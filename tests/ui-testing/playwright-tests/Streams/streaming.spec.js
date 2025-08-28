@@ -10,6 +10,7 @@ test.describe("Streaming for logs", () => {
         pm = new PageManager(page);
         await pm.streamsPage.ingestion();
         await pm.streamsPage.ingestionJoin();
+        await pm.streamsPage.navigateToLogs();
         await pm.streamsPage.goToManagement();
         await page.waitForTimeout(3000);
         await pm.streamsPage.checkStreaming();

@@ -187,6 +187,7 @@ await page.waitForTimeout(1000);
   test("should display results in selected time when multiple stream selected", async ({
     page,
   }) => {
+    const pageManager = new PageManager(page);
     await multistreamselect(page);
     await pageManager.logsPage.setDateTimeToToday(); 
     await expect(page.locator('[data-test="logs-search-index-list"]')).toContainText('e2e_automate, e2e_stream1');

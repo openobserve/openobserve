@@ -30,10 +30,10 @@ export
     }
 
     async goToManagement() {
-
-       // await this.page.locator('[data-test="menu-link-settings-item"]').click();
-
-       // await this.page.waitForSelector('[data-test="menu-link-/settings/-item"]');
+        // Follow same pattern as navigateToManagement() but with validation
+        await this.page.waitForSelector("[name ='home']");
+        await this.homeIcon.hover();
+        await this.page.waitForSelector('[data-test="menu-link-settings-item"]');
         await this.managementMenuItem.click({ force: true });
         await expect(this.page.getByRole('main')).toContainText('Management');
     }

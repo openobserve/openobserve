@@ -1,7 +1,8 @@
-import { test, expect } from "../baseFixtures.js";
+const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import PageManager from "../../pages/page-manager.js";
+const PageManager = require('../../pages/page-manager.js');
+const { waitUtils } = require('../utils/wait-helpers.js');
 
 test.describe.configure({ mode: "parallel" });
 
@@ -20,21 +21,6 @@ const toggleQuickModeIfOn = async (page) => {
   }
 }
 
-async function login(page) {
-  await page.goto(process.env["ZO_BASE_URL"]);
-  if (await page.getByText('Login as internal user').isVisible()) {
-    await page.getByText('Login as internal user').click();
-  }
-  await page.waitForTimeout(1000);
-  await page
-    .locator('[data-cy="login-user-id"]')
-    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-  await page.locator("label").filter({ hasText: "Password *" }).click();
-  await page
-    .locator('[data-cy="login-password"]')
-    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-  await page.locator('[data-cy="login-sign-in"]').click();
-}
 
 async function ingestion(page) {
   const orgId = process.env["ORGNAME"];
@@ -68,12 +54,12 @@ async function ingestion(page) {
 
 async function exploreStreamAndNavigateToPipeline(page, streamName) {
   await page.locator('[data-test="menu-link-\\/streams-item"]').click();
-  await page.waitForTimeout(1000);
+  await waitUtils.smartWait(page, 1000, 'stream navigation wait');
   await page.locator('[data-test="log-stream-refresh-stats-btn"]').click();
-  await page.waitForTimeout(1000);
+  await waitUtils.smartWait(page, 1000, 'stats refresh wait');
   await page.getByPlaceholder('Search Stream').click();
   await page.getByPlaceholder('Search Stream').fill(streamName);
-  await page.waitForTimeout(1000);
+  await waitUtils.smartWait(page, 1000, 'stream search wait');
   await page.getByRole('button', { name: 'Explore' }).first().click();
   await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
   await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
@@ -83,15 +69,15 @@ async function exploreStreamAndInteractWithLogDetails(page, streamName) {
   await page.locator('[data-test="menu-link-\\/streams-item"]').click();
   await page.getByPlaceholder('Search Stream').click();
   await page.getByPlaceholder('Search Stream').fill(streamName);
-  await page.waitForTimeout(1000);
+  await waitUtils.smartWait(page, 1000, 'stream search wait');
   await page.getByRole('button', { name: 'Explore' }).first().click();
-  await page.waitForTimeout(1000);
+  await waitUtils.smartWait(page, 1000, 'explore action wait');
   await page.getByRole('button', { name: 'Run query' }).waitFor();
   await toggleQuickModeIfOn(page);
   await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
     force: true,
   }); 
-  await page.waitForTimeout(1000);
+  await waitUtils.smartWait(page, 1000, 'logs refresh wait');
   await page.waitForSelector('[data-test="log-table-column-1-_timestamp"]');
   await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
   await page.locator('[data-test="log-expand-detail-key-a-text"]').click();
@@ -100,7 +86,7 @@ async function exploreStreamAndInteractWithLogDetails(page, streamName) {
 
 async function applyQueryButton(page) {
   const search = page.waitForResponse(logData.applyQuery);
-  await page.waitForTimeout(3000);
+  await waitUtils.smartWait(page, 3000, 'query execution wait');
   await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
     force: true,
   });
@@ -111,9 +97,8 @@ test.describe("Core Pipeline Tests", () => {
   let pageManager;
 
   test.beforeEach(async ({ page }) => {
-    await login(page);
     pageManager = new PageManager(page);
-    await page.waitForTimeout(5000);
+    await waitUtils.smartWait(page, 5000, 'test setup wait');
 
     const orgId = process.env["ORGNAME"];
     const streamName = "e2e_automate";
@@ -136,7 +121,7 @@ test.describe("Core Pipeline Tests", () => {
 
   test("should add source & destination node and then delete the pipeline", async ({ page }) => {
     await pageManager.pipelinesPage.openPipelineMenu();
-    await page.waitForTimeout(1000);
+    await waitUtils.smartWait(page, 1000, 'pipeline menu navigation wait');
     await pageManager.pipelinesPage.addPipeline();
     await pageManager.pipelinesPage.selectStream();
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
@@ -144,17 +129,17 @@ test.describe("Core Pipeline Tests", () => {
 
     await pageManager.pipelinesPage.enterStreamName("e2e");
     await pageManager.pipelinesPage.enterStreamName("e2e_automate3");
-    await page.waitForTimeout(2000);
+    await waitUtils.smartWait(page, 2000, 'stream selection wait');
     await page.getByRole("option", { name: "e2e_automate3", exact: true }).click();
     await pageManager.pipelinesPage.saveInputNodeStream();
-    await page.waitForTimeout(3000);
+    await waitUtils.smartWait(page, 3000, 'source node save wait');
     await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
     await page.locator("button").filter({ hasText: "edit" }).hover();
     await page.getByRole("img", { name: "Output Stream" }).click();
     await page.getByLabel("Stream Name *").click();
     await page.getByLabel("Stream Name *").fill("destination-node");
-    await page.waitForTimeout(1000);
+    await waitUtils.smartWait(page, 1000, 'destination node setup wait');
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pageManager.pipelinesPage.enterPipelineName(pipelineName);
@@ -163,7 +148,7 @@ test.describe("Core Pipeline Tests", () => {
 
     await exploreStreamAndNavigateToPipeline(page, 'destination_node');
     await pageManager.pipelinesPage.searchPipeline(pipelineName);
-    await page.waitForTimeout(1000);
+    await waitUtils.smartWait(page, 1000, 'pipeline search wait');
     const deletePipelineButton = page.locator(
       `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
     );
@@ -175,17 +160,17 @@ test.describe("Core Pipeline Tests", () => {
 
   test("should add source, function, destination and then delete pipeline", async ({ page }) => {
     await pageManager.pipelinesPage.openPipelineMenu();
-    await page.waitForTimeout(1000);
+    await waitUtils.smartWait(page, 1000, 'pipeline menu navigation wait');
     await pageManager.pipelinesPage.addPipeline();
     await pageManager.pipelinesPage.selectStream();
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
     await pageManager.pipelinesPage.selectLogs();
     await pageManager.pipelinesPage.enterStreamName("e2e");
     await pageManager.pipelinesPage.enterStreamName("e2e_automate1");
-    await page.waitForTimeout(2000);
+    await waitUtils.smartWait(page, 2000, 'stream selection wait');
     await page.getByRole("option", { name: "e2e_automate1", exact: true }).click();
     await pageManager.pipelinesPage.saveInputNodeStream();
-    await page.waitForTimeout(2000);
+    await waitUtils.smartWait(page, 2000, 'source node save wait');
     await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
     await page.locator("button").filter({ hasText: "edit" }).hover();
@@ -198,16 +183,16 @@ test.describe("Core Pipeline Tests", () => {
     await page.keyboard.type(".", { delay: 100 });
     await page.getByText("Note: The function will be").click();
     await page.getByText(".a=41 .");
-    await page.waitForTimeout(1000);
+    await waitUtils.smartWait(page, 1000, 'function code input wait');
     await pageManager.pipelinesPage.saveNewFunction();
-    await page.waitForTimeout(3000);
+    await waitUtils.smartWait(page, 3000, 'function creation wait');
     await pageManager.pipelinesPage.saveFunction();
-    await page.waitForTimeout(3000);
+    await waitUtils.smartWait(page, 3000, 'function save wait');
     await page.getByText(randomFunctionName).hover();
     await page.getByRole("img", { name: "Output Stream" }).click();
     await page.getByLabel("Stream Name *").click();
     await page.getByLabel("Stream Name *").fill("destination-node");
-    await page.waitForTimeout(100);
+    await waitUtils.smartWait(page, 100, 'destination stream input wait');
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pageManager.pipelinesPage.enterPipelineName(pipelineName);
@@ -216,7 +201,7 @@ test.describe("Core Pipeline Tests", () => {
 
     await exploreStreamAndInteractWithLogDetails(page, 'destination_node');
     await pageManager.pipelinesPage.searchPipeline(pipelineName);
-    await page.waitForTimeout(1000);
+    await waitUtils.smartWait(page, 1000, 'pipeline search wait');
     const deletePipelineButton = page.locator(
       `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
     );
@@ -228,7 +213,7 @@ test.describe("Core Pipeline Tests", () => {
 
   test("should add source, condition & destination node and then delete the pipeline", async ({ page }) => {
     await pageManager.pipelinesPage.openPipelineMenu();
-    await page.waitForTimeout(1000);
+    await waitUtils.smartWait(page, 1000, 'pipeline menu navigation wait');
     await pageManager.pipelinesPage.addPipeline();
     await pageManager.pipelinesPage.selectStream();
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
@@ -236,10 +221,10 @@ test.describe("Core Pipeline Tests", () => {
 
     await pageManager.pipelinesPage.enterStreamName("e2e");
     await pageManager.pipelinesPage.enterStreamName("e2e_automate2");
-    await page.waitForTimeout(2000);
+    await waitUtils.smartWait(page, 2000, 'stream selection wait');
     await page.getByRole("option", { name: "e2e_automate2", exact: true }).click();
     await pageManager.pipelinesPage.saveInputNodeStream();
-    await page.waitForTimeout(2000);
+    await waitUtils.smartWait(page, 2000, 'source node save wait');
     await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
     await page.locator("button").filter({ hasText: "edit" }).hover();
@@ -254,12 +239,12 @@ test.describe("Core Pipeline Tests", () => {
     await page.getByPlaceholder("Value").click();
     await page.getByPlaceholder("Value").fill("prometheus");
     await pageManager.pipelinesPage.saveCondition();
-    await page.waitForTimeout(2000);
+    await waitUtils.smartWait(page, 2000, 'condition setup wait');
     await page.getByText('kubernetes_container_name').hover();
     await page.getByRole("img", { name: "Output Stream" }).click();
     await page.getByLabel("Stream Name *").click();
     await page.getByLabel("Stream Name *").fill("destination-node");
-    await page.waitForTimeout(1000);
+    await waitUtils.smartWait(page, 1000, 'destination stream input wait');
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pageManager.pipelinesPage.enterPipelineName(pipelineName);
@@ -267,9 +252,9 @@ test.describe("Core Pipeline Tests", () => {
     await ingestion(page);
 
     await exploreStreamAndNavigateToPipeline(page, 'destination_node');
-    await page.waitForTimeout(1000);
+    await waitUtils.smartWait(page, 1000, 'pipeline navigation wait');
     await pageManager.pipelinesPage.searchPipeline(pipelineName);
-    await page.waitForTimeout(1000);
+    await waitUtils.smartWait(page, 1000, 'pipeline search wait');
     const deletePipelineButton = page.locator(
       `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
     );

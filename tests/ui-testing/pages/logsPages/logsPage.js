@@ -351,7 +351,11 @@ export class LogsPage {
 
     async applyQueryButton(expectedUrl) {
         await this.page.locator(this.queryButton).click();
-        await expect(this.page).toHaveURL(expectedUrl);
+        // Handle both full URLs and path-only URLs, allow query parameters
+        const urlPattern = expectedUrl.startsWith('http') 
+            ? expectedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            : `.*${expectedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`;
+        await expect(this.page).toHaveURL(new RegExp(urlPattern));
     }
 
     async clearAndRunQuery() {
