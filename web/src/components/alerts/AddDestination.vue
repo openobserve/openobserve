@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <q-separator />
-      <div class="row q-col-gutter-sm q-px-lg q-my-md">
+      <div class="row q-col-gutter-sm q-px-md q-mt-md q-mb-xs">
         <div v-if="isAlerts" class="col-12 q-pb-md">
           <app-tabs
             style="
@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
     </div>
-    <div class="flex justify-center q-mt-lg">
+    <div class="flex justify-start q-ml-md ">
       <q-btn
         data-test="add-destination-cancel-btn"
         v-close-popup="true"
