@@ -970,7 +970,6 @@ mod tests {
             stream_names: vec![TableReference::from("logs")],
             has_match_all: false,
             equal_items: hashbrown::HashMap::new(),
-            prefix_items: hashbrown::HashMap::new(),
             columns: {
                 let mut cols = hashbrown::HashMap::new();
                 let mut set = hashbrown::HashSet::new();

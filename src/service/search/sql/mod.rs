@@ -55,7 +55,6 @@ use crate::service::search::sql::{
         index_optimize::IndexOptimizeModeVisitor,
         match_all::MatchVisitor,
         partition_column::PartitionColumnVisitor,
-        prefix_column::PrefixColumnVisitor,
         utils::is_complex_query,
     },
 };
@@ -80,9 +79,8 @@ pub struct Sql {
     pub has_match_all: bool, // match_all, only for single stream
     pub equal_items: HashMap<TableReference, Vec<(String, String)>>, /* table_name ->
                               * [(field_name, value)] */
-    pub prefix_items: HashMap<TableReference, Vec<(String, String)>>, /* table_name -> [(field_name, value)] */
-    pub columns: HashMap<TableReference, HashSet<String>>,            // table_name -> [field_name]
-    pub aliases: Vec<(String, String)>,                               // field_name, alias
+    pub columns: HashMap<TableReference, HashSet<String>>, // table_name -> [field_name]
+    pub aliases: Vec<(String, String)>,                    // field_name, alias
     pub schemas: HashMap<TableReference, Arc<SchemaCache>>,
     pub limit: i64,
     pub offset: i64,
@@ -233,10 +231,6 @@ impl Sql {
         let mut partition_column_visitor = PartitionColumnVisitor::new(&used_schemas);
         let _ = statement.visit(&mut partition_column_visitor);
 
-        // 9. get prefix column value
-        let mut prefix_column_visitor = PrefixColumnVisitor::new(&used_schemas);
-        let _ = statement.visit(&mut prefix_column_visitor);
-
         // 10. pick up histogram interval
         let mut histogram_interval_visitor =
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
@@ -378,7 +372,6 @@ impl Sql {
             stream_names,
             has_match_all: match_visitor.has_match_all,
             equal_items: partition_column_visitor.equal_items,
-            prefix_items: prefix_column_visitor.prefix_items,
             columns,
             aliases,
             schemas: final_schemas,
@@ -399,7 +392,7 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, has_match_all: {}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, index_condition: {:?}, index_optimize_mode: {:?}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, has_match_all: {}, equal_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, index_condition: {:?}, index_optimize_mode: {:?}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -407,7 +400,6 @@ impl std::fmt::Display for Sql {
             self.stream_names,
             self.has_match_all,
             self.equal_items,
-            self.prefix_items,
             self.aliases,
             self.limit,
             self.offset,
