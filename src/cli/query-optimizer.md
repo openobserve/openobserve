@@ -45,16 +45,16 @@ The Query Optimizer follows a 5-stage analysis process:
 
 #### Analyze all queries from the last 24 hours
 ```bash
-./openobserve query-optimiser \
-  --url https://your-openobserve.com \
+./target/debug/openobserve query-optimiser \
+  --url http://localhost:5080 \
   --token "your-auth-token" \
   --duration 24
 ```
 
 #### Focus on a specific stream for the last 12 hours
 ```bash
-./openobserve query-optimiser \
-  --url https://your-openobserve.com \
+./target/debug/openobserve query-optimiser \
+  --url http://localhost:5080 \
   --token "your-auth-token" \
   --duration 12 \
   --stream-name "logs" \
@@ -63,8 +63,8 @@ The Query Optimizer follows a 5-stage analysis process:
 
 #### Use separate tokens for different organizations
 ```bash
-./openobserve query-optimiser \
-  --url https://your-openobserve.com \
+./target/debug/openobserve query-optimiser \
+  --url http://localhost:5080 \
   --token "org-token" \
   --meta-token "meta-org-token" \
   --duration 48 \
@@ -87,10 +87,19 @@ The optimizer generates three types of recommendations:
 
 ## Prerequisites
 
+### Enterprise Version Required
+This feature is only available with the enterprise build:
+
+```bash
+# Build enterprise version
+cre
+```
+
 ### Access Requirements
 - Access to `_meta` organization data
 - Valid authentication tokens
 - Network connectivity to OpenObserve instance
+- Running OpenObserve instance (typically on port 5080)
 
 ### Data Requirements
 The optimizer analyzes data from the `usage` stream in the `_meta` organization, specifically:
@@ -156,15 +165,33 @@ Recommendations are automatically ingested into the `_meta` organization under t
 
 ### Common Issues
 
-**No recommendations found**
-- Check if queries exist in the specified time range
-- Verify access to `_meta` organization
-- Ensure non-UI queries are being logged
+**"No query recommendations found"**
+```
+[INFO] No queries found in usage
+[INFO] No query recommendations found
+```
+This is normal when:
+- No queries have been executed in the specified time range
+- No non-UI queries exist in the `_meta` organization's usage stream
+- The instance is newly set up without query history
 
-**Authentication failures**
+**Authentication failures (401 Unauthorized)**
+```
+[ERROR] HTTP error 401 Unauthorized: Unauthorized Access
+```
+Solutions:
 - Verify token validity and permissions
-- Check network connectivity
-- Confirm organization access
+- Check credentials are correct
+- Ensure the user has access to the `_meta` organization
+
+**Connection errors**
+```
+[ERROR] error sending request for url: dns error: failed to lookup address
+```
+Solutions:
+- Verify OpenObserve is running (check `http://localhost:5080`)
+- Check the URL is correct and accessible
+- Ensure network connectivity
 
 **HTTP errors during ingestion**
 - Verify meta-token permissions
