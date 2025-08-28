@@ -295,13 +295,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="add-report-variable-select"
                     class="full-width q-mt-md o2-input"
                   >
-                    <div
-                      data-test="add-report-variables-title"
-                      style="font-size: 14px"
-                      class="text-bold text-grey-8"
-                    >
-                      Variables
-                    </div>
                     <VariablesInput
                       :variables="dashboard.variables"
                       @add:variable="addDashboardVariable"
@@ -314,9 +307,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   data-test="add-report-step1-continue-btn"
                   @click="step = 2"
-                  color="secondary"
-                  label="Continue"
+                  class="o2-primary-button tw-h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                  flat
                   no-caps
+                  :label="'Continue'"
                 />
               </q-stepper-navigation>
             </q-step>
@@ -677,21 +672,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <q-stepper-navigation>
                 <q-btn
-                  v-if="!isCachedReport"
-                  data-test="add-report-step2-continue-btn"
-                  @click="step = 3"
-                  color="secondary"
-                  label="Continue"
-                  no-caps
-                />
-                <q-btn
                   data-test="add-report-step2-back-btn"
                   flat
                   @click="step = 1"
-                  color="primary"
-                  label="Back"
-                  class="q-ml-sm"
+                  class="o2-secondary-button tw-h-[36px] q-ml-sm"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  :label="'Back'"
                   no-caps
+                />
+                <q-btn
+                  v-if="!isCachedReport"
+                  data-test="add-report-step2-continue-btn"
+                  @click="step = 3"
+                  class="o2-primary-button tw-h-[36px] q-ml-md"
+                  :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                  flat
+                  no-caps
+                  :label="'Continue'"
                 />
               </q-stepper-navigation>
             </q-step>
@@ -773,9 +770,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-report-step3-back-btn"
                   flat
                   @click="step = 2"
-                  color="primary"
-                  label="Back"
-                  class="q-ml-sm"
+                  class="o2-secondary-button tw-h-[36px] q-ml-sm"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  :label="'Back'"
                   no-caps
                 />
               </q-stepper-navigation>
