@@ -138,6 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-folder-dialog"
         >
         <AddFolder  
+        style="width: 30vw;"
         @update:modelValue="updateFolderList"
         :edit-mode="isFolderEditMode"
         :folder-id="selectedFolderToEdit ?? 'default'"

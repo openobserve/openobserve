@@ -82,7 +82,8 @@
     "update": "Update",
     "favourite": "Favorite",
     "refresh": "Refresh",
-    "contactUs": "Contact Us"
+    "contactUs": "Contact Us",
+    "addFolder": "Add Folder"
   },
   "search": {
     "resetFields": "Reset selected table fields",
