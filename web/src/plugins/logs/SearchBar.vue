@@ -2012,6 +2012,11 @@ export default defineComponent({
             }
           }
 
+          // Add timestamp column to the interesting field list, as it is default interesting field
+          searchObj.data.stream.interestingFieldList.unshift(
+            store.state.zoConfig?.timestamp_column,
+          );
+
           for (const item of searchObj.data.stream?.selectedStreamFields ||
             []) {
             if (
