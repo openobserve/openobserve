@@ -223,7 +223,7 @@ const useHttpStreaming = () => {
             status: response.status,
             ...(await response.json()),
           });
-          throw response;
+          return;
         } catch (e) {
           throw response;
         }
