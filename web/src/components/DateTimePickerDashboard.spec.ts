@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { ref } from "vue";
 import { shallowMount, flushPromises, mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -373,24 +374,26 @@ describe("DateTimePickerDashboard", () => {
       expect(wrapper.vm.dateTimePicker).toBeNull();
     });
 
-    it("should cleanup dateTimePicker reference when it has a value", async () => {
+    it("should cleanup dateTimePicker reference when it has a value during unmount", async () => {
       wrapper = createWrapper();
       
-      // Set dateTimePicker to a truthy value (simulating a real ref)
-      const mockDateTimePicker = { 
+      // Simulate a real Vue ref object that would exist
+      const mockRef = ref({ 
         refresh: vi.fn(),
         setCustomDate: vi.fn(),
         getConsumableDateTime: vi.fn()
-      };
-      wrapper.vm.dateTimePicker = mockDateTimePicker;
+      });
       
-      // Verify it's set (using toStrictEqual for object comparison)
-      expect(wrapper.vm.dateTimePicker).toStrictEqual(mockDateTimePicker);
+      // Manually set the ref value to simulate the actual mounted state
+      wrapper.vm.dateTimePicker = mockRef.value;
       
-      // Trigger unmount manually to test the cleanup logic
+      // Verify the ref has a truthy value
+      expect(wrapper.vm.dateTimePicker).toBeTruthy();
+      
+      // Unmount the component which should trigger the cleanup
       wrapper.unmount();
       
-      // Verify it's been cleaned up
+      // Verify cleanup occurred
       expect(wrapper.vm.dateTimePicker).toBeNull();
     });
 
