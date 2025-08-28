@@ -114,6 +114,7 @@ impl Sql {
         let mut limit = query.size as i64;
         let sql =
             config::utils::query_select_utils::replace_o2_custom_patterns(&sql).unwrap_or(sql);
+
         // 1. get table name
         let stream_names = resolve_stream_names_with_type(&sql)
             .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?;
@@ -231,7 +232,7 @@ impl Sql {
         let mut partition_column_visitor = PartitionColumnVisitor::new(&used_schemas);
         let _ = statement.visit(&mut partition_column_visitor);
 
-        // 10. pick up histogram interval
+        // 9. pick up histogram interval
         let mut histogram_interval_visitor =
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
         let _ = statement.visit(&mut histogram_interval_visitor);
@@ -245,11 +246,11 @@ impl Sql {
         };
 
         //********************Change the sql start*********************************//
-        // 11. replace approx_percentile_cont to new format
+        // 10. replace approx_percentile_cont to new format
         let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
         let _ = statement.visit(&mut replace_approx_percentilet_visitor);
 
-        // 12. add _timestamp and _o2_id if need
+        // 11. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);
@@ -259,7 +260,7 @@ impl Sql {
             }
         }
 
-        // 13. generate tantivy query
+        // 12. generate tantivy query
         // TODO: merge IndexVisitor and IndexOptimizeModeVisitor
         let mut index_condition = None;
         let mut can_optimize = false;
@@ -282,7 +283,7 @@ impl Sql {
             });
         }
 
-        // 14. check `select * from table where match_all()` optimizer
+        // 13. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
         if !is_complex_query(&mut statement)
             && order_by.len() == 1
@@ -295,7 +296,7 @@ impl Sql {
             ));
         }
 
-        // 15. check other inverted index optimize modes
+        // 14. check other inverted index optimize modes
         // `select count(*) from table where match_all` -> SimpleCount
         // or `select histogram(..), count(*) from table where match_all` -> SimpleHistogram
         // or `select id, count(*) from t group by id order by cnt desc limit 10` -> SimpleTopN
@@ -326,7 +327,7 @@ impl Sql {
             }
         }
 
-        // 16. replace the Utf8 to Utf8View type
+        // 15. replace the Utf8 to Utf8View type
         let final_schemas = if cfg.common.utf8_view_enabled {
             let mut final_schemas = HashMap::with_capacity(used_schemas.len());
             for (stream, schema) in used_schemas.iter() {
