@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @remove="removeField"
         />
 
-        <div class="flex justify-end q-mt-md">
+        <div class="flex justify-start q-mt-md">
           <q-btn
             v-close-popup="true"
             data-test="add-stream-cancel-btn"
