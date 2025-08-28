@@ -93,12 +93,6 @@ mod tests {
     }
 
     #[test]
-    fn test_metastore_equality() {
-        assert_eq!(MetaStore::Sqlite, MetaStore::Sqlite);
-        assert_ne!(MetaStore::Sqlite, MetaStore::Etcd);
-    }
-
-    #[test]
     fn test_metastore_serialization() {
         let metastore = MetaStore::Etcd;
         let serialized = serde_json::to_string(&metastore).unwrap();

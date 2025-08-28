@@ -647,8 +647,8 @@ mod tests {
             let status = resp.status();
             let body = test::read_body(resp).await;
             let body_str = String::from_utf8_lossy(&body);
-            println!("e2e_post_function response status: {:?}", status);
-            println!("e2e_post_function response body: {:?}", body_str);
+            println!("e2e_post_function response status: {status:?}");
+            println!("e2e_post_function response body: {body_str:?}");
 
             // If function already exists, that's OK for our test
             if status == actix_web::http::StatusCode::BAD_REQUEST
@@ -658,7 +658,7 @@ mod tests {
                 return;
             }
 
-            panic!("e2e_post_function failed with status: {:?}", status);
+            panic!("e2e_post_function failed with status: {status:?}");
         }
         assert!(resp.status().is_success());
     }

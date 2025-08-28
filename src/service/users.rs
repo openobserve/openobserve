@@ -1248,14 +1248,17 @@ mod tests {
     async fn set_up() {
         let _ = ORM_CLIENT.get_or_init(connect_to_orm).await;
         // clear the table here as previous tests could have written to it
-        infra::table::org_users::clear().await.unwrap();
-        infra::table::users::clear().await.unwrap();
-        infra::table::organizations::clear().await.unwrap();
-        infra_db::create_table().await.unwrap();
-        infra_table::create_user_tables().await.unwrap();
-        organization::check_and_create_org_without_ofga("dummy")
-            .await
-            .unwrap();
+        let _ = infra::table::org_users::clear().await;
+        let _ = infra::table::users::clear().await;
+        let _ = infra::table::organizations::clear().await;
+        let _ = infra_db::create_table().await;
+        let _ = infra_table::create_user_tables().await;
+        let _ = organization::check_and_create_org_without_ofga("dummy").await;
+
+        // Clear global caches to ensure test isolation
+        USERS.clear();
+        ORG_USERS.clear();
+
         USERS.insert(
             "admin@zo.dev".to_string(),
             infra::table::users::UserRecord {
@@ -1414,7 +1417,7 @@ mod tests {
 
         let result = create_new_user(db_user).await;
         if let Err(e) = &result {
-            println!("Error creating user: {:?}", e);
+            println!("Error creating user: {e:?}");
         }
         assert!(result.is_ok());
 

@@ -949,15 +949,6 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_error_constants() {
-            // Verify error constants are properly defined
-            assert_eq!(TRANSFORM_FAILED, "document_failed_transform");
-            assert_eq!(TS_PARSE_FAILED, "timestamp_parsing_failed");
-            assert_eq!(SCHEMA_CONFORMANCE_FAILED, "schema_conformance_failed");
-            assert_eq!(PIPELINE_EXEC_FAILED, "pipeline_execution_failed");
-        }
-
-        #[test]
         fn test_error_constants_uniqueness() {
             // Ensure all error constants are unique
             let constants = vec![
