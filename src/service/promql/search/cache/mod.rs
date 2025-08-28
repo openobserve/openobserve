@@ -225,7 +225,7 @@ pub async fn set(
 ) -> Result<()> {
     // check time range, if over ZO_MAX_FILE_RETENTION_TIME, return
     let cfg = get_config();
-    let max_ts = now_micros() - second_micros(cfg.limit.max_file_retention_time as i64);
+    let max_ts = now_micros() - second_micros(cfg.limit.cache_delay_secs as i64);
     let new_end = if end > max_ts { max_ts } else { end };
     if range_values.is_empty() || start >= max_ts || new_end <= start + step {
         // all of the data in retention time, no need to store
@@ -521,7 +521,7 @@ mod tests {
             exemplars: None,
             time_window: None,
         }];
-        let max_ts = end - second_micros(get_config().limit.max_file_retention_time as i64);
+        let max_ts = end - second_micros(get_config().limit.cache_delay_secs as i64);
         let mut valid_max_ts = 0;
         for i in 0..((end - start + step) / step) {
             let ts = start + step * i;
