@@ -92,11 +92,19 @@ impl HasLen for PuffinSliceHandle {
 
 #[async_trait::async_trait]
 impl FileHandle for PuffinSliceHandle {
-    fn read_bytes(&self, _byte_range: Range<usize>) -> io::Result<OwnedBytes> {
-        Err(io::Error::other(format!(
-            "Error read_bytes from blob: {:?}, Not supported with PuffinSliceHandle",
-            self.path
-        )))
+    fn read_bytes(&self, byte_range: Range<usize>) -> io::Result<OwnedBytes> {
+        if byte_range.is_empty() {
+            return Ok(OwnedBytes::empty());
+        }
+        let byte_range = Range {
+            start: byte_range.start as u64,
+            end: byte_range.end as u64,
+        };
+        let data = self
+            .source
+            .read_blob_bytes_blocking(&self.metadata, Some(byte_range.clone()))
+            .map_err(|e| io::Error::other(format!("Error reading bytes from blob: {e}")))?;
+        Ok(OwnedBytes::new(data.to_vec()))
     }
 
     async fn read_bytes_async(&self, byte_range: Range<usize>) -> io::Result<OwnedBytes> {
@@ -377,7 +385,7 @@ mod tests {
     }
 
     #[test]
-    fn test_puffin_slice_handle_read_bytes_sync_error() {
+    fn test_puffin_slice_handle_read_bytes_sync() {
         let blob = create_mock_blob_metadata(BlobTypes::O2FstV1, 0, 100, "test_file.terms")
             .expect("Failed to create blob metadata");
 
@@ -392,14 +400,19 @@ mod tests {
             metadata: Arc::new(blob),
         };
 
+        // This will fail due to missing storage infrastructure in tests, 
+        // but should not fail with "Not supported with PuffinSliceHandle" error
         let result = handle.read_bytes(0..10);
         assert!(result.is_err());
 
         if let Err(e) = result {
             assert_eq!(e.kind(), ErrorKind::Other);
+            // Should now fail with storage error, not "Not supported" error
             assert!(
                 e.to_string()
-                    .contains("Not supported with PuffinSliceHandle")
+                    .contains("Error reading bytes from blob") ||
+                e.to_string()
+                    .contains("Failed to get tokio runtime")
             );
         }
     }

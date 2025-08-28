@@ -17,7 +17,7 @@ use std::str::CharIndices;
 
 use tantivy::tokenizer::{Token, TokenStream, Tokenizer};
 
-/// Tokenize the text by splitting on whitespaces and punctuation.
+/// Tokenize the text by splitting on whitespaces, CamelCase pattern and punctuation.
 #[derive(Clone, Default)]
 pub struct O2Tokenizer {
     token: Token,

@@ -63,6 +63,23 @@ impl PuffinBytesReader {
         Ok(decompressed)
     }
 
+    pub fn read_blob_bytes_blocking(
+        &self,
+        blob_metadata: &BlobMetadata,
+        range: Option<core::ops::Range<u64>>,
+    ) -> Result<bytes::Bytes> {
+        // Use tokio runtime to block on async operation
+        let rt = tokio::runtime::Handle::try_current()
+            .or_else(|_| {
+                // If no runtime is available, create a new one
+                tokio::runtime::Runtime::new()
+                    .map(|rt| rt.handle().clone())
+            })
+            .map_err(|e| anyhow!("Failed to get tokio runtime: {e}"))?;
+        
+        rt.block_on(self.read_blob_bytes(blob_metadata, range))
+    }
+
     pub async fn get_metadata(&mut self) -> Result<Option<PuffinMeta>> {
         self.parse_footer().await?;
         Ok(self.metadata.clone())

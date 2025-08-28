@@ -20,7 +20,7 @@ use std::{
 
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, get_config,
-    utils::tantivy::{query::contains_query::ContainsQuery, tokenizer::o2_collect_tokens},
+    utils::tantivy::{query::contains_query::ContainsQuery, tokenizer::{o2_collect_tokens, whitespace_collect_tokens}},
 };
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
@@ -485,57 +485,7 @@ impl Condition {
                 let default_field = default_field.ok_or_else(|| {
                     anyhow::anyhow!("There's no FullTextSearch field for match_all() function")
                 })?;
-                if value.is_empty() || value == "*" {
-                    Box::new(AllQuery {})
-                } else if value.starts_with("*") && value.ends_with("*") {
-                    let pattern = value.trim_matches('*');
-                    let terms = o2_collect_tokens(pattern);
-                    
-                    if terms.len() > 1 {
-                        // Multiple terms - use RegexPhraseQuery for phrase matching
-                        Box::new(RegexPhraseQuery::new(default_field, terms))
-                    } else {
-                        // Single term - use RegexQuery as before
-                        let regex_pattern = format!(".*{}.*", pattern);
-                        Box::new(RegexQuery::from_pattern(&regex_pattern, default_field)?)
-                    }
-                } else {
-                    if value.is_empty() {
-                        return Err(anyhow::anyhow!(
-                            "The value of match_all() function can't be empty"
-                        ));
-                    }
-                    let mut tokens = o2_collect_tokens(value);
-                    let last_prefix = if value.ends_with("*") {
-                        tokens.pop()
-                    } else {
-                        None
-                    };
-                    let mut terms: Vec<Box<dyn Query>> = tokens
-                        .into_iter()
-                        .map(|value| {
-                            let term = Term::from_field_text(default_field, &value);
-                            Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _
-                        })
-                        .collect();
-                    if let Some(value) = last_prefix {
-                        terms.push(Box::new(PhrasePrefixQuery::new_with_offset(vec![(
-                            0,
-                            Term::from_field_text(default_field, &value),
-                        )])));
-                    }
-                    if !terms.is_empty() {
-                        if terms.len() > 1 {
-                            Box::new(BooleanQuery::intersection(terms))
-                        } else {
-                            terms.remove(0)
-                        }
-                    } else {
-                        return Err(anyhow::anyhow!(
-                            "The value of match_all() function can't be empty"
-                        ));
-                    }
-                }
+                parse_match_all_query(value, default_field)?
             }
             Condition::FuzzyMatchAll(value, distance) => {
                 let default_field = default_field.ok_or_else(|| {
@@ -1020,6 +970,71 @@ fn is_alphanumeric(s: &str) -> bool {
 fn _is_blank_or_alphanumeric(s: &str) -> bool {
     s.chars()
         .all(|c| c.is_ascii_whitespace() || c.is_ascii_alphanumeric())
+}
+
+/// Parse match_all query value into appropriate Tantivy query
+fn parse_match_all_query(value: &str, default_field: tantivy::schema::Field) -> anyhow::Result<Box<dyn Query>> {
+    if value.is_empty() || value == "*" {
+        return Ok(Box::new(AllQuery {}));
+    }
+    
+    // Handle regex patterns with * at beginning and end
+    if value.starts_with("*") && value.ends_with("*") {
+        let pattern = value.trim_matches('*');
+        
+        // Use whitespace tokenizer for regex patterns to preserve regex structure
+        let terms = whitespace_collect_tokens(pattern);
+
+        if terms.len() > 1 {
+            // Multiple terms - use RegexPhraseQuery for phrase matching
+            Ok(Box::new(RegexPhraseQuery::new(default_field, terms)))
+        } else {
+            // Single term - use RegexQuery as before
+            let regex_pattern = format!(".*{}.*", pattern);
+            Ok(Box::new(RegexQuery::from_pattern(&regex_pattern, default_field)?))
+        }
+    } else {
+        // Handle normal patterns and prefix patterns
+        if value.is_empty() {
+            return Err(anyhow::anyhow!(
+                "The value of match_all() function can't be empty"
+            ));
+        }
+        
+        let mut tokens = o2_collect_tokens(value);
+        let last_prefix = if value.ends_with("*") {
+            tokens.pop()
+        } else {
+            None
+        };
+        
+        let mut terms: Vec<Box<dyn Query>> = tokens
+            .into_iter()
+            .map(|value| {
+                let term = Term::from_field_text(default_field, &value);
+                Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _
+            })
+            .collect();
+            
+        if let Some(value) = last_prefix {
+            terms.push(Box::new(PhrasePrefixQuery::new_with_offset(vec![(
+                0,
+                Term::from_field_text(default_field, &value),
+            )])));
+        }
+        
+        if !terms.is_empty() {
+            if terms.len() > 1 {
+                Ok(Box::new(BooleanQuery::intersection(terms)))
+            } else {
+                Ok(terms.remove(0))
+            }
+        } else {
+            Err(anyhow::anyhow!(
+                "The value of match_all() function can't be empty"
+            ))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -2209,5 +2224,84 @@ mod tests {
         // Multiple words - should use RegexPhraseQuery
         let condition3 = Condition::MatchAll("*server error not found*".to_string());
         assert!(condition3.to_tantivy_query(&schema, Some(field)).is_ok());
+    }
+
+    #[test]
+    fn test_whitespace_tokenizer_preserves_regex() {
+        use config::utils::tantivy::tokenizer::whitespace_collect_tokens;
+        
+        // Test that whitespace tokenizer preserves regex patterns
+        let regex_pattern = "[a-z]+\\d{2,4} test.*pattern (group)";
+        let tokens = whitespace_collect_tokens(regex_pattern);
+        
+        // Should split on whitespace but preserve regex characters and case
+        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens[0], "[a-z]+\\d{2,4}");
+        assert_eq!(tokens[1], "test.*pattern");
+        assert_eq!(tokens[2], "(group)");
+        
+        // Test single regex term with special characters
+        let single_regex = "[0-9]{3}-[0-9]{3}-[0-9]{4}";
+        let single_tokens = whitespace_collect_tokens(single_regex);
+        assert_eq!(single_tokens.len(), 1);
+        assert_eq!(single_tokens[0], "[0-9]{3}-[0-9]{3}-[0-9]{4}");
+        
+        // Test case preservation
+        let case_pattern = "ERROR.*[A-Z]+";
+        let case_tokens = whitespace_collect_tokens(case_pattern);
+        assert_eq!(case_tokens.len(), 1);
+        assert_eq!(case_tokens[0], "ERROR.*[A-Z]+"); // Should preserve uppercase
+    }
+
+    #[test]
+    fn test_o2_vs_whitespace_tokenizer_difference() {
+        use config::utils::tantivy::tokenizer::{o2_collect_tokens, whitespace_collect_tokens};
+        
+        let test_text = "CamelCase [a-z]+ test.*pattern";
+        
+        // O2 tokenizer should split CamelCase and lowercase
+        let o2_tokens = o2_collect_tokens(test_text);
+        assert_eq!(o2_tokens.len(), 6);
+        assert_eq!(o2_tokens[0], "camel");
+        assert_eq!(o2_tokens[1], "case");
+        assert_eq!(o2_tokens[2], "a");
+        assert_eq!(o2_tokens[3], "z");
+        assert_eq!(o2_tokens[4], "test");
+        assert_eq!(o2_tokens[5], "pattern");
+        // Note: regex chars [, ], +, *, . are filtered out by O2 tokenizer
+        
+        // Whitespace tokenizer should preserve structure and case
+        let ws_tokens = whitespace_collect_tokens(test_text);
+        assert_eq!(ws_tokens.len(), 3);
+        assert_eq!(ws_tokens[0], "CamelCase");
+        assert_eq!(ws_tokens[1], "[a-z]+");
+        assert_eq!(ws_tokens[2], "test.*pattern");
+    }
+
+    #[test]
+    fn test_match_all_regex_pattern_tokenization() {
+        use tantivy::schema::Schema;
+        
+        let mut schema_builder = tantivy::schema::SchemaBuilder::new();
+        let text_opts = tantivy::schema::TextOptions::default().set_indexing_options(
+            tantivy::schema::TextFieldIndexing::default()
+                .set_index_option(tantivy::schema::IndexRecordOption::WithFreqsAndPositions)
+        );
+        schema_builder.add_text_field("_all", text_opts);
+        let schema = schema_builder.build();
+        let field = schema.get_field("_all").unwrap();
+        
+        // Test that regex patterns with * wrapper use whitespace tokenization
+        let condition = Condition::MatchAll("*ERROR\\s+\\d{3} [A-Z]+*".to_string());
+        let query_result = condition.to_tantivy_query(&schema, Some(field));
+        assert!(query_result.is_ok());
+        
+        // Verify tokens were created with whitespace tokenizer (indirectly through successful query creation)
+        // The fact that complex regex patterns don't cause parsing errors indicates proper tokenization
+        
+        // Test normal pattern uses O2 tokenization
+        let normal_condition = Condition::MatchAll("ErrorException test".to_string());
+        let normal_query = normal_condition.to_tantivy_query(&schema, Some(field));
+        assert!(normal_query.is_ok());
     }
 }

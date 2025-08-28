@@ -56,3 +56,15 @@ pub fn o2_collect_tokens(text: &str) -> Vec<String> {
     token_stream.process(&mut add_token);
     tokens
 }
+
+pub fn whitespace_collect_tokens(text: &str) -> Vec<String> {
+    let mut a = TextAnalyzer::from(tantivy::tokenizer::WhitespaceTokenizer::default());
+    let mut token_stream = a.token_stream(text);
+    let mut tokens: Vec<String> = Vec::new();
+    let mut add_token = |token: &Token| {
+        // For regex patterns, preserve original case
+        tokens.push(token.text.to_string());
+    };
+    token_stream.process(&mut add_token);
+    tokens
+}
