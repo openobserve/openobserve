@@ -87,15 +87,6 @@ The optimizer generates three types of recommendations:
 
 ## Prerequisites
 
-### Enterprise Version Required
-```bash
-# Build enterprise version
-cre
-
-# Or use cargo check for development
-cchk
-```
-
 ### Access Requirements
 - Access to `_meta` organization data
 - Valid authentication tokens
@@ -165,9 +156,6 @@ Recommendations are automatically ingested into the `_meta` organization under t
 
 ### Common Issues
 
-**"query_optimiser not supported"**
-- Solution: Build with enterprise features using `cre`
-
 **No recommendations found**
 - Check if queries exist in the specified time range
 - Verify access to `_meta` organization
@@ -195,27 +183,6 @@ RUST_LOG=debug ./openobserve query-optimiser [OPTIONS]
 Verify recommendations were ingested by querying:
 ```sql
 SELECT * FROM "query_recommendations" ORDER BY _timestamp DESC LIMIT 10
-```
-
-## Integration
-
-### Automated Optimization
-The CLI tool can be integrated into CI/CD pipelines or scheduled jobs:
-
-```bash
-#!/bin/bash
-# Weekly optimization script
-./openobserve query-optimiser \
-  --url "$OPENOBSERVE_URL" \
-  --token "$OPENOBSERVE_TOKEN" \
-  --duration 168 \
-  --top-x 20
-
-# Check for critical recommendations
-./openobserve sql \
-  --org "_meta" \
-  --execute "SELECT COUNT(*) FROM query_recommendations WHERE type = 'SecondaryIndexStreamSettings'" \
-  --time 1h
 ```
 
 ### Monitoring
