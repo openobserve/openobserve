@@ -122,7 +122,6 @@ describe("IngestLogs Index Component", () => {
         "fluentbit",
         "fluentd",
         "vector",
-        "syslog",
         "syslogNg",
       ];
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);
@@ -148,20 +147,6 @@ describe("IngestLogs Index Component", () => {
 
   // Computed Properties Tests
   describe("Computed Properties", () => {
-    it("should compute showSyslog correctly when isCloud is false", () => {
-      // Mock config to simulate non-cloud environment
-      wrapper.vm.config = { isCloud: "false" };
-      expect(wrapper.vm.showSyslog).toBe(true);
-    });
-
-    it("should compute showSyslog correctly when isCloud is true", async () => {
-      // Test by directly checking computed property logic
-      const isCloudTrue = "true";
-      const showSyslogResult = isCloudTrue !== "true"; // This will be false
-      
-      expect(showSyslogResult).toBe(false);
-    });
-
     it("should compute showCloudIngestionOptions correctly when isCloud is true", async () => {
       // Test by directly checking computed property logic
       const isCloudTrue = "true";
@@ -172,12 +157,6 @@ describe("IngestLogs Index Component", () => {
 
     it("should compute showCloudIngestionOptions correctly when isCloud is false", () => {
       wrapper.vm.config = { isCloud: "false" };
-      expect(wrapper.vm.showCloudIngestionOptions).toBe(false);
-    });
-
-    it("should handle undefined isCloud config", () => {
-      wrapper.vm.config = {};
-      expect(wrapper.vm.showSyslog).toBe(true);
       expect(wrapper.vm.showCloudIngestionOptions).toBe(false);
     });
   });
@@ -332,7 +311,6 @@ describe("IngestLogs Index Component", () => {
         "fluentbit", 
         "fluentd",
         "vector",
-        "syslog",
         "syslogNg"
       ];
       

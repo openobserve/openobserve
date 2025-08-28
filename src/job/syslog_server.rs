@@ -24,6 +24,7 @@ use tokio::{
 };
 use tokio_rustls::{TlsAcceptor, TlsConnector};
 
+#[allow(deprecated)]
 use crate::{
     common::infra::config::SYSLOG_ENABLED,
     handler::tcp_udp::{STOP_SRV, tls_tcp_server, udp_server},
@@ -41,6 +42,7 @@ pub static BROADCASTER: Lazy<RwLock<broadcast::Sender<bool>>> = Lazy::new(|| {
     RwLock::new(tx)
 });
 
+#[allow(deprecated)]
 pub async fn run(start_srv: bool, is_init: bool) -> Result<(), anyhow::Error> {
     let cfg = config::get_config();
     let server_running = *SYSLOG_ENABLED.read();

@@ -128,7 +128,6 @@ export default defineComponent({
         "kinesisfirehose",
         "vector",
         "filebeat",
-        "syslog",
         "gcpLogs",
       ];
 
