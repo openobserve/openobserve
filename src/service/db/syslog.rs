@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use config::utils::json;
 
+#[allow(deprecated)]
 use crate::{
     common::{
         infra::config::{SYSLOG_ENABLED, SYSLOG_ROUTES},
@@ -27,6 +28,10 @@ use crate::{
 
 #[tracing::instrument(name = "service:db:syslog:toggle_syslog_setting")]
 pub async fn toggle_syslog_setting(enabled: bool) -> Result<(), anyhow::Error> {
+    if enabled {
+        return Err(anyhow::anyhow!("Syslog is deprecated"));
+    }
+
     Ok(db::put(
         "/syslog/enabled",
         json::to_vec(&json::Value::Bool(enabled)).unwrap().into(),
@@ -37,6 +42,7 @@ pub async fn toggle_syslog_setting(enabled: bool) -> Result<(), anyhow::Error> {
 }
 
 #[tracing::instrument(name = "service:db:syslog:list")]
+#[allow(deprecated)]
 pub async fn list() -> Result<Vec<SyslogRoute>, anyhow::Error> {
     Ok(db::list("/syslog/route/")
         .await?
@@ -46,6 +52,7 @@ pub async fn list() -> Result<Vec<SyslogRoute>, anyhow::Error> {
 }
 
 #[tracing::instrument(name = "service:db:syslog:set", skip_all)]
+#[allow(deprecated)]
 pub async fn set(route: &SyslogRoute) -> Result<(), anyhow::Error> {
     Ok(db::put(
         &format!("/syslog/route/{}", route.id),
@@ -57,6 +64,7 @@ pub async fn set(route: &SyslogRoute) -> Result<(), anyhow::Error> {
 }
 
 #[tracing::instrument(name = "service:db:syslog:get")]
+#[allow(deprecated)]
 pub async fn get(id: &str) -> Result<SyslogRoute, anyhow::Error> {
     let val = db::get(&format!("/syslog/route/{id}")).await?;
     Ok(json::from_slice(&val).unwrap())
@@ -67,6 +75,7 @@ pub async fn delete(id: &str) -> Result<(), anyhow::Error> {
     Ok(db::delete(&format!("/syslog/route/{id}"), false, db::NEED_WATCH, None).await?)
 }
 
+#[allow(deprecated)]
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/syslog/route/";
     let cluster_coordinator = db::get_coordinator().await;
@@ -108,6 +117,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[allow(deprecated)]
 pub async fn cache() -> Result<(), anyhow::Error> {
     let key = "/syslog/route/";
     let ret = db::list(key).await?;
@@ -119,6 +129,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[allow(deprecated)]
 pub async fn watch_syslog_settings() -> Result<(), anyhow::Error> {
     let key = "/syslog/enabled";
     let cluster_coordinator = db::get_coordinator().await;

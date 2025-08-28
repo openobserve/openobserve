@@ -26,6 +26,7 @@ pub mod search;
 pub mod service;
 pub mod service_account;
 pub mod stream;
+#[deprecated(since = "0.15.0", note = "syslog is deprecated")]
 pub mod syslog;
 pub mod telemetry;
 pub mod traces;

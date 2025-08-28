@@ -66,6 +66,7 @@ pub mod hec;
 pub mod ingest;
 pub mod loki;
 pub mod otlp;
+#[deprecated(since = "0.15.0", note = "syslog is deprecated")]
 pub mod syslog;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
