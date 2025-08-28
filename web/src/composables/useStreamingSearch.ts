@@ -316,7 +316,7 @@ const useHttpStreaming = () => {
     } catch (error) {
       if ((error as any).name === 'AbortError') {
         console.error('Stream was canceled');
-      } else if((error as any).status == 401) {
+      } else if((error as any).status === 401) {
         store.dispatch("logout");
         localStorage.clear();
         sessionStorage.clear();
