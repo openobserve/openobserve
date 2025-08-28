@@ -995,7 +995,6 @@ mod tests {
             order_by: vec![("_timestamp".to_string(), OrderBy::Desc)],
             histogram_interval: None,
             sorted_by_time: true,
-            use_inverted_index: false,
             index_condition: None,
             index_optimize_mode: None,
         };

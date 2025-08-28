@@ -90,8 +90,7 @@ pub struct Sql {
     pub group_by: Vec<String>,
     pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
-    pub sorted_by_time: bool,     // if only order by _timestamp
-    pub use_inverted_index: bool, // if can use inverted index
+    pub sorted_by_time: bool, // if only order by _timestamp
     pub index_condition: Option<IndexCondition>, // use for tantivy index
     pub index_optimize_mode: Option<IndexOptimizeMode>,
 }
@@ -289,9 +288,6 @@ impl Sql {
             });
         }
 
-        // set use_inverted_index use index_condition
-        let use_inverted_index = index_condition.is_some();
-
         // 14. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
         if !is_complex_query(&mut statement)
@@ -393,7 +389,6 @@ impl Sql {
             order_by,
             histogram_interval,
             sorted_by_time: need_sort_by_time,
-            use_inverted_index,
             index_condition,
             index_optimize_mode,
         })
@@ -404,7 +399,7 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, has_match_all: {}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}, index_optimize_mode: {:?}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, has_match_all: {}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, index_condition: {:?}, index_optimize_mode: {:?}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -420,7 +415,6 @@ impl std::fmt::Display for Sql {
             self.order_by,
             self.histogram_interval,
             self.sorted_by_time,
-            self.use_inverted_index,
             self.index_condition,
             self.index_optimize_mode,
         )
