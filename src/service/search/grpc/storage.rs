@@ -475,7 +475,7 @@ fn generate_add_filter_back_condition(
             index_condition
                 .as_mut()
                 .unwrap()
-                .add_index_condition(tantivy_cond.clone());
+                .merge(tantivy_cond.clone());
         }
         *is_add_filter_back = true;
         return index_condition;

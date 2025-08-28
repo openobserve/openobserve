@@ -130,7 +130,6 @@ fn construct_filter_exec(
     filter: &FilterExec,
     exprs: Vec<Arc<dyn PhysicalExpr>>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
-    // TODO: maybe we do not need this, because we always have _timestamp filter
     if exprs.is_empty() {
         match filter.projection() {
             Some(projection_indices) => {
@@ -153,10 +152,10 @@ fn construct_filter_exec(
             None => Ok(filter.input().clone()),
         }
     } else {
-        let filter = FilterExec::try_new(conjunction(exprs), filter.input().clone())?;
-        Ok(Arc::new(
-            filter.with_projection(filter.projection().cloned())?,
-        ))
+        // TODO: remove the unused column after extract index condition
+        let plan = FilterExec::try_new(conjunction(exprs), filter.input().clone())?
+            .with_projection(filter.projection().cloned())?;
+        Ok(Arc::new(plan))
     }
 }
 

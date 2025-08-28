@@ -159,16 +159,6 @@ pub async fn search(
         })
         .collect::<Vec<_>>();
 
-    let query_params = Arc::new(QueryParams {
-        trace_id: trace_id.to_string(),
-        org_id: org_id.clone(),
-        stream_type,
-        stream_name: stream_name.to_string(),
-        time_range: Some((req.search_info.start_time, req.search_info.end_time)),
-        work_group: work_group.clone(),
-        use_inverted_index: req.index_info.use_inverted_index,
-    });
-
     // construct tantivy related params
     let index_condition = generate_index_condition(&req.index_info.index_condition)?;
     let idx_optimize_rule: Option<IndexOptimizeMode> =
@@ -187,6 +177,17 @@ pub async fn search(
         index_fields,
         index_condition_ref.clone(),
     )?;
+    let index_condition = update_index_condition(index_condition, index_condition_ref);
+
+    let query_params = Arc::new(QueryParams {
+        trace_id: trace_id.to_string(),
+        org_id: org_id.clone(),
+        stream_type,
+        stream_name: stream_name.to_string(),
+        time_range: Some((req.search_info.start_time, req.search_info.end_time)),
+        work_group: work_group.clone(),
+        use_inverted_index: index_condition.is_some(),
+    });
 
     // search in object storage
     let mut tantivy_file_list = Vec::new();
@@ -369,9 +370,30 @@ fn optimizer_physical_plan(
     index_fields: Vec<String>,
     index_condition_ref: Arc<Mutex<Option<IndexCondition>>>,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
+    let cfg = config::get_config();
+    if !cfg.common.inverted_index_enabled || cfg.common.feature_query_without_index {
+        return Ok(plan);
+    }
     let index_rule = IndexRule::new(index_fields.iter().cloned().collect(), index_condition_ref);
     let plan = index_rule.optimize(plan, ctx.state().config_options())?;
     Ok(plan)
+}
+
+fn update_index_condition(
+    mut index_condition: Option<IndexCondition>,
+    index_condition_ref: Arc<Mutex<Option<IndexCondition>>>,
+) -> Option<IndexCondition> {
+    let index_condition_ref = index_condition_ref.lock().clone();
+    if index_condition.is_none() {
+        return index_condition_ref;
+    }
+    if index_condition_ref.is_none() {
+        return index_condition;
+    }
+    if let Some(index_condition_ref) = index_condition_ref {
+        index_condition.as_mut().unwrap().merge(index_condition_ref);
+    }
+    index_condition
 }
 
 #[allow(clippy::too_many_arguments)]

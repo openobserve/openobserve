@@ -108,7 +108,7 @@ impl IndexCondition {
         self.conditions.push(condition);
     }
 
-    pub fn add_index_condition(&mut self, index_condition: IndexCondition) {
+    pub fn merge(&mut self, index_condition: IndexCondition) {
         self.conditions.extend(index_condition.conditions);
     }
 }
@@ -1810,7 +1810,7 @@ mod tests {
         index_condition2
             .add_condition(Condition::Equal("field2".to_string(), "value2".to_string()));
 
-        index_condition1.add_index_condition(index_condition2);
+        index_condition1.merge(index_condition2);
 
         assert_eq!(index_condition1.conditions.len(), 2);
     }
