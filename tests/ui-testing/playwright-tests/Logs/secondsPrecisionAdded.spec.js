@@ -1,28 +1,33 @@
-// Implementation test.spec.js
-import { test, expect } from "../baseFixtures.js";
-// (duplicate import removed)
-import PageManager from "../../pages/page-manager.js";
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const PageManager = require('../../pages/page-manager.js');
+const testLogger = require('../utils/test-logger.js');
+const { startTimeValue, endTimeValue } = require('../../pages/commonActions.js');
 
-import { startTimeValue, endTimeValue } from '../../pages/commonActions.js';
+test.describe("Seconds Precision Tests", () => {
+  test.describe.configure({ mode: 'parallel' });
+  let pm; // Page Manager instance
 
-test('Relative Seconds on Logs page', async ({ page }) => {
-  // Create page manager instance
-  const pageManager = new PageManager(page);
-  
-  // Step 1: Navigate to the application and login
-  await pageManager.loginPage.gotoLoginPage();
-  await pageManager.loginPage.loginAsInternalUser();
-  await pageManager.loginPage.login();
-  // Step 2: Navigate to Logs Page
- // await page.waitForTimeout(4000);  // Wait for login process 
-  await pageManager.logsPage.navigateToLogs();
-  // Step 3: Set the time to past 30 seconds and verify
-  await pageManager.logsPage.setTimeToPast30Seconds();
-  await pageManager.logsPage.verifyTimeSetTo30Seconds();
-  await pageManager.logsPage.signOut();
+  test.beforeEach(async ({ page }, testInfo) => {
+    // Initialize test setup
+    testLogger.testStart(testInfo.title, testInfo.file);
+    
+    // Navigate to base URL with authentication
+    await navigateToBase(page);
+    pm = new PageManager(page);
+    
+    testLogger.info('Test setup completed');
+  });
+
+  test('Relative Seconds on Logs page', async ({ page }) => {
+    testLogger.info('Testing relative seconds precision on Logs page');
+    
+    // Step 1: Navigate to Logs Page (already authenticated via global setup)
+    await pm.logsPage.navigateToLogs();
+    
+    // Step 2: Set the time to past 30 seconds and verify
+    await pm.logsPage.setTimeToPast30Seconds();
+    await pm.logsPage.verifyTimeSetTo30Seconds();
+    
+    testLogger.info('Seconds precision test completed successfully');
+  });
 });
-
-// no afterEach hook
-
-
-
