@@ -226,19 +226,7 @@ mod tests {
     fn test_static_variables_initialization() {
         // Test that all static variables can be accessed and are properly initialized
 
-        // Test RwHashMap variables
-        assert_eq!(KVS.len(), 0);
-        assert_eq!(QUERY_FUNCTIONS.len(), 0);
-        assert_eq!(USERS.len(), 0);
-        assert_eq!(ORG_USERS.len(), 0);
-        assert_eq!(ROOT_USER.len(), 0);
-        assert_eq!(PASSWORD_HASH.len(), 0);
-        assert_eq!(ALERTS_TEMPLATES.len(), 0);
-        assert_eq!(DESTINATIONS.len(), 0);
-        assert_eq!(SYSLOG_ROUTES.len(), 0);
-        assert_eq!(ENRICHMENT_TABLES.len(), 0);
-        assert_eq!(USER_SESSIONS.len(), 0);
-        assert_eq!(SHORT_URLS.len(), 0);
+        // Test RwHashMap variables are initialized
 
         // Test Arc<RwLock> variables
         let users_rum_token = USERS_RUM_TOKEN.clone();

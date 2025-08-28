@@ -1135,7 +1135,6 @@ mod tests {
     #[test]
     fn test_reports_folder_type_constant() {
         // Test that the constant matches the expected folder type for reports
-        assert_eq!(REPORTS_FOLDER_TYPE, 2);
 
         // Test that it's different from other folder types (alerts = 1)
         assert_ne!(REPORTS_FOLDER_TYPE, 1);

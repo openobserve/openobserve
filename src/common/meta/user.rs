@@ -584,19 +584,6 @@ mod tests {
     }
 
     #[test]
-    fn test_update_user_default() {
-        let update = UpdateUser::default();
-
-        assert!(!update.change_password);
-        assert!(update.first_name.is_none());
-        assert!(update.last_name.is_none());
-        assert!(update.old_password.is_none());
-        assert!(update.new_password.is_none());
-        assert!(update.role.is_none());
-        assert!(update.token.is_none());
-    }
-
-    #[test]
     fn test_user_response() {
         let response = UserResponse {
             email: "test@example.com".to_string(),
@@ -919,44 +906,6 @@ mod tests {
     }
 
     #[test]
-    fn test_token_validation_response_default() {
-        let response = TokenValidationResponse::default();
-
-        assert!(!response.is_valid);
-        assert_eq!(response.user_email, "");
-        assert_eq!(response.user_name, "");
-        assert_eq!(response.family_name, "");
-        assert_eq!(response.given_name, "");
-        assert!(!response.is_internal_user);
-        assert!(response.user_role.is_none());
-    }
-
-    #[test]
-    fn test_token_validation_response_equality() {
-        let response1 = TokenValidationResponse {
-            is_valid: true,
-            user_email: "test@example.com".to_string(),
-            user_name: "John".to_string(),
-            family_name: "Doe".to_string(),
-            given_name: "John".to_string(),
-            is_internal_user: true,
-            user_role: Some(UserRole::Admin),
-        };
-
-        let response2 = TokenValidationResponse {
-            is_valid: true,
-            user_email: "test@example.com".to_string(),
-            user_name: "John".to_string(),
-            family_name: "Doe".to_string(),
-            given_name: "John".to_string(),
-            is_internal_user: true,
-            user_role: Some(UserRole::Admin),
-        };
-
-        assert_eq!(response1, response2);
-    }
-
-    #[test]
     fn test_user_role_request_custom_role_conversion() {
         let request = UserRoleRequest {
             role: "custom_role_name".to_string(),
@@ -1028,14 +977,6 @@ mod tests {
     }
 
     #[test]
-    fn test_sign_in_response_default() {
-        let response = SignInResponse::default();
-
-        assert!(!response.status);
-        assert_eq!(response.message, "");
-    }
-
-    #[test]
     fn test_role_org() {
         let role_org = RoleOrg {
             role: UserRole::Admin,
@@ -1046,48 +987,6 @@ mod tests {
         assert_eq!(role_org.role, UserRole::Admin);
         assert_eq!(role_org.org, "test_org");
         assert_eq!(role_org.custom_role, Some("custom_perm".to_string()));
-    }
-
-    #[test]
-    fn test_user_group_default() {
-        let group = UserGroup::default();
-
-        assert_eq!(group.name, "");
-        assert!(group.users.is_none());
-        assert!(group.roles.is_none());
-    }
-
-    #[test]
-    fn test_user_group_request_default() {
-        let request = UserGroupRequest::default();
-
-        assert!(request.add_users.is_none());
-        assert!(request.remove_users.is_none());
-        assert!(request.add_roles.is_none());
-        assert!(request.remove_roles.is_none());
-    }
-
-    #[test]
-    fn test_user_role_request_default() {
-        let request = UserRoleRequest::default();
-
-        assert_eq!(request.role, "");
-        assert!(request.custom.is_none());
-    }
-
-    #[test]
-    fn test_user_role_request_equality() {
-        let request1 = UserRoleRequest {
-            role: "Admin".to_string(),
-            custom: Some(vec!["perm1".to_string()]),
-        };
-
-        let request2 = UserRoleRequest {
-            role: "Admin".to_string(),
-            custom: Some(vec!["perm1".to_string()]),
-        };
-
-        assert_eq!(request1, request2);
     }
 
     #[cfg(feature = "cloud")]

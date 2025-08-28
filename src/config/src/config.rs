@@ -1073,12 +1073,6 @@ pub struct Common {
     )]
     pub result_cache_selection_strategy: String,
     #[env_config(
-        name = "ZO_RESULT_CACHE_DISCARD_DURATION",
-        default = 60,
-        help = "Discard data of last n seconds from cached results"
-    )]
-    pub result_cache_discard_duration: i64,
-    #[env_config(
         name = "ZO_METRICS_CACHE_ENABLED",
         default = true,
         help = "Enable result cache for PromQL metrics queries"
@@ -1495,6 +1489,8 @@ pub struct Limit {
         default = true
     )]
     pub histogram_enabled: bool,
+    #[env_config(name = "ZO_CACHE_DELAY_SECS", default = 300)] // seconds
+    pub cache_delay_secs: i64,
 }
 
 #[derive(EnvConfig, Default)]
@@ -1638,12 +1634,6 @@ pub struct DiskCache {
     pub gc_interval: u64,
     #[env_config(name = "ZO_DISK_CACHE_MULTI_DIR", default = "")] // dir1,dir2,dir3...
     pub multi_dir: String,
-    #[env_config(
-        name = "ZO_DISK_CACHE_DELAY_WINDOW_MINS",
-        default = 10,
-        help = "Delay window indicates the time range from now to skip caching to disk, default is 10 minutes"
-    )]
-    pub delay_window_mins: i64,
 }
 
 #[derive(EnvConfig, Default)]
