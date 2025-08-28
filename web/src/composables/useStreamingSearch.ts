@@ -227,11 +227,15 @@ const useHttpStreaming = () => {
       });
 
       if (!response.ok) {
-        onError(traceId, {
-          status: response.status,
-          ...(await response.json()),
-        });
-        return;
+        try {
+          onError(traceId, {
+            status: response.status,
+            ...(await response.json()),
+          });
+          return;
+        } catch (e) {
+          throw response;
+        }
       }
 
       // Set up worker for stream processing
@@ -321,6 +325,11 @@ const useHttpStreaming = () => {
             if ((error as any).name === 'AbortError') {
               // console.log('Stream reading was cancelled for traceId:', traceId);
               // Don't call onError for expected cancellations
+            } else if((error as any).status === 401) {
+              store.dispatch("logout");
+              localStorage.clear();
+              sessionStorage.clear();
+              window.location.reload();
             } else {
               console.error('Error reading stream:', error);
               onError(traceId, error);
