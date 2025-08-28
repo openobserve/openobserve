@@ -17,28 +17,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-    <div class="text-bold q-px-sm  q-py-sm tw-flex tw-items-center tw-justify-between tw-gap-2">
-       Folders
-       <div>
-        <q-btn
-          class="text-bold o2-secondary-button  tw-w-full tw-h-[28px] tw-w-[32px]"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          no-caps
-          style="min-width: 0px !important; min-height: 0px !important;"
-          flat
-          @click.stop="addFolder"
-          data-test="dashboard-new-folder-btn"
-        >
-        <q-icon name="add" size="xs" />
-      </q-btn>
-       </div>
-
-    </div>
-    <q-separator class="tw-mb-1 tw-mt-[3px]" size="2px"></q-separator>
-    <div class="folders-tabs">
-    <!-- Search Input -->
-    <div style="width: 100%;" class="flex folder-item q-py-xs">
-          <q-input
+    <div class="folder-header sticky-top" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
+      <div class="text-bold q-px-sm  q-py-sm tw-flex tw-items-center tw-justify-between tw-gap-2">
+         Folders
+         <div>
+          <q-btn
+            class="text-bold o2-secondary-button  tw-w-full tw-h-[28px] tw-w-[32px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            no-caps
+            style="min-width: 0px !important; min-height: 0px !important;"
+            flat
+            @click.stop="addFolder"
+            data-test="dashboard-new-folder-btn"
+          >
+          <q-icon name="add" size="xs" />
+        </q-btn>
+         </div>
+      </div>
+      <q-separator class="tw-mb-1 tw-mt-[3px]" size="2px"></q-separator>
+      
+      <!-- Search Input -->
+      <div style="width: 100%;" class="flex folder-item q-py-xs">
+        <q-input
           v-model="searchQuery"   
           dense
           borderless
@@ -50,12 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
         >
           <template #prepend>
-            <q-icon  class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'"  name="search" />
+            <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
           </template>
         </q-input>
-              <div>
-        </div>
-          </div>
+      </div>
+    </div>
+    <div class="folders-tabs">
       <q-tabs
         indicator-color="transparent"
         inline-label
@@ -350,6 +350,22 @@ export default defineComponent({
   </script>
 
 <style lang="scss" scoped>
+.folder-header {
+  &.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  &.folder-header-light {
+    background-color: white;
+  }
+
+  &.folder-header-dark {
+    background-color: #1a1a1a;
+  }
+}
+
 .folders-tabs {
   .test-class {
     min-height: 1.5rem;
