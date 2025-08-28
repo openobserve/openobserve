@@ -119,6 +119,10 @@ describe("useDashboardPanel", () => {
         projections: ["timestamp", "count"],
         timeseries_field: "timestamp",
       },
+      status: 0,
+      statusText: "",
+      headers: undefined,
+      config: undefined
     });
 
     // Reset parser mock
