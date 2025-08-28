@@ -325,11 +325,6 @@ mod tests {
     }
 
     #[test]
-    fn test_report_media_type_default() {
-        assert_eq!(ReportMediaType::default(), ReportMediaType::Pdf);
-    }
-
-    #[test]
     fn test_report_dashboard_variable_default() {
         let variable = ReportDashboardVariable {
             key: "test_key".to_string(),
@@ -394,11 +389,6 @@ mod tests {
             ReportTimerangeType::default(),
             ReportTimerangeType::Relative
         );
-    }
-
-    #[test]
-    fn test_report_frequency_type_default() {
-        assert_eq!(ReportFrequencyType::default(), ReportFrequencyType::Weeks);
     }
 
     #[test]

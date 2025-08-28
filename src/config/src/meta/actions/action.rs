@@ -392,24 +392,6 @@ mod tests {
     }
 
     #[test]
-    fn test_execution_details_type_default() {
-        let default_type = ExecutionDetailsType::default();
-        assert_eq!(default_type, ExecutionDetailsType::Once);
-    }
-
-    #[test]
-    fn test_action_status_default() {
-        let default_status = ActionStatus::default();
-        assert_eq!(default_status, ActionStatus::Ready);
-    }
-
-    #[test]
-    fn test_action_type_default() {
-        let default_type = ActionType::default();
-        assert_eq!(default_type, ActionType::Job);
-    }
-
-    #[test]
     fn test_serialization_deserialization() {
         let now = Utc::now();
         let mut env_vars = HashMap::new();

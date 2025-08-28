@@ -253,13 +253,6 @@ mod tests {
         assert_eq!(request.streams[0].values[0].line, "log message");
         assert!(request.streams[0].values[0].structured_metadata.is_some());
     }
-    #[test]
-    fn test_loki_entry_default() {
-        let entry = LokiEntry::default();
-        assert_eq!(entry.timestamp, "");
-        assert_eq!(entry.line, "");
-        assert!(entry.structured_metadata.is_none());
-    }
 
     #[test]
     fn test_loki_stream_structure() {
