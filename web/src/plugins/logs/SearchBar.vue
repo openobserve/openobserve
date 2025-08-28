@@ -2485,6 +2485,34 @@ export default defineComponent({
       savedViewDropdownModel.value = false;
     };
 
+    // Common function to restore visualization data and sync to URL
+    const restoreVisualizationData = async (visualizationData) => {
+      if (!visualizationData) return;
+
+      // Restore visualization config to dashboardPanelData
+      if (visualizationData.config) {
+        dashboardPanelData.data.config = visualizationData.config;
+      }
+      if (visualizationData.type) {
+        dashboardPanelData.data.type = visualizationData.type;
+      }
+
+      // Sync visualization data to URL
+      const currentVisualizationData = getVisualizationConfig(dashboardPanelData);
+      if (currentVisualizationData) {
+        const encoded = encodeVisualizationConfig(currentVisualizationData);
+        if (encoded) {
+          const currentQuery = { ...router.currentRoute.value.query };
+          currentQuery.visualization_data = encoded;
+
+          await router.replace({
+            name: router.currentRoute.value.name,
+            query: currentQuery
+          });
+        }
+      }
+    };
+
     const applySavedView = async (item) => {
       await cancelQuery();
       searchObj.shouldIgnoreWatcher = true;
@@ -2593,31 +2621,9 @@ export default defineComponent({
               searchObj.value = mergeDeep(searchObj, extractedObj);
               searchObj.shouldIgnoreWatcher = true;
 
-              // Restore visualization data if available and switch to visualize mode
+              // Restore visualization data if available
               if (extractedObj.data.visualizationData) {
-
-                // Restore visualization config to dashboardPanelData
-                if (extractedObj.data.visualizationData.config) {
-                  dashboardPanelData.data.config = extractedObj.data.visualizationData.config;
-                }
-                if (extractedObj.data.visualizationData.type) {
-                  dashboardPanelData.data.type = extractedObj.data.visualizationData.type;
-                }
-
-                // Sync visualization data to URL
-                const visualizationData = getVisualizationConfig(dashboardPanelData);
-                if (visualizationData) {
-                  const encoded = encodeVisualizationConfig(visualizationData);
-                  if (encoded) {
-                    const currentQuery = { ...router.currentRoute.value.query };
-                    currentQuery.visualization_data = encoded;
-
-                    await router.replace({
-                      name: router.currentRoute.value.name,
-                      query: currentQuery
-                    });
-                  }
-                }
+                await restoreVisualizationData(extractedObj.data.visualizationData);
               }
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
@@ -2705,32 +2711,9 @@ export default defineComponent({
               searchObj.value = mergeDeep(searchObj, extractedObj);
               searchObj.data.streamResults = {};
 
-              // Restore visualization data if available and switch to visualize mode
+              // Restore visualization data if available
               if (extractedObj.data.visualizationData) {
-
-                // Restore visualization config to dashboardPanelData
-                if (extractedObj.data.visualizationData.config) {
-                  dashboardPanelData.data.config = extractedObj.data.visualizationData.config;
-                }
-                if (extractedObj.data.visualizationData.type) {
-                  dashboardPanelData.data.type = extractedObj.data.visualizationData.type;
-                }
-
-                // Sync visualization data to URL
-                const visualizationData = getVisualizationConfig(dashboardPanelData);
-                if (visualizationData) {
-                  const encoded = encodeVisualizationConfig(visualizationData);
-                  if (encoded) {
-                    const currentQuery = { ...router.currentRoute.value.query };
-                    currentQuery.visualization_data = encoded;
-                    currentQuery.logs_visualize_toggle = "visualize";
-
-                    await router.replace({
-                      name: router.currentRoute.value.name,
-                      query: currentQuery
-                    });
-                  }
-                }
+                await restoreVisualizationData(extractedObj.data.visualizationData);
               }
 
               const streamData = await getStreams(
