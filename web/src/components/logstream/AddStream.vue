@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="save-stream-btn"
             class="o2-primary-button no-border tw-h-[36px]"
-            :label="t('logStream.createStream')"
+            :label="t('common.save')"
             type="submit"
             no-caps
             flat
