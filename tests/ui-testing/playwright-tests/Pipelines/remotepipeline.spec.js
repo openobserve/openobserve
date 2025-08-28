@@ -1,9 +1,8 @@
-const { test, expect } = require('../utils/enhanced-baseFixtures.js');
+import { test, expect } from "../baseFixtures.js";
 import logData from "../../fixtures/log.json";
 // import { log } from "console";
 import logsdata from "../../../test-data/logs_data.json";
-const PageManager = require('../../pages/page-manager.js');
-const { waitUtils } = require('../utils/wait-helpers.js');
+import PageManager from "../../pages/page-manager.js";
 // import { pipeline } from "stream";
 // import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
@@ -41,6 +40,20 @@ export const b64EncodeStandard = (str) => {
   }
 };
 
+async function login(page) {
+  await page.goto(process.env["ZO_BASE_URL"]);
+// await page.getByText("Login as internal user").click();
+  await page.waitForTimeout(1000);
+  await page
+    .locator('[data-cy="login-user-id"]')
+    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
+  //Enter Password
+  await page.locator("label").filter({ hasText: "Password *" }).click();
+  await page
+    .locator('[data-cy="login-password"]')
+    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
+  await page.locator('[data-cy="login-sign-in"]').click();
+}
 
 async function ingestion(page) {
   const orgId = process.env["ORGNAME"];
@@ -77,7 +90,7 @@ async function ingestion(page) {
 }
 
 const selectStream = async (page, stream) => {
-  await waitUtils.smartWait(page, 4000, 'stream setup wait');
+  await page.waitForTimeout(4000);
   await page
     .locator('[data-test="log-search-index-list-select-stream"]')
     .click({ force: true });
@@ -170,7 +183,7 @@ async function deletePipeline(page, randomPipelineName) {
   // Click the back button
   await page.locator('[data-test="add-pipeline-back-btn"]').click();
   await page.locator('[data-test="confirm-button"]').click();
-  await waitUtils.smartWait(page, 2000, 'extended wait');
+  await page.waitForTimeout(2000);
 
   // Search for the pipeline
   await page.locator('[data-test="pipeline-list-search-input"]').click();
@@ -198,7 +211,7 @@ test.describe("Pipeline testcases", () => {
     // click on the run query button
     // Type the value of a variable into an input field
     const search = page.waitForResponse(logData.applyQuery);
-    await waitUtils.smartWait(page, 3000, 'long wait');
+    await page.waitForTimeout(3000);
     await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
       force: true,
     });
@@ -210,8 +223,9 @@ test.describe("Pipeline testcases", () => {
   let AuthorizationToken;
 
   test.beforeEach(async ({ page }) => {
+    await login(page);
     pageManager = new PageManager(page);
-    await waitUtils.smartWait(page, 5000, 'test setup wait');
+    await page.waitForTimeout(5000);
 
     const orgId = process.env["ORGNAME"];
     const streamName = "e2e_automate";
@@ -240,7 +254,7 @@ test.describe("Pipeline testcases", () => {
   ) {
     await exploreStreamAndNavigateToPipeline(page, streamName);
     await pipelinePage.searchPipeline(pipelineName);
-    await waitUtils.smartWait(page, 1000, 'general wait');
+    await page.waitForTimeout(1000);
 
     const deletePipelineButton = page.locator(
       `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
@@ -256,7 +270,7 @@ test.describe("Pipeline testcases", () => {
     const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
-    await waitUtils.smartWait(page, 1000, 'pipeline menu navigation wait');
+    await page.waitForTimeout(1000);
     await pipelinePage.addPipeline();
     await pipelinePage.selectStream();
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);
@@ -265,10 +279,10 @@ test.describe("Pipeline testcases", () => {
     // Interact with stream name and save
     await pipelinePage.enterStreamName("e2e");
     await pipelinePage.enterStreamName("e2e_automate");
-    await waitUtils.smartWait(page, 2000, 'stream selection wait');
+    await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
-    await waitUtils.smartWait(page, 3000, 'source node save wait');
+    await page.waitForTimeout(3000);
     await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
     await page
@@ -296,18 +310,18 @@ test.describe("Pipeline testcases", () => {
     const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
-    await waitUtils.smartWait(page, 1000, 'pipeline menu navigation wait');
+    await page.waitForTimeout(1000);
     await pipelinePage.addPipeline();
     await pipelinePage.selectStream();
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);
     await pipelinePage.selectLogs();
     await pipelinePage.enterStreamName("e2e");
     await pipelinePage.enterStreamName("e2e_automate");
-    await waitUtils.smartWait(page, 2000, 'stream selection wait');
+    await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
     // await pipelinePage.selectAndDragFunction(); // Function drag
-    await waitUtils.smartWait(page, 2000, 'extended wait');
+    await page.waitForTimeout(2000);
     await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
     await page.locator("button").filter({ hasText: "edit" }).hover();
@@ -327,13 +341,13 @@ test.describe("Pipeline testcases", () => {
     await page.getByText(".a=41 .");
 
     // Optional: Add a short wait to confirm the action is processed
-    await waitUtils.smartWait(page, 1000, 'general wait');
+    await page.waitForTimeout(1000);
 
     // Optional: Add a brief wait to allow any validation messages to process
     await pipelinePage.saveNewFunction();
-    await waitUtils.smartWait(page, 3000, 'long wait');
+    await page.waitForTimeout(3000);
     await pipelinePage.saveFunction();
-    await waitUtils.smartWait(page, 3000, 'long wait');
+    await page.waitForTimeout(3000);
     await page.getByRole("button", { name: randomFunctionName }).hover();
     
     await pipelinePage.createRemoteDestination(randomNodeName, AuthorizationToken)
@@ -358,7 +372,7 @@ test.describe("Pipeline testcases", () => {
     const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
-    await waitUtils.smartWait(page, 1000, 'pipeline menu navigation wait');
+    await page.waitForTimeout(1000);
     await pipelinePage.addPipeline();
     await pipelinePage.selectStream();
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);
@@ -367,10 +381,10 @@ test.describe("Pipeline testcases", () => {
     // Interact with stream name and save
     await pipelinePage.enterStreamName("e2e");
     await pipelinePage.enterStreamName("e2e_automate");
-    await waitUtils.smartWait(page, 2000, 'stream selection wait');
+    await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
-    await waitUtils.smartWait(page, 2000, 'extended wait');
+    await page.waitForTimeout(2000);
     await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
     await page.locator("button").filter({ hasText: "edit" }).hover();
@@ -389,7 +403,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByPlaceholder("Value").click();
     await page.getByPlaceholder("Value").fill("prometheus");
     await pipelinePage.saveCondition();
-    await waitUtils.smartWait(page, 2000, 'extended wait');
+    await page.waitForTimeout(2000);
     await page.getByText("kubernetes_container_name").hover(); 
     await pipelinePage.createRemoteDestination(randomNodeName, AuthorizationToken)  
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
@@ -409,18 +423,18 @@ test.describe("Pipeline testcases", () => {
   }) => {
     const pipelinePage = pageManager.pipelinesPage;
     await pipelinePage.openPipelineMenu();
-    await waitUtils.smartWait(page, 1000, 'pipeline menu navigation wait');
+    await page.waitForTimeout(1000);
     await pipelinePage.addPipeline();
     await pipelinePage.selectStream();
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);
     await pipelinePage.selectLogs();
     await pipelinePage.enterStreamName("e2e");
     await pipelinePage.enterStreamName("e2e_automate");
-    await waitUtils.smartWait(page, 2000, 'stream selection wait');
+    await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
     // await pipelinePage.selectAndDragFunction(); // Function drag
-    await waitUtils.smartWait(page, 2000, 'extended wait');
+    await page.waitForTimeout(2000);
     await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
     await page.locator("button").filter({ hasText: "edit" }).hover();
@@ -440,7 +454,7 @@ test.describe("Pipeline testcases", () => {
     // Check if the required text is present in the editor
     await page.getByText(".new_k8s_id=.kubernetes_namespace_name .");
     // Optional: Add a short wait to confirm the action is processed
-    await waitUtils.smartWait(page, 1000, 'general wait');
+    await page.waitForTimeout(1000);
     // Optional: Add a brief wait to allow any validation messages to process
     await pipelinePage.saveNewFunction();
     await page
@@ -475,7 +489,7 @@ test.describe("Pipeline testcases", () => {
     // Verify the data ingested in destination & function and verify under logs page
     await exploreStreamAndInteractWithLogDetails(page, "destination_node");
     await pipelinePage.searchPipeline(pipelineName);
-    await waitUtils.smartWait(page, 1000, 'general wait');
+    await page.waitForTimeout(1000);
     const deletePipelineButton = page.locator(
       `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
     );
