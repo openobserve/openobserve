@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </span>
                 </div>
-                <div class="field_overlay">
+                <div class="field_overlay" v-if="props.row.name !== store.state.zoConfig.timestamp_column">
                   <q-btn
                     v-if="
                       props.row.isSchemaField &&
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="
                       !searchObj.data.stream.selectedFields.includes(
                         props.row.name,
-                      )
+                      ) && props.row.name !== store.state.zoConfig.timestamp_column
                     "
                     :name="outlinedVisibility"
                     style="margin-right: 0.375rem"
