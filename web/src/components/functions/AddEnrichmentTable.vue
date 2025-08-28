@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           compilationErr
         }}</pre>
 
-        <div class="flex justify-center">
+        <div class="flex justify-start">
           <q-btn
             v-close-popup
             class="q-mr-md o2-secondary-button tw-h-[36px]"
