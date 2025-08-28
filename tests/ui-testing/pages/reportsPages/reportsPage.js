@@ -24,7 +24,7 @@ export class ReportsPage {
     this.dateTimeButton = dateTimeButtonLocator;
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
     this.absoluteTab = absoluteTabLocator;
-    this.profileButton = page.locator('button').filter({ hasText: (process.env["ZO_ROOT_USER_EMAIL"]) });
+    this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
     this.zoneInput = page.locator('[data-test="add-report-schedule-send-later-section"]').getByText('arrow_drop_down');
     this.timeZoneOption = (zone) => `role=option[name="${zone}"]`;
     this.signOutButton = page.getByText('Sign Out');
@@ -300,18 +300,14 @@ export class ReportsPage {
     // Wait for the logout menu item to be attached to the DOM
     const logoutItem = this.page.locator('[data-test="menu-link-logout-item"]');
     
-    // Wait for the logout item to be present in the DOM
-    await logoutItem.waitFor({ state: 'attached', timeout: 3000 });
+    // Wait for the logout item to be present in the DOM with reasonable timeout
+    await logoutItem.waitFor({ state: 'attached', timeout: 10000 });
 
-    // Optionally, wait a short time to ensure the element is visible
-    await this.page.waitForTimeout(100); // 100 ms delay
+    // Wait for element to be visible instead of hard wait
+    await logoutItem.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Now check if it's visible before clicking
-    if (await logoutItem.isVisible()) {
-        await logoutItem.click({ force: true });
-    } else {
-        console.error("Logout item is not visible after clicking the profile icon.");
-    }
+    // Now click the logout item
+    await logoutItem.click({ force: true });
 }
 
 async notAvailableReport(reportName) {
