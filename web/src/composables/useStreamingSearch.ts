@@ -218,11 +218,15 @@ const useHttpStreaming = () => {
       });
 
       if (!response.ok) {
-        onError(traceId, {
-          status: response.status,
-          ...(await response.json()),
-        });
-        return;
+        try {
+          onError(traceId, {
+            status: response.status,
+            ...(await response.json()),
+          });
+          return;
+        } catch (e) {
+          throw response;
+        }
       }
 
       // Set up worker for stream processing
@@ -311,6 +315,11 @@ const useHttpStreaming = () => {
     } catch (error) {
       if ((error as any).name === 'AbortError') {
         console.error('Stream was canceled');
+      } else if((error as any).status === 401) {
+        store.dispatch("logout");
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.reload();
       } else {
         onError(traceId, error);
       }
