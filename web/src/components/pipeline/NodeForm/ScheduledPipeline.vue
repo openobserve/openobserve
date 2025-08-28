@@ -1089,7 +1089,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="pipelineObj.isEditNode"
                   data-test="stream-routing-query-delete-btn"
                   class="o2-secondary-button tw-h-[36px]"
-                  color="negative"
                   flat
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   no-caps
