@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
           </div>
-          <div class="col-12 flex justify-center">
+          <div class="col-12 flex justify-start">
             <q-btn
               v-close-popup
               class="q-mr-md o2-secondary-button tw-h-[36px]"
