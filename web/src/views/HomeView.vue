@@ -109,138 +109,139 @@ flat
           </q-btn>
         </div>
       </div>
-
-      <div align="center" class="q-w-sm my-card card-container q-mr-lg">
-        <div align="center" flat
-bordered class="q-w-sm my-card q-py-md">
-          <div class="text-subtitle1">{{ t("home.pipelineTitle") }}</div>
-          <q-separator class="q-ma-md" />
-          <div class="row justify-center">
-            <div class="col-4">
-              <div class="text-subtitle1">
-                {{ t("home.schedulePipelineTitle") }}
+      <div class="tw-flex tw-gap-4 tw-flex-wrap tw-items-center tw-justify-center">
+        <div align="center" class="q-w-sm my-card card-container  ">
+          <div align="center" flat
+  bordered class="q-w-sm my-card q-py-md">
+            <div class="text-subtitle1">{{ t("home.pipelineTitle") }}</div>
+            <q-separator class="q-ma-md" />
+            <div class="row justify-center">
+              <div class="col-4">
+                <div class="text-subtitle1">
+                  {{ t("home.schedulePipelineTitle") }}
+                </div>
+                <div class="text-h6">{{ summary.scheduled_pipelines }}</div>
               </div>
-              <div class="text-h6">{{ summary.scheduled_pipelines }}</div>
-            </div>
-            <q-separator vertical />
-            <div class="col-4">
-              <div class="text-subtitle1">
-                {{ t("home.rtPipelineTitle") }}
+              <q-separator vertical />
+              <div class="col-4">
+                <div class="text-subtitle1">
+                  {{ t("home.rtPipelineTitle") }}
+                </div>
+                <div class="text-h6">{{ summary.rt_pipelines }}</div>
               </div>
-              <div class="text-h6">{{ summary.rt_pipelines }}</div>
-            </div>
-          </div>
-        </div>
-        <q-separator />
-        <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary"
-flat
-            >{{ t("home.view") }}
-            <router-link
-              exact
-              :to="{ name: 'pipeline' }"
-              class="absolute full-width full-height"
-            ></router-link>
-          </q-btn>
-        </div>
-      </div>
-
-      <div class="q-w-sm my-card card-container q-mr-lg">
-        <div align="center" flat
-bordered class="q-w-sm my-card q-py-md">
-          <div class="text-subtitle1">{{ t("home.alertTitle") }}</div>
-          <q-separator class="q-ma-md" />
-          <div class="row justify-center">
-            <div class="col-4">
-              <div class="text-subtitle1">
-                {{ t("home.scheduledAlert") }}
-              </div>
-              <div class="text-h6">{{ summary.scheduled_alerts }}</div>
-            </div>
-            <q-separator vertical />
-            <div class="col-4">
-              <div class="text-subtitle1">
-                {{ t("home.rtAlert") }}
-              </div>
-              <div class="text-h6">{{ summary.rt_alerts }}</div>
             </div>
           </div>
+          <q-separator />
+          <div align="center" class="q-py-sm">
+            <q-btn no-caps color="primary"
+  flat
+              >{{ t("home.view") }}
+              <router-link
+                exact
+                :to="{ name: 'pipeline' }"
+                class="absolute full-width full-height"
+              ></router-link>
+            </q-btn>
+          </div>
         </div>
-        <q-separator />
-        <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary"
-flat
-            >{{ t("home.view") }}
-            <router-link
-              exact
-              :to="{ name: 'alertList' }"
-              class="absolute full-width full-height"
-            ></router-link>
-          </q-btn>
-        </div>
-      </div>
 
-      <div class="q-w-sm my-card card-container q-mr-lg">
-        <div align="center" flat
-bordered class="q-w-sm my-card q-py-md">
-          <div class="row justify-center">
-            <div class="col-12">
-              <div class="text-subtitle1">
-                {{ t("home.functionTitle") }}
+        <div class="q-w-sm my-card card-container ">
+          <div align="center" flat
+  bordered class="q-w-sm my-card q-py-md">
+            <div class="text-subtitle1">{{ t("home.alertTitle") }}</div>
+            <q-separator class="q-ma-md" />
+            <div class="row justify-center">
+              <div class="col-4">
+                <div class="text-subtitle1">
+                  {{ t("home.scheduledAlert") }}
+                </div>
+                <div class="text-h6">{{ summary.scheduled_alerts }}</div>
               </div>
-              <q-separator class="q-ma-md" />
-              <div class="row justify-center">
-                <div class="col-4">
-                  <div class="text-h4 q-pa-sm">{{ summary.function_count }}</div>
+              <q-separator vertical />
+              <div class="col-4">
+                <div class="text-subtitle1">
+                  {{ t("home.rtAlert") }}
+                </div>
+                <div class="text-h6">{{ summary.rt_alerts }}</div>
+              </div>
+            </div>
+          </div>
+          <q-separator />
+          <div align="center" class="q-py-sm">
+            <q-btn no-caps color="primary"
+  flat
+              >{{ t("home.view") }}
+              <router-link
+                exact
+                :to="{ name: 'alertList' }"
+                class="absolute full-width full-height"
+              ></router-link>
+            </q-btn>
+          </div>
+        </div>
+
+        <div class="q-w-sm my-card card-container ">
+          <div align="center" flat
+  bordered class="q-w-sm my-card q-py-md">
+            <div class="row justify-center">
+              <div class="col-12">
+                <div class="text-subtitle1">
+                  {{ t("home.functionTitle") }}
+                </div>
+                <q-separator class="q-ma-md" />
+                <div class="row justify-center">
+                  <div class="col-4">
+                    <div class="text-h4 q-pa-sm">{{ summary.function_count }}</div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
+          <q-separator />
+          <div align="center" class="q-py-sm">
+            <q-btn no-caps color="primary"
+  flat
+              >{{ t("home.view") }}
+              <router-link
+                exact
+                :to="{ name: 'functionList' }"
+                class="absolute full-width full-height"
+              ></router-link>
+            </q-btn>
+          </div>
         </div>
-        <q-separator />
-        <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary"
-flat
-            >{{ t("home.view") }}
-            <router-link
-              exact
-              :to="{ name: 'functionList' }"
-              class="absolute full-width full-height"
-            ></router-link>
-          </q-btn>
-        </div>
-      </div>
 
-      <div class="q-w-sm my-card card-container">
-        <div align="center" flat
-bordered class="q-w-sm my-card q-py-md">
-          <div class="row justify-center">
-            <div class="col-12">
-              <div class="text-subtitle1">
-                {{ t("home.dashboardTitle") }}
-              </div>
-              <q-separator class="q-ma-md" />
-              <div class="row justify-center">
-                <div class="col-4">
-                  <div class="text-h4 q-pa-sm">{{ summary.dashboard_count }}</div>
+        <div class="q-w-sm my-card card-container">
+          <div align="center" flat
+  bordered class="q-w-sm my-card q-py-md">
+            <div class="row justify-center">
+              <div class="col-12">
+                <div class="text-subtitle1">
+                  {{ t("home.dashboardTitle") }}
+                </div>
+                <q-separator class="q-ma-md" />
+                <div class="row justify-center">
+                  <div class="col-4">
+                    <div class="text-h4 q-pa-sm">{{ summary.dashboard_count }}</div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
+          <q-separator />
+          <div align="center" class="q-py-sm">
+            <q-btn no-caps color="primary"
+  flat
+              >{{ t("home.view") }}
+              <router-link
+                exact
+                :to="{ name: 'dashboards' }"
+                class="absolute full-width full-height"
+              ></router-link>
+            </q-btn>
+          </div>
         </div>
-        <q-separator />
-        <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary"
-flat
-            >{{ t("home.view") }}
-            <router-link
-              exact
-              :to="{ name: 'dashboards' }"
-              class="absolute full-width full-height"
-            ></router-link>
-          </q-btn>
-        </div>
-      </div>
+    </div>
     </div>
 
     <div
