@@ -4,6 +4,7 @@ import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from '../../pages/page-manager.js';
 // (unused CommonActions import removed)
+const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
 const streamName = `stream${Date.now()}`;

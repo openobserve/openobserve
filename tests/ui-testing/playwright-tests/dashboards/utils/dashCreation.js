@@ -1,5 +1,6 @@
 import { expect } from "playwright/test";
 import logData from "../../../fixtures/log.json";
+const testLogger = require('../../utils/test-logger.js');
 
 // Function to wait for the dashboard page to load
 export const waitForDashboardPage = async function (page) {
