@@ -184,9 +184,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].vrlFunctionQuery
                     "
                     :class="
-                      dashboardPanelData.data.queries[
+                      (!dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
-                      ]?.vrlFunctionQuery === '' &&
+                      ]?.vrlFunctionQuery ||
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ]?.vrlFunctionQuery === '') &&
                       functionEditorPlaceholderFlag
                         ? 'empty-function'
                         : ''
@@ -415,7 +418,7 @@ export default defineComponent({
         dashboardPanelData.data.queries.length - 1;
     };
 
-    const updatePromQLQuery = async (event, value) => {
+    const updatePromQLQuery = async (value, event) => {
       promqlAutoCompleteData.value.query = value;
       // promqlAutoCompleteData.value.text = event.changes[0].text;
 
@@ -440,9 +443,9 @@ export default defineComponent({
       promqlGetSuggestions();
     };
 
-    const updateQuery = (query, fields) => {
+    const updateQuery = (query, event) => {
       if (dashboardPanelData.data.queryType === "promql") {
-        updatePromQLQuery(query, fields);
+        updatePromQLQuery(query, event);
       } else {
         sqlGetSuggestions();
         sqlUpdateFieldKeywords(
@@ -597,11 +600,10 @@ export default defineComponent({
   border-radius: 50%;
 }
 
-.empty-function .cm-content {
+.empty-function .monaco-editor-background {
   background-image: url("../../../assets/images/common/vrl-function.png");
   background-repeat: no-repeat;
   background-size: 170px;
-  background-position: 5px 5px;
 }
 
 // .query-tabs-container {

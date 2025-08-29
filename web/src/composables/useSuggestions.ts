@@ -322,6 +322,7 @@ const useSqlSuggestions = () => {
   };
 
   const updateAutoComplete = () => {
+    autoCompleteKeywords.value = [];
     autoCompleteKeywords.value.push(...functionKeywords.value);
     for (const item of fieldKeywords) {
       autoCompleteKeywords.value.push(item);
