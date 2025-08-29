@@ -131,6 +131,22 @@ export default defineComponent({
         identify({
           username: store.state.userInfo.email,
           type: "sso",
+          other_identities:[
+            {
+              type: "sso",
+              username: name.value,
+            }
+          ]
+        });
+        redirectUser();
+
+      });
+    };
+
+    /**
+              username: store.state.userInfo.email,
+            }
+          ]
         });
         redirectUser();
         
