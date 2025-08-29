@@ -16,7 +16,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{ToSchema, openapi::Object};
 
 use crate::meta::{
     alerts::{QueryCondition, TriggerCondition},
@@ -73,6 +73,7 @@ impl DerivedStream {
 #[serde(rename_all = "snake_case")]
 pub struct Node {
     pub id: String,
+    #[schema(value_type = Object)]
     pub data: NodeData,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<HashMap<String, String>>,
@@ -131,7 +132,7 @@ impl Edge {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "node_type")]
 #[serde(rename_all = "snake_case")]
 #[allow(clippy::large_enum_variant)]

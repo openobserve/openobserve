@@ -25,7 +25,7 @@ use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use svix_ksuid::Ksuid;
-use utoipa::ToSchema;
+use utoipa::{ToSchema, openapi::Object};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Alert {
@@ -155,6 +155,7 @@ pub struct QueryCondition {
     #[serde(default)]
     #[serde(rename = "type")]
     pub query_type: QueryType,
+    #[schema(value_type = Option<Object>)]
     pub conditions: Option<meta_alerts::ConditionList>,
     pub sql: Option<String>,
     pub promql: Option<String>,

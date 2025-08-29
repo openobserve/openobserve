@@ -308,7 +308,7 @@ pub struct NodeListRequest {
     /// List of region names to filter by
     pub regions: Vec<String>,
 }
-#[derive(Serialize, Deserialize, Debug, Clone, Default, ToSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct RegionInfo<T> {
     #[serde(flatten)]
     pub clusters: std::collections::HashMap<String, T>,

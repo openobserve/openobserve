@@ -147,6 +147,7 @@ pub struct PanelFields {
     pub target: Option<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<AxisItem>,
+    #[schema(value_type = Object)]
     pub filter: PanelFilter,
 }
 
@@ -201,7 +202,7 @@ pub enum AggregationFunc {
     P99,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(untagged, rename_all = "camelCase")]
 pub enum PanelFilter {
     #[serde(rename = "condition")]
@@ -210,7 +211,7 @@ pub enum PanelFilter {
     Group(GroupType),
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GroupType {
     pub filter_type: String,
