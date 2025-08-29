@@ -31,7 +31,6 @@ use config::{
         sql::{OrderBy, SqlOperator, TableReferenceExt, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
-    metrics,
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
@@ -131,33 +130,6 @@ pub async fn search(
         trace_id.to_string()
     };
 
-    #[cfg(feature = "enterprise")]
-    {
-        let sql = Some(in_req.query.sql.clone());
-        let start_time = Some(in_req.query.start_time);
-        let end_time = Some(in_req.query.end_time);
-        let s_event_type = in_req
-            .search_type
-            .map(|s_event_type| s_event_type.to_string());
-        // set search task
-        SEARCH_SERVER
-            .insert(
-                trace_id.clone(),
-                TaskStatus::new_leader(
-                    vec![],
-                    true,
-                    user_id.clone(),
-                    Some(org_id.to_string()),
-                    Some(stream_type.to_string()),
-                    sql,
-                    start_time,
-                    end_time,
-                    s_event_type,
-                ),
-            )
-            .await;
-    }
-
     #[cfg(not(feature = "enterprise"))]
     let req_regions = vec![];
     #[cfg(not(feature = "enterprise"))]
@@ -186,6 +158,34 @@ pub async fn search(
         request.set_local_mode(Some(v));
     }
     let meta = Sql::new_from_req(&request, &query).await?;
+
+    #[cfg(feature = "enterprise")]
+    {
+        let sql = Some(in_req.query.sql.clone());
+        let start_time = Some(in_req.query.start_time);
+        let end_time = Some(in_req.query.end_time);
+        let s_event_type = in_req
+            .search_type
+            .map(|s_event_type| s_event_type.to_string());
+        // set search task
+        SEARCH_SERVER
+            .insert(
+                trace_id.clone(),
+                TaskStatus::new_leader(
+                    vec![],
+                    true,
+                    user_id.clone(),
+                    Some(org_id.to_string()),
+                    Some(stream_type.to_string()),
+                    sql,
+                    start_time,
+                    end_time,
+                    s_event_type,
+                ),
+            )
+            .await;
+    }
+
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
         async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
@@ -232,10 +232,6 @@ pub async fn search(
             }
         };
     }
-
-    metrics::QUERY_RUNNING_NUMS
-        .with_label_values(&[org_id])
-        .dec();
 
     // do this because of clippy warning
     match res {
