@@ -42,7 +42,7 @@ const test = baseTest.extend({
           try {
             (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__))
           } catch (error) {
-            console.error('Failed to collect coverage on page unload:', error);
+            testLogger.error('Failed to collect coverage on page unload', { error });
           }
         }),
       );
@@ -54,7 +54,7 @@ const test = baseTest.extend({
         try {
           await fs.promises.writeFile(filename, coverageJSON);
         } catch (error) {
-          console.error('Failed to write coverage data:', error);
+          testLogger.error('Failed to write coverage data', { error });
         }
       });
       
@@ -65,7 +65,7 @@ const test = baseTest.extend({
         try {
           await page.evaluate(() => (window).collectIstanbulCoverage(JSON.stringify((window).__coverage__)))
         } catch (error) {
-          console.error('Failed to collect final coverage for page:', error);
+          testLogger.error('Failed to collect final coverage for page', { error });
         }
       }));
       
@@ -84,7 +84,7 @@ const test = baseTest.extend({
     if (process.env.CI) {
       page.on('console', (msg) => {
         if (msg.type() === 'error') {
-          console.error('Browser console error:', msg.text());
+          testLogger.error('Browser console error', { message: msg.text() });
         }
       });
     }

@@ -14,7 +14,7 @@ test.describe("Stream name casing preservation tests", () => {
       { name: "mylowerstream1" },
     ];
 
-    // Ingest data into streams
+    // Ingest data into stream
     for (const stream of streams) {
       await pm.streamsPage.ingestTestData(stream.name);
     }

@@ -1,6 +1,6 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const logsdata = require("../../../test-data/logs_data.json");
 
@@ -70,7 +70,7 @@ test.describe("Region testcases", () => {
       logsdata: logsdata
     });
   
-    console.log(response);
+    testLogger.debug('API response received', { response });
     
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
@@ -130,7 +130,7 @@ test.describe("Region testcases", () => {
         }
         return false;
     });
-    console.log('Radio button is selected:', isChecked);
+    testLogger.debug('Radio button state checked', { isChecked });
 
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('button').filter({ hasText: 'savesaved_search' }).click();
@@ -152,7 +152,7 @@ test.describe("Region testcases", () => {
     page.reload();
     await page.locator('[data-test="logs-search-bar-region-btn"]').click();
     const isCircleChecked = await page.$eval('[data-test="logs-search-bar-region-btn"] i.material-icons', node => node.innerText === 'check_circle');
-    console.log('Circle is checked:', isCircleChecked);
+    testLogger.debug('Circle state checked', { isCircleChecked });
     // Strategic 500ms wait for region state update - this is functionally necessary
     await page.waitForTimeout(500)
     await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();

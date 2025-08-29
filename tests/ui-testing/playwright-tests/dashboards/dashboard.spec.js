@@ -746,7 +746,6 @@ test.describe("dashboard UI testcases", () => {
 
     // Listen for the dialog and assert its message
     page.once("dialog", async (dialog) => {
-      // console.log(`Dialog message: ${dialog.message()}`);
       await dialog.accept();
     });
     await pm.dashboardList.menuItem("logs-item");

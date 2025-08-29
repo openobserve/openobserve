@@ -3,6 +3,7 @@ import logData from "../../fixtures/log.json";
 // import { log } from "console";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
+const testLogger = require('../utils/test-logger.js');
 
 
 test.describe.configure({ mode: "parallel" });
@@ -53,7 +54,7 @@ async function ingestion(page) {
     streamName: streamName,
     logsdata: logsdata
   });
-  console.log(response);
+  testLogger.debug('API response received', { response });
 }
 }
 
@@ -138,7 +139,6 @@ test.describe("Pipeline testcases", () => {
   let pageManager;
   // let logData;
   function removeUTFCharacters(text) {
-    // console.log(text, "tex");
     // Remove UTF characters using regular expression
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
@@ -709,7 +709,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.saveInputNodeStream();
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     page.once('dialog', async (dialog) => {
-      console.log(`Dialog message: ${dialog.message()}`);
+      testLogger.debug('Dialog message', { message: dialog.message() });
       await dialog.accept();
     });
     
@@ -743,7 +743,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.saveInputNodeStream();
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     page.once('dialog', async (dialog) => {
-      console.log(`Dialog message: ${dialog.message()}`);
+      testLogger.debug('Dialog message', { message: dialog.message() });
       await dialog.dismiss();
     });
     
@@ -755,7 +755,7 @@ test.describe("Pipeline testcases", () => {
     await expect(page).toHaveURL(/pipeline/);
 
     // Log confirmation
-    console.log('URL contains "pipeline"!')
+    testLogger.debug('URL contains pipeline')
     
   });
 

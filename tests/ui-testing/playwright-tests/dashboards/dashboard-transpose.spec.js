@@ -3,6 +3,7 @@ import PageManager from "../../pages/page-manager";
 import { ingestion } from "./utils/dashIngestion.js";
 import { login } from "./utils/dashLogin.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+const testLogger = require('../utils/test-logger.js');
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).slice(2, 11);
@@ -144,10 +145,10 @@ test.describe("dashboard UI testcases", () => {
         a[0].localeCompare(b[0])
       );
 
-      console.log(
-        JSON.parse(JSON.stringify(sortedFlattenedInitialData)),
-        JSON.parse(JSON.stringify(sortedTransposedData))
-      );
+      testLogger.debug('Data comparison debug', { 
+        sortedFlattenedInitialData: JSON.parse(JSON.stringify(sortedFlattenedInitialData)),
+        sortedTransposedData: JSON.parse(JSON.stringify(sortedTransposedData))
+      });
 
       // Step 6: Directly compare sorted arrays
       expect(sortedTransposedData).toEqual(sortedFlattenedInitialData);

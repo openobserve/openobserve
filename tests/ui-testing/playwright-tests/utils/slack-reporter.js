@@ -2,6 +2,7 @@
  * Basic Slack Reporter for Playwright Test Results
  * Sends final test summary to Slack channel
  */
+const testLogger = require('./test-logger.js');
 class SlackReporter {
   constructor(options = {}) {
     this.webhookUrl = options.webhookUrl || process.env.SLACK_WEBHOOK_URL;
@@ -44,7 +45,7 @@ class SlackReporter {
     if (this.webhookUrl) {
       this.sendSlackMessage();
     } else {
-      console.log('⚠️  Slack webhook URL not configured. Skipping Slack notification.');
+      testLogger.warn('Slack webhook URL not configured. Skipping Slack notification.');
       this.logResults();
     }
   }
@@ -62,12 +63,12 @@ class SlackReporter {
       });
 
       if (response.ok) {
-        console.log('✅ Slack notification sent successfully');
+        testLogger.info('Slack notification sent successfully');
       } else {
-        console.error('❌ Failed to send Slack notification:', response.statusText);
+        testLogger.error('Failed to send Slack notification', { status: response.statusText });
       }
     } catch (error) {
-      console.error('❌ Error sending Slack notification:', error);
+      testLogger.error('Error sending Slack notification', { error });
     }
   }
 
@@ -143,17 +144,17 @@ class SlackReporter {
   }
 
   logResults() {
-    console.log('\n📊 Test Results Summary:');
-    console.log(`   Total: ${this.results.total}`);
-    console.log(`   ✅ Passed: ${this.results.passed}`);
-    console.log(`   ❌ Failed: ${this.results.failed}`);
-    console.log(`   ⏭️  Skipped: ${this.results.skipped}`);
-    console.log(`   ⏱️  Duration: ${Math.round(this.results.duration / 1000 / 60 * 100) / 100}m`);
+    testLogger.info('Test Results Summary');
+    testLogger.info('Test Results - Total', { count: this.results.total });
+    testLogger.info('Test Results - Passed', { count: this.results.passed });
+    testLogger.info('Test Results - Failed', { count: this.results.failed });
+    testLogger.info('Test Results - Skipped', { count: this.results.skipped });
+    testLogger.info('Test Results - Duration', { duration: `${Math.round(this.results.duration / 1000 / 60 * 100) / 100}m` });
     
     if (this.results.failedTests.length > 0) {
-      console.log('\n❌ Failed Tests:');
+      testLogger.warn('Failed Tests');
       this.results.failedTests.forEach(test => {
-        console.log(`   • ${test.title} (${test.file.split('/').pop()})`);
+        testLogger.warn('Failed Test', { title: test.title, file: test.file.split('/').pop() });
       });
     }
   }

@@ -35,7 +35,7 @@ async function runQuery(page, query) {
           body: JSON.stringify(query)
         });
       } catch (err) {
-        console.log(err);
+        testLogger.error('Query execution error', { error: err });
       }
   
       return response
@@ -90,7 +90,7 @@ test.describe("Compare SQL query execution times", () => {
       logsdata: logsdata
     });
 
-    console.log(response);
+    testLogger.debug('Query response received', { response });
 
     // Navigate to logs page and setup for performance testing
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
@@ -131,18 +131,18 @@ test.describe("Compare SQL query execution times", () => {
     const result1 = await runQuery(page, query1);
     const result2 = await runQuery(page, query2);
 
-    console.log(`Query 1 (match_all_raw) took ${result1.duration} ms and returned ${result1.response.total} records.`);
-    console.log(`Query 2 (match_all) took ${result2.duration} ms and returned ${result2.response.total} records.`);
+    testLogger.info('Query 1 performance result', { query: 'match_all_raw', duration: result1.duration, records: result1.response.total });
+    testLogger.info('Query 2 performance result', { query: 'match_all', duration: result2.duration, records: result2.response.total });
 
     try {
       expect(result2.duration).toBeLessThan(result1.duration);
-      console.log('Assertion passed: match_all query took less time than match_all_raw query.');
+      testLogger.info('Performance assertion passed', { test: 'match_all vs match_all_raw', result: 'match_all faster' });
       testLogger.info('Performance comparison completed successfully', {
         query1_duration: result1.duration,
         query2_duration: result2.duration
       });
     } catch (error) {
-      console.error('Assertion failed: match_all query did not take less time than match_all_raw query.');
+      testLogger.warn('Performance assertion failed', { test: 'match_all vs match_all_raw', result: 'match_all slower than expected' });
       testLogger.warn('Performance assertion failed', { error: error.message });
     }
   });
@@ -178,18 +178,18 @@ test.describe("Compare SQL query execution times", () => {
     const result1 = await runQuery(page, query1);
     const result2 = await runQuery(page, query2);
 
-    console.log(`Query 1 (match_all) took ${result1.duration} ms and returned ${result1.response.total} records.`);
-    console.log(`Query 2 (match_all_raw_ignorecase) took ${result2.duration} ms and returned ${result2.response.total} records.`);
+    testLogger.info('Query 1 performance result', { query: 'match_all', duration: result1.duration, records: result1.response.total });
+    testLogger.info('Query 2 performance result', { query: 'match_all_raw_ignorecase', duration: result2.duration, records: result2.response.total });
 
     try {
       expect(result1.duration).toBeLessThan(result2.duration);
-      console.log('Assertion passed: match_all query took less time than match_all_raw_ignorecase query.');
+      testLogger.info('Performance assertion passed', { test: 'match_all vs match_all_raw_ignorecase', result: 'match_all faster' });
       testLogger.info('Performance comparison completed successfully', {
         query1_duration: result1.duration,
         query2_duration: result2.duration
       });
     } catch (error) {
-      console.error('Assertion failed: match_all query did not take less time than match_all_raw_ignorecase query.');
+      testLogger.warn('Performance assertion failed', { test: 'match_all vs match_all_raw_ignorecase', result: 'match_all slower than expected' });
       testLogger.warn('Performance assertion failed', { error: error.message });
     }
   });

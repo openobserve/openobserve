@@ -1,6 +1,6 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const cteQueriesData = require("../../../test-data/cte_queries.json");
 
@@ -36,10 +36,10 @@ async function ingestion(page) {
       streamName: streamName,
       logsdata: cteQueriesData
     });
-    console.log('Ingestion response:', response);
+    testLogger.info('Ingestion response', { response });
     return response;
   } catch (error) {
-    console.error('Ingestion failed:', error);
+    testLogger.error('Ingestion failed', { error });
     throw error;
   }
 }
