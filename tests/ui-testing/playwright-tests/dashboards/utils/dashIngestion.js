@@ -1,7 +1,7 @@
 // ingestion.js
 import logsdata from "../../../../test-data/logs_data.json";
 import geoMapdata from "../../../../test-data/geo_map.json";
-const testLogger = require('../utils/test-logger.js');
+const testLogger = require('../../utils/test-logger.js');
 
 // Exported function to remove UTF characters
 const removeUTFCharacters = (text) => {
