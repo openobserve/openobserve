@@ -3,6 +3,7 @@ import logData from "../../fixtures/log.json";
 // import { log } from "console";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
+const testLogger = require('../utils/test-logger.js');
 // import { pipeline } from "stream";
 // import fs from "fs";
 import { v4 as uuidv4 } from "uuid";

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import PageManager from '../../pages/page-manager.js';
 import logsdata from '../../../test-data/logs_data.json';
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
+const testLogger = require('../utils/test-logger.js');
 
 test.describe('Pipeline Dynamic Stream Names', () => {
 
