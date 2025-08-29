@@ -76,6 +76,7 @@ import {
   onActivated,
   nextTick,
   onMounted,
+  type Ref,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -144,13 +145,15 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       // emit window resize event to trigger the layout
-      webVitalsChartsRef.value.layoutUpdate();
+      if (webVitalsChartsRef.value) {
+        webVitalsChartsRef.value.layoutUpdate();
 
-      // Dashboards gets overlapped as we have used keep alive
-      // Its an internal bug of vue-grid-layout
-      // So adding settimeout of 1 sec to fix the issue
+        // Dashboards gets overlapped as we have used keep alive
+        // Its an internal bug of vue-grid-layout
+        // So adding settimeout of 1 sec to fix the issue
 
-      webVitalsChartsRef.value.layoutUpdate();
+        webVitalsChartsRef.value.layoutUpdate();
+      }
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -258,6 +261,8 @@ export default defineComponent({
       loadDashboard,
       webVitalsChartsRef,
       isLoading,
+      updateLayout,
+      router,
     };
   },
 });
