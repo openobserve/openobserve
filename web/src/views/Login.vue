@@ -30,6 +30,7 @@ import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
+import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
   name: "LoginPage",
@@ -42,6 +43,8 @@ export default defineComponent({
     const selectedOrg = ref({});
     const q = useQuasar();
     const router: any = useRouter();
+    const { identify } = useReo();
+
 
     onBeforeMount(async () => {
       if (!router?.currentRoute.value.hash) {
@@ -122,6 +125,13 @@ export default defineComponent({
         if(config.isCloud == 'true' && checkCallBackValues(router.currentRoute.value.hash, "new_user_login") == "true"){
           localStorage.setItem("isFirstTimeLogin", "true");
         }
+        
+        //here we need to send the user to reo.dev for tracking
+        //we need to call the identify function from reo.dev
+        identify({
+          username: store.state.userInfo.email,
+          type: "sso",
+        });
         redirectUser();
         
       });
