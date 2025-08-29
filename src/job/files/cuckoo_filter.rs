@@ -470,7 +470,7 @@ pub async fn build_cuckoo_filters_for_time_range(
                     total_processed += 1;
                 }
                 Err(e) => {
-                    log::info!("✗ Error: {e}");
+                    log::error!("✗ Error: {e}");
                     total_failed += 1;
                 }
             }

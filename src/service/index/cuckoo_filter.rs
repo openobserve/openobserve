@@ -708,7 +708,6 @@ impl CuckooFilterManager {
         let cfg = config::get_config();
         // Group by hour only
         let mut hour_map: HashMap<String, Vec<String>> = HashMap::new();
-        log::info!("start building hour map");
         for item in items {
             if let MetadataItem::TraceListIndexer(TraceListItem {
                 trace_id,
@@ -723,7 +722,6 @@ impl CuckooFilterManager {
                 hour_map.entry(hour_key).or_default().push(trace_id);
             }
         }
-        log::info!("end building hour map");
 
         let mut filters = self.filters.lock().unwrap();
         log::info!("start processing hour map");
@@ -1037,34 +1035,6 @@ impl CuckooFilterManager {
         }
         log::info!("[CUCKOO_FILTER_JOB] Found {} files", files.len());
 
-        let mut parquet_paths = Vec::new();
-        for file in &files {
-            // Check if file already exists locally before downloading
-            if !file_data::disk::exist(&file.key).await {
-                let _ = file_data::disk::download(
-                    &file.account,
-                    &file.key,
-                    Some(file.meta.compressed_size as usize),
-                )
-                .await;
-            } else {
-                log::debug!(
-                    "File already exists locally, skipping download: {}",
-                    file.key
-                );
-            }
-
-            if let Some(path) = file_data::disk::get_file_path(&file.key) {
-                parquet_paths.push(path);
-            }
-        }
-        if parquet_paths.is_empty() {
-            log::info!(
-                "[CUCKOO_FILTER_JOB] No local parquet files found for org {org_id} hour {hour_key}",
-            );
-            return Ok(());
-        }
-
         let schema = Arc::new(Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("stream_name", DataType::Utf8, true),
@@ -1072,7 +1042,7 @@ impl CuckooFilterManager {
             Field::new("trace_id", DataType::Utf8, false),
         ]));
         let parquet_batch_size = 10;
-        let trace_id_batch_size = config::get_config().cuckoo_filter.build_index_batch_size; // Reduce batch size to lower memory pressure
+        let trace_id_batch_size = config::get_config().cuckoo_filter.build_index_batch_size;
         let mut batch_trace_items = Vec::with_capacity(trace_id_batch_size);
         let mut total_processed = 0;
 
@@ -1082,13 +1052,61 @@ impl CuckooFilterManager {
 
         use arrow::array::{Int64Array, StringArray};
         log::info!(
-            "[CUCKOO_FILTER_JOB] Start processing, parquet_paths len: {}",
-            parquet_paths.len()
+            "[CUCKOO_FILTER_JOB] Start processing, files len: {}, will process in chunks of {}",
+            files.len(),
+            parquet_batch_size
         );
-        for chunk in parquet_paths.chunks(parquet_batch_size) {
+
+        // Process files in chunks to avoid cache overflow and GC issues
+        for (chunk_idx, files_chunk) in files.chunks(parquet_batch_size).enumerate() {
+            log::info!(
+                "[CUCKOO_FILTER_JOB] Processing file chunk {}/{}, files in chunk: {}",
+                chunk_idx + 1,
+                files.len().div_ceil(parquet_batch_size),
+                files_chunk.len()
+            );
+
+            // Download only the files needed for this chunk
+            let mut parquet_paths = Vec::new();
+            for file in files_chunk {
+                // Check if file already exists locally before downloading
+                if !file_data::disk::exist(&file.key).await {
+                    log::debug!("Downloading file for chunk processing: {}", file.key);
+                    let _ = file_data::disk::download(
+                        &file.account,
+                        &file.key,
+                        Some(file.meta.compressed_size as usize),
+                    )
+                    .await;
+                } else {
+                    log::debug!(
+                        "File already exists locally, skipping download: {}",
+                        file.key
+                    );
+                }
+
+                if let Some(path) = file_data::disk::get_file_path(&file.key) {
+                    parquet_paths.push(path);
+                }
+            }
+
+            if parquet_paths.is_empty() {
+                log::warn!(
+                    "[CUCKOO_FILTER_JOB] No local parquet files found for chunk {}, skipping",
+                    chunk_idx + 1
+                );
+                continue;
+            }
+
+            log::debug!(
+                "[CUCKOO_FILTER_JOB] Processing {} parquet files in chunk {}",
+                parquet_paths.len(),
+                chunk_idx + 1
+            );
+            // Process the parquet files in this chunk
             let ctx = SessionContext::new();
-            for (i, path) in chunk.iter().enumerate() {
-                let tbl_name = format!("tbl_{i}",);
+            for (i, path) in parquet_paths.iter().enumerate() {
+                let tbl_name = format!("tbl_{i}");
                 ctx.register_parquet(
                     &tbl_name,
                     path,
@@ -1096,12 +1114,12 @@ impl CuckooFilterManager {
                 )
                 .await?;
             }
-            let union_sql = (0..chunk.len())
-                .map(|i| format!("SELECT trace_id, _timestamp FROM tbl_{i}",))
+            let union_sql = (0..parquet_paths.len())
+                .map(|i| format!("SELECT trace_id, _timestamp FROM tbl_{i}"))
                 .collect::<Vec<_>>()
                 .join(" UNION ALL ");
-            let sql = format!("SELECT DISTINCT trace_id, _timestamp FROM ( {union_sql} )",);
-            log::info!("UNION ALL SQL : {sql}");
+            let sql = format!("SELECT DISTINCT trace_id, _timestamp FROM ( {union_sql} )");
+            log::debug!("[CUCKOO_FILTER_JOB] Chunk {} SQL: {}", chunk_idx + 1, sql);
             let df = ctx.sql(&sql).await?;
             let batches = df.collect().await?;
             for batch in batches {
@@ -1142,9 +1160,10 @@ impl CuckooFilterManager {
                             self.process_items(org_id, items, true);
                             total_processed += batch_count;
                             log::info!(
-                                "[CUCKOO_FILTER_JOB] Processed batch of {} items, total so far: {}",
+                                "[CUCKOO_FILTER_JOB] Processed batch of {} items, total so far: {} (chunk {})",
                                 batch_count,
-                                total_processed
+                                total_processed,
+                                chunk_idx + 1
                             );
                         }
                     }
@@ -1158,6 +1177,21 @@ impl CuckooFilterManager {
                     }
                 }
             }
+
+            log::info!(
+                "[CUCKOO_FILTER_JOB] Completed processing file chunk {}/{}, total processed so far: {}",
+                chunk_idx + 1,
+                files.len().div_ceil(parquet_batch_size),
+                total_processed
+            );
+        }
+
+        // Check if we have any files to process
+        if total_processed == 0 {
+            log::info!(
+                "[CUCKOO_FILTER_JOB] No trace data processed for org {org_id} hour {hour_key} day {day_key}"
+            );
+            return Ok(());
         }
 
         // Process remaining items
