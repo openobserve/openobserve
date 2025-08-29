@@ -62,6 +62,8 @@ impl From<FolderError> for HttpResponse {
     context_path = "/api",
     tag = "Folders",
     operation_id = "CreateFolder",
+    summary = "Create new folder",
+    description = "Creates a new folder for organizing dashboards, alerts, or reports. Folders help users organize their content into logical groups and manage access permissions when using role-based access control.",
     security(
         ("Authorization" = [])
     ),
@@ -105,6 +107,8 @@ pub async fn create_folder(
     context_path = "/api",
     tag = "Folders",
     operation_id = "UpdateFolder",
+    summary = "Update folder details",
+    description = "Updates an existing folder's name, description, or other properties. Note that the default folder cannot be updated and folders containing content may have restrictions on certain changes.",
     security(
         ("Authorization" = [])
     ),
@@ -146,6 +150,8 @@ pub async fn update_folder(
     context_path = "/api",
     tag = "Folders",
     operation_id = "ListFolders",
+    summary = "List organization folders",
+    description = "Retrieves a list of all folders in the organization for the specified folder type. Users will only see folders they have access to when role-based access control is enabled.",
     security(
         ("Authorization" = [])
     ),
@@ -189,6 +195,8 @@ pub async fn list_folders(
     context_path = "/api",
     tag = "Folders",
     operation_id = "GetFolder",
+    summary = "Get folder details",
+    description = "Retrieves detailed information about a specific folder including its name, description, creation details, and metadata. Returns folder information for the specified folder type and ID.",
     security(
         ("Authorization" = [])
     ),
@@ -221,6 +229,8 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
     context_path = "/api",
     tag = "Folders",
     operation_id = "GetFolderByName",
+    summary = "Get folder by name",
+    description = "Retrieves detailed information about a specific folder by its name rather than ID. Useful when you know the folder name but not its unique identifier. Returns folder information for the specified folder type and name.",
     security(
         ("Authorization" = [])
     ),
@@ -253,6 +263,8 @@ pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -
     context_path = "/api",
     tag = "Folders",
     operation_id = "DeleteFolder",
+    summary = "Delete folder",
+    description = "Permanently deletes a folder and removes it from the organization. The folder must be empty (no dashboards, alerts, or reports) before it can be deleted. The default folder cannot be deleted.",
     security(
         ("Authorization" = [])
     ),

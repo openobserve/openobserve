@@ -32,6 +32,8 @@ use crate::{
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusRemoteWrite",
+    summary = "Ingest Prometheus metrics",
+    description = "Receives Prometheus metrics data via remote write protocol. Accepts protobuf-encoded WriteRequest payloads containing time series data and stores them for querying. Compatible with standard Prometheus remote write configuration.",
         security(
         ("Authorization"= [])
     ),
@@ -74,6 +76,8 @@ pub async fn remote_write(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusQuery",
+    summary = "Execute Prometheus instant query",
+    description = "Executes a Prometheus instant query at a single point in time. Returns current values for metrics matching the query expression. Compatible with Prometheus instant query API for seamless integration with existing monitoring tools.",
     security(
         ("Authorization"= [])
     ),
@@ -231,6 +235,8 @@ async fn query(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusRangeQuery",
+    summary = "Execute Prometheus range query",
+    description = "Executes a Prometheus range query over a specified time period. Returns time series data with multiple data points for metrics matching the query expression. Compatible with Prometheus range query API for time series analysis and visualization.",
     security(
         ("Authorization"= [])
     ),
@@ -310,6 +316,8 @@ pub async fn query_range_post(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusQueryExemplars",
+    summary = "Query Prometheus exemplars",
+    description = "Queries exemplars for metrics within a specified time range. Exemplars are references to trace data that are associated with specific metric data points, enabling correlation between metrics and traces for observability workflows.",
     security(
         ("Authorization"= [])
     ),
@@ -528,6 +536,8 @@ async fn query_range(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusMetadata",
+    summary = "Get metric metadata",
+    description = "Retrieves metadata information about metrics including their type, help text, and units. Provides essential information for understanding metric semantics and proper usage in queries and visualizations.",
     security(
         ("Authorization"= [])
     ),
@@ -590,6 +600,8 @@ pub async fn metadata(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusSeries",
+    summary = "Find metric series",
+    description = "Finds time series that match given label matchers. Returns the unique combinations of metric names and labels that exist in the specified time range. Useful for discovering available metrics and their label combinations.",
     security(
         ("Authorization"= [])
     ),
@@ -734,6 +746,8 @@ async fn series(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusLabels",
+    summary = "Get metric label names",
+    description = "Returns a list of label names available in the metric data within the specified time range. Optionally filter by series selector to get labels for specific metrics. Useful for building dynamic queries and understanding data structure.",
     security(
         ("Authorization"= [])
     ),
@@ -832,6 +846,8 @@ async fn labels(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusLabelValues",
+    summary = "Get label values",
+    description = "Returns all possible values for a specific label name within the specified time range. Optionally filter by series selector to get values for specific metrics. Essential for building filters and understanding label cardinality.",
     security(
         ("Authorization"= [])
     ),
@@ -946,6 +962,8 @@ fn validate_metadata_params(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusFormatQuery",
+    summary = "Format Prometheus query",
+    description = "Formats and prettifies a Prometheus query expression. Returns the query in a standardized, readable format which helps with query validation, debugging, and ensuring consistent query formatting across applications.",
     security(
         ("Authorization"= [])
     ),

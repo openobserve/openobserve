@@ -164,6 +164,8 @@ impl From<RatelimitError> for HttpResponse {
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "listApiModule",
+    summary = "List API modules",
+    description = "Retrieves all available API modules that can have rate limiting rules applied. Used for configuring rate limits at the module level",
     security(
         ("Authorization"= [])
     ),
@@ -211,6 +213,8 @@ pub async fn api_modules(path: web::Path<String>) -> Result<HttpResponse, Error>
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "listModuleRatelimitRule",
+    summary = "List module rate limit rules",
+    description = "Retrieves rate limiting rules applied at the organization module level, including thresholds and configurations for different API groups",
     security(
         ("Authorization"= [])
     ),
@@ -276,6 +280,8 @@ pub async fn list_module_ratelimit(
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "listRoleRatelimitRule",
+    summary = "List role-based rate limit rules",
+    description = "Retrieves rate limiting rules applied to specific user roles within the organization, showing how different roles have different API usage limits",
     security(
         ("Authorization"= [])
     ),
@@ -360,6 +366,8 @@ pub async fn list_role_ratelimit(
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "UpdateRatelimitRule",
+    summary = "Update rate limit rules",
+    description = "Updates rate limiting rules for modules or user roles. Allows setting custom thresholds for different API operations and groups",
     security(
         ("Authorization"= [])
     ),

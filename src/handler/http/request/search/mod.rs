@@ -163,6 +163,8 @@ async fn can_use_distinct_stream(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchSQL",
+    summary = "Search data with SQL",
+    description = "Executes SQL queries against log streams with support for complex search patterns, time range filtering, aggregations, and histogram generation. Supports advanced features like multi-stream searches, caching, and UI optimizations for dashboard visualizations.",
     security(
         ("Authorization"= [])
     ),
@@ -451,6 +453,8 @@ pub async fn search(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchAround",
+    summary = "Search around specific log entry",
+    description = "Searches for log entries around a specific key (timestamp or record identifier) within a stream. Returns logs before and after the specified key, useful for investigating context around specific events or errors.",
     security(
         ("Authorization"= [])
     ),
@@ -550,6 +554,8 @@ pub async fn around_v1(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchAroundV2",
+    summary = "Search around specific log record",
+    description = "Advanced version of around search that accepts a full log record in the request body instead of just a key. Searches for log entries around the specified record, providing better context matching based on the complete record data.",
     security(
         ("Authorization"= [])
     ),
@@ -659,6 +665,8 @@ pub async fn around_v2(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchValues",
+    summary = "Get distinct field values",
+    description = "Retrieves the top N distinct values for specified fields within a stream and time range. Supports filtering, keyword search, and frequency counting. Essential for building dynamic filters, dropdowns, and understanding data cardinality in dashboards and analytics.",
     security(
         ("Authorization"= [])
     ),

@@ -60,6 +60,8 @@ pub mod service_accounts;
     context_path = "/api",
     tag = "Users",
     operation_id = "UserList",
+    summary = "List organization users",
+    description = "Retrieves a list of all users within the specified organization, with optional filtering to list all users across organizations",
     security(
         ("Authorization"= [])
     ),
@@ -118,6 +120,8 @@ pub async fn list(
     context_path = "/api",
     tag = "Users",
     operation_id = "UserSave",
+    summary = "Create new user",
+    description = "Creates a new user account within the organization with specified role and credentials. Password must be at least 8 characters long",
     security(
         ("Authorization"= [])
     ),
@@ -172,6 +176,8 @@ pub async fn save(
     context_path = "/api",
     tag = "Users",
     operation_id = "UserUpdate",
+    summary = "Update user account",
+    description = "Updates user account information including role, password, or other profile details. Users can update their own accounts or administrators can update other users",
     security(
         ("Authorization"= [])
     ),
@@ -236,6 +242,8 @@ pub async fn update(
     context_path = "/api",
     tag = "Users",
     operation_id = "AddUserToOrg",
+    summary = "Add user to organization",
+    description = "Adds an existing user to the organization with the specified role. The user must already exist in the system",
     security(
         ("Authorization"= [])
     ),
@@ -287,6 +295,8 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
     context_path = "/api",
     tag = "Users",
     operation_id = "RemoveUserFromOrg",
+    summary = "Remove user from organization",
+    description = "Removes a user from the organization, revoking their access to organization resources. The user account itself is not deleted",
     security(
         ("Authorization"= [])
     ),
@@ -316,6 +326,8 @@ pub async fn delete(
 context_path = "/auth",
     tag = "Auth",
     operation_id = "UserLoginCheck",
+    summary = "Authenticate user",
+    description = "Authenticates user credentials and returns authentication tokens in response cookies. Supports both JSON body and Authorization header authentication",
     request_body(content = SignInUser, description = "User login", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = SignInResponse),
@@ -712,6 +724,8 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
     context_path = "/api",
     tag = "Users",
     operation_id = "UserRoles",
+    summary = "List available user roles",
+    description = "Retrieves a list of all available user roles that can be assigned to users within the organization",
     security(
         ("Authorization"= [])
     ),
@@ -769,6 +783,8 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
     context_path = "/api",
     tag = "Users",
     operation_id = "UserInvitations",
+    summary = "List user invitations",
+    description = "Retrieves a list of pending invitations for the authenticated user across different organizations",
     security(
         ("Authorization"= [])
     ),

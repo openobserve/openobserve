@@ -25,6 +25,8 @@ use config::meta::function::{FunctionList, TestVRLRequest, Transform};
     context_path = "/api",
     tag = "Functions",
     operation_id = "createFunction",
+    summary = "Create new function",
+    description = "Creates a new custom transformation function using VRL (Vector Remap Language) code. Functions can be used in pipelines to transform data",
     security(
         ("Authorization"= [])
     ),
@@ -56,6 +58,8 @@ pub async fn save_function(
     context_path = "/api",
     tag = "Functions",
     operation_id = "listFunctions",
+    summary = "List organization functions",
+    description = "Retrieves all custom transformation functions available in the organization, including their VRL code and usage status",
     security(
         ("Authorization"= [])
     ),
@@ -106,6 +110,8 @@ async fn list_functions(
     context_path = "/api",
     tag = "Functions",
     operation_id = "deleteFunction",
+    summary = "Delete function",
+    description = "Permanently deletes a custom transformation function. Use force parameter to delete even if the function is used by active pipelines",
     security(
         ("Authorization"= [])
     ),
@@ -132,6 +138,8 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
     context_path = "/api",
     tag = "Functions",
     operation_id = "updateFunction",
+    summary = "Update function",
+    description = "Updates an existing transformation function with new VRL code or configuration. Changes will apply to all pipelines using this function",
     security(
         ("Authorization"= [])
     ),
@@ -165,6 +173,8 @@ pub async fn update_function(
     context_path = "/api",
     tag = "Functions",
     operation_id = "functionPipelineDependency",
+    summary = "Get function pipeline dependencies",
+    description = "Lists all pipelines that currently use the specified function. Useful for understanding impact before making changes to a function",
     security(
         ("Authorization"= [])
     ),
@@ -191,6 +201,8 @@ pub async fn list_pipeline_dependencies(
     context_path = "/api",
     tag = "Functions",
     operation_id = "testFunction",
+    summary = "Test function execution",
+    description = "Tests a VRL transformation function against sample events to validate the function logic and see the expected output before deployment",
     security(
         ("Authorization"= [])
     ),

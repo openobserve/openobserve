@@ -75,6 +75,8 @@ impl From<DashboardError> for HttpResponse {
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "CreateDashboard",
+    summary = "Create new dashboard",
+    description = "Creates a new dashboard with specified title, description, and visualization panels. The dashboard will be saved in the specified folder",
     security(
         ("Authorization" = [])
     ),
@@ -126,6 +128,8 @@ pub async fn create_dashboard(
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "UpdateDashboard",
+    summary = "Update existing dashboard",
+    description = "Updates an existing dashboard with new content, panels, or settings. Supports concurrent edit conflict detection using hash values",
     security(
         ("Authorization" = [])
     ),
@@ -180,6 +184,8 @@ async fn update_dashboard(
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "ListDashboards",
+    summary = "List organization dashboards",
+    description = "Retrieves a list of dashboards within the organization, with optional filtering by folder and pagination support",
     security(
         ("Authorization" = [])
     ),
@@ -215,6 +221,8 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "GetDashboard",
+    summary = "Get dashboard details",
+    description = "Retrieves complete details of a specific dashboard including its panels, queries, and visualization configurations",
     security(
         ("Authorization" = [])
     ),
@@ -245,6 +253,8 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "ExportDashboard",
+    summary = "Export dashboard",
+    description = "Exports a dashboard configuration in a portable format that can be imported into other organizations or instances",
     security(
         ("Authorization" = [])
     ),
@@ -275,6 +285,8 @@ pub async fn export_dashboard(path: web::Path<(String, String)>) -> impl Respond
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "DeleteDashboard",
+    summary = "Delete dashboard",
+    description = "Permanently deletes a dashboard and all its associated panels and configurations. This action cannot be undone",
     security(
         ("Authorization" = [])
     ),
@@ -307,6 +319,8 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "MoveDashboard",
+    summary = "Move dashboard to folder",
+    description = "Moves a dashboard from one folder to another within the organization. The dashboard content remains unchanged",
     security(
         ("Authorization" = [])
     ),
@@ -359,6 +373,8 @@ async fn move_dashboard(
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "MoveDashboards",
+    summary = "Move multiple dashboards",
+    description = "Moves multiple dashboards to a specified destination folder in a single batch operation. Useful for organizing dashboards efficiently",
     security(
         ("Authorization"= [])
     ),

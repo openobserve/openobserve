@@ -43,6 +43,8 @@ impl From<PipelineError> for HttpResponse {
     context_path = "/api",
     tag = "Pipeline",
     operation_id = "createPipeline",
+    summary = "Create new pipeline",
+    description = "Creates a new data processing pipeline with specified transformations and routing rules. Pipelines define how incoming data is processed before storage",
     security(
         ("Authorization"= [])
     ),
@@ -89,6 +91,8 @@ pub async fn save_pipeline(
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "listPipelines",
+    summary = "List organization pipelines",
+    description = "Retrieves all data processing pipelines configured for the organization, including their status and associated triggers",
     security(
         ("Authorization"= [])
     ),
@@ -154,6 +158,8 @@ async fn list_pipelines(
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "getStreamsWithPipeline",
+    summary = "Get streams with pipelines",
+    description = "Retrieves a list of streams that have associated data processing pipelines, showing the relationship between streams and their transformation rules",
     security(
         ("Authorization"= [])
     ),
@@ -180,6 +186,8 @@ async fn list_streams_with_pipeline(path: web::Path<String>) -> Result<HttpRespo
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "deletePipeline",
+    summary = "Delete pipeline",
+    description = "Permanently deletes a data processing pipeline. This will stop any ongoing data transformations using this pipeline",
     security(
         ("Authorization"= [])
     ),
@@ -211,6 +219,8 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "updatePipeline",
+    summary = "Update pipeline",
+    description = "Updates an existing data processing pipeline with new transformation rules, routing configurations, or other settings",
     security(
         ("Authorization"= [])
     ),
@@ -242,6 +252,8 @@ pub async fn update_pipeline(pipeline: web::Json<Pipeline>) -> Result<HttpRespon
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "enablePipeline",
+    summary = "Enable or disable pipeline",
+    description = "Enables or disables a data processing pipeline. Disabled pipelines will not process incoming data until re-enabled",
     security(
         ("Authorization"= [])
     ),
