@@ -182,10 +182,14 @@ impl Sql {
         // 5. get match_all() value
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
-        let need_fst_fields = match_visitor.has_match_all;
 
         // 6. check if have full text search filed in stream
-        if stream_names.len() == 1 && need_fst_fields {
+        if match_visitor.has_match_all {
+            if match_visitor.is_multi_stream {
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                    "Using match_all() function in a subquery/join is not supported".to_string(),
+                )));
+            }
             let schema = total_schemas.values().next().unwrap();
             let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
             let fts_fields = get_stream_setting_fts_fields(&stream_settings);
@@ -212,7 +216,7 @@ impl Sql {
                 query.quick_mode || cfg.limit.quick_mode_force_enabled,
                 cfg.limit.quick_mode_num_fields,
                 &search_event_type,
-                need_fst_fields,
+                match_visitor.has_match_all,
             );
         } else {
             for (stream, schema) in total_schemas.iter() {

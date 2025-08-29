@@ -100,7 +100,7 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     let mut rules: Vec<Arc<dyn OptimizerRule + Send + Sync>> = Vec::with_capacity(64);
 
     // get full text search fields
-    if sql.has_match_all && sql.stream_names.len() == 1 {
+    if sql.has_match_all {
         let mut fields = Vec::new();
         let stream_name = &sql.stream_names[0];
         let schema = sql.schemas.get(stream_name).unwrap();
