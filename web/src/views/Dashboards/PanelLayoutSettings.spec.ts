@@ -36,6 +36,11 @@ const createMockRouter = () => {
     history: createWebHistory(),
     routes: [
       {
+        path: "/",
+        name: "home",
+        component: { template: "<div>Home</div>" },
+      },
+      {
         path: "/dashboard",
         name: "dashboard",
         component: { template: "<div>Dashboard</div>" },
@@ -186,7 +191,7 @@ describe("PanelLayoutSettings.vue", () => {
       // Set a very small height that would result in negative count
       wrapper.vm.updatedLayout.h = 0.5; // 0.5 * 30 - 24 = -9, which is negative
       const result = wrapper.vm.getRowCount;
-      expect(result === 0 || result === -0).toBe(true);
+      expect(result == 0).toBe(true);
     });
 
     it("should calculate getRowCount correctly for height of 1", () => {
@@ -346,7 +351,7 @@ describe("PanelLayoutSettings.vue", () => {
     it("should handle zero height correctly in getRowCount", () => {
       wrapper.vm.updatedLayout.h = 0;
       const result = wrapper.vm.getRowCount;
-      expect(result === 0 || result === -0).toBe(true);
+      expect(result == 0).toBe(true);
     });
 
     it("should handle very large height in getRowCount", () => {
@@ -417,7 +422,7 @@ describe("PanelLayoutSettings.vue", () => {
       // This means h * 30 - 24 < 0, so h < 24/30 = 0.8
       wrapper.vm.updatedLayout.h = 0.7; // This should result in negative count
       const result = wrapper.vm.getRowCount;
-      expect(result === 0 || result === -0).toBe(true);
+      expect(result == 0).toBe(true);
     });
   });
 });
