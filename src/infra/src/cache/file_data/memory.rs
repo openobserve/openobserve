@@ -20,7 +20,7 @@ use std::{
 
 use bytes::Bytes;
 use config::{
-    RwHashMap, get_config, metrics,
+    RwHashMap, get_config, metrics, spawn_pausable_job,
     utils::hash::{Sum64, gxhash},
 };
 use once_cell::sync::Lazy;
@@ -216,25 +216,13 @@ impl FileData {
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-
     for file in FILES.iter() {
         _ = file.read().await.get("", None).await;
     }
 
-    tokio::task::spawn(async move {
-        if cfg.memory_cache.gc_interval == 0 {
-            return;
-        }
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
-            cfg.memory_cache.gc_interval,
-        ));
-        interval.tick().await; // the first tick is immediate
-        loop {
-            if let Err(e) = gc().await {
-                log::error!("memory cache gc error: {}", e);
-            }
-            interval.tick().await;
+    spawn_pausable_job!("memory_cache_gc", get_config().memory_cache.gc_interval, {
+        if let Err(e) = gc().await {
+            log::error!("memory cache gc error: {e}");
         }
     });
     Ok(())
