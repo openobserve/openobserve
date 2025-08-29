@@ -17,7 +17,7 @@ interface IdentityPayload {
 const isLoaded = ref(false);
 let reoInstance: any = null;
 
-const clientID = "19d81da7206c05b";
+const clientID = config.REO_CLIENT_KEY || "";
 const source = "app";
 const enableAnalytics = config.enableAnalytics == "true";
 
