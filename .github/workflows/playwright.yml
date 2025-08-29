@@ -290,10 +290,11 @@ jobs:
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npx nyc report
 
-      - uses: actions/upload-artifact@v4
-        if: always()
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always() && hashFiles('playwright-report/**') != ''
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.testfolder }}
           path: playwright-report/
           retention-days: 30
 
