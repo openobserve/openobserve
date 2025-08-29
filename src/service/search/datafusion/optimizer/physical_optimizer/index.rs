@@ -17,20 +17,16 @@ use std::{collections::HashSet, sync::Arc};
 
 use datafusion::{
     common::{
-        Result,
         tree_node::{
             Transformed, TransformedResult, TreeNode, TreeNodeRecursion, TreeNodeRewriter,
-        },
+        }, Result
     },
     config::ConfigOptions,
     logical_expr::Operator,
-    physical_expr::{ScalarFunctionExpr, conjunction, split_conjunction},
+    physical_expr::{conjunction, split_conjunction, ScalarFunctionExpr},
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
-        ExecutionPlan, PhysicalExpr,
-        expressions::{BinaryExpr, Column, InListExpr, Literal, NotExpr},
-        filter::FilterExec,
-        projection::ProjectionExec,
+        expressions::{BinaryExpr, CastExpr, Column, InListExpr, Literal, NotExpr}, filter::FilterExec, projection::ProjectionExec, ExecutionPlan, PhysicalExpr
     },
 };
 use parking_lot::Mutex;
@@ -216,7 +212,13 @@ fn is_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
 }
 
 fn get_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
-    expr.as_any().downcast_ref::<Column>().unwrap().name()
+    if let Some(expr) = expr.as_any().downcast_ref::<Column>() {
+        expr.name()
+    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
+        get_column_name(expr.expr())
+    } else {
+        "__o2_unknown_column__"
+    }
 }
 
 fn is_value(expr: &Arc<dyn PhysicalExpr>) -> bool {
