@@ -602,7 +602,22 @@ describe("DrilldownPopUp", () => {
 
     it("should save drilldown in create mode", () => {
       wrapper = createWrapper();
-      wrapper.vm.drilldownData = { name: 'New Drilldown', type: 'logs' };
+      wrapper.vm.drilldownData = { 
+        name: 'New Drilldown', 
+        type: 'logs',
+        targetBlank: false,
+        findBy: "name",
+        data: {
+          logsMode: "auto",
+          logsQuery: "",
+          url: "",
+          folder: "",
+          dashboard: "",
+          tab: "",
+          passAllVariables: true,
+          variables: []
+        }
+      };
 
       const initialLength = mockDashboardPanelData.data.config.drilldown.length;
       wrapper.vm.saveDrilldown();
