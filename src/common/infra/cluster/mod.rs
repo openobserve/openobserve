@@ -706,6 +706,39 @@ async fn update_node_status_metrics() -> NodeMetrics {
     node_status
 }
 
+pub async fn cache_node_list() -> Result<Vec<i32>> {
+    let cfg = get_config();
+    if cfg.common.local_mode {
+        return Ok(vec![]);
+    }
+    let node_list = match list_nodes().await {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(e);
+        }
+    };
+    let mut node_ids = Vec::new();
+    let mut w = NODES.write().await;
+    for node in node_list {
+        if node.is_interactive_querier() {
+            add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
+        }
+        if node.is_background_querier() {
+            add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background)).await;
+        }
+        if node.is_compactor() {
+            add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
+        }
+        if node.is_flatten_compactor() {
+            add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
+        }
+        node_ids.push(node.id);
+        w.insert(node.uuid.clone(), node);
+    }
+    drop(w);
+    Ok(node_ids)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

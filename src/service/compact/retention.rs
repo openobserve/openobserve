@@ -19,7 +19,9 @@ use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config, is_local_disk_storage,
-    meta::stream::{FileKey, FileListDeleted, PartitionTimeLevel, StreamType, TimeRange},
+    meta::stream::{
+        FileKey, FileListBookKeepMode, FileListDeleted, PartitionTimeLevel, StreamType, TimeRange,
+    },
     utils::time::{BASE_TIME, day_micros, get_ymdh_from_micros, hour_micros},
 };
 use infra::{
@@ -505,7 +507,10 @@ async fn write_file_list(
         let created_at = Utc::now().timestamp_micros();
         for _ in 0..5 {
             // only store the file_list into history, don't delete files
-            if cfg.compact.data_retention_history
+            if cfg
+                .compact
+                .file_list_deleted_mode
+                .eq(&FileListBookKeepMode::History.to_string())
                 && let Err(e) = infra_file_list::batch_add_history(&events).await
             {
                 log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
@@ -518,7 +523,11 @@ async fn write_file_list(
                 continue;
             }
             // store to file_list_deleted table, pending delete
-            if !cfg.compact.data_retention_history {
+            if cfg
+                .compact
+                .file_list_deleted_mode
+                .eq(&FileListBookKeepMode::Deleted.to_string())
+            {
                 let del_items = events
                     .iter()
                     .map(|v| FileListDeleted {
