@@ -1,6 +1,7 @@
 // ingestion.js
 import logsdata from "../../../../test-data/logs_data.json";
 import geoMapdata from "../../../../test-data/geo_map.json";
+// Fixed testLogger path - updated to use correct relative path
 const testLogger = require('../../utils/test-logger.js');
 
 // Exported function to remove UTF characters
