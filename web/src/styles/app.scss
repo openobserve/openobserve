@@ -353,76 +353,59 @@
 //so to make this work just introduce a new div around the app-tabs component and add the class app-tabs-container to it
 //and then add the class tabs-selection-container-dark or tabs-selection-container-light to the app-tabs component
 .app-tabs-container{
-  padding: 0px;
-}
-
-.app-tabs-container-dark{
-  border: 1px solid #DFE1E5;
-  border-radius: 4px;
-  background-color: #000000 !important;
-
-}
-.app-tabs-container-light{
-  border: 1px solid #C9CCD6;
-  border-radius: 4px;
-  background-color: #F7F8FA;
-
+  border: 1px solid #cacaca;
+  padding: 2px;
+  border-radius: 2px;
 }
 
 .tabs-selection-container-dark{
   border: none !important;
   border-radius: none !important;
   .rum-tab{
-    height: 100% !important;
-    margin: 0px !important;
+    border-radius: 4px !important;
+    height: 30px !important;
+    margin: 0 2px !important;
+    padding: 4px 12px !important;
+    border-bottom: none !important;
     width: auto !important;
     white-space: normal !important;
-    background-color: #2B2D30 !important;
-    font-size: 13px !important;
-    font-weight: 500 !important;
-    line-height: 16px !important;
   }
   .active{
-    background-color: #575FC5 !important;
-    color: #F7F8FA !important;
-    border-radius: 4px !important;
-
+    background-color: $primary !important;
+    color: white !important;
+    border: 1px solid #cacaca !important;
+    border-bottom: 1px solid #cacaca !important;
   }
   .rum-tab:hover{
-    background-color: #5A5D6B !important;
-    border-radius: 4px !important;
+    background-color: #373A3B !important;
   }
   .rum-tab.active:hover{
-    background-color: #575FC5 !important;
-    border-radius: 4px !important;
+    background-color: $primary !important;
   }
 }
 
 .tabs-selection-container-light{
   border: none !important;
-  height: 100% !important;
+  border-radius: none !important;
   .rum-tab{
-    height: 100% !important;
-    margin: 0px !important;
+    border-radius: 4px !important;
+    height: 30px !important;
+    margin: 0 2px !important;
+    padding: 4px 12px !important;
+    border-bottom: none !important;
     width: auto !important;
     white-space: normal !important;
-    background-color: #EBECF0;
-    font-size: 13px !important;
-    font-weight: 500 !important;
-    line-height: 16px !important;
   }
-  .active{
-    background-color: #575FC5 !important;
-    color: #F7F8FA !important;
-    border-radius: 4px !important;
+  .rum-tab.active{
+    background-color: $primary !important;
+    color: white !important;
+    border: 1px solid #cacaca !important;
   }
   .rum-tab:hover{
-    background-color: #D3D5DB !important;
-    border-radius: 4px !important;
+    background-color: #f0f0f0 !important;
   }
   .rum-tab.active:hover{
-    background-color: #575FC5 !important;
-    border-radius: 4px !important;
+    background-color: $primary !important;
   }
 }
 
