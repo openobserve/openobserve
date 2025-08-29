@@ -354,6 +354,11 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .await
                         .expect("file list remote calculate stats failed");
                 }
+                "node-list" => {
+                    crate::common::infra::cluster::cache_node_list()
+                        .await
+                        .expect("node list refresh failed");
+                }
                 _ => {
                     return Err(anyhow::anyhow!(
                         "unsupported reset component: {}",

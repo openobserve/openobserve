@@ -95,39 +95,7 @@ async fn register() -> Result<()> {
     task::spawn(async move { super::watch_node_list().await });
 
     // 3. get node list
-    let node_list = match super::list_nodes().await {
-        Ok(v) => v,
-        Err(e) => {
-            dist_lock::unlock(&locker).await.map_err(|e| {
-                log::error!("[CLUSTER] nats unlock failed: {}", e);
-                e
-            })?;
-            return Err(e);
-        }
-    };
-
-    // 4. calculate node_id
-    let mut node_ids = Vec::new();
-    let mut w = super::NODES.write().await;
-    for node in node_list {
-        if node.is_interactive_querier() {
-            super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive))
-                .await;
-        }
-        if node.is_background_querier() {
-            super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background))
-                .await;
-        }
-        if node.is_compactor() {
-            super::add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
-        }
-        if node.is_flatten_compactor() {
-            super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
-        }
-        node_ids.push(node.id);
-        w.insert(node.uuid.clone(), node);
-    }
-    drop(w);
+    let node_ids = cache_node_list(&locker).await?;
 
     let new_node_id = generate_node_id(node_ids);
     // update local id
@@ -197,6 +165,41 @@ async fn register() -> Result<()> {
 
     log::info!("[CLUSTER] Register to cluster ok");
     Ok(())
+}
+
+pub(crate) async fn cache_node_list(locker: &Option<dist_lock::Locker>) -> Result<Vec<i32>> {
+    let node_list = match super::list_nodes().await {
+        Ok(v) => v,
+        Err(e) => {
+            dist_lock::unlock(locker).await.map_err(|e| {
+                log::error!("[CLUSTER] nats unlock failed: {}", e);
+                e
+            })?;
+            return Err(e);
+        }
+    };
+    let mut node_ids = Vec::new();
+    let mut w = super::NODES.write().await;
+    for node in node_list {
+        if node.is_interactive_querier() {
+            super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive))
+                .await;
+        }
+        if node.is_background_querier() {
+            super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background))
+                .await;
+        }
+        if node.is_compactor() {
+            super::add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
+        }
+        if node.is_flatten_compactor() {
+            super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
+        }
+        node_ids.push(node.id);
+        w.insert(node.uuid.clone(), node);
+    }
+    drop(w);
+    Ok(node_ids)
 }
 
 fn generate_node_id(mut ids: Vec<i32>) -> i32 {

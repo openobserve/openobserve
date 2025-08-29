@@ -37,6 +37,7 @@ use config::{
 };
 use infra::{
     db::{Event, get_coordinator},
+    dist_lock,
     errors::Result,
 };
 use once_cell::sync::Lazy;
@@ -687,6 +688,36 @@ async fn update_node_status_metrics() -> NodeMetrics {
     }
 
     node_status
+}
+
+pub async fn cache_node_list() -> Result<()> {
+    let cfg = get_config();
+    if cfg.common.local_mode {
+        return Ok(());
+    }
+
+    // 1. create a cluster lock for node register
+    let locker = dist_lock::lock(
+        "/nodes/reset_node_list",
+        cfg.limit.node_heartbeat_ttl as u64,
+    )
+    .await
+    .map_err(|e| {
+        log::error!("[CLUSTER] nats register failed: {}", e);
+        e
+    })?;
+
+    if let Ok(nodes) = match cfg.common.cluster_coordinator.as_str().into() {
+        MetaStore::Nats => nats::cache_node_list(&locker).await,
+        _ => etcd::cache_node_list(&locker).await,
+    } {
+        log::info!("[CLUSTER] cached {} nodes", nodes.len());
+    };
+    dist_lock::unlock(&locker).await.map_err(|e| {
+        log::error!("[CLUSTER] nats unlock failed: {}", e);
+        e
+    })?;
+    Ok(())
 }
 
 #[cfg(test)]
