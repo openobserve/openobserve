@@ -19,7 +19,6 @@ import { useQuasar } from "quasar";
 import { ref, reactive } from "vue";
 import type { SearchRequestPayload, WebSocketSearchPayload, WebSocketSearchResponse } from "@/ts/interfaces";
 import { logsApi } from "@/services/logs/logsApi";
-import { savedViewsApi } from "@/services/logs/savedViewsApi";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useQuery from "@/composables/useQuery";
 import { useLogsState } from "@/composables/useLogsState";

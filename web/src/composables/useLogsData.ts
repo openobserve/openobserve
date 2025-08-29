@@ -20,7 +20,6 @@ import type { SearchRequestPayload, WebSocketSearchPayload, WebSocketSearchRespo
 import { useLogsState } from "@/composables/useLogsState";
 import streamService from "@/services/stream";
 import { logsApi } from "@/services/logs/logsApi";
-import { savedViewsApi } from "@/services/logs/savedViewsApi";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import {
   formatLogDataUtil,
@@ -179,23 +178,130 @@ export const useLogsData = () => {
   };
 
   /**
-   * Extract and process fields from search results
+   * Extract and process fields from stream schemas
+   * This function works with cached stream data when available
    */
-  const extractFields = () => {
+  const extractFields = async () => {
     try {
-      const fieldsSet = new Set<string>();
-      
-      if (searchObj.data.queryResults.hits) {
-        for (const hit of searchObj.data.queryResults.hits) {
-          if (hit._source) {
-            Object.keys(hit._source).forEach(key => fieldsSet.add(key));
+      searchObj.loadingStream = true;
+      searchObj.data.errorMsg = "";
+      searchObj.data.errorDetail = "";
+      searchObj.data.countErrorMsg = "";
+
+      if (!searchObj.data.stream.selectedStream.length) {
+        searchObj.data.stream.selectedStreamFields = [];
+        searchObj.data.stream.interestingFieldList = [];
+        searchObj.loadingStream = false;
+        return [];
+      }
+
+      // If we already have selectedStreamFields populated (e.g., from onStreamChange), 
+      // use those instead of making new API calls
+      if (searchObj.data.stream.selectedStreamFields?.length > 0) {
+        console.log("🔧 extractFields: Using cached fields", {
+          fieldCount: searchObj.data.stream.selectedStreamFields.length,
+          sampleFields: searchObj.data.stream.selectedStreamFields.slice(0, 3).map(f => ({name: f.name, type: f.type}))
+        });
+
+        // Update field keywords for SQL suggestions
+        updateFieldKeywords(searchObj.data.stream.selectedStreamFields);
+
+        // Create index mapping for fields
+        streamSchemaFieldsIndexMapping.value = {};
+        searchObj.data.stream.selectedStreamFields.forEach((field: any, index: number) => {
+          streamSchemaFieldsIndexMapping.value[field.name] = index;
+        });
+
+        console.log("✅ extractFields completed with cached fields");
+        searchObj.loadingStream = false;
+        return searchObj.data.stream.selectedStreamFields;
+      }
+
+      // If no fields are cached, fall back to the direct API approach
+      const orgIdentifier = store.state.selectedOrganization?.identifier;
+      if (!orgIdentifier) {
+        searchObj.loadingStream = false;
+        return [];
+      }
+
+      const streamType = searchObj.data.stream.streamType || "logs";
+      const timestampField = store.state.zoConfig?.timestamp_column || "_timestamp";
+      const allFields: any[] = [];
+
+      // Get fields for each selected stream
+      for (const stream of searchObj.data.stream.selectedStream) {
+        const streamName = stream.value || stream.name || stream;
+        
+        try {
+          const fieldsResponse = await streamService.schema(
+            orgIdentifier,
+            streamName,
+            streamType
+          );
+          
+          if (fieldsResponse.data?.fields) {
+            const streamFields = fieldsResponse.data.fields.map((field: any) => ({
+              ...field,
+              streams: [streamName],
+              group: streamName,
+              isSchemaField: true,
+              isInterestingField: false,
+              showValues: true
+            }));
+            allFields.push(...streamFields);
           }
+        } catch (fieldError) {
+          console.warn(`Error getting fields for stream ${streamName}:`, fieldError);
         }
       }
-      
-      return Array.from(fieldsSet).sort();
+
+      // Remove duplicates and sort
+      const uniqueFields = allFields.filter((field, index, arr) => 
+        arr.findIndex(f => f.name === field.name) === index
+      );
+
+      // Sort fields with timestamp first
+      const sortedFields = uniqueFields.sort((a, b) => {
+        if (a.name === timestampField) return -1;
+        if (b.name === timestampField) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      searchObj.data.stream.selectedStreamFields = sortedFields;
+
+      // Update field keywords for SQL suggestions
+      updateFieldKeywords(sortedFields);
+
+      // Create index mapping for fields
+      streamSchemaFieldsIndexMapping.value = {};
+      sortedFields.forEach((field: any, index: number) => {
+        streamSchemaFieldsIndexMapping.value[field.name] = index;
+      });
+
+      searchObj.loadingStream = false;
+      return sortedFields;
     } catch (error: any) {
       console.error("Error extracting fields:", error);
+      searchObj.loadingStream = false;
+      searchObj.data.errorMsg = error.message || "Error extracting stream fields";
+      return [];
+    }
+  };
+
+  /**
+   * Extract FTS (Full Text Search) fields from selected stream fields
+   */
+  const extractFTSFields = () => {
+    try {
+      if (!searchObj.data.stream.selectedStreamFields?.length) {
+        return [];
+      }
+
+      return searchObj.data.stream.selectedStreamFields
+        .filter((field: any) => field.ftsKey === true)
+        .map((field: any) => field.name);
+    } catch (error: any) {
+      console.error("Error extracting FTS fields:", error);
       return [];
     }
   };
@@ -268,17 +374,17 @@ export const useLogsData = () => {
    */
   const updateGridColumns = () => {
     try {
-      const allFields = extractFields();
-      const selectedFields = searchObj.data.stream.selectedFields;
+      const allFields = searchObj.data.stream.selectedStreamFields || [];
+      const selectedFields = searchObj.data.stream.selectedFields || [];
       
-      // Create column configuration
-      const columns = allFields.map((field: string) => ({
-        name: field,
-        label: field,
-        field: (row: any) => row._source?.[field],
+      // Create column configuration from stream fields
+      const columns = allFields.map((field: any) => ({
+        name: field.name,
+        label: field.name,
+        field: (row: any) => row._source?.[field.name],
         align: "left" as const,
         sortable: true,
-        visible: selectedFields.length === 0 || selectedFields.includes(field)
+        visible: selectedFields.length === 0 || selectedFields.includes(field.name)
       }));
 
       searchObj.data.resultGrid = {
@@ -477,27 +583,6 @@ export const useLogsData = () => {
     }
   };
 
-  /**
-   * Extract Full-Text Search (FTS) fields
-   */
-  const extractFTSFields = () => {
-    try {
-      const ftsFields: string[] = [];
-      
-      if (searchObj.data.stream.selectedStreamFields) {
-        for (const field of searchObj.data.stream.selectedStreamFields) {
-          if (field.fts_key === true) {
-            ftsFields.push(field.name);
-          }
-        }
-      }
-
-      return ftsFields;
-    } catch (error: any) {
-      console.error("Error extracting FTS fields:", error);
-      return [];
-    }
-  };
 
   /**
    * Update selected streams
@@ -612,14 +697,22 @@ export const useLogsData = () => {
   };
 
   /**
-   * Reorder selected fields
+   * Reorder selected fields - if no fields provided, returns current selected fields
    */
-  const reorderSelectedFields = (fields: string[]) => {
+  const reorderSelectedFields = (fields?: string[]) => {
     try {
-      searchObj.data.stream.selectedFields = fields;
-      updateGridColumns();
+      if (fields !== undefined) {
+        // Set selected fields
+        searchObj.data.stream.selectedFields = fields;
+        updateGridColumns();
+        return fields;
+      } else {
+        // Return current selected fields
+        return searchObj.data.stream.selectedFields || [];
+      }
     } catch (error: any) {
       console.error("Error reordering selected fields:", error);
+      return [];
     }
   };
 

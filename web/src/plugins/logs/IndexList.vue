@@ -145,14 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tr>
           <q-tr
             :props="props"
-            v-else-if="
-              !showOnlyInterestingFields ||
-              (showOnlyInterestingFields &&
-                props.row.isInterestingField &&
-                searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-                  props.row.group
-                ])
-            "
+            v-else-if="!props.row.label"
             v-show="searchObj.data.stream.expandGroupRows[props.row.group]"
           >
             <q-td
@@ -1299,7 +1292,7 @@ export default defineComponent({
                   action_id,
                   type: searchObj.data.stream.streamType,
                   clusters:
-                    Object.hasOwn(searchObj.meta, "clusters") &&
+                    Object.prototype.hasOwnProperty.call(searchObj.meta, "clusters") &&
                     searchObj.meta.clusters.length > 0
                       ? searchObj.meta.clusters.join(",")
                       : "",
@@ -1396,9 +1389,13 @@ export default defineComponent({
       field: any,
       isInterestingField: boolean,
     ) => {
-      if (!Object.keys(streamSchemaFieldsIndexMapping.value).length) {
-        return;
-      }
+      console.log("⭐ addToInterestingFieldList called:", {
+        fieldName: field.name,
+        isInterestingField,
+        showOnlyInterestingFields: showOnlyInterestingFields.value,
+        fieldGroup: field.group,
+        selectedStreamFields: searchObj.data.stream.selectedStreamFields?.length
+      });
 
       const defaultInterestingFields = new Set(
         store.state?.zoConfig?.default_quick_mode_fields || [],
@@ -1434,21 +1431,21 @@ export default defineComponent({
           }
 
           field.isInterestingField = !isInterestingField;
-          fieldIndex = streamSchemaFieldsIndexMapping.value[field.name];
-          if (fieldIndex > -1) {
-            searchObj.data.stream.selectedStreamFields[
-              fieldIndex
-            ].isInterestingField = !isInterestingField;
-            fieldIndex = -1;
+          
+          // Update the field in selectedStreamFields array directly
+          const fieldInStreamRemove = searchObj.data.stream.selectedStreamFields.find(
+            (f: any) => f.name === field.name && !f.label
+          );
+          if (fieldInStreamRemove) {
+            fieldInStreamRemove.isInterestingField = !isInterestingField;
           }
-          // searchObj.data.stream.selectedStreamFields[3].isInterestingField = !isInterestingField;
           const localInterestingFields: any = useLocalInterestingFields();
           let localStreamFields: any = {};
           if (localInterestingFields.value != null) {
             localStreamFields = localInterestingFields.value;
           }
 
-          if (field.streams.length > 0) {
+          if (field.streams && field.streams.length > 0) {
             let localFieldIndex = -1;
             for (const selectedStream of field.streams) {
               localFieldIndex = localStreamFields?.[
@@ -1499,19 +1496,20 @@ export default defineComponent({
 
           const localInterestingFields: any = useLocalInterestingFields();
           field.isInterestingField = !isInterestingField;
-          fieldIndex = streamSchemaFieldsIndexMapping.value[field.name];
-          if (fieldIndex > -1) {
-            searchObj.data.stream.selectedStreamFields[
-              fieldIndex
-            ].isInterestingField = !isInterestingField;
-            fieldIndex = -1;
+          
+          // Update the field in selectedStreamFields array directly
+          const fieldInStreamAdd = searchObj.data.stream.selectedStreamFields.find(
+            (f: any) => f.name === field.name && !f.label
+          );
+          if (fieldInStreamAdd) {
+            fieldInStreamAdd.isInterestingField = !isInterestingField;
           }
 
           let localStreamFields: any = {};
           if (localInterestingFields.value != null) {
             localStreamFields = localInterestingFields.value;
           }
-          if (field.streams.length > 0) {
+          if (field.streams && field.streams.length > 0) {
             for (const selectedStream of field.streams) {
               if (selectedStream != undefined) {
                 if (
@@ -1571,55 +1569,74 @@ export default defineComponent({
             }
           }
           useLocalInterestingFields(localStreamFields);
-          addInterestingFieldToSelectedStreamFields(field);
+          addInterestingFieldToSelectedStreamFields();
         }
       }
 
       emit("setInterestingFieldInSQLQuery", field, isInterestingField);
     };
 
-    const addInterestingFieldToSelectedStreamFields = (field: any) => {
-      const defaultFields = [
-        store.state.zoConfig?.timestamp_column,
-        store.state.zoConfig?.all_fields_name,
-      ];
+    const addInterestingFieldToSelectedStreamFields = () => {
+      // Rebuild the entire selectedInterestingStreamFields array based on current state
+      rebuildInterestingFieldsArray();
+    };
 
-      let expandKeys = Object.keys(searchObj.data.stream.expandGroupRows);
-
-      let index = 0;
-      for (const key of expandKeys) {
-        if (Object.keys(expandKeys).length > 1) index += 1;
-
-        if (key === field.group) break;
-        index =
-          index +
-          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[key];
-      }
-
-      // Add the field to the beginning of the array, add all after timestamp column if timestamp column is present
-      if (field.name === store.state.zoConfig?.timestamp_column) {
-        searchObj.data.stream.selectedInterestingStreamFields.splice(
-          index,
-          0,
-          field,
+    const rebuildInterestingFieldsArray = () => {
+      console.log("🔄 rebuildInterestingFieldsArray: Starting rebuild", {
+        totalFields: searchObj.data.stream.selectedStreamFields.length,
+        interestingFieldList: searchObj.data.stream.interestingFieldList
+      });
+      
+      // Filter all stream fields to get only interesting ones
+      const interestingFields = searchObj.data.stream.selectedStreamFields.filter((field: any) => {
+        // Include group headers (label: true)
+        if (field.label) {
+          console.log("🏷️ Including group header:", field.name);
+          return true;
+        }
+        
+        // Include fields that are marked as interesting
+        if (field.isInterestingField) {
+          console.log("⭐ Including field marked as interesting:", field.name);
+          return true;
+        }
+        
+        // Include default interesting fields (like timestamp)
+        const defaultInterestingFields = new Set(
+          store.state?.zoConfig?.default_quick_mode_fields || []
         );
-      } else {
-        searchObj.data.stream.selectedInterestingStreamFields.splice(
-          index +
-            searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-              field.group
-            ],
-          0,
-          field,
-        );
-      }
-
-      searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-        field.group
-      ] =
-        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-          field.group
-        ] + 1;
+        if (defaultInterestingFields.has(field.name)) {
+          console.log("🔧 Including default interesting field:", field.name);
+          return true;
+        }
+        
+        // Include timestamp column by default
+        if (field.name === store.state.zoConfig?.timestamp_column) {
+          console.log("⏰ Including timestamp field:", field.name);
+          return true;
+        }
+        
+        console.log("❌ Excluding field:", field.name, { isInterestingField: field.isInterestingField });
+        return false;
+      });
+      
+      // Update the interesting fields array
+      searchObj.data.stream.selectedInterestingStreamFields = interestingFields;
+      
+      // Rebuild interesting field counts per group
+      searchObj.data.stream.interestingExpandedGroupRowsFieldCount = {};
+      
+      interestingFields.forEach((field: any) => {
+        if (!field.label && field.group) { // Skip group headers, count only actual fields
+          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[field.group] = 
+            (searchObj.data.stream.interestingExpandedGroupRowsFieldCount[field.group] || 0) + 1;
+        }
+      });
+      
+      console.log("🔄 Rebuilt interesting fields array:", {
+        totalCount: interestingFields.length,
+        groupCounts: searchObj.data.stream.interestingExpandedGroupRowsFieldCount
+      });
     };
 
     const pagination = ref({
@@ -1640,8 +1657,26 @@ export default defineComponent({
       await resetFields();
     };
 
-    const toggleInterestingFields = () => {
-      resetFields();
+    const toggleInterestingFields = (newValue: boolean) => {
+      console.log("🔄 toggleInterestingFields called:", { newValue, currentValue: showOnlyInterestingFields.value });
+      
+      // The v-model binding should have already updated showOnlyInterestingFields.value
+      // But let's ensure it's set correctly
+      showOnlyInterestingFields.value = newValue;
+      
+      // If switching to interesting fields mode, ensure we have interesting fields populated
+      if (newValue) {
+        // Make sure selectedInterestingStreamFields is properly populated
+        rebuildInterestingFieldsArray();
+        
+        console.log("✅ Switched to interesting fields mode", {
+          interestingFieldsCount: searchObj.data.stream.selectedInterestingStreamFields.length
+        });
+      } else {
+        console.log("✅ Switched to all fields mode");
+      }
+      
+      // No need to call resetFields() here as it's too heavy and will cause unnecessary re-fetching
     };
 
     const hasUserDefinedSchemas = () => {
@@ -1718,8 +1753,8 @@ export default defineComponent({
       };
 
       if (
-        Object.hasOwn(queryReq.queryReq, "regions") &&
-        Object.hasOwn(queryReq.queryReq, "clusters")
+        Object.prototype.hasOwnProperty.call(queryReq.queryReq, "regions") &&
+        Object.prototype.hasOwnProperty.call(queryReq.queryReq, "clusters")
       ) {
         payload.content.payload["regions"] = queryReq.queryReq.regions;
         payload.content.payload["clusters"] = queryReq.queryReq.clusters;
