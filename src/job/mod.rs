@@ -121,6 +121,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::org_users::watch());
     tokio::task::spawn(db::organization::watch());
 
+    #[cfg(feature = "cloud")]
+    tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
+
     // check version
     db::metas::version::set()
         .await

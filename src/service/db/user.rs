@@ -232,6 +232,10 @@ pub async fn list_user_invites(user_id: &str) -> Result<Vec<InvitationRecord>, a
     org_invites::list_by_invitee(&user_id).await
 }
 
+pub async fn delete_invites_for_user(org_id: &str, user_email: &str) -> Result<(), anyhow::Error> {
+    org_invites::delete_invites_for_user(org_id, user_email).await
+}
+
 pub async fn list_users(
     limit: Option<i64>,
 ) -> Result<Vec<infra::table::users::UserRecord>, anyhow::Error> {
