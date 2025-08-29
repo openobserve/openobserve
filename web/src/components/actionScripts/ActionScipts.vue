@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="height: calc(100vh - 57px)"
     :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   >
-  <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-w-full"
+  <div v-if="!showAddActionScriptDialog" class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-w-full"
     :class="store.state.theme =='dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
     >
     <div class="q-table__title" data-test="alerts-list-title">

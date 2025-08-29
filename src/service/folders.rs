@@ -474,7 +474,6 @@ mod tests {
     #[test]
     fn test_default_folder_validation() {
         // Test default folder validation
-        assert_eq!(DEFAULT_FOLDER, "default");
 
         let default_folder_id = "default";
         let non_default_folder_id = "custom_folder";

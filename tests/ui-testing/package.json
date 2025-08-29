@@ -21,6 +21,7 @@
     "playwright-core": "1.50.0",
     "playwright-firefox": "1.50.0",
     "playwright-webkit": "1.50.0",
-    "pngjs": "^7.0.0"
+    "pngjs": "^7.0.0",
+    "winston": "^3.11.0"
   }
 }

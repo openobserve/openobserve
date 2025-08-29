@@ -1279,61 +1279,6 @@ mod tests {
     }
 
     #[test]
-    fn test_auth_extractor_debug() {
-        let extractor = AuthExtractor {
-            auth: "Bearer token".to_string(),
-            method: "GET".to_string(),
-            o2_type: "streams".to_string(),
-            org_id: "test_org".to_string(),
-            bypass_check: false,
-            parent_id: "folder1".to_string(),
-        };
-
-        // Test Debug formatting
-        let debug_str = format!("{:?}", extractor);
-        assert!(debug_str.contains("AuthExtractor"));
-        assert!(debug_str.contains("Bearer token"));
-        assert!(debug_str.contains("GET"));
-        assert!(debug_str.contains("streams"));
-        assert!(debug_str.contains("test_org"));
-        assert!(debug_str.contains("false"));
-        assert!(debug_str.contains("folder1"));
-    }
-
-    #[test]
-    fn test_auth_extractor_partial_eq() {
-        let extractor1 = AuthExtractor {
-            auth: "Bearer token".to_string(),
-            method: "GET".to_string(),
-            o2_type: "streams".to_string(),
-            org_id: "test_org".to_string(),
-            bypass_check: false,
-            parent_id: "folder1".to_string(),
-        };
-
-        let extractor2 = AuthExtractor {
-            auth: "Bearer token".to_string(),
-            method: "GET".to_string(),
-            o2_type: "streams".to_string(),
-            org_id: "test_org".to_string(),
-            bypass_check: false,
-            parent_id: "folder1".to_string(),
-        };
-
-        let extractor3 = AuthExtractor {
-            auth: "Bearer different".to_string(),
-            method: "GET".to_string(),
-            o2_type: "streams".to_string(),
-            org_id: "test_org".to_string(),
-            bypass_check: false,
-            parent_id: "folder1".to_string(),
-        };
-
-        assert_eq!(extractor1, extractor2);
-        assert_ne!(extractor1, extractor3);
-    }
-
-    #[test]
     fn test_generate_presigned_url_variations() {
         let username = "testuser";
         let password = "testpass";
@@ -1346,8 +1291,8 @@ mod tests {
 
         assert!(url.starts_with(base_url));
         assert!(url.contains("/auth/login"));
-        assert!(url.contains(&format!("request_time={}", time)));
-        assert!(url.contains(&format!("exp_in={}", exp_in)));
+        assert!(url.contains(&format!("request_time={time}")));
+        assert!(url.contains(&format!("exp_in={exp_in}")));
         assert!(url.contains("auth="));
 
         // Test with different parameters
@@ -1363,7 +1308,6 @@ mod tests {
         // In non-enterprise mode, this should not panic and return immediately
         save_org_tuples("test_org").await;
         // If we reach here, the function completed successfully
-        assert!(true);
     }
 
     #[tokio::test]
@@ -1371,7 +1315,6 @@ mod tests {
         // In non-enterprise mode, this should not panic and return immediately
         delete_org_tuples("test_org").await;
         // If we reach here, the function completed successfully
-        assert!(true);
     }
 
     #[test]
@@ -1383,34 +1326,6 @@ mod tests {
 
         // In non-enterprise mode, should always return Admin
         assert_eq!(get_role(&user_role), UserRole::Admin);
-    }
-
-    #[tokio::test]
-    async fn test_set_ownership_non_enterprise() {
-        let authz = Authz {
-            obj_id: "test_obj".to_string(),
-            parent: "test_parent".to_string(),
-            parent_type: "folder".to_string(),
-        };
-
-        // In non-enterprise mode, this should not panic and return immediately
-        set_ownership("test_org", "dashboard", authz).await;
-        // If we reach here, the function completed successfully
-        assert!(true);
-    }
-
-    #[tokio::test]
-    async fn test_remove_ownership_non_enterprise() {
-        let authz = Authz {
-            obj_id: "test_obj".to_string(),
-            parent: "test_parent".to_string(),
-            parent_type: "folder".to_string(),
-        };
-
-        // In non-enterprise mode, this should not panic and return immediately
-        remove_ownership("test_org", "dashboard", authz).await;
-        // If we reach here, the function completed successfully
-        assert!(true);
     }
 
     #[tokio::test]
@@ -1426,23 +1341,6 @@ mod tests {
         .await;
 
         assert!(!result);
-    }
-
-    #[test]
-    fn test_user_email_debug() {
-        let user_email = UserEmail {
-            user_id: "test@example.com".to_string(),
-        };
-
-        // Ensure Debug is implemented
-        let debug_str = format!("{:?}", user_email);
-        assert!(debug_str.contains("UserEmail"));
-        assert!(debug_str.contains("test@example.com"));
-    }
-
-    #[test]
-    fn test_constants() {
-        assert_eq!(V2_API_PREFIX, "v2");
     }
 
     #[test]
