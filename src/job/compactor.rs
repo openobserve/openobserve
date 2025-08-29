@@ -20,7 +20,7 @@ use config::{
     metrics, spawn_pausable_job,
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
 use crate::{common::infra::cluster::get_node_by_uuid, service::compact};
 

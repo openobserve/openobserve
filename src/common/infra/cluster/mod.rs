@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    cmp::max,
     collections::HashMap,
     ops::Bound,
     sync::{Arc, atomic::Ordering},
@@ -205,7 +204,6 @@ pub async fn register_and_keep_alive() -> Result<()> {
 
     // check node heatbeat
     tokio::task::spawn(async move {
-        let cfg = get_config();
         let client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(true)
             .build()

@@ -280,7 +280,7 @@ pub async fn flush() {
 // Cron job to frequently publish auditted events
 #[cfg(feature = "enterprise")]
 pub fn run_audit_publish() -> Option<tokio::task::JoinHandle<()>> {
-    let o2cfg = o2_enterprise::enterprise::common::config::get_config();
+    let o2cfg = o2_enterprise::enterprise::common::infra::config::get_config();
     if !o2cfg.common.audit_enabled {
         return None;
     }
@@ -296,7 +296,7 @@ pub fn run_audit_publish() -> Option<tokio::task::JoinHandle<()>> {
             )
             .await;
         },
-        pause_if: o2cfg.common.audit_publish_interval == 0 || !o2_enterprise::enterprise::common::config::get_config().common.audit_enabled
+        pause_if: o2cfg.common.audit_publish_interval == 0 || !o2_enterprise::enterprise::common::infra::config::get_config().common.audit_enabled
     ))
 }
 

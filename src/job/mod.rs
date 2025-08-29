@@ -109,8 +109,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if self_reporting::run_audit_publish().is_none() {
         log::error!("Failed to run audit publish");
     };
-    #[cfg(feature = "cloud")]
-    tokio::task::spawn(self_reporting::cloud_events::flush_cloud_events());
 
     #[cfg(feature = "enterprise")]
     {
@@ -226,14 +224,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
-    #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_querier() && get_enterprise_config().ai.enabled {
-        tokio::task::spawn(async move {
-            o2_enterprise::enterprise::ai::prompt::prompts::load_system_prompt()
-                .await
-                .expect("load system prompt failed");
-        });
-    }
     tokio::task::spawn(async move { files::run().await });
     tokio::task::spawn(async move { stats::run().await });
     tokio::task::spawn(async move { compactor::run().await });
