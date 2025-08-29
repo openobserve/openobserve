@@ -58,6 +58,7 @@ import {
   onActivated,
   onMounted,
   nextTick,
+  type Ref,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -91,7 +92,7 @@ export default defineComponent({
     const showDashboardSettingsDialog = ref(false);
     const viewOnly = ref(true);
     const errorsByView = ref([]);
-    const variablesData = ref(null);
+    const variablesData = ref({ isVariablesLoading: true, values: [] });
     const errorRenderDashboardChartsRef = ref(null);
 
     const refDateTime: any = ref(null);
@@ -113,12 +114,14 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       // emit window resize event to trigger the layout
-      errorRenderDashboardChartsRef.value.layoutUpdate();
+      if (errorRenderDashboardChartsRef.value) {
+        errorRenderDashboardChartsRef.value.layoutUpdate();
 
-      // Dashboards gets overlapped as we have used keep alive
-      // Its an internal bug of vue-grid-layout
-      // So adding settimeout of 1 sec to fix the issue
-      errorRenderDashboardChartsRef.value.layoutUpdate();
+        // Dashboards gets overlapped as we have used keep alive
+        // Its an internal bug of vue-grid-layout
+        // So adding settimeout of 1 sec to fix the issue
+        errorRenderDashboardChartsRef.value.layoutUpdate();
+      }
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -156,8 +159,10 @@ export default defineComponent({
           currentDashboardData.data?.variables?.list.length
         )
       ) {
-        variablesData.value.isVariablesLoading = false;
-        variablesData.value.values = [];
+        if (variablesData.value) {
+          variablesData.value.isVariablesLoading = false;
+          variablesData.value.values = [];
+        }
       }
     };
 
@@ -181,6 +186,7 @@ export default defineComponent({
       errorsByView,
       errorRenderDashboardChartsRef,
       isLoading,
+      updateLayout,
     };
   },
 });
