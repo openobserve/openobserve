@@ -920,6 +920,7 @@ pub async fn check_permissions(
     _user_id: &str,
     _object_type: &str,
     _method: &str,
+    _parent_id: &str,
 ) -> bool {
     false
 }
@@ -1338,6 +1339,7 @@ mod tests {
             "test_user",
             "dashboard",
             "GET",
+            "",
         )
         .await;
 

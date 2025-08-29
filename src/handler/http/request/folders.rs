@@ -14,12 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, post, put, web};
+use config::meta::folder::Folder;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::models::folders::{
-        CreateFolderRequestBody, CreateFolderResponseBody, FolderType, ListFoldersResponseBody,
-        UpdateFolderRequestBody,
+        CreateFolderRequestBody, CreateFolderResponseBody, FolderType, GetFolderResponseBody,
+        ListFoldersResponseBody, UpdateFolderRequestBody,
     },
     service::folders::{self, FolderError},
 };
@@ -61,6 +62,9 @@ impl From<FolderError> for HttpResponse {
     context_path = "/api",
     tag = "Folders",
     operation_id = "CreateFolder",
+    summary = "Create new folder",
+    description = "Creates a new folder for organizing dashboards, alerts, or reports. Folders help users organize their \
+                   content into logical groups and manage access permissions when using role-based access control.",
     security(
         ("Authorization" = [])
     ),
@@ -78,7 +82,7 @@ impl From<FolderError> for HttpResponse {
     ),
     responses(
         (status = StatusCode::OK, description = "Folder created", body = CreateFolderResponseBody),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
 )]
 #[post("/v2/{org_id}/folders/{folder_type}")]
@@ -104,6 +108,8 @@ pub async fn create_folder(
     context_path = "/api",
     tag = "Folders",
     operation_id = "UpdateFolder",
+    summary = "Update folder details",
+    description = "Updates an existing folder's name, description, or other properties. Note that the default folder cannot be updated and folders containing content may have restrictions on certain changes.",
     security(
         ("Authorization" = [])
     ),
@@ -121,8 +127,8 @@ pub async fn create_folder(
         }),
     ),
     responses(
-        (status = StatusCode::OK, description = "Folder updated", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+        (status = StatusCode::OK, description = "Folder updated", body = String),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
 )]
 #[put("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
@@ -145,6 +151,8 @@ pub async fn update_folder(
     context_path = "/api",
     tag = "Folders",
     operation_id = "ListFolders",
+    summary = "List organization folders",
+    description = "Retrieves a list of all folders in the organization for the specified folder type. Users will only see folders they have access to when role-based access control is enabled.",
     security(
         ("Authorization" = [])
     ),
@@ -188,6 +196,8 @@ pub async fn list_folders(
     context_path = "/api",
     tag = "Folders",
     operation_id = "GetFolder",
+    summary = "Get folder details",
+    description = "Retrieves detailed information about a specific folder including its name, description, creation details, and metadata. Returns folder information for the specified folder type and ID.",
     security(
         ("Authorization" = [])
     ),
@@ -198,7 +208,7 @@ pub async fn list_folders(
     ),
     responses(
         (status = StatusCode::OK, body = GetFolderResponseBody),
-        (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
     ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
@@ -220,6 +230,8 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
     context_path = "/api",
     tag = "Folders",
     operation_id = "GetFolderByName",
+    summary = "Get folder by name",
+    description = "Retrieves detailed information about a specific folder by its name rather than ID. Useful when you know the folder name but not its unique identifier. Returns folder information for the specified folder type and name.",
     security(
         ("Authorization" = [])
     ),
@@ -230,7 +242,7 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
     ),
     responses(
         (status = StatusCode::OK, body = GetFolderResponseBody),
-        (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
     ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}/name/{folder_name}")]
@@ -252,6 +264,8 @@ pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -
     context_path = "/api",
     tag = "Folders",
     operation_id = "DeleteFolder",
+    summary = "Delete folder",
+    description = "Permanently deletes a folder and removes it from the organization. The folder must be empty (no dashboards, alerts, or reports) before it can be deleted. The default folder cannot be deleted.",
     security(
         ("Authorization" = [])
     ),
@@ -261,9 +275,9 @@ pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -
         ("folder_id" = String, Path, description = "Folder ID"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Success", body = HttpResponse),
-        (status = StatusCode::NOT_FOUND, description = "NotFound", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = HttpResponse),
+        (status = StatusCode::OK, description = "Success", body = String),
+        (status = StatusCode::NOT_FOUND, description = "NotFound", body = String),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = String),
     ),
 )]
 #[delete("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
@@ -287,6 +301,8 @@ pub mod deprecated {
         context_path = "/api",
         tag = "Folders",
         operation_id = "CreateFolder",
+        summary = "Create a new folder (deprecated)",
+        description = "Creates a new dashboard folder - this endpoint is deprecated",
         security(
             ("Authorization" = [])
         ),
@@ -303,7 +319,7 @@ pub mod deprecated {
         ),
         responses(
             (status = StatusCode::OK, description = "Folder created", body = CreateFolderResponseBody),
-            (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+            (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
         ),
     )]
     #[post("/{org_id}/folders")]
@@ -331,6 +347,8 @@ pub mod deprecated {
         context_path = "/api",
         tag = "Folders",
         operation_id = "UpdateFolder",
+        summary = "Update an existing folder (deprecated)",
+        description = "Updates folder details like name and description - this endpoint is deprecated",
         security(
             ("Authorization" = [])
         ),
@@ -347,8 +365,8 @@ pub mod deprecated {
             }),
         ),
         responses(
-            (status = StatusCode::OK, description = "Folder updated", body = HttpResponse),
-            (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+            (status = StatusCode::OK, description = "Folder updated", body = String),
+            (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
         ),
     )]
     #[put("/{org_id}/folders/{folder_id}")]
@@ -373,6 +391,8 @@ pub mod deprecated {
         context_path = "/api",
         tag = "Folders",
         operation_id = "ListFolders",
+        summary = "List all folders (deprecated)",
+        description = "Retrieves all dashboard folders for the organization - this endpoint is deprecated",
         security(
             ("Authorization" = [])
         ),
@@ -414,6 +434,8 @@ pub mod deprecated {
         context_path = "/api",
         tag = "Folders",
         operation_id = "GetFolder",
+        summary = "Get folder by ID (deprecated)",
+        description = "Retrieves a specific folder by its identifier - this endpoint is deprecated",
         security(
             ("Authorization" = [])
         ),
@@ -423,7 +445,7 @@ pub mod deprecated {
         ),
         responses(
             (status = StatusCode::OK, body = GetFolderResponseBody),
-            (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
+            (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
         ),
     )]
     #[get("/{org_id}/folders/{folder_id}")]
@@ -447,6 +469,8 @@ pub mod deprecated {
         context_path = "/api",
         tag = "Folders",
         operation_id = "GetFolderByName",
+        summary = "Get folder by name (deprecated)",
+        description = "Retrieves a folder using its name instead of ID - this endpoint is deprecated",
         security(
             ("Authorization" = [])
         ),
@@ -456,7 +480,7 @@ pub mod deprecated {
         ),
         responses(
             (status = StatusCode::OK, body = GetFolderResponseBody),
-            (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
+            (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
         ),
     )]
     #[get("/{org_id}/folders/name/{folder_name}")]
@@ -480,6 +504,8 @@ pub mod deprecated {
         context_path = "/api",
         tag = "Folders",
         operation_id = "DeleteFolder",
+        summary = "Delete a folder (deprecated)",
+        description = "Removes a folder and all its contents - this endpoint is deprecated",
         security(
             ("Authorization" = [])
         ),
@@ -488,9 +514,9 @@ pub mod deprecated {
             ("folder_id" = String, Path, description = "Folder ID"),
         ),
         responses(
-            (status = StatusCode::OK, description = "Success", body = HttpResponse),
-            (status = StatusCode::NOT_FOUND, description = "NotFound", body = HttpResponse),
-            (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = HttpResponse),
+            (status = StatusCode::OK, description = "Success", body = ()),
+            (status = StatusCode::NOT_FOUND, description = "NotFound", body = ()),
+            (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
         ),
     )]
     #[delete("/{org_id}/folders/{folder_id}")]

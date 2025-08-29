@@ -39,6 +39,8 @@ use crate::{
     context_path = "/api",
     tag = "Billings",
     operation_id = "GetSubscriptionUrl",
+    summary = "Get subscription URL for checkout session",
+    description = "Creates a checkout session URL for subscription upgrades and billing management",
     security(
         ("Authorization" = [])
     ),
@@ -46,9 +48,9 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
 )]
 #[get("/{org_id}/billings/hosted_subscription_url")]
@@ -117,6 +119,8 @@ pub async fn create_checkout_session(
     context_path = "/api",
     tag = "Billings",
     operation_id = "ProcessSessionDetail",
+    summary = "Process checkout session detail after payment",
+    description = "Processes successful checkout session details and updates subscription status",
     security(
         ("Authorization" = [])
     ),
@@ -124,9 +128,9 @@ pub async fn create_checkout_session(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
 )]
 #[get("/{org_id}/billings/checkout_session_detail")]
@@ -199,6 +203,8 @@ pub async fn process_session_detail(
     context_path = "/api",
     tag = "Billings",
     operation_id = "Unsubscribe",
+    summary = "Unsubscribe from current billing plan",
+    description = "Cancels the current subscription at the end of the billing cycle",
     security(
         ("Authorization" = [])
     ),
@@ -206,9 +212,9 @@ pub async fn process_session_detail(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
 )]
 #[get("/{org_id}/billings/unsubscribe")]
@@ -244,6 +250,8 @@ pub async fn unsubscribe(path: web::Path<String>, user_email: UserEmail) -> impl
     context_path = "/api",
     tag = "Billings",
     operation_id = "ListInvoices",
+    summary = "List organization billing invoices",
+    description = "Retrieves all billing invoices for the specified organization",
     security(
         ("Authorization" = [])
     ),
@@ -251,9 +259,9 @@ pub async fn unsubscribe(path: web::Path<String>, user_email: UserEmail) -> impl
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
 )]
 #[get("/{org_id}/billings/invoices")]
@@ -279,6 +287,8 @@ pub async fn list_invoices(path: web::Path<String>, user_email: UserEmail) -> im
     context_path = "/api",
     tag = "Billings",
     operation_id = "ListSubscription",
+    summary = "List organization subscription details",
+    description = "Gets current subscription information and billing details for the organization",
     security(
         ("Authorization" = [])
     ),
@@ -286,9 +296,9 @@ pub async fn list_invoices(path: web::Path<String>, user_email: UserEmail) -> im
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
 )]
 #[get("/{org_id}/billings/list_subscription")]
@@ -309,6 +319,8 @@ pub async fn list_subscription(path: web::Path<String>, user_email: UserEmail) -
     context_path = "/api",
     tag = "Billings",
     operation_id = "CreateBillingPortalSession",
+    summary = "Create customer billing portal session",
+    description = "Creates a Stripe customer portal session for managing subscription and billing",
     security(
         ("Authorization" = [])
     ),
@@ -316,9 +328,9 @@ pub async fn list_subscription(path: web::Path<String>, user_email: UserEmail) -
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
 )]
 #[get("/{org_id}/billings/billing_portal")]
@@ -350,8 +362,11 @@ pub async fn create_billing_portal_session(
 #[utoipa::path(
     context_path = "/webhook",
     tag = "Billings",
+    summary = "Handle Stripe webhook events",
+    description = "Processes webhook events from Stripe for subscription changes and payments",
+    request_body(content = String, description = "Raw Stripe webhook payload"),
     responses(
-        (status = 200, description="Status OK", content_type = "application/json", body = HttpResponse)
+        (status = 200, description="Status OK", content_type = "application/json", body = ())
     )
 )]
 #[post("/stripe")]

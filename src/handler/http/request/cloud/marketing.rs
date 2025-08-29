@@ -31,6 +31,8 @@ use crate::{
     context_path = "/api",
     tag = "Marketing",
     operation_id = "HandleUserAttributionEvent",
+    summary = "Handle user attribution event for marketing",
+    description = "Processes user attribution data for marketing analytics and campaign tracking",
     security(
         ("Authorization" = [])
     ),
@@ -46,8 +48,8 @@ use crate::{
         }),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
 )]
 #[post("/{org_id}/billings/new_user_attribution")]

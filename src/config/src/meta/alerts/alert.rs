@@ -32,6 +32,7 @@ use crate::{
 #[serde(default)]
 pub struct Alert {
     #[serde(default)]
+    #[schema(value_type = Option<String>)]
     pub id: Option<Ksuid>,
     #[serde(default)]
     pub name: String,
