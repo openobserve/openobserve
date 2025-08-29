@@ -1,4 +1,5 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const logsdata = require("../../../test-data/logs_data.json");
@@ -34,7 +35,7 @@ async function ingestTestData(page) {
     streamName: streamName,
     logsdata: logsdata
   });
-  console.log(response);
+  testLogger.debug('API response received', { response });
 }
 
 async function applyQueryButton(page) {
@@ -51,7 +52,6 @@ async function applyQueryButton(page) {
 }
 
 function removeUTFCharacters(text) {
-  // console.log(text, "tex");
   // Remove UTF characters using regular expression
   return text.replace(/[^\x00-\x7F]/g, " ");
 }

@@ -1,10 +1,10 @@
 // ingestion.js
 import logsdata from "../../../../test-data/logs_data.json";
 import geoMapdata from "../../../../test-data/geo_map.json";
+const testLogger = require('../utils/test-logger.js');
 
 // Exported function to remove UTF characters
 const removeUTFCharacters = (text) => {
-  // console.log(text, "tex");
   // Remove UTF characters using regular expression
   return text.replace(/[^\x00-\x7F]/g, " ");
 };
@@ -48,7 +48,7 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
 
     return await fetchResponse.json();
   } catch (error) {
-    console.error("Ingestion failed:", error);
+    testLogger.error("Ingestion failed", { error });
     throw error;
   }
 };
@@ -86,7 +86,7 @@ const ingestionForMaps = async (page, streamName = "geojson") => {
 
     return await fetchResponse.json();
   } catch (error) {
-    console.error("Ingestion failed:", error);
+    testLogger.error("Ingestion failed", { error });
     throw error;
   }
 };

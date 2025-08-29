@@ -36,7 +36,7 @@ export const b64EncodeStandard = (str) => {
       })
     );
   } catch (e) {
-    console.log("Error: getBase64Encode: error while encoding.");
+    testLogger.error('Base64 encoding error');
   }
 };
 
@@ -86,7 +86,7 @@ async function ingestion(page) {
       logsdata: logsdata,
     }
   );
-  console.log(response);
+  testLogger.debug('API response received', { response });
 }
 
 const selectStream = async (page, stream) => {
@@ -203,7 +203,6 @@ test.describe("Pipeline testcases", () => {
   let pageManager;
   // let logData;
   function removeUTFCharacters(text) {
-    // console.log(text, "tex");
     // Remove UTF characters using regular expression
     return text.replace(/[^\x00-\x7F]/g, " ");
   }

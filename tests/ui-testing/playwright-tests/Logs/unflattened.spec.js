@@ -70,14 +70,13 @@ async function ingestion(page) {
       logsdata: logsdata,
     }
   );
-  console.log(response);
+  testLogger.debug('API response received', { response });
 }
 
 test.describe("Unflattened testcases", () => {
   let pageManager;
   // let logData;
   function removeUTFCharacters(text) {
-    // console.log(text, "tex");
     // Remove UTF characters using regular expression
     return text.replace(/[^\x00-\x7F]/g, " ");
   }

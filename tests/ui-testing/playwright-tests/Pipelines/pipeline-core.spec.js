@@ -62,7 +62,7 @@ async function ingestion(page) {
       streamName: streamName,
       logsdata: logsdata
     });
-    console.log(response);
+    testLogger.debug('API response received', { response });
   }
 }
 

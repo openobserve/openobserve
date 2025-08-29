@@ -45,7 +45,7 @@ test.describe('Pipeline Dynamic Stream Names', () => {
     for(const streamName of streamNames) {
       const url = getIngestionUrl(orgId, streamName);
       const response = await sendRequest(page, url, logsdata, headers);
-      console.log(response);
+      testLogger.debug('API response received', { response });
     }
     await page.waitForTimeout(2000);
   });

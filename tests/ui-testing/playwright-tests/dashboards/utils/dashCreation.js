@@ -36,7 +36,8 @@ export const applyQueryButton = async function (page) {
 };
 
 export async function deleteDashboard(page, dashboardName) {
-  console.log(`Deleting dashboard with name: ${dashboardName}`);
+  const testLogger = require('../../utils/test-logger.js');
+  testLogger.info('Deleting dashboard', { dashboardName });
 
   // Wait for page to be fully loaded
   await page.waitForLoadState('networkidle');
