@@ -70,7 +70,8 @@ console.warn = (...args) => {
   const message = args[0];
   if (typeof message === 'string') {
     if (message.includes('Failed setting prop "prefix" on <q-input-stub>') ||
-        message.includes('Cannot set property prefix of [object Element]')) {
+        message.includes('Cannot set property prefix of [object Element]') || 
+        message.includes('Failed setting prop "prefix" on <q-select-stub>: value undefined is invalid')) {
       return; // Suppress this specific warning
     }
   }
