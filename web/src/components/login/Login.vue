@@ -197,6 +197,7 @@ import { redirectUser } from "@/utils/common";
 import { computed } from "vue";
 import config from "@/aws-exports";
 import { openobserveRum } from "@openobserve/browser-rum";
+import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
   name: "PageLogin",
@@ -214,6 +215,7 @@ export default defineComponent({
     const selectedOrg = ref({});
     const autoRedirectDexLogin = ref(false);
     let orgOptions = ref([{ label: Number, value: String }]);
+    const { identify } = useReo();
 
     const submitting = ref(false);
 
@@ -290,7 +292,13 @@ export default defineComponent({
                 const encodedUserInfo: any = b64EncodeStandard(
                   JSON.stringify(userInfo),
                 );
-
+                //here we need to send the user to reo.dev for tracking 
+                //we need to call the identify function from reo.dev
+                identify({
+                  username: name.value,
+                  type: "email",
+                  
+                });
                 //set user info into localstorage & store
                 useLocalUserInfo(encodedUserInfo);
                 store.dispatch("setUserInfo", encodedUserInfo);
