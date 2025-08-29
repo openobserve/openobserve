@@ -335,6 +335,7 @@ impl QueryConditionExt for QueryCondition {
                 skip_wal: false,
                 index_type: "".to_string(),
                 per_query_response: false, // Will return results in single array
+                is_refresh_cache: false,
             };
             log::debug!(
                 "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search_multi, {req:?}"
@@ -389,6 +390,7 @@ impl QueryConditionExt for QueryCondition {
                 search_type,
                 search_event_context,
                 use_cache: false,
+                is_refresh_cache: false,
                 local_mode: None,
             };
             log::debug!(

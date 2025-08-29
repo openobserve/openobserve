@@ -44,8 +44,9 @@ use crate::{
             functions,
             http::{
                 get_dashboard_info_from_request, get_enable_align_histogram_from_request,
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
+                get_is_refresh_cache_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
+                get_stream_type_from_request,
             },
             stream::get_settings_max_query_range,
         },
@@ -59,7 +60,11 @@ use crate::{
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchSQL",
-    params(("org_id" = String, Path, description = "Organization name")),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("is_refresh_cache" = bool, Query, description = "Indicates that the query should not use the cache for processing but also needs to refresh the cache once the query is completed"),
+
+    ),
     request_body(
         content = SearchRequest,
         description = "Search query",
@@ -159,6 +164,7 @@ pub async fn search_multi(
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let is_refresh_cache = get_is_refresh_cache_from_request(&query);
 
     let dashboard_info = get_dashboard_info_from_request(&query);
 
@@ -173,12 +179,13 @@ pub async fn search_multi(
         .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
 
     // handle encoding for query and aggs
-    let multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
+    let mut multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => {
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
+    multi_req.is_refresh_cache = is_refresh_cache;
 
     let mut query_fn = multi_req
         .query_fn

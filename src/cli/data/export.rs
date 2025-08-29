@@ -67,6 +67,7 @@ impl Context for Export {
             search_type,
             search_event_context,
             use_cache: false,
+            is_refresh_cache: false,
             local_mode: None,
         };
 

@@ -70,6 +70,8 @@ pub struct Request {
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default = "default_use_cache")]
     pub use_cache: bool,
+    #[serde(default)]
+    pub is_refresh_cache: bool,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub local_mode: Option<bool>,
 }
@@ -595,6 +597,8 @@ pub struct SearchHistoryRequest {
     pub user_email: Option<String>,
     #[serde(default = "default_size")]
     pub size: i64,
+    #[serde(default)]
+    pub is_refresh_cache: bool,
 }
 
 impl SearchHistoryRequest {
@@ -649,6 +653,7 @@ impl SearchHistoryRequest {
             search_event_context: None,
             use_cache: default_use_cache(),
             local_mode: None,
+            is_refresh_cache: self.is_refresh_cache,
         };
         Ok(search_req)
     }
@@ -1126,6 +1131,8 @@ pub struct MultiStreamRequest {
     pub index_type: String, // parquet(default) or fst
     #[serde(default)]
     pub per_query_response: bool,
+    #[serde(default)]
+    pub is_refresh_cache: bool,
 }
 
 fn deserialize_sql<'de, D>(deserializer: D) -> Result<Vec<SqlQuery>, D::Error>
@@ -1206,6 +1213,7 @@ impl MultiStreamRequest {
                 search_event_context: self.search_event_context.clone(),
                 use_cache: default_use_cache(),
                 local_mode: None,
+                is_refresh_cache: self.is_refresh_cache,
             });
         }
         res
@@ -1241,6 +1249,8 @@ pub struct ValuesRequest {
     pub timeout: Option<i64>,
     #[serde(default)]
     pub use_cache: bool,
+    #[serde(default)]
+    pub is_refresh_cache: bool,
     pub stream_name: String,
     pub stream_type: StreamType,
     pub sql: String,

@@ -746,6 +746,108 @@ pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
     Ok(true)
 }
 
+#[tracing::instrument]
+pub async fn delete_cache_by_time_range(
+    path: &str,
+    query_start_time: i64,
+    query_end_time: i64,
+) -> std::io::Result<bool> {
+    let root_dir = disk::get_dir().await;
+    // Part 1: delete the results cache files that overlap with query time range
+    let pattern = format!("{root_dir}/results/{path}");
+    let prefix = format!("{root_dir}/");
+    let files = scan_files(&pattern, "json", None).unwrap_or_default();
+    let mut remove_files: Vec<String> = vec![];
+
+    for file in files {
+        // Parse the start_time and end_time from filename:
+        // {start_time}_{end_time}_{is_aggregate}_{is_descending}.json
+        if let Some(file_name) = file.split('/').next_back() {
+            let parts: Vec<&str> = file_name.split('_').collect();
+            if parts.len() >= 2 {
+                if let (Ok(cache_start_time), Ok(cache_end_time)) =
+                    (parts[0].parse::<i64>(), parts[1].parse::<i64>())
+                {
+                    // Check if cache time range overlaps with query time range
+                    // Overlap occurs when: cache_start <= query_end && cache_end >= query_start
+                    if cache_start_time <= query_end_time && cache_end_time >= query_start_time {
+                        match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
+                            Ok(_) => {
+                                remove_files.push(file.clone());
+                                log::info!("Deleted cache file: {}", file);
+                            }
+                            Err(e) => {
+                                log::error!("Error deleting cache file {}: {}", file, e);
+                                return Err(std::io::Error::other("Error deleting cache"));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Part 2: delete the aggregation cache files that overlap with query time range
+    #[cfg(feature = "enterprise")]
+    {
+        let aggs_pattern = format!("{root_dir}/{STREAMING_AGGS_CACHE_DIR}/{path}");
+        let aggs_files = scan_files(&aggs_pattern, "arrow", None).unwrap_or_default();
+
+        for file in aggs_files {
+            // Parse the start_time and end_time from filename
+            // {start_time}_{end_time}.arrow
+            if let Some(file_name) = file.split('/').next_back() {
+                let parts: Vec<&str> = file_name.split('_').collect();
+                if parts.len() >= 2 {
+                    if let (Ok(cache_start_time), Ok(cache_end_time)) =
+                        (parts[0].parse::<i64>(), parts[1].parse::<i64>())
+                    {
+                        // Check if cache time range overlaps with query time range
+                        if cache_start_time <= query_end_time && cache_end_time >= query_start_time
+                        {
+                            match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
+                                Ok(_) => {
+                                    log::info!("Deleted aggregation cache file: {}", file);
+                                }
+                                Err(e) => {
+                                    log::error!(
+                                        "Error deleting aggregation cache file {}: {}",
+                                        file,
+                                        e
+                                    );
+                                    return Err(std::io::Error::other(
+                                        "Error deleting aggregation cache",
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Part 3: Clean up query result cache in memory for deleted files
+    for file in remove_files {
+        let columns = file
+            .strip_prefix(&prefix)
+            .unwrap()
+            .split('/')
+            .collect::<Vec<&str>>();
+
+        if columns.len() >= 5 {
+            let query_key = format!(
+                "{}_{}_{}_{}",
+                columns[1], columns[2], columns[3], columns[4]
+            );
+            let mut r = QUERY_RESULT_CACHE.write().await;
+            r.remove(&query_key);
+        }
+    }
+
+    Ok(true)
+}
+
 pub fn handle_histogram(
     origin_sql: &mut String,
     q_time_range: Option<(i64, i64)>,

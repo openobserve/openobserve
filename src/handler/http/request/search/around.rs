@@ -28,7 +28,7 @@ use hashbrown::HashMap;
 use tracing::{Instrument, Span};
 
 use crate::{
-    common::utils::http::get_work_group,
+    common::utils::http::{get_is_refresh_cache_from_request, get_work_group},
     service::{
         search::{
             self as SearchService,
@@ -56,6 +56,7 @@ pub(crate) async fn around(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
+    let is_refresh_cache = get_is_refresh_cache_from_request(&query);
     let mut around_key = match query.get("key") {
         Some(v) => v.parse::<i64>().unwrap_or(0),
         None => 0,
@@ -170,6 +171,7 @@ pub(crate) async fn around(
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
         use_cache: default_use_cache(),
+        is_refresh_cache,
         local_mode: None,
     };
     let resp_forward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)
@@ -206,6 +208,7 @@ pub(crate) async fn around(
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
         use_cache: default_use_cache(),
+        is_refresh_cache,
         local_mode: None,
     };
     let resp_backward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)

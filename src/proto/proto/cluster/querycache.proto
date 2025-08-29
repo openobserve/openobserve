@@ -56,8 +56,15 @@ message DeleteResultCacheResponse {
     bool deleted = 1;  
 }
 
+message DeleteResultCacheByTimeRangeRequest {
+    string  path = 1; 
+    int64   start_time = 2; 
+    int64   end_time = 3; 
+}
+
 service QueryCache {
     rpc GetCachedResult (QueryCacheRequest) returns (QueryCacheResponse) {}
     rpc GetMultipleCachedResult (QueryCacheRequest) returns (MultiQueryCacheResponse) {}
     rpc DeleteResultCache (DeleteResultCacheRequest) returns (DeleteResultCacheResponse) {}
+    rpc DeleteResultCacheByTimeRange (DeleteResultCacheByTimeRangeRequest) returns (DeleteResultCacheResponse) {}
 }
