@@ -18,6 +18,7 @@ use std::io::Error;
 use actix_web::{HttpResponse, Result, delete, get, http::StatusCode, put, web};
 use config::meta::ai::PromptType;
 use o2_enterprise::enterprise::ai::prompt::{meta::UpdatePromptRequest, service as prompt_service};
+use utoipa::openapi::Object;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
@@ -36,8 +37,8 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
     ),
     responses(
         (status = StatusCode::OK, description = "Chat response", body = PromptResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = MetaHttpResponse),
-        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = MetaHttpResponse),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
 )]
 #[get("/{org_id}/ai/prompts")]
@@ -72,9 +73,9 @@ pub async fn list_prompts(org_id: web::Path<String>) -> Result<HttpResponse, Err
     ),
     responses(
         (status = StatusCode::OK, description = "Prompt retrieved", body = PromptResponse),
-        (status = StatusCode::NOT_FOUND, description = "Prompt not found", body = MetaHttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = MetaHttpResponse),
-        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = MetaHttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Prompt not found", body = Object),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
 )]
 #[get("/{org_id}/ai/prompts/{prompt_type}")]
@@ -116,9 +117,9 @@ pub async fn get_prompt(path: web::Path<(String, PromptType)>) -> Result<HttpRes
     ),
     responses(
         (status = StatusCode::OK, description = "Prompt updated", body = PromptResponse), 
-        (status = StatusCode::NOT_FOUND, description = "Prompt not found", body = MetaHttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = MetaHttpResponse),
-        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = MetaHttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Prompt not found", body = Object),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
 )]
 #[put("/{org_id}/ai/prompts")]
@@ -181,8 +182,8 @@ pub async fn update_prompt(
     ),
     responses(
         (status = StatusCode::OK, description = "Prompt rolled back to default", body = PromptResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = MetaHttpResponse),
-        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = MetaHttpResponse),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
 )]
 #[delete("/{org_id}/ai/prompts")]

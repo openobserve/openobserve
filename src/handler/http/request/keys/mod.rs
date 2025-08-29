@@ -36,7 +36,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
     post,
     context_path = "/api",
     request_body(
-        content = KeyAddRequest,
+        content = Object,
         description = "Key data to add",
         content_type = "application/json",
     ),
@@ -134,7 +134,7 @@ pub async fn save(
         (
             status = 200,
             description = "Key info",
-            body = KeyGetResponse,
+            body = Object,
             content_type = "application/json",
         ),
         (status = 404, description = "Key not found", content_type = "text/plain")
@@ -187,7 +187,7 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
         (
             status = 200,
             description = "list all keys in the org",
-            body = KeyListResponse,
+            body = Object,
             content_type = "application/json",
         ),
     ),
@@ -284,7 +284,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ("key_name" = String, Path, description = "name of the key to update", example = "test_key")
     ),
     request_body(
-        content = KeyAddRequest,
+        content = Object,
         description = "updated key data",
         content_type = "application/json",
     ),

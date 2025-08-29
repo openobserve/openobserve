@@ -50,7 +50,7 @@ pub async fn toggle_state(details: web::Json<SyslogServer>) -> Result<HttpRespon
     ),
     responses(
         (status = StatusCode::CREATED, description = "Route created", body = SyslogRoute),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
 )]
 #[post("/{org_id}/syslog-routes")]
@@ -79,8 +79,8 @@ pub async fn create_route(details: web::Json<SyslogRoute>) -> Result<HttpRespons
     ),
     responses(
         (status = StatusCode::OK, description = "SyslogRoute updated", body = SyslogRoute),
-        (status = StatusCode::NOT_FOUND, description = "SyslogRoute not found", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the SyslogRoute", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "SyslogRoute not found", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the SyslogRoute", body = ()),
     ),
 )]
 #[put("/{org_id}/syslog-routes/{id}")]
@@ -107,7 +107,7 @@ async fn update_route(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = StatusCode::OK, body = SyslogRoutes),
+        (status = StatusCode::OK, body = Object),
     ),
 )]
 #[get("/{org_id}/syslog-routes")]
@@ -131,8 +131,8 @@ async fn list_routes() -> impl Responder {
         ("id" = String, Path, description = "SyslogRoute Id"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Route deleted", body = HttpResponse),
-        (status = StatusCode::NOT_FOUND, description = "Route not found", body = HttpResponse),
+        (status = StatusCode::OK, description = "Route deleted", body = ()),
+        (status = StatusCode::NOT_FOUND, description = "Route not found", body = ()),
     ),
 )]
 #[delete("/{org_id}/syslog-routes/{id}")]

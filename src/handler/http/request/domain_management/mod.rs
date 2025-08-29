@@ -43,9 +43,9 @@ fn validate_meta_org_access(org_id: &str) -> Result<(), infra::errors::Error> {
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = DomainManagementResponse),
-        (status = 403, description = "Forbidden", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "Not Found", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Internal Server Error", content_type = "application/json", body = HttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+        (status = 404, description = "Not Found", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/domain_management")]
@@ -83,9 +83,9 @@ pub async fn get_domain_management_config(path: web::Path<String>) -> Result<Htt
     request_body(content = DomainManagementRequest, description = "Domain management configuration", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = DomainOperationResponse),
-        (status = 400, description = "Bad Request", content_type = "application/json", body = HttpResponse),
-        (status = 403, description = "Forbidden", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Internal Server Error", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Bad Request", content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/domain_management")]

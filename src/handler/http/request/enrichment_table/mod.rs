@@ -40,8 +40,8 @@ use crate::{
         ("table_name" = String, Path, description = "Table name"),
     ),
     responses(
-        (status = StatusCode::CREATED, description = "Saved enrichment table", body = HttpResponse),
-        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = HttpResponse),
+        (status = StatusCode::CREATED, description = "Saved enrichment table", body = ()),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = ()),
     ),
 )]
 #[post("/{org_id}/enrichment_tables/{table_name}")]

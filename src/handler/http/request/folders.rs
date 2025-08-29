@@ -14,12 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, post, put, web};
+use config::meta::folder::Folder;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::models::folders::{
-        CreateFolderRequestBody, CreateFolderResponseBody, FolderType, ListFoldersResponseBody,
-        UpdateFolderRequestBody,
+        CreateFolderRequestBody, CreateFolderResponseBody, FolderType, GetFolderResponseBody,
+        ListFoldersResponseBody, UpdateFolderRequestBody,
     },
     service::folders::{self, FolderError},
 };
@@ -78,7 +79,7 @@ impl From<FolderError> for HttpResponse {
     ),
     responses(
         (status = StatusCode::OK, description = "Folder created", body = CreateFolderResponseBody),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
 )]
 #[post("/v2/{org_id}/folders/{folder_type}")]
@@ -121,8 +122,8 @@ pub async fn create_folder(
         }),
     ),
     responses(
-        (status = StatusCode::OK, description = "Folder updated", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+        (status = StatusCode::OK, description = "Folder updated", body = String),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
 )]
 #[put("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
@@ -198,7 +199,7 @@ pub async fn list_folders(
     ),
     responses(
         (status = StatusCode::OK, body = GetFolderResponseBody),
-        (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
     ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
@@ -230,7 +231,7 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
     ),
     responses(
         (status = StatusCode::OK, body = GetFolderResponseBody),
-        (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
     ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}/name/{folder_name}")]
@@ -261,9 +262,9 @@ pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -
         ("folder_id" = String, Path, description = "Folder ID"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Success", body = HttpResponse),
-        (status = StatusCode::NOT_FOUND, description = "NotFound", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = HttpResponse),
+        (status = StatusCode::OK, description = "Success", body = String),
+        (status = StatusCode::NOT_FOUND, description = "NotFound", body = String),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = String),
     ),
 )]
 #[delete("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
@@ -303,7 +304,7 @@ pub mod deprecated {
         ),
         responses(
             (status = StatusCode::OK, description = "Folder created", body = CreateFolderResponseBody),
-            (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+            (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
         ),
     )]
     #[post("/{org_id}/folders")]
@@ -347,8 +348,8 @@ pub mod deprecated {
             }),
         ),
         responses(
-            (status = StatusCode::OK, description = "Folder updated", body = HttpResponse),
-            (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+            (status = StatusCode::OK, description = "Folder updated", body = String),
+            (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
         ),
     )]
     #[put("/{org_id}/folders/{folder_id}")]
@@ -423,7 +424,7 @@ pub mod deprecated {
         ),
         responses(
             (status = StatusCode::OK, body = GetFolderResponseBody),
-            (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
+            (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
         ),
     )]
     #[get("/{org_id}/folders/{folder_id}")]
@@ -456,7 +457,7 @@ pub mod deprecated {
         ),
         responses(
             (status = StatusCode::OK, body = GetFolderResponseBody),
-            (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
+            (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
         ),
     )]
     #[get("/{org_id}/folders/name/{folder_name}")]
@@ -488,9 +489,9 @@ pub mod deprecated {
             ("folder_id" = String, Path, description = "Folder ID"),
         ),
         responses(
-            (status = StatusCode::OK, description = "Success", body = HttpResponse),
-            (status = StatusCode::NOT_FOUND, description = "NotFound", body = HttpResponse),
-            (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = HttpResponse),
+            (status = StatusCode::OK, description = "Success", body = ()),
+            (status = StatusCode::NOT_FOUND, description = "NotFound", body = ()),
+            (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
         ),
     )]
     #[delete("/{org_id}/folders/{folder_id}")]

@@ -67,7 +67,7 @@ pub mod service_accounts;
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[get("/{org_id}/users")]
@@ -126,7 +126,7 @@ pub async fn list(
     ),
     request_body(content = PostUserRequest, description = "User data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[post("/{org_id}/users")]
@@ -181,7 +181,7 @@ pub async fn save(
     ),
     request_body(content = UpdateUser, description = "User data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[put("/{org_id}/users/{email_id}")]
@@ -245,7 +245,7 @@ pub async fn update(
     ),
     request_body(content = UserRoleRequest, description = "User role", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[post("/{org_id}/users/{email_id}")]
@@ -295,8 +295,8 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
         ("email_id" = String, Path, description = "User name"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[delete("/{org_id}/users/{email_id}")]
@@ -719,7 +719,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[get("/{org_id}/users/roles")]
@@ -776,7 +776,7 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[get("/invites")]

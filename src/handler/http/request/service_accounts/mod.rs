@@ -50,7 +50,7 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[get("/{org_id}/service_accounts")]
@@ -105,7 +105,7 @@ pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpRes
     ),
     request_body(content = ServiceAccountRequest, description = "ServiceAccount data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[post("/{org_id}/service_accounts")]
@@ -149,7 +149,7 @@ pub async fn save(
     ),
     request_body(content = UpdateServiceAccountRequest, description = "Service Account data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[put("/{org_id}/service_accounts/{email_id}")]
@@ -225,8 +225,8 @@ pub async fn update(
         ("email_id" = String, Path, description = "Service Account email id"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[delete("/{org_id}/service_accounts/{email_id}")]
@@ -254,7 +254,7 @@ pub async fn delete(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = APIToken),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/service_accounts/{email_id}")]

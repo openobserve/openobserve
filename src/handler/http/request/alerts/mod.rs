@@ -98,8 +98,8 @@ impl From<AlertError> for HttpResponse {
       ),
     request_body(content = CreateAlertRequestBody, description = "Alert data", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[post("/v2/{org_id}/alerts")]
@@ -144,12 +144,12 @@ pub async fn create_alert(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("alert_id" = String, Path, description = "Alert ID"),
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = GetAlertResponseBody),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[get("/v2/{org_id}/alerts/{alert_id}")]
@@ -182,12 +182,12 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("alert_id" = String, Path, description = "Alert ID"),
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = GetAlertResponseBody),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[get("/v2/{org_id}/alerts/{alert_id}/export")]
@@ -220,13 +220,13 @@ pub async fn export_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("alert_id" = String, Path, description = "Alert ID"),
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
       ),
     request_body(content = UpdateAlertRequestBody, description = "Alert data", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[put("/v2/{org_id}/alerts/{alert_id}")]
@@ -261,12 +261,12 @@ pub async fn update_alert(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("alert_id" = String, Path, description = "Alert ID"),
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[delete("/v2/{org_id}/alerts/{alert_id}")]
@@ -353,13 +353,13 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("alert_id" = String, Path, description = "Alert ID"),
         EnableAlertQuery,
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[patch("/v2/{org_id}/alerts/{alert_id}/enable")]
@@ -394,13 +394,13 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("alert_id" = String, Path, description = "Alert ID"),
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[patch("/v2/{org_id}/alerts/{alert_id}/trigger")]
@@ -430,9 +430,9 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     ),
     request_body(content = MoveAlertsRequestBody, description = "Identifies alerts and the destination folder", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[patch("/v2/{org_id}/alerts/move")]

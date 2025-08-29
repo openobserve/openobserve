@@ -251,7 +251,7 @@ pub async fn all_organizations(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = OrgSummary),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[get("/{org_id}/summary")]
@@ -276,7 +276,7 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/passcode")]
@@ -314,7 +314,7 @@ async fn get_user_passcode(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/passcode")]
@@ -352,7 +352,7 @@ async fn update_user_passcode(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/rumtoken")]
@@ -390,7 +390,7 @@ async fn get_user_rumtoken(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/rumtoken")]
@@ -428,7 +428,7 @@ async fn update_user_rumtoken(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/rumtoken")]
@@ -491,7 +491,7 @@ async fn create_org(
     ),
     request_body(content = ExtendTrialPeriodRequest, description = "Extend free trial request", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "text"),
+        (status = 200, description = "Success", content_type = "text", body = String),
     )
 )]
 #[put("/{org_id}/extend_trial_period")]
@@ -699,8 +699,8 @@ async fn accept_org_invite(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = NodeListResponse),
-        (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = ()),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/node/list")]
@@ -786,8 +786,8 @@ pub async fn node_list_impl(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = ClusterInfoResponse),
-        (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = ()),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/cluster/info")]

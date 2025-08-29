@@ -17,6 +17,7 @@ use std::collections::HashMap;
 
 use actix_web::{Responder, post, web};
 use config::utils::json;
+use utoipa::openapi::Object;
 
 use crate::{
     common::{
@@ -46,8 +47,8 @@ use crate::{
         }),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
 )]
 #[post("/{org_id}/billings/new_user_attribution")]

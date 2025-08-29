@@ -47,8 +47,8 @@ use {
     request_body(content = Template, description = "Template data", content_type =
 "application/json"),     responses(
         (status = 200, description = "Success", content_type = "application/json", body =
-HttpResponse),         (status = 400, description = "Error",   content_type = "application/json",
-body = HttpResponse),     )
+Object),         (status = 400, description = "Error",   content_type = "application/json",
+body = ()),     )
 )]
 #[post("/{org_id}/actions/test/{action_id}")]
 pub async fn test_action(
@@ -102,8 +102,8 @@ pub async fn test_action(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body =
-HttpResponse),         (status = 400, description = "Error",   content_type = "application/json",
-body = HttpResponse),     )
+Object),         (status = 400, description = "Error",   content_type = "application/json",
+body = ()),     )
 )]
 #[get("/{org_id}/actions/pause/{action_id}")]
 pub async fn pause_action(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
@@ -124,8 +124,8 @@ pub async fn pause_action(_path: web::Path<(String, String)>) -> Result<HttpResp
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body =
-HttpResponse),         (status = 400, description = "Error",   content_type = "application/json",
-body = HttpResponse),     )
+Object),         (status = 400, description = "Error",   content_type = "application/json",
+body = ()),     )
 )]
 #[get("/{org_id}/actions/resume/{action_id}")]
 pub async fn resume_action(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {

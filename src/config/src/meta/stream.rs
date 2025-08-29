@@ -187,18 +187,22 @@ impl std::fmt::Display for StreamType {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
 #[serde(default)]
 pub struct StreamParams {
+    #[schema(value_type = String)]
     pub org_id: faststr::FastStr,
+    #[schema(value_type = String)]
     pub stream_name: faststr::FastStr,
     pub stream_type: StreamType,
 }
 
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
 #[serde(default)]
 pub struct RemoteStreamParams {
+    #[schema(value_type = String)]
     pub org_id: faststr::FastStr,
+    #[schema(value_type = String)]
     pub destination_name: faststr::FastStr,
 }
 
@@ -627,7 +631,7 @@ pub struct UpdateSettingsWrapper<D> {
     pub remove: Vec<D>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, ToSchema)]
 pub struct PatternAssociation {
     pub field: String,
     pub pattern_name: String,

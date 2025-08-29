@@ -35,7 +35,7 @@ use crate::{
     post,
     context_path = "/api",
     request_body(
-        content = ShortenUrlRequest,
+        content = Object,
         description = "The original URL to shorten",
         content_type = "application/json",
         example = json!({

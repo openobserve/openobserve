@@ -50,8 +50,8 @@ impl From<DestinationError> for HttpResponse {
       ),
     request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/alerts/destinations")]
@@ -91,8 +91,8 @@ pub async fn save_destination(
       ),
     request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/alerts/destinations/{destination_name}")]
@@ -127,7 +127,7 @@ pub async fn update_destination(
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = Destination),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse), 
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()), 
     )
 )]
 #[get("/{org_id}/alerts/destinations/{destination_name}")]
@@ -155,7 +155,7 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<Destination>),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/alerts/destinations")]
@@ -215,10 +215,10 @@ async fn list_destinations(
         ("destination_name" = String, Path, description = "Destination name"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = HttpResponse),
-        (status = 409, description = "Conflict", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 409, description = "Conflict", content_type = "application/json", body = ()),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     )
 )]
 #[delete("/{org_id}/alerts/destinations/{destination_name}")]

@@ -33,6 +33,7 @@ pub struct ListAlertsResponseBody {
 /// An item in the list returned by the `ListDashboards` endpoint.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ListAlertsResponseBodyItem {
+    #[schema(value_type = String)]
     pub alert_id: Ksuid,
     pub folder_id: String,
     pub folder_name: String,

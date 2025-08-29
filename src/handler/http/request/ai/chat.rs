@@ -20,6 +20,7 @@ use actix_web::{
 };
 use o2_enterprise::enterprise::{ai, common::config::get_config as get_o2_config};
 use serde::Deserialize;
+use utoipa::openapi::Object;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -56,8 +57,8 @@ use crate::{
     ),
     responses(
         (status = StatusCode::OK, description = "Chat response", body = PromptResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = MetaHttpResponse),
-        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = MetaHttpResponse),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
 )]
 #[post("/{org_id}/ai/chat")]
@@ -112,9 +113,9 @@ struct TraceInfo {
         }),
     ),
     responses(
-        (status = StatusCode::OK, description = "Chat response", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = MetaHttpResponse),
-        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = MetaHttpResponse),
+        (status = StatusCode::OK, description = "Chat response", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
 )]
 #[post("/{org_id}/ai/chat_stream")]

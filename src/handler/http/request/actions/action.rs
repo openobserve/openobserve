@@ -17,7 +17,7 @@ use std::io::Error;
 
 use actix_multipart::Multipart;
 use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
-use config::meta::actions::action::UpdateActionDetailsRequest;
+use config::meta::{actions::action::UpdateActionDetailsRequest, destinations::Template};
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
@@ -74,11 +74,12 @@ fn validate_environment_variables(env_vars: &HashMap<String, String>) -> Result<
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("ksuid" = String, Path, description = "Action ID"),
     ),
     request_body(content = Template, description = "Template data", content_type ="application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body =HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json",body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json",body = ()),
     )
 )]
 #[delete("/{org_id}/actions/{ksuid}")]
@@ -114,11 +115,12 @@ pub async fn delete_action(path: web::Path<(String, Ksuid)>) -> Result<HttpRespo
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("ksuid" = String, Path, description = "Action ID"),
     ),
     request_body(content = Template, description = "Template data", content_type ="application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body =HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json",body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/zip", body = String),
+        (status = 400, description = "Error",   content_type = "application/json",body = ()),
     )
 )]
 #[get("/{org_id}/actions/download/{ksuid}")]
@@ -160,12 +162,13 @@ pub async fn serve_action_zip(path: web::Path<(String, Ksuid)>) -> Result<HttpRe
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("action_id" = String, Path, description = "Action ID"),
     ),
     request_body(content = Template, description = "Template data", content_type =
 "application/json"),     responses(
         (status = 200, description = "Success", content_type = "application/json", body =
-HttpResponse),         (status = 400, description = "Error",   content_type = "application/json",
-body = HttpResponse),     )
+Object),         (status = 400, description = "Error",   content_type = "application/json",
+body = ()),     )
 )]
 #[put("/{org_id}/actions/{action_id}")]
 pub async fn update_action_details(
@@ -235,8 +238,8 @@ pub async fn update_action_details(
     request_body(content = Template, description = "Template data", content_type =
 "application/json"),     responses(
         (status = 200, description = "Success", content_type = "application/json", body =
-HttpResponse),         (status = 400, description = "Error",   content_type = "application/json",
-body = HttpResponse),     )
+Object),         (status = 400, description = "Error",   content_type = "application/json",
+body = ()),     )
 )]
 #[get("/{org_id}/actions")]
 pub async fn list_actions(path: web::Path<String>) -> Result<HttpResponse, Error> {
@@ -283,8 +286,8 @@ pub async fn list_actions(path: web::Path<String>) -> Result<HttpResponse, Error
     request_body(content = Template, description = "Template data", content_type =
 "application/json"),     responses(
         (status = 200, description = "Success", content_type = "application/json", body =
-HttpResponse),         (status = 400, description = "Error",   content_type = "application/json",
-body = HttpResponse),     )
+Object),         (status = 400, description = "Error",   content_type = "application/json",
+body = ()),     )
 )]
 #[get("/{org_id}/actions/{action_id}")]
 pub async fn get_action_from_id(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {

@@ -77,7 +77,7 @@ use crate::{
     })),
     responses(
         (status = 200, description = "Success", content_type = "text/event-stream"),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/_search_stream")]
@@ -525,7 +525,7 @@ pub async fn report_to_audit(
     })),
     responses(
         (status = 200, description = "Success", content_type = "text/event-stream"),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/_values_stream")]

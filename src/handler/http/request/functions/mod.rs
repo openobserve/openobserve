@@ -16,7 +16,7 @@
 use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
-use config::meta::function::{TestVRLRequest, Transform};
+use config::meta::function::{FunctionList, TestVRLRequest, Transform};
 
 /// CreateFunction
 ///
@@ -33,8 +33,8 @@ use config::meta::function::{TestVRLRequest, Transform};
     ),
     request_body(content = Transform, description = "Function data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/functions")]
@@ -115,8 +115,8 @@ async fn list_functions(
         ("force" = bool, Query, description = "Force delete function regardless pipeline dependencies"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[delete("/{org_id}/functions/{name}")]
@@ -141,8 +141,8 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
     ),
     request_body(content = Transform, description = "Function data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/functions/{name}")]
@@ -174,8 +174,8 @@ pub async fn update_function(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = FunctionList),
-        (status = 404, description = "Function not found", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Internal server error", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "Function not found", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal server error", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/functions/{name}")]
@@ -199,8 +199,8 @@ pub async fn list_pipeline_dependencies(
     ),
     request_body(content = TestVRLRequest, description = "Test run function", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/functions/test")]

@@ -77,8 +77,8 @@ impl From<ReportError> for HttpResponse {
         }),
     ),
     responses(
-        (status = StatusCode::CREATED, description = "Report created", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+        (status = StatusCode::CREATED, description = "Report created", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
 )]
 #[post("/{org_id}/reports")]
@@ -118,9 +118,9 @@ pub async fn create_report(
         description = "Report details",
     ),
     responses(
-        (status = StatusCode::OK, description = "Report updated", body = HttpResponse),
-        (status = StatusCode::NOT_FOUND, description = "Report not found", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the report", body = HttpResponse),
+        (status = StatusCode::OK, description = "Report updated", body = ()),
+        (status = StatusCode::NOT_FOUND, description = "Report not found", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the report", body = ()),
     ),
 )]
 #[put("/{org_id}/reports/{name}")]
@@ -246,7 +246,7 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
     ),
     responses(
         (status = StatusCode::OK, body = Report),
-        (status = StatusCode::NOT_FOUND, description = "Report not found", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Report not found", body = ()),
     ),
 )]
 #[get("/{org_id}/reports/{name}")]
@@ -273,9 +273,9 @@ async fn get_report(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ("name" = String, Path, description = "Report name"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Success", body = HttpResponse),
-        (status = StatusCode::NOT_FOUND, description = "NotFound", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = HttpResponse),
+        (status = StatusCode::OK, description = "Success", body = ()),
+        (status = StatusCode::NOT_FOUND, description = "NotFound", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
 )]
 #[delete("/{org_id}/reports/{name}")]
@@ -306,9 +306,9 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
         ("value" = bool, Query, description = "Enable or disable report"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/reports/{name}/enable")]
@@ -348,9 +348,9 @@ async fn enable_report(
         ("name" = String, Path, description = "Report name"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/reports/{name}/trigger")]

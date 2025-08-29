@@ -16,6 +16,7 @@
 use std::{fmt::Debug, str::FromStr, sync::Arc};
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{
     get_config, get_instance_id, meta::search::SearchEventType, utils::sysinfo::NodeMetrics,
@@ -38,7 +39,7 @@ pub trait NodeInfo: Debug + Send + Sync {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Node {
     pub id: i32,
     pub uuid: String,
@@ -173,7 +174,7 @@ impl IntoArcVec for Vec<Node> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum NodeStatus {
     Prepare = 1,
     Online = 2,
@@ -191,7 +192,7 @@ impl From<i32> for NodeStatus {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum Role {
     All,
     Ingester,
@@ -240,7 +241,7 @@ impl std::fmt::Display for Role {
 /// None        -> All tasks
 /// Background  -> Low-priority tasks
 /// Interactive -> High-priority tasks
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Default, ToSchema)]
 pub enum RoleGroup {
     #[default]
     None,

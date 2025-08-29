@@ -91,7 +91,7 @@ impl From<DashboardError> for HttpResponse {
     ),
     responses(
         (status = StatusCode::CREATED, description = "Dashboard created", body = CreateDashboardResponseBody),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
 )]
 #[post("/{org_id}/dashboards")]
@@ -139,8 +139,8 @@ pub async fn create_dashboard(
     ),
     responses(
         (status = StatusCode::OK, description = "Dashboard updated", body = UpdateDashboardResponseBody),
-        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the dashboard", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the dashboard", body = ()),
     ),
 )]
 #[put("/{org_id}/dashboards/{dashboard_id}")]
@@ -224,7 +224,7 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
     ),
     responses(
         (status = StatusCode::OK, body = GetDashboardResponseBody),
-        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}")]
@@ -254,7 +254,7 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     ),
     responses(
         (status = StatusCode::OK, body = GetDashboardResponseBody),
-        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}/export")]
@@ -283,9 +283,9 @@ pub async fn export_dashboard(path: web::Path<(String, String)>) -> impl Respond
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Success", body = HttpResponse),
-        (status = StatusCode::NOT_FOUND, description = "NotFound", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = HttpResponse),
+        (status = StatusCode::OK, description = "Success", body = Object),
+        (status = StatusCode::NOT_FOUND, description = "NotFound", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}")]
@@ -323,8 +323,8 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         }),
     ),
     responses(
-        (status = StatusCode::OK, description = "Dashboard Moved", body = HttpResponse),
-        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
+        (status = StatusCode::OK, description = "Dashboard Moved", body = Object),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
 )]
 #[put("/{org_id}/folders/dashboards/{dashboard_id}")]
@@ -367,9 +367,9 @@ async fn move_dashboard(
     ),
     request_body(content = MoveDashboardsRequestBody, description = "Identifies dashboards and the destination folder", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[patch("/{org_id}/dashboards/move")]

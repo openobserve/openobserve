@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum ExecutionDetailsType {
     #[default]
@@ -42,7 +42,16 @@ impl TryFrom<&str> for ExecutionDetailsType {
 }
 
 #[derive(
-    Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, EnumIter, DeriveActiveEnum,
+    Debug,
+    Default,
+    Clone,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    EnumIter,
+    DeriveActiveEnum,
+    ToSchema,
 )]
 #[sea_orm(db_type = "Enum", rs_type = "String", enum_name = "status")]
 pub enum ActionStatus {
@@ -87,6 +96,7 @@ impl Display for ActionStatus {
 pub struct Action {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<String>)]
     pub id: Option<Ksuid>,
     #[serde(default)]
     pub org_id: String,
@@ -104,14 +114,18 @@ pub struct Action {
     #[serde(default)]
     pub created_by: String,
     pub status: ActionStatus,
+    #[schema(value_type = String)]
     pub created_at: DateTime<Utc>,
+    #[schema(value_type = Option<String>)]
     pub last_executed_at: Option<DateTime<Utc>>,
     // User Set variable
     pub zip_file_name: String,
     // default to created_at
     #[serde(default)]
+    #[schema(value_type = String)]
     pub last_modified_at: DateTime<Utc>,
     #[serde(default)]
+    #[schema(value_type = Option<String>)]
     pub last_successful_at: Option<DateTime<Utc>>,
     pub origin_cluster_url: String,
     pub service_account: String,

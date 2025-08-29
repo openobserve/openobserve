@@ -53,8 +53,8 @@ impl From<TemplateError> for HttpResponse {
       ),
     request_body(content = Template, description = "Template data", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/alerts/templates")]
@@ -90,8 +90,8 @@ pub async fn save_template(
       ),
     request_body(content = Template, description = "Template data", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/alerts/templates/{template_name}")]
@@ -123,7 +123,7 @@ pub async fn update_template(
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = Template),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/alerts/templates/{template_name}")]
@@ -150,7 +150,7 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<Template>),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/alerts/templates")]
@@ -205,10 +205,10 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
         ("template_name" = String, Path, description = "Template name"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = HttpResponse),
-        (status = 409, description = "Conflict", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 409, description = "Conflict", content_type = "application/json", body = ()),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     )
 )]
 #[delete("/{org_id}/alerts/templates/{template_name}")]

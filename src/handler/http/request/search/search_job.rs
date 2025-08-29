@@ -66,7 +66,7 @@ use crate::service::organization::is_org_in_free_trial_period;
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
+    request_body(content = Object, description = "Search query", content_type = "application/json", example = json!({
         "query": {
             "sql": "select * from k8s ",
             "start_time": 1675182660872049i64,
@@ -76,9 +76,9 @@ use crate::service::organization::is_org_in_free_trial_period;
         }
     })),
     responses(
-        (status = 200, description = "Search Job submitted successfully", body = MetaHttpResponse),
-        (status = 400, description = "Bad Request", body = MetaHttpResponse),
-        (status = 500, description = "Internal Server Error", body = MetaHttpResponse),
+        (status = 200, description = "Search Job submitted successfully", body = Object),
+        (status = 400, description = "Bad Request", body = Object),
+        (status = 500, description = "Internal Server Error", body = Object),
     )
 )]
 #[post("/{org_id}/search_jobs")]
@@ -230,7 +230,7 @@ pub async fn submit_job(
         ("org_id" = String, Path, description = "Organization name")
     ),
     responses(
-        (status = 200, description = "List of search jobs", body = Vec<JobModel>, example = json!([{
+        (status = 200, description = "List of search jobs", body = Vec<Object>, example = json!([{
             "id": "abc123",
             "trace_id": "xyz789",
             "org_id": "default",
@@ -246,7 +246,7 @@ pub async fn submit_job(
             "cluster": "cluster1",
             "result_path": "/path/to/result"
         }])),
-        (status = 400, description = "Bad Request", body = MetaHttpResponse)
+        (status = 400, description = "Bad Request", body = Object)
     )
 )]
 #[get("/{org_id}/search_jobs")]
@@ -285,7 +285,7 @@ pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Erro
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job status", body = JobModel, example = json!({
+        (status = 200, description = "Search job status", body = Object, example = json!({
             "id": "abc123",
             "trace_id": "xyz789",
             "org_id": "default",
@@ -301,7 +301,7 @@ pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Erro
             "cluster": "cluster1",
             "result_path": "/path/to/result"
         })),
-        (status = 400, description = "Bad Request", body = MetaHttpResponse)
+        (status = 400, description = "Bad Request", body = Object)
     )
 )]
 #[get("/{org_id}/search_jobs/{job_id}/status")]
@@ -357,11 +357,11 @@ pub async fn get_status(
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job cancelled successfully", body = MetaHttpResponse, example = json!({
+        (status = 200, description = "Search job cancelled successfully", body = Object, example = json!({
             "code": 200,
             "message": "[Job_Id: abc123] Running Search Job cancelled successfully."
         })),
-        (status = 400, description = "Bad Request", body = MetaHttpResponse)
+        (status = 400, description = "Bad Request", body = Object)
     )
 )]
 #[post("/{org_id}/search_jobs/{job_id}/cancel")]
@@ -415,15 +415,15 @@ pub async fn cancel_job(
         ("size" = Option<i64>, Query, description = "Number of results to return")
     ),
     responses(
-        (status = 200, description = "Search job results", body = Response, example = json!({
+        (status = 200, description = "Search job results", body = Object, example = json!({
             "took": 155,
             "hits": [],
             "total": 27179431,
             "from": 0,
             "size": 100
         })),
-        (status = 400, description = "Bad Request", body = MetaHttpResponse),
-        (status = 404, description = "Not Found", body = MetaHttpResponse)
+        (status = 400, description = "Bad Request", body = Object),
+        (status = 404, description = "Not Found", body = Object)
     )
 )]
 #[get("/{org_id}/search_jobs/{job_id}/result")]
@@ -504,12 +504,12 @@ pub async fn get_job_result(
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job deleted successfully", body = MetaHttpResponse, example = json!({
+        (status = 200, description = "Search job deleted successfully", body = Object, example = json!({
             "code": 200,
             "message": "[Job_Id: abc123] Running Search Job deleted successfully."
         })),
-        (status = 400, description = "Bad Request", body = MetaHttpResponse),
-        (status = 404, description = "Not Found", body = MetaHttpResponse)
+        (status = 400, description = "Bad Request", body = Object),
+        (status = 404, description = "Not Found", body = Object)
     )
 )]
 #[delete("/{org_id}/search_jobs/{job_id}")]
@@ -576,12 +576,12 @@ pub async fn delete_job(
         ("job_id" = String, Path, description = "Search job ID")
     ),
     responses(
-        (status = 200, description = "Search job retry initiated successfully", body = MetaHttpResponse, example = json!({
+        (status = 200, description = "Search job retry initiated successfully", body = Object, example = json!({
             "code": 200,
             "message": "[Job_Id: abc123] Search Job retry successfully."
         })),
-        (status = 400, description = "Bad Request", body = MetaHttpResponse),
-        (status = 403, description = "Forbidden - Job cannot be retried", body = MetaHttpResponse)
+        (status = 400, description = "Bad Request", body = Object),
+        (status = 403, description = "Forbidden - Job cannot be retried", body = Object)
     )
 )]
 #[post("/{org_id}/search_jobs/{job_id}/retry")]

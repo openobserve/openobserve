@@ -54,8 +54,8 @@ use crate::{
       ),
     request_body(content = Alert, description = "Alert data", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/{stream_name}/alerts")]
@@ -107,8 +107,8 @@ pub async fn save_alert(
       ),
     request_body(content = Alert, description = "Alert data", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/{stream_name}/alerts/{alert_name}")]
@@ -146,8 +146,8 @@ pub async fn update_alert(
         ("stream_name" = String, Path, description = "Stream name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/{stream_name}/alerts")]
@@ -201,7 +201,7 @@ async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest)
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[get("/{org_id}/alerts")]
@@ -310,7 +310,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = Alert),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/{stream_name}/alerts/{alert_name}")]
@@ -360,9 +360,9 @@ async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) 
         ("alert_name" = String, Path, description = "Alert name"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[delete("/{org_id}/{stream_name}/alerts/{alert_name}")]
@@ -394,9 +394,9 @@ async fn delete_alert(path: web::Path<(String, String, String)>, req: HttpReques
         ("value" = bool, Query, description = "Enable or disable alert"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/{stream_name}/alerts/{alert_name}/enable")]
@@ -433,9 +433,9 @@ async fn enable_alert(path: web::Path<(String, String, String)>, req: HttpReques
         ("alert_name" = String, Path, description = "Alert name"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/{stream_name}/alerts/{alert_name}/trigger")]

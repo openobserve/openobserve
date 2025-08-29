@@ -61,7 +61,7 @@ use crate::{
     operation_id = "SearchSQL",
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(
-        content = SearchRequest,
+        content = Object,
         description = "Search query",
         content_type = "application/json",
         example = json!({
@@ -79,7 +79,7 @@ use crate::{
             status = 200,
             description = "Success",
             content_type = "application/json",
-            body = SearchResponse,
+            body = Object,
             example = json!({
             "took": 155,
             "hits": [
@@ -110,13 +110,13 @@ use crate::{
             status = 400,
             description = "Failure",
             content_type = "application/json",
-            body = HttpResponse,
+            body = (),
         ),
         (
             status = 500,
             description = "Failure",
             content_type = "application/json",
-            body = HttpResponse,
+            body = (),
         )
     )
 )]
@@ -642,7 +642,7 @@ pub async fn search_multi(
         ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
     ),
     request_body(
-        content = SearchRequest,
+        content = Object,
         description = "Search query",
         content_type = "application/json",
         example = json!({
@@ -656,7 +656,7 @@ pub async fn search_multi(
             status = 200,
             description = "Success",
             content_type = "application/json",
-            body = SearchResponse,
+            body = Object,
             example = json!({
             "took": 155,
             "file_num": 10,
@@ -672,13 +672,13 @@ pub async fn search_multi(
             status = 400,
             description = "Failure",
             content_type = "application/json",
-            body = HttpResponse,
+            body = (),
         ),
         (
             status = 500,
             description = "Failure",
             content_type = "application/json",
-            body = HttpResponse,
+            body = (),
         )
     )
 )]
@@ -821,7 +821,7 @@ pub async fn _search_partition_multi(
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -846,7 +846,7 @@ pub async fn _search_partition_multi(
             "size": 10,
             "scan_size": 28943
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/{stream_names}/_around_multi")]
