@@ -332,6 +332,7 @@ jobs:
 
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
+        if: hashFiles('tests/ui-testing/coverage-report/**') != ''
         with:
           name: coverage-report
           path: tests/ui-testing/coverage-report
