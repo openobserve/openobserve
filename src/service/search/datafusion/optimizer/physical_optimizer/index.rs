@@ -17,16 +17,20 @@ use std::{collections::HashSet, sync::Arc};
 
 use datafusion::{
     common::{
+        Result,
         tree_node::{
             Transformed, TransformedResult, TreeNode, TreeNodeRecursion, TreeNodeRewriter,
-        }, Result
+        },
     },
     config::ConfigOptions,
     logical_expr::Operator,
-    physical_expr::{conjunction, split_conjunction, ScalarFunctionExpr},
+    physical_expr::{ScalarFunctionExpr, conjunction, split_conjunction},
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
-        expressions::{BinaryExpr, CastExpr, Column, InListExpr, Literal, NotExpr}, filter::FilterExec, projection::ProjectionExec, ExecutionPlan, PhysicalExpr
+        ExecutionPlan, PhysicalExpr,
+        expressions::{BinaryExpr, CastExpr, Column, InListExpr, Literal, NotExpr},
+        filter::FilterExec,
+        projection::ProjectionExec,
     },
 };
 use parking_lot::Mutex;
