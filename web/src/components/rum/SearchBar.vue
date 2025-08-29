@@ -56,7 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-pa-none search-button bg-secondary"
             @click="searchData"
             :disable="
-              searchObj.loading || searchObj.data.streamResults.list.length == 0
+              searchObj.loading ||
+              searchObj.data.streamResults?.list?.length == 0
             "
             >{{ t("search.runQuery") }}</q-btn
           >
@@ -87,10 +88,10 @@ import {
   ref,
   watch,
   onBeforeMount,
+  defineAsyncComponent,
   onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
@@ -116,32 +117,17 @@ export default defineComponent({
       type: Object,
       default: () => {},
     },
-    sqlMode: {
-      type: Boolean,
-      default: false,
-    },
-    disabled: {
-      type: Boolean,
-      default: false,
-    },
-    showQuery: {
-      type: Boolean,
-      default: true,
-    },
   },
   methods: {
     searchData() {
       if (this.searchObj?.loading == false) {
-        // this.searchObj.runQuery = true;
         this.$emit("searchdata");
       }
     },
   },
   setup(props, { emit }) {
-    const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const btnRefreshInterval = ref(null);
 
     const { searchObj } = useTraces();
     const queryEditorRef = ref(null);
@@ -155,12 +141,6 @@ export default defineComponent({
       getSuggestions,
       updateFieldKeywords,
     } = useSqlSuggestions();
-
-    const refreshTimeChange = (item) => {
-      searchObj.meta.refreshInterval = item.value;
-      searchObj.meta.refreshIntervalLabel = item.label;
-      btnRefreshInterval.value = false;
-    };
 
     onBeforeMount(async () => {
       await importSqlParser();
@@ -254,8 +234,6 @@ export default defineComponent({
           button: "Date Change",
           tab: value.tab,
           value: value,
-          //user_org: this.store.state.selectedOrganization.identifier,
-          //user_id: this.store.state.userInfo.email,
           stream_name: searchObj.data.stream.selectedStream.value,
           page: "Search Logs",
         });
@@ -265,7 +243,6 @@ export default defineComponent({
     };
 
     const updateQuery = () => {
-      // alert(searchObj.data.query);
       if (queryEditorRef.value?.setValue)
         queryEditorRef.value.setValue(searchObj.data.query);
     };
@@ -308,12 +285,8 @@ export default defineComponent({
 
     return {
       t,
-      router,
       searchObj,
       queryEditorRef,
-      btnRefreshInterval,
-      refreshTimes: searchObj.config.refreshTimes,
-      refreshTimeChange,
       updateQueryValue,
       updateDateTime,
       updateQuery,
