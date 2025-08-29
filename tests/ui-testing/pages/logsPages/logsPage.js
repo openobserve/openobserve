@@ -112,6 +112,7 @@ export class LogsPage {
         this.cmContent = '.cm-content';
         this.cmLine = '.cm-line';
         this.searchFunctionInput = { placeholder: 'Search Function' };
+        this.timestampFieldTable = '[data-test="log-search-index-list-fields-table"]';
     }
 
 
@@ -1917,5 +1918,25 @@ export class LogsPage {
                 await toggleButton.click();
             }
         }
+    }
+
+    async clickTimestampField() {
+        return await this.page.locator(this.timestampFieldTable).getByTitle('_timestamp').click();
+    }
+
+    async clickSchemaButton() {
+        return await this.page.getByRole('button').filter({ hasText: /^schema$/ }).click();
+    }
+
+    async clickInfoSchemaButton() {
+        return await this.page.getByRole('button').filter({ hasText: 'infoschema' }).click();
+    }
+
+    async clickClearButton() {
+        return await this.page.getByRole('button', { name: 'Clear' }).click();
+    }
+
+    async expectTimestampFieldVisible() {
+        return await expect(this.page.locator(this.timestampFieldTable).getByTitle('_timestamp')).toBeVisible();
     }
 } 
