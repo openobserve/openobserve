@@ -469,7 +469,7 @@ pub async fn generate_invitation(
         }
     }
     for invitee in &invites.invites {
-        match get_user(Some(org_id),invitee).await {
+        match get_user(Some(org_id), invitee).await {
             None => {}
             Some(_) => {
                 return Err(anyhow::anyhow!(

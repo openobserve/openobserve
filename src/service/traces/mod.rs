@@ -146,13 +146,23 @@ pub async fn handle_otlp_request(
 ) -> Result<HttpResponse, Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
-        log::error!("[TRACES:OTLP] ingestion error: {e}");
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE,
-                e,
-            )),
-        );
+        // we do not want to log trial period expired errors
+        if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        } else {
+            log::error!("[TRACES:OTLP] ingestion error: {e}");
+            return Ok(
+                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                    http::StatusCode::SERVICE_UNAVAILABLE,
+                    e,
+                )),
+            );
+        }
     }
 
     #[cfg(feature = "cloud")]
@@ -575,13 +585,23 @@ pub async fn ingest_json(
 ) -> Result<HttpResponse, Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
-        log::error!("[TRACES:JSON] ingestion error: {e}");
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE,
-                e,
-            )),
-        );
+        // we do not want to log trial period expired errors
+        if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            log::error!("[TRACES:JSON] ingestion error: {e}");
+            return Ok(
+                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                    http::StatusCode::SERVICE_UNAVAILABLE,
+                    e,
+                )),
+            );
+        } else {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        }
     }
 
     let start = std::time::Instant::now();
