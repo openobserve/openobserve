@@ -28,10 +28,6 @@ use crate::{
 
 #[tracing::instrument(name = "service:db:syslog:toggle_syslog_setting")]
 pub async fn toggle_syslog_setting(enabled: bool) -> Result<(), anyhow::Error> {
-    if enabled {
-        return Err(anyhow::anyhow!("Syslog is deprecated"));
-    }
-
     Ok(db::put(
         "/syslog/enabled",
         json::to_vec(&json::Value::Bool(enabled)).unwrap().into(),
