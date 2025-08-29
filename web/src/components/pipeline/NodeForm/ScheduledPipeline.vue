@@ -82,10 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
-                dense
                 flat
+                no-caps
                 :title="t('search.runQuery')"
-                class="q-pa-none q-mr-sm search-button-pipeline"
+                class="q-pa-none q-mr-sm o2-primary-button tw-h-[36px]"
+                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                 @click="{
                   expandState.output = true;
                   expandState.query = false;
