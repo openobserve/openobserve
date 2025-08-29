@@ -21,6 +21,11 @@ export default class DashboardFolder {
     await this.folderSearchInput.fill(folderName);
   }
 
+  // Verify folder is visible after search
+  async verifyFolderVisible(folderName) {
+    await expect(this.page.locator(`text=${folderName}`)).toBeVisible();
+  }
+
   // Create folder
   async createFolder(folderName) {
     const newFolderBtn = this.page.locator('[data-test="dashboard-new-folder-btn"]');

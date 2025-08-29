@@ -22,10 +22,12 @@ use tokio::{
 };
 use tokio_rustls::TlsAcceptor;
 
+#[allow(deprecated)]
 use crate::{job::syslog_server::BROADCASTER, service::logs::syslog};
 
 pub static STOP_SRV: &str = "ZO_STOP_TCP_UDP";
 
+#[allow(deprecated)]
 pub async fn udp_server(socket: UdpSocket) {
     let mut buf_udp = vec![0u8; 1472];
     let sender = BROADCASTER.read().await;
@@ -94,6 +96,7 @@ pub async fn tls_tcp_server(listener: TcpListener, tls_acceptor: Option<TlsAccep
     }
 }
 
+#[allow(deprecated)]
 async fn handle_connection<S>(mut stream: S, peer_addr: SocketAddr)
 where
     S: AsyncRead + Unpin + Send + 'static,

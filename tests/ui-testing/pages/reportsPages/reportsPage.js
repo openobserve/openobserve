@@ -24,7 +24,7 @@ export class ReportsPage {
     this.dateTimeButton = dateTimeButtonLocator;
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
     this.absoluteTab = absoluteTabLocator;
-    this.profileButton = page.locator('button').filter({ hasText: (process.env["ZO_ROOT_USER_EMAIL"]) });
+    this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
     this.zoneInput = page.locator('[data-test="add-report-schedule-send-later-section"]').getByText('arrow_drop_down');
     this.timeZoneOption = (zone) => `role=option[name="${zone}"]`;
     this.signOutButton = page.getByText('Sign Out');
@@ -261,7 +261,10 @@ export class ReportsPage {
     await this.page
       .locator(`[data-test="report-list-${reportName}-pause-start-report"]`)
       .click({ force: true });
-      await expect(this.page.getByRole('alert').first()).toContainText('Stopped report successfully.');
+      // Wait for alert and find specific message
+      await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
+      const stopAlert = this.page.getByRole('alert').filter({ hasText: 'Stopped report successfully.' });
+      await expect(stopAlert).toBeVisible({ timeout: 5000 });
   }
 
   async updateReport(reportName) {
@@ -277,7 +280,10 @@ export class ReportsPage {
       await this.page.locator('[data-test="add-report-step1-continue-btn"]').click({ force: true });
       await this.page.locator('[data-test="add-report-step2-continue-btn"]').click({ force: true });
       await this.page.locator('[data-test="add-report-save-btn"]').click({ force: true });
-      await expect(this.page.getByRole('alert').first()).toContainText('Report updated successfully.');
+      // Wait for alert and find specific message
+      await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
+      const updateAlert = this.page.getByRole('alert').filter({ hasText: 'Report updated successfully.' });
+      await expect(updateAlert).toBeVisible({ timeout: 5000 });
   }
 
   // async logedOut() {
@@ -294,18 +300,14 @@ export class ReportsPage {
     // Wait for the logout menu item to be attached to the DOM
     const logoutItem = this.page.locator('[data-test="menu-link-logout-item"]');
     
-    // Wait for the logout item to be present in the DOM
-    await logoutItem.waitFor({ state: 'attached', timeout: 3000 });
+    // Wait for the logout item to be present in the DOM with reasonable timeout
+    await logoutItem.waitFor({ state: 'attached', timeout: 10000 });
 
-    // Optionally, wait a short time to ensure the element is visible
-    await this.page.waitForTimeout(100); // 100 ms delay
+    // Wait for element to be visible instead of hard wait
+    await logoutItem.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Now check if it's visible before clicking
-    if (await logoutItem.isVisible()) {
-        await logoutItem.click({ force: true });
-    } else {
-        console.error("Logout item is not visible after clicking the profile icon.");
-    }
+    // Now click the logout item
+    await logoutItem.click({ force: true });
 }
 
 async notAvailableReport(reportName) {
