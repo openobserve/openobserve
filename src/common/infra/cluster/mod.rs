@@ -703,7 +703,7 @@ pub async fn cache_node_list() -> Result<()> {
     )
     .await
     .map_err(|e| {
-        log::error!("[CLUSTER] nats register failed: {}", e);
+        log::error!("[CLUSTER] cache_node_list lock register failed: {}", e);
         e
     })?;
 
@@ -714,7 +714,7 @@ pub async fn cache_node_list() -> Result<()> {
         log::info!("[CLUSTER] cached {} nodes", nodes.len());
     };
     dist_lock::unlock(&locker).await.map_err(|e| {
-        log::error!("[CLUSTER] nats unlock failed: {}", e);
+        log::error!("[CLUSTER] cache_node_list lock unlock failed: {}", e);
         e
     })?;
     Ok(())
