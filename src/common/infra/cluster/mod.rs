@@ -696,16 +696,13 @@ pub async fn cache_node_list() -> Result<()> {
         return Ok(());
     }
 
-    // 1. create a cluster lock for node register
-    let locker = dist_lock::lock(
-        "/nodes/reset_node_list",
-        cfg.limit.node_heartbeat_ttl as u64,
-    )
-    .await
-    .map_err(|e| {
-        log::error!("[CLUSTER] cache_node_list lock register failed: {}", e);
-        e
-    })?;
+    // 1. create a cluster lock for cache_node_list with  /nodes/register as key to allow
+    let locker = dist_lock::lock("/nodes/register", cfg.limit.node_heartbeat_ttl as u64)
+        .await
+        .map_err(|e| {
+            log::error!("[CLUSTER] cache_node_list lock register failed: {}", e);
+            e
+        })?;
 
     if let Ok(nodes) = match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::cache_node_list(&locker).await,

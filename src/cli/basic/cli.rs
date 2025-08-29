@@ -359,6 +359,11 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .await
                         .expect("node list refresh failed");
                 }
+                "user-sessions" => {
+                    db::session::cache()
+                        .await
+                        .expect("user sessions refresh failed");
+                }
                 _ => {
                     return Err(anyhow::anyhow!(
                         "unsupported reset component: {}",
