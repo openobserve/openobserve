@@ -488,6 +488,12 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 Some(("metrics", _)) => {
                     super::http::local_node_metrics().await?;
                 }
+                Some(("node-list", _)) => {
+                    super::http::refresh_nodes_list().await?;
+                }
+                Some(("user-sessions", _)) => {
+                    super::http::refresh_user_sessions().await?;
+                }
                 _ => {
                     return Err(anyhow::anyhow!("unsupported sub command: {name}"));
                 }

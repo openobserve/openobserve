@@ -1489,8 +1489,9 @@ pub struct Compact {
     pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
     pub blocked_orgs: String,
-    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_HISTORY", default = false)]
-    pub data_retention_history: bool,
+    #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_MODE", default = "deleted")]
+    // "history" "deleted" "none"
+    pub file_list_deleted_mode: String,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
         default = 500,
