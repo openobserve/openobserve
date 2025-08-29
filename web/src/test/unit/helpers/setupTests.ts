@@ -15,6 +15,7 @@
 
 // @ts-ignore
 import { beforeAll, afterEach, afterAll, vi } from "vitest";
+import { config } from "@vue/test-utils";
 
 import { setupServer } from "msw/node";
 
@@ -60,7 +61,54 @@ global.IntersectionObserver = MockIntersectionObserver;
 
 vi.stubGlobal("server", server);
 
+// Configure global stubs for Quasar components to avoid prop errors
+config.global.stubs = {
+  'q-input': {
+    template: '<div class="q-input-stub" data-testid="q-input-stub"><slot></slot></div>',
+    props: ['modelValue', 'label', 'filled', 'dense', 'class', 'style', 'dataTest', 'suffix', 'prefix', 'type', 'placeholder', 'outlined', 'loading', 'disable', 'readonly', 'clearable', 'mask'],
+    emits: ['update:modelValue', 'clear', 'focus', 'blur'],
+    inheritAttrs: false
+  },
+  'q-splitter': {
+    template: '<div class="q-splitter-stub" v-bind="$attrs"><slot name="before"></slot><slot name="after"></slot><slot></slot></div>',
+    props: ['modelValue', 'style'],
+    emits: ['update:modelValue']
+  },
+  'q-btn': {
+    template: '<button v-bind="$attrs" @click="$emit(\'click\', $event)"><slot></slot></button>',
+    props: ['label', 'color', 'padding', 'noCaps', 'outline'],
+    emits: ['click']
+  },
+  'DateTimePickerDashboard': {
+    template: '<div class="datetime-picker-stub"></div>',
+    methods: {
+      setCustomDate: vi.fn(),
+      getConsumableDateTime: vi.fn(() => ({
+        startTime: '2023-01-01T00:00:00Z',
+        endTime: '2023-01-01T23:59:59Z',
+        relativeTimePeriod: '15m',
+        type: 'relative'
+      })),
+      updateDateTime: vi.fn(),
+    }
+  }
+};
+
 global.document.queryCommandSupported = vi.fn().mockReturnValue(true);
+
+// Suppress Vue warnings for testing environment
+const originalWarn = console.warn;
+console.warn = (...args) => {
+  // Filter out specific Vue warnings that are expected in test environment
+  const message = args[0];
+  if (typeof message === 'string') {
+    if (message.includes('Failed setting prop "prefix" on <q-input-stub>') ||
+        message.includes('Cannot set property prefix of [object Element]')) {
+      return; // Suppress this specific warning
+    }
+  }
+  originalWarn.apply(console, args);
+};
 
 // Mock URL.createObjectURL and URL.revokeObjectURL for file download tests
 global.URL.createObjectURL = vi.fn().mockReturnValue('mock-object-url');

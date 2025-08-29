@@ -26,6 +26,12 @@ vi.mock("@/composables/useDashboardPanel", () => ({
       },
       layout: {
         currentQueryIndex: 0,
+        splitter: 20,
+        querySplitter: 41,
+        showQueryBar: true,
+        isConfigPanelOpen: false,
+        vrlFunctionToggle: false,
+        showFieldList: true,
       },
     },
     resetDashboardPanelData: vi.fn(),
@@ -132,6 +138,11 @@ const createMockRouter = () => {
     history: createWebHistory(),
     routes: [
       {
+        path: "/",
+        name: "home",
+        component: { template: "<div>Home</div>" },
+      },
+      {
         path: "/dashboard",
         name: "dashboard",
         component: { template: "<div>Dashboard</div>" },
@@ -152,6 +163,7 @@ const createMockI18n = () => {
           name: "Name",
           discard: "Discard",
           save: "Save",
+          apply: "Apply",
         },
       },
     },
@@ -3244,7 +3256,11 @@ describe("AddPanel.vue", () => {
                 }
               }]
             },
-            layout: { currentQueryIndex: 0 }
+            layout: { 
+              currentQueryIndex: 0,
+              splitter: 20,
+              showFieldList: true
+            }
           };
 
           if (vm.getContext) {
@@ -3284,7 +3300,11 @@ describe("AddPanel.vue", () => {
         // Set up conditions
         vm.dashboardPanelData = {
           data: { queries: [{ fields: { stream: "test-stream" } }] },
-          layout: { currentQueryIndex: 0 }
+          layout: { 
+              currentQueryIndex: 0,
+              splitter: 20,
+              showFieldList: true
+            }
         };
 
         if (vm.getContext) {
@@ -3316,7 +3336,11 @@ describe("AddPanel.vue", () => {
         // Set up conditions: no stream selected
         vm.dashboardPanelData = {
           data: { queries: [{ fields: { stream: null } }] }, // NO stream
-          layout: { currentQueryIndex: 0 }
+          layout: { 
+              currentQueryIndex: 0,
+              splitter: 20,
+              showFieldList: true
+            }
         };
 
         if (vm.getContext) {
@@ -3348,7 +3372,11 @@ describe("AddPanel.vue", () => {
         // Test case 1: no streamType
         vm.dashboardPanelData = {
           data: { queries: [{ fields: { stream: "test-stream", stream_type: null } }] },
-          layout: { currentQueryIndex: 0 }
+          layout: { 
+              currentQueryIndex: 0,
+              splitter: 20,
+              showFieldList: true
+            }
         };
 
         if (vm.getContext) {
@@ -3359,7 +3387,11 @@ describe("AddPanel.vue", () => {
         // Test case 2: empty stream
         vm.dashboardPanelData = {
           data: { queries: [{ fields: { stream: "", stream_type: "logs" } }] },
-          layout: { currentQueryIndex: 0 }
+          layout: { 
+              currentQueryIndex: 0,
+              splitter: 20,
+              showFieldList: true
+            }
         };
 
         if (vm.getContext) {
@@ -3393,7 +3425,11 @@ describe("AddPanel.vue", () => {
           const vm = wrapper.vm as any;
           vm.dashboardPanelData = {
             data: { queries: [{ fields: { stream: "test-stream", stream_type: "logs" } }] },
-            layout: { currentQueryIndex: 0 }
+            layout: { 
+              currentQueryIndex: 0,
+              splitter: 20,
+              showFieldList: true
+            }
           };
 
           if (vm.getContext) {
@@ -3433,7 +3469,11 @@ describe("AddPanel.vue", () => {
           const vm = wrapper.vm as any;
           vm.dashboardPanelData = {
             data: { queries: [{ fields: { stream: "test-stream", stream_type: "logs" } }] },
-            layout: { currentQueryIndex: 0 }
+            layout: { 
+              currentQueryIndex: 0,
+              splitter: 20,
+              showFieldList: true
+            }
           };
 
           if (vm.getContext) {
@@ -3477,7 +3517,11 @@ describe("AddPanel.vue", () => {
           const vm = wrapper.vm as any;
           vm.dashboardPanelData = {
             data: { queries: [{ fields: { stream: "error-stream", stream_type: "logs" } }] },
-            layout: { currentQueryIndex: 0 }
+            layout: { 
+              currentQueryIndex: 0,
+              splitter: 20,
+              showFieldList: true
+            }
           };
 
           if (vm.getContext) {
@@ -3521,7 +3565,11 @@ describe("AddPanel.vue", () => {
           for (const streamType of streamTypes) {
             vm.dashboardPanelData = {
               data: { queries: [{ fields: { stream: "multi-stream", stream_type: streamType } }] },
-              layout: { currentQueryIndex: 0 }
+              layout: { 
+                currentQueryIndex: 0,
+                splitter: 20,
+                showFieldList: true
+              }
             };
 
             if (vm.getContext) {
