@@ -499,6 +499,8 @@ async fn extend_trial_period(
     org_id: web::Path<String>,
     req: web::Json<ExtendTrialPeriodRequest>,
 ) -> Result<HttpResponse, Error> {
+    use crate::service::db::organization::ORG_KEY_PREFIX;
+
     let req = req.into_inner();
     let org = org_id.into_inner();
     if org != "_meta" {
@@ -524,13 +526,19 @@ async fn extend_trial_period(
         )));
     }
 
-    match infra::table::organizations::set_trial_period_end(&req.org_id, req.new_end_date).await {
+    let ret = match infra::table::organizations::set_trial_period_end(&req.org_id, req.new_end_date)
+        .await
+    {
         Ok(_) => Ok(HttpResponse::Ok().body("success")),
         Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST,
             err.to_string(),
         ))),
-    }
+    };
+
+    let key = format!("{ORG_KEY_PREFIX}{}", req.org_id);
+    let _ = infra::db::put_into_db_coordinator(&key, Default::default(), true, None).await;
+    ret
 }
 
 /// RenameOrganization
