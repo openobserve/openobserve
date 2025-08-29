@@ -347,3 +347,12 @@ pub async fn batch_remove(org_ids: Vec<String>) -> Result<(), errors::Error> {
 
     Ok(())
 }
+
+pub async fn invalidate_cache(org_id: Option<&str>) {
+    let mut cache = CACHE.write().await;
+    if let Some(v) = org_id {
+        cache.remove(v);
+    } else {
+        cache.drain();
+    }
+}
