@@ -201,4 +201,36 @@ test.describe("Logs Quickmode testcases", () => {
     
     testLogger.info('Quick mode results test completed');
   });
+
+  test("should click timestamp field and then search for kubernetes_pod_id field", {
+    tag: ['@fieldInteraction', '@all', '@logs']
+  }, async ({ page }) => {
+    testLogger.info('Testing timestamp field click and kubernetes_pod_id field search');
+    
+    // Check if _timestamp field exists and click it
+    await pm.logsPage.clickTimestampField();
+    
+    // Click on schema button
+    await pm.logsPage.clickSchemaButton();
+    
+    // Search and click kubernetes_pod_id field
+    await pm.logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
+    await pm.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    
+    // Click on infoschema button
+    await pm.logsPage.clickInfoSchemaButton();
+    
+    // Click Clear button
+    await pm.logsPage.clickClearButton();
+    
+    // Remove kubernetes_pod_id as interesting field
+    await pm.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    
+    // Assert that _timestamp still exists
+    await pm.logsPage.expectTimestampFieldVisible();
+    
+    testLogger.info('Timestamp field click and kubernetes_pod_id field search completed');
+  });
+
+
 });
