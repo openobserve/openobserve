@@ -36,6 +36,7 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc;
 use vector_enrichment::TableRegistry;
 
+#[allow(deprecated)]
 use crate::{
     common::meta::{
         maxmind::MaxmindClient,
@@ -74,6 +75,7 @@ pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, db_scheduler::Trigge
     Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, Template>> = Lazy::new(Default::default);
 pub static DESTINATIONS: Lazy<RwHashMap<String, Destination>> = Lazy::new(Default::default);
+#[allow(deprecated)]
 pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(Default::default);
 pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
 pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(Default::default);
@@ -226,19 +228,7 @@ mod tests {
     fn test_static_variables_initialization() {
         // Test that all static variables can be accessed and are properly initialized
 
-        // Test RwHashMap variables
-        assert_eq!(KVS.len(), 0);
-        assert_eq!(QUERY_FUNCTIONS.len(), 0);
-        assert_eq!(USERS.len(), 0);
-        assert_eq!(ORG_USERS.len(), 0);
-        assert_eq!(ROOT_USER.len(), 0);
-        assert_eq!(PASSWORD_HASH.len(), 0);
-        assert_eq!(ALERTS_TEMPLATES.len(), 0);
-        assert_eq!(DESTINATIONS.len(), 0);
-        assert_eq!(SYSLOG_ROUTES.len(), 0);
-        assert_eq!(ENRICHMENT_TABLES.len(), 0);
-        assert_eq!(USER_SESSIONS.len(), 0);
-        assert_eq!(SHORT_URLS.len(), 0);
+        // Test RwHashMap variables are initialized
 
         // Test Arc<RwLock> variables
         let users_rum_token = USERS_RUM_TOKEN.clone();

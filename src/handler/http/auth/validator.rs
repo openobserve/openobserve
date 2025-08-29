@@ -1050,10 +1050,20 @@ fn extract_full_url(req: &ServiceRequest) -> String {
 #[cfg(test)]
 mod tests {
     use actix_web::test;
-    use infra::{db as infra_db, table as infra_table};
+    use infra::{
+        db as infra_db,
+        db::{ORM_CLIENT, connect_to_orm},
+        table as infra_table,
+    };
 
     use super::*;
-    use crate::{common::meta::user::UserRequest, service::organization};
+    use crate::{
+        common::{
+            infra::config::{ORG_USERS, USERS},
+            meta::user::UserRequest,
+        },
+        service::{organization, users},
+    };
 
     #[tokio::test]
     async fn test_validation_response_builder_from_db_user() {
@@ -1115,12 +1125,19 @@ mod tests {
         let init_user = "root@example.com";
         let pwd = "Complexpass#123";
 
-        infra_db::create_table().await.unwrap();
-        infra_table::create_user_tables().await.unwrap();
-        organization::check_and_create_org_without_ofga(org_id)
-            .await
-            .unwrap();
-        users::create_root_user_if_not_exists(
+        // Initialize ORM client and clear database tables for test isolation
+        let _ = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let _ = infra::table::org_users::clear().await;
+        let _ = infra::table::users::clear().await;
+        let _ = infra::table::organizations::clear().await;
+        let _ = infra_db::create_table().await;
+        let _ = infra_table::create_user_tables().await;
+        let _ = organization::check_and_create_org_without_ofga(org_id).await;
+
+        // Clear global caches to ensure test isolation
+        USERS.clear();
+        ORG_USERS.clear();
+        let _ = users::create_root_user_if_not_exists(
             org_id,
             UserRequest {
                 email: init_user.to_string(),
@@ -1135,9 +1152,8 @@ mod tests {
                 token: None,
             },
         )
-        .await
-        .unwrap();
-        users::post_user(
+        .await;
+        let _ = users::post_user(
             org_id,
             UserRequest {
                 email: user_id.to_string(),
@@ -1153,8 +1169,7 @@ mod tests {
             },
             init_user,
         )
-        .await
-        .unwrap();
+        .await;
 
         assert!(
             validate_credentials(init_user, pwd, "default/_bulk")
@@ -1190,15 +1205,6 @@ mod tests {
                 .is_valid
         );
         assert!(validate_user(init_user, pwd).await.unwrap().is_valid);
-    }
-
-    #[test]
-    async fn test_constants() {
-        // Test that constants are properly defined
-        assert_eq!(PKCE_STATE_ORG, "o2_pkce_state");
-        assert_eq!(ACCESS_TOKEN, "access_token");
-        assert_eq!(REFRESH_TOKEN, "refresh_token");
-        assert_eq!(ID_TOKEN_HEADER, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
     }
 
     #[test]

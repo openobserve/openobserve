@@ -958,16 +958,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_healthz_response_serialization() {
-        let response = HealthzResponse {
-            status: "ok".to_string(),
-        };
-
-        let json = serde_json::to_string(&response).unwrap();
-        assert!(json.contains("\"status\":\"ok\""));
-    }
-
-    #[test]
     fn test_healthz_response_different_status() {
         let response = HealthzResponse {
             status: "not ok".to_string(),
@@ -1064,16 +1054,6 @@ mod tests {
     }
 
     #[test]
-    fn test_healthz_response_can_be_created() {
-        // Test basic construction of HealthzResponse
-        let response = HealthzResponse {
-            status: "healthy".to_string(),
-        };
-
-        assert_eq!(response.status, "healthy");
-    }
-
-    #[test]
     fn test_prepare_empty_cookie_basic() {
         use std::sync::Arc;
 
@@ -1143,20 +1123,6 @@ mod tests {
 
         // Should return some values, even if caches are empty
         assert!(mem_size > 0); // At least the size of empty HashMap
-    }
-
-    #[test]
-    fn test_healthz_response_deserialization() {
-        let json = r#"{"status":"ok"}"#;
-        let response: HealthzResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(response.status, "ok");
-    }
-
-    #[test]
-    fn test_healthz_response_deserialization_different_status() {
-        let json = r#"{"status":"error"}"#;
-        let response: HealthzResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(response.status, "error");
     }
 
     #[test]

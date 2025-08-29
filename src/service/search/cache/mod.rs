@@ -35,7 +35,7 @@ use config::{
         hash::Sum64,
         json,
         sql::{is_aggregate_query, is_eligible_for_histogram},
-        time::format_duration,
+        time::{format_duration, second_micros},
     },
 };
 use infra::{
@@ -93,7 +93,7 @@ pub async fn search(
 
     // Result caching check start
     let mut origin_sql = in_req.query.sql.clone();
-    let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
+    let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or(true);
     let (stream_name, all_streams) = match resolve_stream_names(&origin_sql) {
         // TODO: cache don't not support multiple stream names
         Ok(v) => (v[0].clone(), v.join(",")),
@@ -754,7 +754,7 @@ pub async fn _write_results(
     let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
 
     let smallest_ts = std::cmp::min(first_rec_ts, last_rec_ts);
-    let discard_duration = get_config().common.result_cache_discard_duration * 1000 * 1000;
+    let discard_duration = second_micros(get_config().limit.cache_delay_secs);
 
     if (last_rec_ts - first_rec_ts).abs() < discard_duration
         && smallest_ts > Utc::now().timestamp_micros() - discard_duration
@@ -908,7 +908,7 @@ pub async fn write_results_v2(
     let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
 
     let smallest_ts = std::cmp::min(first_rec_ts, last_rec_ts);
-    let discard_duration = get_config().common.result_cache_discard_duration * 1000 * 1000;
+    let discard_duration = second_micros(get_config().limit.cache_delay_secs);
 
     if (last_rec_ts - first_rec_ts).abs() < discard_duration
         && smallest_ts > Utc::now().timestamp_micros() - discard_duration

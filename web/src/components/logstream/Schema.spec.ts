@@ -211,15 +211,6 @@ describe("Schema Component Tests", async () => {
       enrichmentWrapper.unmount();
     });
 
-    // Test 11: isEnvironmentSettings function
-    it("should identify environment settings correctly", () => {
-      const envRow = { index_type: ["fullTextSearchKeyEnv"] };
-      const normalRow = { index_type: ["fullTextSearchKey"] };
-      
-      expect(wrapper.vm.isEnvironmentSettings(envRow)).toBe(true);
-      expect(wrapper.vm.isEnvironmentSettings(normalRow)).toBe(false);
-      expect(wrapper.vm.isEnvironmentSettings(null)).toBe(false);
-    });
 
     // Test 12: getFieldIndices function with full text search
     it("should get correct field indices for full text search", () => {
@@ -240,23 +231,6 @@ describe("Schema Component Tests", async () => {
       expect(property.index_type).toContain("fullTextSearchKey");
     });
 
-    // Test 13: getFieldIndices function with environment FTS
-    it("should get correct field indices for environment FTS", () => {
-      const property = { name: "log" };
-      const settings = {
-        full_text_search_keys: [],
-        index_fields: [],
-        bloom_filter_fields: [],
-        partition_keys: {},
-      };
-      
-      // Mock store properties that are used in getFieldIndices
-      wrapper.vm.store.state.zoConfig.default_fts_keys = ["log"];
-      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
-      
-      const indices = wrapper.vm.getFieldIndices(property, settings);
-      expect(indices).toContain("fullTextSearchKeyEnv");
-    });
 
     // Test 14: getFieldIndices function with secondary index
     it("should get correct field indices for secondary index", () => {

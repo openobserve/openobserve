@@ -67,6 +67,20 @@ pub fn set_stream_settings_atomic(settings: StreamSettingsCache) {
     STREAM_SETTINGS_ATOMIC.store(Arc::new(settings));
 }
 
+pub async fn get_stream_schema_from_cache(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> Option<Schema> {
+    let key = mk_key(org_id, stream_type, stream_name);
+    let cache_key = key.strip_prefix("/schema/").unwrap();
+    STREAM_SCHEMAS_LATEST
+        .read()
+        .await
+        .get(cache_key)
+        .map(|schema| schema.schema().as_ref().clone())
+}
+
 pub fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("/schema/{org_id}/{stream_type}/{stream_name}")
 }

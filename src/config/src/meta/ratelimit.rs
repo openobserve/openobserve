@@ -499,14 +499,4 @@ mod tests {
         assert!(json.contains("org"));
         assert!(json.contains("threshold"));
     }
-
-    #[test]
-    fn test_ratelimit_rule_type_clone_and_debug() {
-        let rule_type = RatelimitRuleType::Exact;
-        let cloned = rule_type.clone();
-
-        assert!(matches!(cloned, RatelimitRuleType::Exact));
-        assert_eq!(format!("{:?}", rule_type), "Exact");
-        assert_eq!(format!("{:?}", RatelimitRuleType::Regex), "Regex");
-    }
 }

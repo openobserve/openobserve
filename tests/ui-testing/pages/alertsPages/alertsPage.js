@@ -149,48 +149,46 @@ export class AlertsPage {
         this.currentAlertName = randomAlertName;  // Store the alert name
 
         await this.page.locator(this.addAlertButton).click();
-        await this.page.waitForTimeout(1000); // Wait for alert creation form to load
+        await expect(this.page.locator(this.alertNameInput)).toBeVisible();
 
         await this.page.locator(this.alertNameInput).click();
         await this.page.locator(this.alertNameInput).fill(randomAlertName);
-        await this.page.waitForTimeout(1000); // Wait after filling alert name
+        await expect(this.page.locator(this.alertNameInput)).toHaveValue(randomAlertName);
 
         await this.page.locator(this.streamTypeDropdown).click();
-        await this.page.waitForTimeout(2000); // Wait for stream type options to load
+        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible();
         await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000); // Wait after selecting stream type
+        await expect(this.page.locator(this.streamNameDropdown)).toBeVisible();
 
         await this.page.locator(this.streamNameDropdown).click();
-        await this.page.waitForTimeout(2000); // Wait for stream name options to load
+        await expect(this.page.getByText(`${streamName}`, { exact: true })).toBeVisible();
         await this.page.getByText(`${streamName}`, { exact: true }).click();
-        await this.page.waitForTimeout(1000); // Wait after selecting stream name
+        await expect(this.page.locator(this.realtimeAlertRadio)).toBeVisible();
 
         await this.page.locator(this.realtimeAlertRadio).click();
-        await this.page.waitForTimeout(1000); // Wait after selecting realtime alert
+        await expect(this.page.locator(this.alertDelayInput)).toBeVisible();
 
         await this.page.locator(this.alertDelayInput).click();
         await this.page.locator(this.alertDelayInput).getByLabel('').fill('0');
-        await this.page.waitForTimeout(1000); // Wait after setting delay
+        await expect(this.page.locator(this.alertDelayInput).getByLabel('')).toHaveValue('0');
 
         // Handle destination selection with scrolling
         await this.page.locator('[data-test="add-alert-destination-select"]').getByLabel('arrow_drop_down').click();
-        await this.page.waitForTimeout(2000); // Wait for destination options to load
+        await this.page.waitForLoadState('networkidle');
         
         // Use the common scroll function for destination
         await this.commonActions.scrollAndFindOption(destinationName, 'template');
-        
-        await this.page.waitForTimeout(1000); // Wait after selecting destination
+        await this.page.waitForLoadState('networkidle');
 
         await this.page.locator(this.columnInput).click();
-        await this.page.waitForTimeout(2000); // Wait for column options to load
-        await this.page.waitForSelector(`[role="option"]:has-text("${column}")`);
+        await expect(this.page.getByRole('option', { name: column })).toBeVisible({ timeout: 10000 });
         await this.page.getByRole('option', { name: column }).click();
-        await this.page.waitForTimeout(1000); // Wait after selecting column
+        await expect(this.page.locator('[data-test="alert-conditions-operator-select"]')).toBeVisible({ timeout: 10000 });
 
         await this.page.locator('[data-test="alert-conditions-operator-select"] div').filter({ hasText: '>' }).nth(3).click();
         await this.page.getByText('Contains', { exact: true }).click();
         await this.page.locator(this.valueInput).fill(value);
-        await this.page.waitForTimeout(1000); // Wait after filling value
+        await expect(this.page.locator(this.valueInput)).toHaveValue(value);
 
         await this.page.locator(this.alertSubmitButton).click();
         await expect(this.page.getByText(this.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
@@ -388,27 +386,27 @@ export class AlertsPage {
         this.currentAlertName = randomAlertName;
 
         await this.page.locator(this.addAlertButton).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.alertNameInput)).toBeVisible();
 
         // Fill alert name
         await this.page.locator(this.alertNameInput).click();
         await this.page.locator(this.alertNameInput).fill(randomAlertName);
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.alertNameInput)).toHaveValue(randomAlertName);
 
         // Select stream type and name
         await this.page.locator(this.streamTypeDropdown).click();
-        await this.page.waitForTimeout(2000);
+        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible();
         await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator(this.streamNameDropdown)).toBeVisible();
 
         await this.page.locator(this.streamNameDropdown).click();
-        await this.page.waitForTimeout(2000);
+        await expect(this.page.getByText(streamName, { exact: true })).toBeVisible();
         await this.page.getByText(streamName, { exact: true }).click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator('[data-test="add-alert-scheduled-alert-radio"]')).toBeVisible();
 
         // Select scheduled alert radio
         await this.page.locator('[data-test="add-alert-scheduled-alert-radio"]').click();
-        await this.page.waitForTimeout(1000);
+        await expect(this.page.locator('[data-test="scheduled-alert-threshold-operator-select"]')).toBeVisible({ timeout: 10000 });
 
         // Set threshold
         await this.page.locator('[data-test="scheduled-alert-threshold-operator-select"]').getByLabel('arrow_drop_down').click();
@@ -423,12 +421,11 @@ export class AlertsPage {
 
         // Select destination with scrolling
         await this.page.locator(this.destinationSelect).getByLabel('arrow_drop_down').click();
-        await this.page.waitForTimeout(2000); // Wait for destination options to load
+        await this.page.waitForLoadState('networkidle');
         
         // Use the common scroll function
         await this.commonActions.scrollAndFindOption(destinationName, 'template');
-        
-        await this.page.waitForTimeout(1000); // Wait after selecting destination
+        await this.page.waitForLoadState('networkidle');
         //here we are expanding the multi window section as because it is not expanded by default
         await this.page.getByText('Multi WindowSet relative alerting system based on SQL query').click();
         await this.page.getByText('keyboard_arrow_down').click();
@@ -443,12 +440,22 @@ export class AlertsPage {
         await this.page.locator('[data-test="scheduled-alert-sql-editor"]').locator('.cm-content')
             .fill('SELECT name\n  FROM "auto_playwright_stream"\n  WHERE \n    gender = \'Male\'\n    AND age > 60\n    AND country IN (\'Germany\', \'Japan\', \'USA\')');
         await this.page.getByRole('button', { name: 'Run Query' }).click();
-        await this.page.waitForTimeout(2000);
+        await this.page.waitForLoadState('networkidle');
 
-        // Close dialog
-        //this is modified according to the new dialog structure and new close icon
-        await this.page.locator('#q-portal--dialog--9').getByText('arrow_back_ios_new').click();
-        await this.page.waitForTimeout(1000);
+        // Close dialog with enhanced error handling
+        try {
+            const closeButton = this.page.locator('[data-test*="dialog"], [role="dialog"]').getByText('arrow_back_ios_new');
+            await expect(closeButton).toBeVisible({ timeout: 15000 });
+            await closeButton.click({ timeout: 10000 });
+        } catch (error) {
+            console.warn('Primary close button failed, trying alternative:', error.message);
+            await this.page.waitForLoadState('networkidle');
+            // Try alternative close methods
+            const altCloseButton = this.page.locator('.q-dialog').getByText('arrow_back_ios_new');
+            await expect(altCloseButton).toBeVisible({ timeout: 10000 });
+            await altCloseButton.click({ timeout: 10000 });
+        }
+        await this.page.waitForLoadState('networkidle');
 
         // Submit alert
         await this.page.locator(this.alertSubmitButton).click();

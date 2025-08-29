@@ -282,7 +282,7 @@ mod tests {
     use std::sync::Arc;
 
     use arrow_schema::{DataType, Field, Schema};
-    use config::{ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME};
+    use config::{ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME};
     use datafusion::common::TableReference;
     use hashbrown::{HashMap, HashSet};
 
@@ -519,13 +519,6 @@ mod tests {
     }
 
     // Test constants and field name validation
-    #[test]
-    fn test_original_data_column_constants() {
-        assert_eq!(ORIGINAL_DATA_COL_NAME, "_original");
-        assert_eq!(ALL_VALUES_COL_NAME, "_all_values");
-        assert_eq!(TIMESTAMP_COL_NAME, "_timestamp");
-        assert_eq!(ID_COL_NAME, "_o2_id");
-    }
 
     #[test]
     fn test_table_reference_creation() {

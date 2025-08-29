@@ -362,6 +362,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
     #[cfg(not(feature = "enterprise"))]
     let server = cfg.common.instance_name_short.to_string();
 
+    #[allow(deprecated)]
     let service = web::scope("/api")
         .wrap(middleware::from_fn(audit_middleware))
         .wrap(HttpAuthentication::with_fn(

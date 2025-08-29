@@ -402,7 +402,7 @@ class="padding-none" />
                   <q-icon size="xs" name="language" class="padding-none" />
                 </q-item-section>
                 <q-item-section>
-                  <q-item-label>{{ t("menu.language") }}</q-item-label>
+                  <q-item-label class="tw-max-w-[150px]">{{ t("menu.language") }}</q-item-label>
                 </q-item-section>
                 <q-item-section></q-item-section>
                 <q-item-section side>

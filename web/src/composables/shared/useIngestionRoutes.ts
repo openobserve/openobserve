@@ -15,7 +15,6 @@
 
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
-import SysLog from "@/components/ingestion/logs/SysLog.vue";
 import SyslogNg from "@/components/ingestion/logs/SyslogNg.vue";
 import Ingestion from "@/views/Ingestion.vue";
 import FluentBit from "@/components/ingestion/logs/FluentBit.vue";
@@ -794,29 +793,10 @@ const useIngestionRoutes = () => {
     },
   ];
 
-  const sysLog = {
-    path: "syslog",
-    name: "syslog",
-    component: SysLog,
-    beforeEnter(to: any, from: any, next: any) {
-      routeGuard(to, from, next);
-    },
-  };
-
-  // const sysLogNg = {
-  //   path: "syslogng",
-  //   name: "syslogNg",
-  //   component: SyslogNg,
-  //   beforeEnter(to: any, from: any, next: any) {
-  //     routeGuard(to, from, next);
-  //   },
-  // };
-
   if (config.isCloud === "false" || !config.isCloud) {
     ingestionRoutes[0].children
       .find((child: any) => child.name === "custom")
-      .children.find((child: any) => child.name === "ingestLogs")
-      ?.children.push(...[sysLog]);
+      .children.find((child: any) => child.name === "ingestLogs");
   }
 
   return ingestionRoutes;

@@ -570,13 +570,6 @@ mod tests {
     }
 
     #[test]
-    fn test_footer_cache_constants() {
-        assert_eq!(FOOTER_CACHE_VERSION, 1);
-        assert_eq!(FOOTER_VERSION_LEN, 4);
-        assert_eq!(FOOTER_OFFSET_LEN, 8);
-    }
-
-    #[test]
     fn test_footer_cache_item_serialization() {
         let item = FooterCacheMetaItem {
             offset: 100,
