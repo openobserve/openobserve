@@ -814,14 +814,18 @@ export default defineComponent({
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
     handleMultiStreamSelection() {
+      console.log("handleMultiStreamSelection called");
+      console.log("Current selected streams:", this.searchObj.data.stream.selectedStream);
       this.onStreamChange("");
       this.pagination.page = 1;
     },
     handleSingleStreamSelect(opt: any) {
+      console.log("handleSingleStreamSelect called with:", opt);
       if (this.searchObj.data.stream.selectedStream.indexOf(opt.value) == -1) {
         this.searchObj.data.stream.selectedFields = [];
       }
       this.searchObj.data.stream.selectedStream = [opt.value];
+      console.log("After selection, streams:", this.searchObj.data.stream.selectedStream);
       this.onStreamChange("");
       this.pagination.page = 1;
     },
@@ -1941,7 +1945,10 @@ export default defineComponent({
       store,
       router,
       searchObj,
-      streamOptions,
+      streamOptions: computed(() => {
+        console.log("Available streams:", streamOptions.value);
+        return streamOptions.value;
+      }),
       filterFieldFn,
       addToFilter,
       clickFieldFn,

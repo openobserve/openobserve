@@ -3258,6 +3258,8 @@ const useLogs = () => {
 
   async function extractFields() {
     try {
+      console.log("extractFields: Starting with streamResults.list:", searchObj.data.streamResults.list);
+      
       searchObjDebug["extractFieldsStartTime"] = performance.now();
       searchObjDebug["extractFieldsWithAPI"] = "";
       searchObj.data.errorMsg = "";
@@ -3268,6 +3270,7 @@ const useLogs = () => {
       const schemaFields: any = [];
       const commonSchemaFields: any = [];
       if (searchObj.data.streamResults.list.length > 0) {
+        console.log("extractFields: Processing streams...");
         const timestampField = store.state.zoConfig.timestamp_column;
         const allField = store.state.zoConfig?.all_fields_name;
         const schemaInterestingFields: string[] = [];
@@ -3327,7 +3330,10 @@ const useLogs = () => {
         const interestingFieldsMap: {[key: string]: boolean} = {}
 
         for (const stream of searchObj.data.streamResults.list) {
+          console.log("extractFields: Processing stream:", stream.name);
+          console.log("extractFields: Stream has schema length:", stream.schema?.length);
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
+            console.log("extractFields: Stream is in selected streams");
             if (searchObj.data.stream.selectedStream.length > 1) {
               schemaMaps.push({
                 name: convertToCamelCase(stream.name),
@@ -3349,13 +3355,15 @@ const useLogs = () => {
 
             // check for schema exist in the object or not
             // if not pull the schema from server.
+            console.log("extractFields: About to call loadStreamFields for:", stream.name);
             const streamData = await loadStreamFields(stream.name);
-            if (streamData.schema === undefined) {
-              searchObj.loadingStream = false;
-              searchObj.data.errorMsg = t("search.noFieldFound");
-              throw new Error(searchObj.data.errorMsg);
-              return;
+            console.log("extractFields: loadStreamFields returned:", streamData);
+            if (streamData.schema === undefined || !streamData.schema || streamData.schema.length === 0) {
+              console.log("extractFields: No schema or empty schema for stream:", stream.name, "schema:", streamData.schema);
+              // Skip this stream but don't error out - continue with other streams
+              continue;
             }
+            console.log("extractFields: Stream schema found, length:", streamData.schema.length);
 
             stream.settings =  { ...streamData.settings };
             stream.schema = [ ...streamData.schema ];
@@ -3807,6 +3815,7 @@ const useLogs = () => {
         Object.entries(searchObj.data.stream.interestingExpandedGroupRowsFieldCount).forEach(([key, value]) => {
           searchObj.data.stream.interestingExpandedGroupRowsFieldCount[key] = interestingFieldsMapping[key].size;
         });
+
 
         if (
           searchObj.data.stream.selectedStreamFields != undefined &&
@@ -4791,6 +4800,10 @@ const useLogs = () => {
 
   const onStreamChange = async (queryStr: string) => {
     try {
+      console.log("=== onStreamChange START ===");
+      console.log("Selected streams:", searchObj.data.stream.selectedStream);
+      console.log("Query string:", queryStr);
+      
       searchObj.loadingStream = true;
 
       await cancelQuery();
@@ -4799,50 +4812,30 @@ const useLogs = () => {
 
       // Build UNION query once
       const streams = searchObj.data.stream.selectedStream;
+      if (!streams || streams.length === 0) {
+        console.log("No streams selected, exiting");
+        return;
+      }
+
       const unionquery = streams
         .map((stream: string) => `SELECT [FIELD_LIST] FROM "${stream}"`)
         .join(" UNION ");
 
       const query = searchObj.meta.sqlMode ? queryStr || unionquery : "";
 
-      // Fetch all stream data in parallel
-      const streamDataPromises = streams.map((stream: string) =>
-        getStream(stream, searchObj.data.stream.streamType || "logs", true),
-      );
+      // Update stream results list with basic stream info - extractFields will load the schema
+      searchObj.data.streamResults.list = streams.map((streamName: string) => ({
+        name: streamName,
+        schema: [], // Will be populated by extractFields -> loadStreamFields
+        settings: {} // Will be populated by extractFields -> loadStreamFields  
+      }));
 
-      const streamDataResults = await Promise.all(streamDataPromises);
-
-      // Collect all schema fields
-      const allStreamFields = streamDataResults
-        .filter((data) => data?.schema)
-        .flatMap((data) => data.schema);
-
-      // Update selectedStreamFields once
-      searchObj.data.stream.selectedStreamFields = allStreamFields;
-      //check if allStreamFields is empty or not 
-      //if empty then we are displaying no events found... message on the UI instead of throwing in an error format
-      if (allStreamFields.length === 0) {
-
-        // searchObj.data.errorMsg = t("search.noFieldFound");
-        return;
-      }
-
-      // Update selected fields if needed
-      const streamFieldNames = new Set(
-        allStreamFields.map((item) => item.name),
-      );
-      if (searchObj.data.stream.selectedFields.length > 0) {
-        searchObj.data.stream.selectedFields =
-          searchObj.data.stream.selectedFields.filter((fieldName: string) =>
-            streamFieldNames.has(fieldName),
-          );
-      }
-
-      // Update interesting fields list
-      searchObj.data.stream.interestingFieldList =
-        searchObj.data.stream.interestingFieldList.filter((fieldName: string) =>
-          streamFieldNames.has(fieldName),
-        );
+      // Always call extractFields to properly organize fields for the UI
+      console.log("About to call extractFields...");
+      await extractFields();
+      console.log("extractFields completed");
+      console.log("Final selectedStreamFields count:", searchObj.data.stream.selectedStreamFields?.length);
+      console.log("Final selectedInterestingStreamFields count:", searchObj.data.stream.selectedInterestingStreamFields?.length);
 
       // Replace field list in query
       const fieldList =
@@ -4881,10 +4874,10 @@ const useLogs = () => {
           errorMsg: "",
           errorDetail: "",
         };
-        extractFields();
       }
+      console.log("=== onStreamChange END ===");
     } catch (e: any) {
-      console.info("Error while getting stream data:", e);
+      console.error("Error while getting stream data:", e);
     } finally {
       searchObj.loadingStream = false;
     }
