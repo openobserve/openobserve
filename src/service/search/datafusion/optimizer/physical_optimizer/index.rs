@@ -207,12 +207,20 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
         };
     } else if let Some(expr) = expr.as_any().downcast_ref::<NotExpr>() {
         return is_expr_valid_for_index(expr.arg(), index_fields);
+    } else {
+        return false;
     }
     true
 }
 
 fn is_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    expr.as_any().downcast_ref::<Column>().is_some()
+    if expr.as_any().downcast_ref::<Column>().is_some() {
+        true
+    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
+        is_column(expr.expr())
+    } else {
+        false
+    }
 }
 
 fn get_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
