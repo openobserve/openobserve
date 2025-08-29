@@ -1109,20 +1109,25 @@ export default defineComponent({
             searchObj.data.query = "";
             const streams = searchObj.data.stream.selectedStream;
 
-            streams.forEach((stream: string, index: number) => {
+            streams.forEach((stream: any, index: number) => {
               // Add UNION for all but the first SELECT statement
               if (index > 0) {
                 searchObj.data.query += " UNION ";
               }
-              searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${whereClause}`;
+              // Extract stream name properly (handle both strings and objects)
+              const streamName = typeof stream === 'string' ? stream : (stream?.value || stream?.name || stream?.label || String(stream));
+              searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${streamName}" ${whereClause}`;
             });
 
             if (
               !searchObj.data.stream?.selectedStreamFields?.length &&
               searchObj.data?.stream?.selectedStream?.[0]
             ) {
+              // Extract first stream name properly (handle both strings and objects)
+              const firstStream = searchObj.data.stream.selectedStream[0];
+              const firstStreamName = typeof firstStream === 'string' ? firstStream : (firstStream?.value || firstStream?.name || firstStream?.label || String(firstStream));
               const streamData: any = getStream(
-                searchObj.data.stream.selectedStream[0],
+                firstStreamName,
                 searchObj.data.stream.streamType || "logs",
                 true,
               );
@@ -1265,7 +1270,9 @@ export default defineComponent({
       );
 
       // Modify the query based on stream name
-      const streamName = searchObj.data.stream.selectedStream[0].replace(
+      const firstStream = searchObj.data.stream.selectedStream[0];
+      const firstStreamName = typeof firstStream === 'string' ? firstStream : (firstStream?.value || firstStream?.name || firstStream?.label || String(firstStream));
+      const streamName = firstStreamName.replace(
         /[.*+?^${}()|[\]\\]/g,
         "\\$&",
       );
@@ -1273,7 +1280,7 @@ export default defineComponent({
         .replace(/`/g, "")
         .replace(
           new RegExp(`\\b${streamName}\\b`, "g"),
-          `"${searchObj.data.stream.selectedStream[0]}"`,
+          `"${firstStreamName}"`,
         );
 
       searchObj.data.query = newQuery;

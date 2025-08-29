@@ -161,10 +161,29 @@ export const useLogs = () => {
     }
   }
 
+  // Utility function to extract stream name consistently
+  const extractStreamName = (stream: any): string => {
+    if (typeof stream === 'string') {
+      return stream;
+    } else if (stream && typeof stream === 'object') {
+      return stream.value || stream.name || stream.label || String(stream);
+    } else {
+      return String(stream);
+    }
+  };
+
   // Functions that need to be implemented in the main composable
   // These are complex functions that span multiple composables
   const onStreamChange = async (queryStr: string) => {
-    console.log("🔄 onStreamChange called!", { queryStr, selectedStreams: searchObj.data.stream.selectedStream });
+    console.log("🔄 onStreamChange called!", { 
+      queryStr, 
+      selectedStreams: searchObj.data.stream.selectedStream,
+      streamTypes: searchObj.data.stream.selectedStream.map((s: any) => ({ 
+        stream: s, 
+        type: typeof s, 
+        stringified: String(s) 
+      }))
+    });
     try {
       searchObj.loadingStream = true;
       await logsWebSocket.cancelQuery();
@@ -176,7 +195,8 @@ export const useLogs = () => {
       const streams = searchObj.data.stream.selectedStream;
       const unionquery = streams
         .map((stream: any) => {
-          const streamName = stream.value || stream.name || stream;
+          const streamName = extractStreamName(stream);
+          console.log("🔧 Processing stream:", { stream, streamName, type: typeof stream });
           return `SELECT [FIELD_LIST] FROM "${streamName}"`;
         })
         .join(" UNION ");
@@ -184,7 +204,7 @@ export const useLogs = () => {
 
       // Fetch all stream data in parallel using getStream from useStreams
       const streamDataPromises = streams.map((stream: any) => {
-        const streamName = stream.value || stream.name || stream;
+        const streamName = extractStreamName(stream);
         return getStream(streamName, searchObj.data.stream.streamType || "logs", true);
       });
       
@@ -192,7 +212,7 @@ export const useLogs = () => {
       console.log("📊 Stream data results:", streamDataResults.map(r => ({ name: r?.name, hasSchema: !!r?.schema, fieldCount: r?.schema?.length })));
       
       // Initialize group expansion state for streams
-      const selectedStreamValues = streams.map((stream: any) => stream.value || stream.name || stream);
+      const selectedStreamValues = streams.map(extractStreamName);
       
       // Initialize expandGroupRows - controls expand/collapse state of groups
       searchObj.data.stream.expandGroupRows = {
@@ -232,7 +252,7 @@ export const useLogs = () => {
       // First pass: collect all fields by name from all streams
       streamDataResults.forEach((streamData) => {
         if (streamData?.schema) {
-          const streamName = streamData.name || streams[0]?.value || streams[0]?.name || streams[0];
+          const streamName = streamData.name;
           
           streamData.schema.forEach((field: any) => {
             const fieldName = field.name;
@@ -258,7 +278,7 @@ export const useLogs = () => {
       // Initialize stream-specific fields arrays
       streamDataResults.forEach((streamData) => {
         if (streamData?.schema) {
-          const streamName = streamData.name || streams[0]?.value || streams[0]?.name || streams[0];
+          const streamName = streamData.name;
           streamSpecificFields[streamName] = [];
         }
       });
