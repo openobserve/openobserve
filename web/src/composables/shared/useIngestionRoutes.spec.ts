@@ -601,41 +601,6 @@ describe("useIngestionRoutes", () => {
     });
   });
 
-  describe("conditional syslog route logic", () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
-
-    it("should add syslog route when config.isCloud is false", () => {
-      vi.doMock("@/aws-exports", () => ({
-        default: { isCloud: "false" }
-      }));
-
-      const routes = useIngestionRoutes();
-      const customRoute = routes[0].children.find((child: any) => child.name === "custom");
-      const logsRoute = customRoute.children.find((child: any) => child.name === "ingestLogs");
-      const syslogRoute = logsRoute.children.find((child: any) => child.name === "syslog");
-      
-      expect(syslogRoute).toBeDefined();
-      expect(syslogRoute.path).toBe("syslog");
-      expect(syslogRoute.component).toBeDefined();
-      expect(typeof syslogRoute.beforeEnter).toBe("function");
-    });
-
-    it("should add syslog route when config.isCloud is undefined", () => {
-      vi.doMock("@/aws-exports", () => ({
-        default: { isCloud: undefined }
-      }));
-
-      const routes = useIngestionRoutes();
-      const customRoute = routes[0].children.find((child: any) => child.name === "custom");
-      const logsRoute = customRoute.children.find((child: any) => child.name === "ingestLogs");
-      const syslogRoute = logsRoute.children.find((child: any) => child.name === "syslog");
-      
-      expect(syslogRoute).toBeDefined();
-    });
-  });
-
   describe("route structure validation", () => {
     it("should have proper route structure with required properties", () => {
       const routes = useIngestionRoutes();

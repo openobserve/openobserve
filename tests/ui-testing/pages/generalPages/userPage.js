@@ -12,7 +12,7 @@ export class UserPage {
         this.userRoleField = '[data-test="user-role-field"]';
         this.saveUserButton = '[data-test="save-user-button"]';
 
-        this.alertMessage = this.page.getByRole('alert').first();
+        // Removed deprecated alert reference - use specific alert verification in methods
 
 
     }
@@ -32,9 +32,19 @@ export class UserPage {
 
     
     async selectUserRole(role) {
-        await this.page.locator('[data-test="user-role-field"]').dblclick({ force: true });
+        // Wait for the role field to be visible and in viewport
+        const roleField = this.page.locator('[data-test="user-role-field"]');
+        await roleField.waitFor({ state: 'visible', timeout: 10000 });
+        await roleField.scrollIntoViewIfNeeded();
+        
+        // Wait for any animations or layout shifts to complete
+        await this.page.waitForLoadState("domcontentloaded");
+        await this.page.waitForTimeout(500); // Brief wait for UI stability
+        
+        // Now safely interact with the element
+        await roleField.dblclick({ force: true });
         await this.page.waitForLoadState("networkidle");
-        await this.page.locator('[data-test="user-role-field"]').pressSequentially(role, { delay: 100 });
+        await roleField.pressSequentially(role, { delay: 100 });
         await this.page.getByRole('option', { name: role }).click({ force: true });
       }
     
@@ -53,7 +63,11 @@ export class UserPage {
         // Click the edit button
         await this.page.locator(editButtonSelector).click();
         await this.page.goto(process.env["ZO_BASE_URL"] + "/web/iam/users?action=update&org_identifier=default&email=" + email);
-        await this.page.waitForTimeout(10000);
+        await this.page.waitForLoadState('domcontentloaded');
+        await this.page.waitForLoadState('networkidle');
+        
+        // Wait for edit form elements to be available
+        await this.page.waitForSelector('[data-test="user-first-name-field"]', { state: 'visible', timeout: 15000 });
     }
     
 
@@ -69,9 +83,14 @@ export class UserPage {
     }
 
     async verifySuccessMessage(expectedMessage) {
-        await expect(this.page.locator('role=alert').first()).toBeVisible();
-        await expect(this.alertMessage).toContainText(expectedMessage);
-
+        // Wait for alert to appear and verify the message
+        await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
+        
+        // Find the alert that contains the expected message (instead of just checking the first one)
+        const specificAlert = this.page.getByRole('alert').filter({ hasText: expectedMessage });
+        
+        // Verify the specific alert with our expected message is visible
+        await expect(specificAlert).toBeVisible({ timeout: 5000 });
     }
 
     async addUserFirstLast(firstName, lastName) {

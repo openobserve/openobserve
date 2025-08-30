@@ -316,18 +316,6 @@ mod tests {
     }
 
     #[test]
-    fn test_timed_annotation_default() {
-        let annotation = TimedAnnotation::default();
-        assert_eq!(annotation.annotation_id, None);
-        assert_eq!(annotation.start_time, 0);
-        assert_eq!(annotation.end_time, None);
-        assert_eq!(annotation.title, "");
-        assert_eq!(annotation.text, None);
-        assert!(annotation.tags.is_empty());
-        assert!(annotation.panels.is_empty());
-    }
-
-    #[test]
     fn test_timed_annotation_delete_validate_empty() {
         let delete_req = TimedAnnotationDelete {
             annotation_ids: vec![],

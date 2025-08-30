@@ -47,6 +47,7 @@ pub mod schema;
 pub mod search_job;
 pub mod session;
 pub mod short_url;
+#[deprecated(since = "0.15.0", note = "syslog is deprecated")]
 pub mod syslog;
 pub mod user;
 

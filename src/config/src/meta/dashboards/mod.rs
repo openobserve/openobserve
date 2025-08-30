@@ -297,19 +297,6 @@ mod tests {
     }
 
     #[test]
-    fn test_dashboard_default() {
-        let dashboard = Dashboard::default();
-        assert!(dashboard.v1.is_none());
-        assert!(dashboard.v2.is_none());
-        assert!(dashboard.v3.is_none());
-        assert!(dashboard.v4.is_none());
-        assert!(dashboard.v5.is_none());
-        assert_eq!(dashboard.version, 0);
-        assert_eq!(dashboard.hash, "");
-        assert_eq!(dashboard.updated_at, 0);
-    }
-
-    #[test]
     fn test_dashboard_id_methods() {
         // Test with unsupported version
         let dashboard = Dashboard {

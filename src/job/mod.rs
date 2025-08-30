@@ -236,7 +236,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::alerts::alert::cache()
         .await
         .expect("alerts cache failed");
+    #[allow(deprecated)]
     db::syslog::cache().await.expect("syslog cache failed");
+    #[allow(deprecated)]
     db::syslog::cache_syslog_settings()
         .await
         .expect("syslog settings cache failed");
@@ -340,7 +342,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     log::info!("Job initialization complete");
 
     // Syslog server start
+    #[allow(deprecated)]
     tokio::task::spawn(db::syslog::watch());
+    #[allow(deprecated)]
     tokio::task::spawn(db::syslog::watch_syslog_settings());
 
     let start_syslog = *SYSLOG_ENABLED.read();

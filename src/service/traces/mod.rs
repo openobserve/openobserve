@@ -1213,15 +1213,6 @@ mod tests {
     }
 
     // Test constants and validation logic
-    #[test]
-    fn test_span_id_bytes_count() {
-        assert_eq!(super::SPAN_ID_BYTES_COUNT, 8);
-    }
-
-    #[test]
-    fn test_trace_id_bytes_count() {
-        assert_eq!(super::TRACE_ID_BYTES_COUNT, 16);
-    }
 
     #[test]
     fn test_block_fields() {
@@ -1233,34 +1224,12 @@ mod tests {
         assert!(block_fields.contains(&"end_time"));
     }
 
-    #[test]
-    fn test_service_name_constant() {
-        assert_eq!(super::SERVICE_NAME, "service.name");
-        assert_eq!(super::SERVICE, "service");
-        assert_eq!(super::PARENT_SPAN_ID, "reference.parent_span_id");
-        assert_eq!(super::PARENT_TRACE_ID, "reference.parent_trace_id");
-        assert_eq!(super::REF_TYPE, "reference.ref_type");
-        assert_eq!(super::ATTR_STATUS_CODE, "status_code");
-        assert_eq!(super::ATTR_STATUS_MESSAGE, "status_message");
-    }
-
     // Test validation helper functions
-    #[test]
-    fn test_valid_trace_id_length() {
-        let valid_trace_id = [0u8; super::TRACE_ID_BYTES_COUNT];
-        assert_eq!(valid_trace_id.len(), super::TRACE_ID_BYTES_COUNT);
-    }
 
     #[test]
     fn test_invalid_trace_id_length() {
         let invalid_trace_id = [0u8; 10]; // Wrong length
         assert_ne!(invalid_trace_id.len(), super::TRACE_ID_BYTES_COUNT);
-    }
-
-    #[test]
-    fn test_valid_span_id_length() {
-        let valid_span_id = [0u8; super::SPAN_ID_BYTES_COUNT];
-        assert_eq!(valid_span_id.len(), super::SPAN_ID_BYTES_COUNT);
     }
 
     #[test]

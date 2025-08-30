@@ -307,7 +307,6 @@ describe("Custom Component", () => {
         "kinesisfirehose",
         "vector",
         "filebeat",
-        "syslog",
         "gcpLogs",
       ];
       
@@ -647,29 +646,6 @@ describe("Custom Component", () => {
 
     it("should handle filebeat route", () => {
       mockRouter.currentRoute.value.name = "filebeat";
-      
-      const testWrapper = mount(Custom, {
-        props: { currOrgIdentifier: "test-org" },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true
-          }
-        },
-      });
-      
-      expect(testWrapper.vm.tabs).toBe("ingestLogs");
-      testWrapper.unmount();
-    });
-
-    it("should handle syslog route", () => {
-      mockRouter.currentRoute.value.name = "syslog";
       
       const testWrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
