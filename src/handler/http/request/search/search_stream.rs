@@ -45,9 +45,9 @@ use crate::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::http::{
             get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
-            get_is_ui_histogram_from_request, get_or_create_trace_id,
-            get_search_event_context_from_request, get_search_type_from_request,
-            get_stream_type_from_request, get_use_cache_from_request,
+            get_is_refresh_cache_from_request, get_is_ui_histogram_from_request,
+            get_or_create_trace_id, get_search_event_context_from_request,
+            get_search_type_from_request, get_stream_type_from_request, get_use_cache_from_request,
         },
     },
     handler::http::request::search::{
@@ -517,6 +517,7 @@ pub async fn report_to_audit(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("is_refresh_cache" = bool, Query, description = "Indicates that the query should not use the cache for processing but also needs to refresh the cache once the query is completed"),
     ),
     request_body(content = String, description = "Values query", content_type = "application/json", example = json!({
         "sql": "select * from logs LIMIT 10",
@@ -560,6 +561,7 @@ pub async fn values_http2_stream(
     // Get query params
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let mut stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let is_refresh_cache = get_is_refresh_cache_from_request(&query);
 
     #[cfg(feature = "enterprise")]
     let body_bytes = String::from_utf8_lossy(&body).to_string();
@@ -592,6 +594,7 @@ pub async fn values_http2_stream(
     };
     let no_count = values_req.no_count;
     let top_k = values_req.size;
+    values_req.is_refresh_cache = is_refresh_cache;
 
     // check stream type from request
     if values_req.stream_type != stream_type {

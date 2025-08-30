@@ -281,6 +281,7 @@ pub async fn get_latest_traces(
         search_event_context: None,
         use_cache: default_use_cache(),
         local_mode: None,
+        is_refresh_cache: false,
     };
 
     req.use_cache = get_use_cache_from_request(&query);

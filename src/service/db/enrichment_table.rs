@@ -59,6 +59,7 @@ pub async fn get_enrichment_table_data(
         search_event_context: None,
         use_cache: false,
         local_mode: Some(true),
+        is_refresh_cache: false,
     };
     log::info!(
         "get enrichment table {}/{} data req start time: {}",
@@ -108,6 +109,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         search_type: None,
         search_event_context: None,
         use_cache: false,
+        is_refresh_cache: false,
         local_mode: Some(true),
     };
     log::debug!("get enrichment table {name} data req start time: {start_time}");

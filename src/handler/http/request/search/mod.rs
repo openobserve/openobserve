@@ -47,10 +47,10 @@ use crate::{
             functions,
             http::{
                 get_dashboard_info_from_request, get_enable_align_histogram_from_request,
-                get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request, get_work_group,
+                get_is_multi_stream_search_from_request, get_is_refresh_cache_from_request,
+                get_is_ui_histogram_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
+                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
             },
             stream::get_settings_max_query_range,
         },
@@ -170,6 +170,7 @@ async fn can_use_distinct_stream(
         ("org_id" = String, Path, description = "Organization name"),
         ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
         ("is_multi_stream_search" = bool, Query, description = "Indicate is search is for multi stream"),
+        ("is_refresh_cache" = bool, Query, description = "Indicates that the query should not use the cache for processing but also needs to refresh the cache once the query is completed"),
     ),
     request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
         "query": {
@@ -259,6 +260,12 @@ pub async fn search(
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let is_ui_histogram = get_is_ui_histogram_from_request(&query);
     let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
+    let is_refresh_cache = get_is_refresh_cache_from_request(&query);
+    let use_cache = if is_refresh_cache {
+        false
+    } else {
+        get_use_cache_from_request(&query)
+    };
 
     let dashboard_info = get_dashboard_info_from_request(&query);
 
@@ -273,7 +280,7 @@ pub async fn search(
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
         req.query.sql = sql;
     };
-    req.use_cache = get_use_cache_from_request(&query);
+    req.use_cache = use_cache;
 
     // get stream name
     let stream_names = match resolve_stream_names(&req.query.sql) {
@@ -461,6 +468,7 @@ pub async fn search(
         ("size" = i64, Query, description = "around size"),
         ("regions" = Option<String>, Query, description = "regions, split by comma"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
+        ("is_refresh_cache" = bool, Query, description = "Indicates that the query should not use the cache for processing but also needs to refresh the cache once the query is completed"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
@@ -674,6 +682,7 @@ pub async fn around_v2(
         ("regions" = Option<String>, Query, description = "regions, split by comma"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
         ("no_count" = Option<bool>, Query, description = "no need count, true of false"),
+        ("is_refresh_cache" = bool, Query, description = "Indicates that the query should not use the cache for processing but also needs to refresh the cache once the query is completed"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
@@ -698,6 +707,7 @@ pub async fn values(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let is_refresh_cache = get_is_refresh_cache_from_request(&query);
 
     let user_id = in_req
         .headers()
@@ -730,6 +740,7 @@ pub async fn values(
         &user_id,
         trace_id,
         http_span,
+        is_refresh_cache,
     )
     .await
 }
@@ -907,6 +918,7 @@ pub async fn build_search_request_per_field(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: req.use_cache,
+        is_refresh_cache: req.is_refresh_cache,
         local_mode: None,
     };
 
@@ -968,6 +980,7 @@ async fn values_v1(
     user_id: &str,
     trace_id: String,
     http_span: Span,
+    is_refresh_cache: bool,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
@@ -1119,6 +1132,7 @@ async fn values_v1(
         search_event_context: None,
         use_cache: default_use_cache(),
         local_mode: None,
+        is_refresh_cache,
     };
 
     req.use_cache = get_use_cache_from_request(query);

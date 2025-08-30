@@ -464,6 +464,17 @@ pub async fn search(
     let write_res = deep_copy_response(&res);
     let mut local_res = deep_copy_response(&res);
 
+    // Clean cache before writing new cache
+    if in_req.is_refresh_cache {
+        let _is_deleted =
+            crate::service::search::cluster::cacher::delete_cached_results_by_time_range(
+                file_path.to_owned(),
+                req.query.start_time,
+                req.query.end_time,
+            )
+            .await;
+    }
+
     // There are 3 types of partial responses:
     // 1. VRL error
     // 2. Super cluster error
@@ -477,7 +488,8 @@ pub async fn search(
         && res.new_start_time.is_none()
         && res.new_end_time.is_none()
         && res.function_error.is_empty()
-        && !res.hits.is_empty();
+        && !res.hits.is_empty()
+        && !in_req.is_refresh_cache;
     if should_cache_results
         && (results.first().is_some_and(|res| !res.hits.is_empty())
             || results.last().is_some_and(|res| !res.hits.is_empty()))
