@@ -201,7 +201,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   val="false"
                   dense
                   :label="t('alerts.scheduled')"
-                  class="q-ml-none"
+                  class="q-ml-none o2-radio-button"
+                  :class="store.state.theme == 'dark' ? 'o2-radio-button-dark' : 'o2-radio-button-light'"
                 />
                 <q-radio
                   data-test="add-alert-realtime-alert-radio"
@@ -212,8 +213,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   val="true"
                   dense
                   :label="t('alerts.realTime')"
-                  class="q-ml-none"
-                />
+                  class="q-ml-none o2-radio-button"
+                  :class="store.state.theme == 'dark' ? 'o2-radio-button-dark' : 'o2-radio-button-light'" 
+                  />
               </div>
               </div>
             </div>
@@ -404,22 +406,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-btn
         data-test="add-alert-cancel-btn"
         v-close-popup="true"
-        class=" text-bold"
+        class="q-mr-md o2-secondary-button tw-h-[36px]"
         :label="t('alerts.cancel')"
-        text-color="light-text"
-        padding="sm md"
         no-caps
+        flat
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         @click="$emit('cancel:hideform')"
       />
       <q-btn
         data-test="add-alert-submit-btn"
+        class="o2-primary-button no-border tw-h-[36px]"
         :label="t('alerts.save')"
-        class=" text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
         type="submit"
-        @click="onSubmit"
         no-caps
+        flat
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+        @click="onSubmit"
       />
     </div>
 
