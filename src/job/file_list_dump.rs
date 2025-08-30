@@ -61,6 +61,8 @@ pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
         Field::new("original_size", arrow_schema::DataType::Int64, false),
         Field::new("compressed_size", arrow_schema::DataType::Int64, false),
         Field::new("index_size", arrow_schema::DataType::Int64, true),
+        Field::new("created_at", arrow_schema::DataType::Int64, false),
+        Field::new("updated_at", arrow_schema::DataType::Int64, false),
     ]))
 });
 
@@ -328,6 +330,8 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, anyhow::Er
     let mut field_compressed_size = Int64Builder::with_capacity(batch_size);
     let mut field_index_size = Int64Builder::with_capacity(batch_size);
     let mut field_flattened = BooleanBuilder::with_capacity(batch_size);
+    let mut field_created_at = Int64Builder::with_capacity(batch_size);
+    let mut field_updated_at = Int64Builder::with_capacity(batch_size);
 
     for file in files {
         field_id.append_value(file.id);
@@ -344,6 +348,8 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, anyhow::Er
         field_compressed_size.append_value(file.compressed_size);
         field_index_size.append_value(file.index_size);
         field_flattened.append_value(file.flattened);
+        field_created_at.append_value(file.created_at);
+        field_updated_at.append_value(file.updated_at);
     }
 
     let batch = RecordBatch::try_new(
@@ -363,6 +369,8 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, anyhow::Er
             Arc::new(field_original_size.finish()),
             Arc::new(field_compressed_size.finish()),
             Arc::new(field_index_size.finish()),
+            Arc::new(field_created_at.finish()),
+            Arc::new(field_updated_at.finish()),
         ],
     )?;
     Ok(batch)

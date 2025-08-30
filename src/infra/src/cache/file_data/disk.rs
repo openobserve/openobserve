@@ -433,9 +433,7 @@ impl FileData {
 pub async fn init() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     // clean the tmp dir
-    if let Err(e) = std::fs::remove_dir_all(&cfg.common.data_tmp_dir) {
-        log::warn!("clean tmp dir error: {}", e);
-    }
+    _ = std::fs::remove_dir_all(&cfg.common.data_tmp_dir);
     std::fs::create_dir_all(&cfg.common.data_tmp_dir).expect("create tmp dir success");
 
     for file in FILES.iter() {
