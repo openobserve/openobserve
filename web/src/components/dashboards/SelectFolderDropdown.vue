@@ -109,10 +109,12 @@ export default defineComponent({
 
     const updateFolderList = async (newFolder: any) => {
       showAddFolderDialog.value = false;
-      selectedFolder.value = {
-        label: newFolder.data.name,
-        value: newFolder.data.folderId,
-      };
+      if (newFolder && newFolder.data) {
+        selectedFolder.value = {
+          label: newFolder.data.name,
+          value: newFolder.data.folderId,
+        };
+      }
     };
 
     onActivated(() => {

@@ -155,5 +155,60 @@ describe("visualizationUtils", () => {
       const result = allSelectionFieldsHaveAlias(sql);
       expect(result).toBe(true);
     });
+
+    it("should return false when AST contains null or undefined columns", () => {
+      // This test targets the uncovered lines 24-25 in columnsHaveAlias function
+      const sql = "SELECT";
+      const result = allSelectionFieldsHaveAlias(sql);
+      expect(result).toBe(false);
+    });
+
+    it("should return false for SELECT with empty columns array", () => {
+      // Target the empty array case in columnsHaveAlias function (lines 24-25)
+      // Need to force a scenario where columns is an empty array
+      const sql = "SELECT FROM users WHERE 1=0";
+      const result = allSelectionFieldsHaveAlias(sql);
+      expect(result).toBe(false);
+    });
+
+    it("should handle malformed SELECT statements with no column list", () => {
+      // Another attempt to trigger the empty/null columns case
+      const sql = "SELECT WHERE 1=1";
+      const result = allSelectionFieldsHaveAlias(sql);
+      expect(result).toBe(false);
+    });
+
+    it("should handle SELECT statements with various edge cases", () => {
+      // Test multiple edge cases that might trigger the uncovered lines
+      const edgeCases = [
+        "",  // empty string
+        "   ",  // whitespace only
+        "SELECT;",  // bare SELECT with semicolon
+        "SELECT\n",  // SELECT with newline
+        "SELECT FROM",  // incomplete SELECT FROM
+      ];
+      
+      edgeCases.forEach(sql => {
+        const result = allSelectionFieldsHaveAlias(sql);
+        expect(result).toBe(false);
+      });
+    });
+
+    it("should return false for UNION with malformed second SELECT (line 73)", () => {
+      // Target line 73: if (!node || node?.type !== "select") return false;
+      // This occurs when a UNION has a malformed second part
+      const sql = "SELECT name as n FROM users UNION INSERT INTO test VALUES (1)";
+      const result = allSelectionFieldsHaveAlias(sql);
+      expect(result).toBe(false);
+    });
+
+    it("should return false for complex expressions without aliases (line 12)", () => {
+      // Target line 12: return column?.expr?.type === 'column_ref';
+      // This tests when column has expr property but type is NOT 'column_ref'
+      // Complex expressions like functions should require aliases
+      const sql = "SELECT COUNT(*), SUM(price), AVG(rating) FROM products";
+      const result = allSelectionFieldsHaveAlias(sql);
+      expect(result).toBe(false);
+    });
   });
 });
