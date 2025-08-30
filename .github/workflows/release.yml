@@ -171,7 +171,7 @@ jobs:
   release:
     name: Release artifacts
     needs: [build]
-    runs-on: ubuntu-latest
+    runs-on: repo-openobserve-standard-4
     permissions:
       id-token: write
       contents: write
