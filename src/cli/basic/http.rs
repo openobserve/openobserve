@@ -318,6 +318,28 @@ pub async fn consistent_hash(files: Vec<String>) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn refresh_user_sessions() -> Result<(), anyhow::Error> {
+    let url = "/node/refresh_user_sessions";
+    let response = request(url, None, reqwest::Method::GET).await?;
+    if response.is_some() {
+        println!("user sessions refresh successfully");
+    } else {
+        println!("user sessions refresh failed");
+    }
+    Ok(())
+}
+
+pub async fn refresh_nodes_list() -> Result<(), anyhow::Error> {
+    let url = "/node/refresh_nodes_list";
+    let response = request(url, None, reqwest::Method::GET).await?;
+    if response.is_some() {
+        println!("node list refresh successfully");
+    } else {
+        println!("node list refresh failed");
+    }
+    Ok(())
+}
+
 async fn request(
     url: &str,
     body: Option<Vec<u8>>,
