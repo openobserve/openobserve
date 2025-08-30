@@ -48,6 +48,41 @@ export default class ChartTypeSelector {
   }
 
   // Search field and added for X, Y,Breakdown etc.
+  // async searchAndAddField(fieldName, target) {
+  //   const searchInput = this.page.locator(
+  //     '[data-test="index-field-search-input"]'
+  //   );
+  //   await searchInput.click();
+  //   await searchInput.fill(fieldName);
+
+  //   const buttonSelectors = {
+  //     x: '[data-test="dashboard-add-x-data"]',
+  //     y: '[data-test="dashboard-add-y-data"]',
+  //     b: '[data-test="dashboard-add-b-data"]',
+  //     filter: '[data-test="dashboard-add-filter-data"]',
+  //     latitude: '[data-test="dashboard-add-latitude-data"]',
+  //     longitude: '[data-test="dashboard-add-longitude-data"]',
+  //     weight: '[data-test="dashboard-add-weight-data"]',
+  //     z: '[data-test="dashboard-add-z-data"]',
+  //   };
+  //   const buttonTestId = buttonSelectors[target];
+
+  //   if (!buttonTestId) {
+  //     throw new Error(`Invalid target type: ${target}`);
+  //   }
+
+  //   // Locate the specific field item container that contains the field name
+  //   const fieldItem = this.page.locator(`[data-test^="field-list-item-"]`, {
+  //     hasText: fieldName,
+  //   });
+
+  //   // Now locate the button within that field item
+  //   const button = fieldItem.locator(`[data-test="${buttonTestId}"]`);
+
+  //   // Click the button
+  //   await button.click();
+  //   await searchInput.fill(""); // Clear the search input
+  // }
   async searchAndAddField(fieldName, target) {
     const searchInput = this.page.locator(
       '[data-test="index-field-search-input"]'
@@ -56,23 +91,37 @@ export default class ChartTypeSelector {
     await searchInput.fill(fieldName);
 
     const buttonSelectors = {
-      x: '[data-test="dashboard-add-x-data"]',
-      y: '[data-test="dashboard-add-y-data"]',
-      b: '[data-test="dashboard-add-b-data"]',
-      filter: '[data-test="dashboard-add-filter-data"]',
-      latitude: '[data-test="dashboard-add-latitude-data"]',
-      longitude: '[data-test="dashboard-add-longitude-data"]',
-      weight: '[data-test="dashboard-add-weight-data"]',
-      z: '[data-test="dashboard-add-z-data"]',
+      x: "dashboard-add-x-data",
+      y: "dashboard-add-y-data",
+      b: "dashboard-add-b-data",
+      filter: "dashboard-add-filter-data",
+      latitude: "dashboard-add-latitude-data",
+      longitude: "dashboard-add-longitude-data",
+      weight: "dashboard-add-weight-data",
+      z: "dashboard-add-z-data",
+      name: "dashboard-name-layout",
+      value: "dashboard-value_for_maps-layout",
+      firstcolumn: "dashboard-x-layout",
+      othercolumn: "dashboard-y-layout",
     };
 
-    const buttonSelector = buttonSelectors[target];
+    const buttonTestId = buttonSelectors[target];
 
-    if (!buttonSelector) {
+    if (!buttonTestId) {
       throw new Error(`Invalid target type: ${target}`);
     }
 
-    await this.page.locator(buttonSelector).click();
+    // Locate the specific field item container that contains the field name
+    const fieldItem = this.page.locator(`[data-test^="field-list-item-"]`, {
+      hasText: fieldName,
+    });
+
+    // Now locate the button within that field item
+    const button = fieldItem.locator(`[data-test="${buttonTestId}"]`);
+
+    // Click the button
+    await button.click();
+    await searchInput.fill(""); // Clear the search input
   }
 
   // Add filter condition

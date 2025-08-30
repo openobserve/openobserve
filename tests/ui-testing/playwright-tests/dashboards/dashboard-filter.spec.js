@@ -979,11 +979,8 @@ test.describe("dashboard filter testcases", () => {
       '[data-test="dashboard-if-no-panel-add-panel-btn"]'
     );
     await expect(button).toBeVisible();
-
     await page.waitForTimeout(1000);
     await button.click();
-    // await page.waitForTimeout(2000);
-
     await page
       .locator('[data-test="index-dropdown-stream"]')
       .waitFor({ state: "visible" });
