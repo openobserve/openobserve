@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div>
       <q-select
+        ref="streamSelect"
         data-test="log-search-index-list-select-stream"
         v-model="searchObj.data.stream.selectedStream"
         :options="streamOptions"
@@ -814,6 +815,16 @@ export default defineComponent({
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
     handleMultiStreamSelection() {
+      // Clear the filter input when streams change
+      //we will first check if qselect is there or not and then call the method
+      //we will use the quasar next tick to ensure that the dom is updated before we call the method
+      //we will also us the quasar's updateInputValue method to clear the input value
+      this.$nextTick(() => {
+        const indexListSelectField = this.$refs.streamSelect;
+        if (indexListSelectField && indexListSelectField.updateInputValue) {
+          indexListSelectField.updateInputValue("");
+        }
+      });
       this.onStreamChange("");
     },
     handleSingleStreamSelect(opt: any) {
@@ -821,6 +832,16 @@ export default defineComponent({
         this.searchObj.data.stream.selectedFields = [];
       }
       this.searchObj.data.stream.selectedStream = [opt.value];
+      // Clear the filter input when single stream is selected
+      //we will first check if qselect is there or not and then call the method
+      //we will use the quasar next tick to ensure that the dom is updated before we call the method
+      //we will also us the quasar's updateInputValue method to clear the input value
+      this.$nextTick(() => {
+        const indexListSelectField = this.$refs.streamSelect;
+        if (indexListSelectField && indexListSelectField.updateInputValue) {
+          indexListSelectField.updateInputValue("");
+        }
+      });
       this.onStreamChange("");
     },
   },
