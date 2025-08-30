@@ -232,36 +232,6 @@ impl IndexCondition {
         self.conditions.len() == 1 && matches!(self.conditions[0], Condition::All())
     }
 
-    // use for check if the index condition contains
-    // negated condition, like NOT(field = 'value')
-    pub fn is_negated_condition(&self) -> bool {
-        self.conditions
-            .iter()
-            .any(|condition| condition.is_negated_condition())
-    }
-
-    // split the index condition into negated and normal conditions
-    // return (positive_conditions, negative_conditions)
-    pub fn split_condition_by_negated(&self) -> (IndexCondition, IndexCondition) {
-        let mut positive_conditions = Vec::new();
-        let mut negative_conditions = Vec::new();
-        for condition in self.conditions.iter() {
-            if condition.is_negated_condition() {
-                negative_conditions.push(condition.clone());
-            } else {
-                positive_conditions.push(condition.clone());
-            }
-        }
-        (
-            IndexCondition {
-                conditions: positive_conditions,
-            },
-            IndexCondition {
-                conditions: negative_conditions,
-            },
-        )
-    }
-
     pub fn is_empty(&self) -> bool {
         self.conditions.is_empty()
     }
@@ -789,23 +759,6 @@ impl Condition {
             Condition::Or(left, right) => left.can_remove_filter() && right.can_remove_filter(),
             Condition::And(left, right) => left.can_remove_filter() && right.can_remove_filter(),
             Condition::Not(condition) => condition.can_remove_filter(),
-        }
-    }
-
-    // check if the condition is negated
-    pub fn is_negated_condition(&self) -> bool {
-        match self {
-            Condition::Equal(..)
-            | Condition::StrMatch(..)
-            | Condition::In(_, _, false)
-            | Condition::Regex(..)
-            | Condition::MatchAll(..)
-            | Condition::FuzzyMatchAll(..)
-            | Condition::All() => false,
-            Condition::NotEqual(..) | Condition::Not(..) | Condition::In(_, _, true) => true,
-            Condition::Or(left, right) | Condition::And(left, right) => {
-                left.is_negated_condition() || right.is_negated_condition()
-            }
         }
     }
 }
@@ -1815,37 +1768,6 @@ mod tests {
     }
 
     #[test]
-    fn test_index_condition_is_negated_condition() {
-        let mut index_condition = IndexCondition::new();
-        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-
-        assert!(!index_condition.is_negated_condition());
-
-        index_condition.add_condition(Condition::NotEqual(
-            "field2".to_string(),
-            "value2".to_string(),
-        ));
-        assert!(index_condition.is_negated_condition());
-    }
-
-    #[test]
-    fn test_index_condition_split_condition_by_negated() {
-        let mut index_condition = IndexCondition::new();
-        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-        index_condition.add_condition(Condition::NotEqual(
-            "field2".to_string(),
-            "value2".to_string(),
-        ));
-        index_condition.add_condition(Condition::Equal("field3".to_string(), "value3".to_string()));
-
-        let (positive, negative) = index_condition.split_condition_by_negated();
-
-        assert_eq!(positive.conditions.len(), 2);
-        assert_eq!(negative.conditions.len(), 1);
-        assert!(matches!(negative.conditions[0], Condition::NotEqual(_, _)));
-    }
-
-    #[test]
     fn test_condition_to_query_equal() {
         let condition = Condition::Equal("field1".to_string(), "value1".to_string());
         assert_eq!(condition.to_query(), "field1=value1");
@@ -2028,37 +1950,6 @@ mod tests {
         let right = Condition::Regex("field2".to_string(), "pattern.*".to_string());
         let condition = Condition::Or(Box::new(left), Box::new(right));
         assert!(!condition.can_remove_filter());
-    }
-
-    #[test]
-    fn test_condition_is_negated_condition() {
-        assert!(!Condition::Equal("field".to_string(), "value".to_string()).is_negated_condition());
-        assert!(
-            Condition::NotEqual("field".to_string(), "value".to_string()).is_negated_condition()
-        );
-        assert!(
-            !Condition::In("field".to_string(), vec!["value".to_string()], false)
-                .is_negated_condition()
-        );
-        assert!(
-            Condition::In("field".to_string(), vec!["value".to_string()], true)
-                .is_negated_condition()
-        );
-        assert!(
-            Condition::Not(Box::new(Condition::Equal(
-                "field".to_string(),
-                "value".to_string()
-            )))
-            .is_negated_condition()
-        );
-    }
-
-    #[test]
-    fn test_condition_is_negated_condition_or() {
-        let left = Condition::Equal("field1".to_string(), "value1".to_string());
-        let right = Condition::NotEqual("field2".to_string(), "value2".to_string());
-        let condition = Condition::Or(Box::new(left), Box::new(right));
-        assert!(condition.is_negated_condition());
     }
 
     #[test]
