@@ -440,6 +440,7 @@ pub struct Config {
     pub health_check: HealthCheck,
     pub encryption: Encryption,
     pub enrichment_table: EnrichmentTable,
+    pub cuckoo_filter: CuckooFilter,
 }
 
 #[derive(EnvConfig, Default)]
@@ -1621,6 +1622,8 @@ pub struct DiskCache {
     pub result_max_size: usize,
     #[env_config(name = "ZO_DISK_AGGREGATION_CACHE_MAX_SIZE", default = 0)]
     pub aggregation_max_size: usize,
+    #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
+    pub aggregation_cache_enabled: bool,
     // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
@@ -2019,6 +2022,49 @@ pub struct EnrichmentTable {
     pub merge_interval: u64,
 }
 
+#[derive(EnvConfig, Default)]
+pub struct CuckooFilter {
+    #[env_config(name = "ZO_CUCKOO_FILTER_ENABLED", default = false)]
+    pub enabled: bool,
+
+    #[env_config(
+        name = "ZO_CUCKOO_FILTER_DIR",
+        default = "",
+        help = "cuckoo filter dir"
+    )]
+    pub dir: String,
+    #[env_config(
+        name = "ZO_CUCKOO_FILTER_CAPACITY",
+        default = 50000000,
+        help = "The desired capacity of the filter, default for per file hourly, almost 128M"
+    )]
+    pub capacity: usize,
+    #[env_config(
+        name = "ZO_CUCKOO_FILTER_FLUSH_MODE",
+        default = "none",
+        help = "Defines the flushing strategy for the Cuckoo Filter"
+    )]
+    pub flush_mode: String,
+    #[env_config(
+        name = "ZO_DATA_LOOKBACK_HOURS",
+        default = 2,
+        help = "Number of hours to look back for building cuckoo filters"
+    )]
+    pub data_lookback_hours: i64,
+    #[env_config(
+        name = "ZO_BUILD_INDEX_INTERVAL",
+        default = 3600,
+        help = "building cuckoo filter index job interval, unit seconds, default 1 hour"
+    )]
+    pub build_index_interval: u64,
+    #[env_config(
+        name = "ZO_BUILD_INDEX_BATCH_SIZE",
+        default = 2000000,
+        help = "building cuckoo filter index batch size when using command"
+    )]
+    pub build_index_batch_size: usize,
+}
+
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().expect("config init error");
@@ -2111,6 +2157,10 @@ pub fn init() -> Config {
     // check nats config
     if let Err(e) = check_nats_config(&mut cfg) {
         panic!("nats config error: {e}");
+    }
+
+    if let Err(e) = check_cuckoo_filter_config(&mut cfg) {
+        panic!("cuckoo filter config error: {e}");
     }
 
     cfg
@@ -2927,6 +2977,14 @@ fn check_nats_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.nats.queue_max_size = 2048; // 2GB
     }
     cfg.nats.queue_max_size *= 1024 * 1024; // convert to bytes
+    Ok(())
+}
+
+fn check_cuckoo_filter_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.cuckoo_filter.enabled && cfg.cuckoo_filter.dir.is_empty() {
+        cfg.cuckoo_filter.dir = format!("{}cuckoo_filter/", cfg.common.data_dir);
+    }
+
     Ok(())
 }
 

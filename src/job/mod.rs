@@ -40,7 +40,7 @@ mod cloud;
 mod compactor;
 mod file_downloader;
 mod file_list_dump;
-pub(crate) mod files;
+pub mod files;
 mod flatten_compactor;
 pub mod metrics;
 mod mmdb_downloader;
@@ -53,6 +53,7 @@ pub(crate) mod syslog_server;
 
 pub use file_downloader::{download_from_node, queue_download};
 pub use file_list_dump::FILE_LIST_SCHEMA;
+pub use files::cuckoo_filter::GLOBAL_CUCKOO_FILTER_MANAGER;
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -268,6 +269,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         if let Err(e) = std::fs::create_dir_all(&cfg.common.data_wal_dir) {
             log::error!("Failed to create wal dir: {e}");
         }
+
+        if cfg.cuckoo_filter.enabled {
+            files::cuckoo_filter::start_ingester_cleanup_job().await;
+        }
     }
 
     #[cfg(feature = "enterprise")]
@@ -347,6 +352,19 @@ pub async fn init() -> Result<(), anyhow::Error> {
         syslog_server::run(start_syslog, true)
             .await
             .expect("syslog server run failed");
+    }
+
+    if cfg.cuckoo_filter.enabled {
+        // Start cuckoo filter generation job
+        tokio::task::spawn(async move {
+            if let Err(e) = crate::job::files::cuckoo_filter::start_hourly_job(
+                GLOBAL_CUCKOO_FILTER_MANAGER.clone(),
+            )
+            .await
+            {
+                log::error!("[JOB] Cuckoo filter job failed: {}", e);
+            }
+        });
     }
 
     Ok(())

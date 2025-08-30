@@ -47,6 +47,7 @@ pub mod schema;
 pub mod search;
 pub mod tantivy;
 
+pub mod index;
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
 pub mod self_reporting;
