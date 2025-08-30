@@ -970,7 +970,6 @@ mod tests {
             stream_names: vec![TableReference::from("logs")],
             has_match_all: false,
             equal_items: hashbrown::HashMap::new(),
-            prefix_items: hashbrown::HashMap::new(),
             columns: {
                 let mut cols = hashbrown::HashMap::new();
                 let mut set = hashbrown::HashSet::new();
@@ -995,7 +994,6 @@ mod tests {
             order_by: vec![("_timestamp".to_string(), OrderBy::Desc)],
             histogram_interval: None,
             sorted_by_time: true,
-            use_inverted_index: false,
             index_condition: None,
             index_optimize_mode: None,
         };

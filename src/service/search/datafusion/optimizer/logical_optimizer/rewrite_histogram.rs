@@ -196,7 +196,7 @@ mod tests {
     };
 
     use crate::service::search::datafusion::{
-        optimizer::rewrite_histogram::RewriteHistogram, udf::histogram_udf,
+        optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram, udf::histogram_udf,
     };
 
     #[tokio::test]

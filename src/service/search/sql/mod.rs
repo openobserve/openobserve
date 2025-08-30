@@ -55,7 +55,6 @@ use crate::service::search::sql::{
         index_optimize::IndexOptimizeModeVisitor,
         match_all::MatchVisitor,
         partition_column::PartitionColumnVisitor,
-        prefix_column::PrefixColumnVisitor,
         utils::is_complex_query,
     },
 };
@@ -80,9 +79,8 @@ pub struct Sql {
     pub has_match_all: bool, // match_all, only for single stream
     pub equal_items: HashMap<TableReference, Vec<(String, String)>>, /* table_name ->
                               * [(field_name, value)] */
-    pub prefix_items: HashMap<TableReference, Vec<(String, String)>>, /* table_name -> [(field_name, value)] */
-    pub columns: HashMap<TableReference, HashSet<String>>,            // table_name -> [field_name]
-    pub aliases: Vec<(String, String)>,                               // field_name, alias
+    pub columns: HashMap<TableReference, HashSet<String>>, // table_name -> [field_name]
+    pub aliases: Vec<(String, String)>,                    // field_name, alias
     pub schemas: HashMap<TableReference, Arc<SchemaCache>>,
     pub limit: i64,
     pub offset: i64,
@@ -90,8 +88,7 @@ pub struct Sql {
     pub group_by: Vec<String>,
     pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
-    pub sorted_by_time: bool,     // if only order by _timestamp
-    pub use_inverted_index: bool, // if can use inverted index
+    pub sorted_by_time: bool, // if only order by _timestamp
     pub index_condition: Option<IndexCondition>, // use for tantivy index
     pub index_optimize_mode: Option<IndexOptimizeMode>,
 }
@@ -117,14 +114,10 @@ impl Sql {
         let mut limit = query.size as i64;
         let sql =
             config::utils::query_select_utils::replace_o2_custom_patterns(&sql).unwrap_or(sql);
+
         // 1. get table name
         let stream_names = resolve_stream_names_with_type(&sql)
             .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?;
-        if stream_names.len() > 1 && stream_names.iter().any(|s| s.schema() == Some("index")) {
-            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                "Index stream is not supported in multi-stream query".to_string(),
-            )));
-        }
         let mut total_schemas = HashMap::with_capacity(stream_names.len());
         for stream in stream_names.iter() {
             let stream_name = stream.stream_name();
@@ -189,10 +182,14 @@ impl Sql {
         // 5. get match_all() value
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
-        let need_fst_fields = match_visitor.has_match_all;
 
         // 6. check if have full text search filed in stream
-        if stream_names.len() == 1 && need_fst_fields {
+        if match_visitor.has_match_all {
+            if match_visitor.is_multi_stream {
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                    "Using match_all() function in a subquery/join is not supported".to_string(),
+                )));
+            }
             let schema = total_schemas.values().next().unwrap();
             let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
             let fts_fields = get_stream_setting_fts_fields(&stream_settings);
@@ -219,7 +216,7 @@ impl Sql {
                 query.quick_mode || cfg.limit.quick_mode_force_enabled,
                 cfg.limit.quick_mode_num_fields,
                 &search_event_type,
-                need_fst_fields,
+                match_visitor.has_match_all,
             );
         } else {
             for (stream, schema) in total_schemas.iter() {
@@ -234,11 +231,7 @@ impl Sql {
         let mut partition_column_visitor = PartitionColumnVisitor::new(&used_schemas);
         let _ = statement.visit(&mut partition_column_visitor);
 
-        // 9. get prefix column value
-        let mut prefix_column_visitor = PrefixColumnVisitor::new(&used_schemas);
-        let _ = statement.visit(&mut prefix_column_visitor);
-
-        // 10. pick up histogram interval
+        // 9. pick up histogram interval
         let mut histogram_interval_visitor =
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
         let _ = statement.visit(&mut histogram_interval_visitor);
@@ -252,11 +245,11 @@ impl Sql {
         };
 
         //********************Change the sql start*********************************//
-        // 11. replace approx_percentile_cont to new format
+        // 10. replace approx_percentile_cont to new format
         let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
         let _ = statement.visit(&mut replace_approx_percentilet_visitor);
 
-        // 12. add _timestamp and _o2_id if need
+        // 11. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);
@@ -266,7 +259,7 @@ impl Sql {
             }
         }
 
-        // 13. generate tantivy query
+        // 12. generate tantivy query
         // TODO: merge IndexVisitor and IndexOptimizeModeVisitor
         let mut index_condition = None;
         let mut can_optimize = false;
@@ -289,10 +282,7 @@ impl Sql {
             });
         }
 
-        // set use_inverted_index use index_condition
-        let use_inverted_index = index_condition.is_some();
-
-        // 14. check `select * from table where match_all()` optimizer
+        // 13. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
         if !is_complex_query(&mut statement)
             && order_by.len() == 1
@@ -305,7 +295,7 @@ impl Sql {
             ));
         }
 
-        // 15. check other inverted index optimize modes
+        // 14. check other inverted index optimize modes
         // `select count(*) from table where match_all` -> SimpleCount
         // or `select histogram(..), count(*) from table where match_all` -> SimpleHistogram
         // or `select id, count(*) from t group by id order by cnt desc limit 10` -> SimpleTopN
@@ -336,7 +326,7 @@ impl Sql {
             }
         }
 
-        // 16. replace the Utf8 to Utf8View type
+        // 15. replace the Utf8 to Utf8View type
         let final_schemas = if cfg.common.utf8_view_enabled {
             let mut final_schemas = HashMap::with_capacity(used_schemas.len());
             for (stream, schema) in used_schemas.iter() {
@@ -382,7 +372,6 @@ impl Sql {
             stream_names,
             has_match_all: match_visitor.has_match_all,
             equal_items: partition_column_visitor.equal_items,
-            prefix_items: prefix_column_visitor.prefix_items,
             columns,
             aliases,
             schemas: final_schemas,
@@ -393,7 +382,6 @@ impl Sql {
             order_by,
             histogram_interval,
             sorted_by_time: need_sort_by_time,
-            use_inverted_index,
             index_condition,
             index_optimize_mode,
         })
@@ -404,7 +392,7 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, has_match_all: {}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}, index_optimize_mode: {:?}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, has_match_all: {}, equal_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, index_condition: {:?}, index_optimize_mode: {:?}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -412,7 +400,6 @@ impl std::fmt::Display for Sql {
             self.stream_names,
             self.has_match_all,
             self.equal_items,
-            self.prefix_items,
             self.aliases,
             self.limit,
             self.offset,
@@ -420,7 +407,6 @@ impl std::fmt::Display for Sql {
             self.order_by,
             self.histogram_interval,
             self.sorted_by_time,
-            self.use_inverted_index,
             self.index_condition,
             self.index_optimize_mode,
         )

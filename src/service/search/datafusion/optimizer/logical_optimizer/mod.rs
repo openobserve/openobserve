@@ -13,14 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod add_sort_and_limit;
+pub mod add_timestamp;
 #[cfg(feature = "enterprise")]
-pub mod cipher_key;
-pub mod column;
-#[cfg(feature = "enterprise")]
-pub mod group_by;
-pub mod histogram_interval;
-pub mod index_optimize;
-pub mod match_all;
-pub mod partition_column;
-pub mod pickup_where;
-pub mod utils;
+pub mod cipher;
+pub mod limit_join_right_side;
+pub mod rewrite_histogram;
+pub mod rewrite_match;

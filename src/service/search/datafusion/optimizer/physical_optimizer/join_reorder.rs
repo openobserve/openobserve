@@ -115,7 +115,7 @@ mod tests {
         prelude::{SessionConfig, SessionContext},
     };
 
-    use crate::service::search::datafusion::optimizer::join_reorder::JoinReorderRule;
+    use super::*;
 
     #[tokio::test]
     async fn test_join_reorder() -> Result<()> {
