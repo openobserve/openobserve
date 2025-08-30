@@ -1,8 +1,10 @@
+name: Release
+
 on:
   push:
     tags:
       - "v*.*.*"
-name: Release
+
 env:
   RUST_TOOLCHAIN: nightly-2025-05-20
 jobs:
