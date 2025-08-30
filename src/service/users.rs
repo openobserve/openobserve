@@ -1391,4 +1391,271 @@ mod tests {
 
         assert!(resp.is_ok());
     }
+
+    #[tokio::test]
+    async fn test_create_new_user() {
+        set_up().await;
+
+        let db_user = DBUser {
+            email: "newuser@example.com".to_string(),
+            password: "".to_string(),
+            salt: "".to_string(),
+            first_name: "New".to_string(),
+            last_name: "User".to_string(),
+            password_ext: None,
+            is_external: false,
+            organizations: vec![UserOrg {
+                name: "dummy".to_string(),
+                token: "".to_string(),
+                rum_token: None,
+                role: UserRole::User,
+            }],
+        };
+
+        let result = create_new_user(db_user).await;
+        if let Err(e) = &result {
+            println!("Error creating user: {:?}", e);
+        }
+        assert!(result.is_ok());
+
+        // Test creating another user with pre-existing password and token
+        let db_user2 = DBUser {
+            email: "existinguser@example.com".to_string(),
+            password: "existing_password".to_string(),
+            salt: "existing_salt".to_string(),
+            first_name: "Existing".to_string(),
+            last_name: "User".to_string(),
+            password_ext: None,
+            is_external: false,
+            organizations: vec![UserOrg {
+                name: "dummy".to_string(),
+                token: "existing_token".to_string(),
+                rum_token: Some("existing_rum".to_string()),
+                role: UserRole::User,
+            }],
+        };
+
+        let result = create_new_user(db_user2).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_user() {
+        set_up().await;
+
+        let resp = delete_user("nonexistent@example.com").await;
+        assert!(resp.is_ok());
+
+        let resp = delete_user("admin@zo.dev").await;
+        assert!(resp.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_root_user_exists_edge_cases() {
+        set_up().await;
+
+        let exists = root_user_exists().await;
+        assert!(!exists);
+
+        crate::common::infra::config::ROOT_USER.insert(
+            "root".to_string(),
+            User {
+                email: "root@example.com".to_string(),
+                first_name: "Root".to_string(),
+                last_name: "User".to_string(),
+                password: "root_pass".to_string(),
+                salt: "root_salt".to_string(),
+                password_ext: Some("root_pass_ext".to_string()),
+                role: UserRole::Root,
+                token: "root_token".to_string(),
+                rum_token: Some("root_rum".to_string()),
+                org: "default".to_string(),
+                is_external: false,
+            },
+        );
+
+        let exists = root_user_exists().await;
+        assert!(!exists);
+    }
+
+    #[tokio::test]
+    async fn test_create_root_user_if_not_exists() {
+        set_up().await;
+
+        let user_req = UserRequest {
+            email: "root@example.com".to_string(),
+            password: "root_password".to_string(),
+            role: UserOrgRole {
+                base_role: UserRole::Root,
+                custom_role: None,
+            },
+            first_name: "Root".to_string(),
+            last_name: "User".to_string(),
+            is_external: false,
+            token: Some("root_token".to_string()),
+        };
+
+        let result = create_root_user_if_not_exists("default", user_req).await;
+        assert!(result.is_ok());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_get_user_roles_by_org_id() {
+        let roles = vec![
+            "org1/role1".to_string(),
+            "org1/role2".to_string(),
+            "org2/role3".to_string(),
+            "global_role".to_string(),
+        ];
+
+        let org1_roles = get_user_roles_by_org_id(roles.clone(), Some("org1"));
+        assert_eq!(org1_roles, vec!["role1".to_string(), "role2".to_string()]);
+
+        let org2_roles = get_user_roles_by_org_id(roles.clone(), Some("org2"));
+        assert_eq!(org2_roles, vec!["role3".to_string()]);
+
+        let all_roles = get_user_roles_by_org_id(roles.clone(), None);
+        assert_eq!(all_roles, roles);
+
+        let empty_roles = get_user_roles_by_org_id(vec![], Some("org1"));
+        assert_eq!(empty_roles, Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    async fn test_post_user_validation() {
+        set_up().await;
+
+        let invalid_email_req = UserRequest {
+            email: "invalid-email".to_string(),
+            password: "password123".to_string(),
+            role: UserOrgRole {
+                base_role: UserRole::User,
+                custom_role: None,
+            },
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+            is_external: false,
+            token: None,
+        };
+
+        let resp = post_user("dummy", invalid_email_req, "admin@zo.dev").await;
+        assert!(resp.is_ok());
+        let response = resp.unwrap();
+        assert_eq!(response.status(), 400);
+
+        let empty_password_req = UserRequest {
+            email: "test@example.com".to_string(),
+            password: "".to_string(),
+            role: UserOrgRole {
+                base_role: UserRole::User,
+                custom_role: None,
+            },
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+            is_external: false,
+            token: None,
+        };
+
+        let resp = post_user("dummy", empty_password_req, "admin@zo.dev").await;
+        assert!(resp.is_ok());
+        let response = resp.unwrap();
+        assert_eq!(response.status(), 400);
+
+        let existing_user_req = UserRequest {
+            email: "admin@zo.dev".to_string(),
+            password: "password123".to_string(),
+            role: UserOrgRole {
+                base_role: UserRole::User,
+                custom_role: None,
+            },
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+            is_external: false,
+            token: None,
+        };
+
+        let resp = post_user("dummy", existing_user_req, "admin@zo.dev").await;
+        assert!(resp.is_ok());
+        let response = resp.unwrap();
+        assert_eq!(response.status(), 400);
+    }
+
+    #[tokio::test]
+    async fn test_update_user_validation() {
+        set_up().await;
+
+        let resp = update_user(
+            "dummy",
+            "invalid-email",
+            false,
+            "admin@zo.dev",
+            UpdateUser {
+                token: None,
+                first_name: None,
+                last_name: None,
+                old_password: None,
+                new_password: None,
+                role: None,
+                change_password: false,
+            },
+        )
+        .await;
+        assert!(resp.is_ok());
+        let response = resp.unwrap();
+        assert_eq!(response.status(), 400);
+
+        let resp = update_user(
+            "dummy",
+            "nonexistent@example.com",
+            false,
+            "admin@zo.dev",
+            UpdateUser {
+                token: None,
+                first_name: Some("New Name".to_string()),
+                last_name: None,
+                old_password: None,
+                new_password: None,
+                role: None,
+                change_password: false,
+            },
+        )
+        .await;
+        assert!(resp.is_ok());
+        let response = resp.unwrap();
+        assert_eq!(response.status(), 404);
+    }
+
+    #[tokio::test]
+    async fn test_add_user_to_org_validation() {
+        set_up().await;
+
+        let resp = add_user_to_org(
+            "dummy",
+            "invalid-email",
+            UserOrgRole {
+                base_role: UserRole::User,
+                custom_role: None,
+            },
+            "admin@zo.dev",
+        )
+        .await;
+        assert!(resp.is_ok());
+        let response = resp.unwrap();
+        assert_eq!(response.status(), 400);
+
+        let resp = add_user_to_org(
+            "dummy",
+            "nonexistent@example.com",
+            UserOrgRole {
+                base_role: UserRole::User,
+                custom_role: None,
+            },
+            "admin@zo.dev",
+        )
+        .await;
+        assert!(resp.is_ok());
+        let response = resp.unwrap();
+        assert_eq!(response.status(), 422);
+    }
 }

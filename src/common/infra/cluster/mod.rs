@@ -208,8 +208,9 @@ pub async fn register_and_keep_alive() -> Result<()> {
             .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
-        let ttl_keep_alive = std::cmp::max(1, (get_config().limit.node_heartbeat_ttl / 2) as u64);
         loop {
+            let cfg = get_config();
+            let ttl_keep_alive = std::cmp::max(1, (cfg.limit.node_heartbeat_ttl / 2) as u64);
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             if let Err(e) = check_nodes_status(&client).await {
                 log::error!("[CLUSTER] check_nodes_status failed: {e}");
@@ -633,6 +634,23 @@ async fn set_node_status_metrics(node: &Node) {
     if let Some(v) = w.get_mut(node.uuid.as_str()) {
         v.metrics = node.metrics.clone();
     }
+}
+
+fn generate_node_id(mut ids: Vec<i32>) -> i32 {
+    ids.sort();
+    ids.dedup();
+    log::debug!("node_ids: {:?}", ids);
+
+    let mut new_node_id = 1;
+    for id in ids {
+        if id == new_node_id {
+            new_node_id += 1;
+        } else {
+            break;
+        }
+    }
+    log::debug!("new_node_id: {:?}", new_node_id);
+    new_node_id
 }
 
 async fn update_node_status_metrics() -> NodeMetrics {

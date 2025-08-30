@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, atomic::Ordering};
 
 use arrow_schema::{Field, Schema};
 use bytes::Bytes;
@@ -363,7 +363,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     && let dashmap::Entry::Vacant(entry) =
                         STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
                 {
-                    entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
+                    entry.insert(SnowflakeIdGenerator::new(
+                        LOCAL_NODE_ID.load(Ordering::Relaxed),
+                    ));
                 }
                 let mut w = STREAM_SETTINGS.write().await;
                 w.insert(item_key.to_string(), settings);
@@ -520,7 +522,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             && let dashmap::Entry::Vacant(entry) =
                 STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
         {
-            entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
+            entry.insert(SnowflakeIdGenerator::new(
+                LOCAL_NODE_ID.load(Ordering::Relaxed),
+            ));
         }
         let mut w = STREAM_SETTINGS.write().await;
         w.insert(item_key.to_string(), settings);

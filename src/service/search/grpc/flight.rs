@@ -52,7 +52,7 @@ use crate::service::{
                 rewrite::tantivy_optimize_rewrite,
             },
             exec::{DataFusionContextBuilder, register_udf},
-            table_provider::{enrich_table::NewEnrichTable, uniontable::NewUnionTable},
+            table_provider::{enrich_table::EnrichTable, uniontable::NewUnionTable},
         },
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -304,8 +304,7 @@ pub async fn search(
     // enrichment data from db to datafusion tables
     if stream_type == StreamType::EnrichmentTables && req.query_identifier.enrich_mode {
         // get the enrichment table from db
-        let enrichment_table =
-            NewEnrichTable::new(&org_id, &stream_name, empty_exec.schema().clone());
+        let enrichment_table = EnrichTable::new(&org_id, &stream_name, empty_exec.schema().clone());
         // add the enrichment table to the tables
         tables.push(Arc::new(enrichment_table) as _);
     }

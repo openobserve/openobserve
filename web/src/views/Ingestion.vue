@@ -225,70 +225,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 export default defineComponent({
   name: "PageIngestion",
   components: { ConfirmDialog },
-  methods: {
-    generateRUMToken() {
-      apiKeysService
-        .createRUMToken(this.store.state.selectedOrganization.identifier)
-        .then((res) => {
-          this.store.dispatch("setRUMToken", {
-            rum_token: res.data.data.new_key,
-          });
-          this.getRUMToken();
-          this.q.notify({
-            type: "positive",
-            message: "RUM Token generated successfully.",
-            timeout: 5000,
-          });
-        })
-        .catch((e) => {
-          if(e.response.status != 403){
-            this.q.notify({
-              type: "negative",
-              message: e.response?.data?.message || "Error while generating RUM Token.",
-              timeout: 5000,
-            });
-          }   
-        });
-
-      segment.track("Button Click", {
-        button: "Generate RUM Token",
-        user_org: this.store.state.selectedOrganization.identifier,
-        user_id: this.store.state.userInfo.email,
-        page: "Ingestion",
-      });
-    },
-    updateRUMToken() {
-      apiKeysService
-        .updateRUMToken(
-          this.store.state.selectedOrganization.identifier,
-          this.store.state.organizationData.rumToken.id
-        )
-        .then((res) => {
-          this.getRUMToken();
-          this.q.notify({
-            type: "positive",
-            message: "RUM Token updated successfully.",
-            timeout: 5000,
-          });
-        })
-        .catch((e) => {
-          if(e.response.status != 403){
-            this.q.notify({
-            type: "negative",
-            message: e.response?.data?.message || "Error while refreshing RUM Token.",
-            timeout: 5000,
-          });
-          }  
-        });
-
-      segment.track("Button Click", {
-        button: "Update RUM Token",
-        user_org: this.store.state.selectedOrganization.identifier,
-        user_id: this.store.state.userInfo.email,
-        page: "Ingestion",
-      });
-    },
-  },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -462,6 +398,70 @@ export default defineComponent({
       });
     };
 
+    const generateRUMToken = () => {
+      apiKeysService
+        .createRUMToken(store.state.selectedOrganization.identifier)
+        .then((res) => {
+          store.dispatch("setRUMToken", {
+            rum_token: res.data.data.new_key,
+          });
+          getRUMToken();
+          q.notify({
+            type: "positive",
+            message: "RUM Token generated successfully.",
+            timeout: 5000,
+          });
+        })
+        .catch((e) => {
+          if(e.response.status != 403){
+            q.notify({
+              type: "negative",
+              message: e.response?.data?.message || "Error while generating RUM Token.",
+              timeout: 5000,
+            });
+          }   
+        });
+
+      segment.track("Button Click", {
+        button: "Generate RUM Token",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Ingestion",
+      });
+    };
+
+    const updateRUMToken = () => {
+      apiKeysService
+        .updateRUMToken(
+          store.state.selectedOrganization.identifier,
+          store.state.organizationData.rumToken.id
+        )
+        .then((res) => {
+          getRUMToken();
+          q.notify({
+            type: "positive",
+            message: "RUM Token updated successfully.",
+            timeout: 5000,
+          });
+        })
+        .catch((e) => {
+          if(e.response.status != 403){
+            q.notify({
+            type: "negative",
+            message: e.response?.data?.message || "Error while refreshing RUM Token.",
+            timeout: 5000,
+          });
+          }  
+        });
+
+      segment.track("Button Click", {
+        button: "Update RUM Token",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Ingestion",
+      });
+    };
+
     return {
       t,
       q,
@@ -485,6 +485,10 @@ export default defineComponent({
       activeTab,
       copyToClipboardFn,
       rumRoutes,
+      metricRoutes,
+      traceRoutes,
+      generateRUMToken,
+      updateRUMToken,
     };
   },
 });
