@@ -42,6 +42,7 @@ use crate::service::search::{
     cluster::flight::{generate_context, register_table},
     datafusion::distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    is_use_inverted_index,
     request::Request,
     sql::Sql,
     utils::{AsyncDefer, ScanStatsVisitor},
@@ -80,7 +81,7 @@ pub async fn search(
         return Ok((vec![], ScanStats::new(), 0, false, "".to_string()));
     }
 
-    let (use_inverted_index, _) = super::super::is_use_inverted_index(&sql);
+    let use_inverted_index = is_use_inverted_index(&sql);
     req.set_use_inverted_index(use_inverted_index);
 
     // 2. get nodes

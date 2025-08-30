@@ -61,6 +61,7 @@ use crate::{
                 table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
             },
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+            is_use_inverted_index,
             request::Request,
             sql::Sql,
             utils::{AsyncDefer, ScanStatsVisitor},
@@ -137,7 +138,11 @@ pub async fn search(
         ..Default::default()
     };
 
-    // 2. get nodes
+    // 2. check use inverted index
+    let use_inverted_index = is_use_inverted_index(&sql);
+    req.set_use_inverted_index(use_inverted_index);
+
+    // 3. get nodes
     let get_node_start = std::time::Instant::now();
     let role_group = req
         .search_event_type
