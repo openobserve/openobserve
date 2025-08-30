@@ -103,6 +103,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- :maxRecordToReturn="maxRecordToReturn" -->
         <!-- @update:maxRecordToReturn="changeMaxRecordToReturn" -->
       </template>
+
+      <template #body-cell-actions="props">
+        <q-td :props="props" side>
+          <q-btn
+            data-test="organization-name-edit"
+            icon="edit"
+            :title="'Edit'"
+            class="q-ml-xs"
+            padding="sm"
+            unelevated
+            size="sm"
+            round
+            flat
+            @click="renameOrganization(props)"
+            style="cursor: pointer !important"
+          />
+        </q-td>
+      </template>
     </q-table>
     </div>
     <q-dialog
@@ -112,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
       @before-hide="hideAddOrgDialog"
     >
-      <add-update-organization @updated="updateOrganizationList" />
+      <add-update-organization @updated="updateOrganizationList" :model-value="toBeUpdatedOrganization" />
     </q-dialog>
   </q-page>
 </template>
@@ -153,6 +171,11 @@ export default defineComponent({
     const showOrgAPIKeyDialog = ref(false);
     const organizationAPIKey = ref("");
     const qTable: any = ref(null);
+    const toBeUpdatedOrganization = ref({
+      id: "",
+      name: "",
+      identifier: "",
+    });
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -196,6 +219,20 @@ export default defineComponent({
       });
     }
 
+    if(config.isCloud === "true" || config.isEnterprise === "true"){
+      columns.value.push(
+        {
+        name: "actions",
+        field: "actions",
+        label: t("user.actions"),
+        align: "center",
+        sortable: false,
+        classes: "actions-column",
+        style: "width: 67px;",
+      }
+    )
+    }
+
     const perPageOptions = [
       { label: "25", value: 25 },
       { label: "50", value: 50 },
@@ -219,6 +256,14 @@ export default defineComponent({
         if (action == "add" && isCloudOrEnterprise()) {
           showAddOrganizationDialog.value = true;
         }
+        else if (action == "update" && isCloudOrEnterprise()) {
+          showAddOrganizationDialog.value = true;
+          toBeUpdatedOrganization.value = {
+            id: router.currentRoute.value.query?.to_be_updated_org_id || "",
+            name: router.currentRoute.value.query?.to_be_updated_org_name || "",
+            identifier: router.currentRoute.value.query?.to_be_updated_org_id || "",
+          };
+        }
       },
     );
 
@@ -229,6 +274,17 @@ export default defineComponent({
       ) {
         showAddOrganizationDialog.value = true;
       }
+      else if (
+        router.currentRoute.value.query.action == "update" &&
+        isCloudOrEnterprise()
+      ) {
+        showAddOrganizationDialog.value = true;
+        toBeUpdatedOrganization.value = {
+          id: router.currentRoute.value.query?.to_be_updated_org_id || "",
+          name: router.currentRoute.value.query?.to_be_updated_org_name || "",
+          identifier: router.currentRoute.value.query?.to_be_updated_org_id || "",
+        };
+      }
     });
 
     onUpdated(() => {
@@ -237,6 +293,17 @@ export default defineComponent({
         isCloudOrEnterprise()
       ) {
         showAddOrganizationDialog.value = true;
+      }
+      else if (
+        router.currentRoute.value.query.action == "update" &&
+        isCloudOrEnterprise()
+      ) {
+        showAddOrganizationDialog.value = true;
+        toBeUpdatedOrganization.value = {
+          id: router.currentRoute.value.query?.to_be_updated_org_id || "",
+          name: router.currentRoute.value.query?.to_be_updated_org_name || "",
+          identifier: router.currentRoute.value.query?.to_be_updated_org_id || "",
+        };
       }
 
       if (router.currentRoute.value.query.action == "invite") {
@@ -253,16 +320,15 @@ export default defineComponent({
       if (router.currentRoute.value.query?.action == "add") {
         showAddOrganizationDialog.value = true;
       }
+      else if (router.currentRoute.value.query?.action == "update" && isCloudOrEnterprise()) {
+        showAddOrganizationDialog.value = true;
+        toBeUpdatedOrganization.value = {
+          id: router.currentRoute.value.query?.to_be_updated_org_id || "",
+          name: router.currentRoute.value.query?.to_be_updated_org_name || "",
+          identifier: router.currentRoute.value.query?.to_be_updated_org_id || "",
+        };
+      }
     });
-
-    watch(
-      () => router.currentRoute.value.query?.action,
-      (value) => {
-        if (value == "add") {
-          showAddOrganizationDialog.value = true;
-        }
-      },
-    );
 
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
@@ -349,6 +415,12 @@ export default defineComponent({
     getOrganizations();
 
     const addOrganization = (evt) => {
+      //reset the toBeUpdated data if user clicked on update and not submitted the form
+      toBeUpdatedOrganization.value = {
+        id: "",
+        name: "",
+        identifier: "",
+      };
       router.push({
         query: {
           action: "add",
@@ -393,6 +465,23 @@ export default defineComponent({
       });
     };
 
+    const renameOrganization = (props: any) => {
+      router.push({
+        query: {
+          action: "update",
+          org_identifier: store.state.selectedOrganization.identifier,
+          to_be_updated_org_id: props.row.identifier,
+          to_be_updated_org_name: props.row.name,
+        },
+      })
+      toBeUpdatedOrganization.value = {
+        id: props.row.identifier,
+        name: props.row.name,
+        identifier: props.row.identifier,
+      };
+
+    };
+
     return {
       t,
       store,
@@ -420,13 +509,15 @@ export default defineComponent({
         const filtered = [];
         terms = terms.toLowerCase();
         for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
+          if (rows[i]["name"].toLowerCase().includes(terms.trim()) || rows[i]["identifier"].toLowerCase().includes(terms.trim())) {
             filtered.push(rows[i]);
           }
         }
         return filtered;
       },
       hideAddOrgDialog,
+      renameOrganization,
+      toBeUpdatedOrganization,
     };
   },
   methods: {
@@ -438,11 +529,18 @@ export default defineComponent({
         },
       });
       this.showAddOrganizationDialog = false;
+      //after updating the organization we will reset the toBeUpdatedOrganization
+      const isUpdated = this.toBeUpdatedOrganization.id.length !== 0;
+      this.toBeUpdatedOrganization = {
+        id: "",
+        name: "",
+        identifier: "",
+      }
       this.getOrganizations();
 
       this.$q.notify({
         type: "positive",
-        message: `Organization added successfully.`,
+        message: isUpdated ? 'Organization updated successfully.' : 'Organization added successfully.',
       });
     },
     joinOrganization() {

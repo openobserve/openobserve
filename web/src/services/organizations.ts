@@ -81,6 +81,11 @@ const organizations = {
   },
   extend_trial_period: (orgIdentifier: string, data: any) => {
     return http().put(`/api/${orgIdentifier}/extend_trial_period`, data);
+  },
+  rename_organization: (orgIdentifier: string, newOrgName: string) => {
+    return http().put(`/api/${orgIdentifier}/rename`, {
+      new_name: newOrgName,
+    });
   }
 };
 
