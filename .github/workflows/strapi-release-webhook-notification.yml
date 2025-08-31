@@ -9,7 +9,7 @@ on:
 jobs:
   notify-webhook:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    runs-on: repo-openobserve-standard-2
+    runs-on: repo-openobserve-standard-4
     steps:
       - name: Get release tag from workflow event
         run: |
