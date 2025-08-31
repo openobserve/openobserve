@@ -257,6 +257,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               handleDataRowClick(tableRows[virtualRow.index], virtualRow.index)
             "
           >
+            <!-- Status color line for entire row -->
+            <div 
+              v-if="!(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow"
+              class="tw-absolute tw-left-0 tw-inset-y-0 tw-w-1 tw-z-10"
+              :style="{ backgroundColor: getRowStatusColor(tableRows[virtualRow.index]) }"
+            ></div>
             <td
               v-if="
                 (formattedRows[virtualRow.index]?.original as any)
@@ -264,13 +270,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :colspan="columnOrder.length"
               :data-test="`log-search-result-expanded-row-${virtualRow.index}`"
-              class="tw-w-full"
+              class="tw-w-full tw-relative"
             >
               <json-preview
                 :value="tableRows[virtualRow.index - 1] as any"
                 show-copy-button
                 class="tw-py-1"
                 mode="expanded"
+                :highlight-query="highlightQuery"
                 @copy="copyLogToClipboard"
                 @add-field-to-table="addFieldToTable"
                 @add-search-term="addSearchTerm"
@@ -294,6 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   cell.column.columnDef.id
                 "
                 class="tw-py-none tw-px-2 tw-items-center tw-justify-start tw-relative table-cell"
+                :class="[...tableCellClass, { 'tw-pl-4': cellIndex === 0 }]"
                 :style="{
                   width:
                     cell.column.columnDef.id !== 'source' ||
@@ -304,7 +312,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'auto',
                   height: wrap ? '100%' : '20px',
                 }"
-                :class="tableCellClass"
                 @mouseover="handleCellMouseOver(cell)"
                 @mouseleave="handleCellMouseLeave()"
               >
@@ -339,10 +346,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @send-to-ai-chat="sendToAiChat"
                   />
                 </template>
-
-                <HighLight
-                  :content="cell.renderValue()"
+                <LogsHighLighting
+                  :data="cell.column.columnDef.id === 'source' ? cell.row.original : cell.renderValue()"
+                  :show-braces="cell.column.columnDef.id === 'source'"
+                  :show-quotes="cell.column.columnDef.id === 'source'"
                   :query-string="highlightQuery"
+                  :simple-mode="!(cell.column.columnDef.id === 'source' || isFTSColumn(cell.column.columnDef.id, cell.renderValue(), selectedStreamFtsKeys))"
                 />
                 <O2AIContextAddBtn
                   v-if="
@@ -388,8 +397,10 @@ import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import { debounce } from "quasar";
-import { getImageURL } from "@/utils/zincutils";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import { extractStatusFromLog } from "@/utils/logs/statusParser";
+import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+import { useTextHighlighter } from "@/composables/useTextHighlighter";
 
 const props = defineProps({
   rows: {
@@ -442,6 +453,10 @@ const props = defineProps({
     default: "",
     required: false,
   },
+  selectedStreamFtsKeys: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 const { t } = useI18n();
@@ -462,6 +477,7 @@ const emits = defineEmits([
 const sorting = ref<SortingState>([]);
 
 const store = useStore();
+const { isFTSColumn } = useTextHighlighter();
 
 const getSortingHandler = (e: Event, fn: any) => {
   return fn(e);
@@ -483,6 +499,10 @@ const columnOrder = ref<any>([]);
 
 const tableRows = ref([...props.rows]);
 
+const selectedStreamFtsKeys = computed(() => {
+  return props.selectedStreamFtsKeys || [];
+});
+
 const isFunctionErrorOpen = ref(false);
 
 const activeCellActionId = ref("");
@@ -490,6 +510,12 @@ const activeCellActionId = ref("");
 const highlightQuery = computed(() => {
   return props.highlightQuery;
 });
+
+const getRowStatusColor = (rowData: any) => {
+  const statusInfo = extractStatusFromLog(rowData);
+  return statusInfo.color;
+};
+
 
 watch(
   () => props.columns,
@@ -880,6 +906,7 @@ defineExpose({
   virtualRows,
   sendToAiChat,
   store,
+  selectedStreamFtsKeys,
 });
 </script>
 <style scoped lang="scss">
@@ -982,4 +1009,5 @@ td {
     }
   }
 }
+
 </style>
