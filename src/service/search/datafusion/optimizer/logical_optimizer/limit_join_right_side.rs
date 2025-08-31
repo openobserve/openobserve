@@ -27,8 +27,10 @@ use datafusion::{
 };
 use itertools::Itertools;
 
-use super::utils::{AddSortAndLimit, is_contain_deduplication_plan};
-use crate::service::search::datafusion::plan::deduplication::DeduplicationLogicalNode;
+use crate::service::search::datafusion::{
+    optimizer::utils::{AddSortAndLimit, is_contain_deduplication_plan},
+    plan::deduplication::DeduplicationLogicalNode,
+};
 
 #[derive(Default, Debug)]
 pub struct LimitJoinRightSide {
