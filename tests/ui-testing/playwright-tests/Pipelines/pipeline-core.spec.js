@@ -94,8 +94,9 @@ async function exploreStreamAndInteractWithLogDetails(page, streamName) {
   await page.waitForTimeout(1000);
   await page.waitForSelector('[data-test="log-table-column-1-_timestamp"]');
   await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
-  await page.waitForTimeout(1000);
-  await page.locator('[data-test="log-expand-detail-key-a"]').click();
+  const expandDetailElement = page.locator('[data-test="log-expand-detail-key-a"]');
+  await expandDetailElement.waitFor({ state: 'visible' });
+  await expandDetailElement.click();
   await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
 }
 
