@@ -21,7 +21,7 @@ class EnrichmentPage {
         this.timestampColumn = '[data-test="log-table-column-0-_timestamp"]';
         this.closeDialog = '[data-test="close-dialog"]';
         this.expandMenu = '[data-test="table-row-expand-menu"]';
-        this.protocolKeywordText = '[data-test="log-expand-detail-key-protocol_keyword-text"]';
+        this.protocolKeywordText = '[data-test="log-expand-detail-key-protocol_keyword"]';
         this.dateTimeBtn = '[data-test="date-time-btn"]';
         
         // VRL editor locator
