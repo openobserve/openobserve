@@ -177,7 +177,7 @@ self="top right" max-width="220px">
           flat
           size="sm"
           padding="1px"
-          @click="onRefreshPanel"
+          @click="() => onRefreshPanel(false)"
           :title="t('panel.refreshPanel')"
           data-test="dashboard-panel-refresh-panel-btn"
           :color="variablesDataUpdated ? 'warning' : ''"
@@ -316,6 +316,32 @@ self="top right" max-width="220px">
             <q-item
               clickable
               v-close-popup="true"
+              @click="onPanelModifyClick('Refresh')"
+            >
+              <q-item-section>
+                <q-item-label
+                  data-test="dashboard-refresh-without-cache"
+                  class="q-pa-sm"
+                  >Refresh Without Using Cache</q-item-label
+                >
+              </q-item-section>
+            </q-item>
+            <q-item
+              clickable
+              v-close-popup="true"
+              @click="onPanelModifyClick('Refresh')"
+            >
+              <q-item-section>
+                <q-item-label
+                  data-test="dashboard-refresh-without-cache"
+                  class="q-pa-sm"
+                  >Refresh Without Using Cache</q-item-label
+                >
+              </q-item-section>
+            </q-item>
+            <q-item
+              clickable
+              v-close-popup="true"
               @click="onPanelModifyClick('MovePanel')"
             >
               <q-item-section>
@@ -361,6 +387,7 @@ self="top right" max-width="220px">
       :dashboardName="props.dashboardName"
       :folderName="props.folderName"
       :viewOnly="viewOnly"
+      :shouldRefreshWithoutCache="props.shouldRefreshWithoutCache"
       @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
       @limit-number-of-series-warning-message-update="
@@ -475,6 +502,7 @@ export default defineComponent({
     "dashboardName",
     "folderName",
     "allowAlertCreation",
+    "shouldRefreshWithoutCache",
   ],
   components: {
     PanelSchemaRenderer,
@@ -789,7 +817,7 @@ export default defineComponent({
       return newRunId;
     };
 
-    const onRefreshPanel = async () => {
+    const onRefreshPanel = async (shouldRefreshWithoutCache=false) => {
       // Need to generate a new run id when refreshing the panel
       generateNewDashboardRunId();
 
@@ -797,7 +825,7 @@ export default defineComponent({
 
       isPanelLoading.value = true;
       try {
-        await emit("refreshPanelRequest", props.data.id);
+        await emit("refreshPanelRequest", props.data.id, shouldRefreshWithoutCache);
       } finally {
         isPanelLoading.value = false;
       }
@@ -940,6 +968,8 @@ export default defineComponent({
         this.$emit("onEditLayout", this.props.data.id);
       } else if (evt == "CreateAlert") {
         this.createAlertFromPanel();
+      } else if (evt == "Refresh") {
+        this.onRefreshPanel(true);
       } else {
       }
     },

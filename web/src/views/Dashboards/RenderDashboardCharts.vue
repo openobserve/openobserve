@@ -17,8 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="card-container"
-    :class="store.state.printMode ? '' : 'tw-h-full tw-overflow-y-auto' " >
+  <div
+    class="card-container"
+    :class="store.state.printMode ? '' : 'tw-h-full tw-overflow-y-auto'"
+  >
     <div class="tw-px-[0.625rem]">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
       <span
@@ -68,6 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               currentTimeObj['__global'] ||
               {}
             "
+            :shouldRefreshWithoutCache="
+              (panels[0]?.id
+                ? shouldRefreshWithoutCacheObj[panels[0].id]
+                : undefined) || false
+            "
             :variablesData="
               currentVariablesDataRef[panels[0].id] ||
               currentVariablesDataRef['__global']
@@ -77,8 +84,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :runId="runId"
             :tabId="selectedTabId"
             :tabName="
-              dashboardData?.tabs?.find((tab: any) => tab.tabId === selectedTabId)
-                ?.name
+              dashboardData?.tabs?.find(
+                (tab: any) => tab.tabId === selectedTabId,
+              )?.name
             "
             :dashboardName="dashboardName"
             :folderName="folderName"
@@ -92,8 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: 100%; width: 100%"
           />
         </div>
-        <div v-else ref="gridStackContainer"
-  class="grid-stack">
+        <div v-else ref="gridStackContainer" class="grid-stack">
           <div
             v-for="item in panels"
             :key="item.id + selectedTabId"
@@ -118,6 +125,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :reportId="reportId"
                 :selectedTimeDate="
                   currentTimeObj[item.id] || currentTimeObj['__global'] || {}
+                "
+                :shouldRefreshWithoutCache="
+                  shouldRefreshWithoutCacheObj[item.id] || false
                 "
                 :variablesData="
                   currentVariablesDataRef[item.id] ||
@@ -177,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- if data not available show nodata component -->
         <NoPanel @update:Panel="addPanelData" :view-only="viewOnly" />
       </div>
-  </div>
+    </div>
   </div>
 </template>
 
@@ -240,6 +250,7 @@ export default defineComponent({
     folderId: {},
     reportId: {},
     currentTimeObj: {},
+    shouldRefreshWithoutCacheObj: {},
     initialVariableValues: { value: {} },
     selectedDateForViewPanel: {},
     showTabs: {
@@ -788,8 +799,11 @@ export default defineComponent({
       };
     };
 
-    const refreshPanelRequest = (panelId) => {
-      emit("refreshPanelRequest", panelId);
+    const refreshPanelRequest = (
+      panelId,
+      shouldRefreshWithoutCache = false,
+    ) => {
+      emit("refreshPanelRequest", panelId, shouldRefreshWithoutCache);
 
       currentVariablesDataRef.value = {
         ...currentVariablesDataRef.value,

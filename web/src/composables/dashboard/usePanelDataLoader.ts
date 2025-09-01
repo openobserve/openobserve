@@ -72,6 +72,7 @@ export const usePanelDataLoader = (
   tabName?: any,
   searchResponse?: any,
   is_ui_histogram?: any,
+  shouldRefreshWithoutCache?: any,
   dashboardName?: any,
   folderName?: any,
 ) => {
@@ -693,6 +694,7 @@ export const usePanelDataLoader = (
           tab_name: tabName?.value,
           fallback_order_by_col: getFallbackOrderByCol(),
           is_ui_histogram: is_ui_histogram.value,
+          is_refresh_cache: shouldRefreshWithoutCache?.value || false,
         },
       };
 
@@ -1136,6 +1138,7 @@ export const usePanelDataLoader = (
                     tab_name: tabName?.value,
                     fallback_order_by_col: getFallbackOrderByCol(),
                     is_ui_histogram: is_ui_histogram.value,
+                    is_refresh_cache: shouldRefreshWithoutCache?.value || false,
                     timeShiftQueries,
                   },
                 };
@@ -1155,7 +1158,8 @@ export const usePanelDataLoader = (
                         state.resultMetaData[queryIndex] = {
                           ...(state.resultMetaData[queryIndex] ?? {}),
                           ...results,
-                          streaming_aggs: response?.content?.streaming_aggs ?? false,
+                          streaming_aggs:
+                            response?.content?.streaming_aggs ?? false,
                         };
                       }
                     }
@@ -1188,7 +1192,8 @@ export const usePanelDataLoader = (
                       ) {
                         // Check if streaming_aggs is enabled
                         const streaming_aggs =
-                          state.resultMetaData[queryIndex]?.streaming_aggs ?? false;
+                          state.resultMetaData[queryIndex]?.streaming_aggs ??
+                          false;
 
                         // If streaming_aggs, replace the data (aggregation query)
                         if (streaming_aggs) {
@@ -1197,7 +1202,9 @@ export const usePanelDataLoader = (
                         // Otherwise, append/prepend based on order_by (multiple partitions)
                         else {
                           const orderBy =
-                            state.resultMetaData[queryIndex]?.order_by?.toLowerCase();
+                            state.resultMetaData[
+                              queryIndex
+                            ]?.order_by?.toLowerCase();
 
                           if (orderBy === "asc") {
                             // For ascending order, prepend new data at start
@@ -1215,7 +1222,8 @@ export const usePanelDataLoader = (
                         }
 
                         if (state.resultMetaData[queryIndex]) {
-                          state.resultMetaData[queryIndex].hits = state.data[queryIndex];
+                          state.resultMetaData[queryIndex].hits =
+                            state.data[queryIndex];
                         }
                       }
                       state.errorDetail = { message: "", code: "" };
@@ -1487,7 +1495,7 @@ export const usePanelDataLoader = (
     // calculate range in seconds (total time range of the dashboard)
     // Note: startISOTimestamp and endISOTimestamp are in microseconds (from API)
     const __range_micros = endISOTimestamp - startISOTimestamp;
-    const __range_seconds = __range_micros / 1000000;  // Convert microseconds to seconds
+    const __range_seconds = __range_micros / 1000000; // Convert microseconds to seconds
 
     // format range, ensuring it's never empty (minimum 1s for PromQL compatibility)
     const formattedRange = formatRateInterval(__range_seconds) || "1s";
