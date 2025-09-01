@@ -118,7 +118,8 @@ pub fn wal_dir_datetime_filter_builder(
     move |path: PathBuf| {
         let mut components = path
             .components()
-            .skip(skip_count)
+            .skip(skip_count + 1)   // For a given <stream_name> there are multiple <thread_id's> 
+                                                                        // underwhich datetime folders happen
             .map(|c| c.as_os_str())
             .filter_map(|osc| osc.to_str());
 
@@ -197,11 +198,7 @@ where
     F: Fn(PathBuf) -> bool + Send + Clone + 'static,
 {
     let walker = WalkDir::new(root).filter(move |entry| {
-        // Interestingly, entry.path(), although a PathBuf itself, won't move into async block as
-        // expected. By the time the async block starts running, it becomes garbled. I
-        // suppose, the PathBuf stack struct gets reused. So the fix for this is to clone()
-        // - which goes against my understanding of Rust!
-        let path = entry.path().clone();
+        let path = entry.path();
         let filter = filter.clone();
         async move {
             let is_dir = path.is_dir();
