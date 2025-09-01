@@ -81,7 +81,11 @@ import useStreamingSearch from "./useStreamingSearch";
 
 import { searchState } from "@/composables/useLogs/searchState";
 import { INTERVAL_MAP, DEFAULT_LOGS_CONFIG } from "@/utils/logs/constants";
-import { fnParsedSQL, fnUnparsedSQL } from "@/composables/useLogs/logsUtils";
+import {
+  fnParsedSQL,
+  fnUnparsedSQL,
+  extractTimestamps,
+} from "@/composables/useLogs/logsUtils";
 
 // TODO OK:
 // useStreamManagement for stream-related functions
@@ -4546,47 +4550,47 @@ const useLogs = () => {
     }
   };
 
-  function extractTimestamps(period: string) {
-    const currentTime = new Date();
-    let fromTimestamp, toTimestamp;
+  // function extractTimestamps(period: string) {
+  //   const currentTime = new Date();
+  //   let fromTimestamp, toTimestamp;
 
-    switch (period.slice(-1)) {
-      case "s":
-        fromTimestamp = currentTime.getTime() - parseInt(period) * 1000; // 1 second = 1000 milliseconds
-        toTimestamp = currentTime.getTime();
-        break;
-      case "m":
-        fromTimestamp = currentTime.getTime() - parseInt(period) * 60000; // 1 minute = 60000 milliseconds
-        toTimestamp = currentTime.getTime();
-        break;
-      case "h":
-        fromTimestamp = currentTime.getTime() - parseInt(period) * 3600000; // 1 hour = 3600000 milliseconds
-        toTimestamp = currentTime.getTime();
-        break;
-      case "d":
-        fromTimestamp = currentTime.getTime() - parseInt(period) * 86400000; // 1 day = 86400000 milliseconds
-        toTimestamp = currentTime.getTime();
-        break;
-      case "w":
-        fromTimestamp = currentTime.getTime() - parseInt(period) * 604800000; // 1 week = 604800000 milliseconds
-        toTimestamp = currentTime.getTime();
-        break;
-      case "M":
-        const currentMonth = currentTime.getMonth();
-        const currentYear = currentTime.getFullYear();
-        const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-        const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-        const fromDate = new Date(prevYear, prevMonth, 1);
-        fromTimestamp = fromDate.getTime();
-        toTimestamp = currentTime.getTime();
-        break;
-      default:
-        console.error("Invalid period format!");
-        return;
-    }
+  //   switch (period.slice(-1)) {
+  //     case "s":
+  //       fromTimestamp = currentTime.getTime() - parseInt(period) * 1000; // 1 second = 1000 milliseconds
+  //       toTimestamp = currentTime.getTime();
+  //       break;
+  //     case "m":
+  //       fromTimestamp = currentTime.getTime() - parseInt(period) * 60000; // 1 minute = 60000 milliseconds
+  //       toTimestamp = currentTime.getTime();
+  //       break;
+  //     case "h":
+  //       fromTimestamp = currentTime.getTime() - parseInt(period) * 3600000; // 1 hour = 3600000 milliseconds
+  //       toTimestamp = currentTime.getTime();
+  //       break;
+  //     case "d":
+  //       fromTimestamp = currentTime.getTime() - parseInt(period) * 86400000; // 1 day = 86400000 milliseconds
+  //       toTimestamp = currentTime.getTime();
+  //       break;
+  //     case "w":
+  //       fromTimestamp = currentTime.getTime() - parseInt(period) * 604800000; // 1 week = 604800000 milliseconds
+  //       toTimestamp = currentTime.getTime();
+  //       break;
+  //     case "M":
+  //       const currentMonth = currentTime.getMonth();
+  //       const currentYear = currentTime.getFullYear();
+  //       const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+  //       const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+  //       const fromDate = new Date(prevYear, prevMonth, 1);
+  //       fromTimestamp = fromDate.getTime();
+  //       toTimestamp = currentTime.getTime();
+  //       break;
+  //     default:
+  //       console.error("Invalid period format!");
+  //       return;
+  //   }
 
-    return { from: fromTimestamp, to: toTimestamp };
-  }
+  //   return { from: fromTimestamp, to: toTimestamp };
+  // }
 
   const restoreUrlQueryParams = async (dashboardPanelData: any = null) => {
     searchObj.shouldIgnoreWatcher = true;
@@ -4712,22 +4716,22 @@ const useLogs = () => {
     );
   };
 
-  const showNotification = () => {
-    return $q.notify({
-      type: "positive",
-      message: "Waiting for response...",
-      timeout: 10000,
-      actions: [
-        {
-          icon: "cancel",
-          color: "white",
-          handler: () => {
-            /* ... */
-          },
-        },
-      ],
-    });
-  };
+  // const showNotification = () => {
+  //   return $q.notify({
+  //     type: "positive",
+  //     message: "Waiting for response...",
+  //     timeout: 10000,
+  //     actions: [
+  //       {
+  //         icon: "cancel",
+  //         color: "white",
+  //         handler: () => {
+  //           /* ... */
+  //         },
+  //       },
+  //     ],
+  //   });
+  // };
 
   const updateStreams = async () => {
     if (searchObj.data.streamResults?.list?.length) {
@@ -6996,7 +7000,6 @@ const useLogs = () => {
     reorderSelectedFields,
     resetHistogramWithError,
     isLimitQuery,
-    extractTimestamps,
     getFilterExpressionByFieldType,
     setSelectedStreams,
     extractValueQuery,
