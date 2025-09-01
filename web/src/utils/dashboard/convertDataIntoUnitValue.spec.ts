@@ -771,6 +771,9 @@ describe("Dashboard Data Conversion Utils", () => {
     });
 
     it("should handle exceptions gracefully", () => {
+      // Mock console.log to avoid logging during tests
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
       // Mock Date constructor to throw
       const originalDate = Date;
       global.Date = function(this: any, ...args: any[]) {
@@ -786,7 +789,12 @@ describe("Dashboard Data Conversion Utils", () => {
       expect(result.seconds).toBe(0);
       expect(result.periodAsStr).toBe("");
 
+      // Verify console.log was called with the error
+      expect(consoleSpy).toHaveBeenCalled();
+
+      // Restore mocks
       global.Date = originalDate;
+      consoleSpy.mockRestore();
     });
   });
 
