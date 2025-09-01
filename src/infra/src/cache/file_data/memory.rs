@@ -20,7 +20,7 @@ use std::{
 
 use bytes::Bytes;
 use config::{
-    RwHashMap, get_config, metrics, spawn_pausable_job,
+    RwHashMap, get_config, is_local_disk_storage, metrics, spawn_pausable_job,
     utils::hash::{Sum64, gxhash},
 };
 use once_cell::sync::Lazy;
@@ -141,7 +141,9 @@ impl FileData {
             let (key, data_size) = item.unwrap();
             // move the file from memory to disk cache
             let idx = get_bucket_idx(&key);
-            if let Some((key, data)) = DATA[idx].remove(&key) {
+            if !is_local_disk_storage()
+                && let Some((key, data)) = DATA[idx].remove(&key)
+            {
                 _ = super::disk::set(&key, data).await;
             }
             // metrics
