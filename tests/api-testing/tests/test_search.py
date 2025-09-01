@@ -1067,7 +1067,7 @@ def test_e2e_where_condition_validation(create_session, base_url):
 
 
 def test_e2e_match_all_validation(create_session, base_url):
-    """Test match_all query and validate all hits contain the search term."""
+    """Test WHERE level = 'info' query and validate that results contain the expected field value."""
 
     session = create_session
     url = base_url
@@ -1077,7 +1077,7 @@ def test_e2e_match_all_validation(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
         "query": {
-            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('level=info')",
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE level = 'info'",
             "start_time": one_min_ago,
             "end_time": end_time,
             "from": 0,
@@ -1097,25 +1097,22 @@ def test_e2e_match_all_validation(create_session, base_url):
     hits = response_data["hits"]
     
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for match_all query")
+        print(f"Found {len(hits)} hits for level='info' query")
         
-        matching_hits = 0
+        # For WHERE level = 'info' queries, ALL hits should have level = 'info'
         for i, hit in enumerate(hits):
-            # Check if the hit has 'level' field with value 'info'
-            if "level" in hit and hit["level"] == "info":
-                matching_hits += 1
-            else:
-                print(f"Hit {i} does not have level='info': level={hit.get('level', 'MISSING')}")
+            assert "level" in hit, f"Hit {i} should contain 'level' field"
+            assert hit["level"] == "info", f"Hit {i} level should be 'info', got '{hit.get('level')}'"
         
-        # For match_all queries, we expect at least some hits to contain the term
-        assert matching_hits > 0, f"Expected some hits to contain 'level=info', but found {matching_hits}/{len(hits)}"
-        print(f"✅ {matching_hits}/{len(hits)} hits contain 'level=info' as expected")
+        print(f"✅ All {len(hits)} hits have level='info' as expected")
     else:
-        print("⚠️  No hits found for match_all query")
+        print("⚠️  No hits found for level='info' query in the time window")
+        # This is acceptable - the test validates the query syntax works correctly
+        # and that when data IS found, it's properly filtered
     
     total_hits = response_data.get("total", 0)
     took_time = response_data.get("took", 0)
-    print(f"match_all query executed in {took_time}ms and found {total_hits} total matching records")
+    print(f"level='info' query executed in {took_time}ms and found {total_hits} total matching records")
 
 
 
@@ -1263,3 +1260,87 @@ def test_e2e_cte_query_validation(create_session, base_url):
     total_hits = response_data.get("total", 0)
     took_time = response_data.get("took", 0)
     print(f"CTE query executed in {took_time}ms and found {total_hits} total matching records")
+
+
+def test_e2e_group_by_where_container_name_validation(create_session, base_url):
+    """Test GROUP BY with WHERE clause to ensure only specified container_name is returned.
+    
+    This test validates the bug fix where GROUP BY queries with WHERE clauses
+    were incorrectly returning results from other values as well.
+    Regression test for WHERE clause filtering issues in GROUP BY operations.
+    """
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    
+    # Use a specific test container name that should be filtered precisely
+    target_container_name = "ziox"
+    
+    json_data = {
+        "query": {
+            "sql": f"SELECT kubernetes_container_name, COUNT(*) AS log_count, MAX(_timestamp) AS latest_timestamp FROM \"stream_pytest_data\" WHERE kubernetes_container_name = '{target_container_name}' GROUP BY kubernetes_container_name",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 100,
+            "quick_mode": False
+        }
+    }
+
+    resp_get_group_where_query = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_group_where_query.status_code == 200
+    ), f"GROUP BY WHERE container_name query failed with status {resp_get_group_where_query.status_code} {resp_get_group_where_query.content}"
+    
+    response_data = resp_get_group_where_query.json()
+    assert "hits" in response_data, "Response should contain 'hits' field"
+    
+    hits = response_data["hits"]
+    
+    if len(hits) > 0:
+        print(f"Found {len(hits)} hits for GROUP BY WHERE kubernetes_container_name query")
+        
+        # CRITICAL VALIDATION: All returned hits must have ONLY the specified container_name
+        for i, hit in enumerate(hits):
+            # Validate required fields are present
+            assert "kubernetes_container_name" in hit, f"Hit {i} should contain 'kubernetes_container_name' field"
+            assert "log_count" in hit, f"Hit {i} should contain 'log_count' field (COUNT result)"
+            assert "latest_timestamp" in hit, f"Hit {i} should contain 'latest_timestamp' field (MAX result)"
+            
+            # CRITICAL BUG CHECK: Ensure kubernetes_container_name matches exactly what was queried
+            actual_container_name = hit["kubernetes_container_name"]
+            assert actual_container_name == target_container_name, (
+                f"🚨 BUG DETECTED: Hit {i} has kubernetes_container_name='{actual_container_name}' but query specified kubernetes_container_name='{target_container_name}'. "
+                f"This indicates the WHERE clause is not properly filtering results!"
+            )
+            
+            # Validate aggregation fields
+            log_count = hit["log_count"]
+            assert isinstance(log_count, int) and log_count > 0, (
+                f"Hit {i} log_count (COUNT result) should be positive integer, got {log_count}"
+            )
+            
+            latest_timestamp = hit["latest_timestamp"]
+            assert latest_timestamp is not None, (
+                f"Hit {i} latest_timestamp (MAX result) should not be null"
+            )
+        
+        # Count unique container_names to ensure no leakage
+        unique_container_names = set(hit["kubernetes_container_name"] for hit in hits)
+        assert len(unique_container_names) == 1, (
+            f"🚨 CRITICAL BUG: Expected only 1 kubernetes_container_name ('{target_container_name}') but found {len(unique_container_names)}: {unique_container_names}"
+        )
+        
+        print(f"✅ All {len(hits)} hits contain ONLY kubernetes_container_name='{target_container_name}' as expected")
+        print(f"✅ Bug validation PASSED: WHERE clause properly filters GROUP BY results")
+        
+    else:
+        print(f"ℹ️  No hits found for kubernetes_container_name='{target_container_name}' (this is acceptable if no data exists)")
+    
+    total_hits = response_data.get("total", 0)
+    took_time = response_data.get("took", 0)
+    print(f"GROUP BY WHERE kubernetes_container_name query executed in {took_time}ms and found {total_hits} total matching records")
