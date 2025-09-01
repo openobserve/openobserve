@@ -249,3 +249,418 @@ impl ListAlertsParams {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use chrono::Utc;
+    use serde_json;
+    use svix_ksuid::Ksuid;
+
+    use super::*;
+    use crate::ider;
+
+    #[test]
+    fn test_alert_default() {
+        let alert = Alert::default();
+
+        assert_eq!(alert.id, None);
+        assert_eq!(alert.name, "");
+        assert_eq!(alert.org_id, "");
+        assert_eq!(alert.stream_type, StreamType::default());
+        assert_eq!(alert.stream_name, "");
+        assert_eq!(alert.is_real_time, false);
+        assert_eq!(alert.query_condition, QueryCondition::default());
+        assert_eq!(alert.trigger_condition, TriggerCondition::default());
+        assert!(alert.destinations.is_empty());
+        assert_eq!(alert.context_attributes, None);
+        assert_eq!(alert.row_template, "");
+        assert_eq!(alert.description, "");
+        assert_eq!(alert.enabled, false);
+        assert_eq!(alert.tz_offset, 0);
+        assert_eq!(alert.last_triggered_at, None);
+        assert_eq!(alert.last_satisfied_at, None);
+        assert_eq!(alert.owner, None);
+        assert_eq!(alert.updated_at, None);
+        assert_eq!(alert.last_edited_by, None);
+    }
+
+    #[test]
+    fn test_alert_partial_eq() {
+        let alert1 = Alert {
+            name: "test_alert".to_string(),
+            stream_type: StreamType::Logs,
+            stream_name: "test_stream".to_string(),
+            ..Default::default()
+        };
+
+        let alert2 = Alert {
+            name: "test_alert".to_string(),
+            stream_type: StreamType::Logs,
+            stream_name: "test_stream".to_string(),
+            org_id: "different_org".to_string(), // Different org_id
+            ..Default::default()
+        };
+
+        let alert3 = Alert {
+            name: "different_alert".to_string(), // Different name
+            stream_type: StreamType::Logs,
+            stream_name: "test_stream".to_string(),
+            ..Default::default()
+        };
+
+        // Should be equal because only name, stream_type, and stream_name matter
+        assert_eq!(alert1, alert2);
+
+        // Should not be equal because name is different
+        assert_ne!(alert1, alert3);
+    }
+
+    #[test]
+    fn test_get_unique_key_with_id() {
+        let ksuid_str = ider::uuid();
+        let ksuid = Ksuid::from_str(&ksuid_str).unwrap();
+        let alert = Alert {
+            id: Some(ksuid),
+            ..Default::default()
+        };
+
+        assert_eq!(alert.get_unique_key(), ksuid_str);
+    }
+
+    #[test]
+    fn test_get_unique_key_without_id() {
+        let alert = Alert {
+            id: None,
+            ..Default::default()
+        };
+
+        assert_eq!(alert.get_unique_key(), "");
+    }
+
+    #[test]
+    fn test_get_last_satisfied_at_from_trigger_data() {
+        let trigger_data = ScheduledTriggerData {
+            last_satisfied_at: Some(1234567890),
+            ..Default::default()
+        };
+        let trigger_data_json = serde_json::to_string(&trigger_data).unwrap();
+
+        let trigger = Trigger {
+            data: trigger_data_json,
+            ..Default::default()
+        };
+
+        let alert = Alert {
+            last_satisfied_at: Some(987654321), // This should be ignored
+            ..Default::default()
+        };
+
+        let result = alert.get_last_satisfied_at(Some(&trigger));
+        assert_eq!(result, Some(1234567890));
+    }
+
+    #[test]
+    fn test_get_last_satisfied_at_fallback_to_alert_table() {
+        let trigger = Trigger {
+            data: "invalid_json".to_string(), // Invalid JSON
+            ..Default::default()
+        };
+
+        let alert = Alert {
+            last_satisfied_at: Some(987654321),
+            ..Default::default()
+        };
+
+        let result = alert.get_last_satisfied_at(Some(&trigger));
+        assert_eq!(result, Some(987654321));
+    }
+
+    #[test]
+    fn test_get_last_satisfied_at_no_trigger() {
+        let alert = Alert {
+            last_satisfied_at: Some(987654321),
+            ..Default::default()
+        };
+
+        let result = alert.get_last_satisfied_at(None);
+        assert_eq!(result, Some(987654321));
+    }
+
+    #[test]
+    fn test_get_last_satisfied_at_none() {
+        let alert = Alert {
+            last_satisfied_at: None,
+            ..Default::default()
+        };
+
+        let result = alert.get_last_satisfied_at(None);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_get_last_triggered_at_from_trigger() {
+        let trigger = Trigger {
+            start_time: Some(1234567890),
+            ..Default::default()
+        };
+
+        let alert = Alert {
+            last_triggered_at: Some(987654321), // This should be ignored
+            ..Default::default()
+        };
+
+        let result = alert.get_last_triggered_at(Some(&trigger));
+        assert_eq!(result, Some(1234567890));
+    }
+
+    #[test]
+    fn test_get_last_triggered_at_fallback_to_alert_table() {
+        let trigger = Trigger {
+            start_time: None,
+            ..Default::default()
+        };
+
+        let alert = Alert {
+            last_triggered_at: Some(987654321),
+            ..Default::default()
+        };
+
+        let result = alert.get_last_triggered_at(Some(&trigger));
+        assert_eq!(result, Some(987654321));
+    }
+
+    #[test]
+    fn test_get_last_triggered_at_no_trigger() {
+        let alert = Alert {
+            last_triggered_at: Some(987654321),
+            ..Default::default()
+        };
+
+        let result = alert.get_last_triggered_at(None);
+        assert_eq!(result, Some(987654321));
+    }
+
+    #[test]
+    fn test_get_last_triggered_at_none() {
+        let alert = Alert {
+            last_triggered_at: None,
+            ..Default::default()
+        };
+
+        let result = alert.get_last_triggered_at(None);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_get_last_triggered_at_from_table() {
+        let alert = Alert {
+            last_triggered_at: Some(1234567890),
+            ..Default::default()
+        };
+
+        assert_eq!(alert.get_last_triggered_at_from_table(), Some(1234567890));
+    }
+
+    #[test]
+    fn test_get_last_satisfied_at_from_table() {
+        let alert = Alert {
+            last_satisfied_at: Some(1234567890),
+            ..Default::default()
+        };
+
+        assert_eq!(alert.get_last_satisfied_at_from_table(), Some(1234567890));
+    }
+
+    #[test]
+    fn test_set_last_satisfied_at() {
+        let mut alert = Alert::default();
+
+        alert.set_last_satisfied_at(Some(1234567890));
+        assert_eq!(alert.last_satisfied_at, Some(1234567890));
+
+        alert.set_last_satisfied_at(None);
+        assert_eq!(alert.last_satisfied_at, None);
+    }
+
+    #[test]
+    fn test_set_last_triggered_at() {
+        let mut alert = Alert::default();
+
+        alert.set_last_triggered_at(Some(1234567890));
+        assert_eq!(alert.last_triggered_at, Some(1234567890));
+
+        alert.set_last_triggered_at(None);
+        assert_eq!(alert.last_triggered_at, None);
+    }
+
+    #[test]
+    fn test_list_alerts_params_new() {
+        let params = ListAlertsParams::new("test_org");
+
+        assert_eq!(params.org_id, "test_org");
+        assert_eq!(params.folder_id, None);
+        assert_eq!(params.name_substring, None);
+        assert_eq!(params.stream_type_and_name, None);
+        assert_eq!(params.enabled, None);
+        assert_eq!(params.owner, None);
+        assert_eq!(params.page_size_and_idx, None);
+    }
+
+    #[test]
+    fn test_list_alerts_params_in_folder() {
+        let params = ListAlertsParams::new("test_org").in_folder("test_folder");
+
+        assert_eq!(params.org_id, "test_org");
+        assert_eq!(params.folder_id, Some("test_folder".to_string()));
+    }
+
+    #[test]
+    fn test_list_alerts_params_with_name_substring() {
+        let params = ListAlertsParams::new("test_org").with_name_substring("test");
+
+        assert_eq!(params.org_id, "test_org");
+        assert_eq!(params.name_substring, Some("test".to_string()));
+    }
+
+    #[test]
+    fn test_list_alerts_params_for_stream() {
+        let params =
+            ListAlertsParams::new("test_org").for_stream(StreamType::Logs, Some("test_stream"));
+
+        assert_eq!(params.org_id, "test_org");
+        assert_eq!(
+            params.stream_type_and_name,
+            Some((StreamType::Logs, Some("test_stream".to_string())))
+        );
+    }
+
+    #[test]
+    fn test_list_alerts_params_for_stream_no_name() {
+        let params = ListAlertsParams::new("test_org").for_stream(StreamType::Metrics, None);
+
+        assert_eq!(params.org_id, "test_org");
+        assert_eq!(
+            params.stream_type_and_name,
+            Some((StreamType::Metrics, None))
+        );
+    }
+
+    #[test]
+    fn test_list_alerts_params_paginate() {
+        let params = ListAlertsParams::new("test_org").paginate(10, 2);
+
+        assert_eq!(params.org_id, "test_org");
+        assert_eq!(params.page_size_and_idx, Some((10, 2)));
+    }
+
+    #[test]
+    fn test_list_alerts_params_chaining() {
+        let params = ListAlertsParams::new("test_org")
+            .in_folder("test_folder")
+            .with_name_substring("test")
+            .for_stream(StreamType::Logs, Some("test_stream"))
+            .paginate(20, 1);
+
+        assert_eq!(params.org_id, "test_org");
+        assert_eq!(params.folder_id, Some("test_folder".to_string()));
+        assert_eq!(params.name_substring, Some("test".to_string()));
+        assert_eq!(
+            params.stream_type_and_name,
+            Some((StreamType::Logs, Some("test_stream".to_string())))
+        );
+        assert_eq!(params.page_size_and_idx, Some((20, 1)));
+    }
+
+    #[test]
+    fn test_alert_with_context_attributes() {
+        let mut context_attrs = HashMap::new();
+        context_attrs.insert("key1".to_string(), "value1".to_string());
+        context_attrs.insert("key2".to_string(), "value2".to_string());
+
+        let alert = Alert {
+            context_attributes: Some(context_attrs.clone()),
+            ..Default::default()
+        };
+
+        assert_eq!(alert.context_attributes, Some(context_attrs));
+    }
+
+    #[test]
+    fn test_alert_with_destinations() {
+        let destinations = vec!["email@example.com".to_string(), "webhook_url".to_string()];
+
+        let alert = Alert {
+            destinations: destinations.clone(),
+            ..Default::default()
+        };
+
+        assert_eq!(alert.destinations, destinations);
+    }
+
+    #[test]
+    fn test_alert_with_updated_at() {
+        let now = Utc::now().fixed_offset();
+        let alert = Alert {
+            updated_at: Some(now),
+            ..Default::default()
+        };
+
+        assert_eq!(alert.updated_at, Some(now));
+    }
+
+    #[test]
+    fn test_alert_with_owner_and_editor() {
+        let alert = Alert {
+            owner: Some("test_owner".to_string()),
+            last_edited_by: Some("test_editor".to_string()),
+            ..Default::default()
+        };
+
+        assert_eq!(alert.owner, Some("test_owner".to_string()));
+        assert_eq!(alert.last_edited_by, Some("test_editor".to_string()));
+    }
+
+    #[test]
+    fn test_alert_timezone_offset() {
+        let alert = Alert {
+            tz_offset: -300, // UTC-5
+            ..Default::default()
+        };
+
+        assert_eq!(alert.tz_offset, -300);
+    }
+
+    #[test]
+    fn test_alert_enabled_status() {
+        let enabled_alert = Alert {
+            enabled: true,
+            ..Default::default()
+        };
+
+        let disabled_alert = Alert {
+            enabled: false,
+            ..Default::default()
+        };
+
+        assert_eq!(enabled_alert.enabled, true);
+        assert_eq!(disabled_alert.enabled, false);
+    }
+
+    #[test]
+    fn test_alert_real_time_flag() {
+        let real_time_alert = Alert {
+            is_real_time: true,
+            ..Default::default()
+        };
+
+        let scheduled_alert = Alert {
+            is_real_time: false,
+            ..Default::default()
+        };
+
+        assert_eq!(real_time_alert.is_real_time, true);
+        assert_eq!(scheduled_alert.is_real_time, false);
+    }
+}
