@@ -160,6 +160,7 @@ pub async fn search(
         )
         .await
     } else {
+        // For refresh cache mode, we still need the metadata without using cache
         let query: SearchQuery = req.query.clone().into();
         match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
             Ok(v) => {
@@ -169,12 +170,26 @@ pub async fn search(
 
                 let order_by = v.order_by;
 
-                MultiCachedQueryResponse {
+                // Handle histogram interval and file path modifications like check_cache does
+                let mut discard_interval = -1;
+                if let Some(interval) = v.histogram_interval {
+                    file_path = format!("{file_path}_{interval}_{ts_column}");
+                    discard_interval = interval * 1000 * 1000; // in microseconds
+                }
+
+                let mut multi_resp = MultiCachedQueryResponse {
                     ts_column,
                     is_descending,
                     order_by,
+                    file_path: file_path.clone(),
                     ..Default::default()
+                };
+
+                if discard_interval > -1 {
+                    multi_resp.histogram_interval = discard_interval / 1000 / 1000;
                 }
+
+                multi_resp
             }
             Err(e) => {
                 log::error!("Error parsing sql: {e}");
