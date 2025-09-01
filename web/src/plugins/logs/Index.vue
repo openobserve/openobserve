@@ -395,7 +395,7 @@ import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import useAiChat from "@/composables/useAiChat";
 import queryService from "@/services/search";
 import { fnParsedSQL, fnUnparsedSQL } from "@/composables/useLogs/logsUtils";
-import { resetSearchObj } from "@/composables/useLogs/searchState";
+import searchState from "@/composables/useLogs/searchState";
 
 export default defineComponent({
   name: "PageSearch",
@@ -547,6 +547,7 @@ export default defineComponent({
     const $q = useQuasar();
     const disableMoreErrorDetails: boolean = ref(false);
     const searchHistoryRef = ref(null);
+    const { resetSearchObj, initialLogsState } = searchState();
     let {
       searchObj,
       getQueryData,
@@ -578,7 +579,6 @@ export default defineComponent({
       isDistinctQuery,
       isWithQuery,
       getStream,
-      initialLogsState,
       clearSearchObj,
       setCommunicationMethod,
       cancelQuery,
