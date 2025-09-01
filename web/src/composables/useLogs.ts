@@ -66,11 +66,6 @@ import {
 import { byString } from "@/utils/json";
 import { logsErrorMessage } from "@/utils/common";
 import useSqlSuggestions from "@/composables/useSuggestions";
-// import {
-//   b64EncodeUnicode,
-//   useLocalLogFilterField,
-//   b64DecodeUnicode,
-// } from "@/utils/zincutils";
 
 import useFunctions from "@/composables/useFunctions";
 import useNotifications from "@/composables/useNotifications";
@@ -83,239 +78,18 @@ import config from "@/aws-exports";
 import useSearchWebSocket from "./useSearchWebSocket";
 import useActions from "./useActions";
 import useStreamingSearch from "./useStreamingSearch";
-import { changeHistogramInterval } from "@/utils/query/sqlUtils";
 
-const defaultObject = {
-  organizationIdentifier: "",
-  runQuery: false,
-  loading: false,
-  loadingHistogram: false,
-  loadingCounter: false,
-  loadingStream: false,
-  loadingSavedView: false,
-  shouldIgnoreWatcher: false,
-  communicationMethod: "http",
-  config: {
-    splitterModel: 20,
-    lastSplitterPosition: 0,
-    splitterLimit: [0, 40],
-    fnSplitterModel: 60,
-    fnLastSplitterPosition: 0,
-    fnSplitterLimit: [40, 100],
-    refreshTimes: [
-      [
-        { label: "5 sec", value: 5 },
-        { label: "1 min", value: 60 },
-        { label: "1 hr", value: 3600 },
-      ],
-      [
-        { label: "10 sec", value: 10 },
-        { label: "5 min", value: 300 },
-        { label: "2 hr", value: 7200 },
-      ],
-      [
-        { label: "15 sec", value: 15 },
-        { label: "15 min", value: 900 },
-        { label: "1 day", value: 86400 },
-      ],
-      [
-        { label: "30 sec", value: 30 },
-        { label: "30 min", value: 1800 },
-      ],
-    ],
-  },
-  meta: {
-    logsVisualizeToggle: "logs",
-    refreshInterval: <number>0,
-    refreshIntervalLabel: "Off",
-    refreshHistogram: false,
-    showFields: true,
-    showQuery: true,
-    showHistogram: true,
-    showDetailTab: false,
-    showTransformEditor: false, //we are making showTransformEditor false because by default function / actions editor should be hidden
-    searchApplied: false,
-    toggleSourceWrap: useLocalWrapContent()
-      ? JSON.parse(useLocalWrapContent())
-      : false,
-    histogramDirtyFlag: false,
-    logsVisualizeDirtyFlag: false,
-    sqlMode: false,
-    sqlModeManualTrigger: false,
-    quickMode: false,
-    queryEditorPlaceholderFlag: true,
-    functionEditorPlaceholderFlag: true,
-    resultGrid: {
-      rowsPerPage: 50,
-      wrapCells: false,
-      manualRemoveFields: false,
-      chartInterval: "1 second",
-      chartKeyFormat: "HH:mm:ss",
-      navigation: {
-        currentRowIndex: 0,
-      },
-      showPagination: true,
-    },
-    jobId: "",
-    jobRecords: "100",
-    scrollInfo: {},
-    pageType: "logs", // 'logs' or 'stream
-    regions: [],
-    clusters: [],
-    useUserDefinedSchemas: "user_defined_schema",
-    hasUserDefinedSchemas: false,
-    selectedTraceStream: "",
-    showSearchScheduler: false,
-    toggleFunction: false, // DEPRECATED use showTransformEditor instead
-    isActionsEnabled: false,
-    resetPlotChart: false,
-  },
-  data: {
-    query: <any>"",
-    histogramQuery: <any>"",
-    parsedQuery: {},
-    countErrorMsg: "",
-    errorMsg: "",
-    errorDetail: "",
-    errorCode: 0,
-    filterErrMsg: "",
-    missingStreamMessage: "",
-    additionalErrorMsg: "",
-    savedViewFilterFields: "",
-    hasSearchDataTimestampField: false,
-    originalDataCache: {},
-    stream: {
-      loading: false,
-      streamLists: <object[]>[],
-      selectedStream: <any>[],
-      selectedStreamFields: <any>[],
-      selectedFields: <string[]>[],
-      filterField: "",
-      addToFilter: "",
-      functions: <any>[],
-      streamType: "logs",
-      interestingFieldList: <string[]>[],
-      userDefinedSchema: <any>[],
-      expandGroupRows: <any>{},
-      expandGroupRowsFieldCount: <any>{},
-      filteredField: <any>[],
-      missingStreamMultiStreamFilter: <any>[],
-      pipelineQueryStream: <any>[],
-      selectedInterestingStreamFields: <string[]>[],
-      interestingExpandedGroupRows: <any>{},
-      interestingExpandedGroupRowsFieldCount: <any>{},
-    },
-    resultGrid: {
-      currentDateTime: new Date(),
-      currentPage: 1,
-      columns: <any>[],
-      colOrder: <any>{},
-      colSizes: <any>{},
-    },
-    histogramInterval: <any>0,
-    transforms: <any>[],
-    transformType: "function",
-    actions: <any>[],
-    selectedTransform: <any>null,
-    queryResults: <any>[],
-    sortedQueryResults: <any>[],
-    streamResults: <any>[],
-    histogram: <any>{
-      xData: [],
-      yData: [],
-      chartParams: {
-        title: "",
-        unparsed_x_data: [],
-        timezone: "",
-      },
-      errorMsg: "",
-      errorCode: 0,
-      errorDetail: "",
-    },
-    editorValue: <any>"",
-    datetime: <any>{
-      startTime: (new Date().getTime() - 900000) * 1000,
-      endTime: new Date().getTime(),
-      relativeTimePeriod: "15m",
-      type: "relative",
-      selectedDate: <any>{},
-      selectedTime: <any>{},
-      queryRangeRestrictionMsg: "",
-      queryRangeRestrictionInHour: 100000,
-    },
-    searchAround: {
-      indexTimestamp: 0,
-      size: <number>10,
-      histogramHide: false,
-    },
-    tempFunctionName: "",
-    tempFunctionContent: "",
-    tempFunctionLoading: false,
-    savedViews: <any>[],
-    customDownloadQueryObj: <any>{},
-    functionError: "",
-    searchRequestTraceIds: <string[]>[],
-    searchWebSocketTraceIds: <string[]>[],
-    isOperationCancelled: false,
-    searchRetriesCount: <{ [key: string]: number }>{},
-    actionId: null,
-  },
-};
-
-const maxSearchRetries = 2;
-const searchReconnectDelay = 1000; // 1 second
+import { searchState } from "@/composables/useLogs/searchState";
+import { INTERVAL_MAP } from "@/utils/logs/constants";
+import { fnParsedSQL, fnUnparsedSQL } from "@/composables/useLogs/logsUtils";
 
 // TODO OK:
 // useStreamManagement for stream-related functions
 // useQueryProcessing for query-related functions
 // useDataVisualization for histogram and data display functions
 
-let searchObj: any = reactive(Object.assign({}, defaultObject));
-
-
-const searchObjDebug = reactive({
-  queryDataStartTime: 0,
-  queryDataEndTime: 0,
-  buildSearchStartTime: 0,
-  buildSearchEndTime: 0,
-  partitionStartTime: 0,
-  partitionEndTime: 0,
-  paginatedDatawithAPIStartTime: 0,
-  paginatedDatawithAPIEndTime: 0,
-  pagecountStartTime: 0,
-  pagecountEndTime: 0,
-  paginatedDataReceivedStartTime: 0,
-  paginatedDataReceivedEndTime: 0,
-  histogramStartTime: 0,
-  histogramEndTime: 0,
-  histogramProcessingStartTime: 0,
-  histogramProcessingEndTime: 0,
-  extractFieldsStartTime: 0,
-  extractFieldsEndTime: 0,
-  extractFieldsWithAPI: "",
-});
-
-const searchAggData = reactive({
-  total: 0,
-  hasAggregation: false,
-});
-
-const initialQueryPayload: Ref<SearchRequestPayload | null> = ref(null);
-
-const streamSchemaFieldsIndexMapping = ref<{ [key: string]: number }>({});
-
 let histogramResults: any = [];
 let histogramMappedData: any = [];
-const intervalMap: any = {
-  "10 second": 10 * 1000 * 1000,
-  "15 second": 15 * 1000 * 1000,
-  "30 second": 30 * 1000 * 1000,
-  "1 minute": 60 * 1000 * 1000,
-  "5 minute": 5 * 60 * 1000 * 1000,
-  "30 minute": 30 * 60 * 1000 * 1000,
-  "1 hour": 60 * 60 * 1000 * 1000,
-  "1 day": 24 * 60 * 60 * 1000 * 1000,
-};
 
 const {
   fetchQueryDataWithWebSocket,
@@ -324,9 +98,7 @@ const {
   closeSocketBasedOnRequestId,
 } = useSearchWebSocket();
 
-const {
-  fetchQueryDataWithHttpStream,
-} = useStreamingSearch();
+const { fetchQueryDataWithHttpStream } = useStreamingSearch();
 
 
 type SearchPartition = {
@@ -346,7 +118,13 @@ const useLogs = () => {
   let parser: null | Parser = new Parser();
 
   const { showErrorNotification } = useNotifications();
-  const { getStreams, getStream, getMultiStreams, isStreamExists, isStreamFetched } = useStreams();
+  const {
+    getStreams,
+    getStream,
+    getMultiStreams,
+    isStreamExists,
+    isStreamFetched,
+  } = useStreams();
   const router = useRouter();
   const fieldValues = ref();
 
@@ -536,7 +314,9 @@ const useLogs = () => {
       (router.currentRoute.value.query.stream_type as string) || "logs";
     searchObj.data.stream.streamLists = [];
     resetQueryData();
-    resetSearchAroundData();
+    // reset search around data
+    searchObj.data.searchAround.indexTimestamp = -1;
+    searchObj.data.searchAround.size = 0;
   }
 
   function resetQueryData() {
@@ -553,11 +333,6 @@ const useLogs = () => {
     searchObj.data.errorMsg = "";
     searchObj.data.errorDetail = "";
     searchObj.data.countErrorMsg = "";
-  }
-
-  function resetSearchAroundData() {
-    searchObj.data.searchAround.indexTimestamp = -1;
-    searchObj.data.searchAround.size = 0;
   }
 
   async function loadStreamLists(selectStream: boolean = true) {
@@ -2382,7 +2157,7 @@ const useLogs = () => {
       histogramResults = [];
       histogramMappedData = [];
       const intervalMs: any =
-        intervalMap[searchObj.meta.resultGrid.chartInterval];
+        INTERVAL_MAP[searchObj.meta.resultGrid.chartInterval];
       if (!intervalMs) {
         throw new Error("Invalid interval");
       }
@@ -2433,47 +2208,47 @@ const useLogs = () => {
     return false; // No aggregation function or non-null groupby property found
   }
 
-  const fnParsedSQL = (queryString: string = "") => {
-    try {
-      queryString = queryString || searchObj.data.query;
-      const filteredQuery = queryString
-        .split("\n")
-        .filter((line: string) => !line.trim().startsWith("--"))
-        .join("\n");
+  // const fnParsedSQL = (queryString: string = "") => {
+  //   try {
+  //     queryString = queryString || searchObj.data.query;
+  //     const filteredQuery = queryString
+  //       .split("\n")
+  //       .filter((line: string) => !line.trim().startsWith("--"))
+  //       .join("\n");
 
-      const parsedQuery: any = parser?.astify(filteredQuery);
-      return parsedQuery || {
-        columns: [],
-        from: [],
-        orderby: null,
-        limit: null,
-        groupby: null,
-        where: null,
-      };
+  //     const parsedQuery: any = parser?.astify(filteredQuery);
+  //     return parsedQuery || {
+  //       columns: [],
+  //       from: [],
+  //       orderby: null,
+  //       limit: null,
+  //       groupby: null,
+  //       where: null,
+  //     };
 
-      // return convertPostgreToMySql(parser.astify(filteredQuery));
-    } catch (e: any) {
-      return {
-        columns: [],
-        from: [],
-        orderby: null,
-        limit: null,
-        groupby: null,
-        where: null,
-      };
-    }
-  };
+  //     // return convertPostgreToMySql(parser.astify(filteredQuery));
+  //   } catch (e: any) {
+  //     return {
+  //       columns: [],
+  //       from: [],
+  //       orderby: null,
+  //       limit: null,
+  //       groupby: null,
+  //       where: null,
+  //     };
+  //   }
+  // };
 
   // TODO OK : Replace backticks with double quotes, as stream name from sqlify is coming with backticks
-  const fnUnparsedSQL = (parsedObj: any) => {
-    try {
-      const sql = parser?.sqlify(parsedObj);
-      return sql || "";
-    } catch (e: any) {
-      console.info(`Error while unparsing SQL : ${e.message}`);
-      return "";
-    }
-  };
+  // const fnUnparsedSQL = (parsedObj: any) => {
+  //   try {
+  //     const sql = parser?.sqlify(parsedObj);
+  //     return sql || "";
+  //   } catch (e: any) {
+  //     console.info(`Error while unparsing SQL : ${e.message}`);
+  //     return "";
+  //   }
+  // };
 
   const getPageCount = async (queryReq: any) => {
     return new Promise((resolve, reject) => {
@@ -4436,210 +4211,210 @@ const useLogs = () => {
     }
   }
 
-  const searchAroundData = (obj: any) => {
-    try {
-      searchObj.loading = true;
-      searchObj.data.errorCode = 0;
-      searchObj.data.functionError = "";
-      const sqlContext: any = [];
-      let query_context: any = "";
-      const query = searchObj.data.query;
-      if (searchObj.meta.sqlMode == true) {
-        const parsedSQL: any = fnParsedSQL(query);
-        parsedSQL.where = null;
-        sqlContext.push(
-          b64EncodeUnicode(fnUnparsedSQL(parsedSQL).replace(/`/g, '"')),
-        );
-      } else {
-        const parseQuery = [query];
-        let queryFunctions = "";
-        let whereClause = "";
-        if (parseQuery.length > 1) {
-          queryFunctions = "," + parseQuery[0].trim();
-          whereClause = "";
-        } else {
-          whereClause = "";
-        }
-        query_context = `SELECT [FIELD_LIST]${queryFunctions} FROM "[INDEX_NAME]" `;
+  // const searchAroundData = (obj: any) => {
+  //   try {
+  //     searchObj.loading = true;
+  //     searchObj.data.errorCode = 0;
+  //     searchObj.data.functionError = "";
+  //     const sqlContext: any = [];
+  //     let query_context: any = "";
+  //     const query = searchObj.data.query;
+  //     if (searchObj.meta.sqlMode == true) {
+  //       const parsedSQL: any = fnParsedSQL(query);
+  //       parsedSQL.where = null;
+  //       sqlContext.push(
+  //         b64EncodeUnicode(fnUnparsedSQL(parsedSQL).replace(/`/g, '"')),
+  //       );
+  //     } else {
+  //       const parseQuery = [query];
+  //       let queryFunctions = "";
+  //       let whereClause = "";
+  //       if (parseQuery.length > 1) {
+  //         queryFunctions = "," + parseQuery[0].trim();
+  //         whereClause = "";
+  //       } else {
+  //         whereClause = "";
+  //       }
+  //       query_context = `SELECT [FIELD_LIST]${queryFunctions} FROM "[INDEX_NAME]" `;
 
-        if (!searchObj.meta.quickMode) {
-          query_context = query_context.replace("[FIELD_LIST]", "*");
-        }
+  //       if (!searchObj.meta.quickMode) {
+  //         query_context = query_context.replace("[FIELD_LIST]", "*");
+  //       }
 
-        // const preSQLQuery = req.query.sql;
-        const streamsData: any = searchObj.data.stream.selectedStream.filter(
-          (streams: any) =>
-            !searchObj.data.stream.missingStreamMultiStreamFilter.includes(
-              streams,
-            ),
-        );
+  //       // const preSQLQuery = req.query.sql;
+  //       const streamsData: any = searchObj.data.stream.selectedStream.filter(
+  //         (streams: any) =>
+  //           !searchObj.data.stream.missingStreamMultiStreamFilter.includes(
+  //             streams,
+  //           ),
+  //       );
 
-        let finalQuery: string = "";
-        streamsData.forEach((item: any) => {
-          finalQuery = query_context.replace("[INDEX_NAME]", item);
+  //       let finalQuery: string = "";
+  //       streamsData.forEach((item: any) => {
+  //         finalQuery = query_context.replace("[INDEX_NAME]", item);
 
-          const listOfFields: any = [];
-          let streamField: any = {};
-          for (const field of searchObj.data.stream.interestingFieldList) {
-            for (streamField of searchObj.data.stream.selectedStreamFields) {
-              if (
-                streamField?.name == field &&
-                streamField?.streams.indexOf(item) > -1
-              ) {
-                listOfFields.push(field);
-              }
-            }
-          }
+  //         const listOfFields: any = [];
+  //         let streamField: any = {};
+  //         for (const field of searchObj.data.stream.interestingFieldList) {
+  //           for (streamField of searchObj.data.stream.selectedStreamFields) {
+  //             if (
+  //               streamField?.name == field &&
+  //               streamField?.streams.indexOf(item) > -1
+  //             ) {
+  //               listOfFields.push(field);
+  //             }
+  //           }
+  //         }
 
-          let queryFieldList: string = "";
-          if (listOfFields.length > 0) {
-            queryFieldList = "," + listOfFields.join(",");
-          }
+  //         let queryFieldList: string = "";
+  //         if (listOfFields.length > 0) {
+  //           queryFieldList = "," + listOfFields.join(",");
+  //         }
 
-          finalQuery = finalQuery.replace(
-            "[FIELD_LIST]",
-            `'${item}' as _stream_name` + queryFieldList,
-          );
-          sqlContext.push(b64EncodeUnicode(finalQuery));
-        });
-      }
+  //         finalQuery = finalQuery.replace(
+  //           "[FIELD_LIST]",
+  //           `'${item}' as _stream_name` + queryFieldList,
+  //         );
+  //         sqlContext.push(b64EncodeUnicode(finalQuery));
+  //       });
+  //     }
 
-      let query_fn: any = "";
-      if (shouldAddFunctionToSearch()) {
-        query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent);
-      }
+  //     let query_fn: any = "";
+  //     if (shouldAddFunctionToSearch()) {
+  //       query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent);
+  //     }
 
-      let action_id: any = "";
+  //     let action_id: any = "";
 
-      if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
-        action_id = searchObj.data.selectedTransform.id;
-      }
+  //     if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
+  //       action_id = searchObj.data.selectedTransform.id;
+  //     }
 
-      let streamName: string = "";
-      if (searchObj.data.stream.selectedStream.length > 1) {
-        streamName =
-          b64EncodeUnicode(searchObj.data.stream.selectedStream.join(",")) ||
-          "";
-      } else {
-        streamName = searchObj.data.stream.selectedStream[0];
-      }
+  //     let streamName: string = "";
+  //     if (searchObj.data.stream.selectedStream.length > 1) {
+  //       streamName =
+  //         b64EncodeUnicode(searchObj.data.stream.selectedStream.join(",")) ||
+  //         "";
+  //     } else {
+  //       streamName = searchObj.data.stream.selectedStream[0];
+  //     }
 
-      const { traceparent, traceId } = generateTraceContext();
-      addTraceId(traceId);
+  //     const { traceparent, traceId } = generateTraceContext();
+  //     addTraceId(traceId);
 
-      searchService
-        .search_around({
-          org_identifier: searchObj.organizationIdentifier,
-          index: streamName,
-          key: obj.key,
-          size: obj.size,
-          body: obj.body,
-          query_context: sqlContext,
-          query_fn: query_fn,
-          stream_type: searchObj.data.stream.streamType,
-          regions: searchObj.meta.hasOwnProperty("regions")
-            ? searchObj.meta.regions.join(",")
-            : "",
-          clusters: searchObj.meta.hasOwnProperty("clusters")
-            ? searchObj.meta.clusters.join(",")
-            : "",
-          action_id,
-          is_multistream:
-            searchObj.data.stream.selectedStream.length > 1 ? true : false,
-          traceparent,
-        })
-        .then((res) => {
-          searchObj.loading = false;
-          searchObj.data.histogram.chartParams.title = "";
-          if (res.data.from > 0) {
-            searchObj.data.queryResults.from = res.data.from;
-            searchObj.data.queryResults.scan_size += res.data.scan_size;
-            searchObj.data.queryResults.took += res.data.took;
-            searchObj.data.queryResults.hits.push(...res.data.hits);
-          } else {
-            searchObj.data.queryResults = res.data;
-          }
-          //extract fields from query response
-          extractFields();
-          generateHistogramSkeleton();
-          generateHistogramData();
-          //update grid columns
-          updateGridColumns();
-          filterHitsColumns();
+  //     searchService
+  //       .search_around({
+  //         org_identifier: searchObj.organizationIdentifier,
+  //         index: streamName,
+  //         key: obj.key,
+  //         size: obj.size,
+  //         body: obj.body,
+  //         query_context: sqlContext,
+  //         query_fn: query_fn,
+  //         stream_type: searchObj.data.stream.streamType,
+  //         regions: searchObj.meta.hasOwnProperty("regions")
+  //           ? searchObj.meta.regions.join(",")
+  //           : "",
+  //         clusters: searchObj.meta.hasOwnProperty("clusters")
+  //           ? searchObj.meta.clusters.join(",")
+  //           : "",
+  //         action_id,
+  //         is_multistream:
+  //           searchObj.data.stream.selectedStream.length > 1 ? true : false,
+  //         traceparent,
+  //       })
+  //       .then((res) => {
+  //         searchObj.loading = false;
+  //         searchObj.data.histogram.chartParams.title = "";
+  //         if (res.data.from > 0) {
+  //           searchObj.data.queryResults.from = res.data.from;
+  //           searchObj.data.queryResults.scan_size += res.data.scan_size;
+  //           searchObj.data.queryResults.took += res.data.took;
+  //           searchObj.data.queryResults.hits.push(...res.data.hits);
+  //         } else {
+  //           searchObj.data.queryResults = res.data;
+  //         }
+  //         //extract fields from query response
+  //         extractFields();
+  //         generateHistogramSkeleton();
+  //         generateHistogramData();
+  //         //update grid columns
+  //         updateGridColumns();
+  //         filterHitsColumns();
 
-          if (searchObj.meta.showHistogram) {
-            searchObj.meta.showHistogram = false;
-            searchObj.data.searchAround.histogramHide = true;
-          }
+  //         if (searchObj.meta.showHistogram) {
+  //           searchObj.meta.showHistogram = false;
+  //           searchObj.data.searchAround.histogramHide = true;
+  //         }
 
-          searchObj.data.histogram.chartParams.title = "";
-          // segment.track("Button Click", {
-          //   button: "Search Around Data",
-          //   user_org: store.state.selectedOrganization.identifier,
-          //   user_id: store.state.userInfo.email,
-          //   stream_name: searchObj.data.stream.selectedStream.value,
-          //   show_timestamp: obj.key,
-          //   show_size: obj.size,
-          //   show_histogram: searchObj.meta.showHistogram,
-          //   sqlMode: searchObj.meta.sqlMode,
-          //   showFields: searchObj.meta.showFields,
-          //   page: "Search Logs - Search around data",
-          // });
+  //         searchObj.data.histogram.chartParams.title = "";
+  //         // segment.track("Button Click", {
+  //         //   button: "Search Around Data",
+  //         //   user_org: store.state.selectedOrganization.identifier,
+  //         //   user_id: store.state.userInfo.email,
+  //         //   stream_name: searchObj.data.stream.selectedStream.value,
+  //         //   show_timestamp: obj.key,
+  //         //   show_size: obj.size,
+  //         //   show_histogram: searchObj.meta.showHistogram,
+  //         //   sqlMode: searchObj.meta.sqlMode,
+  //         //   showFields: searchObj.meta.showFields,
+  //         //   page: "Search Logs - Search around data",
+  //         // });
 
-          // const visibleIndex =
-          //   obj.size > 30 ? obj.size / 2 - 12 : obj.size / 2;
-          // setTimeout(() => {
-          //   searchResultRef.value.searchTableRef.scrollTo(
-          //     visibleIndex,
-          //     "start-force"
-          //   );
-          // }, 500);
-        })
-        .catch((err) => {
-          let trace_id = "";
-          searchObj.data.errorMsg = "Error while processing search request.";
-          if (err.response != undefined) {
-            searchObj.data.errorMsg = err.response.data.error;
-            searchObj.data.errorDetail = err.response.data.error_detail;
-            if (err.response.data.hasOwnProperty("trace_id")) {
-              trace_id = err.response.data?.trace_id;
-            }
-          } else {
-            searchObj.data.errorMsg = err.message;
-            if (err.hasOwnProperty("trace_id")) {
-              trace_id = err?.trace_id;
-            }
-          }
+  //         // const visibleIndex =
+  //         //   obj.size > 30 ? obj.size / 2 - 12 : obj.size / 2;
+  //         // setTimeout(() => {
+  //         //   searchResultRef.value.searchTableRef.scrollTo(
+  //         //     visibleIndex,
+  //         //     "start-force"
+  //         //   );
+  //         // }, 500);
+  //       })
+  //       .catch((err) => {
+  //         let trace_id = "";
+  //         searchObj.data.errorMsg = "Error while processing search request.";
+  //         if (err.response != undefined) {
+  //           searchObj.data.errorMsg = err.response.data.error;
+  //           searchObj.data.errorDetail = err.response.data.error_detail;
+  //           if (err.response.data.hasOwnProperty("trace_id")) {
+  //             trace_id = err.response.data?.trace_id;
+  //           }
+  //         } else {
+  //           searchObj.data.errorMsg = err.message;
+  //           if (err.hasOwnProperty("trace_id")) {
+  //             trace_id = err?.trace_id;
+  //           }
+  //         }
 
-          const customMessage = logsErrorMessage(err.response?.data?.code);
-          searchObj.data.errorCode = err.response?.data?.code;
-          if (customMessage != "") {
-            searchObj.data.errorMsg = customMessage;
-          }
+  //         const customMessage = logsErrorMessage(err.response?.data?.code);
+  //         searchObj.data.errorCode = err.response?.data?.code;
+  //         if (customMessage != "") {
+  //           searchObj.data.errorMsg = customMessage;
+  //         }
 
-          if (err?.request?.status >= 429 || err?.request?.status == 400) {
-            notificationMsg.value = err?.response?.data?.message;
-            searchObj.data.errorMsg = err?.response?.data?.message;
-          }
+  //         if (err?.request?.status >= 429 || err?.request?.status == 400) {
+  //           notificationMsg.value = err?.response?.data?.message;
+  //           searchObj.data.errorMsg = err?.response?.data?.message;
+  //         }
 
-          if (trace_id) {
-            searchObj.data.errorMsg +=
-              " <br><span class='text-subtitle1'>TraceID:" +
-              trace_id +
-              "</span>";
-            trace_id = "";
-          }
-        })
-        .finally(() => {
-          removeTraceId(traceId);
+  //         if (trace_id) {
+  //           searchObj.data.errorMsg +=
+  //             " <br><span class='text-subtitle1'>TraceID:" +
+  //             trace_id +
+  //             "</span>";
+  //           trace_id = "";
+  //         }
+  //       })
+  //       .finally(() => {
+  //         removeTraceId(traceId);
 
-          searchObj.loading = false;
-        });
-    } catch (e: any) {
-      searchObj.loading = false;
-      showErrorNotification("Error while fetching data");
-    }
-  };
+  //         searchObj.loading = false;
+  //       });
+  //   } catch (e: any) {
+  //     searchObj.loading = false;
+  //     showErrorNotification("Error while fetching data");
+  //   }
+  // };
 
   const refreshData = () => {
     try {
@@ -7196,7 +6971,6 @@ const useLogs = () => {
     extractFields,
     getQueryData,
     getJobData,
-    searchAroundData,
     updateGridColumns,
     refreshData,
     updateUrlQueryParams,
@@ -7217,7 +6991,6 @@ const useLogs = () => {
     getHistogramQueryData,
     generateHistogramSkeleton,
     fnParsedSQL,
-    fnUnparsedSQL,
     getRegionInfo,
     validateFilterForMultiStream,
     cancelQuery,
@@ -7260,7 +7033,11 @@ const useLogs = () => {
     getVisualizationConfig,
     encodeVisualizationConfig,
     decodeVisualizationConfig,
-    streamSchemaFieldsIndexMapping
+    streamSchemaFieldsIndexMapping,
+    shouldAddFunctionToSearch,
+    notificationMsg,
+    removeTraceId,
+    showErrorNotification
   };
 };
 
