@@ -468,6 +468,7 @@ export default defineComponent({
       logout_confirm,
       loggedInUserEmail,
       filterdOption,
+      invalidateLoginData,
       filterFn(val: any, update: any) {
         if (val === "") {
           update(() => {
@@ -506,7 +507,7 @@ export default defineComponent({
   methods: {
     signout() {
       if (config.isEnterprise == "true") {
-        invalidateLoginData();
+        this.invalidateLoginData();
       }
 
       this.store.dispatch("logout");
