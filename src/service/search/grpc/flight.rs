@@ -19,6 +19,7 @@ use ::datafusion::{
     common::tree_node::TreeNode, datasource::TableProvider, physical_plan::ExecutionPlan,
     prelude::SessionContext,
 };
+use arrow_schema::Schema;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -53,7 +54,9 @@ use crate::service::{
                 rewrite::tantivy_optimize_rewrite,
             },
             exec::{DataFusionContextBuilder, register_udf},
-            optimizer::physical_optimizer::index::IndexRule,
+            optimizer::physical_optimizer::{
+                index::IndexRule, rewrite_match::RewriteMatchPhysical,
+            },
             table_provider::{enrich_table::EnrichTable, uniontable::NewUnionTable},
         },
         grpc::QueryParams,
@@ -174,6 +177,8 @@ pub async fn search(
     let mut physical_plan = optimizer_physical_plan(
         physical_plan,
         &ctx,
+        &latest_schema,
+        fst_fields.clone(),
         index_fields,
         index_condition_ref.clone(),
     )?;
@@ -367,6 +372,8 @@ pub async fn search(
 fn optimizer_physical_plan(
     plan: Arc<dyn ExecutionPlan>,
     ctx: &SessionContext,
+    schema: &Schema,
+    fst_fields: Vec<String>,
     index_fields: Vec<String>,
     index_condition_ref: Arc<Mutex<Option<IndexCondition>>>,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
@@ -376,6 +383,21 @@ fn optimizer_physical_plan(
     }
     let index_rule = IndexRule::new(index_fields.iter().cloned().collect(), index_condition_ref);
     let plan = index_rule.optimize(plan, ctx.state().config_options())?;
+
+    let rewrite_match_rule = RewriteMatchPhysical::new(
+        fst_fields
+            .clone()
+            .into_iter()
+            .map(|f| {
+                (
+                    f.clone(),
+                    schema.field_with_name(&f).unwrap().data_type().clone(),
+                )
+            })
+            .collect(),
+    );
+    let plan = rewrite_match_rule.optimize(plan, ctx.state().config_options())?;
+
     Ok(plan)
 }
 
