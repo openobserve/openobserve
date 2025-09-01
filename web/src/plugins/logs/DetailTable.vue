@@ -357,6 +357,7 @@ import JsonPreview from "./JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
+import { fnParsedSQL } from "@/composables/useLogs/logsUtils";
 
 const defaultValue: any = () => {
   return {
@@ -432,7 +433,8 @@ export default defineComponent({
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
     const shouldWrapValues: any = ref(true);
-    const { searchObj, fnParsedSQL, hasAggregation } = useLogs();
+    const { searchObj, hasAggregation } = useLogs();
+
     const $q = useQuasar();
     let multiStreamFields: any = ref([]);
     let hasAggregationQuery: any = computed(() => {

@@ -395,6 +395,7 @@ import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import useAiChat from "@/composables/useAiChat";
 import queryService from "@/services/search";
+import { fnParsedSQL, fnUnparsedSQL } from "@/composables/useLogs/logsUtils";
 
 export default defineComponent({
   name: "PageSearch",
@@ -564,7 +565,6 @@ export default defineComponent({
       resetStreamData,
       getHistogramQueryData,
       generateHistogramSkeleton,
-      fnParsedSQL,
       getRegionInfo,
       getStreamList,
       getFunctions,
@@ -579,7 +579,6 @@ export default defineComponent({
       isDistinctQuery,
       isWithQuery,
       getStream,
-      fnUnparsedSQL,
       initialLogsState,
       clearSearchObj,
       setCommunicationMethod,
