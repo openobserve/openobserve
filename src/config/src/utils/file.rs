@@ -22,6 +22,7 @@ use std::{
 
 use async_recursion::async_recursion;
 use async_walkdir::WalkDir;
+use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 use futures::StreamExt;
 
 #[inline(always)]
@@ -84,6 +85,60 @@ pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Err
     Ok(())
 }
 
+pub fn wal_dir_datetime_filter_builder(
+    start_time: DateTime<Utc>,
+    end_time: DateTime<Utc>,
+    extension_pattern: String,
+    skip_count: usize,
+) -> impl Fn(PathBuf) -> bool + Send + Clone + 'static {
+    move |path: PathBuf| {
+        let mut components = path
+            .components()
+            .skip(skip_count)
+            .map(|c| c.as_os_str())
+            .filter_map(|osc| osc.to_str());
+
+        let year = components
+            .next()
+            .map(|c| c.parse::<i32>().ok())
+            .flatten()
+            .unwrap_or_default();
+        let month = components
+            .next()
+            .map(|c| c.parse::<u32>().ok())
+            .flatten()
+            .unwrap_or(start_time.month());
+        let day = components
+            .next()
+            .map(|c| c.parse::<u32>().ok())
+            .flatten()
+            .unwrap_or(start_time.day());
+        let hour = components
+            .next()
+            .map(|c| c.parse::<u32>().ok())
+            .flatten()
+            .unwrap_or(start_time.hour());
+
+        let date_range_check = if 0 == year {
+            return false;
+        } else {
+            if let Some(datetime) = Utc.with_ymd_and_hms(year, month, day, hour, 0, 0).single() {
+                datetime >= start_time && datetime <= end_time
+            } else {
+                false
+            }
+        };
+
+        date_range_check
+            && (!path.is_file()
+                || path
+                    .extension()
+                    .map(|extension| extension.to_str().map(|s| s == extension_pattern))
+                    .flatten()
+                    .unwrap_or_default())
+    }
+}
+
 pub async fn scan_files_filtered<P, F>(
     root: P,
     filter: F,
@@ -94,13 +149,16 @@ where
     F: Fn(PathBuf) -> bool + Send + Clone + 'static,
 {
     let walker = WalkDir::new(root).filter(move |entry| {
-        let path = entry.path().to_path_buf();
+        let path = entry.path().clone();
         let filter = filter.clone();
         async move {
-            if path.is_dir() && !filter(path) {
+            let is_dir = path.is_dir();
+            if filter(path) {
+                async_walkdir::Filtering::Continue
+            } else if is_dir {
                 async_walkdir::Filtering::IgnoreDir
             } else {
-                async_walkdir::Filtering::Continue
+                async_walkdir::Filtering::Ignore
             }
         }
     });
@@ -108,11 +166,15 @@ where
     let walker = walker.filter_map(|item| async {
         item.ok()
             .map(|dir_entry| {
-                dir_entry
-                    .path()
-                    .canonicalize()
-                    .ok()
-                    .and_then(|cpath| cpath.to_str().map(String::from))
+                let pb = dir_entry.path();
+
+                if !pb.is_file() {
+                    None
+                } else {
+                    pb.canonicalize()
+                        .ok()
+                        .and_then(|cpath| cpath.to_str().map(String::from))
+                }
             })
             .flatten()
     });
@@ -228,6 +290,7 @@ pub fn set_permission<P: AsRef<std::path::Path>>(
 mod tests {
     use std::fs;
 
+    use chrono::{TimeZone, Utc};
     use tempfile::TempDir;
 
     use super::*;
@@ -497,5 +560,70 @@ mod tests {
             let has_symlink = files.iter().any(|f| f.ends_with("symlink.txt"));
             assert!(has_symlink);
         }
+    }
+
+    #[tokio::test]
+    async fn test_scan_files_filtered_basic() {
+        let years = vec![2025];
+        let months: Vec<_> = (9..=10).collect();
+        let days: Vec<_> = (8..=11).collect();
+        let hours: Vec<_> = (1..=5).collect();
+        let filenames: Vec<_> = vec!["a", "b", "c", "d"];
+        let extensions = vec!["parquet", "blink"];
+
+        let temp_dir = tempfile::tempdir().expect("Temp dir");
+
+        let root = temp_dir.path();
+
+        for year in years {
+            for month in &months {
+                for day in &days {
+                    for hour in &hours {
+                        tokio::fs::create_dir_all(format!(
+                            "{}/{}/{}/{}/{}",
+                            root.display(),
+                            year,
+                            month,
+                            day,
+                            hour
+                        ))
+                        .await
+                        .expect("Pretest setup failure");
+
+                        for filename in &filenames {
+                            for extension in &extensions {
+                                tokio::fs::File::create(format!(
+                                    "{}/{}/{}/{}/{}/{}.{}",
+                                    root.display(),
+                                    year,
+                                    month,
+                                    day,
+                                    hour,
+                                    filename,
+                                    extension
+                                ))
+                                .await
+                                .expect("Pretest setup failure");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let start_time = Utc.with_ymd_and_hms(2025, 9, 10, 2, 0, 0).single().unwrap();
+        let end_time = Utc.with_ymd_and_hms(2025, 9, 10, 4, 0, 0).single().unwrap();
+        // 3 hours (2, 3, 4 - inclusive matching) - 4 parquet files per hour -> 12 files in total
+        let filter = wal_dir_datetime_filter_builder(
+            start_time,
+            end_time,
+            "parquet".to_string(),
+            PathBuf::from(root).components().count(),
+        );
+        let files = scan_files_filtered(root, filter, None)
+            .await
+            .expect("Basic Test Failure");
+
+        assert_eq!(files.len(), 12);
     }
 }

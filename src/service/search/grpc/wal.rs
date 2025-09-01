@@ -13,14 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{path::Path, sync::Arc};
 
 use arrow::array::{ArrayRef, new_null_array};
 use arrow_schema::{DataType, Field};
-use chrono::{DateTime, TimeZone, Utc, offset::LocalResult};
+use chrono::DateTime;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -29,7 +26,7 @@ use config::{
         stream::{FileKey, StreamParams, StreamPartition},
     },
     utils::{
-        file::{is_exists, scan_files_filtered},
+        file::{is_exists, scan_files_filtered, wal_dir_datetime_filter_builder},
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
         record_batch_ext::concat_batches,
         size::bytes_to_human_readable,
@@ -586,54 +583,8 @@ async fn get_file_list_inner(
     {
         let skip_count = AsRef::<Path>::as_ref(&pattern).components().count();
         let extension_pattern = file_ext.to_string();
-        let filter = move |path: PathBuf| {
-            let mut components = path
-                .components()
-                .skip(skip_count)
-                .map(|c| c.as_os_str())
-                .filter_map(|osc| osc.to_str());
-
-            let year = components
-                .next()
-                .map(|c| c.parse::<i32>().ok())
-                .flatten()
-                .unwrap_or_default();
-            let month = components
-                .next()
-                .map(|c| c.parse::<u32>().ok())
-                .flatten()
-                .unwrap_or_default();
-            let day = components
-                .next()
-                .map(|c| c.parse::<u32>().ok())
-                .flatten()
-                .unwrap_or_default();
-            let hour = components
-                .next()
-                .map(|c| c.parse::<u32>().ok())
-                .flatten()
-                .unwrap_or_default();
-
-            let date_range_check = if 0 == year {
-                return false;
-            } else {
-                if let LocalResult::Single(datetime) =
-                    Utc.with_ymd_and_hms(year, month, day, hour, 0, 0)
-                {
-                    datetime >= start_time && datetime <= end_time
-                } else {
-                    false
-                }
-            };
-
-            date_range_check
-                && (!path.is_file()
-                    || path
-                        .extension()
-                        .map(|extension| extension.to_str().map(|s| s == extension_pattern))
-                        .flatten()
-                        .unwrap_or_default())
-        };
+        let filter =
+            wal_dir_datetime_filter_builder(start_time, end_time, extension_pattern, skip_count);
 
         scan_files_filtered(&pattern, filter, None).await?
     } else {
