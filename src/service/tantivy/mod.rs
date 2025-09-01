@@ -62,13 +62,15 @@ pub(crate) async fn create_tantivy_index(
     let puffin_bytes = dir.to_puffin_bytes()?;
     let index_size = puffin_bytes.len();
 
-    // write fst bytes into disk
+    // write tantivy bytes into disk
     let Some(idx_file_name) = convert_parquet_file_name_to_tantivy_file(parquet_file_name) else {
         return Ok(0);
     };
 
-    if get_config().cache_latest_files.cache_index
-        && get_config().cache_latest_files.download_from_node
+    let cfg = get_config();
+    if cfg.cache_latest_files.enabled
+        && cfg.cache_latest_files.cache_index
+        && cfg.cache_latest_files.download_from_node
     {
         infra::cache::file_data::disk::set(&idx_file_name, Bytes::from(puffin_bytes.clone()))
             .await?;
