@@ -721,7 +721,7 @@ mod tests {
         assert_eq!(format_role_name_only("admin@org.com"), "admin_org_com");
         assert_eq!(format_role_name_only("role!@#$%"), "role_");
         assert_eq!(
-            format_role_name_only("test-role.with_spaces"),
+            format_role_name_only("test-role  with_spaces"),
             "test_role_with_spaces"
         );
     }

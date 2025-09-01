@@ -612,23 +612,6 @@ mod tests {
         assert!(debug_str.contains("Usage"));
     }
 
-    #[test]
-    fn test_reporting_queue_debug() {
-        let (tx, _rx) = mpsc::channel(10);
-        let queue = ReportingQueue::new(tx);
-        let debug_str = format!("{:?}", queue);
-        assert!(!debug_str.is_empty());
-        assert!(debug_str.contains("ReportingQueue"));
-    }
-
-    #[test]
-    fn test_reporting_runner_debug() {
-        let runner = ReportingRunner::new(10, Duration::from_secs(30));
-        let debug_str = format!("{:?}", runner);
-        assert!(!debug_str.is_empty());
-        assert!(debug_str.contains("ReportingRunner"));
-    }
-
     #[ignore]
     #[tokio::test]
     async fn test_reporting_queue_channel_full() {

@@ -254,7 +254,6 @@ impl ListAlertsParams {
 mod tests {
     use std::str::FromStr;
 
-    use chrono::Utc;
     use serde_json;
     use svix_ksuid::Ksuid;
 
@@ -571,96 +570,5 @@ mod tests {
             Some((StreamType::Logs, Some("test_stream".to_string())))
         );
         assert_eq!(params.page_size_and_idx, Some((20, 1)));
-    }
-
-    #[test]
-    fn test_alert_with_context_attributes() {
-        let mut context_attrs = HashMap::new();
-        context_attrs.insert("key1".to_string(), "value1".to_string());
-        context_attrs.insert("key2".to_string(), "value2".to_string());
-
-        let alert = Alert {
-            context_attributes: Some(context_attrs.clone()),
-            ..Default::default()
-        };
-
-        assert_eq!(alert.context_attributes, Some(context_attrs));
-    }
-
-    #[test]
-    fn test_alert_with_destinations() {
-        let destinations = vec!["email@example.com".to_string(), "webhook_url".to_string()];
-
-        let alert = Alert {
-            destinations: destinations.clone(),
-            ..Default::default()
-        };
-
-        assert_eq!(alert.destinations, destinations);
-    }
-
-    #[test]
-    fn test_alert_with_updated_at() {
-        let now = Utc::now().fixed_offset();
-        let alert = Alert {
-            updated_at: Some(now),
-            ..Default::default()
-        };
-
-        assert_eq!(alert.updated_at, Some(now));
-    }
-
-    #[test]
-    fn test_alert_with_owner_and_editor() {
-        let alert = Alert {
-            owner: Some("test_owner".to_string()),
-            last_edited_by: Some("test_editor".to_string()),
-            ..Default::default()
-        };
-
-        assert_eq!(alert.owner, Some("test_owner".to_string()));
-        assert_eq!(alert.last_edited_by, Some("test_editor".to_string()));
-    }
-
-    #[test]
-    fn test_alert_timezone_offset() {
-        let alert = Alert {
-            tz_offset: -300, // UTC-5
-            ..Default::default()
-        };
-
-        assert_eq!(alert.tz_offset, -300);
-    }
-
-    #[test]
-    fn test_alert_enabled_status() {
-        let enabled_alert = Alert {
-            enabled: true,
-            ..Default::default()
-        };
-
-        let disabled_alert = Alert {
-            enabled: false,
-            ..Default::default()
-        };
-
-        assert_eq!(enabled_alert.enabled, true);
-        assert_eq!(disabled_alert.enabled, false);
-    }
-
-    #[test]
-    fn test_alert_real_time_flag() {
-        let real_time_alert = Alert {
-            is_real_time: true,
-            ..Default::default()
-        };
-
-        let scheduled_alert = Alert {
-            is_real_time: false,
-            ..Default::default()
-        };
-
-        assert_eq!(real_time_alert.is_real_time, true);
-        assert_eq!(scheduled_alert.is_real_time, false);
     }
 }

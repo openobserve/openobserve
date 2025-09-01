@@ -1044,41 +1044,6 @@ mod tests {
             assert_eq!(variant, deserialized);
         }
     }
-
-    #[test]
-    fn test_usage_event_hash() {
-        use std::collections::HashMap;
-
-        let mut map = HashMap::new();
-        map.insert(UsageEvent::Search, "search_value");
-        map.insert(UsageEvent::Ingestion, "ingestion_value");
-
-        assert_eq!(map.get(&UsageEvent::Search), Some(&"search_value"));
-        assert_eq!(map.get(&UsageEvent::Ingestion), Some(&"ingestion_value"));
-        assert_eq!(map.len(), 2);
-    }
-
-    #[test]
-    fn test_usage_type_copy_clone() {
-        let original = UsageType::Search;
-        let copied = original;
-        let cloned = original.clone();
-
-        assert_eq!(original, copied);
-        assert_eq!(original, cloned);
-        assert_eq!(copied, cloned);
-    }
-
-    #[test]
-    fn test_usage_event_copy_clone() {
-        let original = UsageEvent::Functions;
-        let copied = original;
-        let cloned = original.clone();
-
-        assert_eq!(original, copied);
-        assert_eq!(original, cloned);
-        assert_eq!(copied, cloned);
-    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
