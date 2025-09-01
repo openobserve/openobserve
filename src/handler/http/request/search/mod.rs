@@ -973,6 +973,7 @@ pub async fn build_search_request_per_field(
 // sql query in the query are stored in distinct stream,
 // this will search on the distinct stream, otherwise
 // just search on the original data
+#[allow(clippy::too_many_arguments)]
 async fn values_v1(
     org_id: &str,
     stream_type: StreamType,
