@@ -2,6 +2,7 @@ import { mount } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import ErrorsDashboard from "./ErrorsDashboard.vue";
 import { createI18n } from "vue-i18n";
+import { onMounted } from "vue";
 
 // Mock services and utilities
 vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
@@ -46,6 +47,18 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore
 }));
 
+// Mock onMounted to prevent automatic execution
+let mountedCallback: (() => void) | null = null;
+vi.mock("vue", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("vue")>();
+  return {
+    ...actual,
+    onMounted: vi.fn((callback: () => void) => {
+      mountedCallback = callback;
+    })
+  };
+});
+
 const i18n = createI18n({
   locale: "en",
   messages: {
@@ -74,8 +87,11 @@ describe("ErrorsDashboard", () => {
     }
   };
 
-  const createWrapper = (props = {}) => {
-    return mount(ErrorsDashboard, {
+  const createWrapper = (props = {}, options = {}) => {
+    // Reset mounted callback before each test
+    mountedCallback = null;
+    
+    const wrapper = mount(ErrorsDashboard, {
       props: {
         ...defaultProps,
         ...props
@@ -104,6 +120,18 @@ describe("ErrorsDashboard", () => {
         }
       }
     });
+    
+    // Initialize variablesData to prevent null reference errors
+    wrapper.vm.variablesData = options.variablesData || { isVariablesLoading: false, values: [] };
+    
+    // Add helper method to trigger mounted lifecycle
+    wrapper.triggerMounted = async () => {
+      if (mountedCallback) {
+        await mountedCallback();
+      }
+    };
+    
+    return wrapper;
   };
 
   beforeEach(() => {
@@ -150,25 +178,23 @@ describe("ErrorsDashboard", () => {
 
   describe("Dashboard Loading", () => {
     beforeEach(() => {
-      wrapper = createWrapper();
+      wrapper = createWrapper({}, { variablesData: { isVariablesLoading: true, values: [] } });
     });
 
     it("should load dashboard data", async () => {
       expect(wrapper.vm.loadDashboard).toBeInstanceOf(Function);
-      wrapper.vm.variablesData = { isVariablesLoading: true, values: [] };
-      await wrapper.vm.loadDashboard();
+      await wrapper.triggerMounted();
       expect(wrapper.vm.currentDashboardData.data).toBeTruthy();
     });
   });
 
   describe("Variables Management", () => {
     beforeEach(() => {
-      wrapper = createWrapper();
+      wrapper = createWrapper({}, { variablesData: { old: "data" } });
     });
 
     it("should update variables data when data changes", () => {
       const newData = { variable1: "value1" };
-      wrapper.vm.variablesData = { old: "data" };
       
       wrapper.vm.variablesDataUpdated(newData);
       
