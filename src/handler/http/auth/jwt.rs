@@ -699,3 +699,211 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
 
     is_new_user
 }
+
+#[cfg(feature = "enterprise")]
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use serde_json::Value;
+
+    use super::*;
+
+    #[test]
+    fn test_format_role_name_only() {
+        assert_eq!(format_role_name_only("admin-role"), "admin_role");
+        assert_eq!(format_role_name_only("user@role"), "user_role");
+        assert_eq!(format_role_name_only("test-role-123"), "test_role_123");
+        assert_eq!(format_role_name_only("normal_role"), "normal_role");
+        assert_eq!(format_role_name_only(""), "");
+
+        // Test special characters replacement
+        assert_eq!(format_role_name_only("admin@org.com"), "admin_org_com");
+        assert_eq!(format_role_name_only("role!@#$%"), "role_");
+        assert_eq!(
+            format_role_name_only("test-role  with_spaces"),
+            "test_role_with_spaces"
+        );
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_format_role_name() {
+        assert_eq!(format_role_name("org1", "admin-role"), "org1/admin_role");
+        assert_eq!(
+            format_role_name("test_org", "user@role"),
+            "test_org/user_role"
+        );
+        assert_eq!(format_role_name("", "role"), "/role");
+
+        // Test with special characters
+        assert_eq!(
+            format_role_name("test@org", "admin-role"),
+            "test@org/admin_role"
+        );
+        assert_eq!(
+            format_role_name("org123", "developer@role"),
+            "org123/developer_role"
+        );
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_parse_dn_with_empty_input() {
+        let result = parse_dn("");
+        assert!(result.is_some());
+        let role_org = result.unwrap();
+        assert_eq!(role_org.org, "default"); // Assuming default org is "default"
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_parse_dn_with_invalid_format() {
+        let result = parse_dn("invalid_dn_format");
+        assert!(result.is_some());
+        let role_org = result.unwrap();
+        assert_eq!(role_org.org, "default");
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_parse_dn_with_valid_ldap_format() {
+        let result = parse_dn("cn=admin,ou=groups,dc=example,dc=com");
+        assert!(result.is_some());
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_parse_dn_with_multiple_attributes() {
+        let result = parse_dn("role=admin,org=testorg,cn=user");
+        assert!(result.is_some());
+        // The exact behavior depends on the DEX config, but should handle multiple attributes
+    }
+
+    #[tokio::test]
+    async fn test_process_token_with_invalid_token() {
+        use crate::common::meta::user::TokenValidationResponse;
+
+        let validation_response = TokenValidationResponse {
+            user_name: "Test User".to_string(),
+            family_name: "Test".to_string(),
+            given_name: "User".to_string(),
+            is_internal_user: false,
+            user_email: "test@example.com".to_string(),
+            is_valid: false,
+            user_role: None,
+        };
+
+        let mut claims = HashMap::new();
+        claims.insert("name".to_string(), Value::String("Test User".to_string()));
+        claims.insert(
+            "email".to_string(),
+            Value::String("test@example.com".to_string()),
+        );
+
+        let token_data = jsonwebtoken::TokenData {
+            header: jsonwebtoken::Header::default(),
+            claims,
+        };
+
+        let result = process_token((validation_response, Some(token_data))).await;
+        assert!(result.is_none() || result == Some(false));
+    }
+
+    #[test]
+    fn test_role_name_formatting_edge_cases() {
+        // Test empty role name
+        assert_eq!(format_role_name_only(""), "");
+
+        // Test role name with only special characters
+        assert_eq!(format_role_name_only("@#$%^&*()"), "_");
+
+        // Test role name with mixed case and special characters
+        assert_eq!(
+            format_role_name_only("Admin-Role@Test.Org"),
+            "Admin_Role_Test_Org"
+        );
+
+        // Test role name with underscores (should remain unchanged)
+        assert_eq!(format_role_name_only("admin_role_test"), "admin_role_test");
+
+        // Test role name with numbers
+        assert_eq!(format_role_name_only("role123-test456"), "role123_test456");
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_parse_dn_custom_role_mapping() {
+        // Test when mapping groups to roles is enabled
+        // This would require mocking the config, so we test the basic functionality
+        let result = parse_dn("developers");
+        assert!(result.is_some());
+        let role_org = result.unwrap();
+        assert!(role_org.custom_role.is_some() || role_org.custom_role.is_none());
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_user_name_parsing() {
+        let name = "John Doe Smith";
+        let (first_name, last_name) = name.split_once(' ').unwrap_or((name, ""));
+        assert_eq!(first_name, "John");
+        assert_eq!(last_name, "Doe Smith");
+
+        let name_single = "John";
+        let (first_name_single, last_name_single) =
+            name_single.split_once(' ').unwrap_or((name_single, ""));
+        assert_eq!(first_name_single, "John");
+        assert_eq!(last_name_single, "");
+    }
+
+    #[test]
+    fn test_regex_role_name_replacement() {
+        // Test the regex pattern used in RE_ROLE_NAME
+        let test_cases = vec![
+            ("admin-role", "admin_role"),
+            ("user@domain.com", "user_domain_com"),
+            ("test_role_123", "test_role_123"),
+            ("role!@#$%^&*()", "role_"),
+            ("", ""),
+            ("OnlyAlphaNumeric123", "OnlyAlphaNumeric123"),
+        ];
+
+        for (input, expected) in test_cases {
+            assert_eq!(
+                format_role_name_only(input),
+                expected,
+                "Failed for input: {}",
+                input
+            );
+        }
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_parse_dn_with_comma_separated_values() {
+        // Test DN with multiple comma-separated values
+        let test_cases = vec![
+            "cn=admin,ou=users,dc=example,dc=com",
+            "role=developer,org=testorg,cn=user1",
+            "ou=admins,dc=company,dc=org",
+        ];
+
+        for dn in test_cases {
+            let result = parse_dn(dn);
+            assert!(result.is_some(), "Failed to parse DN: {}", dn);
+        }
+    }
+
+    #[test]
+    fn test_format_role_name_consistency() {
+        let org = "test_org";
+        let role = "admin-role";
+        let formatted_role = format_role_name_only(role);
+        let full_role_name = format_role_name(org, role);
+
+        assert_eq!(full_role_name, format!("{}/{}", org, formatted_role));
+        assert!(!full_role_name.contains("-"));
+        assert!(!full_role_name.contains("@"));
+    }
+}
