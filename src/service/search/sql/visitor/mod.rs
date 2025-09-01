@@ -19,6 +19,7 @@ pub mod column;
 #[cfg(feature = "enterprise")]
 pub mod group_by;
 pub mod histogram_interval;
+#[allow(dead_code)]
 pub mod index_optimize;
 pub mod match_all;
 pub mod partition_column;

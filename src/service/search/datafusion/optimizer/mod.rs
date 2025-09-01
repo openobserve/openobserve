@@ -37,7 +37,6 @@ use datafusion::{
     physical_plan::ExecutionPlan,
     prelude::SessionContext,
 };
-use infra::schema::get_stream_setting_fts_fields;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::search::datafusion::optimizer::context::generate_streaming_agg_rules,
@@ -55,7 +54,6 @@ use crate::service::search::{
         logical_optimizer::{
             add_sort_and_limit::AddSortAndLimitRule, add_timestamp::AddTimestampRule,
             limit_join_right_side::LimitJoinRightSide, rewrite_histogram::RewriteHistogram,
-            rewrite_match::RewriteMatch,
         },
         physical_optimizer::{
             distribute_analyze::optimize_distribute_analyze, join_reorder::JoinReorderRule,
@@ -99,23 +97,23 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
 
     let mut rules: Vec<Arc<dyn OptimizerRule + Send + Sync>> = Vec::with_capacity(64);
 
-    // get full text search fields
-    if sql.has_match_all {
-        let mut fields = Vec::new();
-        let stream_name = &sql.stream_names[0];
-        let schema = sql.schemas.get(stream_name).unwrap();
-        let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
-        let fts_fields = get_stream_setting_fts_fields(&stream_settings);
-        for fts_field in fts_fields {
-            let Some(field) = schema.field_with_name(&fts_field) else {
-                continue;
-            };
-            fields.push((fts_field, field.data_type().clone()));
-        }
-        // *********** custom rules ***********
-        rules.push(Arc::new(RewriteMatch::new(fields)));
-        // ************************************
-    }
+    // // get full text search fields
+    // if sql.has_match_all {
+    //     let mut fields = Vec::new();
+    //     let stream_name = &sql.stream_names[0];
+    //     let schema = sql.schemas.get(stream_name).unwrap();
+    //     let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
+    //     let fts_fields = get_stream_setting_fts_fields(&stream_settings);
+    //     for fts_field in fts_fields {
+    //         let Some(field) = schema.field_with_name(&fts_field) else {
+    //             continue;
+    //         };
+    //         fields.push((fts_field, field.data_type().clone()));
+    //     }
+    //     // *********** custom rules ***********
+    //     rules.push(Arc::new(RewriteMatch::new(fields)));
+    //     // ************************************
+    // }
 
     rules.push(Arc::new(EliminateNestedUnion::new()));
     rules.push(Arc::new(SimplifyExpressions::new()));
