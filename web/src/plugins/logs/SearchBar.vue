@@ -1507,7 +1507,7 @@ import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { fnParsedSQL, fnUnparsedSQL } from "@/composables/useLogs/logsUtils";
-import { searchState } from "@/store/modules/searchState";
+import { searchState } from "@/composables/useLogs/searchState";
 
 const defaultValue: any = () => {
   return {
