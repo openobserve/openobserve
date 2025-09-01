@@ -29,7 +29,6 @@ use config::{
         sql::TableReferenceExt,
         stream::{FileKey, StreamType},
     },
-    utils::json,
 };
 use datafusion::{common::TableReference, physical_optimizer::PhysicalOptimizerRule};
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
@@ -162,11 +161,6 @@ pub async fn search(
         })
         .collect::<Vec<_>>();
 
-    // construct tantivy related params
-    let index_condition = generate_index_condition(&req.index_info.index_condition)?;
-    let idx_optimize_rule: Option<IndexOptimizeMode> =
-        req.index_info.index_optimize_mode.clone().map(|x| x.into());
-
     // get all tables
     let mut tables = Vec::new();
     let mut scan_stats = ScanStats::new();
@@ -174,6 +168,7 @@ pub async fn search(
 
     // optimize physical plan, current for tantivy index optimize
     let index_condition_ref = Arc::new(Mutex::new(None));
+    let index_optimizer_rule_ref = Arc::new(Mutex::new(None));
     let mut physical_plan = optimizer_physical_plan(
         physical_plan,
         &ctx,
@@ -181,8 +176,10 @@ pub async fn search(
         fst_fields.clone(),
         index_fields,
         index_condition_ref.clone(),
+        index_optimizer_rule_ref.clone(),
     )?;
-    let index_condition = update_index_condition(index_condition, index_condition_ref);
+    let index_condition = { index_condition_ref.lock().clone() };
+    let idx_optimize_rule = { index_optimizer_rule_ref.lock().clone() };
 
     let query_params = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),
@@ -191,7 +188,10 @@ pub async fn search(
         stream_name: stream_name.to_string(),
         time_range: Some((req.search_info.start_time, req.search_info.end_time)),
         work_group: work_group.clone(),
-        use_inverted_index: index_condition.is_some(),
+        use_inverted_index: index_condition.is_some()
+            && cfg.common.inverted_index_enabled
+            && !cfg.common.feature_query_without_index
+            && !index_condition.as_ref().unwrap().is_condition_all(),
     });
 
     // search in object storage
@@ -376,6 +376,7 @@ fn optimizer_physical_plan(
     fst_fields: Vec<String>,
     index_fields: Vec<String>,
     index_condition_ref: Arc<Mutex<Option<IndexCondition>>>,
+    _index_optimizer_rule_ref: Arc<Mutex<Option<IndexOptimizeMode>>>,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
     let cfg = config::get_config();
     if !cfg.common.inverted_index_enabled || cfg.common.feature_query_without_index {
@@ -399,23 +400,6 @@ fn optimizer_physical_plan(
     let plan = rewrite_match_rule.optimize(plan, ctx.state().config_options())?;
 
     Ok(plan)
-}
-
-fn update_index_condition(
-    mut index_condition: Option<IndexCondition>,
-    index_condition_ref: Arc<Mutex<Option<IndexCondition>>>,
-) -> Option<IndexCondition> {
-    let index_condition_ref = index_condition_ref.lock().clone();
-    if index_condition.is_none() {
-        return index_condition_ref;
-    }
-    if index_condition_ref.is_none() {
-        return index_condition;
-    }
-    if let Some(index_condition_ref) = index_condition_ref {
-        index_condition.as_mut().unwrap().merge(index_condition_ref);
-    }
-    index_condition
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -463,22 +447,6 @@ async fn get_file_list_by_ids(
     files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
     files.dedup_by(|a, b| a.key == b.key);
     Ok((files, start.elapsed().as_millis() as usize))
-}
-
-fn generate_index_condition(index_condition: &str) -> Result<Option<IndexCondition>, Error> {
-    Ok(if !index_condition.is_empty() {
-        let condition: IndexCondition = match json::from_str(index_condition) {
-            Ok(cond) => cond,
-            Err(e) => {
-                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(format!(
-                    "Invalid index condition JSON: {e}",
-                ))));
-            }
-        };
-        Some(condition)
-    } else {
-        None
-    })
 }
 
 async fn handle_tantivy_optimize(

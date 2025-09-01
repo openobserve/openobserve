@@ -129,9 +129,7 @@ pub async fn search(
         files.len(),
     );
 
-    let use_inverted_index = query.use_inverted_index
-        && index_condition.is_some()
-        && !index_condition.as_ref().unwrap().is_condition_all();
+    let use_inverted_index = query.use_inverted_index;
     log::info!(
         "[trace_id {}] flight->search: use_inverted_index {use_inverted_index}, index_condition {:?}",
         query.trace_id,
