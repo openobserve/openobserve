@@ -44,6 +44,14 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
+// Mock console methods
+global.console = {
+  ...console,
+  error: vi.fn(),
+  warn: vi.fn(),
+  log: vi.fn()
+};
+
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
