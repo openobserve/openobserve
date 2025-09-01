@@ -141,8 +141,8 @@ impl FileData {
             let (key, data_size) = item.unwrap();
             // move the file from memory to disk cache
             let idx = get_bucket_idx(&key);
-            if !is_local_disk_storage()
-                && let Some((key, data)) = DATA[idx].remove(&key)
+            if let Some((key, data)) = DATA[idx].remove(&key)
+                && !is_local_disk_storage()
             {
                 _ = super::disk::set(&key, data).await;
             }
