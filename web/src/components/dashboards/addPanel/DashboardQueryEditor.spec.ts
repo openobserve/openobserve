@@ -331,6 +331,10 @@ describe("DashboardQueryEditor", () => {
 
   describe("Edge Cases", () => {
     it("should handle empty queries array", () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
       const emptyQueriesPanelData = {
         ...mockDashboardPanelData,
         data: { ...mockDashboardPanelData.data, queries: [] }
@@ -339,10 +343,16 @@ describe("DashboardQueryEditor", () => {
       wrapper = createWrapper({ dashboardPanelData: emptyQueriesPanelData });
 
       expect(wrapper.exists()).toBe(true);
+      
+      consoleWarnSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
     });
 
     it("should handle missing panel data gracefully", () => {
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       
       // Don't pass null, just minimal data
       const minimalData = { 
@@ -352,7 +362,10 @@ describe("DashboardQueryEditor", () => {
       wrapper = createWrapper({ dashboardPanelData: minimalData });
 
       expect(wrapper.exists()).toBe(true);
+      
       consoleWarnSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -454,6 +467,9 @@ describe("DashboardQueryEditor", () => {
     });
 
     it("should handle function template loading", async () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
       wrapper = createWrapper();
 
       // Component should handle function loading
@@ -463,6 +479,9 @@ describe("DashboardQueryEditor", () => {
       if (wrapper.vm.getFunctions) {
         expect(typeof wrapper.vm.getFunctions).toBe('function');
       }
+      
+      consoleLogSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -523,6 +542,10 @@ describe("DashboardQueryEditor", () => {
     });
 
     it("should handle chart panel types", () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
       const chartTypes = ['line', 'bar', 'area', 'scatter', 'pie'];
       
       chartTypes.forEach(chartType => {
@@ -534,6 +557,10 @@ describe("DashboardQueryEditor", () => {
         expect(localWrapper.exists()).toBe(true);
         localWrapper.unmount();
       });
+      
+      consoleWarnSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
     });
 
     it("should handle geomap panel type", () => {
@@ -598,17 +625,29 @@ describe("DashboardQueryEditor", () => {
       };
 
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
       wrapper = createWrapper({ dashboardPanelData: malformedData });
 
       expect(wrapper.exists()).toBe(true);
+      
       consoleWarnSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
     });
 
     it("should handle component unmounting gracefully", () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
       wrapper = createWrapper();
       
       expect(wrapper.exists()).toBe(true);
       expect(() => wrapper.unmount()).not.toThrow();
+      
+      consoleLogSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
     });
   });
 });
