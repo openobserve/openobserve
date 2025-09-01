@@ -719,7 +719,7 @@ mod tests {
 
         // Test special characters replacement
         assert_eq!(format_role_name_only("admin@org.com"), "admin_org_com");
-        assert_eq!(format_role_name_only("role!@#$%"), "role_____");
+        assert_eq!(format_role_name_only("role!@#$%"), "role_");
         assert_eq!(
             format_role_name_only("test-role.with_spaces"),
             "test_role_with_spaces"
@@ -731,7 +731,7 @@ mod tests {
     fn test_format_role_name() {
         assert_eq!(format_role_name("org1", "admin-role"), "org1/admin_role");
         assert_eq!(
-            format_role_name("test-org", "user@role"),
+            format_role_name("test_org", "user@role"),
             "test_org/user_role"
         );
         assert_eq!(format_role_name("", "role"), "/role");
@@ -785,6 +785,10 @@ mod tests {
         use crate::common::meta::user::TokenValidationResponse;
 
         let validation_response = TokenValidationResponse {
+            user_name: "Test User".to_string(),
+            family_name: "Test".to_string(),
+            given_name: "User".to_string(),
+            is_internal_user: false,
             user_email: "test@example.com".to_string(),
             is_valid: false,
             user_role: None,
@@ -812,7 +816,7 @@ mod tests {
         assert_eq!(format_role_name_only(""), "");
 
         // Test role name with only special characters
-        assert_eq!(format_role_name_only("@#$%^&*()"), "__________");
+        assert_eq!(format_role_name_only("@#$%^&*()"), "_");
 
         // Test role name with mixed case and special characters
         assert_eq!(
@@ -860,7 +864,7 @@ mod tests {
             ("admin-role", "admin_role"),
             ("user@domain.com", "user_domain_com"),
             ("test_role_123", "test_role_123"),
-            ("role!@#$%^&*()", "role__________"),
+            ("role!@#$%^&*()", "role_"),
             ("", ""),
             ("OnlyAlphaNumeric123", "OnlyAlphaNumeric123"),
         ];

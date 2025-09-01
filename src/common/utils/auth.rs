@@ -1337,6 +1337,7 @@ mod tests {
             "test_user",
             "dashboard",
             "GET",
+            "test_parent_id",
         )
         .await;
 
