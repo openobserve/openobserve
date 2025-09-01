@@ -132,7 +132,7 @@ describe("VideoPlayer Component", () => {
       configurable: true,
       value: 800,
     });
-    
+
     Object.defineProperty(HTMLElement.prototype, "clientHeight", {
       configurable: true,
       value: 600,
@@ -184,7 +184,17 @@ describe("VideoPlayer Component", () => {
                 {{ modelValue ? modelValue.label : '' }}
               </div>
             `,
-            props: ["modelValue", "options", "color", "bg-color", "stack-label", "outlined", "filled", "dense", "size"],
+            props: [
+              "modelValue",
+              "options",
+              "color",
+              "bg-color",
+              "stack-label",
+              "outlined",
+              "filled",
+              "dense",
+              "size",
+            ],
             emits: ["update:model-value"],
           },
         },
@@ -234,13 +244,15 @@ describe("VideoPlayer Component", () => {
 
     it("should display loading message when loading", async () => {
       await wrapper.setProps({ isLoading: true });
-      expect(wrapper.text()).toContain("Hold on tight, we're fetching session.");
+      expect(wrapper.text()).toContain(
+        "Hold on tight, we're fetching session.",
+      );
     });
 
     it("should hide loading content when not loading", async () => {
       await wrapper.setProps({ isLoading: true });
       expect(wrapper.find('[data-test="spinner"]').exists()).toBe(true);
-      
+
       await wrapper.setProps({ isLoading: false });
       expect(wrapper.find('[data-test="spinner"]').exists()).toBe(false);
     });
@@ -321,7 +333,7 @@ describe("VideoPlayer Component", () => {
       wrapper.vm.playerState.isPlaying = false;
       wrapper.vm.togglePlay();
       expect(wrapper.vm.playerState.isPlaying).toBe(true);
-      
+
       wrapper.vm.togglePlay();
       expect(wrapper.vm.playerState.isPlaying).toBe(false);
     });
@@ -370,9 +382,9 @@ describe("VideoPlayer Component", () => {
     it("should update progress on time change", () => {
       wrapper.vm.playerState.totalTime = 120000;
       wrapper.vm.playerState.width = 800;
-      
+
       wrapper.vm.updateProgressBar({ payload: 60000 });
-      
+
       expect(wrapper.vm.playerState.actualTime).toBe(60000);
       expect(wrapper.vm.playerState.progressWidth).toBeGreaterThan(0);
     });
@@ -382,7 +394,7 @@ describe("VideoPlayer Component", () => {
     it("should handle player click", async () => {
       const playerElement = wrapper.find("#player");
       expect(playerElement.exists()).toBe(true);
-      
+
       const initialPlaying = wrapper.vm.playerState.isPlaying;
       await playerElement.trigger("click");
       expect(wrapper.vm.playerState.isPlaying).toBe(!initialPlaying);
@@ -391,12 +403,12 @@ describe("VideoPlayer Component", () => {
     it("should handle playback bar click", async () => {
       const playbackBar = wrapper.find(".playback_bar");
       expect(playbackBar.exists()).toBe(true);
-      
+
       // Mock player and state for successful click handling
       wrapper.vm.player = { goto: vi.fn() };
       wrapper.vm.playerState.totalTime = 120000;
       wrapper.vm.playerState.width = 800;
-      
+
       await playbackBar.trigger("click");
       // Verify the component handles the click (even if no specific behavior)
       expect(playbackBar.exists()).toBe(true);
@@ -420,7 +432,7 @@ describe("VideoPlayer Component", () => {
     it("should have correct layout structure", () => {
       const container = wrapper.find(".player-container");
       const controlsContainer = wrapper.find(".controls-container");
-      
+
       expect(container.exists()).toBe(true);
       expect(controlsContainer.exists()).toBe(true);
     });
@@ -451,9 +463,11 @@ describe("VideoPlayer Component", () => {
       expect(() => wrapper.vm.togglePlay()).not.toThrow();
     });
 
-    it("should handle worker errors", () => {
+    it("should handle worker errors", async () => {
       wrapper.vm.worker = null;
-      expect(wrapper.vm.processCss("css", "id")).rejects.toBe("Worker not initialized");
+      await expect(wrapper.vm.processCss("css", "id")).rejects.toBe(
+        "Worker not initialized",
+      );
     });
   });
 

@@ -115,7 +115,9 @@ describe("ErrorTag Component", () => {
 
     it("should handle word breaking", () => {
       const valueElement = wrapper.find(".tag-bg");
-      expect(valueElement.attributes("style")).toContain("word-break: break-all");
+      expect(valueElement.attributes("style")).toContain(
+        "word-break: break-all",
+      );
     });
   });
 
@@ -127,9 +129,8 @@ describe("ErrorTag Component", () => {
 
     it("should have vertical separator", () => {
       const separator = wrapper.findComponent({ name: "q-separator" });
-      if (separator.exists()) {
-        expect(separator.props("vertical")).toBe(true);
-      }
+      expect(separator.exists()).toBe(true);
+      expect(separator.props("vertical")).toBe(true);
     });
   });
 
@@ -157,14 +158,17 @@ describe("ErrorTag Component", () => {
     it("should handle long values", async () => {
       const longTag = {
         key: "url",
-        value: "https://example.com/very/long/path/that/might/overflow/the/container",
+        value:
+          "https://example.com/very/long/path/that/might/overflow/the/container",
       };
 
       await wrapper.setProps({ tag: longTag });
 
       const valueElement = wrapper.find(".tag-bg");
       expect(valueElement.text()).toBe(longTag.value);
-      expect(valueElement.attributes("style")).toContain("word-break: break-all");
+      expect(valueElement.attributes("style")).toContain(
+        "word-break: break-all",
+      );
     });
 
     it("should handle special characters", async () => {
@@ -350,6 +354,11 @@ describe("ErrorTag Component", () => {
       await wrapper.setProps({ tag: newTag });
 
       expect(wrapper.props("tag")).toEqual(newTag);
+    });
+
+    it("should cleanup on unmount", () => {
+      wrapper.unmount();
+      expect(true).toBe(true); // Component should unmount without errors
     });
   });
 });

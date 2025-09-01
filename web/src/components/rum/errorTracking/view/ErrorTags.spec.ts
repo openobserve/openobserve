@@ -38,15 +38,27 @@ vi.mock("@/components/rum/errorTracking/view/ErrorTag.vue", () => ({
 }));
 
 // Mock image imports
-vi.mock("@/assets/images/rum/chrome.png", () => ({ default: "/mock/chrome.png" }));
-vi.mock("@/assets/images/rum/firefox.png", () => ({ default: "/mock/firefox.png" }));
-vi.mock("@/assets/images/rum/safari.png", () => ({ default: "/mock/safari.png" }));
-vi.mock("@/assets/images/rum/opera.png", () => ({ default: "/mock/opera.png" }));
+vi.mock("@/assets/images/rum/chrome.png", () => ({
+  default: "/mock/chrome.png",
+}));
+vi.mock("@/assets/images/rum/firefox.png", () => ({
+  default: "/mock/firefox.png",
+}));
+vi.mock("@/assets/images/rum/safari.png", () => ({
+  default: "/mock/safari.png",
+}));
+vi.mock("@/assets/images/rum/opera.png", () => ({
+  default: "/mock/opera.png",
+}));
 vi.mock("@/assets/images/rum/edge.png", () => ({ default: "/mock/edge.png" }));
 vi.mock("@/assets/images/rum/ip_ad.png", () => ({ default: "/mock/ip.png" }));
-vi.mock("@/assets/images/rum/windows.png", () => ({ default: "/mock/windows.png" }));
+vi.mock("@/assets/images/rum/windows.png", () => ({
+  default: "/mock/windows.png",
+}));
 vi.mock("@/assets/images/rum/mac.png", () => ({ default: "/mock/mac.png" }));
-vi.mock("@/assets/images/rum/linux.png", () => ({ default: "/mock/linux.png" }));
+vi.mock("@/assets/images/rum/linux.png", () => ({
+  default: "/mock/linux.png",
+}));
 
 describe("ErrorTags Component", () => {
   let wrapper: any;
@@ -155,7 +167,7 @@ describe("ErrorTags Component", () => {
       });
 
       await wrapper.vm.$nextTick();
-      
+
       // The component sets icons only on mount, not reactively
       // So we need to check the computed method result instead
       expect(wrapper.vm.getBrowserIcon()).toBe("/mock/firefox.png");
@@ -317,7 +329,7 @@ describe("ErrorTags Component", () => {
   describe("Tags Generation", () => {
     it("should generate correct tags", () => {
       const tags = wrapper.vm.getTags;
-      
+
       expect(tags.ip).toBe("192.168.1.1");
       expect(tags.url).toBe("https://example.com/dashboard");
       expect(tags.handled).toBe(false);
@@ -447,12 +459,13 @@ describe("ErrorTags Component", () => {
 
     it("should pass correct props to ErrorTag components", () => {
       const errorTags = wrapper.findAllComponents({ name: "ErrorTag" });
-      
-      const ipTag = errorTags.find(tag => 
-        tag.props("tag").key === "ip" && 
-        tag.props("tag").value === "192.168.1.1"
+
+      const ipTag = errorTags.find(
+        (tag) =>
+          tag.props("tag").key === "ip" &&
+          tag.props("tag").value === "192.168.1.1",
       );
-      
+
       expect(ipTag).toBeDefined();
     });
 
@@ -470,7 +483,7 @@ describe("ErrorTags Component", () => {
 
     it("should have proper separator placement", () => {
       const separators = wrapper.findAllComponents({ name: "q-separator" });
-      separators.forEach(separator => {
+      separators.forEach((separator: any) => {
         if (separator.exists()) {
           expect(separator.props("vertical")).toBe(true);
         }
@@ -518,7 +531,7 @@ describe("ErrorTags Component", () => {
 
       for (const { family, expected } of testCases) {
         await wrapper.setProps({
-          error: { ...mockError, user_agent_user_agent_family: family }
+          error: { ...mockError, user_agent_user_agent_family: family },
         });
         const result = wrapper.vm.getBrowserIcon();
         expect(result).toBe(expected);
@@ -534,7 +547,7 @@ describe("ErrorTags Component", () => {
 
       for (const { family, expected } of testCases) {
         await wrapper.setProps({
-          error: { ...mockError, user_agent_user_agent_family: family }
+          error: { ...mockError, user_agent_user_agent_family: family },
         });
         const result = wrapper.vm.getBrowserIcon();
         expect(result).toBe(expected);
@@ -552,7 +565,7 @@ describe("ErrorTags Component", () => {
 
       for (const { family, expected } of testCases) {
         await wrapper.setProps({
-          error: { ...mockError, user_agent_os_family: family }
+          error: { ...mockError, user_agent_os_family: family },
         });
         const result = wrapper.vm.getOsIcon();
         expect(result).toBe(expected);

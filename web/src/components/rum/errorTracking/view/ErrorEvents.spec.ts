@@ -62,13 +62,17 @@ vi.mock("@/components/AppTable.vue", () => ({
 }));
 
 // Mock ErrorEventDescription
-vi.mock("@/components/rum/errorTracking/view/ErrorEventDescription.vue", () => ({
-  default: {
-    name: "ErrorEventDescription",
-    template: '<div data-test="error-event-description">{{ column.type }}</div>',
-    props: ["column"],
-  },
-}));
+vi.mock(
+  "@/components/rum/errorTracking/view/ErrorEventDescription.vue",
+  () => ({
+    default: {
+      name: "ErrorEventDescription",
+      template:
+        '<div data-test="error-event-description">{{ column.type }}</div>',
+      props: ["column"],
+    },
+  }),
+);
 
 // Mock ErrorTypeIcons
 vi.mock("@/components/rum/errorTracking/view/ErrorTypeIcons.vue", () => ({
@@ -192,7 +196,9 @@ describe("ErrorEvents Component", () => {
     });
 
     it("should have type column with slot", () => {
-      const typeColumn = wrapper.vm.columns.find((col: any) => col.name === "type");
+      const typeColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "type",
+      );
       expect(typeColumn).toBeDefined();
       expect(typeColumn.label).toBe("Type");
       expect(typeColumn.slot).toBe(true);
@@ -200,7 +206,9 @@ describe("ErrorEvents Component", () => {
     });
 
     it("should have category column with field function", () => {
-      const categoryColumn = wrapper.vm.columns.find((col: any) => col.name === "category");
+      const categoryColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "category",
+      );
       expect(categoryColumn).toBeDefined();
       expect(categoryColumn.label).toBe("Category");
       expect(typeof categoryColumn.field).toBe("function");
@@ -208,7 +216,9 @@ describe("ErrorEvents Component", () => {
     });
 
     it("should have description column with slot", () => {
-      const descColumn = wrapper.vm.columns.find((col: any) => col.name === "description");
+      const descColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "description",
+      );
       expect(descColumn).toBeDefined();
       expect(descColumn.label).toBe("Description");
       expect(descColumn.slot).toBe(true);
@@ -216,14 +226,18 @@ describe("ErrorEvents Component", () => {
     });
 
     it("should have level column with field function", () => {
-      const levelColumn = wrapper.vm.columns.find((col: any) => col.name === "level");
+      const levelColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "level",
+      );
       expect(levelColumn).toBeDefined();
       expect(levelColumn.label).toBe("Level");
       expect(typeof levelColumn.field).toBe("function");
     });
 
     it("should have timestamp column with field function", () => {
-      const timestampColumn = wrapper.vm.columns.find((col: any) => col.name === "timestamp");
+      const timestampColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "timestamp",
+      );
       expect(timestampColumn).toBeDefined();
       expect(timestampColumn.label).toBe("Timestamp");
       expect(typeof timestampColumn.field).toBe("function");
@@ -276,21 +290,25 @@ describe("ErrorEvents Component", () => {
 
   describe("Column Field Functions", () => {
     it("should compute category field correctly", () => {
-      const categoryColumn = wrapper.vm.columns.find((col: any) => col.name === "category");
+      const categoryColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "category",
+      );
       const mockRow = { type: "error", error_type: "ReferenceError" };
-      
+
       const fieldResult = categoryColumn.field(mockRow);
       const propResult = categoryColumn.prop(mockRow);
-      
+
       expect(fieldResult).toBe("ReferenceError");
       expect(propResult).toBe("ReferenceError");
     });
 
     it("should compute level field correctly for error events", () => {
-      const levelColumn = wrapper.vm.columns.find((col: any) => col.name === "level");
+      const levelColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "level",
+      );
       const errorRow = { type: "error" };
       const nonErrorRow = { type: "view" };
-      
+
       expect(levelColumn.field(errorRow)).toBe("error");
       expect(levelColumn.field(nonErrorRow)).toBe("info");
       expect(levelColumn.prop(errorRow)).toBe("error");
@@ -298,9 +316,11 @@ describe("ErrorEvents Component", () => {
     });
 
     it("should compute timestamp field correctly", () => {
-      const timestampColumn = wrapper.vm.columns.find((col: any) => col.name === "timestamp");
+      const timestampColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "timestamp",
+      );
       const mockRow = { _timestamp: 1704110400000000 };
-      
+
       const result = timestampColumn.field(mockRow);
       expect(result).toBe("Jan 01, 2024 10:00:00 +0000");
     });
@@ -308,25 +328,29 @@ describe("ErrorEvents Component", () => {
 
   describe("Column Styling", () => {
     it("should apply error styling to error rows", () => {
-      const typeColumn = wrapper.vm.columns.find((col: any) => col.name === "type");
+      const typeColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "type",
+      );
       const errorRow = { type: "error" };
       const nonErrorRow = { type: "view" };
-      
+
       const errorStyle = typeColumn.style(errorRow);
       const nonErrorStyle = typeColumn.style(nonErrorRow);
-      
+
       expect(errorStyle).toBe("border-bottom: 1px solid red");
       expect(nonErrorStyle).toBe("");
     });
 
     it("should apply error styling to level column with color", () => {
-      const levelColumn = wrapper.vm.columns.find((col: any) => col.name === "level");
+      const levelColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "level",
+      );
       const errorRow = { type: "error" };
       const nonErrorRow = { type: "view" };
-      
+
       const errorStyle = levelColumn.style(errorRow);
       const nonErrorStyle = levelColumn.style(nonErrorRow);
-      
+
       expect(errorStyle).toBe("color: red; border-bottom: 1px solid red");
       expect(nonErrorStyle).toBe("");
     });
@@ -334,9 +358,11 @@ describe("ErrorEvents Component", () => {
     it("should apply consistent styling across all columns for error rows", () => {
       const errorRow = { type: "error" };
       const nonErrorRow = { type: "view" };
-      
-      const columnsWithStyling = wrapper.vm.columns.filter((col: any) => col.style);
-      
+
+      const columnsWithStyling = wrapper.vm.columns.filter(
+        (col: any) => col.style,
+      );
+
       columnsWithStyling.forEach((column: any) => {
         if (column.name === "level") {
           expect(column.style(errorRow)).toContain("color: red");
@@ -370,7 +396,9 @@ describe("ErrorEvents Component", () => {
     });
 
     it("should pass correct data to description slot", () => {
-      const errorEventDescription = wrapper.findComponent({ name: "ErrorEventDescription" });
+      const errorEventDescription = wrapper.findComponent({
+        name: "ErrorEventDescription",
+      });
       expect(errorEventDescription.exists()).toBe(true);
       expect(errorEventDescription.props("column")).toEqual({
         type: "error",
@@ -432,7 +460,7 @@ describe("ErrorEvents Component", () => {
     it("should handle different timestamp formats", () => {
       const microseconds = 1704110400000000;
       const milliseconds = microseconds / 1000;
-      
+
       const result = wrapper.vm.getFormattedDate(milliseconds);
       expect(result).toBe("Jan 01, 2024 10:00:00 +0000");
     });
@@ -465,19 +493,27 @@ describe("ErrorEvents Component", () => {
 
   describe("Column Classes", () => {
     it("should apply correct CSS classes to columns", () => {
-      const typeColumn = wrapper.vm.columns.find((col: any) => col.name === "type");
-      const descColumn = wrapper.vm.columns.find((col: any) => col.name === "description");
-      const levelColumn = wrapper.vm.columns.find((col: any) => col.name === "level");
-      
+      const typeColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "type",
+      );
+      const descColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "description",
+      );
+      const levelColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "level",
+      );
+
       expect(typeColumn.classes).toBe("error-type");
       expect(descColumn.classes).toBe("description-column");
       expect(levelColumn.classes).toBe("error-level");
     });
 
     it("should mark appropriate columns as sortable", () => {
-      const sortableColumns = wrapper.vm.columns.filter((col: any) => col.sortable);
+      const sortableColumns = wrapper.vm.columns.filter(
+        (col: any) => col.sortable,
+      );
       const sortableNames = sortableColumns.map((col: any) => col.name);
-      
+
       expect(sortableNames).toContain("type");
       expect(sortableNames).toContain("category");
       expect(sortableNames).toContain("description");
@@ -509,21 +545,25 @@ describe("ErrorEvents Component", () => {
   describe("Edge Cases", () => {
     it("should handle events with missing fields", () => {
       const incompleteRow = { type: "incomplete" };
-      
+
       const categoryResult = wrapper.vm.getErrorCategory(incompleteRow);
       expect(categoryResult).toBe("incomplete");
     });
 
     it("should handle malformed timestamps", () => {
-      const timestampColumn = wrapper.vm.columns.find((col: any) => col.name === "timestamp");
+      const timestampColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "timestamp",
+      );
       const invalidRow = { _timestamp: "invalid" };
-      
+
       expect(() => timestampColumn.field(invalidRow)).not.toThrow();
     });
 
     it("should handle null row data", () => {
-      const categoryColumn = wrapper.vm.columns.find((col: any) => col.name === "category");
-      
+      const categoryColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "category",
+      );
+
       // The actual component will error on null data - this reflects real behavior
       expect(() => categoryColumn.field(null)).toThrow();
     });
@@ -562,6 +602,11 @@ describe("ErrorEvents Component", () => {
         const appTable = wrapper.findComponent({ name: "AppTable" });
         expect(appTable.props("rows")).toEqual(events);
       }
+    });
+
+    it("should cleanup on unmount", () => {
+      wrapper.unmount();
+      expect(true).toBe(true); // Component should unmount without errors
     });
   });
 });

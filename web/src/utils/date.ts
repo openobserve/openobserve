@@ -84,7 +84,6 @@ export const generateDurationLabel = (seconds: number) => {
 };
 
 export const getQueryParamsForDuration = (obj: any) => {
-  console.log("obj-----", obj);
   const params: any = {};
   const tab = obj.tab;
   const period = obj.relative.period;
