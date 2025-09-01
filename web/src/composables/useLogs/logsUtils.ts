@@ -15,48 +15,12 @@
 
 import { searchState } from "@/composables/useLogs/searchState";
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
-
-interface SQLColumn {
-  expr: any;
-  as?: string;
-}
-
-interface SQLFrom {
-  table: string;
-  as?: string;
-}
-
-interface SQLOrderBy {
-  expr: any;
-  type: "ASC" | "DESC";
-}
-
-interface SQLLimit {
-  seperator?: string;
-  value: number[];
-}
-
-interface SQLGroupBy {
-  type: string;
-  value: any;
-}[];
-
-interface SQLWhere {
-  type: string;
-  left: any;
-  operator: string;
-  right: any;
-}
-
-interface ParsedSQLResult {
-  columns: SQLColumn[];
-  from: SQLFrom[];
-  orderby: SQLOrderBy[] | null;
-  limit: SQLLimit | null;
-  groupby: SQLGroupBy | null;
-  where: SQLWhere | null;
-}
-
+import {
+  TimestampRange,
+  ParsedSQLResult,
+  TimePeriodUnit,
+} from "@/ts/interfaces";
+import { TIME_MULTIPLIERS, } from "@/utils/logs/constants";
 
 const { searchObj } = searchState();
 let parser: Parser | null = new Parser();
@@ -150,4 +114,80 @@ export const fnUnparsedSQL = (parsedObj: ParsedSQLResult | any): string => {
     console.info(`Error while unparsing SQL : ${errorMessage}`);
     return "";
   }
+};
+
+/**
+ * Extracts timestamp range based on a relative time period string.
+ *
+ * This function parses a time period string (e.g., "5m", "2h", "1d") and returns
+ * a timestamp range from the calculated past time to the current time. It supports
+ * seconds, minutes, hours, days, weeks, and months with special handling for
+ * month calculations to account for variable month lengths.
+ *
+ * @param period - Time period string ending with unit (s/m/h/d/w/M)
+ *                 Examples: "30s", "5m", "2h", "1d", "1w", "1M"
+ * @returns Object containing 'from' and 'to' timestamps in milliseconds,
+ *          or undefined if the period format is invalid
+ *
+ * @example
+ * ```typescript
+ * // Get timestamps for last 5 minutes
+ * const range = extractTimestamps("5m");
+ * console.log(range); // { from: 1640000000000, to: 1640000300000 }
+ *
+ * // Get timestamps for last 2 hours
+ * const hourRange = extractTimestamps("2h");
+ * console.log(hourRange); // { from: 1639992800000, to: 1640000000000 }
+ *
+ * // Handle invalid format
+ * const invalid = extractTimestamps("5x");
+ * console.log(invalid); // undefined
+ * ```
+ *
+ * @throws {Error} Logs error to console for invalid period formats
+ */
+export const extractTimestamps = (
+  period: string,
+): TimestampRange | undefined => {
+  if (!period || typeof period !== "string") {
+    console.error("Invalid period: must be a non-empty string");
+    return undefined;
+  }
+
+  const currentTime = new Date();
+  const toTimestamp = currentTime.getTime();
+  const unit = period.slice(-1) as TimePeriodUnit;
+  const value = parseInt(period.slice(0, -1), 10);
+
+  // Validate parsed value
+  if (isNaN(value) || value <= 0) {
+    console.error(
+      `Invalid period value: "${period}". Must be a positive number followed by unit (s/m/h/d/w/M)`,
+    );
+    return undefined;
+  }
+
+  let fromTimestamp: number;
+
+  // Handle month calculation separately due to variable month lengths
+  if (unit === "M") {
+    const monthsToSubtract = value;
+    const fromDate = new Date(currentTime);
+    fromDate.setMonth(fromDate.getMonth() - monthsToSubtract);
+    fromTimestamp = fromDate.getTime();
+  } else if (unit in TIME_MULTIPLIERS) {
+    // Handle standard time units
+    const multiplier = TIME_MULTIPLIERS[unit];
+    fromTimestamp = toTimestamp - value * multiplier;
+  } else {
+    console.error(
+      `Invalid period unit: "${unit}". Supported units: s, m, h, d, w, M`,
+    );
+    return undefined;
+  }
+
+  return {
+    from: fromTimestamp,
+    to: toTimestamp,
+  };
 };
