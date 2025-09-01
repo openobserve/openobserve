@@ -119,7 +119,7 @@ pub async fn token_validator(
                     // nothing else. Similarly for accepting invite, we will not have the
                     // user in db anymore, and the fn checks based on email and token, so ok to
                     // bypass
-                    None if is_list_invite_call | is_member_subscription => {
+                    None if (is_list_invite_call || is_member_subscription) => {
                         let mut req = req;
 
                         if req.method().eq(&Method::POST)

@@ -228,7 +228,7 @@ pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
         log::error!("Error saving org: {e}");
         return Err(anyhow::anyhow!("Error saving org: {}", e));
     }
-    organizations::invalidate_cache(Some(org_name)).await;
+    organizations::invalidate_cache(Some(&entry.identifier)).await;
 
     let key = format!("{}{}", ORG_KEY_PREFIX, entry.identifier);
     let _ = put_into_db_coordinator(&key, json::to_vec(entry).unwrap().into(), true, None).await;

@@ -137,7 +137,7 @@ pub async fn add(
     let org = OrganizationRecord {
         identifier: org_id.to_string(),
         org_name: org_name.to_string(),
-        org_type: org_type.into(),
+        org_type,
         created_at: now,
         updated_at: now,
         #[cfg(feature = "cloud")]

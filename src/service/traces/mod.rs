@@ -586,18 +586,18 @@ pub async fn ingest_json(
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
         // we do not want to log trial period expired errors
-        if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
-            log::error!("[TRACES:JSON] ingestion error: {e}");
+        if matches!(e, infra::errors::Error::TrialPeriodExpired) {
             return Ok(
-                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                    http::StatusCode::SERVICE_UNAVAILABLE,
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
                     e,
                 )),
             );
         } else {
+            log::error!("[TRACES:JSON] ingestion error: {e}");
             return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
+                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                    http::StatusCode::SERVICE_UNAVAILABLE,
                     e,
                 )),
             );
