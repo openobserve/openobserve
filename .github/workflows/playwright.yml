@@ -235,6 +235,8 @@ jobs:
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
+
+          npx playwright install
           
           # Get list of files to run using join function
           FILE_LIST="${{ join(matrix.run_files, ' ') }}"
