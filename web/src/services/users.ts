@@ -62,10 +62,10 @@ const users = {
   logout: () => {
     return http().get(`/config/logout`);
   },
-  getUserGroups: (orgId: any, userEmail: any) => {
+  getUserGroups: (orgId: string, userEmail: string) => {
     return http().get(`api/${orgId}/users/${userEmail}/groups`);
   },
-  getUserRoles: (orgId: any, userEmail: any) => {
+  getUserRoles: (orgId: string, userEmail: string) => {
     return http().get(`api/${orgId}/users/${userEmail}/roles`);
   },
   invitedUsers: (org_identifier: string) => {
