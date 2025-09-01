@@ -242,9 +242,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::service::search::datafusion::{
-        optimizer::rewrite_match::RewriteMatch, udf::match_all_udf,
-    };
+    use crate::service::search::datafusion::udf::match_all_udf;
 
     #[tokio::test]
     async fn test_rewrite_match() {
