@@ -4443,6 +4443,8 @@ describe("convertSQLData", () => {
       });
 
       it("should handle trellis configuration with custom layout", async () => {
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        
         const schema = {
           ...mockPanelSchema,
           config: {
@@ -4492,9 +4494,13 @@ describe("convertSQLData", () => {
 
         expect(result).toBeDefined();
         expect(result.options).toBeDefined();
+        
+        consoleSpy.mockRestore();
       });
 
       it("should handle trellis configuration with vertical layout", async () => {
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        
         const schema = {
           ...mockPanelSchema,
           config: {
@@ -4541,9 +4547,13 @@ describe("convertSQLData", () => {
 
         expect(result).toBeDefined();
         expect(result.options).toBeDefined();
+        
+        consoleSpy.mockRestore();
       });
 
       it("should handle trellis configuration with group_by_y_axis enabled", async () => {
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        
         const schema = {
           ...mockPanelSchema,
           config: {
@@ -4590,6 +4600,8 @@ describe("convertSQLData", () => {
 
         expect(result).toBeDefined();
         expect(result.options).toBeDefined();
+        
+        consoleSpy.mockRestore();
       });
 
       it("should handle Y-axis name gap calculation with horizontal chart", async () => {
@@ -4834,6 +4846,8 @@ describe("convertSQLData", () => {
       });
 
       it("should handle error with invalid trellis column configuration", async () => {
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        
         const schema = {
           ...mockPanelSchema,
           config: {
@@ -4878,6 +4892,8 @@ describe("convertSQLData", () => {
 
         expect(result).toBeDefined();
         expect(result.options).toBeDefined();
+        
+        consoleSpy.mockRestore();
       });
 
       it("should handle chart panel reference without dimensions", async () => {
