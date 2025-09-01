@@ -53,8 +53,6 @@ pub mod self_reporting;
 pub mod session;
 pub mod short_url;
 pub mod stream;
-#[deprecated(since = "0.15.0", note = "syslog is deprecated")]
-pub mod syslogs_route;
 pub mod tls;
 pub mod traces;
 pub mod users;
