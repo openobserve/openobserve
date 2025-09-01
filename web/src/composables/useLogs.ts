@@ -7024,7 +7024,6 @@ const useLogs = () => {
     router,
     $q,
     getPageCount,
-    initialLogsState,
     clearSearchObj,
     setCommunicationMethod,
     hasAggregation,
