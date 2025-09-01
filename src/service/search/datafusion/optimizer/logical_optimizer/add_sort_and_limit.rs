@@ -22,8 +22,7 @@ use datafusion::{
     optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder},
 };
 
-use super::utils::AddSortAndLimit;
-use crate::service::search::datafusion::optimizer::utils::is_empty_relation;
+use crate::service::search::datafusion::optimizer::utils::{AddSortAndLimit, is_empty_relation};
 
 #[derive(Debug)]
 pub struct AddSortAndLimitRule {

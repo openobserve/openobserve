@@ -114,7 +114,6 @@
       </div>
     </div>
     <div v-show="activeTab !== 'unflattened'" class="q-pl-md">
-      {
       <div
         class="log_json_content"
         v-for="(key, index) in Object.keys(value)"
@@ -270,21 +269,9 @@
         </q-btn-dropdown>
 
         <span class="q-pl-xs" :data-test="`log-expand-detail-key-${key}`">
-          <span
-            :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'"
-            :data-test="`log-expand-detail-key-${key}-text`"
-            >{{ key }}:</span
-          ><span class="q-pl-xs" :data-test="`log-expand-detail-value-${key}`"
-            ><template v-if="index < Object.keys(value).length - 1"
-              >{{ value[key] }},</template
-            >
-            <template v-else>
-              {{ value[key] }}
-            </template>
-          </span>
+          <LogsHighLighting :data="{ [key]: value[key] }" :show-braces="false" :query-string="highlightQuery" /><span v-if="index < Object.keys(value).length - 1">,</span>
         </span>
       </div>
-      }
       <div
         v-if="showMenu"
         class="context-menu shadow-lg rounded-sm"
@@ -390,6 +377,7 @@ import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
 import { useQuasar } from "quasar";
 import config from "@/aws-exports";
+import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 
 export default {
   name: "JsonPreview",
@@ -412,11 +400,17 @@ export default {
       default: "",
       required: false,
     },
+    highlightQuery: {
+      type: String,
+      default: "",
+      required: false,
+    },
   },
   components: {
     NotEqualIcon,
     EqualIcon,
     AppTabs,
+    LogsHighLighting,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
