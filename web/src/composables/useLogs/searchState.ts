@@ -57,6 +57,7 @@ interface SearchAroundData {
 }
 
 interface SearchObjectData {
+  streamResults: any;
   errorMsg: string;
   errorDetail: string;
   countErrorMsg: string;
@@ -330,9 +331,9 @@ export const searchState = () => {
    * ```
    */
   const resetFunctions = (): void => {
-    store.dispatch("setFunctions", []);
-    searchObj.data.transforms = [];
-    searchObj.data.stream.functions = [];
+      searchObj.data.transforms = [];
+      searchObj.data.stream.functions = [];
+      store?.dispatch("setFunctions", []);
   };
 
   /**
