@@ -821,6 +821,15 @@ pub async fn decline_invitation(
 }
 
 #[cfg(not(feature = "cloud"))]
+#[delete("/invites/{token}")]
+pub async fn decline_invitation(
+    _user_email: UserEmail,
+    _path: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(not(feature = "cloud"))]
 #[get("/invites")]
 pub async fn list_invitations(_user_email: UserEmail) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))

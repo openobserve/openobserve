@@ -18,7 +18,7 @@ use std::{
     io::Error,
 };
 
-use actix_web::{HttpRequest, HttpResponse, Result, delete, get, http, post, put, web};
+use actix_web::{HttpRequest, HttpResponse, Result,  get, http, post, put, web};
 use config::meta::cluster::NodeInfo;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
@@ -30,6 +30,8 @@ use {
     },
     o2_enterprise::enterprise::cloud::list_customer_billings,
 };
+#[cfg(feature="cloud")]
+use actix_web::delete;
 
 use crate::{
     common::{

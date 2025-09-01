@@ -598,6 +598,7 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     Ok(())
 }
 
+#[cfg(feature = "cloud")]
 pub async fn decline_invitation(user_email: &str, token: &str) -> Result<(), anyhow::Error> {
     let invite = org_invites::get_by_token_user(token, user_email)
         .await
