@@ -19,22 +19,25 @@ import { useQuasar } from "quasar";
 import { ref, reactive } from "vue";
 import type { SearchRequestPayload, WebSocketSearchPayload, WebSocketSearchResponse } from "@/ts/interfaces";
 import { logsApi } from "@/services/logs/logsApi";
+import search from "@/services/search";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useQuery from "@/composables/useQuery";
 import { useLogsState } from "@/composables/useLogsState";
+import { useLogsData } from "@/composables/useLogsData";
 import {
-  fnParsedSQL,
-  fnUnparsedSQL,
-  generateURLQueryUtil,
-  buildWebSocketPayloadUtil,
-  hasAggregation,
-  extractValueQueryUtil,
+  createSQLParserFunctions,
+  extractValueQuery,
 } from "@/utils/logs/parsers";
+import {
+  buildWebSocketPayload as buildWebSocketPayloadUtil,
+  chunkedAppend,
+} from "@/utils/logs/transformers";
 import {
   MAX_SEARCH_RETRIES,
   SEARCH_RECONNECT_DELAY,
 } from "@/utils/logs/constants";
-import { showErrorNotification } from "@/utils/common";
+import useNotifications from "@/composables/useNotifications";
+import { generateTraceContext } from "@/utils/zincutils";
 
 interface URLQueryParams {
   [key: string]: any;
@@ -57,6 +60,7 @@ export const useLogsSearch = () => {
   const router = useRouter();
   const $q = useQuasar();
   const { buildQueryPayload, getTimeInterval } = useQuery();
+  const { showErrorNotification } = useNotifications();
   const {
     fetchQueryDataWithWebSocket,
     sendSearchMessageBasedOnRequestId,
@@ -70,14 +74,196 @@ export const useLogsSearch = () => {
     initialQueryPayload,
     streamSchemaFieldsIndexMapping 
   } = useLogsState();
+  
+  const {
+    processPostPaginationData,
+    updateFieldValues,
+    extractFields,
+    updateGridColumns,
+    handleFunctionError,
+    handleAggregation,
+    refreshPagination,
+  } = useLogsData();
+  
 
   // Search partition mapping
   const searchPartitionMap = reactive<{ [key: string]: number }>({});
 
   /**
+   * Reset query data
+   */
+  const resetQueryData = () => {
+    searchObj.data.sortedQueryResults = [];
+    searchObj.data.resultGrid.currentPage = 1;
+    searchObj.runQuery = false;
+    searchObj.data.errorMsg = "";
+    searchObj.data.errorDetail = "";
+    searchObj.data.countErrorMsg = "";
+  };
+
+  /**
+   * Get paginated data (matches original implementation)
+   */
+  const getPaginatedData = async (queryReq: any, appendResult: boolean = false, isInitialRequest: boolean = true) => {
+    return new Promise((resolve, reject) => {
+      // Check if operation is cancelled
+      if (searchObj.data.isOperationCancelled) {
+        searchObj.loading = false;
+        searchObj.data.isOperationCancelled = false;
+        showErrorNotification("Search operation is cancelled.");
+        return;
+      }
+
+      const parsedSQL: any = createSQLParserFunctions(null).parseSQL(searchObj.data.query);
+
+      if (isInitialRequest) {
+        searchObj.meta.resultGrid.showPagination = true;
+      }
+
+      // Handle SQL mode aggregation and limit queries (matching original)
+      if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
+        // If query has aggregation or groupby then we need to set size to -1 to get all records
+        // Here BE return all the records if we set the size to -1 as we don't support pagination for aggregation and groupby
+        if (parsedSQL.groupby != null) {
+          queryReq.query.size = -1;
+        }
+        
+        // If the query has limit then we need to set the size to the limit as we don't support pagination for limit
+        if (parsedSQL.limit != null) {
+          queryReq.query.size = parsedSQL.limit.value[0].value;
+          searchObj.meta.resultGrid.showPagination = false;
+          
+          if (parsedSQL.limit.separator == "offset") {
+            queryReq.query.from = parsedSQL.limit.value[1].value || 0;
+          }
+          delete queryReq.query.track_total_hits;
+        }
+        
+        // Remove track_total_hits for specific query types
+        if (parsedSQL.distinct != null || parsedSQL.with != null || !searchObj.data.queryResults.is_histogram_eligible) {
+          delete queryReq.query.track_total_hits;
+        }
+      }
+
+      // Set histogram interval if available
+      if (searchObj.data.queryResults.histogram_interval) {
+        queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
+      }
+
+      // Generate trace context (matching original)
+      const { traceparent, traceId } = generateTraceContext();
+      addTraceId(traceId);
+      
+      // Determine which search function to call
+      const searchCall = searchObj.meta.jobId 
+        ? search.get_scheduled_search_result
+        : search.search;
+
+      // Ensure organizationIdentifier is set
+      if (!searchObj.organizationIdentifier && store.state?.selectedOrganization?.identifier) {
+        searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
+      }
+      
+      // Ensure streamType is set (default to "logs")  
+      if (!searchObj.data.stream.streamType) {
+        searchObj.data.stream.streamType = "logs";
+      }
+      
+      if (searchCall) {
+        console.log("🔧 getPaginatedData calling with:", {
+          org_identifier: searchObj.organizationIdentifier,
+          page_type: searchObj.data.stream.streamType,
+          queryReq: queryReq
+        });
+        
+        searchCall(
+          {
+            org_identifier: searchObj.organizationIdentifier,
+            query: queryReq,
+            jobId: searchObj.meta.jobId ? searchObj.meta.jobId : "",
+            page_type: searchObj.data.stream.streamType,
+            traceparent,
+          },
+          "ui",
+        )
+        .then(async (res: any) => {
+          // Process function errors if any
+          if (res.data.hasOwnProperty("function_error") && res.data.function_error != "") {
+            searchObj.data.functionError = res.data.function_error;
+          }
+
+          // Handle successful response
+          await updateResult(queryReq, res.data, false, appendResult);
+          resolve(res);
+        })
+        .catch((err: any) => {
+          console.error("Error in getPaginatedData:", err);
+          searchObj.loading = false;
+          searchObj.data.errorMsg = err.response?.data?.error || err.message;
+          reject(err);
+        });
+      } else {
+        reject(new Error("Search function not available"));
+      }
+    });
+  };
+
+  /**
+   * Generate histogram data
+   */
+  const generateHistogram = async (queryReq: any, parsedSQL: any) => {
+    try {
+      searchObj.meta.refreshHistogram = false;
+      if (searchObj.data.queryResults.hits.length > 0) {
+        if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == true) {
+          // Multi-stream SQL mode - no histogram
+          searchObj.data.histogram = {
+            xData: [],
+            yData: [],
+            chartParams: {
+              title: "", // Should use getHistogramTitle()
+              unparsed_x_data: [],
+              timezone: "",
+            },
+            errorCode: 0,
+            errorMsg: "Histogram is not available for multi-stream SQL mode search.",
+            errorDetail: "",
+          };
+          searchObj.meta.histogramDirtyFlag = false;
+        } else {
+          // Single stream or multi-stream non-SQL mode
+          searchObj.data.histogram.errorMsg = "";
+          searchObj.data.histogram.errorCode = 0;
+          searchObj.data.histogram.errorDetail = "";
+          searchObj.loadingHistogram = true;
+
+          // Generate histogram skeleton and process partitions
+          // This would need full implementation based on original
+          console.log("Generating histogram for partitions...");
+          
+          searchObj.loadingHistogram = false;
+        }
+      }
+    } catch (error: any) {
+      console.error("Error generating histogram:", error);
+      searchObj.loadingHistogram = false;
+    }
+  };
+
+  /**
    * Build search query request
    */
   const buildSearch = () => {
+    // Ensure organizationIdentifier is set
+    if (!searchObj.organizationIdentifier && store.state?.selectedOrganization?.identifier) {
+      searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
+    }
+    
+    // Ensure streamType is set (default to "logs")  
+    if (!searchObj.data.stream.streamType) {
+      searchObj.data.stream.streamType = "logs";
+    }
+    
     const identifier: string = searchObj.organizationIdentifier || "default";
     
     try {
@@ -110,31 +296,68 @@ export const useLogsSearch = () => {
       }
 
       const queryPayloadData = {
-        org_identifier: identifier,
-        query: {
-          sql: query,
-          start_time: timestamps.start_time,
-          end_time: timestamps.end_time,
-          from: 0,
-          size: searchObj.meta.resultGrid.rowsPerPage,
-          quick_mode: searchObj.meta.quickMode,
-          track_total_hits: searchObj.data.countEnabled,
-          sql_mode: searchObj.meta.sqlMode,
-          query_type: "",
+        streamName: searchObj.data.stream.selectedStream[0] || "",
+        timestamps: {
+          startTime: timestamps.start_time,
+          endTime: timestamps.end_time
         },
-        aggs: {
-          histogram: `SELECT histogram(_timestamp, '${searchObj.meta.resultGrid.chartInterval}') AS zo_sql_key, count(*) AS zo_sql_num FROM query GROUP BY zo_sql_key ORDER BY zo_sql_key`,
-        },
-        encoding: "base64",
+        from: 0,
+        size: searchObj.meta.resultGrid.rowsPerPage,
+        sqlMode: searchObj.meta.sqlMode,
+        currentPage: searchObj.data.resultGrid.currentPage,
+        selectedStream: searchObj.data.stream.selectedStream[0] || "",
+        timeInterval: searchObj.meta.resultGrid.chartInterval || "1 minute",
+        parsedQuery: {
+          queryFunctions: "",
+          whereClause: "",
+          limit: 0,
+          query: query,
+          offset: 0
+        }
       };
 
+      console.log("🔧 Building query payload with data:", queryPayloadData);
       const req = buildQueryPayload(queryPayloadData);
+      console.log("🔧 buildQueryPayload returned:", req);
       
-      if (searchObj.meta.regions?.length) {
-        req.regions = searchObj.meta.regions;
+      if (!req) {
+        throw new Error("Failed to build search query payload");
       }
       
-      return req;
+      // The search API expects a clean query object without aggs and org_identifier
+      // Create a clean structure matching the original
+      const cleanQueryReq = {
+        query: {
+          ...req.query
+        }
+      };
+      
+      // Override SQL if needed
+      if (searchObj.meta.sqlMode && query && query.trim() !== "") {
+        cleanQueryReq.query.sql = query;
+        console.log("🔧 Set SQL query (SQL mode):", cleanQueryReq.query.sql);
+      } else if (query && query.trim() !== "" && !query.includes('[FIELD_LIST]')) {
+        cleanQueryReq.query.sql = query;
+        console.log("🔧 Set SQL query (non-SQL mode):", cleanQueryReq.query.sql);
+      }
+      
+      cleanQueryReq.query.quick_mode = searchObj.meta.quickMode;
+      cleanQueryReq.query.track_total_hits = searchObj.data.countEnabled;
+      
+      // Handle SQL mode specific settings (matching original)
+      if (searchObj.meta.sqlMode) {
+        cleanQueryReq.query.sql_mode = "full";  // This is the critical missing field!
+      }
+      
+      if (searchObj.meta.regions?.length) {
+        cleanQueryReq.regions = searchObj.meta.regions;
+      }
+      
+      console.log("🔧 Final clean request structure:", cleanQueryReq);
+      console.log("🔧 Final clean query structure:", cleanQueryReq.query);
+      
+      // Return the clean request object without aggs and org_identifier
+      return cleanQueryReq;
     } catch (error: any) {
       console.error("Error in buildSearch:", error);
       throw new Error("An error occurred while constructing the search query.");
@@ -166,45 +389,164 @@ export const useLogsSearch = () => {
   };
 
   /**
-   * Get query partitions for pagination
+   * Get query partitions for pagination (matches original implementation)
    */
   const getQueryPartitions = async (queryReq: any) => {
     try {
-      const parsedSQL: any = fnParsedSQL(searchObj.data.query);
+      // Reset hits and histogram
+      searchObj.data.queryResults.hits = [];
+      searchObj.data.histogram = {
+        xData: [],
+        yData: [],
+        chartParams: {
+          title: "",
+          unparsed_x_data: [],
+          timezone: "",
+        },
+        errorCode: 0,
+        errorMsg: "",
+        errorDetail: "",
+      };
 
+      const parsedSQL: any = createSQLParserFunctions(null).parseSQL(searchObj.data.query);
+
+      // In Limit we don't need to get partitions, as we directly hit search request with query limit
       if (
-        searchObj.meta.sqlMode &&
-        parsedSQL != undefined &&
-        (parsedSQL.limit != null || parsedSQL.offset != null)
+        !searchObj.meta.sqlMode ||
+        (searchObj.meta.sqlMode && parsedSQL && parsedSQL.limit == null)
       ) {
-        return null;
-      } else {
         const partitionQueryReq: any = {
-          query: {
-            sql: queryReq.query.sql,
-            start_time: queryReq.query.start_time,
-            end_time: queryReq.query.end_time,
-            from: queryReq.query.from,
-            size: queryReq.query.size,
-            quick_mode: false,
-            query_type: "",
-            track_total_hits: false,
-          },
-          aggs: {},
-          encoding: "base64",
+          sql: queryReq.query.sql,
+          start_time: queryReq.query.start_time,
+          end_time: queryReq.query.end_time,
         };
 
-        partitionQueryReq.org_identifier = queryReq.org_identifier;
-
-        if (searchObj.meta.regions?.length) {
-          partitionQueryReq.regions = searchObj.meta.regions;
+        // If sql_base64_enabled is true, then we will encode the query
+        if (store.state.zoConfig.sql_base64_enabled) {
+          partitionQueryReq["encoding"] = "base64";
         }
 
-        return await logsApi.partition(partitionQueryReq);
+        // Add enterprise features if enabled
+        if (searchObj.meta.regions?.length) {
+          partitionQueryReq["regions"] = searchObj.meta.regions;
+        }
+
+        // Generate trace context (matching original)
+        const { traceparent, traceId } = generateTraceContext();
+        addTraceId(traceId);
+
+        partitionQueryReq["streaming_output"] = true;
+
+        searchObj.data.queryResults.histogram_interval = null;
+        searchObj.data.queryResults.visualization_histogram_interval = null;
+
+        // Ensure organizationIdentifier is set
+        if (!searchObj.organizationIdentifier && store.state?.selectedOrganization?.identifier) {
+          searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
+        }
+        
+        // Ensure streamType is set (default to "logs")
+        if (!searchObj.data.stream.streamType) {
+          searchObj.data.stream.streamType = "logs";
+        }
+        
+        console.log("🔧 Debug values for partition API:");
+        console.log("- organizationIdentifier:", searchObj.organizationIdentifier);
+        console.log("- streamType:", searchObj.data.stream.streamType);
+        console.log("- store selectedOrganization:", store.state.selectedOrganization);
+        console.log("- partitionQueryReq:", partitionQueryReq);
+        
+        console.log("🔧 Calling partition API with:", {
+          org_identifier: searchObj.organizationIdentifier,
+          query: partitionQueryReq,
+          page_type: searchObj.data.stream.streamType,
+        });
+
+        const partitionResponse = await search.partition({
+          org_identifier: searchObj.organizationIdentifier,
+          query: partitionQueryReq,
+          page_type: searchObj.data.stream.streamType,
+          traceparent,
+          enable_align_histogram: true,
+        });
+
+        console.log("✅ Partition API response:", partitionResponse);
+
+        // Process partition response to set up pagination (matching original implementation)
+        if (partitionResponse.data) {
+          searchObj.data.queryResults.partitionDetail = {
+            partitions: [],
+            partitionTotal: [],
+            paginations: [],
+          };
+          
+          // Set histogram eligibility and intervals
+          searchObj.data.queryResults.is_histogram_eligible = partitionResponse.data?.is_histogram_eligible;
+          searchObj.data.queryResults.histogram_interval = partitionResponse.data.histogram_interval;
+          
+          if (!searchObj.data.queryResults.visualization_histogram_interval && partitionResponse.data?.histogram_interval) {
+            searchObj.data.queryResults.visualization_histogram_interval = partitionResponse.data?.histogram_interval;
+          }
+
+          // Process partitions based on query type (single stream vs multi-stream)
+          if (typeof partitionQueryReq.sql != "string") {
+            // Multi-stream case
+            const partItem = partitionResponse.data;
+            searchObj.data.queryResults.total += partItem.records;
+            
+            if (partItem.partitions && partItem.partitions.length > 0) {
+              const partitions = partItem.partitions;
+              searchObj.data.queryResults.partitionDetail.partitions = partitions;
+              
+              for (const [index, item] of partitions.entries()) {
+                const pageObject = [
+                  {
+                    startTime: item[0],
+                    endTime: item[1],
+                    from: 0,
+                    size: searchObj.meta.resultGrid.rowsPerPage,
+                    streaming_output: partitionResponse.data?.streaming_aggs || false,
+                    streaming_id: partitionResponse.data?.streaming_id || null,
+                  },
+                ];
+                searchObj.data.queryResults.partitionDetail.paginations.push(pageObject);
+                searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+              }
+            }
+          } else {
+            // Single stream case
+            searchObj.data.queryResults.total = 0;
+            const partitions = partitionResponse.data.partitions;
+            
+            if (partitions && partitions.length > 0) {
+              searchObj.data.queryResults.partitionDetail.partitions = partitions;
+              
+              for (const [index, item] of partitions.entries()) {
+                const pageObject = [
+                  {
+                    startTime: item[0],
+                    endTime: item[1],
+                    from: 0,
+                    size: searchObj.meta.resultGrid.rowsPerPage,
+                    streaming_output: partitionResponse.data?.streaming_aggs || false,
+                    streaming_id: partitionResponse.data?.streaming_id || null,
+                  },
+                ];
+                searchObj.data.queryResults.partitionDetail.paginations.push(pageObject);
+                searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+              }
+            }
+          }
+        }
+
+        return partitionResponse;
       }
+      
+      return null;
     } catch (error: any) {
       console.error("Error in getQueryPartitions:", error);
-      return null;
+      searchObj.data.errorMsg = error.response?.data?.error || error.message;
+      throw error;
     }
   };
 
@@ -242,7 +584,17 @@ export const useLogsSearch = () => {
         }
       }
 
-      return generateURLQueryUtil(params);
+      const query = new URLSearchParams();
+      Object.keys(params).forEach(key => {
+        if (params[key] != null) {
+          if (Array.isArray(params[key])) {
+            query.append(key, params[key].join(','));
+          } else {
+            query.append(key, params[key].toString());
+          }
+        }
+      });
+      return query.toString();
     } catch (error: any) {
       console.error("Error generating URL query:", error);
       return "";
@@ -253,32 +605,168 @@ export const useLogsSearch = () => {
    * Execute search query
    */
   const getQueryData = async (isPagination = false) => {
+    console.log("🔍 getQueryData called with isPagination:", isPagination);
+    console.log("📊 Current state:", {
+      selectedStreams: searchObj.data.stream.selectedStream,
+      streamsLength: searchObj.data.stream.selectedStream.length,
+      sqlMode: searchObj.meta.sqlMode,
+      query: searchObj.data.query,
+      communicationMethod: searchObj.communicationMethod,
+      streamLists: searchObj.data.stream.streamLists?.length
+    });
+    
     try {
-      if (searchObj.data.stream.selectedStream.length === 0) {
-        searchObj.data.queryResults.hits = [];
-        searchObj.data.queryResults.total = 0;
-        searchObj.data.histogram.loading = false;
-        searchObj.data.histogram.errorCode = 0;
-        searchObj.data.histogram.errorMsg = "";
+      // Reset cancel query on new search request initiation
+      searchObj.data.isOperationCancelled = false;
+      
+      // Check if streams are available and selected (matching original logic)
+      if (
+        !searchObj.data.stream.streamLists?.length ||
+        searchObj.data.stream.selectedStream.length == 0
+      ) {
+        console.log("❌ No streams available or selected - returning early");
+        searchObj.loading = false;
         return;
       }
 
-      searchObj.loading = true;
-      searchObj.data.errorMsg = "";
+      // Set communication method
+      searchObj.meta.jobId = "";
+      
+      console.log("✅ Streams are available and selected, continuing...");
+      searchObj.meta.showDetailTab = false;
+      searchObj.meta.searchApplied = true;
+      searchObj.data.functionError = "";
 
+      console.log("🔄 Communication method:", searchObj.communicationMethod);
+
+      // Use the appropriate method to fetch data (matching original implementation)
+      if (searchObj.communicationMethod === "ws" || searchObj.communicationMethod === "streaming") {
+        console.log("📡 Using WebSocket/streaming method");
+        await getDataThroughStream(isPagination);
+        return;
+      }
+
+      // HTTP method flow
+      console.log("🌐 Using HTTP method");
+      console.log("🔧 Building search request...");
       const queryReq: any = buildSearch();
+      console.log("🔧 Built queryReq:", queryReq);
+
+      if (!queryReq) {
+        throw new Error("Failed to build search query");
+      }
 
       if (searchObj.meta.sqlMode && queryReq.query.sql.trim() === "") {
+        console.log("❌ SQL mode with empty query - returning early");
         searchObj.data.errorMsg = "SQL mode requires a non-empty query.";
+        searchObj.loading = false;
         return;
       }
 
-      // Handle different communication methods
-      if (searchObj.communicationMethod === "websocket") {
-        await handleWebSocketSearch(queryReq, isPagination);
-      } else {
-        await handleHttpSearch(queryReq, isPagination);
+      console.log("✅ Query validation passed, proceeding with search...");
+
+      // Update URL query parameters (if not pagination)
+      if (!isPagination) {
+        console.log("🔗 Updating URL query parameters...");
+        // URL update would be handled by useLogsURL composable
       }
+
+      // Reset query data and get partition detail for given query (if not pagination)
+      if (!isPagination) {
+        resetQueryData();
+        console.log("📦 Getting query partitions...");
+        await getQueryPartitions(queryReq);
+        console.log("✅ Query partitions complete");
+      }
+
+      if (queryReq != null) {
+        // In case of live refresh, reset from to 0
+        if (
+          searchObj.meta.refreshInterval > 0 &&
+          router.currentRoute.value.name == "logs"
+        ) {
+          queryReq.query.from = 0;
+          searchObj.meta.refreshHistogram = true;
+        }
+
+        // Update query with function or action (if needed)
+        // addTransformToQuery(queryReq);
+
+        // In case of relative time, set start_time and end_time to query
+        if (searchObj.data.datetime.type === "relative") {
+          if (!isPagination) {
+            // Store initial query payload for pagination requests
+            // initialQueryPayload.value = cloneDeep(queryReq);
+          }
+        }
+
+        // Reset errorCode
+        searchObj.data.errorCode = 0;
+
+        // Copy query request for histogram query
+        searchObj.data.histogramQuery = JSON.parse(JSON.stringify(queryReq));
+        searchObj.data.histogramQuery.query.sql = queryReq.query.sql;
+        
+        delete searchObj.data.histogramQuery.query.quick_mode;
+        delete searchObj.data.histogramQuery.query.from;
+        delete searchObj.data.histogramQuery.aggs;
+        
+        searchObj.data.customDownloadQueryObj = JSON.parse(JSON.stringify(queryReq));
+
+        // Get the current page detail and set it into query request
+        if (searchObj.data.queryResults.partitionDetail?.paginations) {
+          const currentPageDetail = searchObj.data.queryResults.partitionDetail.paginations[
+            searchObj.data.resultGrid.currentPage - 1
+          ];
+          if (currentPageDetail && currentPageDetail[0]) {
+            queryReq.query.start_time = currentPageDetail[0].startTime;
+            queryReq.query.end_time = currentPageDetail[0].endTime;
+            queryReq.query.from = currentPageDetail[0].from;
+            queryReq.query.size = currentPageDetail[0].size;
+            queryReq.query.streaming_output = currentPageDetail[0].streaming_output;
+            queryReq.query.streaming_id = currentPageDetail[0].streaming_id;
+
+            // For custom download
+            searchObj.data.customDownloadQueryObj.query.streaming_output = queryReq.query.streaming_output;
+            searchObj.data.customDownloadQueryObj.query.streaming_id = queryReq.query.streaming_id;
+          }
+        }
+
+        // Setting subpage for pagination
+        searchObj.data.queryResults.subpage = 1;
+
+        // Get paginated data
+        console.log("📄 Getting paginated data...");
+        await getPaginatedData(queryReq);
+        console.log("✅ Paginated data complete");
+
+        // Handle histogram generation if needed
+        if (!isPagination && searchObj.meta.refreshInterval == 0 && searchObj.data.queryResults.hits?.length > 0) {
+          searchObj.meta.resetPlotChart = true;
+        }
+
+        // Check if histogram should be generated
+        const parsedSQL: any = createSQLParserFunctions(null).parseSQL(searchObj.data.query);
+        
+        const shouldGenerateHistogram = (
+          (searchObj.data.queryResults.aggs == undefined &&
+            searchObj.meta.refreshHistogram == true &&
+            searchObj.loadingHistogram == false &&
+            searchObj.meta.showHistogram == true) ||
+          (searchObj.loadingHistogram == false &&
+            searchObj.meta.showHistogram == true &&
+            searchObj.meta.sqlMode == false &&
+            searchObj.meta.refreshHistogram == true)
+        );
+
+        if (shouldGenerateHistogram) {
+          console.log("📊 Generating histogram...");
+          await generateHistogram(queryReq, parsedSQL);
+          console.log("✅ Histogram generation complete");
+        }
+      }
+
+      searchObj.loading = false;
     } catch (error: any) {
       console.error("Error in getQueryData:", error);
       searchObj.data.errorMsg = error.message || "An unexpected error occurred while fetching data.";
@@ -287,7 +775,29 @@ export const useLogsSearch = () => {
   };
 
   /**
-   * Handle WebSocket-based search
+   * Handle WebSocket/streaming data fetching (matching original implementation)
+   */
+  const getDataThroughStream = async (isPagination: boolean = false) => {
+    try {
+      console.log("📡 getDataThroughStream called with isPagination:", isPagination);
+      const queryReq: any = buildSearch();
+      const payload = buildWebSocketPayloadUtil(queryReq, isPagination, "search");
+      const requestId = initializeSearchConnection(payload);
+      
+      if (requestId) {
+        addTraceId(requestId);
+      }
+      
+      console.log("✅ WebSocket search initiated with requestId:", requestId);
+    } catch (error: any) {
+      console.error("WebSocket search error:", error);
+      searchObj.loading = false;
+      throw error;
+    }
+  };
+
+  /**
+   * Handle WebSocket-based search (legacy function for backward compatibility)
    */
   const handleWebSocketSearch = async (queryReq: SearchRequestPayload, isPagination: boolean) => {
     try {
@@ -306,10 +816,67 @@ export const useLogsSearch = () => {
   /**
    * Handle HTTP-based search
    */
-  const handleHttpSearch = async (queryReq: SearchRequestPayload, isPagination: boolean) => {
+  const handleHttpSearch = async (queryReq: any, isPagination: boolean) => {
     try {
-      const response = await logsApi.search(queryReq);
+      // Ensure organizationIdentifier is set
+      if (!searchObj.organizationIdentifier && store.state?.selectedOrganization?.identifier) {
+        searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
+      }
+      
+      // Ensure streamType is set (default to "logs")  
+      if (!searchObj.data.stream.streamType) {
+        searchObj.data.stream.streamType = "logs";
+      }
+      
+      console.log("🌐 handleHttpSearch calling with:", {
+        org_identifier: searchObj.organizationIdentifier,
+        query: queryReq,
+        page_type: searchObj.data.stream.streamType
+      });
+      
+      const response = await search.search({
+        org_identifier: searchObj.organizationIdentifier,
+        query: queryReq,
+        page_type: searchObj.data.stream.streamType,
+        traceparent: null
+      });
+      
+      // Handle function error
+      if (response.data.hasOwnProperty("function_error") && response.data.function_error != "") {
+        searchObj.data.functionError = response.data.function_error;
+      }
+      
+      // Debug: Log the response structure
+      console.log("🔍 Search API response structure:", {
+        responseKeys: Object.keys(response),
+        dataKeys: Object.keys(response.data || {}),
+        data: response.data,
+        hasContent: !!response.data?.content,
+        hasResults: !!response.data?.content?.results,
+        hasHits: !!response.data?.content?.results?.hits,
+        hitsLength: response.data?.content?.results?.hits?.length || 0,
+        directHits: response.data?.hits?.length || 0,
+        sampleHit: response.data?.content?.results?.hits?.[0] || response.data?.hits?.[0],
+      });
+      
+      // Handle aggregation
+      handleAggregation(queryReq, response.data);
+      
+      // Update results
       await updateResult(queryReq, response.data, isPagination, false);
+      
+      // Set up pagination array if not a pagination request
+      if (!isPagination) {
+        searchObj.data.queryResults.pagination = [];
+      }
+      
+      // Refresh pagination if it's a pagination request
+      if (isPagination) {
+        refreshPagination(true);
+      }
+      
+      // Process post-pagination data (extract fields, update grid columns, etc.)
+      processPostPaginationData();
     } catch (error: any) {
       console.error("HTTP search error:", error);
       searchObj.data.errorMsg = error.response?.data?.error || error.message;
@@ -441,8 +1008,59 @@ export const useLogsSearch = () => {
    */
   const updateResult = async (queryReq: SearchRequestPayload, response: any, isPagination: boolean, appendResult: boolean = false) => {
     try {
-      // Update search results based on response
-      // Implementation depends on specific result structure
+      // Handle refresh interval case
+      if (searchObj.meta.refreshInterval > 0 && router.currentRoute.value.name === "logs") {
+        searchObj.data.queryResults.from = response.from;
+        searchObj.data.queryResults.scan_size = response.scan_size;
+        searchObj.data.queryResults.took = response.took;
+        searchObj.data.queryResults.aggs = response.aggs;
+        searchObj.data.queryResults.hits = response.hits;
+      }
+      
+      if (searchObj.meta.refreshInterval === 0) {
+        // In page count we set track_total_hits
+        if (!queryReq.query.hasOwnProperty("track_total_hits")) {
+          delete response.total;
+        }
+
+        // Handle append result case
+        if (appendResult) {
+          await chunkedAppend(searchObj.data.queryResults.hits, response.hits);
+          searchObj.data.queryResults.total += response.total;
+          searchObj.data.queryResults.took += response.took;
+          searchObj.data.queryResults.scan_size += response.scan_size;
+        } else {
+          if (response.streaming_aggs) {
+            searchObj.data.queryResults = {
+              ...response,
+              took: (searchObj.data?.queryResults?.took || 0) + response.took,
+              scan_size: (searchObj.data?.queryResults?.scan_size || 0) + response.scan_size,
+            };
+          } else if (isPagination) {
+            searchObj.data.queryResults.hits = response.hits;
+            searchObj.data.queryResults.from = response.from;
+            searchObj.data.queryResults.scan_size = response.scan_size;
+            searchObj.data.queryResults.took = response.took;
+            searchObj.data.queryResults.total = response.total;
+          } else {
+            // Replace results for initial request
+            const resultsData = response.content?.results || response;
+            console.log("📋 Assigning queryResults:", {
+              hasContent: !!response.content,
+              hasResults: !!response.content?.results,
+              resultsData,
+              hitsCount: resultsData?.hits?.length || 0,
+            });
+            searchObj.data.queryResults = resultsData;
+          }
+        }
+      }
+
+      // Store time_offset for pagecount context
+      if (searchObj.data.queryResults && response.time_offset) {
+        searchObj.data.queryResults.time_offset = response.time_offset;
+      }
+
       searchObj.loading = false;
     } catch (error: any) {
       console.error("Error updating search results:", error);
@@ -531,6 +1149,8 @@ export const useLogsSearch = () => {
     // Core search functions
     buildSearch,
     getQueryData,
+    getDataThroughStream,
+    getPaginatedData,
     searchAroundData,
     cancelQuery,
     
@@ -539,12 +1159,15 @@ export const useLogsSearch = () => {
     isDistinctQuery,
     isWithQuery,
     getQueryPartitions,
+    resetQueryData,
+    generateHistogram,
     
     // URL and sharing
     generateURLQuery,
     
     // WebSocket handlers
     initializeSearchConnection,
+    handleWebSocketSearch,
     handleSearchOpen,
     handleSearchMessage,
     handleSearchClose,

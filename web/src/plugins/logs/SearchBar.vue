@@ -3419,9 +3419,20 @@ export default defineComponent({
     const handleHistogramMode = () => {};
 
     const handleRunQueryFn = () => {
+      console.log("🎯 SearchBar handleRunQueryFn called!");
+      console.log("🎯 Current state:", {
+        logsVisualizeToggle: searchObj.meta.logsVisualizeToggle,
+        sqlMode: searchObj.meta.sqlMode,
+        selectedStreamsLength: searchObj.data.stream.selectedStream.length,
+        query: searchObj.data.query,
+        editorValue: searchObj.data.editorValue
+      });
+      
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
+        console.log("📊 In visualize mode - emitting handleRunQueryFn event");
         emit("handleRunQueryFn");
       } else {
+        console.log("📋 In logs mode - calling handleRunQuery directly");
         handleRunQuery();
       }
     };

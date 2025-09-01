@@ -239,7 +239,7 @@ export function generateURLQuery(params: URLQueryParams): Record<string, any> {
   }
 
   // Selected fields
-  if (params.selectedFields && params.selectedFields.length > 0) {
+  if (params.selectedFields && Array.isArray(params.selectedFields) && params.selectedFields.length > 0) {
     query["defined_schemas"] = params.selectedFields.join(",");
   }
 

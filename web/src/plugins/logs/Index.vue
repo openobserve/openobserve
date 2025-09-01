@@ -821,12 +821,15 @@ export default defineComponent({
     const runQueryFn = async () => {
       // searchObj.data.resultGrid.currentPage = 0;
       // searchObj.runQuery = false;
+      console.log("📊 runQueryFn called - starting query execution");
       try {
+        console.log("📋 About to call getQueryData()");
         await getQueryData();
+        console.log("✅ getQueryData completed - refreshing histogram");
         refreshHistogramChart();
         showJobScheduler.value = true;
       } catch (e) {
-        console.log(e);
+        console.log("❌ Error while getting query data: ", e);
       }
     };
 
@@ -1065,23 +1068,34 @@ export default defineComponent({
     };
 
     const setQuery = (sqlMode: boolean) => {
+      console.log("🔧 setQuery called with sqlMode:", sqlMode);
+      console.log("🔧 Current streams:", searchObj.data.stream.selectedStream);
+      console.log("🔧 searchBarRef exists:", !!searchBarRef.value);
+      
       if (!searchBarRef.value) {
-        console.error("searchBarRef is null");
+        console.error("❌ searchBarRef is null");
         return;
       }
 
       try {
         if (sqlMode) {
+          console.log("✅ In SQL mode - generating query");
           let selectFields = "";
           let whereClause = "";
           let currentQuery = searchObj.data.query;
+          
+          console.log("📝 Current query:", currentQuery);
 
           const hasSelect =
             currentQuery != "" &&
             (currentQuery.toLowerCase() === "select" ||
               currentQuery.toLowerCase().indexOf("select ") == 0);
+          
+          console.log("🔍 hasSelect:", hasSelect);
+          
           //check if user try to applied saved views in which sql mode is enabled.
           if (currentQuery.indexOf("SELECT") >= 0) {
+            console.log("⚠️ Query already has SELECT - returning early");
             return;
           }
 
@@ -1092,7 +1106,9 @@ export default defineComponent({
           //   currentQuery.toLowerCase() === "select" ||
           //   currentQuery.toLowerCase().indexOf("select ") == 0;
           if (!hasSelect) {
+            console.log("🔨 Building SQL query from scratch");
             if (currentQuery != "") {
+              console.log("📋 Processing existing query:", currentQuery);
               currentQuery = currentQuery.split("|");
               if (currentQuery.length > 1) {
                 selectFields = "," + currentQuery[0].trim();
@@ -1105,9 +1121,13 @@ export default defineComponent({
                 }
               }
             }
+            
+            console.log("🔧 selectFields:", selectFields);
+            console.log("🔧 whereClause:", whereClause);
 
             searchObj.data.query = "";
             const streams = searchObj.data.stream.selectedStream;
+            console.log("📊 Processing streams:", streams, "Length:", streams.length);
 
             streams.forEach((stream: any, index: number) => {
               // Add UNION for all but the first SELECT statement
@@ -1116,8 +1136,12 @@ export default defineComponent({
               }
               // Extract stream name properly (handle both strings and objects)
               const streamName = typeof stream === 'string' ? stream : (stream?.value || stream?.name || stream?.label || String(stream));
-              searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${streamName}" ${whereClause}`;
+              const queryPart = `SELECT [FIELD_LIST]${selectFields} FROM "${streamName}" ${whereClause}`;
+              console.log(`🔗 Adding query part ${index + 1}:`, queryPart);
+              searchObj.data.query += queryPart;
             });
+            
+            console.log("🔧 Generated base query:", searchObj.data.query);
 
             if (
               !searchObj.data.stream?.selectedStreamFields?.length &&
@@ -1169,10 +1193,14 @@ export default defineComponent({
             }
           }
 
+          console.log("🎯 Final query after field replacement:", searchObj.data.query);
           searchObj.data.editorValue = searchObj.data.query;
-
+          
+          console.log("📝 Setting editorValue:", searchObj.data.editorValue);
+          console.log("🔄 Calling updateQuery on searchBarRef");
           searchBarRef.value.updateQuery();
         } else {
+          console.log("❌ Not in SQL mode - clearing query");
           searchObj.data.query = "";
           searchBarRef.value.updateQuery();
         }
@@ -1769,6 +1797,7 @@ export default defineComponent({
     );
 
     const handleRunQueryFn = async () => {
+      console.log("🔥 handleRunQueryFn called! Mode:", searchObj.meta.logsVisualizeToggle);
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
@@ -1833,6 +1862,10 @@ export default defineComponent({
 
         // Sync visualization config to URL parameters
         updateUrlQueryParams(dashboardPanelData);
+      } else {
+        // Handle logs mode - call the runQueryFn directly
+        console.log("🚀 In logs mode - calling runQueryFn");
+        runQueryFn();
       }
     };
 
@@ -2499,11 +2532,16 @@ export default defineComponent({
       }
     },
     async fullSQLMode(newVal) {
+      console.log("🔄 fullSQLMode watcher triggered with:", newVal);
+      console.log("🔄 sqlModeManualTrigger:", this.searchObj.meta.sqlModeManualTrigger);
+      
       if (newVal) {
         await nextTick();
         if (this.searchObj.meta.sqlModeManualTrigger) {
+          console.log("🔧 Manual trigger - skipping setQuery");
           this.searchObj.meta.sqlModeManualTrigger = false;
         } else {
+          console.log("🔧 Auto trigger - calling setQuery");
           this.setQuery(newVal);
           this.updateUrlQueryParams();
         }

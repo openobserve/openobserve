@@ -45,6 +45,7 @@ import { useLogsVisualization } from "@/composables/useLogsVisualization";
 import { useLogsWebSocket } from "@/composables/useLogsWebSocket";
 import { useLogsURL } from "@/composables/useLogsURL";
 import { useLogsData } from "@/composables/useLogsData";
+import { useLogsSearch } from "@/composables/useLogsSearch";
 
 // Import utility functions
 import {
@@ -84,6 +85,7 @@ export const useLogs = () => {
   const logsWebSocket = useLogsWebSocket();
   const logsURL = useLogsURL();
   const logsData = useLogsData();
+  const logsSearch = useLogsSearch();
 
   // Initialize additional dependencies
   const { getStreams, getStream } = useStreams();
@@ -119,27 +121,17 @@ export const useLogs = () => {
 
   // Query execution functions (using function declarations for hoisting)
   async function getQueryData(isPagination: boolean = false) {
+    console.log("🔍 Main getQueryData called, delegating to logsSearch.getQueryData");
     try {
       // Clear cache
       if (Object.keys(searchObj.data.originalDataCache || {}).length > 0) {
         searchObj.data.originalDataCache = {};
       }
 
-      const queryReq: any = logsQuery.buildSearchRequest();
-      if (!queryReq) {
-        throw new Error("Invalid query request");
-      }
-
-      if (!isPagination) {
-        // Reset query data and get partition details
-        await getQueryPartitions(queryReq);
-      }
-
-      // Get paginated data
-      await getPaginatedData(queryReq);
-
+      // Use the improved getQueryData from logsSearch that matches original logic
+      await logsSearch.getQueryData(isPagination);
+      
       searchObj.loading = false;
-      return queryReq;
     } catch (error: any) {
       console.error("Error getting query data:", error);
       searchObj.loading = false;
@@ -670,6 +662,7 @@ export const useLogs = () => {
   };
 
   const handleRunQuery = async () => {
+    console.log("🏃‍♂️ handleRunQuery called in composable");
     try {
       searchObj.loading = true;
       searchObj.meta.refreshHistogram = true;
@@ -677,9 +670,11 @@ export const useLogs = () => {
       logsState.initialQueryPayload.value = null;
       searchObj.data.queryResults.aggs = null;
 
+      console.log("🔍 About to call getQueryData from handleRunQuery");
       await getQueryData();
+      console.log("✅ getQueryData completed from handleRunQuery");
     } catch (error: any) {
-      console.error("Error while running query:", error);
+      console.error("❌ Error while running query:", error);
       searchObj.loading = false;
     }
   };
@@ -829,6 +824,7 @@ export const useLogs = () => {
     loadLogsData,
     fnParsedSQL,
     fnUnparsedSQL,
+    getDataThroughStream: logsSearch.getDataThroughStream,
     
     // Query validation
     isLimitQuery: (parsedSQL?: any) => logsQuery.isLimitQuery(parsedSQL),

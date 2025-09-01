@@ -183,6 +183,7 @@ export const useLogsData = () => {
    */
   const extractFields = async () => {
     try {
+      console.log("🏷️  Extracting fields from search results");
       searchObj.loadingStream = true;
       searchObj.data.errorMsg = "";
       searchObj.data.errorDetail = "";
@@ -311,9 +312,11 @@ export const useLogsData = () => {
    */
   const updateFieldValues = () => {
     try {
+      console.log("🔍 Updating field values, hits:", searchObj.data.queryResults.hits?.length || 0);
       const fieldValueMap: FieldData = {};
       
-      for (const item of searchObj.data.queryResults.hits) {
+      for (const item of searchObj.data.queryResults.hits || []) {
+        console.log("📄 Processing hit item:", { hasSource: !!item._source, keys: Object.keys(item) });
         if (item._source) {
           Object.entries(item._source).forEach(([key, value]) => {
             if (!fieldValueMap[key]) {
@@ -554,29 +557,40 @@ export const useLogsData = () => {
    */
   const processPostPaginationData = () => {
     try {
-      const { rowsPerPage } = searchObj.meta.resultGrid;
-      const { currentPage } = searchObj.data.resultGrid;
+      // Always perform basic field processing (matching original implementation)
+      console.log("🔄 Processing post-pagination data, hits count:", searchObj.data.queryResults.hits?.length || 0);
       
-      if (!searchObj.data.queryResults.partitionDetail) {
-        return;
-      }
-
-      const partitionDetail = searchObj.data.queryResults.partitionDetail;
-      const startIndex = currentPage * rowsPerPage;
-      const endIndex = startIndex + rowsPerPage;
-
-      // Process partition data for current page
-      if (partitionDetail.paginations && partitionDetail.paginations.length > 0) {
-        const currentPartition = Math.floor(startIndex / partitionDetail.partition_size);
-        const partitionData = partitionDetail.paginations[currentPartition] || [];
+      updateFieldValues();
+      extractFields();
+      updateGridColumns();
+      
+      // Handle partitioned pagination if available
+      if (searchObj.data.queryResults.partitionDetail) {
+        const { rowsPerPage } = searchObj.meta.resultGrid;
+        const { currentPage } = searchObj.data.resultGrid;
         
-        // Extract data for current page
-        const pageData = partitionData.slice(
-          startIndex % partitionDetail.partition_size,
-          Math.min(endIndex % partitionDetail.partition_size, partitionData.length)
-        );
+        const partitionDetail = searchObj.data.queryResults.partitionDetail;
+        const startIndex = currentPage * rowsPerPage;
+        const endIndex = startIndex + rowsPerPage;
 
-        searchObj.data.queryResults.hits = pageData;
+        // Process partition data for current page
+        if (partitionDetail.paginations && partitionDetail.paginations.length > 0) {
+          const currentPartition = Math.floor(startIndex / partitionDetail.partition_size);
+          const partitionData = partitionDetail.paginations[currentPartition] || [];
+          
+          // Extract data for current page
+          const pageData = partitionData.slice(
+            startIndex % partitionDetail.partition_size,
+            Math.min(endIndex % partitionDetail.partition_size, partitionData.length)
+          );
+
+          searchObj.data.queryResults.hits = pageData;
+          
+          // Re-process after pagination adjustment
+          updateFieldValues();
+          extractFields();
+          updateGridColumns();
+        }
       }
     } catch (error: any) {
       console.error("Error processing post-pagination data:", error);
@@ -728,6 +742,37 @@ export const useLogsData = () => {
     }
   };
 
+  /**
+   * Refresh pagination state based on current results
+   */
+  const refreshPagination = (regenerateFlag: boolean = false) => {
+    try {
+      const { rowsPerPage } = searchObj.meta.resultGrid;
+      const { currentPage } = searchObj.data.resultGrid;
+      
+      if (searchObj.meta.jobId !== "") {
+        searchObj.meta.resultGrid.rowsPerPage = 100;
+      }
+      
+      let total = 0;
+      let totalPages = 0;
+      
+      if (searchObj.data.queryResults.hits?.length > 0) {
+        total = searchObj.data.queryResults.total || searchObj.data.queryResults.hits.length;
+        totalPages = Math.ceil(total / rowsPerPage);
+      }
+      
+      searchObj.data.resultGrid.totalPages = totalPages;
+      
+      if (regenerateFlag) {
+        // Regenerate pagination based on current data
+        searchObj.data.resultGrid.currentPage = Math.max(1, Math.min(currentPage, totalPages));
+      }
+    } catch (error: any) {
+      console.error("Error refreshing pagination:", error);
+    }
+  };
+
   return {
     // Stream operations
     getStreams,
@@ -758,6 +803,7 @@ export const useLogsData = () => {
     
     // Utility functions
     hasAggregation,
+    refreshPagination,
     
     // State
     processedFieldValues,
