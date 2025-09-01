@@ -146,7 +146,10 @@ pub async fn search(
         .into_iter()
         .filter_map(|v| latest_schema_map.contains_key(&v).then_some(v))
         .collect_vec();
-    let index_fields = get_stream_setting_index_fields(&stream_settings);
+    let index_fields = get_stream_setting_index_fields(&stream_settings)
+        .into_iter()
+        .filter_map(|v| latest_schema_map.contains_key(&v).then_some(v))
+        .collect_vec();
     let index_updated_at = get_stream_setting_index_updated_at(&stream_settings, stream_created_at);
 
     // construct partition filters
