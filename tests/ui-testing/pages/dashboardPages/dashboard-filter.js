@@ -163,37 +163,45 @@ export default class DashboardFilter {
 
     // More robust field selection approach
     await columnLocator.click();
-    
+
     // Ensure field is focused and ready for input
     await columnLocator.focus();
     await this.page.waitForTimeout(300);
-    
+
     // Clear existing content and enter new field name
-    await this.page.keyboard.press('Control+a'); // Select all
+    await this.page.keyboard.press("Control+a"); // Select all
     await this.page.keyboard.type(newFieldName);
-    
+
     // Wait for suggestions to load
     await this.page.waitForTimeout(1000);
-    
+
     // Use a more deterministic approach to select from dropdown
     const maxRetries = 5;
     let success = false;
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         // Wait for dropdown to be present
-        const dropdownExists = await this.page.locator('div.q-menu[role="listbox"]').isVisible();
-        
+        const dropdownExists = await this.page
+          .locator('div.q-menu[role="listbox"]')
+          .isVisible();
+
         if (dropdownExists) {
           // Get all dropdown options
-          const options = this.page.locator('div.q-menu[role="listbox"] div.q-item');
+          const options = this.page.locator(
+            'div.q-menu[role="listbox"] div.q-item'
+          );
           const optionCount = await options.count();
-          
+
           if (optionCount > 0) {
             // Try to find exact match first
-            const exactMatch = options.filter({ hasText: new RegExp(`^${newFieldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) });
+            const exactMatch = options.filter({
+              hasText: new RegExp(
+                `^${newFieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`
+              ),
+            });
             const exactCount = await exactMatch.count();
-            
+
             if (exactCount > 0) {
               await exactMatch.first().click();
               success = true;
@@ -206,36 +214,39 @@ export default class DashboardFilter {
             }
           }
         }
-        
+
         // If dropdown not visible, try keyboard selection
-        await this.page.keyboard.press('ArrowDown');
+        await this.page.keyboard.press("ArrowDown");
         await this.page.waitForTimeout(200);
-        await this.page.keyboard.press('Enter');
-        
+        await this.page.keyboard.press("Enter");
+
         // Check if selection was successful by verifying dropdown closed
         await this.page.waitForTimeout(500);
-        const stillVisible = await this.page.locator('div.q-menu[role="listbox"]').isVisible();
+        const stillVisible = await this.page
+          .locator('div.q-menu[role="listbox"]')
+          .isVisible();
         if (!stillVisible) {
           success = true;
           break;
         }
-        
       } catch (error) {
         console.log(`Attempt ${attempt} failed: ${error.message}`);
         if (attempt === maxRetries) {
           // Last resort: just press Enter
-          await this.page.keyboard.press('Enter');
+          await this.page.keyboard.press("Enter");
           success = true;
           break;
         }
         await this.page.waitForTimeout(500); // Wait before retry
       }
     }
-    
+
     if (!success) {
-      throw new Error(`Failed to select field after ${maxRetries} attempts: ${newFieldName}`);
+      throw new Error(
+        `Failed to select field after ${maxRetries} attempts: ${newFieldName}`
+      );
     }
-    
+
     // Additional wait to ensure selection is processed
     await this.page.waitForTimeout(500);
 
@@ -244,8 +255,33 @@ export default class DashboardFilter {
       const conditionLocator = this.page.locator(
         `[data-test="dashboard-add-condition-condition-${idx}"]`
       );
-      await conditionLocator.click();
-      await conditionLocator.click(); // safety click
+
+      // Wait for element to be ready for interaction
+      // await conditionLocator.waitFor({
+      //   state: "visible",
+      //   timeout: 10000,
+      // });
+
+      // Wait for element to be enabled and interactable
+      await this.page.waitForFunction(
+        (selector) => {
+          const element = document.querySelector(selector);
+          return (
+            element &&
+            !element.disabled &&
+            !element.hasAttribute("aria-disabled") &&
+            getComputedStyle(element).pointerEvents !== "none"
+          );
+        },
+        `[data-test="dashboard-add-condition-condition-${idx}"]`,
+        { timeout: 10000 }
+      );
+
+      // Scroll into view if needed
+      await conditionLocator.scrollIntoViewIfNeeded();
+
+      // Click when truly ready
+      await conditionLocator.click({ timeout: 10000 });
     }
 
     // Step 4: Operator dropdown
