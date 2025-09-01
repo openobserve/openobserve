@@ -910,13 +910,11 @@ export default defineComponent({
           store.dispatch("logs/setIsInitialized", true);
         } else {
           await initialLogsState();
-          await getStreamList(false);
-          updateGridColumns();
           await nextTick();
-        }
-
-        if (isCloudEnvironment()) {
-          setupCloudSpecificThreshold();
+          await getStreamList(false);
+          await nextTick();
+          await updateGridColumns();
+          await nextTick();
         }
 
         isLogsMounted.value = true;
