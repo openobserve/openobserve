@@ -54,7 +54,7 @@ import organizationsService from "@/services/organizations";
 import {
   useLocalCurrentUser,
   useLocalOrganization,
-  invlidateLoginData,
+  invalidateLoginData,
   useLocalUserInfo,
   getImageURL,
 } from "@/utils/zincutils";
@@ -188,7 +188,7 @@ export default defineComponent({
 
     const signout = () => {
       if (config?.isEnterprise == "true" || config?.isCloud == "true") {
-        invlidateLoginData();
+        invalidateLoginData();
       }
 
       store.dispatch("logout");
