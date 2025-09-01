@@ -101,12 +101,12 @@ impl TreeNodeRewriter for PlanRewriter {
         if let Some(filter) = plan.as_any().downcast_ref::<FilterExec>() {
             let predicate = filter.predicate();
 
-            // Check if the predicate contains any match_all functions
+            // 1. Check if the predicate contains any match_all functions
             if !has_match_all_function(predicate) {
                 return Ok(Transformed::no(plan));
             }
 
-            // Rewrite the filter datasource projection
+            // 2. Rewrite the datasource projection to include FST fields
             let mut add_fst_fields_to_projection = AddFstFieldsToProjection::new(
                 self.fields.iter().map(|f| f.0.clone()).collect(),
                 filter.schema(),
@@ -117,14 +117,13 @@ impl TreeNodeRewriter for PlanRewriter {
                 .rewrite(&mut add_fst_fields_to_projection)?
                 .data;
 
-            // Apply expression rewriter to the predicate
+            // 3. Rewrite match_all/fuzzy_match_all
             let mut expr_rewriter =
                 MatchAllRewriter::new(input.schema().clone(), self.fields.clone());
             let rewritten_predicate = predicate.clone().rewrite(&mut expr_rewriter).data()?;
 
-            // Create new filter with rewritten predicate
-            let new_filter = FilterExec::try_new(rewritten_predicate, input)?;
-            let new_filter = new_filter
+            // 4. Create new filter with rewritten predicate
+            let new_filter = FilterExec::try_new(rewritten_predicate, input)?
                 .with_projection(add_fst_fields_to_projection.filter_projection.clone())?;
             return Ok(Transformed::yes(Arc::new(new_filter)));
         }
@@ -320,17 +319,17 @@ fn is_match_all_physical(expr: &Arc<dyn PhysicalExpr>) -> bool {
 }
 
 struct AddFstFieldsToProjection {
-    fields: Vec<String>,
-    pub filter_projection: Option<Vec<usize>>,
+    fst_fields: Vec<String>,
     filter_schema: SchemaRef,
+    pub filter_projection: Option<Vec<usize>>,
 }
 
 impl AddFstFieldsToProjection {
-    pub fn new(fields: Vec<String>, filter_schema: SchemaRef) -> Self {
+    pub fn new(fst_fields: Vec<String>, filter_schema: SchemaRef) -> Self {
         Self {
-            fields,
-            filter_projection: None,
+            fst_fields,
             filter_schema,
+            filter_projection: None,
         }
     }
 }
@@ -345,7 +344,7 @@ impl TreeNodeRewriter for AddFstFieldsToProjection {
             // the field in argument, so when we rewrite match_all function, we need to add
             // the field to the projection
             let mut parquet_projection = self
-                .fields
+                .fst_fields
                 .iter()
                 .map(|f| schema.index_of(f).unwrap())
                 .collect::<Vec<_>>();
