@@ -15,6 +15,8 @@
 
 pub mod distribute_analyze;
 pub mod index;
+#[allow(dead_code)]
+pub mod index_optimizer;
 pub mod join_reorder;
 pub mod remote_scan;
 pub mod rewrite_match;
