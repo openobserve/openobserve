@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { useLocalWrapContent } from "@/utils/zincutils";
+import { TimePeriodUnit } from "@/ts/interfaces";
 
 /**
  * Maximum number of search retries before giving up
@@ -38,6 +39,16 @@ export const INTERVAL_MAP = {
   "30 minute": 30 * 60 * 1000 * 1000,
   "1 hour": 60 * 60 * 1000 * 1000,
   "1 day": 24 * 60 * 60 * 1000 * 1000,
+} as const;
+
+// Time conversion constants in milliseconds
+export const TIME_MULTIPLIERS: Record<TimePeriodUnit, number> = {
+  s: 1000, // 1 second
+  m: 60 * 1000, // 1 minute
+  h: 60 * 60 * 1000, // 1 hour
+  d: 24 * 60 * 60 * 1000, // 1 day
+  w: 7 * 24 * 60 * 60 * 1000, // 1 week
+  M: 0, // Special case - handled separately
 } as const;
 
 /**
