@@ -532,6 +532,11 @@ export default defineComponent({
       addLabelToEditor,
       addValueToEditor,
       selectedMetric,
+      // Exposed for testing
+      selectedMetricLabels,
+      getMetricsFieldValues,
+      getFilteredMetricValues,
+      updateMetricLabels,
     };
   },
 });

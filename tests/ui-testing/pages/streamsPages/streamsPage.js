@@ -64,6 +64,10 @@ export class StreamsPage {
         await this.logsPage.clickQuickModeToggle();
     }
 
+    async clickAllFieldsButton() {
+        await this.logsPage.clickAllFieldsButton();
+    }
+
     async clearAndFillQueryEditor(query) {
         await this.logsPage.clearAndFillQueryEditor(query);
     }
@@ -130,7 +134,19 @@ export class StreamsPage {
 
     // Stream methods
     async navigateToStreamExplorer() {
-        await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
+        // First navigate to home if not already there
+        if (!this.page.url().includes('web/logs')) {
+            await this.page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=${process.env.ORGNAME}`);
+            await this.page.waitForLoadState('networkidle');
+        }
+        
+        try {
+            await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
+        } catch (error) {
+            console.warn('Retry clicking streams menu:', error.message);
+            await this.page.waitForTimeout(2000);
+            await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
+        }
         await this.page.waitForTimeout(1000);
     }
 

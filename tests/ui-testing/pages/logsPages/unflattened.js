@@ -48,7 +48,7 @@ class UnflattenedPage {
     }
 
     get o2IdText() {
-        return this.page.locator('[data-test="log-detail-json-content"] [data-test="log-expand-detail-key-_o2_id-text"]');
+        return this.page.locator('[data-test="log-detail-json-content"] [data-test="log-expand-detail-key-_o2_id"]');
     }
 
     get unflattenedTab() {
@@ -69,6 +69,10 @@ class UnflattenedPage {
 
     get logsSearchBarQueryEditor() {
         return this.page.locator('[data-test="logs-search-bar-query-editor"]');
+    }
+
+    get allFieldsButton() {
+        return this.page.locator('[data-test="logs-all-fields-btn"]');
     }
 }
 export default UnflattenedPage;

@@ -27,10 +27,12 @@ use datafusion::{
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
+        metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet},
         stream::RecordBatchStreamAdapter,
     },
 };
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
+use flight::common::Metrics;
 use futures::{StreamExt, TryStreamExt};
 use futures_util::pin_mut;
 use parking_lot::Mutex;
@@ -45,7 +47,7 @@ use crate::service::search::datafusion::distributed_plan::{
 };
 
 /// Execution plan for empty relation with produce_one_row=false
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RemoteScanExec {
     input: Arc<dyn ExecutionPlan>,
     remote_scan_node: RemoteScanNode,
@@ -53,7 +55,9 @@ pub struct RemoteScanExec {
     cache: PlanProperties,
     pub scan_stats: Arc<Mutex<ScanStats>>,
     pub partial_err: Arc<Mutex<String>>,
+    pub cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
     pub enrich_mode_node_idx: usize,
+    pub metrics: ExecutionPlanMetricsSet,
 }
 
 impl RemoteScanExec {
@@ -89,7 +93,9 @@ impl RemoteScanExec {
             cache,
             scan_stats: Arc::new(Mutex::new(ScanStats::default())),
             partial_err: Arc::new(Mutex::new(String::new())),
+            cluster_metrics: Arc::new(Mutex::new(Vec::new())),
             enrich_mode_node_idx,
+            metrics: ExecutionPlanMetricsSet::new(),
         })
     }
 
@@ -99,6 +105,10 @@ impl RemoteScanExec {
 
     pub fn partial_err(&self) -> Arc<Mutex<String>> {
         self.partial_err.clone()
+    }
+
+    pub fn cluster_metrics(&self) -> Arc<Mutex<Vec<Metrics>>> {
+        self.cluster_metrics.clone()
     }
 
     fn output_partitioning_helper(n_partitions: usize) -> Partitioning {
@@ -118,6 +128,11 @@ impl RemoteScanExec {
             EmissionType::Incremental,
             Boundedness::Bounded,
         )
+    }
+
+    pub fn set_analyze(mut self) -> Self {
+        self.remote_scan_node.search_infos.is_analyze = true;
+        self
     }
 }
 
@@ -171,6 +186,7 @@ impl ExecutionPlan for RemoteScanExec {
         partition: usize,
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
+        let baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
         let fut = get_remote_batch(
             self.remote_scan_node.clone(),
             partition,
@@ -178,6 +194,8 @@ impl ExecutionPlan for RemoteScanExec {
             self.input.schema().clone(),
             self.scan_stats(),
             self.partial_err(),
+            self.cluster_metrics(),
+            baseline_metrics,
         );
         let stream = futures::stream::once(fut).try_flatten();
         Ok(Box::pin(RecordBatchStreamAdapter::new(
@@ -189,8 +207,13 @@ impl ExecutionPlan for RemoteScanExec {
     fn statistics(&self) -> Result<Statistics> {
         Ok(Statistics::new_unknown(&self.schema()))
     }
+
+    fn metrics(&self) -> Option<MetricsSet> {
+        Some(self.metrics.clone_inner())
+    }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn get_remote_batch(
     remote_scan_node: RemoteScanNode,
     partition: usize,
@@ -198,6 +221,8 @@ async fn get_remote_batch(
     schema: SchemaRef,
     scan_stats: Arc<Mutex<ScanStats>>,
     partial_err: Arc<Mutex<String>>,
+    cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
+    metrics: BaselineMetrics,
 ) -> Result<SendableRecordBatchStream> {
     let start = std::time::Instant::now();
     let cfg = config::get_config();
@@ -294,15 +319,16 @@ async fn get_remote_batch(
         "[trace_id {trace_id}] flight->search: prepare to response node: {grpc_addr}, is_super: {is_super}, is_querier: {is_querier}",
     );
 
-    let query_context = QueryContext::new(context.clone(), node)
+    let query_context = QueryContext::new(node)
         .with_trace_id(&trace_id)
         .with_is_super(is_super)
         .with_is_querier(is_querier)
         .with_scan_stats(scan_stats)
         .with_partial_err(partial_err.clone())
+        .with_cluster_metrics(cluster_metrics)
         .with_start_time(start);
 
-    let mut stream = FlightDecoderStream::new(stream, schema.clone(), query_context);
+    let mut stream = FlightDecoderStream::new(stream, schema.clone(), metrics, query_context);
     let stream = async_stream::stream! {
         let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));
         pin_mut!(timeout);

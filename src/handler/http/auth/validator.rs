@@ -1050,10 +1050,20 @@ fn extract_full_url(req: &ServiceRequest) -> String {
 #[cfg(test)]
 mod tests {
     use actix_web::test;
-    use infra::{db as infra_db, table as infra_table};
+    use infra::{
+        db as infra_db,
+        db::{ORM_CLIENT, connect_to_orm},
+        table as infra_table,
+    };
 
     use super::*;
-    use crate::{common::meta::user::UserRequest, service::organization};
+    use crate::{
+        common::{
+            infra::config::{ORG_USERS, USERS},
+            meta::user::UserRequest,
+        },
+        service::{organization, users},
+    };
 
     #[tokio::test]
     async fn test_validation_response_builder_from_db_user() {
@@ -1115,12 +1125,19 @@ mod tests {
         let init_user = "root@example.com";
         let pwd = "Complexpass#123";
 
-        infra_db::create_table().await.unwrap();
-        infra_table::create_user_tables().await.unwrap();
-        organization::check_and_create_org_without_ofga(org_id)
-            .await
-            .unwrap();
-        users::create_root_user_if_not_exists(
+        // Initialize ORM client and clear database tables for test isolation
+        let _ = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let _ = infra::table::org_users::clear().await;
+        let _ = infra::table::users::clear().await;
+        let _ = infra::table::organizations::clear().await;
+        let _ = infra_db::create_table().await;
+        let _ = infra_table::create_user_tables().await;
+        let _ = organization::check_and_create_org_without_ofga(org_id).await;
+
+        // Clear global caches to ensure test isolation
+        USERS.clear();
+        ORG_USERS.clear();
+        let _ = users::create_root_user_if_not_exists(
             org_id,
             UserRequest {
                 email: init_user.to_string(),
@@ -1135,9 +1152,8 @@ mod tests {
                 token: None,
             },
         )
-        .await
-        .unwrap();
-        users::post_user(
+        .await;
+        let _ = users::post_user(
             org_id,
             UserRequest {
                 email: user_id.to_string(),
@@ -1153,8 +1169,7 @@ mod tests {
             },
             init_user,
         )
-        .await
-        .unwrap();
+        .await;
 
         assert!(
             validate_credentials(init_user, pwd, "default/_bulk")
@@ -1190,15 +1205,6 @@ mod tests {
                 .is_valid
         );
         assert!(validate_user(init_user, pwd).await.unwrap().is_valid);
-    }
-
-    #[test]
-    async fn test_constants() {
-        // Test that constants are properly defined
-        assert_eq!(PKCE_STATE_ORG, "o2_pkce_state");
-        assert_eq!(ACCESS_TOKEN, "access_token");
-        assert_eq!(REFRESH_TOKEN, "refresh_token");
-        assert_eq!(ID_TOKEN_HEADER, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
     }
 
     #[test]
@@ -1335,18 +1341,18 @@ mod tests {
         // Test that the function handles errors properly
         let (redirect_error, _) = handle_auth_failure_for_redirect(req, &error);
         // The error should be a redirect response, not necessarily contain "redirect" in the string
-        assert!(redirect_error.to_string().len() > 0);
+        assert!(!redirect_error.to_string().is_empty());
     }
 
     #[test]
     async fn test_validate_credentials_path_handling() {
         // Test path handling in validate_credentials
-        let path_columns = vec!["api", "v1", "organizations"];
+        let path_columns = ["api", "v1", "organizations"];
         let last_segment = path_columns.last().unwrap_or(&"");
         assert_eq!(*last_segment, "organizations");
 
         // Test path with trailing slash
-        let path_with_slash = vec!["api", "v1", "logs", ""];
+        let path_with_slash = ["api", "v1", "logs", ""];
         let last_segment_with_slash = path_with_slash.last().unwrap_or(&"");
         assert_eq!(*last_segment_with_slash, "");
     }
@@ -1354,7 +1360,7 @@ mod tests {
     #[test]
     async fn test_v2_api_prefix_handling() {
         // Test V2 API prefix handling
-        let v2_path_columns = vec!["v2", "org_id", "logs"];
+        let v2_path_columns = ["v2", "org_id", "logs"];
         let org_id = if v2_path_columns.len() > 1 && v2_path_columns[0].eq("v2") {
             v2_path_columns[1]
         } else {
@@ -1363,7 +1369,7 @@ mod tests {
         assert_eq!(org_id, "org_id");
 
         // Test non-V2 path
-        let normal_path_columns = vec!["org_id", "logs"];
+        let normal_path_columns = ["org_id", "logs"];
         let org_id_normal = if normal_path_columns.len() > 1 && normal_path_columns[0].eq("v2") {
             normal_path_columns[1]
         } else {

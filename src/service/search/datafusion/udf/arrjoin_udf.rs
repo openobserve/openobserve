@@ -104,7 +104,7 @@ mod tests {
 
     // Helper function to run a single test case
     async fn run_single_test(arr_field: &str, delimiter: &str, expected_output: Vec<&str>) {
-        let sql = format!("select arrjoin(arr_field, '{}') as ret from t", delimiter);
+        let sql = format!("select arrjoin(arr_field, '{delimiter}') as ret from t");
         let sqls = [(sql.as_str(), expected_output)];
 
         let schema = Arc::new(Schema::new(vec![Field::new(
@@ -244,7 +244,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_arr_join_null_input() {
-        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
+        let expected_output = ["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
 
         let schema = Arc::new(Schema::new(vec![Field::new(
             "arr_field",
@@ -278,7 +278,7 @@ mod tests {
             r#"{"key": "value"}"#,
         ];
         let sql = "select arrjoin(arr_field, ',') as ret from t";
-        let expected_output = vec![
+        let expected_output = [
             "+-------+",
             "| ret   |",
             "+-------+",

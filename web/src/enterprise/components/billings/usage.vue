@@ -851,6 +851,8 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         searchIcon,
         functionsIcon,
         usageData,
+        getUsage,
+        router,
       };
     },
   });

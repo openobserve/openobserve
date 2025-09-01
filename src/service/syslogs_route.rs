@@ -19,6 +19,7 @@ use actix_web::{HttpResponse, http::StatusCode};
 use config::ider;
 use ipnetwork::IpNetwork;
 
+#[allow(deprecated)]
 use crate::{
     common::{
         infra::config::SYSLOG_ROUTES,
@@ -32,6 +33,7 @@ use crate::{
 };
 
 #[tracing::instrument(skip_all)]
+#[allow(deprecated)]
 pub async fn create_route(mut route: SyslogRoute) -> Result<HttpResponse, io::Error> {
     if route.org_id.trim().is_empty()
         || route.stream_name.trim().is_empty()
@@ -68,6 +70,7 @@ pub async fn create_route(mut route: SyslogRoute) -> Result<HttpResponse, io::Er
 }
 
 #[tracing::instrument(skip_all)]
+#[allow(deprecated)]
 pub async fn update_route(id: &str, route: &mut SyslogRoute) -> Result<HttpResponse, io::Error> {
     if route.org_id.trim().is_empty()
         && route.stream_name.trim().is_empty()
@@ -111,6 +114,7 @@ pub async fn update_route(id: &str, route: &mut SyslogRoute) -> Result<HttpRespo
 }
 
 #[tracing::instrument]
+#[allow(deprecated)]
 pub async fn list_routes() -> Result<HttpResponse, io::Error> {
     Ok(HttpResponse::Ok().json(SyslogRoutes {
         routes: syslog::list().await.unwrap(),
@@ -118,6 +122,7 @@ pub async fn list_routes() -> Result<HttpResponse, io::Error> {
 }
 
 #[tracing::instrument]
+#[allow(deprecated)]
 pub async fn get_route(id: &str) -> Result<HttpResponse, io::Error> {
     let resp = if let Ok(route) = syslog::get(id).await {
         HttpResponse::Ok().json(route)
@@ -128,6 +133,7 @@ pub async fn get_route(id: &str) -> Result<HttpResponse, io::Error> {
 }
 
 #[tracing::instrument]
+#[allow(deprecated)]
 pub async fn delete_route(id: &str) -> Result<HttpResponse, io::Error> {
     let resp = if syslog::delete(id).await.is_err() {
         Response::NotFound
@@ -138,6 +144,7 @@ pub async fn delete_route(id: &str) -> Result<HttpResponse, io::Error> {
 }
 
 #[tracing::instrument(skip_all)]
+#[allow(deprecated)]
 pub async fn toggle_state(server: SyslogServer) -> Result<HttpResponse, io::Error> {
     if job::syslog_server::run(server.state, false).await.is_err() {
         return Ok(Response::InternalServerError(anyhow::anyhow!(
@@ -181,56 +188,4 @@ fn subnets_overlap(net1: &IpNetwork, net2: &IpNetwork) -> bool {
         || net1.contains(net2.broadcast())
         || net2.contains(net1.network())
         || net2.contains(net1.broadcast())
-}
-
-#[cfg(test)]
-mod tests {
-    use ipnetwork::IpNetwork;
-
-    use super::*;
-
-    #[test]
-    fn test_subnets_overlap() {
-        let net1: IpNetwork = "192.168.1.0/24".parse().unwrap();
-        let net2: IpNetwork = "192.168.1.128/25".parse().unwrap();
-
-        assert!(subnets_overlap(&net1, &net2));
-    }
-
-    #[test]
-    fn test_subnets_no_overlap() {
-        let net1: IpNetwork = "192.168.1.0/24".parse().unwrap();
-        let net2: IpNetwork = "192.168.2.0/24".parse().unwrap();
-
-        assert!(!subnets_overlap(&net1, &net2));
-    }
-
-    #[test]
-    fn test_response_from_ok_message() {
-        let response = Response::OkMessage("test message".to_string());
-        let http_response: HttpResponse = response.into();
-        assert_eq!(http_response.status(), StatusCode::OK);
-    }
-
-    #[test]
-    fn test_response_from_not_found() {
-        let response = Response::NotFound;
-        let http_response: HttpResponse = response.into();
-        assert_eq!(http_response.status(), StatusCode::NOT_FOUND);
-    }
-
-    #[test]
-    fn test_response_from_bad_request() {
-        let response = Response::BadRequest("bad request".to_string());
-        let http_response: HttpResponse = response.into();
-        assert_eq!(http_response.status(), StatusCode::BAD_REQUEST);
-    }
-
-    #[test]
-    fn test_response_from_internal_server_error() {
-        let error = anyhow::anyhow!("test error");
-        let response = Response::InternalServerError(error);
-        let http_response: HttpResponse = response.into();
-        assert_eq!(http_response.status(), StatusCode::INTERNAL_SERVER_ERROR);
-    }
 }

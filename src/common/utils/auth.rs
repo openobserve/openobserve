@@ -59,7 +59,7 @@ static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
 
 pub static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"^([a-zA-Z0-9_+]([a-zA-Z0-9_+.-]*[a-zA-Z0-9_+])?)@([a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9]+)*\.[a-zA-Z]{2,6})",
+        r"^([a-zA-Z0-9_+]([a-zA-Z0-9_+\-]*(\.[a-zA-Z0-9_+\-]+)*)?[a-zA-Z0-9_+])@([a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9]+)*\.[a-zA-Z]{2,6})",
     )
     .unwrap()
 });
@@ -197,6 +197,7 @@ pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
 #[cfg(not(feature = "enterprise"))]
 pub async fn remove_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
+#[derive(Debug)]
 pub struct UserEmail {
     pub user_id: String,
 }
@@ -1216,5 +1217,177 @@ mod tests {
         println!(
             "http://localhost:5080/auth/login?request_time={time}&exp_in={exp_in}&auth={auth}"
         );
+    }
+
+    #[test]
+    fn test_get_hash_caching() {
+        let pass = "testpass";
+        let salt = "testsalt";
+
+        // First call should create hash and cache it
+        let hash1 = get_hash(pass, salt);
+
+        // Second call should return cached value
+        let hash2 = get_hash(pass, salt);
+
+        assert_eq!(hash1, hash2);
+        assert!(!hash1.is_empty());
+    }
+
+    #[test]
+    fn test_email_regex_edge_cases() {
+        // Valid emails
+        assert!(is_valid_email("test@example.com"));
+        assert!(is_valid_email("user.name@example.com"));
+        assert!(is_valid_email("user+tag@example.com"));
+        assert!(is_valid_email("user_name@example.co.uk"));
+        assert!(is_valid_email("123@example.com"));
+
+        // Invalid emails
+        assert!(!is_valid_email(""));
+        assert!(!is_valid_email("no-at-sign"));
+        assert!(!is_valid_email("@no-user.com"));
+        assert!(!is_valid_email("user@"));
+        assert!(!is_valid_email("user..double@example.com"));
+        assert!(!is_valid_email("user@no-domain"));
+        assert!(!is_valid_email("user@domain.c")); // TLD too short
+        assert!(!is_valid_email("user with space@example.com"));
+        assert!(!is_valid_email("user@domain with space.com"));
+        assert!(!is_valid_email(".user@example.com"));
+        assert!(!is_valid_email("user@.example.com"));
+    }
+
+    #[test]
+    fn test_ofga_format_conversion_comprehensive() {
+        // Basic replacements
+        assert_eq!(into_ofga_supported_format("test"), "test");
+        assert_eq!(into_ofga_supported_format("test_name"), "test_name");
+        assert_eq!(into_ofga_supported_format("123"), "123");
+
+        // Special characters
+        assert_eq!(into_ofga_supported_format("a:b"), "a_b");
+        assert_eq!(into_ofga_supported_format("a#b"), "a_b");
+        assert_eq!(into_ofga_supported_format("a?b"), "a_b");
+        assert_eq!(into_ofga_supported_format("a'b"), "a_b");
+        assert_eq!(into_ofga_supported_format("a\"b"), "a_b");
+        assert_eq!(into_ofga_supported_format("a%b"), "a_b");
+        assert_eq!(into_ofga_supported_format("a&b"), "a_b");
+
+        // Multiple spaces
+        assert_eq!(into_ofga_supported_format("a   b"), "a_b");
+        assert_eq!(into_ofga_supported_format("  a  b  "), "_a_b_");
+
+        // Complex combinations
+        assert_eq!(
+            into_ofga_supported_format("test:name with spaces"),
+            "test_name_with_spaces"
+        );
+        assert_eq!(into_ofga_supported_format("a & b : c # d"), "a_b_c_d");
+
+        // Edge cases
+        assert_eq!(into_ofga_supported_format(""), "");
+        assert_eq!(into_ofga_supported_format(":::"), "_");
+        assert_eq!(into_ofga_supported_format("   "), "_");
+    }
+
+    #[test]
+    fn test_ofga_unsupported_detection() {
+        // Supported characters (should return false)
+        assert!(!is_ofga_unsupported("valid"));
+        assert!(!is_ofga_unsupported("valid123"));
+        assert!(!is_ofga_unsupported("valid_name"));
+        assert!(!is_ofga_unsupported("CamelCase"));
+        assert!(!is_ofga_unsupported(""));
+
+        // Unsupported characters (should return true)
+        assert!(is_ofga_unsupported("has:colon"));
+        assert!(is_ofga_unsupported("has#hash"));
+        assert!(is_ofga_unsupported("has?question"));
+        assert!(is_ofga_unsupported("has space"));
+        assert!(is_ofga_unsupported("has'quote"));
+        assert!(is_ofga_unsupported("has\"doublequote"));
+        assert!(is_ofga_unsupported("has%percent"));
+        assert!(is_ofga_unsupported("has&ampersand"));
+
+        // Mixed cases
+        assert!(is_ofga_unsupported("valid:invalid"));
+        assert!(is_ofga_unsupported("valid invalid"));
+    }
+
+    #[test]
+    fn test_generate_presigned_url_variations() {
+        let username = "testuser";
+        let password = "testpass";
+        let salt = "testsalt";
+        let base_url = "https://auth.example.com";
+        let exp_in = 7200;
+        let time = 1600000000;
+
+        let url = generate_presigned_url(username, password, salt, base_url, exp_in, time);
+
+        assert!(url.starts_with(base_url));
+        assert!(url.contains("/auth/login"));
+        assert!(url.contains(&format!("request_time={time}")));
+        assert!(url.contains(&format!("exp_in={exp_in}")));
+        assert!(url.contains("auth="));
+
+        // Test with different parameters
+        let url2 = generate_presigned_url(username, password, salt, base_url, exp_in, time + 1);
+        assert_ne!(url, url2); // Different time should generate different URL
+
+        let url3 = generate_presigned_url("different", password, salt, base_url, exp_in, time);
+        assert_ne!(url, url3); // Different username should generate different URL
+    }
+
+    #[tokio::test]
+    async fn test_save_org_tuples_non_enterprise() {
+        // In non-enterprise mode, this should not panic and return immediately
+        save_org_tuples("test_org").await;
+        // If we reach here, the function completed successfully
+    }
+
+    #[tokio::test]
+    async fn test_delete_org_tuples_non_enterprise() {
+        // In non-enterprise mode, this should not panic and return immediately
+        delete_org_tuples("test_org").await;
+        // If we reach here, the function completed successfully
+    }
+
+    #[test]
+    fn test_get_role_non_enterprise() {
+        let user_role = UserOrgRole {
+            base_role: UserRole::User,
+            custom_role: None,
+        };
+
+        // In non-enterprise mode, should always return Admin
+        assert_eq!(get_role(&user_role), UserRole::Admin);
+    }
+
+    #[tokio::test]
+    async fn test_check_permissions_non_enterprise() {
+        // In non-enterprise mode, should always return false
+        let result = check_permissions(
+            Some("test_object".to_string()),
+            "test_org",
+            "test_user",
+            "dashboard",
+            "GET",
+        )
+        .await;
+
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_regex_compilation() {
+        // Test that the regexes compile without panicking
+        assert!(RE_OFGA_UNSUPPORTED_NAME.is_match("test:name"));
+        assert!(RE_SPACE_AROUND.is_match("a @ b")); // @ is not in the exclusion list, so this should match
+        assert!(EMAIL_REGEX.is_match("test@example.com"));
+
+        // Test that the regexes work as expected
+        assert!(!RE_OFGA_UNSUPPORTED_NAME.is_match("valid_name"));
+        assert!(!EMAIL_REGEX.is_match("invalid-email"));
     }
 }

@@ -73,6 +73,13 @@ export default defineComponent({
     onMounted(() => {
       fetchAndRedirect();
     });
+
+    return {
+      routeToHome,
+      handleOriginalUrl,
+      routeToOriginalUrl,
+      fetchAndRedirect,
+    };
   },
 });
 </script>

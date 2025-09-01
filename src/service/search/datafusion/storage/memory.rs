@@ -315,7 +315,7 @@ mod tests {
 
         for path in &test_paths {
             let result = fs.get(path).await;
-            assert!(result.is_err(), "Should fail for path: {}", path);
+            assert!(result.is_err(), "Should fail for path: {path}");
         }
     }
 }

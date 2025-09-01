@@ -27,761 +27,651 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
-describe.skip("Streams", async () => {
+describe("Schema Component Tests", async () => {
   let wrapper: any;
 
-  beforeEach(async () => {
-    
-    const updateStream = vi.spyOn(StreamService, "updateSettings");
-
-    wrapper = mount(LogStream, {
-      props: {
-        modelValue: {
-          name: "k8s_json",
-          storage_type: "s3",
-          stream_type: "logs",
-          stats: {
-            doc_time_min: 1678448628630259,
-            doc_time_max: 1678448628652947,
-            doc_num: 400,
-            file_num: 1,
-            storage_size: 0.74,
-            compressed_size: 0.03,
-          },
-          schema: [
-            {
-              name: "_timestamp",
-              type: "Int64",
-            },
-            {
-              name: "kubernetes.container_hash",
-              type: "Utf8",
-            },
-            {
-              name: "log",
-              type: "Utf8",
-            },
-            {
-              name: "message",
-              type: "Utf8",
-            },
-            {
-              name: "test_this_field",
-              type: "Utf8",
-            },
-          ],
-          settings: {
-            partition_time_level: "hourly",
-            partition_keys: {},
-            full_text_search_keys: ["level", "log"],
-            index_fields: [],
-            bloom_filter_fields: [],
-            distinct_value_fields: [],
-            data_retention: 3650,
-            max_query_range: 0,
-            store_original_data: false,
-            approx_partition: false,
-            index_updated_at: 1737970280285469,
-            extended_retention_days: [],
-          },
-        },
-      },
-      global: {
-        provide: {
-          store: store,
-        },
-        plugins: [i18n],
-      },
-    });
-    await flushPromises();
-  });
-
-  afterEach(() => {
-    wrapper.unmount();
-    vi.restoreAllMocks();
-  });
-
-  it("should display title", () => {
-    const pageTitle = wrapper.find('[data-test="schema-title-text"]');
-    expect(pageTitle.text()).toBe("Stream Detail");
-  });
-
-  it("Should display stream title", () => {
-    const streamTitle = wrapper.find('[data-test="schema-stream-title-text"]');
-    expect(streamTitle.text()).toBe("Stream Name k8s_json");
-  });
-
-  it("Should have cancel button", () => {
-    const cancelButton = wrapper.find('[data-test="schema-cancel-button"]');
-    expect(cancelButton.exists()).toBeTruthy();
-    expect(cancelButton.text()).toBe("Cancel");
-  });
-
-  it("Should have Update Settings button", () => {
-    const updateSettingsButton = wrapper.find(
-      '[data-test="schema-update-settings-button"]',
-    );
-    expect(updateSettingsButton.exists()).toBeTruthy();
-    expect(updateSettingsButton.text()).toBe("Update Settings");
-  });
-
-  it("Should display stream fields mapping table", async () => {
-    const table = await wrapper.find(
-      '[data-test="schema-log-stream-field-mapping-table"]',
-    );
-    expect(table.exists()).toBeTruthy();
-  });
-
-  it("Should display stream fields mapping title", () => {
-    const table = wrapper.find(
-      '[data-test="schema-log-stream-mapping-title-text"]',
-    );
-    expect(table.text()).toBe(
-      "Mapping Default FTS keys used (no custom keys set).Store Original Data",
-    );
-  });
-
-  it("Should display stream fields mapping table headers", () => {
-    const tableHeaders = wrapper
-      .find('[data-test="schema-log-stream-field-mapping-table"]')
-      .find("thead")
-      .find("tr")
-      .findAll("th");
-
-    expect(tableHeaders[0].text()).toBe("");
-    expect(tableHeaders[1].text()).toBe("Fieldarrow_upward");
-  });
-
-  it.skip("Should display stream fields mapping table data", () => {
-    const tableData = wrapper
-      .find('[data-test="schema-log-stream-field-mapping-table"]')
-      .find("tbody")
-      .findAll("tr")[0]
-      .findAll("td");
-
-    expect(tableData[0].text()).toBe("");
-    expect(tableData[1].text()).toBe("_timestamp");
-    expect(tableData[2].text()).toBe("Int64");
-  });
-
-  // TODO : Check if we can update this test case
-  // - expect(logCheckbox.find(".q-checkbox__inner--truthy").exists()).toBeTruthy();
-  // + expect(wrapper.vm.ftsKeys.includes('log')).toBeTruthy();
-
-  describe("When user make changes and update settings", () => {
-    const updateStream = vi.spyOn(StreamService, "updateSettings");
-
-    
-
-    let logPartition, timeStampCheckbox, updateSettingsButton: any;
+  // Additional comprehensive tests for schema.vue functions from lines 697-1784
+  describe("Comprehensive Schema Function Tests", () => {
     beforeEach(async () => {
-    });
-    it("Should make api call when user updates the form and click update settings ", async () => {
-      // Find the q-toggle component wrapper
-      const toggleWrapper = await wrapper.find(
-        '[data-test="log-stream-store-original-data-toggle-btn"]',
-      );
-
-      // Verify initial state of the toggle
-      const checkBox = await toggleWrapper.find('input[type="checkbox"]');
-      expect(checkBox.element.checked).toBe(false);
-
-      // Simulate a click on the toggle
-      await checkBox.trigger("click");
-      await wrapper.vm.$nextTick();
-      await flushPromises();
-
-      await checkBox.setValue(true);
-      expect(checkBox.element.checked).toBe(true);
-
-      // Verify that formDirtyFlag has been updated
-      expect(wrapper.vm.formDirtyFlag).toBe(true);
-
-      // Find and trigger the update settings button
-      const updateSettingsButton = wrapper.find(
-        '[data-test="schema-update-settings-button"]',
-      );
-      expect(updateSettingsButton.attributes("disabled")).toBe(undefined); // Ensure it's enabled
-      await updateSettingsButton.trigger("submit");
-
-      // Simulate form submission
-      // const settingsForm = wrapper.find('[data-test="settings-form"]');
-      // await settingsForm.trigger("submit");
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-
-      // Verify that the API call was made (mocked in your setup)
-      expect(updateStream).toHaveBeenCalledTimes(1); // Uncomment if you have a mocked function
-    });
-    it("Should prevent multiple API calls on rapid form submissions", async () => {
-      // Simulate form changes
-      const toggleWrapper = wrapper.find(
-        '[data-test="log-stream-store-original-data-toggle-btn"]',
-      );
-      const checkBox = toggleWrapper.find('input[type="checkbox"]');
-      await checkBox.setValue(true);
-      await checkBox.trigger("click");
-      await wrapper.vm.$nextTick();
-
-      await checkBox.setValue(true);
-      expect(checkBox.element.checked).toBe(true);
-
-      const updateSettingsButton = wrapper.find(
-        '[data-test="schema-update-settings-button"]',
-      );
-
-      // Rapidly trigger multiple submissions
-      await Promise.all([
-        updateSettingsButton.trigger("submit"),
-        updateSettingsButton.trigger("submit"),
-        updateSettingsButton.trigger("submit"),
-      ]);
-
-      await flushPromises();
-
-      // Verify that only one API call was made
-      expect(updateStream).toHaveBeenCalledTimes(1);
-    });
-    it("Should not call update settings API if retention days is less than 1", async () => {
-      // Simulate form changes
-      const retentionDaysInput = await wrapper.find(
-        '[data-test="stream-details-data-retention-input"]',
-      );
-
-      await retentionDaysInput.setValue(0); // Set retention days to less than 1
-      await retentionDaysInput.trigger("input");
-      await wrapper.vm.$nextTick();
-
-      // Verify that formDirtyFlag has been updated
-      expect(wrapper.vm.formDirtyFlag).toBe(true);
-
-      // Find and trigger the update settings button
-      const updateSettingsButton = wrapper.find(
-        '[data-test="schema-update-settings-button"]',
-      );
-      expect(updateSettingsButton.attributes("disabled")).toBe(undefined); // Ensure it's enabled
-      await updateSettingsButton.trigger("submit");
-
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-
-      // Verify that the API call was not made
-      expect(updateStream).toHaveBeenCalledTimes(0);
-    });
-
-    it("Should handle API error when updating settings", async () => {
-      // Mock the API to return an error
-      await flushPromises();
-
-      // Simulate form changes
-      const toggleWrapper = wrapper.find(
-        '[data-test="log-stream-store-original-data-toggle-btn"]',
-      );
-      const checkBox = toggleWrapper.find('input[type="checkbox"]');
-      await checkBox.setValue(true);
-      await checkBox.trigger("click");
-      await wrapper.vm.$nextTick();
-
-      await checkBox.setValue(true);
-      expect(checkBox.element.checked).toBe(true);
-
-      // Verify that formDirtyFlag has been updated
-      expect(wrapper.vm.formDirtyFlag).toBe(true);
-
-      // Find and trigger the update settings button
-      const updateSettingsButton = wrapper.find(
-        '[data-test="schema-update-settings-button"]',
-      );
-      expect(updateSettingsButton.attributes("disabled")).toBe(undefined); // Ensure it's enabled
-      await updateSettingsButton.trigger("submit");
-
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-
-      // Verify that the API call was made and handled the error
-      expect(updateStream).toHaveBeenCalledTimes(1);
-      expect(
-        updateStream.mock.settledResults[0].value.response.data.message,
-      ).toBe("Internal Server Error"); // Assuming you set an errorMessage in your component
-    });
-    it("Should update index type to prefixPartition when selected and verify using update call", async () => {
-      await flushPromises();
-      // Find the index type select dropdown within the table row
-      const indexTypeSelectWrapper = wrapper
-        .find('[data-test="schema-log-stream-field-mapping-table"]')
-        .findAll("tbody tr")
-        .at(1) // Assuming you want to select the first row for this test
-        .find('[data-test="schema-stream-index-select"]');
-      const indexTypeSelector = indexTypeSelectWrapper.findComponent({
-        name: "QSelect",
-      });
-
-      // Simulate selecting the "prefixPartition" option
-      await indexTypeSelector.vm.$emit("update:modelValue", [
-        "prefixPartition",
-      ]);
-
-      await wrapper.vm.$nextTick();
-
-      // Verify that the selected value is "prefixPartition"
-      // expect(indexTypeSelect.element.value).toBe("prefixPartition");
-
-      // Verify that formDirtyFlag has been updated
-      expect(wrapper.vm.formDirtyFlag).toBe(true);
-      // Find and trigger the update settings button
-      const updateSettingsButton = wrapper.find(
-        '[data-test="schema-update-settings-button"]',
-      );
-      expect(updateSettingsButton.attributes("disabled")).toBe(undefined); // Ensure it's enabled
-      await updateSettingsButton.trigger("submit");
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-      const parsedRequest = JSON.parse(
-        updateStream.mock.settledResults[0].value.config.data,
-      );
-
-      parsedRequest.partition_keys.add.forEach((index: any) => {
-        if (index.field == "kubernetes.container_hash") {
-          expect(index.types).toEqual("prefix");
-        }
-      });
-      // Verify that the API call was made
-      expect(updateStream).toHaveBeenCalledTimes(1);
-    });
-    it("Should update index type to fullTextSearchKey when selected and verify using update call", async () => {
-      await flushPromises();
-      // Find the index type select dropdown within the table row
-      const indexTypeSelectWrapper = wrapper
-        .find('[data-test="schema-log-stream-field-mapping-table"]')
-        .findAll("tbody tr")
-        .at(1) // Assuming you want to select the first row for this test
-        .find('[data-test="schema-stream-index-select"]');
-      const indexTypeSelector = indexTypeSelectWrapper.findComponent({
-        name: "QSelect",
-      });
-
-      // Simulate selecting the "prefixPartition" option
-      await indexTypeSelector.vm.$emit("update:modelValue", [
-        "fullTextSearchKey",
-      ]);
-
-      await wrapper.vm.$nextTick();
-
-      // Verify that the selected value is "prefixPartition"
-      // expect(indexTypeSelect.element.value).toBe("prefixPartition");
-
-      // Verify that formDirtyFlag has been updated
-      expect(wrapper.vm.formDirtyFlag).toBe(true);
-      // Find and trigger the update settings button
-      const updateSettingsButton = wrapper.find(
-        '[data-test="schema-update-settings-button"]',
-      );
-      expect(updateSettingsButton.attributes("disabled")).toBe(undefined); // Ensure it's enabled
-      await updateSettingsButton.trigger("submit");
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-      const parsedRequest = JSON.parse(
-        updateStream.mock.settledResults[0].value.config.data,
-      );
-      expect(parsedRequest.full_text_search_keys.add[0]).toEqual(
-        "kubernetes.container_hash",
-      );
-      // Verify that the API call was made
-      expect(updateStream).toHaveBeenCalledTimes(1);
-    });
-    it("Should update index type to keyPartition when selected and verify using update call", async () => {
-      await flushPromises();
-      // Find the index type select dropdown within the table row
-      const indexTypeSelectWrapper = wrapper
-        .find('[data-test="schema-log-stream-field-mapping-table"]')
-        .findAll("tbody tr")
-        .at(2) // Assuming you want to select the first row for this test
-        .find('[data-test="schema-stream-index-select"]');
-      const indexTypeSelector = indexTypeSelectWrapper.findComponent({
-        name: "QSelect",
-      });
-
-      // Simulate selecting the "prefixPartition" option
-      await indexTypeSelector.vm.$emit("update:modelValue", ["keyPartition"]);
-
-      await wrapper.vm.$nextTick();
-
-      // Verify that the selected value is "prefixPartition"
-      // expect(indexTypeSelect.element.value).toBe("prefixPartition");
-
-      // Verify that formDirtyFlag has been updated
-      expect(wrapper.vm.formDirtyFlag).toBe(true);
-      // Find and trigger the update settings button
-      const updateSettingsButton = wrapper.find(
-        '[data-test="schema-update-settings-button"]',
-      );
-      expect(updateSettingsButton.attributes("disabled")).toBe(undefined); // Ensure it's enabled
-      await updateSettingsButton.trigger("submit");
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-      const parsedRequest = JSON.parse(
-        updateStream.mock.settledResults[0].value.config.data,
-      );
-
-      parsedRequest.partition_keys.add.forEach((index: any) => {
-        if (index.field == "log") {
-          expect(index.types).toEqual("value");
-        }
-      });
-      // Verify that the API call was made
-      expect(updateStream).toHaveBeenCalledTimes(1);
-    });
-    it("Should update index type to hashPartition_8 when selected and verify using update call", async () => {
-      await flushPromises();
-      // Find the index type select dropdown within the table row
-      const indexTypeSelectWrapper = wrapper
-        .find('[data-test="schema-log-stream-field-mapping-table"]')
-        .findAll("tbody tr")
-        .at(3) // Assuming you want to select the first row for this test
-        .find('[data-test="schema-stream-index-select"]');
-      const indexTypeSelector = indexTypeSelectWrapper.findComponent({
-        name: "QSelect",
-      });
-
-      // Simulate selecting the "prefixPartition" option
-      await indexTypeSelector.vm.$emit("update:modelValue", [
-        "hashPartition_8",
-      ]);
-
-      await wrapper.vm.$nextTick();
-
-      // Verify that the selected value is "prefixPartition"
-      // expect(indexTypeSelect.element.value).toBe("prefixPartition");
-
-      // Verify that formDirtyFlag has been updated
-      expect(wrapper.vm.formDirtyFlag).toBe(true);
-      // Find and trigger the update settings button
-      const updateSettingsButton = wrapper.find(
-        '[data-test="schema-update-settings-button"]',
-      );
-      expect(updateSettingsButton.attributes("disabled")).toBe(undefined); // Ensure it's enabled
-      await updateSettingsButton.trigger("submit");
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-      const parsedRequest = JSON.parse(
-        updateStream.mock.settledResults[0].value.config.data,
-      );
-
-      parsedRequest.partition_keys.add.forEach((index: any) => {
-        if (index.field == "message") {
-          expect(index.types.hash).toEqual(8);
-        }
-      });
-      // Verify that the API call was made
-      expect(updateStream).toHaveBeenCalledTimes(1);
-    });
-    it("Should add fields to user defined schema", async () => {
-      await flushPromises();
-      // Find the index type select dropdown within the table row
-      const indexTypeSelectWrapper = wrapper.find(
-        '[data-test="schema-stream-delete-log-field-fts-key-checkbox"]',
-      );
-      const indexTypeSelector = await indexTypeSelectWrapper.find(
-        'input[type="checkbox"]',
-      );
-
-      await indexTypeSelector.setValue(true);
-      await indexTypeSelector.trigger("click");
-
-      await wrapper.vm.$nextTick();
-
-
-      const updateSchemaBtn = await wrapper.find(
-        '[data-test="schema-add-field-button"]',
-      );
-
-      await updateSchemaBtn.trigger("click");
-
-      // wrapper.vm.formDirtyFlag = true;
-
-      await wrapper.vm.$nextTick(); // Find and trigger the update settings button
-      const updateSettingsButton = wrapper.find(
-        '[data-test="schema-update-settings-button"]',
-      );
-      await updateSettingsButton.trigger("submit");
-      await flushPromises();
-      await vi.advanceTimersByTime(500);
-      await flushPromises();
-      const parsedRequest = JSON.parse(
-        updateStream.mock.settledResults[0].value.config.data,
-      );
-
-      parsedRequest.partition_keys.add.forEach((index: any) => {
-        expect(index).toEqual("log");
-      });
-      // Verify that the API call was made
-      expect(updateStream).toHaveBeenCalledTimes(1);
-    });
-
-    describe("disable options test cases", () => {
-      it("disable Options: should disable options correctly based on row data", async () => {
-        const wrapper = mount(LogStream, {
-          props: {
-            modelValue: {
-              name: "k8s_json",
-              storage_type: "s3",
-              stream_type: "logs",
-              stats: {
-                doc_time_min: 1678448628630259,
-                doc_time_max: 1678448628652947,
-                doc_num: 400,
-                file_num: 1,
-                storage_size: 0.74,
-                compressed_size: 0.03,
+      // Reset wrapper for each test
+      wrapper = mount(LogStream, {
+        props: {
+          modelValue: {
+            name: "test-stream",
+            storage_type: "s3",
+            stream_type: "logs",
+            stats: {
+              doc_time_min: 1678448628630259,
+              doc_time_max: 1678448628652947,
+              doc_num: 400,
+              file_num: 1,
+              storage_size: 0.74,
+              compressed_size: 0.03,
+            },
+            schema: [
+              {
+                name: "_timestamp",
+                type: "Int64",
               },
-              schema: [
-                {
-                  name: "_timestamp",
-                  type: "Int64",
-                },
-                {
-                  name: "kubernetes.container_hash",
-                  type: "Utf8",
-                },
-                {
-                  name: "log",
-                  type: "Utf8",
-                },
-                {
-                  name: "message",
-                  type: "Utf8",
-                },
-                {
-                  name: "test_this_field",
-                  type: "Utf8",
-                },
-              ],
-              settings: {
-                partition_time_level: "hourly",
-                partition_keys: {},
-                full_text_search_keys: ["level", "log"],
-                index_fields: [],
-                bloom_filter_fields: [],
-                distinct_value_fields: [],
-                data_retention: 3650,
-                max_query_range: 0,
-                store_original_data: false,
-                approx_partition: false,
-                index_updated_at: 1737970280285469,
-                extended_retention_days: [],
+              {
+                name: "message",
+                type: "Utf8",
               },
+            ],
+            settings: {
+              partition_time_level: "hourly",
+              partition_keys: {},
+              full_text_search_keys: ["message"],
+              index_fields: [],
+              bloom_filter_fields: [],
+              data_retention: 30,
+              max_query_range: 0,
+              store_original_data: false,
+              approx_partition: false,
+              defined_schema_fields: [],
+              extended_retention_days: [],
+              pattern_associations: []
             },
           },
-          global: {
-            provide: {
-              store: store,
-            },
-            plugins: [i18n],
+        },
+        global: {
+          provide: {
+            store: store,
           },
-        });
+          plugins: [i18n],
+        },
+      });
+      await flushPromises();
+    });
 
-        const disableOptions = wrapper.vm.disableOptions;
+    // Test 1: Component initialization with default values
+    it("should initialize with correct default values", () => {
+      expect(wrapper.vm.indexData.name).toBe("test-stream");
+      expect(wrapper.vm.indexData.schema).toBeDefined();
+      expect(wrapper.vm.loadingState).toBe(false);
+      expect(wrapper.vm.formDirtyFlag).toBe(false);
+    });
 
-        const row = {
-          name: "log",
-          index_type: ["fullTextSearchKey"],
-        };
+    // Test 2: markFormDirty function
+    it("should mark form as dirty", () => {
+      expect(wrapper.vm.formDirtyFlag).toBe(false);
+      wrapper.vm.markFormDirty();
+      expect(wrapper.vm.formDirtyFlag).toBe(true);
+    });
 
-        const option = { value: "prefixPartition" };
-        const result = disableOptions(row, option);
-        expect(result).toBe(false);
+    // Test 3: changePagination function
+    it("should change pagination correctly", () => {
+      const newPagination = { label: "50", value: 50 };
+      wrapper.vm.changePagination(newPagination);
+      
+      expect(wrapper.vm.selectedPerPage).toBe(50);
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
+    });
 
-        row.index_type = ["keyPartition"];
-        const result2 = disableOptions(row, option);
-        expect(result2).toBe(true);
+    // Test 4: updateActiveTab function
+    it("should update active tab and result total", () => {
+      wrapper.vm.indexData.defined_schema_fields = ["field1"];
+      wrapper.vm.indexData.schema = [{ name: "field1" }, { name: "field2" }];
+      
+      wrapper.vm.updateActiveTab("schemaFields");
+      expect(wrapper.vm.activeTab).toBe("schemaFields");
+      expect(wrapper.vm.resultTotal).toBe(1);
+      
+      wrapper.vm.updateActiveTab("allFields");
+      expect(wrapper.vm.activeTab).toBe("allFields");
+      expect(wrapper.vm.resultTotal).toBe(2);
+    });
+
+    // Test 5: updateActiveMainTab function
+    it("should update active main tab", () => {
+      wrapper.vm.updateActiveMainTab("redButton");
+      expect(wrapper.vm.activeMainTab).toBe("redButton");
+    });
+
+    // Test 6: openDialog function
+    it("should open dialog and initialize fields", () => {
+      wrapper.vm.openDialog();
+      
+      expect(wrapper.vm.isDialogOpen).toBe(true);
+      expect(wrapper.vm.formDirtyFlag).toBe(true);
+      expect(wrapper.vm.newSchemaFields.length).toBe(1);
+      expect(wrapper.vm.newSchemaFields[0]).toEqual({
+        name: "",
+        type: "",
+        index_type: [],
       });
     });
-    describe("filterFieldFn test cases", () => {
-      const rows = [
-        { name: "log" },
-        { name: "message" },
-        { name: "kubernetes.container_hash" },
-        { name: "_timestamp" },
-      ];
 
-      const indexData = {
-        value: {
-          defined_schema_fields: ["log", "message"],
+    // Test 7: closeDialog function
+    it("should close dialog and reset fields", () => {
+      wrapper.vm.isDialogOpen = true;
+      wrapper.vm.newSchemaFields = [{ name: "test", type: "string", index_type: [] }];
+      
+      wrapper.vm.closeDialog();
+      
+      expect(wrapper.vm.isDialogOpen).toBe(false);
+      expect(wrapper.vm.newSchemaFields).toEqual([]);
+    });
+
+    // Test 8: hasUserDefinedSchema computed property
+    it("should compute hasUserDefinedSchema correctly", () => {
+      // Initially false
+      expect(wrapper.vm.hasUserDefinedSchema).toBe(false);
+      
+      // Set defined schema fields
+      wrapper.vm.indexData.defined_schema_fields = ["field1"];
+      expect(wrapper.vm.hasUserDefinedSchema).toBe(true);
+    });
+
+    // Test 9: showPartitionColumn computed property
+    it("should compute showPartitionColumn correctly for different stream types", async () => {
+      expect(wrapper.vm.showPartitionColumn).toBe(true);
+      
+      // Test with enrichment_tables
+      const enrichmentWrapper = mount(LogStream, {
+        props: {
+          modelValue: {
+            name: "test-stream",
+            stream_type: "enrichment_tables",
+            settings: { defined_schema_fields: [] }
+          },
+        },
+        global: {
+          provide: { store: store },
+          plugins: [i18n],
+        },
+      });
+      
+      await flushPromises();
+      expect(enrichmentWrapper.vm.showPartitionColumn).toBe(false);
+      enrichmentWrapper.unmount();
+    });
+
+    // Test 10: showDataRetention computed property  
+    it("should compute showDataRetention correctly", async () => {
+      expect(wrapper.vm.showDataRetention).toBe(true);
+      
+      // Test with enrichment_tables
+      const enrichmentWrapper = mount(LogStream, {
+        props: {
+          modelValue: {
+            name: "test-stream",
+            stream_type: "enrichment_tables",
+            settings: { defined_schema_fields: [] }
+          },
+        },
+        global: {
+          provide: { store: store },
+          plugins: [i18n],
+        },
+      });
+      
+      await flushPromises();
+      expect(enrichmentWrapper.vm.showDataRetention).toBe(false);
+      enrichmentWrapper.unmount();
+    });
+
+
+    // Test 12: getFieldIndices function with full text search
+    it("should get correct field indices for full text search", () => {
+      const property = { name: "message" };
+      const settings = {
+        full_text_search_keys: ["message"],
+        index_fields: [],
+        bloom_filter_fields: [],
+        partition_keys: {},
+      };
+      
+      // Mock store properties that are used in getFieldIndices
+      wrapper.vm.store.state.zoConfig.default_fts_keys = wrapper.vm.store.state.zoConfig.default_fts_keys || [];
+      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
+      
+      const indices = wrapper.vm.getFieldIndices(property, settings);
+      expect(indices).toContain("fullTextSearchKey");
+      expect(property.index_type).toContain("fullTextSearchKey");
+    });
+
+
+    // Test 14: getFieldIndices function with secondary index
+    it("should get correct field indices for secondary index", () => {
+      const property = { name: "status" };
+      const settings = {
+        full_text_search_keys: [],
+        index_fields: ["status"],
+        bloom_filter_fields: [],
+        partition_keys: {},
+      };
+      
+      // Mock store properties that are used in getFieldIndices
+      wrapper.vm.store.state.zoConfig.default_fts_keys = wrapper.vm.store.state.zoConfig.default_fts_keys || [];
+      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
+      
+      const indices = wrapper.vm.getFieldIndices(property, settings);
+      expect(indices).toContain("secondaryIndexKey");
+    });
+
+    // Test 15: getFieldIndices function with bloom filter
+    it("should get correct field indices for bloom filter", () => {
+      const property = { name: "userId" };
+      const settings = {
+        full_text_search_keys: [],
+        index_fields: [],
+        bloom_filter_fields: ["userId"],
+        partition_keys: {},
+      };
+      
+      // Mock store properties that are used in getFieldIndices
+      wrapper.vm.store.state.zoConfig.default_fts_keys = wrapper.vm.store.state.zoConfig.default_fts_keys || [];
+      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
+      
+      const indices = wrapper.vm.getFieldIndices(property, settings);
+      expect(indices).toContain("bloomFilterKey");
+    });
+
+    // Test 16: getFieldIndices function with key partition
+    it("should get correct field indices for key partition", () => {
+      const property = { name: "region" };
+      const settings = {
+        full_text_search_keys: [],
+        index_fields: [],
+        bloom_filter_fields: [],
+        partition_keys: {
+          level1: { field: "region", types: "value", disabled: false }
         },
       };
-
-      it("should filter rows based on field name", () => {
-        const filterFieldFn = wrapper.vm.filterFieldFn;
-
-        const terms = "log";
-        const result = filterFieldFn(rows, terms);
-        expect(result).toEqual([{ name: "log" }]);
-      });
-
-      it("should filter rows based on field name and schemaFields type", () => {
-        const filterFieldFn = wrapper.vm.filterFieldFn;
-
-        const terms = "message";
-        const result = filterFieldFn(rows, terms);
-        expect(result).toEqual([{ name: "message" }]);
-      });
-
-      it("should return all rows if field is empty and type is schemaFields", () => {
-        const filterFieldFn = wrapper.vm.filterFieldFn;
-
-        const terms = "@schemaFields";
-        const result = filterFieldFn(rows, terms);
-        expect(result).toEqual([]);
-      });
-
-      it("should return all rows if field is empty", () => {
-        const filterFieldFn = wrapper.vm.filterFieldFn;
-
-        const terms = "";
-        const result = filterFieldFn(rows, terms);
-        expect(result).toEqual(rows);
-      });
-
-      it("should return empty array if no rows match the field", () => {
-        const filterFieldFn = wrapper.vm.filterFieldFn;
-
-        const terms = "nonexistent";
-        const result = filterFieldFn(rows, terms);
-        expect(result).toEqual([]);
-      });
-
-      it("should filter rows based on field name case insensitively", () => {
-        const filterFieldFn = wrapper.vm.filterFieldFn;
-
-        const terms = "LOG";
-        const result = filterFieldFn(rows, terms);
-        expect(result).toEqual([{ name: "log" }]);
-      });
+      
+      // Mock store properties that are used in getFieldIndices
+      wrapper.vm.store.state.zoConfig.default_fts_keys = wrapper.vm.store.state.zoConfig.default_fts_keys || [];
+      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
+      
+      const indices = wrapper.vm.getFieldIndices(property, settings);
+      expect(indices).toContain("keyPartition");
+      expect(property.level).toBe("level1");
     });
 
-    describe("Schema Field Management", () => {
-      let wrapper: any;
+    // Test 17: getFieldIndices function with hash partition
+    it("should get correct field indices for hash partition", () => {
+      const property = { name: "customerId" };
+      const settings = {
+        full_text_search_keys: [],
+        index_fields: [],
+        bloom_filter_fields: [],
+        partition_keys: {
+          level1: { field: "customerId", types: { hash: 16 }, disabled: false }
+        },
+      };
+      
+      // Mock store properties that are used in getFieldIndices
+      wrapper.vm.store.state.zoConfig.default_fts_keys = wrapper.vm.store.state.zoConfig.default_fts_keys || [];
+      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
+      
+      const indices = wrapper.vm.getFieldIndices(property, settings);
+      expect(indices).toContain("hashPartition_16");
+    });
 
-      beforeEach(async () => {
-        
-        wrapper = mount(LogStream, {
-          props: {
-            modelValue: {
-              name: "k8s_json",
-              storage_type: "s3",
-              stream_type: "logs",
-              stats: {
-                doc_time_min: 1678448628630259,
-                doc_time_max: 1678448628652947,
-                doc_num: 400,
-                file_num: 1,
-                storage_size: 0.74,
-                compressed_size: 0.03,
-              },
-              schema: [
-                {
-                  name: "_timestamp",
-                  type: "Int64",
-                },
-                {
-                  name: "kubernetes.container_hash",
-                  type: "Utf8",
-                },
-                {
-                  name: "log",
-                  type: "Utf8",
-                },
-                {
-                  name: "message",
-                  type: "Utf8",
-                },
-                {
-                  name: "test_this_field",
-                  type: "Utf8",
-                },
-              ],
-              settings: {
-                partition_time_level: "hourly",
-                partition_keys: {},
-                full_text_search_keys: ["level", "log"],
-                index_fields: [],
-                bloom_filter_fields: [],
-                distinct_value_fields: [],
-                data_retention: 3650,
-                max_query_range: 0,
-                store_original_data: false,
-                approx_partition: false,
-                index_updated_at: 1737970280285469,
-                extended_retention_days: [],
-              },
-            },
+    // Test 18: updateDefinedSchemaFields function - removing fields
+    it("should update defined schema fields when removing", () => {
+      wrapper.vm.indexData.defined_schema_fields = ["field1", "field2", "field3"];
+      wrapper.vm.selectedFields = [{ name: "field2" }];
+      wrapper.vm.activeTab = "schemaFields";
+      
+      wrapper.vm.updateDefinedSchemaFields();
+      
+      expect(wrapper.vm.indexData.defined_schema_fields).toEqual(["field1", "field3"]);
+      expect(wrapper.vm.selectedFields).toEqual([]);
+      expect(wrapper.vm.formDirtyFlag).toBe(true);
+    });
+
+    // Test 19: updateDefinedSchemaFields function - adding fields
+    it("should update defined schema fields when adding", () => {
+      wrapper.vm.indexData.defined_schema_fields = ["field1"];
+      wrapper.vm.selectedFields = [{ name: "field2" }];
+      wrapper.vm.activeTab = "allFields";
+      
+      wrapper.vm.updateDefinedSchemaFields();
+      
+      expect(wrapper.vm.indexData.defined_schema_fields).toContain("field1");
+      expect(wrapper.vm.indexData.defined_schema_fields).toContain("field2");
+    });
+
+    // Test 20: updateDefinedSchemaFields function - switch tab when empty
+    it("should switch to allFields when schema fields becomes empty", () => {
+      wrapper.vm.indexData.defined_schema_fields = ["field1"];
+      wrapper.vm.selectedFields = [{ name: "field1" }];
+      wrapper.vm.activeTab = "schemaFields";
+      
+      wrapper.vm.updateDefinedSchemaFields();
+      
+      expect(wrapper.vm.indexData.defined_schema_fields).toEqual([]);
+      expect(wrapper.vm.activeTab).toBe("allFields");
+    });
+
+    // Test 21: updateStreamResponse function
+    it("should update stream response with user defined flags", () => {
+      const streamResponse = {
+        settings: {
+          defined_schema_fields: ["field1"]
+        },
+        schema: [
+          { name: "field1", type: "string" },
+          { name: "field2", type: "number" }
+        ]
+      };
+      
+      const result = wrapper.vm.updateStreamResponse(streamResponse);
+      
+      expect(result.schema[0].isUserDefined).toBe(true);
+      expect(result.schema[1].isUserDefined).toBe(false);
+    });
+
+    // Test 22: formatDate function
+    it("should format date correctly", () => {
+      const result = wrapper.vm.formatDate("2023-12-25T10:30:00");
+      expect(result).toBe("25-12-2023");
+    });
+
+    // Test 23: convertUnixToQuasarFormat function
+    it("should convert unix timestamp correctly", () => {
+      const unixMicroseconds = 1703505000000000; // 2023-12-25
+      const result = wrapper.vm.convertUnixToQuasarFormat(unixMicroseconds);
+      expect(result).toMatch(/\d{2}-\d{2}-\d{4}/);
+    });
+
+    // Test 24: convertUnixToQuasarFormat with empty input
+    it("should handle empty unix timestamp", () => {
+      const result = wrapper.vm.convertUnixToQuasarFormat("");
+      expect(result).toBe("");
+    });
+
+    // Test 25: calculateDateRange function
+    it("should calculate date range correctly", () => {
+      wrapper.vm.dataRetentionDays = 30;
+      wrapper.vm.calculateDateRange();
+      expect(wrapper.vm.minDate).toBeDefined();
+    });
+
+    // Test 26: openPatternAssociationDialog function
+    it("should open pattern association dialog", () => {
+      wrapper.vm.patternAssociations = {
+        field1: [{ field: "field1", pattern_name: "pattern1", pattern_id: "id1" }]
+      };
+      
+      wrapper.vm.openPatternAssociationDialog("field1");
+      
+      expect(wrapper.vm.patternAssociationDialog.show).toBe(true);
+      expect(wrapper.vm.patternAssociationDialog.fieldName).toBe("field1");
+    });
+
+    // Test 27: handleAddPattern function
+    it("should add new pattern correctly", () => {
+      const pattern = {
+        field: "field1",
+        pattern_name: "test-pattern",
+        pattern_id: "pattern-123",
+        policy: "replace",
+        apply_at: "ingestion"
+      };
+      
+      wrapper.vm.handleAddPattern(pattern);
+      
+      expect(wrapper.vm.formDirtyFlag).toBe(true);
+      expect(wrapper.vm.patternAssociations.field1).toEqual(
+        expect.arrayContaining([expect.objectContaining(pattern)])
+      );
+    });
+
+    // Test 28: handleRemovePattern function
+    it("should remove pattern correctly", () => {
+      wrapper.vm.patternAssociations = {
+        field1: [
+          { field: "field1", pattern_name: "pattern1", pattern_id: "id1" },
+          { field: "field1", pattern_name: "pattern2", pattern_id: "id2" }
+        ]
+      };
+      
+      wrapper.vm.handleRemovePattern("id1", "field1");
+      
+      expect(wrapper.vm.formDirtyFlag).toBe(true);
+      expect(wrapper.vm.patternAssociations.field1).toHaveLength(1);
+      expect(wrapper.vm.patternAssociations.field1[0].pattern_id).toBe("id2");
+    });
+
+    // Test 29: handleUpdateAppliedPattern for policy
+    it("should update applied pattern policy", () => {
+      wrapper.vm.patternAssociations = {
+        field1: [{ field: "field1", pattern_name: "pattern1", pattern_id: "id1", policy: "old" }]
+      };
+      
+      const updatedPattern = {
+        field: "field1",
+        pattern_name: "pattern1",
+        pattern_id: "id1",
+        policy: "new"
+      };
+      
+      wrapper.vm.handleUpdateAppliedPattern(updatedPattern, "field1", "id1", "policy");
+      expect(wrapper.vm.patternAssociations.field1[0].policy).toBe("new");
+    });
+
+    // Test 30: scrollToAddFields function
+    it("should scroll to add fields section", () => {
+      const mockElement = { scrollIntoView: vi.fn() };
+      vi.spyOn(document, "getElementById").mockReturnValue(mockElement);
+      
+      wrapper.vm.scrollToAddFields();
+      
+      expect(document.getElementById).toHaveBeenCalledWith("schema-add-fields-section");
+      expect(mockElement.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth" });
+    });
+
+    // Test 31: dateChangeValue function
+    it("should handle date change correctly", () => {
+      const dateValue = {
+        selectedDate: {
+          from: new Date("2023-12-25"),
+          to: new Date("2023-12-26")
+        },
+        relativeTimePeriod: null
+      };
+      
+      wrapper.vm.dateChangeValue(dateValue);
+      expect(wrapper.vm.redDaysList.length).toBeGreaterThan(0);
+    });
+
+    // Test 32: deleteDates function
+    it("should delete dates correctly", () => {
+      wrapper.vm.selectedDateFields = [
+        { original_start: 1703505000000, original_end: 1703591400000 }
+      ];
+      
+      wrapper.vm.deleteDates();
+      expect(wrapper.vm.formDirtyFlag).toBe(true);
+    });
+
+    // Test 33: groupPatternAssociationsByField function
+    it("should group pattern associations by field", () => {
+      const associations = [
+        { field: "field1", pattern_name: "pattern1", pattern_id: "id1" },
+        { field: "field1", pattern_name: "pattern2", pattern_id: "id2" },
+        { field: "field2", pattern_name: "pattern3", pattern_id: "id3" }
+      ];
+      
+      const result = wrapper.vm.groupPatternAssociationsByField(associations);
+      expect(result.field1).toHaveLength(2);
+      expect(result.field2).toHaveLength(1);
+    });
+
+    // Test 34: ungroupPatternAssociations function
+    it("should ungroup pattern associations", () => {
+      const grouped = {
+        field1: [
+          { field: "field1", pattern_name: "pattern1", pattern_id: "id1" },
+          { field: "field1", pattern_name: "pattern2", pattern_id: "id2" }
+        ],
+        field2: [{ field: "field2", pattern_name: "pattern3", pattern_id: "id3" }]
+      };
+      
+      const result = wrapper.vm.ungroupPatternAssociations(grouped);
+      expect(result).toHaveLength(3);
+    });
+
+    // Test 35: computedSchemaFieldsName computed property
+    it("should compute schema fields name correctly", () => {
+      // Without user defined schema
+      expect(wrapper.vm.computedSchemaFieldsName).toBe("All Fields");
+      
+      // With user defined schema
+      wrapper.vm.indexData.defined_schema_fields = ["field1"];
+      expect(wrapper.vm.computedSchemaFieldsName).toBe("Other Fields");
+    });
+
+    // Test 36: tabs computed property
+    it("should compute tabs correctly", () => {
+      wrapper.vm.indexData.defined_schema_fields = ["field1"];
+      wrapper.vm.indexData.schema = [{ name: "field1" }, { name: "field2" }];
+      
+      const tabs = wrapper.vm.tabs;
+      expect(tabs[0].value).toBe("schemaFields");
+      expect(tabs[1].value).toBe("allFields");
+      expect(tabs[0].label).toContain("User Defined Schema (1)");
+      expect(tabs[1].label).toContain("Other Fields (2)");
+    });
+
+    // Test 37: mainTabs computed property
+    it("should compute main tabs correctly", () => {
+      const mainTabs = wrapper.vm.mainTabs;
+      expect(mainTabs[0].value).toBe("schemaSettings");
+      expect(mainTabs[0].label).toBe("Schema Settings");
+      expect(mainTabs[1].value).toBe("redButton");
+      expect(mainTabs[1].label).toBe("Extended Retention");
+    });
+
+    // Test 38: isSchemaUDSEnabled computed property
+    it("should compute UDS enabled correctly", () => {
+      expect(wrapper.vm.isSchemaUDSEnabled).toBe(true);
+    });
+
+    // Test 39: allFieldsName computed property
+    it("should compute all fields name correctly", () => {
+      // The allFieldsName is a computed property that depends on store state
+      expect(wrapper.vm.allFieldsName).toBe("_all");
+    });
+
+    // Test 40: showStoreOriginalDataToggle computed property
+    it("should compute store original data toggle visibility", async () => {
+      expect(wrapper.vm.showStoreOriginalDataToggle).toBe(true);
+      
+      // Test with traces
+      const tracesWrapper = mount(LogStream, {
+        props: {
+          modelValue: {
+            name: "test-stream",
+            stream_type: "traces",
+            settings: { defined_schema_fields: [] }
           },
-          global: {
-            provide: {
-              store: store,
-            },
-            plugins: [i18n],
-          },
-        });
-        await flushPromises();
+        },
+        global: {
+          provide: { store: store },
+          plugins: [i18n],
+        },
       });
+      
+      await flushPromises();
+      expect(tracesWrapper.vm.showStoreOriginalDataToggle).toBe(false);
+      tracesWrapper.unmount();
+    });
 
-      afterEach(() => {
-        wrapper.unmount();
-        vi.restoreAllMocks();
-      });
+    // Test 41-50: Additional edge cases and error scenarios
+    it("should handle empty pattern associations in openPatternAssociationDialog", () => {
+      wrapper.vm.openPatternAssociationDialog("nonexistent");
+      expect(wrapper.vm.patternAssociationDialog.data).toEqual([]);
+    });
 
-      it("should add a new schema field", async () => {
-        const addSchemaFieldButton = wrapper.find(
-          '[data-test="schema-add-fields-title"]',
-        );
-        await addSchemaFieldButton.trigger("click");
+    it("should handle adding pattern to existing field", () => {
+      wrapper.vm.patternAssociations = {
+        field1: [{ field: "field1", pattern_name: "existing", pattern_id: "existing-id" }]
+      };
+      
+      const newPattern = {
+        field: "field1",
+        pattern_name: "new-pattern",
+        pattern_id: "new-id"
+      };
+      
+      wrapper.vm.handleAddPattern(newPattern);
+      expect(wrapper.vm.patternAssociations.field1).toHaveLength(2);
+    });
 
-        expect(wrapper.vm.newSchemaFields.length).toBe(1);
-        expect(wrapper.vm.newSchemaFields[0]).toEqual({
-          name: "",
-          type: "",
-          index_type: [],
-        });
-        expect(wrapper.vm.formDirtyFlag).toBe(true);
-      });
+    it("should handle updateAppliedPattern with apply_at attribute", () => {
+      wrapper.vm.patternAssociations = {
+        field1: [{ field: "field1", pattern_name: "pattern1", pattern_id: "id1", apply_at: "old" }]
+      };
+      
+      const updatedPattern = {
+        field: "field1",
+        pattern_name: "pattern1", 
+        pattern_id: "id1",
+        apply_at: "new"
+      };
+      
+      wrapper.vm.handleUpdateAppliedPattern(updatedPattern, "field1", "id1", "apply_at");
+      expect(wrapper.vm.patternAssociations.field1[0].apply_at).toBe("new");
+    });
 
-      it("should remove a schema field", async () => {
-        const addSchemaFieldButton = wrapper.find(
-          '[data-test="schema-add-fields-title"]',
-        );
-        await addSchemaFieldButton.trigger("click");
-        wrapper.vm.newSchemaFields = [
-          { name: "field1", type: "Utf8", index_type: [] },
-          { name: "field2", type: "Int64", index_type: [] },
-        ];
-        wrapper.vm.removeSchemaField(0);
-        expect(wrapper.vm.newSchemaFields.length).toBe(1);
-        expect(wrapper.vm.newSchemaFields[0]).toEqual({
-          name: "field2",
-          type: "Int64",
-          index_type: [],
-        });
-      });
+    it("should handle filter field function with schema fields", () => {
+      wrapper.vm.indexData.defined_schema_fields = ["field1", "field2"];
+      
+      const rows = [
+        { name: "field1" },
+        { name: "field2" },
+        { name: "field3" }
+      ];
+      
+      const result = wrapper.vm.filterFieldFn(rows, "field@schemaFields");
+      expect(result.length).toBe(2);
+    });
 
-      it("should close dialog and reset newSchemaFields when last field is removed", async () => {
-        wrapper.vm.newSchemaFields = [
-          { name: "field1", type: "Utf8", index_type: [] },
-        ];
-        wrapper.vm.isDialogOpen = true;
-        wrapper.vm.removeSchemaField(0);
+    it("should handle empty date value in dateChangeValue", () => {
+      const dateValue = { relativeTimePeriod: "1h" };
+      wrapper.vm.dateChangeValue(dateValue);
+      // Should not add to redDaysList
+      expect(wrapper.vm.redDaysList).toEqual([]);
+    });
 
-        expect(wrapper.vm.newSchemaFields.length).toBe(0);
-        expect(wrapper.vm.isDialogOpen).toBe(false);
-        expect(wrapper.vm.newSchemaFields).toEqual([]);
-      });
+    it("should handle scroll when element doesn't exist", () => {
+      vi.spyOn(document, "getElementById").mockReturnValue(null);
+      expect(() => wrapper.vm.scrollToAddFields()).not.toThrow();
+    });
+
+    it("should handle empty stream response in updateStreamResponse", () => {
+      const streamResponse = {
+        settings: {},
+        schema: []
+      };
+      
+      const result = wrapper.vm.updateStreamResponse(streamResponse);
+      expect(result.schema).toEqual([]);
+    });
+
+    it("should handle partition key conflicts in disableOptions", () => {
+      const schema = { index_type: ["prefixPartition"] };
+      const keyPartitionOption = { value: "keyPartition" };
+      
+      expect(wrapper.vm.disableOptions(schema, keyPartitionOption)).toBe(true);
+    });
+
+    it("should handle hash partition conflicts in disableOptions", () => {
+      const schema = { index_type: ["hashPartition_8"] };
+      const hashOption = { value: "hashPartition_16" };
+      
+      expect(wrapper.vm.disableOptions(schema, hashOption)).toBe(true);
+    });
+
+    it("should not disable non-conflicting options", () => {
+      const schema = { index_type: ["fullTextSearchKey"] };
+      const bloomOption = { value: "bloomFilterKey" };
+      
+      expect(wrapper.vm.disableOptions(schema, bloomOption)).toBe(false);
     });
   });
 });

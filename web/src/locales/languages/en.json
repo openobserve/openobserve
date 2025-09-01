@@ -171,7 +171,8 @@
     "moreActions": "More Actions",
     "downloadCSV": "CSV",
     "downloadJSON": "JSON",
-    "fileType": "File Type"
+    "fileType": "File Type",
+    "showOnlyInterestingFields": "Interesting Fields"
   },
   "menu": {
     "home": "Home",
@@ -597,6 +598,7 @@
     "otherLabel": "Other",
     "sqlserver": "SQL Server",
     "postgres": "Postgres",
+    "oracle": "Oracle",
     "mongodb": "MongoDB",
     "redis": "Redis",
     "couchdb": "CouchDB",

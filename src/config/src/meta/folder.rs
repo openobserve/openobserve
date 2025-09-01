@@ -24,7 +24,7 @@ pub struct Folder {
 }
 
 /// Indicates the type of data that the folder can contain.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub enum FolderType {
     #[default]
     Dashboards,

@@ -191,9 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div
-            data-test="edit-role-permissions-table-section"
-          >
+          <div data-test="edit-role-permissions-table-section">
             <div v-show="permissionsUiType === 'table'">
               <permissions-table
                 ref="permissionTableRef"
@@ -582,10 +580,14 @@ const setPermission = (resource: any, visited: Set<string>) => {
   }
 
   modifyResourcePermissions(resourcePermission);
-    if (resourcePermission.name === 'org' && store.state.selectedOrganization.identifier !== store.state.zoConfig.meta_org) {
-      return; // Skip adding 'org' resource if the organization is not _meta
-    }
-    permissionsState.permissions.push(resourcePermission as Resource);
+  if (
+    resourcePermission.name === "org" &&
+    store.state.selectedOrganization.identifier !==
+      store.state.zoConfig.meta_org
+  ) {
+    return; // Skip adding 'org' resource if the organization is not _meta
+  }
+  permissionsState.permissions.push(resourcePermission as Resource);
 };
 
 const setDefaultPermissions = () => {
@@ -1337,6 +1339,8 @@ const getPermissionHash = (
  * @param typeOf - Type to assign the new entities that we get from the server
  */
 const getResourceEntities = (resource: Resource | Entity) => {
+  if (!resource) return Promise.resolve(true);
+
   const listEntitiesFnMap: {
     [key: string]: (resource: Resource | Entity) => Promise<any>;
   } = {

@@ -361,6 +361,15 @@ export class PipelinesPage {
         await this.page.waitForTimeout(3000);
     }
     async deleteEnrichmentTableByName(fileName) {
+        // First ensure we search for the specific file
+        await this.page.waitForLoadState('networkidle');
+        const searchBox = this.page.getByPlaceholder('Search Enrichment Table');
+        await searchBox.waitFor({ state: 'visible' });
+        await searchBox.clear();
+        await searchBox.fill(fileName);
+        await this.page.waitForLoadState('domcontentloaded');
+        await this.page.waitForTimeout(1000); // Allow search to filter results
+        
         const rows = await this.tableRowsLocator;
         let fileFound = false;
 

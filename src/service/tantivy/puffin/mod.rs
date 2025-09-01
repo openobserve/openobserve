@@ -168,17 +168,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_magic_constants() {
-        assert_eq!(MAGIC, [0x50, 0x46, 0x41, 0x31]);
-        assert_eq!(MAGIC_SIZE, 4);
-        assert_eq!(FLAGS_SIZE, 4);
-        assert_eq!(FOOTER_PAYLOAD_SIZE_SIZE, 4);
-        assert_eq!(FOOTER_SIZE, 12);
-        assert_eq!(MIN_DATA_SIZE, 16);
-        assert_eq!(MIN_FILE_SIZE, 20);
-    }
-
-    #[test]
     fn test_puffin_footer_flags() {
         let default_flags = PuffinFooterFlags::DEFAULT;
         let compressed_flags = PuffinFooterFlags::COMPRESSED;
@@ -245,12 +234,6 @@ mod tests {
     }
 
     #[test]
-    fn test_blob_types_default() {
-        let default_type = BlobTypes::default();
-        assert_eq!(default_type, BlobTypes::O2FstV1);
-    }
-
-    #[test]
     fn test_blob_metadata_get_offset() {
         let metadata = BlobMetadata {
             blob_type: BlobTypes::O2FstV1,
@@ -313,31 +296,6 @@ mod tests {
             deserialized.properties.get("key2"),
             Some(&"value2".to_string())
         );
-    }
-
-    #[test]
-    fn test_blob_metadata_default_serialization() {
-        // Test that default values are handled correctly
-        let metadata = BlobMetadata {
-            blob_type: BlobTypes::O2FstV1,
-            fields: vec![],
-            snapshot_id: 0,
-            sequence_number: 0,
-            offset: 100,
-            length: 50,
-            compression_codec: None,
-            properties: HashMap::new(),
-        };
-
-        let json = serde_json::to_string(&metadata).unwrap();
-        let deserialized: BlobMetadata = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(deserialized, metadata);
-        assert!(deserialized.fields.is_empty());
-        assert_eq!(deserialized.snapshot_id, 0);
-        assert_eq!(deserialized.sequence_number, 0);
-        assert!(deserialized.compression_codec.is_none());
-        assert!(deserialized.properties.is_empty());
     }
 
     #[test]

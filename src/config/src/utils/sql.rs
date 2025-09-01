@@ -56,9 +56,10 @@ pub fn is_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::Parser
                 || has_group_by(query)
                 || has_having(query)
                 || has_join(query)
-                || has_subquery(statement)
                 || has_union(query))
         {
+            return Ok(true);
+        } else if has_distinct(statement) || has_subquery(statement) {
             return Ok(true);
         }
     }
@@ -86,12 +87,21 @@ pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser:
     Ok(true)
 }
 
+pub fn is_explain_query(query: &str) -> bool {
+    match Parser::parse_sql(&GenericDialect {}, query) {
+        Ok(statements) if !statements.is_empty() => {
+            matches!(statements[0], Statement::Explain { .. })
+        }
+        _ => false,
+    }
+}
+
 /// distinct with no group by
 pub fn is_simple_distinct_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
         if let Statement::Query(query) = statement
-            && has_distinct(query)
+            && has_distinct(statement)
             && !has_group_by(query)
         {
             return Ok(true);
@@ -182,7 +192,7 @@ pub fn is_eligible_for_histogram(
         if let Statement::Query(query) = statement {
             if has_subquery(statement) {
                 return Ok((true, true));
-            } else if has_distinct(query)
+            } else if has_distinct(statement)
                 || has_limit(query)
                 || has_cte(query)
                 || has_join(query)
@@ -222,9 +232,9 @@ fn has_group_by(query: &Query) -> bool {
 }
 
 // Check if has distinct
-fn has_distinct(query: &Query) -> bool {
+fn has_distinct(statement: &Statement) -> bool {
     let mut visitor = DistinctVisitor::new();
-    let _ = query.visit(&mut visitor);
+    let _ = statement.visit(&mut visitor);
     visitor.has_distinct
 }
 
@@ -1124,5 +1134,22 @@ mod tests {
 
         assert_eq!(is_not_union_all, false);
         assert_eq!(is_union_all, true);
+    }
+
+    #[test]
+    fn test_is_explain_query() {
+        // Test EXPLAIN query
+        assert!(is_explain_query("EXPLAIN SELECT * FROM users"));
+        assert!(is_explain_query("explain select count(*) from logs"));
+
+        // Test EXPLAIN ANALYZE query
+        assert!(is_explain_query("EXPLAIN ANALYZE SELECT * FROM users"));
+
+        // Test regular query
+        assert!(!is_explain_query("SELECT * FROM users"));
+        assert!(!is_explain_query("SELECT count(*) FROM logs"));
+
+        // Test invalid SQL
+        assert!(!is_explain_query("INVALID SQL"));
     }
 }

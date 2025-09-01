@@ -362,6 +362,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
     #[cfg(not(feature = "enterprise"))]
     let server = cfg.common.instance_name_short.to_string();
 
+    #[allow(deprecated)]
     let service = web::scope("/api")
         .wrap(middleware::from_fn(audit_middleware))
         .wrap(HttpAuthentication::with_fn(
@@ -403,7 +404,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(organization::es::org_pipeline)
         .service(organization::es::org_pipeline_create)
         .service(stream::schema)
-        .service(stream::settings)
+        .service(stream::create)
         .service(stream::update_settings)
         .service(stream::delete_fields)
         .service(stream::delete)

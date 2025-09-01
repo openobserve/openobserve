@@ -15,10 +15,9 @@
 
 use std::sync::Arc;
 
-use add_sort_and_limit::AddSortAndLimitRule;
-use add_timestamp::AddTimestampRule;
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME};
 use datafusion::{
+    common::Result,
     optimizer::{
         AnalyzerRule, OptimizerRule, common_subexpr_eliminate::CommonSubexprEliminate,
         decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
@@ -35,40 +34,42 @@ use datafusion::{
         single_distinct_to_groupby::SingleDistinctToGroupBy,
     },
     physical_optimizer::PhysicalOptimizerRule,
+    physical_plan::ExecutionPlan,
+    prelude::SessionContext,
 };
 use infra::schema::get_stream_setting_fts_fields;
-use limit_join_right_side::LimitJoinRightSide;
-use remove_index_fields::RemoveIndexFieldsRule;
-use rewrite_histogram::RewriteHistogram;
-use rewrite_match::RewriteMatch;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::search::datafusion::optimizer::context::generate_streaming_agg_rules,
-    cipher::{RewriteCipherCall, RewriteCipherKey},
+    crate::service::search::datafusion::optimizer::logical_optimizer::cipher::{
+        RewriteCipherCall, RewriteCipherKey,
+    },
     o2_enterprise::enterprise::search::datafusion::optimizer::aggregate_topk::AggregateTopkRule,
     o2_enterprise::enterprise::search::datafusion::optimizer::eliminate_aggregate::EliminateAggregateRule,
 };
 
 use crate::service::search::{
     datafusion::optimizer::{
-        context::PhysicalOptimizerContext, join_reorder::JoinReorderRule,
-        remote_scan::generate_remote_scan_rules,
+        analyze::remove_index_fields::RemoveIndexFieldsRule,
+        context::PhysicalOptimizerContext,
+        logical_optimizer::{
+            add_sort_and_limit::AddSortAndLimitRule, add_timestamp::AddTimestampRule,
+            limit_join_right_side::LimitJoinRightSide, rewrite_histogram::RewriteHistogram,
+            rewrite_match::RewriteMatch,
+        },
+        physical_optimizer::{
+            distribute_analyze::optimize_distribute_analyze, join_reorder::JoinReorderRule,
+            remote_scan::generate_remote_scan_rules,
+        },
     },
     request::Request,
     sql::Sql,
 };
 
-pub mod add_sort_and_limit;
-pub mod add_timestamp;
-#[cfg(feature = "enterprise")]
-pub mod cipher;
+pub mod analyze;
 pub mod context;
-pub mod join_reorder;
-pub mod limit_join_right_side;
-pub mod remote_scan;
-pub mod remove_index_fields;
-pub mod rewrite_histogram;
-pub mod rewrite_match;
+pub mod logical_optimizer;
+pub mod physical_optimizer;
 pub mod utils;
 
 pub fn generate_analyzer_rules(sql: &Sql) -> Vec<Arc<dyn AnalyzerRule + Send + Sync>> {
@@ -99,7 +100,7 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     let mut rules: Vec<Arc<dyn OptimizerRule + Send + Sync>> = Vec::with_capacity(64);
 
     // get full text search fields
-    if sql.has_match_all && sql.stream_names.len() == 1 {
+    if sql.has_match_all {
         let mut fields = Vec::new();
         let stream_name = &sql.stream_names[0];
         let schema = sql.schemas.get(stream_name).unwrap();
@@ -210,4 +211,16 @@ pub fn generate_physical_optimizer_rules(
         }
     }
     rules
+}
+
+// create physical plan
+// NOTE: this function only can rewrite AnalyzeExec
+// another rewrite should move to optimize rule
+pub async fn create_physical_plan(
+    ctx: &SessionContext,
+    sql: &str,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    let plan = ctx.state().create_logical_plan(sql).await?;
+    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+    optimize_distribute_analyze(physical_plan)
 }

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="row q-px-sm"
       v-if="
         traceTree.length &&
+        spanList.length &&
         !(
           searchObj.data.traceDetails.isLoadingTraceDetails ||
           searchObj.data.traceDetails.isLoadingTraceMeta
@@ -29,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="full-width flex items-center toolbar flex justify-between">
         <div class="flex items-center">
           <div
-            data-test="add-alert-back-btn"
+            data-test="trace-details-back-btn"
             class="flex justify-center items-center q-mr-sm cursor-pointer"
             style="
               border: 1.5px solid;
@@ -43,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon name="arrow_back_ios_new" size="14px" />
           </div>
           <div
+            data-test="trace-details-operation-name"
             class="text-subtitle1 q-mr-lg ellipsis toolbar-operation-name"
             :title="traceTree[0]['operationName']"
           >
@@ -52,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center">
               Trace ID:
               <div
+                data-test="trace-details-trace-id"
                 class="toolbar-trace-id ellipsis q-pl-xs"
                 :title="spanList[0]['trace_id']"
               >
@@ -59,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <q-icon
+              data-test="trace-details-copy-trace-id-btn"
               class="q-ml-xs cursor-pointer trace-copy-icon"
               size="12px"
               name="content_copy"
@@ -67,12 +71,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <div class="q-pb-xs q-mr-lg">Spans: {{ spanList.length }}</div>
+          <div data-test="trace-details-spans-count" class="q-pb-xs q-mr-lg">
+            Spans: {{ spanList.length }}
+          </div>
 
           <!-- TODO OK: Create component for this usecase multi select with button -->
           <div class="o2-input flex items-center trace-logs-selector">
             <q-select
-              data-test="log-search-index-list-select-stream"
+              data-test="trace-details-log-streams-select"
               v-model="searchObj.data.traceDetails.selectedLogStreams"
               :label="
                 searchObj.data.traceDetails.selectedLogStreams.length
@@ -93,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #no-option>
                 <div class="o2-input log-stream-search-input">
                   <q-input
-                    data-test="alert-list-search-input"
+                    data-test="trace-details-stream-search-input"
                     v-model="streamSearchValue"
                     borderless
                     filled
@@ -117,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #before-options>
                 <div class="o2-input log-stream-search-input">
                   <q-input
-                    data-test="alert-list-search-input"
+                    data-test="trace-details-stream-search-input-options"
                     v-model="streamSearchValue"
                     borderless
                     debounce="500"
@@ -136,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-select>
             <q-btn
-              data-test="trace-view-logs-btn"
+              data-test="trace-details-view-logs-btn"
               v-close-popup="true"
               class="text-bold traces-view-logs-btn"
               :label="
@@ -159,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex justify-center items-center tw-border tw-pl-2 tw-rounded-sm tw-border-gray-300"
           >
             <q-input
+              data-test="trace-details-search-input"
               v-model="searchQuery"
               placeholder="Search..."
               @update:model-value="handleSearchQueryChange"
@@ -168,13 +175,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               debounce="500"
               class="q-mr-sm custom-height flex items-center"
             />
-            <p class="tw-mr-1" v-if="searchResults">
+            <p
+              data-test="trace-details-search-results"
+              class="tw-mr-1"
+              v-if="searchResults"
+            >
               <small
                 ><span>{{ currentIndex + 1 }}</span> of
                 <span>{{ searchResults }}</span></small
               >
             </p>
             <q-btn
+              data-test="trace-details-search-prev-btn"
               v-if="searchResults"
               :disable="currentIndex === 0"
               class="tw-mr-1 download-logs-btn flex"
@@ -187,6 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :size="`sm`"
             />
             <q-btn
+              data-test="trace-details-search-next-btn"
               v-if="searchResults"
               :disable="currentIndex + 1 === searchResults"
               class="tw-mr-1 download-logs-btn flex"
@@ -200,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <q-btn
-            data-test="logs-search-bar-share-link-btn"
+            data-test="trace-details-share-link-btn"
             class="q-mr-sm download-logs-btn"
             size="sm"
             icon="share"
@@ -211,6 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="shareLink"
           />
           <q-btn
+            data-test="trace-details-close-btn"
             round
             flat
             icon="cancel"
@@ -223,6 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator style="width: 100%" />
       <div class="col-12 flex justify-between items-end q-pr-sm q-pt-sm">
         <div
+          data-test="trace-details-toggle-timeline-btn"
           class="trace-chart-btn flex items-center no-wrap cursor-pointer q-mb-sm"
           @click="toggleTimeline"
         >
@@ -232,7 +247,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="22px"
             class="cursor-pointer text-grey-10"
           />
-          <div class="text-subtitle2 text-bold">
+          <div
+            data-test="trace-details-visual-title"
+            class="text-subtitle2 text-bold"
+          >
             {{
               activeVisual === "timeline"
                 ? "Trace Timeline"
@@ -248,6 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template v-for="visual in traceVisuals" :key="visual.value">
             <q-btn
+              :data-test="`trace-details-visual-${visual.value}-btn`"
               :color="visual.value === activeVisual ? 'primary' : ''"
               :flat="visual.value === activeVisual ? false : true"
               dense
@@ -268,6 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="isTimelineExpanded.toString()"
       >
         <ChartRenderer
+          data-test="trace-details-timeline-chart"
           v-if="activeVisual === 'timeline'"
           class="trace-details-chart"
           id="trace_details_gantt_chart"
@@ -275,7 +295,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @updated:chart="updateChart"
           style="height: 200px"
         />
-        <ChartRenderer v-else :data="traceServiceMap" style="height: 200px" />
+        <ChartRenderer
+          data-test="trace-details-service-map-chart"
+          v-else
+          :data="traceServiceMap"
+          style="height: 200px"
+        />
       </div>
       <q-separator style="width: 100%" class="q-mb-sm" />
       <div
@@ -287,6 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="parentContainer"
       >
         <trace-header
+          data-test="trace-details-header"
           :baseTracePosition="baseTracePosition"
           :splitterWidth="leftWidth"
           @resize-start="startResize"
@@ -295,6 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="trace-tree-container"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+            data-test="trace-details-tree-container"
           >
             <div class="position-relative">
               <div
@@ -312,6 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @mousedown="startResize"
               />
               <trace-tree
+                data-test="trace-details-tree"
                 :collapseMapping="collapseMapping"
                 :spans="spanPositionList"
                 :baseTracePosition="baseTracePosition"
@@ -337,6 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="isTimelineExpanded ? '' : 'full'"
       >
         <trace-details-sidebar
+          data-test="trace-details-sidebar"
           :span="spanMap[selectedSpanId as string]"
           :baseTracePosition="baseTracePosition"
           :search-query="searchQuery"
@@ -354,8 +383,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex column items-center justify-center"
       :style="{ height: '100%' }"
     >
-      <q-spinner-hourglass color="primary" size="3em" :thickness="2" />
-      <div class="q-pt-sm">Fetching your trace.</div>
+      <q-spinner-hourglass
+        data-test="trace-details-loading-spinner"
+        color="primary"
+        size="3em"
+        :thickness="2"
+      />
+      <div data-test="trace-details-loading-text" class="q-pt-sm">
+        Fetching your trace.
+      </div>
     </div>
   </div>
 </template>
@@ -877,9 +913,11 @@ export default defineComponent({
         }
       }
 
+      // Purposely converting to microseconds to avoid floating point precision issues
+      // In updateChart method, we are using start and end time to set the time range of trace
       traceTree.value[0].lowestStartTime =
-        convertTimeFromNsToMs(lowestStartTime);
-      traceTree.value[0].highestEndTime = convertTimeFromNsToMs(highestEndTime);
+        convertTimeFromNsToUs(lowestStartTime);
+      traceTree.value[0].highestEndTime = convertTimeFromNsToUs(highestEndTime);
       traceTree.value[0].style.color =
         searchObj.meta.serviceColors[traceTree.value[0].serviceName];
 
@@ -1029,6 +1067,12 @@ export default defineComponent({
       return Number((time / 1000000).toFixed(2));
     };
 
+    const convertTimeFromNsToUs = (time: number) => {
+      const nanoseconds = time;
+      const microseconds = Math.floor(nanoseconds / 1000);
+      return microseconds;
+    };
+
     const convertTimeFromNsToMs = (time: number) => {
       const nanoseconds = time;
       const milliseconds = Math.floor(nanoseconds / 1000000);
@@ -1064,15 +1108,15 @@ export default defineComponent({
       for (let i = spanPositionList.value.length - 1; i > -1; i--) {
         const absoluteStartTime =
           spanPositionList.value[i].startTimeMs -
-          traceTree.value[0].lowestStartTime;
+          convertTimeFromNsToMs(traceTree.value[0].lowestStartTime * 1000);
+
+        const x1 = Number(
+          (absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(4),
+        );
 
         data.push({
           x0: absoluteStartTime,
-          x1: Number(
-            (absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(
-              4,
-            ),
-          ),
+          x1,
           fillcolor: spanPositionList.value[i].style.color,
         });
       }
@@ -1092,10 +1136,18 @@ export default defineComponent({
       if (typeof data.start !== "number" || typeof data.end !== "number") {
         newStart = 0;
         // Safety check to ensure trace chart data exists
-        newEnd =
-          traceChart.value.data && traceChart.value.data.length > 0
-            ? traceChart.value.data[traceChart.value.data.length - 1].x1
-            : 0;
+        if (
+          traceTree.value[0].highestEndTime > 0 &&
+          traceTree.value[0].lowestStartTime > 0 &&
+          traceTree.value[0].highestEndTime > traceTree.value[0].lowestStartTime
+        ) {
+          newEnd =
+            (traceTree.value[0].highestEndTime -
+              traceTree.value[0].lowestStartTime) /
+            1000;
+        } else {
+          newEnd = 0;
+        }
       } else {
         newStart = data.start || 0;
         newEnd = data.end || 0;
@@ -1288,6 +1340,8 @@ export default defineComponent({
       parentContainer,
       parentHeight,
       updateHeight,
+      getSpanKind,
+      adjustOpacity,
     };
   },
 });

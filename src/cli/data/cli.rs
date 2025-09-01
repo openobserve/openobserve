@@ -232,8 +232,7 @@ mod tests {
         for expected_id in expected_ids {
             assert!(
                 arg_ids.contains(&expected_id.to_string()),
-                "Missing argument: {}",
-                expected_id
+                "Missing argument: {expected_id}"
             );
         }
     }
@@ -403,7 +402,7 @@ mod tests {
         assert_eq!(cli.end_time, cloned_cli.end_time);
 
         // Test debug formatting
-        let debug_str = format!("{:?}", cli);
+        let debug_str = format!("{cli:?}");
         assert!(debug_str.contains("test_context"));
         assert!(debug_str.contains("test_org"));
         assert!(debug_str.contains("test_stream"));

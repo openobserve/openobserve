@@ -69,6 +69,7 @@ message SearchInfo {
     int64                         timeout = 6;
     bool                        use_cache = 7;
     int64              histogram_interval = 8;
+    bool                       is_analyze = 9;
 }
 
 message IndexInfo {

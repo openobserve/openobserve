@@ -267,7 +267,7 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
-      await _getRoles();
+      await getRoles();
 
       // if (config.isCloud == "true") {
         // columns.value.push({
@@ -347,7 +347,7 @@ export default defineComponent({
     const currentUserRole = ref("");
     let deleteUserEmail = "";
 
-    const _getRoles = () => {
+    const getRoles = () => {
       return new Promise((resolve) => {
         usersService
           .getRoles(store.state.selectedOrganization.identifier)
@@ -898,7 +898,14 @@ export default defineComponent({
       verifyOrganizationStatus,
       isEnterprise,
       isCurrentUserInternal,
-      _getRoles,
+      getRoles,
+      getCustomRoles,
+      getInvitedMembers,
+      updateUserActions,
+      shouldAllowEdit,
+      shouldAllowChangeRole,
+      shouldAllowDelete,
+      fetchUserRoles,
       // showAddUserBtn,
     };
   },

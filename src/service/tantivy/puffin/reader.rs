@@ -310,19 +310,12 @@ mod tests {
 
         // This would fail in real scenario due to storage dependency, but we can test the error
         // paths by checking the match statement logic in read_blob_bytes
-        match blob_metadata.compression_codec {
-            Some(CompressionCodec::Lz4) => {
-                // Should return error for Lz4
-                assert!(true);
-            }
-            Some(CompressionCodec::Zstd) => {
-                // Should return error for Zstd
-                assert!(true);
-            }
-            None => {
-                // Should proceed with raw data
-                assert!(true);
-            }
+
+        if let Some(codec) = blob_metadata.compression_codec {
+            assert!(matches!(
+                codec,
+                CompressionCodec::Lz4 | CompressionCodec::Zstd
+            ));
         }
     }
 

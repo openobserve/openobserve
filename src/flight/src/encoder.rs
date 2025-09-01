@@ -117,3 +117,202 @@ fn split_batch_for_grpc_response(
 
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::{
+        array::{Int32Array, StringArray},
+        ipc::writer::IpcWriteOptions,
+    };
+    use arrow_schema::{DataType, Field, Schema};
+    use config::meta::search::ScanStats;
+
+    use super::*;
+    use crate::common::CustomMessage;
+
+    fn create_test_schema() -> Schema {
+        Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, true),
+        ])
+    }
+
+    fn create_test_record_batch() -> RecordBatch {
+        let schema = Arc::new(create_test_schema());
+        let id_array = Arc::new(Int32Array::from(vec![1, 2, 3, 4, 5]));
+        let name_array = Arc::new(StringArray::from(vec![
+            Some("Alice"),
+            Some("Bob"),
+            None,
+            Some("Charlie"),
+            Some("Diana"),
+        ]));
+
+        RecordBatch::try_new(schema, vec![id_array, name_array]).unwrap()
+    }
+
+    fn create_test_custom_message() -> CustomMessage {
+        let scan_stats = ScanStats {
+            files: 10,
+            records: 1000,
+            original_size: 2048,
+            compressed_size: 1024,
+            querier_files: 5,
+            querier_memory_cached_files: 2,
+            querier_disk_cached_files: 3,
+            idx_scan_size: 512,
+            idx_took: 100,
+            file_list_took: 50,
+            aggs_cache_ratio: 80,
+        };
+        CustomMessage::ScanStats(scan_stats)
+    }
+
+    #[test]
+    fn test_flight_data_encoder_new() {
+        let options = IpcWriteOptions::default();
+        let max_size = 8192;
+        let encoder = FlightDataEncoder::new(options, max_size);
+        assert_eq!(encoder.max_flight_data_size, max_size);
+    }
+
+    #[test]
+    fn test_encode_schema() {
+        let options = IpcWriteOptions::default();
+        let encoder = FlightDataEncoder::new(options, 8192);
+        let schema = create_test_schema();
+
+        let flight_data = encoder.encode_schema(&schema);
+
+        assert!(!flight_data.data_header.is_empty());
+        // Schema flight data may not always have a data body, only header
+        assert!(flight_data.app_metadata.is_empty());
+    }
+
+    #[test]
+    fn test_encode_batch() {
+        let options = IpcWriteOptions::default();
+        let mut encoder = FlightDataEncoder::new(options, 8192);
+        let batch = create_test_record_batch();
+
+        let flight_data_vec = encoder.encode_batch(batch).unwrap();
+
+        assert!(!flight_data_vec.is_empty());
+        for flight_data in flight_data_vec {
+            assert!(!flight_data.data_header.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_encode_custom() {
+        let options = IpcWriteOptions::default();
+        let mut encoder = FlightDataEncoder::new(options, 8192);
+        let custom_message = create_test_custom_message();
+
+        let flight_data = encoder.encode_custom(&custom_message).unwrap();
+
+        assert!(!flight_data.data_header.is_empty());
+        assert!(!flight_data.app_metadata.is_empty());
+        assert!(flight_data.data_body.is_empty());
+
+        // Verify the custom message can be deserialized
+        let deserialized: CustomMessage =
+            serde_json::from_slice(&flight_data.app_metadata).unwrap();
+
+        match deserialized {
+            CustomMessage::ScanStats(stats) => {
+                assert_eq!(stats.files, 10);
+                assert_eq!(stats.records, 1000);
+            }
+            _ => panic!("Expected ScanStats variant"),
+        }
+    }
+
+    #[test]
+    fn test_header_none() {
+        let header = header_none();
+
+        assert!(!header.is_empty());
+        // Verify it's a valid flatbuffer message
+        let message = arrow::ipc::root_as_message(&header).unwrap();
+        assert_eq!(message.header_type(), arrow::ipc::MessageHeader::NONE);
+        assert_eq!(message.bodyLength(), 0);
+    }
+
+    #[test]
+    fn test_split_batch_for_grpc_response_small_batch() {
+        let batch = create_test_record_batch();
+        let max_size = 1024 * 1024; // Large enough to not split
+
+        let batches = split_batch_for_grpc_response(batch.clone(), max_size);
+
+        assert_eq!(batches.len(), 1);
+        assert_eq!(batches[0].num_rows(), batch.num_rows());
+        assert_eq!(batches[0].num_columns(), batch.num_columns());
+    }
+
+    #[test]
+    fn test_split_batch_for_grpc_response_large_batch() {
+        let batch = create_test_record_batch();
+        let max_size = 1; // Very small to force splitting
+
+        let batches = split_batch_for_grpc_response(batch.clone(), max_size);
+
+        assert!(batches.len() > 1);
+
+        // Verify all rows are preserved
+        let total_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+        assert_eq!(total_rows, batch.num_rows());
+
+        // Verify all batches have the same schema
+        for split_batch in &batches {
+            assert_eq!(split_batch.schema(), batch.schema());
+        }
+    }
+
+    #[test]
+    fn test_split_batch_for_grpc_response_empty_batch() {
+        let schema = Arc::new(create_test_schema());
+        let empty_id_array = Arc::new(Int32Array::from(Vec::<i32>::new()));
+        let empty_name_array = Arc::new(StringArray::from(Vec::<Option<&str>>::new()));
+        let empty_batch =
+            RecordBatch::try_new(schema, vec![empty_id_array, empty_name_array]).unwrap();
+
+        let batches = split_batch_for_grpc_response(empty_batch, 1024);
+
+        // Empty batches return empty vector since the while loop condition (offset <
+        // batch.num_rows()) is false when num_rows() is 0
+        assert!(batches.is_empty());
+    }
+
+    #[test]
+    fn test_split_batch_for_grpc_response_single_row() {
+        let schema = Arc::new(create_test_schema());
+        let id_array = Arc::new(Int32Array::from(vec![1]));
+        let name_array = Arc::new(StringArray::from(vec![Some("Test")]));
+        let single_row_batch = RecordBatch::try_new(schema, vec![id_array, name_array]).unwrap();
+
+        let batches = split_batch_for_grpc_response(single_row_batch, 1);
+
+        assert_eq!(batches.len(), 1);
+        assert_eq!(batches[0].num_rows(), 1);
+    }
+
+    #[test]
+    fn test_split_batch_calculates_correct_number_of_batches() {
+        let batch = create_test_record_batch();
+        let size = batch
+            .columns()
+            .iter()
+            .map(|col| col.get_buffer_memory_size())
+            .sum::<usize>();
+
+        let max_size = size / 2; // Should create 2 batches
+        let batches = split_batch_for_grpc_response(batch, max_size);
+
+        // Should create at least 2 batches due to splitting
+        assert!(batches.len() >= 2);
+    }
+}

@@ -195,7 +195,7 @@ mod tests {
     #[test]
     fn test_ingester_struct() {
         // Test that Ingester can be created
-        let ingester = Ingester::default();
+        let ingester = Ingester;
         // Ingester is a unit struct, so its size is 0
         assert_eq!(std::mem::size_of_val(&ingester), 0);
     }
@@ -503,8 +503,7 @@ mod tests {
 
         // This test just ensures the logging format is valid
         let log_message = format!(
-            "Internal gPRC ingestion service errors saving enrichment data: code: {status}, body: {:?}",
-            body
+            "Internal gPRC ingestion service errors saving enrichment data: code: {status}, body: {body:?}"
         );
 
         assert!(log_message.contains("Internal gPRC ingestion service errors"));
@@ -519,15 +518,13 @@ mod tests {
 
         for stream_type in valid_stream_types {
             let converted: StreamType = stream_type.into();
-            match converted {
+            assert!(matches!(
+                converted,
                 StreamType::Logs
-                | StreamType::Metrics
-                | StreamType::Traces
-                | StreamType::EnrichmentTables => {
-                    // Valid stream types
-                }
-                _ => panic!("Unexpected stream type: {:?}", converted),
-            }
+                    | StreamType::Metrics
+                    | StreamType::Traces
+                    | StreamType::EnrichmentTables
+            ));
         }
     }
 

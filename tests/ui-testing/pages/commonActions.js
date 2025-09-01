@@ -45,7 +45,8 @@ export class CommonActions {
      * @returns {Promise<boolean>} - Whether the option was found
      */
     async scrollAndFindOption(optionName, optionType) {
-        const dropdown = this.page.locator('.q-menu');
+        // Use more specific locator to target the visible dropdown to avoid strict mode violation
+        const dropdown = this.page.locator('.q-menu:visible').first();
         let optionFound = false;
         let maxScrolls = 50;
         let scrollAmount = 1000;
@@ -66,7 +67,7 @@ export class CommonActions {
                     }
                     optionFound = true;
                     console.log(`Found ${optionType} after scrolling: ${optionName}`);
-                    await this.page.waitForTimeout(1000);
+                    await this.page.waitForTimeout(500);
                 } else {
                     // Get the current scroll position and height
                     const { scrollTop, scrollHeight, clientHeight } = await dropdown.evaluate(el => ({
@@ -79,12 +80,12 @@ export class CommonActions {
                     if (scrollTop + clientHeight >= scrollHeight) {
                         await dropdown.evaluate(el => el.scrollTop = 0);
                         totalScrolled = 0;
-                        await this.page.waitForTimeout(1000);
+                        await this.page.waitForTimeout(500);
                     } else {
                         // Scroll down
                         await dropdown.evaluate((el, amount) => el.scrollTop += amount, scrollAmount);
                         totalScrolled += scrollAmount;
-                        await this.page.waitForTimeout(1000);
+                        await this.page.waitForTimeout(500);
                     }
                     maxScrolls--;
                 }
@@ -92,7 +93,7 @@ export class CommonActions {
                 // If option not found, scroll and try again
                 await dropdown.evaluate((el, amount) => el.scrollTop += amount, scrollAmount);
                 totalScrolled += scrollAmount;
-                await this.page.waitForTimeout(1000);
+                await this.page.waitForLoadState('networkidle');
                 maxScrolls--;
             }
         }

@@ -327,10 +327,10 @@ mod tests {
             assert!(sql.contains("VALUES"));
             assert!(sql.contains("FALSE, FALSE")); // deleted and flattened flags
             assert!(sql.contains(", 0);")); // index_size at the end
-            assert!(sql.contains(&account));
-            assert!(sql.contains(&org));
-            assert!(sql.contains(&date));
-            assert!(sql.contains(&file_name));
+            assert!(sql.contains(account));
+            assert!(sql.contains(org));
+            assert!(sql.contains(date));
+            assert!(sql.contains(file_name));
         }
     }
 
@@ -357,7 +357,7 @@ mod tests {
             "files/org/metrics/cpu/2025/01/01/00/metrics.parquet",
         ];
 
-        for (_i, file) in test_files.iter().enumerate() {
+        for file in test_files.iter() {
             // Test that we can parse the file path
             let parse_result = parse_file_key_columns(file);
             assert!(parse_result.is_ok(), "Failed to parse file: {file}");

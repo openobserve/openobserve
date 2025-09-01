@@ -386,7 +386,7 @@ mod tests {
         println!("Title: {}", api.info.title);
         println!("Version: {}", api.info.version);
         if let Some(description) = &api.info.description {
-            println!("Description: {}", description);
+            println!("Description: {description}");
         }
 
         // Print all tags with descriptions
@@ -396,7 +396,7 @@ mod tests {
             for tag in tags {
                 println!("Tag: {}", tag.name);
                 if let Some(desc) = &tag.description {
-                    println!("Description: {}", desc);
+                    println!("Description: {desc}");
                 }
                 if let Some(ext_docs) = &tag.external_docs {
                     println!(
@@ -413,8 +413,11 @@ mod tests {
         println!("==============");
 
         // Group endpoints by tags with full operation details
-        let mut tag_operations: HashMap<String, Vec<(String, String, Operation, Vec<String>)>> =
-            HashMap::new();
+        #[allow(clippy::type_complexity)]
+        let mut tag_operations: HashMap<
+            String,
+            Vec<(String, String, Operation, Vec<String>)>,
+        > = HashMap::new();
 
         for (path, path_item) in &api.paths.paths {
             for (method, operation) in path_item.operations.clone() {
@@ -445,7 +448,7 @@ mod tests {
                 for tag in tags {
                     tag_operations
                         .entry(tag)
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(operation_info.clone());
                 }
             }
@@ -453,23 +456,23 @@ mod tests {
 
         // Print grouped operations with detailed information
         for (tag, operations) in tag_operations.iter() {
-            println!("\n[{}]", tag);
+            println!("\n[{tag}]");
             println!("{}", "=".repeat(tag.len() + 2));
 
             for (method, path, operation, _) in operations {
-                println!("\n{} {}", method, path);
+                println!("\n{method} {path}");
 
                 // Print operation ID if available
                 if let Some(operation_id) = &operation.operation_id {
-                    println!("Operation ID: {}", operation_id);
+                    println!("Operation ID: {operation_id}");
                 }
 
                 // Print operation summary and description
                 if let Some(summary) = &operation.summary {
-                    println!("Summary: {}", summary);
+                    println!("Summary: {summary}");
                 }
                 if let Some(description) = &operation.description {
-                    println!("Description: {}", description);
+                    println!("Description: {description}");
                 } else {
                     println!("No description available");
                 }

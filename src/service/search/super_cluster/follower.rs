@@ -272,6 +272,7 @@ pub async fn search(
         timeout: req.timeout as u64,
         use_cache: req.use_cache,
         histogram_interval: req.histogram_interval,
+        is_analyze: flight_request.search_info.is_analyze,
     };
 
     let context = tracing::Span::current().context();

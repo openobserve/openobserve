@@ -259,6 +259,23 @@ const computedOpacity = computed(() => {
   return props.depth + 10;
 });
 
+// Expose functions for testing
+defineExpose({
+  isGroup,
+  addCondition,
+  addGroup,
+  toggleLabel,
+  removeCondition,
+  inputUpdate,
+  hexToHSL,
+  hslToCSS,
+  computedStyleMap,
+  computedOpacity,
+  groups,
+  label,
+  isOpen
+});
+
   </script>
 
   <style lang="scss">   

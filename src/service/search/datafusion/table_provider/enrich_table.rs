@@ -26,18 +26,18 @@ use datafusion::{
     prelude::Expr,
 };
 
-use crate::service::search::datafusion::distributed_plan::enrich_exec::NewEnrichExec;
+use crate::service::search::datafusion::distributed_plan::enrich_exec::EnrichExec;
 
 /// An enrich table that is used for loading enrichment data from database.
 #[derive(Debug, Clone)]
-pub struct NewEnrichTable {
+pub struct EnrichTable {
     org_id: String,
     name: String,
     schema: SchemaRef,
     partitions: usize,
 }
 
-impl NewEnrichTable {
+impl EnrichTable {
     /// Initialize a new `EnrichTable` from a schema.
     pub fn new(org_id: &str, name: &str, schema: SchemaRef) -> Self {
         Self {
@@ -50,7 +50,7 @@ impl NewEnrichTable {
 }
 
 #[async_trait]
-impl TableProvider for NewEnrichTable {
+impl TableProvider for EnrichTable {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -72,7 +72,7 @@ impl TableProvider for NewEnrichTable {
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let projected_schema = project_schema(&self.schema, projection)?;
         Ok(Arc::new(
-            NewEnrichExec::new(&self.org_id, &self.name, projected_schema)
+            EnrichExec::new(&self.org_id, &self.name, projected_schema)
                 .with_partitions(self.partitions),
         ))
     }

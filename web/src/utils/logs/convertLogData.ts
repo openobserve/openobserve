@@ -109,7 +109,7 @@ export const convertLogData = (
   return { options };
 };
 
-const formatDate = (date: any) => {
+export const formatDate = (date: any) => {
   const year = String(date.getFullYear());
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
