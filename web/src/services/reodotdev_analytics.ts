@@ -64,16 +64,21 @@ export function useReo() {
   const identify = (identity: IdentityPayload) => {
     if (!enableAnalytics) {
       console.info("Analytics disabled. Skipping identify.");
-      return;
+      return Promise.resolve();
     }
 
     if (!reoInstance) {
       console.warn("Reo not initialized yet. Queuing identify.");
       eventQueue.push({ type: "identify", args: [identity] });
-      return;
+      return Promise.resolve();
     }
 
     reoInstance.identify(identity);
+    
+    // Return a promise that resolves after a fixed delay
+    return new Promise<void>((resolve) => {
+      setTimeout(resolve, 800); 
+    });
   };
 
   const track = (eventName: string, payload?: Record<string, any>) => {
