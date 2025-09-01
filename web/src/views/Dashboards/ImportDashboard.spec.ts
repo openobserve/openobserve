@@ -703,6 +703,8 @@ describe("ImportDashboard.vue", () => {
   });
 
   it("should test error handling in jsonFiles watcher", async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    
     wrapper = mountComponent();
     await nextTick();
 
@@ -725,6 +727,7 @@ describe("ImportDashboard.vue", () => {
     await new Promise(resolve => setTimeout(resolve, 50));
 
     global.FileReader = originalFileReader;
+    consoleErrorSpy.mockRestore();
     
     expect(wrapper.vm.jsonFiles).toEqual([mockFile]);
   });
