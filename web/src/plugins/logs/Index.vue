@@ -547,7 +547,7 @@ export default defineComponent({
     const $q = useQuasar();
     const disableMoreErrorDetails: boolean = ref(false);
     const searchHistoryRef = ref(null);
-    const { resetSearchObj, initialLogsState } = searchState();
+    const { resetSearchObj, initialLogsState, resetStreamData } = searchState();
     let {
       searchObj,
       getQueryData,
@@ -562,7 +562,6 @@ export default defineComponent({
       restoreUrlQueryParams,
       handleRunQuery,
       generateHistogramData,
-      resetStreamData,
       getHistogramQueryData,
       generateHistogramSkeleton,
       getRegionInfo,
@@ -2257,7 +2256,6 @@ export default defineComponent({
       redirectBackToLogs,
       handleRunQuery,
       refreshTimezone,
-      resetStreamData,
       getHistogramQueryData,
       generateHistogramSkeleton,
       setInterestingFieldInSQLQuery,

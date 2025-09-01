@@ -1507,6 +1507,7 @@ import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { fnParsedSQL, fnUnparsedSQL } from "@/composables/useLogs/logsUtils";
+import { searchState } from "@/store/modules/searchState";
 
 const defaultValue: any = () => {
   return {
@@ -1659,6 +1660,7 @@ export default defineComponent({
     const rowsPerPage = ref(10);
     const regionFilter = ref();
     const regionFilterRef = ref(null);
+    const { resetStreamData } = searchState();
 
     const {
       searchObj,
@@ -1671,7 +1673,6 @@ export default defineComponent({
       updateUrlQueryParams,
       generateURLQuery,
       buildSearch,
-      resetStreamData,
       loadStreamLists,
       onStreamChange,
       moveItemsToTop,
