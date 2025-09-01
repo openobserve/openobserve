@@ -1328,6 +1328,7 @@ mod tests {
         assert_eq!(get_role(&user_role), UserRole::Admin);
     }
 
+    #[cfg(not(feature = "enterprise"))]
     #[tokio::test]
     async fn test_check_permissions_non_enterprise() {
         // In non-enterprise mode, should always return false
@@ -1337,7 +1338,6 @@ mod tests {
             "test_user",
             "dashboard",
             "GET",
-            "test_parent_id",
         )
         .await;
 
