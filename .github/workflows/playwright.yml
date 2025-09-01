@@ -101,9 +101,9 @@ jobs:
     needs: [build_binary]
     runs-on:
       labels: repo-openobserve-standard-8
-    container:
-      image: mcr.microsoft.com/playwright:v1.50.0-jammy
-      options: --user root
+    # container:
+    #   image: mcr.microsoft.com/playwright:v1.50.0-jammy
+    #   options: --user root
     strategy:
       matrix:
         include:
@@ -217,9 +217,9 @@ jobs:
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
+      # - uses: actions/setup-node@v4
+      #   with:
+      #     node-version: lts/*
           
       - name: Install dependencies and run ui-tests
         run: |
