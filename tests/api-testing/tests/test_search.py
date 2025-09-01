@@ -1101,12 +1101,11 @@ def test_e2e_match_all_validation(create_session, base_url):
         
         matching_hits = 0
         for i, hit in enumerate(hits):
-            # Convert hit to string and check if it contains 'level=info'
-            hit_str = str(hit).lower()
-            if 'level=info' in hit_str or 'level":"info' in hit_str:
+            # Check if the hit has 'level' field with value 'info'
+            if "level" in hit and hit["level"] == "info":
                 matching_hits += 1
             else:
-                print(f"Hit {i} does not contain 'level=info': {hit}")
+                print(f"Hit {i} does not have level='info': level={hit.get('level', 'MISSING')}")
         
         # For match_all queries, we expect at least some hits to contain the term
         assert matching_hits > 0, f"Expected some hits to contain 'level=info', but found {matching_hits}/{len(hits)}"
