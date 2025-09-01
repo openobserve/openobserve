@@ -441,19 +441,6 @@
     "internalLabel": "Nota: Utilice esta opción si el colector está instalado en el mismo clúster que O2",
     "redirectionIngestionMsg": "Nota: Para acceder a páginas distintas de IAM, la ingestión de datos debe iniciarse dentro de la organización actual."
   },
-  "syslog": {
-    "stream": "Transmitir",
-    "organization": "Organización",
-    "subnets": "Subredes",
-    "deleteRoute": "Eliminar ruta",
-    "syslog_addroute": "Agregar ruta",
-    "save": "Guardar",
-    "cancel": "Cancelar",
-    "delete": "Eliminar",
-    "edit": "Editar",
-    "on": "Activar",
-    "off": "Desactivar"
-  },
   "dashboard": {
     "selectField": "Campo",
     "selectIndex": "Seleccionar índice",
