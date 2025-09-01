@@ -361,19 +361,6 @@
     "tracesLabel": "निशान",
     "subnetMessage": "अल्पविराम से अलग किए गए कई सबनेट दर्ज करें"
   },
-  "syslog": {
-    "stream": "स्ट्रीम",
-    "organization": "संगठन",
-    "subnets": "सबनेट्स",
-    "deleteRoute": "रूट डिलीट करें",
-    "syslog_addroute": "रूट जोड़ें",
-    "save": "सेव करें",
-    "cancel": "रद्द करना",
-    "delete": "डिलीट करें",
-    "edit": "संपादित करें",
-    "on": "चालू करें",
-    "off": "बंद करें"
-  },
   "dashboard": {
     "selectField": "फ़ील्ड",
     "selectIndex": "स्ट्रीम",

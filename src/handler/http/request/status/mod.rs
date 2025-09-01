@@ -67,7 +67,7 @@ use {
 
 use crate::{
     common::{
-        infra::{cluster, config::*},
+        infra::cluster,
         meta::{
             http::HttpResponse as MetaHttpResponse,
             user::{AuthTokens, AuthTokensExt},
@@ -101,7 +101,6 @@ struct ConfigResponse<'a> {
     default_functions: Vec<ZoFunction<'a>>,
     sql_base64_enabled: bool,
     timestamp_column: String,
-    syslog_enabled: bool,
     data_retention_days: i64,
     extended_data_retention_days: i64,
     restricted_routes_on_empty_data: bool,
@@ -300,7 +299,6 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
         sql_base64_enabled: cfg.common.ui_sql_base64_enabled,
         timestamp_column: TIMESTAMP_COL_NAME.to_string(),
-        syslog_enabled: *SYSLOG_ENABLED.read(),
         data_retention_days: cfg.compact.data_retention_days,
         extended_data_retention_days: cfg.compact.extended_data_retention_days,
         restricted_routes_on_empty_data: cfg.common.restricted_routes_on_empty_data,
@@ -388,10 +386,16 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     );
 
     let file_list_num = file_list::len().await;
-    let file_list_max_id = file_list::get_max_pk_value().await.unwrap_or_default();
+    let file_list_last_update_at = file_list::get_max_update_at().await.unwrap_or_default();
+    let (last_check_updated_at, _) = db::compact::stats::get_offset().await;
+
     stats.insert(
         "FILE_LIST",
-        json::json!({"num":file_list_num,"max_id": file_list_max_id}),
+        json::json!({
+            "num":file_list_num,
+            "last_update_at": file_list_last_update_at,
+            "last_check_updated_at": last_check_updated_at,
+        }),
     );
 
     let last_file_list_offset = db::compact::file_list::get_offset().await.unwrap();

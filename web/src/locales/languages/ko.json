@@ -441,19 +441,6 @@
     "internalLabel": "참고: 컬렉터가 O2와 동일한 클러스터에 설치된 경우 이 옵션을 사용하십시오.",
     "redirectionIngestionMsg": "참고: IAM 이외의 페이지에 액세스하려면 현재 조직 내에서 데이터 수집을 시작해야 합니다."
   },
-  "syslog": {
-    "stream": "스트림",
-    "organization": "조직",
-    "subnets": "서브넷",
-    "deleteRoute": "경로 삭제",
-    "syslog_addroute": "경로 추가",
-    "save": "저장",
-    "cancel": "취소",
-    "delete": "삭제",
-    "edit": "편집",
-    "on": "켜기",
-    "off": "끄기"
-  },
   "dashboard": {
     "selectField": "필드",
     "selectIndex": "스트림",

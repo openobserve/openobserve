@@ -80,7 +80,7 @@ import useActions from "./useActions";
 import useStreamingSearch from "./useStreamingSearch";
 
 import { searchState } from "@/composables/useLogs/searchState";
-import { INTERVAL_MAP, DEFAULT_LOGS_CONFIG } from "@/utils/logs/constants";
+import { INTERVAL_MAP } from "@/utils/logs/constants";
 import { fnParsedSQL, fnUnparsedSQL } from "@/composables/useLogs/logsUtils";
 
 // TODO OK:

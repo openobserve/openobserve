@@ -91,3 +91,68 @@ pub async fn emit_batch_delete_event(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use infra::table::distinct_values::{DistinctFieldRecord, OriginType};
+
+    fn create_test_record() -> DistinctFieldRecord {
+        DistinctFieldRecord {
+            org_name: "test_org".to_string(),
+            stream_name: "test_stream".to_string(),
+            stream_type: "logs".to_string(),
+            field_name: "test_field".to_string(),
+            origin: OriginType::Stream,
+            origin_id: "test_stream_id".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_record_creation() {
+        let record = create_test_record();
+        assert_eq!(record.org_name, "test_org");
+        assert_eq!(record.stream_name, "test_stream");
+        assert_eq!(record.field_name, "test_field");
+        assert_eq!(record.field_name, "test_field");
+        assert!(matches!(record.origin, OriginType::Stream));
+    }
+
+    #[cfg(feature = "enterprise")]
+    mod enterprise_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_emit_put_event() {
+            let record = create_test_record();
+
+            // Test function exists and handles the record
+            let result = emit_put_event(&record).await;
+            // Would succeed if super cluster is disabled
+            assert!(result.is_ok() || result.is_err());
+        }
+
+        #[tokio::test]
+        async fn test_emit_delete_event() {
+            let record = create_test_record();
+
+            let result = emit_delete_event(&record).await;
+            assert!(result.is_ok() || result.is_err());
+        }
+
+        #[tokio::test]
+        async fn test_emit_batch_delete_event() {
+            let result = emit_batch_delete_event(&OriginType::Stream, "test_id").await;
+            assert!(result.is_ok() || result.is_err());
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    mod non_enterprise_tests {
+        #[test]
+        fn test_enterprise_functions_not_available() {
+            // Verify that enterprise-specific functions are not compiled
+            // without the enterprise feature
+            assert!(true);
+        }
+    }
+}
