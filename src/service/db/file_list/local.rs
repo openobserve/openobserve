@@ -131,8 +131,9 @@ mod tests {
             let removing_count = REMOVING_FILES.read().await.len();
 
             // Just verify they're accessible (counts can be anything)
-            assert!(pending_count >= 0);
-            assert!(removing_count >= 0);
+            // Counts are usize so they're always >= 0, just verify they exist
+            let _ = pending_count;
+            let _ = removing_count;
         });
     }
 

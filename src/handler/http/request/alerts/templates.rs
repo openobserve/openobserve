@@ -45,6 +45,11 @@ impl From<TemplateError> for HttpResponse {
     context_path = "/api",
     tag = "Templates",
     operation_id = "CreateTemplate",
+    summary = "Create alert template",
+    description = "Creates a new alert notification template for an organization. Templates define the format and content \
+                   of alert notifications, including message structure, variable substitutions, and styling options. \
+                   Templates can be reused across multiple alert destinations to maintain consistent notification formatting \
+                   and branding across different channels.",
     security(
         ("Authorization"= [])
     ),
@@ -53,8 +58,8 @@ impl From<TemplateError> for HttpResponse {
       ),
     request_body(content = Template, description = "Template data", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/alerts/templates")]
@@ -81,6 +86,11 @@ pub async fn save_template(
     context_path = "/api",
     tag = "Templates",
     operation_id = "UpdateTemplate",
+    summary = "Update alert template",
+    description = "Updates an existing alert notification template. Allows modification of template content, formatting, \
+                   variable placeholders, and styling options. Changes to templates will apply to all future alert \
+                   notifications that use this template, providing a centralized way to update notification formats across \
+                   multiple alerts and destinations.",
     security(
         ("Authorization"= [])
     ),
@@ -90,8 +100,8 @@ pub async fn save_template(
       ),
     request_body(content = Template, description = "Template data", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/alerts/templates/{template_name}")]
@@ -114,6 +124,11 @@ pub async fn update_template(
     context_path = "/api",
     tag = "Templates",
     operation_id = "GetTemplate",
+    summary = "Get alert template",
+    description = "Retrieves the configuration and content of a specific alert notification template. Returns the template \
+                   structure including message format, variable definitions, styling options, and other formatting \
+                   parameters. Used for reviewing existing templates and understanding notification formats before making \
+                   modifications.",
     security(
         ("Authorization"= [])
     ),
@@ -123,7 +138,7 @@ pub async fn update_template(
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = Template),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/alerts/templates/{template_name}")]
@@ -142,6 +157,11 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
     context_path = "/api",
     tag = "Templates",
     operation_id = "ListTemplates",
+    summary = "List alert templates",
+    description = "Retrieves a list of all alert notification templates configured for an organization. Returns template \
+                   names, types, and basic metadata to help administrators manage notification formatting options. \
+                   Templates provide reusable formatting configurations that ensure consistent alert notifications across \
+                   different channels and destinations.",
     security(
         ("Authorization"= [])
     ),
@@ -150,7 +170,7 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<Template>),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/alerts/templates")]
@@ -197,6 +217,10 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
     context_path = "/api",
     tag = "Templates",
     operation_id = "DeleteAlertTemplate",
+    summary = "Delete alert template",
+    description = "Removes an alert notification template from the organization. The template must not be in use by any \
+                   active destinations before deletion. Once deleted, any destinations previously using this template \
+                   will need to be updated with alternative templates to continue formatting notifications properly.",
     security(
         ("Authorization"= [])
     ),
@@ -205,10 +229,10 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
         ("template_name" = String, Path, description = "Template name"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = HttpResponse),
-        (status = 409, description = "Conflict", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 409, description = "Conflict", content_type = "application/json", body = ()),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     )
 )]
 #[delete("/{org_id}/alerts/templates/{template_name}")]

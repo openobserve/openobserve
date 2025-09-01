@@ -164,6 +164,8 @@ impl From<RatelimitError> for HttpResponse {
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "listApiModule",
+    summary = "List API modules",
+    description = "Retrieves all available API modules that can have rate limiting rules applied. Used for configuring rate limits at the module level",
     security(
         ("Authorization"= [])
     ),
@@ -171,8 +173,8 @@ impl From<RatelimitError> for HttpResponse {
         ("org_id" = String, Path, description = "Organization Name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/ratelimit/api_modules")]
@@ -211,6 +213,8 @@ pub async fn api_modules(path: web::Path<String>) -> Result<HttpResponse, Error>
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "listModuleRatelimitRule",
+    summary = "List module rate limit rules",
+    description = "Retrieves rate limiting rules applied at the organization module level, including thresholds and configurations for different API groups",
     security(
         ("Authorization"= [])
     ),
@@ -219,8 +223,8 @@ pub async fn api_modules(path: web::Path<String>) -> Result<HttpResponse, Error>
         ("org_id" = String, Query, description = "Organization Name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/ratelimit/module_list")]
@@ -276,6 +280,8 @@ pub async fn list_module_ratelimit(
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "listRoleRatelimitRule",
+    summary = "List role-based rate limit rules",
+    description = "Retrieves rate limiting rules applied to specific user roles within the organization, showing how different roles have different API usage limits",
     security(
         ("Authorization"= [])
     ),
@@ -285,8 +291,8 @@ pub async fn list_module_ratelimit(
         ("user_role" = String, Query, description = "User Role Name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/ratelimit/role_list")]
@@ -360,6 +366,8 @@ pub async fn list_role_ratelimit(
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "UpdateRatelimitRule",
+    summary = "Update rate limit rules",
+    description = "Updates rate limiting rules for modules or user roles. Allows setting custom thresholds for different API operations and groups",
     security(
         ("Authorization"= [])
     ),
@@ -371,8 +379,8 @@ pub async fn list_role_ratelimit(
     ),
     request_body(content = String, description = "json array", content_type = "application/json", example = json!({"Key Values": {"list": 0,"create": 0,"delete": 0,"get": 0},"Service Accounts": {"update": 0,"list": 0,"create": 0,"delete": 0,"get": 0}})),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/ratelimit/update")]

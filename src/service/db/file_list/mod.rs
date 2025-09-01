@@ -186,9 +186,10 @@ mod tests {
         let blocked_orgs_count = BLOCKED_ORGS.len();
 
         // Just verify they're accessible (counts can be anything)
-        assert!(duplicate_count >= 0);
-        assert!(deleted_count >= 0);
-        assert!(blocked_orgs_count >= 0);
+        // Counts are usize so they're always >= 0, just verify they exist
+        let _ = duplicate_count;
+        let _ = deleted_count;
+        let _ = blocked_orgs_count;
     }
 
     #[test]
@@ -228,7 +229,7 @@ mod tests {
     fn test_blocked_orgs() {
         // Test that BLOCKED_ORGS is initialized from config
         let blocked_count = BLOCKED_ORGS.len();
-        assert!(blocked_count >= 0); // Can be 0 if no orgs are blocked in config
+        let _ = blocked_count; // Can be 0 if no orgs are blocked in config
 
         // Test that it contains strings
         for org in BLOCKED_ORGS.iter() {
