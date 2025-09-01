@@ -243,12 +243,14 @@ impl FileData {
     }
 
     async fn gc(&mut self, trace_id: &str, need_release_size: usize) -> Result<(), anyhow::Error> {
+        let start = std::time::Instant::now();
         log::info!(
-            "[CacheType:{} trace_id {trace_id}] File disk cache start gc {}/{}, need to release {} bytes",
+            "[CacheType:{} trace_id {trace_id}] File disk cache start gc {}/{}, need to release {} bytes, time={}",
             self.file_type,
             self.cur_size,
             self.max_size,
-            need_release_size
+            need_release_size,
+            chrono::Utc::now().to_rfc3339()
         );
         let mut release_size = 0;
         let mut remove_result_files = vec![];
@@ -319,9 +321,11 @@ impl FileData {
             drop(r);
         }
         log::info!(
-            "[CacheType:{} trace_id {trace_id}] File disk cache gc done, released {} bytes",
+            "[CacheType:{} trace_id {trace_id}] File disk cache gc done, released {} bytes, time={}, took={}",
             self.file_type,
-            release_size
+            release_size,
+            chrono::Utc::now().to_rfc3339(),
+            start.elapsed().as_millis()
         );
 
         Ok(())
