@@ -804,7 +804,10 @@ async fn merge_files(
 
     // upload file
     let buf = Bytes::from(buf);
-    if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node {
+    if cfg.cache_latest_files.enabled
+        && cfg.cache_latest_files.cache_parquet
+        && cfg.cache_latest_files.download_from_node
+    {
         infra::cache::file_data::disk::set(
             TRACE_ID_FOR_CACHE_LATEST_FILE,
             &new_file_key,
