@@ -1377,10 +1377,6 @@ export default defineComponent({
         if (!props.row) {
         isUpdated.value = false;
         action = "Add Alert";
-        track("Button Click", {
-          button: "Add Alert",
-          page: "Alerts"
-        });
         await router.push({
           name: "alertList",
           query: {
@@ -1413,6 +1409,10 @@ export default defineComponent({
           page: "Alerts",
         });
       }
+      track("Button Click", {
+        button: action,
+        page: "Add Alert"
+      });
       } catch (error) {
         console.error('Navigation failed:', error);
       }
@@ -1435,6 +1435,10 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           folder: activeFolderId.value,
         },
+      });
+      track("Button Click", {
+        button: "Hide Form",
+        page: "Add Alert"
       });
     };
     const deleteAlertByAlertId = () => {

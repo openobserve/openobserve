@@ -94,6 +94,7 @@ import { useQuasar } from "quasar";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const { t } = useI18n();
 const props = defineProps({
@@ -116,6 +117,8 @@ const emits = defineEmits(["cancel:hideform", "added:group"]);
 const name = ref(props.group?.name || "");
 
 const q = useQuasar();
+
+const { track } = useReo();
 
 const store = useStore();
 
@@ -149,6 +152,10 @@ const saveGroup = () => {
       });
       }
       console.log(err);
+    });
+    track("Button Click", {
+      button: "Save Group",
+      page: "Add Group"
     });
 };
 </script>

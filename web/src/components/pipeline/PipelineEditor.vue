@@ -890,6 +890,10 @@ const onSubmitPipeline = async () => {
       isPipelineSaving.value = false;
       dismiss();
     });
+    track("Button Click", {
+      button: "Save Pipeline",
+      page: "Add Pipeline"
+    });
 };
 
 const openCancelDialog = () => {
@@ -909,6 +913,10 @@ const openCancelDialog = () => {
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
+      });
+      track("Button Click", {
+        button: "Cancel Pipeline",
+        page: "Add Pipeline"
       });
     };
   } else {
