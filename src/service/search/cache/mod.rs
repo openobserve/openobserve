@@ -488,6 +488,7 @@ pub async fn search(
                 req.query.end_time,
             )
             .await;
+        c_resp.cache_query_response = true;
     }
 
     // There are 3 types of partial responses:
@@ -503,8 +504,7 @@ pub async fn search(
         && res.new_start_time.is_none()
         && res.new_end_time.is_none()
         && res.function_error.is_empty()
-        && !res.hits.is_empty()
-        && !in_req.is_refresh_cache;
+        && !res.hits.is_empty();
     if should_cache_results
         && (results.first().is_some_and(|res| !res.hits.is_empty())
             || results.last().is_some_and(|res| !res.hits.is_empty()))

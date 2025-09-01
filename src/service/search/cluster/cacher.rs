@@ -432,8 +432,6 @@ pub async fn delete_cached_results_by_time_range(
 
     let mut tasks = Vec::new();
 
-    // For remote nodes, we'll use a series of individual deletions with different timestamps
-    // This is a workaround since we don't have a dedicated gRPC method for time range deletion
     for node in nodes {
         let cfg = config::get_config();
         let node_addr = node.grpc_addr.clone();

@@ -764,22 +764,18 @@ pub async fn delete_cache_by_time_range(
         // {start_time}_{end_time}_{is_aggregate}_{is_descending}.json
         if let Some(file_name) = file.split('/').next_back() {
             let parts: Vec<&str> = file_name.split('_').collect();
-            if parts.len() >= 2 {
-                if let (Ok(cache_start_time), Ok(cache_end_time)) =
-                    (parts[0].parse::<i64>(), parts[1].parse::<i64>())
-                {
-                    // Check if cache time range overlaps with query time range
-                    // Overlap occurs when: cache_start <= query_end && cache_end >= query_start
-                    if cache_start_time <= query_end_time && cache_end_time >= query_start_time {
-                        match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
-                            Ok(_) => {
-                                remove_files.push(file.clone());
-                                log::info!("Deleted cache file: {}", file);
-                            }
-                            Err(e) => {
-                                log::error!("Error deleting cache file {}: {}", file, e);
-                                return Err(std::io::Error::other("Error deleting cache"));
-                            }
+            if let (Ok(cache_start_time), Ok(cache_end_time)) =
+                (parts[0].parse::<i64>(), parts[1].parse::<i64>())
+            {
+                // Check if cache time range overlaps with query time range
+                if cache_start_time >= query_start_time && cache_end_time <= query_end_time {
+                    match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
+                        Ok(_) => {
+                            remove_files.push(file.clone());
+                        }
+                        Err(e) => {
+                            log::error!("Error deleting cache file {file}: {e}");
+                            return Err(std::io::Error::other("Error deleting cache"));
                         }
                     }
                 }
@@ -798,27 +794,18 @@ pub async fn delete_cache_by_time_range(
             // {start_time}_{end_time}.arrow
             if let Some(file_name) = file.split('/').next_back() {
                 let parts: Vec<&str> = file_name.split('_').collect();
-                if parts.len() >= 2 {
-                    if let (Ok(cache_start_time), Ok(cache_end_time)) =
-                        (parts[0].parse::<i64>(), parts[1].parse::<i64>())
-                    {
-                        // Check if cache time range overlaps with query time range
-                        if cache_start_time <= query_end_time && cache_end_time >= query_start_time
-                        {
-                            match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
-                                Ok(_) => {
-                                    log::info!("Deleted aggregation cache file: {}", file);
-                                }
-                                Err(e) => {
-                                    log::error!(
-                                        "Error deleting aggregation cache file {}: {}",
-                                        file,
-                                        e
-                                    );
-                                    return Err(std::io::Error::other(
-                                        "Error deleting aggregation cache",
-                                    ));
-                                }
+                if let (Ok(cache_start_time), Ok(cache_end_time)) =
+                    (parts[0].parse::<i64>(), parts[1].parse::<i64>())
+                {
+                    // Check if cache time range overlaps with query time range
+                    if cache_start_time >= query_start_time && cache_end_time <= query_end_time {
+                        match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
+                            Ok(_) => {}
+                            Err(e) => {
+                                log::error!("Error deleting aggregation cache file {file}: {e}",);
+                                return Err(std::io::Error::other(
+                                    "Error deleting aggregation cache",
+                                ));
                             }
                         }
                     }
@@ -835,14 +822,12 @@ pub async fn delete_cache_by_time_range(
             .split('/')
             .collect::<Vec<&str>>();
 
-        if columns.len() >= 5 {
-            let query_key = format!(
-                "{}_{}_{}_{}",
-                columns[1], columns[2], columns[3], columns[4]
-            );
-            let mut r = QUERY_RESULT_CACHE.write().await;
-            r.remove(&query_key);
-        }
+        let query_key = format!(
+            "{}_{}_{}_{}",
+            columns[1], columns[2], columns[3], columns[4]
+        );
+        let mut r = QUERY_RESULT_CACHE.write().await;
+        r.remove(&query_key);
     }
 
     Ok(true)
