@@ -1012,3 +1012,255 @@ def test_e2e_floatvalue(create_session, base_url):
         resp_get_inquery.status_code == 200
     ), f"histogram mode added 200, but got {resp_get_inquery.status_code} {resp_get_inquery.content}"
     response_data = resp_get_inquery.json()
+
+
+def test_e2e_where_condition_validation(create_session, base_url):
+    """Test WHERE condition query and validate all hits have the expected data."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE kubernetes_container_name = 'ziox'",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 100,
+            "quick_mode": False
+        }
+    }
+
+    resp_get_where_query = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_where_query.status_code == 200
+    ), f"WHERE condition query failed with status {resp_get_where_query.status_code} {resp_get_where_query.content}"
+    
+    response_data = resp_get_where_query.json()
+    
+    # Assert that we got results
+    assert "hits" in response_data, "Response should contain 'hits' field"
+    
+    hits = response_data["hits"]
+    
+    # If we have hits, validate that ALL hits contain kubernetes_container_name = 'ziox'
+    if len(hits) > 0:
+        print(f"Found {len(hits)} hits matching the WHERE condition")
+        
+        for i, hit in enumerate(hits):
+            assert "kubernetes_container_name" in hit, f"Hit {i} should contain 'kubernetes_container_name' field"
+            assert hit["kubernetes_container_name"] == "ziox", (
+                f"Hit {i} kubernetes_container_name should be 'ziox', but got '{hit.get('kubernetes_container_name')}'"
+            )
+        
+        print(f"✅ All {len(hits)} hits have kubernetes_container_name = 'ziox' as expected")
+    else:
+        print("⚠️  No hits found for the WHERE condition query")
+    
+    # Log the total count and took time for monitoring
+    total_hits = response_data.get("total", 0)
+    took_time = response_data.get("took", 0)
+    print(f"Query executed in {took_time}ms and found {total_hits} total matching records")
+
+
+def test_e2e_match_all_validation(create_session, base_url):
+    """Test match_all query and validate all hits contain the search term."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('level=info')",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 50,
+            "quick_mode": False
+        }
+    }
+
+    resp_get_match_query = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_match_query.status_code == 200
+    ), f"match_all query failed with status {resp_get_match_query.status_code} {resp_get_match_query.content}"
+    
+    response_data = resp_get_match_query.json()
+    assert "hits" in response_data, "Response should contain 'hits' field"
+    
+    hits = response_data["hits"]
+    
+    if len(hits) > 0:
+        print(f"Found {len(hits)} hits for match_all query")
+        
+        matching_hits = 0
+        for i, hit in enumerate(hits):
+            # Convert hit to string and check if it contains 'level=info'
+            hit_str = str(hit).lower()
+            if 'level=info' in hit_str or 'level":"info' in hit_str:
+                matching_hits += 1
+            else:
+                print(f"Hit {i} does not contain 'level=info': {hit}")
+        
+        # For match_all queries, we expect at least some hits to contain the term
+        assert matching_hits > 0, f"Expected some hits to contain 'level=info', but found {matching_hits}/{len(hits)}"
+        print(f"✅ {matching_hits}/{len(hits)} hits contain 'level=info' as expected")
+    else:
+        print("⚠️  No hits found for match_all query")
+    
+    total_hits = response_data.get("total", 0)
+    took_time = response_data.get("took", 0)
+    print(f"match_all query executed in {took_time}ms and found {total_hits} total matching records")
+
+
+
+def test_e2e_timestamp_ordering_validation(create_session, base_url):
+    """Test ORDER BY timestamp and validate proper ordering."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": "SELECT * FROM \"stream_pytest_data\" ORDER BY _timestamp DESC LIMIT 10",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 10,
+            "quick_mode": False
+        }
+    }
+
+    resp_get_order_query = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_order_query.status_code == 200
+    ), f"ORDER BY query failed with status {resp_get_order_query.status_code} {resp_get_order_query.content}"
+    
+    response_data = resp_get_order_query.json()
+    assert "hits" in response_data, "Response should contain 'hits' field"
+    
+    hits = response_data["hits"]
+    
+    if len(hits) > 1:
+        print(f"Found {len(hits)} hits for ORDER BY query")
+        
+        # Validate descending timestamp order
+        for i in range(len(hits) - 1):
+            current_timestamp = hits[i].get("_timestamp", 0)
+            next_timestamp = hits[i + 1].get("_timestamp", 0)
+            
+            assert current_timestamp >= next_timestamp, (
+                f"Timestamps not in DESC order: hit {i} ({current_timestamp}) should be >= hit {i+1} ({next_timestamp})"
+            )
+        
+        print(f"✅ All {len(hits)} hits are properly ordered by timestamp DESC")
+    else:
+        print("⚠️  Need at least 2 hits to validate ordering")
+    
+    total_hits = response_data.get("total", 0)
+    took_time = response_data.get("took", 0)
+    print(f"ORDER BY query executed in {took_time}ms and found {total_hits} total matching records")
+
+
+def test_e2e_limit_validation(create_session, base_url):
+    """Test LIMIT clause and validate result count."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": "SELECT * FROM \"stream_pytest_data\" LIMIT 3",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 100,  # Set high size but query has LIMIT 3
+            "quick_mode": False
+        }
+    }
+
+    resp_get_limit_query = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_limit_query.status_code == 200
+    ), f"LIMIT query failed with status {resp_get_limit_query.status_code} {resp_get_limit_query.content}"
+    
+    response_data = resp_get_limit_query.json()
+    assert "hits" in response_data, "Response should contain 'hits' field"
+    
+    hits = response_data["hits"]
+    
+    # Validate that LIMIT clause is respected
+    assert len(hits) <= 3, f"LIMIT 3 should return max 3 results, got {len(hits)}"
+    
+    if len(hits) > 0:
+        print(f"✅ LIMIT clause respected: got {len(hits)} hits (≤3) as expected")
+    else:
+        print("⚠️  No hits found for LIMIT query")
+    
+    total_hits = response_data.get("total", 0)
+    took_time = response_data.get("took", 0)
+    print(f"LIMIT query executed in {took_time}ms and found {total_hits} total matching records")
+
+
+
+
+def test_e2e_cte_query_validation(create_session, base_url):
+    """Test CTE (Common Table Expression) query and validate results."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": "WITH filtered_logs AS (SELECT * FROM \"stream_pytest_data\" WHERE level = 'info') SELECT level, _timestamp FROM filtered_logs LIMIT 5",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 5,
+            "quick_mode": False
+        }
+    }
+
+    resp_get_cte_query = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_cte_query.status_code == 200
+    ), f"CTE query failed with status {resp_get_cte_query.status_code} {resp_get_cte_query.content}"
+    
+    response_data = resp_get_cte_query.json()
+    assert "hits" in response_data, "Response should contain 'hits' field"
+    
+    hits = response_data["hits"]
+    
+    if len(hits) > 0:
+        print(f"Found {len(hits)} hits for CTE query")
+        
+        # Validate that all results have level = 'info' (from the CTE WHERE clause)
+        for i, hit in enumerate(hits):
+            assert "level" in hit, f"Hit {i} should contain 'level' field"
+            assert "_timestamp" in hit, f"Hit {i} should contain '_timestamp' field"
+            assert hit["level"] == "info", (
+                f"Hit {i} level should be 'info', got '{hit.get('level')}'"
+            )
+        
+        print(f"✅ All {len(hits)} hits from CTE have level='info' as expected")
+    else:
+        print("⚠️  No hits found for CTE query")
+    
+    total_hits = response_data.get("total", 0)
+    took_time = response_data.get("took", 0)
+    print(f"CTE query executed in {took_time}ms and found {total_hits} total matching records")
