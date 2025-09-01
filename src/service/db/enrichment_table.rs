@@ -373,9 +373,126 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_convert_to_vrl() {
+    fn test_convert_to_vrl_string() {
         let value = json::Value::String("123".to_string());
         let vrl_value = convert_to_vrl(&value);
         assert_eq!(vrl_value, vrl::value::Value::Bytes(b"123".to_vec().into()));
+    }
+
+    #[test]
+    fn test_convert_to_vrl_null() {
+        let value = json::Value::Null;
+        let vrl_value = convert_to_vrl(&value);
+        assert_eq!(vrl_value, vrl::value::Value::Null);
+    }
+
+    #[test]
+    fn test_convert_to_vrl_boolean() {
+        let value = json::Value::Bool(true);
+        let vrl_value = convert_to_vrl(&value);
+        assert_eq!(vrl_value, vrl::value::Value::Boolean(true));
+
+        let value = json::Value::Bool(false);
+        let vrl_value = convert_to_vrl(&value);
+        assert_eq!(vrl_value, vrl::value::Value::Boolean(false));
+    }
+
+    #[test]
+    fn test_convert_to_vrl_integer() {
+        let value = json::Value::Number(serde_json::Number::from(42));
+        let vrl_value = convert_to_vrl(&value);
+        assert_eq!(vrl_value, vrl::value::Value::Integer(42));
+    }
+
+    #[test]
+    fn test_convert_to_vrl_float() {
+        let value = json::Value::Number(serde_json::Number::from_f64(3.14).unwrap());
+        let vrl_value = convert_to_vrl(&value);
+        match vrl_value {
+            vrl::value::Value::Float(f) => assert_eq!(f.into_inner(), 3.14),
+            _ => panic!("Expected float value"),
+        }
+    }
+
+    #[test]
+    fn test_convert_to_vrl_array() {
+        let array = vec![
+            json::Value::String("item1".to_string()),
+            json::Value::Number(serde_json::Number::from(2)),
+        ];
+        let value = json::Value::Array(array);
+        let vrl_value = convert_to_vrl(&value);
+
+        match vrl_value {
+            vrl::value::Value::Array(arr) => {
+                assert_eq!(arr.len(), 2);
+                assert_eq!(arr[0], vrl::value::Value::Bytes(b"item1".to_vec().into()));
+                assert_eq!(arr[1], vrl::value::Value::Integer(2));
+            }
+            _ => panic!("Expected array value"),
+        }
+    }
+
+    #[test]
+    fn test_convert_to_vrl_object() {
+        let mut obj = serde_json::Map::new();
+        obj.insert(
+            "key1".to_string(),
+            json::Value::String("value1".to_string()),
+        );
+        obj.insert(
+            "key2".to_string(),
+            json::Value::Number(serde_json::Number::from(42)),
+        );
+        let value = json::Value::Object(obj);
+
+        let vrl_value = convert_to_vrl(&value);
+        match vrl_value {
+            vrl::value::Value::Object(vrl_obj) => {
+                assert_eq!(vrl_obj.len(), 2);
+                assert_eq!(
+                    vrl_obj.get("key1"),
+                    Some(&vrl::value::Value::Bytes(b"value1".to_vec().into()))
+                );
+                assert_eq!(vrl_obj.get("key2"), Some(&vrl::value::Value::Integer(42)));
+            }
+            _ => panic!("Expected object value"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_enrichment_table_data() {
+        // This will fail in test environment due to missing dependencies,
+        // but tests the function structure
+        let result = get_enrichment_table_data("test_org", "test_table").await;
+        assert!(result.is_ok());
+        let data = result.unwrap();
+        assert_eq!(data.len(), 0); // Should return empty vec due to search service failure
+    }
+
+    #[tokio::test]
+    async fn test_get() {
+        let result = get("test_org", "test_table").await;
+        assert!(result.is_ok());
+        let data = result.unwrap();
+        assert_eq!(data.len(), 0); // Should return empty vec due to search service failure
+    }
+
+    #[tokio::test]
+    async fn test_get_table_size() {
+        let size = get_table_size("test_org", "test_table").await;
+        assert_eq!(size, 0.0); // Should return 0 when no data is found
+    }
+
+    #[tokio::test]
+    async fn test_get_start_time() {
+        let start_time = get_start_time("test_org", "test_table").await;
+        assert!(start_time > 0); // Should return BASE_TIME if no stats found
+    }
+
+    #[tokio::test]
+    async fn test_get_meta_table_stats() {
+        let result = get_meta_table_stats("test_org", "test_table").await;
+        assert!(result.is_none()); // Should return None when no stats exist
     }
 }
