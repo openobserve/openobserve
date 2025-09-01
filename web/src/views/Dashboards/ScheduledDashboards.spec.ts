@@ -80,6 +80,14 @@ vi.mock('@/utils/date', () => ({
   })
 }));
 
+// Mock console methods
+global.console = {
+  ...console,
+  error: vi.fn(),
+  warn: vi.fn(),
+  log: vi.fn()
+};
+
 // Create i18n instance
 const i18n = createI18n({
   locale: 'en',
