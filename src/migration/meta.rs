@@ -16,10 +16,9 @@
 use chrono::Utc;
 use infra::{db as infra_db, scheduler as infra_scheduler};
 
-const ITEM_PREFIXES: [&str; 13] = [
+const ITEM_PREFIXES: [&str; 12] = [
     "/user",
     "/schema",
-    "/syslog",
     "/function",
     "/dashboard",    // dashboard
     "/folders",      // dashboard

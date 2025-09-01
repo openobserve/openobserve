@@ -441,19 +441,6 @@
     "internalLabel": "Hinweis: Verwenden Sie diese Option, wenn der Kollektor im selben Cluster wie O2 installiert ist",
     "redirectionIngestionMsg": "Hinweis: Um auf andere Seiten als das IAM zuzugreifen, muss die Datenaufnahme innerhalb der aktuellen Organisation initiiert werden."
   },
-  "syslog": {
-    "stream": "Streamen",
-    "organization": "Organisation",
-    "subnets": "Subnetze",
-    "deleteRoute": "Route löschen",
-    "syslog_addroute": "Route hinzufügen",
-    "save": "Speichern",
-    "cancel": "Abbrechen",
-    "delete": "Löschen",
-    "edit": "Bearbeiten",
-    "on": "Einschalten",
-    "off": "Ausschalten"
-  },
   "dashboard": {
     "selectField": "Feld",
     "selectIndex": "Streamen",
