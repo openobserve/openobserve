@@ -8,7 +8,7 @@
 // This program is distributed in the hope that it will be useful
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affro General Public License for more details.
+// GNU Affero General Public License for more details.
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
@@ -107,7 +107,9 @@ describe("ErrorStackTrace Component", () => {
     it("should display the first stack line separately", () => {
       const firstLine = wrapper.find(".q-mb-sm");
       expect(firstLine.exists()).toBe(true);
-      expect(firstLine.text()).toBe("TypeError: Cannot read property 'foo' of undefined");
+      expect(firstLine.text()).toBe(
+        "TypeError: Cannot read property 'foo' of undefined",
+      );
     });
 
     it("should have correct first line styling", () => {
@@ -124,16 +126,22 @@ describe("ErrorStackTrace Component", () => {
 
     it("should display correct content for each stack line", () => {
       const stackLines = wrapper.findAll(".error_stack");
-      
-      expect(stackLines[0].text()).toBe("at Object.fn (/app/src/main.js:15:20)");
-      expect(stackLines[1].text()).toBe("at process.processImmediate (internal/timers.js:461:26)");
-      expect(stackLines[2].text()).toBe("at process.processTicksAndRejections (internal/process/task_queues.js:95:5)");
+
+      expect(stackLines[0].text()).toBe(
+        "at Object.fn (/app/src/main.js:15:20)",
+      );
+      expect(stackLines[1].text()).toBe(
+        "at process.processImmediate (internal/timers.js:461:26)",
+      );
+      expect(stackLines[2].text()).toBe(
+        "at process.processTicksAndRejections (internal/process/task_queues.js:95:5)",
+      );
     });
 
     it("should apply correct styling to stack lines", () => {
       const stackLines = wrapper.findAll(".error_stack");
-      
-      stackLines.forEach(line => {
+
+      stackLines.forEach((line) => {
         expect(line.classes()).toContain("error_stack");
         expect(line.classes()).toContain("q-px-sm");
       });
@@ -158,18 +166,20 @@ describe("ErrorStackTrace Component", () => {
     it("should apply top border to first stack line", () => {
       const stackLines = wrapper.findAll(".error_stack");
       const firstStackLine = stackLines[0];
-      
+
       const style = firstStackLine.attributes("style");
       expect(style).toContain("border-top: 1px solid rgb(224, 224, 224)");
     });
 
     it("should not apply top border to non-first stack lines", () => {
       const stackLines = wrapper.findAll(".error_stack");
-      
+
       for (let i = 1; i < stackLines.length; i++) {
         const style = stackLines[i].attributes("style");
         if (style) {
-          expect(style).not.toContain("border-top: 1px solid rgb(224, 224, 224)");
+          expect(style).not.toContain(
+            "border-top: 1px solid rgb(224, 224, 224)",
+          );
         }
       }
     });
@@ -177,7 +187,7 @@ describe("ErrorStackTrace Component", () => {
     it("should apply correct border radius to first stack line", () => {
       const stackLines = wrapper.findAll(".error_stack");
       const firstStackLine = stackLines[0];
-      
+
       const style = firstStackLine.attributes("style");
       expect(style).toContain("border-radius: 4px 4px 0 0");
     });
@@ -185,14 +195,14 @@ describe("ErrorStackTrace Component", () => {
     it("should apply correct border radius to last stack line", () => {
       const stackLines = wrapper.findAll(".error_stack");
       const lastStackLine = stackLines[stackLines.length - 1];
-      
+
       const style = lastStackLine.attributes("style");
       expect(style).toContain("border-radius: 0 0 4px 4px");
     });
 
     it("should not apply border radius to middle stack lines", () => {
       const stackLines = wrapper.findAll(".error_stack");
-      
+
       if (stackLines.length > 2) {
         for (let i = 1; i < stackLines.length - 1; i++) {
           const style = stackLines[i].attributes("style");
@@ -288,8 +298,8 @@ describe("ErrorStackTrace Component", () => {
   describe("Content Rendering", () => {
     it("should preserve whitespace in stack traces", () => {
       const stackLines = wrapper.findAll(".error_stack");
-      
-      stackLines.forEach(line => {
+
+      stackLines.forEach((line) => {
         const text = line.text();
         // Check that text starts with "at"
         if (text.includes("at")) {
@@ -332,7 +342,7 @@ describe("ErrorStackTrace Component", () => {
 
     it("should render template conditionally", () => {
       const stackLines = wrapper.findAll(".error_stack");
-      
+
       stackLines.forEach((line, index) => {
         // Should skip index 0 (first line)
         const actualIndex = index + 1;
@@ -344,8 +354,8 @@ describe("ErrorStackTrace Component", () => {
   describe("CSS Classes", () => {
     it("should apply correct CSS classes to stack lines", () => {
       const stackLines = wrapper.findAll(".error_stack");
-      
-      stackLines.forEach(line => {
+
+      stackLines.forEach((line) => {
         expect(line.classes()).toContain("error_stack");
         expect(line.classes()).toContain("q-px-sm");
       });
@@ -356,7 +366,9 @@ describe("ErrorStackTrace Component", () => {
       const colContainer = wrapper.find(".col-12");
       const stackContainer = wrapper.find(".error-stacks");
 
-      expect(mainContainer.classes()).toEqual(expect.arrayContaining(["row", "q-mt-lg", "q-ml-xs"]));
+      expect(mainContainer.classes()).toEqual(
+        expect.arrayContaining(["row", "q-mt-lg", "q-ml-xs"]),
+      );
       expect(colContainer.classes()).toContain("col-12");
       expect(stackContainer.classes()).toContain("error-stacks");
     });
@@ -409,7 +421,9 @@ describe("ErrorStackTrace Component", () => {
     it("should handle very long stack traces", async () => {
       const longStack = ["Long error"];
       for (let i = 0; i < 50; i++) {
-        longStack.push(`    at function${i} (/very/long/path/file${i}.js:${i}:${i})`);
+        longStack.push(
+          `    at function${i} (/very/long/path/file${i}.js:${i}:${i})`,
+        );
       }
 
       await wrapper.setProps({

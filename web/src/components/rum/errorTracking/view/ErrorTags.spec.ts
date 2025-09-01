@@ -138,7 +138,7 @@ describe("ErrorTags Component", () => {
     it("should render IP icon", () => {
       const ipIcon = wrapper.find("img[src='/mock/ip.png']");
       expect(ipIcon.exists()).toBe(true);
-      expect(ipIcon.attributes("alt")).toBe("Chrome");
+      expect(ipIcon.attributes("alt")).toBe("IP");
       expect(ipIcon.attributes("style")).toContain("height: 30px");
       expect(ipIcon.attributes("style")).toContain("width: 30px");
     });
