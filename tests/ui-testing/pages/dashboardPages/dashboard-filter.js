@@ -140,7 +140,6 @@ export default class DashboardFilter {
         .join("");
     });
 
-    // await this.page.waitForTimeout(1000); // waits for 1 second
     await dynamicLabelLocator.waitFor({ state: "visible" });
 
     const fieldLabelLocator = this.page.locator(
@@ -262,26 +261,14 @@ export default class DashboardFilter {
       //   timeout: 10000,
       // });
 
-      // Wait for element to be enabled and interactable
-      await this.page.waitForFunction(
-        (selector) => {
-          const element = document.querySelector(selector);
-          return (
-            element &&
-            !element.disabled &&
-            !element.hasAttribute("aria-disabled") &&
-            getComputedStyle(element).pointerEvents !== "none"
-          );
-        },
-        `[data-test="dashboard-add-condition-condition-${idx}"]`,
-        { timeout: 10000 }
-      );
-
+      // Simple and reliable approach - just wait for visibility and click
+      await conditionLocator.waitFor({ state: "visible", timeout: 15000 });
+      
       // Scroll into view if needed
       await conditionLocator.scrollIntoViewIfNeeded();
-
-      // Click when truly ready
-      await conditionLocator.click({ timeout: 10000 });
+      
+      // Click when ready - Playwright will automatically wait for element to be actionable
+      await conditionLocator.click({ timeout: 15000 });
     }
 
     // Step 4: Operator dropdown
