@@ -285,6 +285,9 @@ describe("DashboardJsonEditor", () => {
     const saveError = new Error("Save failed");
     mockSaveJsonDashboard.execute.mockRejectedValue(saveError);
     
+    // Mock console.error to suppress stderr output
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    
     wrapper = createWrapper();
     wrapper.vm.isValidJson = true;
     wrapper.vm.jsonContent = JSON.stringify(mockDashboardData);
@@ -292,6 +295,9 @@ describe("DashboardJsonEditor", () => {
     await wrapper.vm.saveChanges();
     
     expect(wrapper.vm.validationErrors).toContain("Failed during JSON save: Save failed");
+    expect(consoleErrorSpy).toHaveBeenCalledWith("Failed during JSON save:", saveError);
+    
+    consoleErrorSpy.mockRestore();
   });
 
   // Test 17: saveChanges should handle non-Error exceptions
@@ -301,6 +307,9 @@ describe("DashboardJsonEditor", () => {
     
     mockSaveJsonDashboard.execute.mockRejectedValue("String error");
     
+    // Mock console.error to suppress stderr output
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    
     wrapper = createWrapper();
     wrapper.vm.isValidJson = true;
     wrapper.vm.jsonContent = JSON.stringify(mockDashboardData);
@@ -308,17 +317,26 @@ describe("DashboardJsonEditor", () => {
     await wrapper.vm.saveChanges();
     
     expect(wrapper.vm.validationErrors).toContain("Failed during JSON save: Unknown error");
+    expect(consoleErrorSpy).toHaveBeenCalledWith("Failed during JSON save:", "String error");
+    
+    consoleErrorSpy.mockRestore();
   });
 
   // Test 18: saveChanges should handle JSON parsing errors during save
   it("should handle JSON parsing errors during save", async () => {
+    // Mock console.error to suppress stderr output
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    
     wrapper = createWrapper();
     wrapper.vm.isValidJson = true;
     wrapper.vm.jsonContent = "{ invalid json }";
     
     await wrapper.vm.saveChanges();
     
-    expect(wrapper.vm.validationErrors[0]).toMatch(/Failed during JSON save: .*/);
+    expect(wrapper.vm.validationErrors[0]).toMatch(/Failed during JSON save: .*/);  
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    
+    consoleErrorSpy.mockRestore();
   });
 
   // Test 19: Watch functionality - should update jsonContent when dashboardData changes
@@ -493,10 +511,15 @@ describe("DashboardJsonEditor", () => {
 
   // Test 32: Component handles empty or null dashboard data
   it("should handle empty or null dashboard data gracefully", () => {
+    // Mock console.warn to suppress Vue prop validation warnings
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    
     wrapper = createWrapper({ dashboardData: null });
     
     expect(wrapper.vm.jsonContent).toBe("null");
     expect(wrapper.vm.isValidJson).toBe(true);
+    
+    consoleWarnSpy.mockRestore();
   });
 
   // Test 33: Component handles empty validation errors array reset
