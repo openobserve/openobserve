@@ -15,6 +15,7 @@
 
 import { reactive, ref, type Ref, nextTick } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 import {
   DEFAULT_LOGS_CONFIG,
@@ -35,13 +36,31 @@ interface HistogramData {
   errorDetail: string;
 }
 
+interface StreamData {
+  streamLists: any[];
+  selectedStream: string[];
+  selectedStreamFields: any[];
+  selectedFields: any[];
+  filterField: string;
+  addToFilter: string;
+  functions: any[];
+  streamType: string;
+}
+
+interface ResultGrid {
+  currentPage: number;
+}
+
+interface SearchAroundData {
+  indexTimestamp: number;
+  size: number;
+}
+
 interface SearchObjectData {
   errorMsg: string;
-  stream: {
-    streamLists: any[];
-    selectedStream: string[];
-    selectedStreamFields: any[];
-  };
+  errorDetail: string;
+  countErrorMsg: string;
+  stream: StreamData;
   queryResults: any;
   sortedQueryResults: any[];
   histogram: HistogramData;
@@ -49,6 +68,9 @@ interface SearchObjectData {
   query: string;
   editorValue: string;
   savedViews: any[];
+  transforms: any[];
+  resultGrid: ResultGrid;
+  searchAround: SearchAroundData;
 }
 
 interface SearchObject {
@@ -66,6 +88,7 @@ interface SearchObject {
  */
 export const searchState = () => {
   const store = useStore();
+  const router = useRouter();
 
   // Main search object containing all search state
   const searchObj = reactive(
@@ -167,6 +190,7 @@ export const searchState = () => {
       );
 
       await nextTick();
+      return true;
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
@@ -176,6 +200,7 @@ export const searchState = () => {
       searchObj.organizationIdentifier =
         store.state?.selectedOrganization?.identifier || "";
       resetSearchObj();
+      return true;
     } finally {
       // eslint-disable-next-line no-unsafe-finally
       return Promise.resolve(true);
@@ -232,6 +257,126 @@ export const searchState = () => {
     searchObj.data.savedViews = [];
   };
 
+  /**
+   * Resets histogram error state to default values.
+   *
+   * Clears all error messages, codes, and details related to histogram operations.
+   * This is typically called before new histogram data is loaded or when
+   * recovering from histogram-related errors.
+   *
+   * @example
+   * ```typescript
+   * resetHistogramError();
+   * // Histogram errors are now cleared
+   * ```
+   */
+  const resetHistogramError = (): void => {
+    searchObj.data.histogram.errorMsg = "";
+    searchObj.data.histogram.errorCode = 0;
+    searchObj.data.histogram.errorDetail = "";
+  };
+
+  /**
+   * Resets query-related data and pagination state.
+   *
+   * Clears query results, resets pagination to first page, stops any running queries,
+   * and clears error messages. This function is commonly used before executing
+   * new queries or when switching between different query contexts.
+   *
+   * @example
+   * ```typescript
+   * resetQueryData();
+   * // Query data is now cleared and ready for new search
+   * ```
+   */
+  const resetQueryData = (): void => {
+    searchObj.data.sortedQueryResults = [];
+    searchObj.data.resultGrid.currentPage = 1;
+    searchObj.runQuery = false;
+    searchObj.data.errorMsg = "";
+    searchObj.data.errorDetail = "";
+    searchObj.data.countErrorMsg = "";
+  };
+
+  /**
+   * Resets search around data to default state.
+   *
+   * Clears the search around timestamp and size, effectively disabling
+   * any active search around context. Used when starting fresh searches
+   * or switching between different search modes.
+   *
+   * @example
+   * ```typescript
+   * resetSearchAroundData();
+   * // Search around context is now cleared
+   * ```
+   */
+  const resetSearchAroundData = (): void => {
+    searchObj.data.searchAround.indexTimestamp = -1;
+    searchObj.data.searchAround.size = 0;
+  };
+
+  /**
+   * Resets all function-related data and clears store.
+   *
+   * Dispatches store action to clear functions and resets local function
+   * data including transforms and stream functions. This ensures a clean
+   * state when switching contexts or organizations.
+   *
+   * @example
+   * ```typescript
+   * resetFunctions();
+   * // All function data is now cleared from store and local state
+   * ```
+   */
+  const resetFunctions = (): void => {
+    store.dispatch("setFunctions", []);
+    searchObj.data.transforms = [];
+    searchObj.data.stream.functions = [];
+  };
+
+  /**
+   * Comprehensively resets all stream-related data.
+   *
+   * This function performs a complete reset of stream state including:
+   * - Dispatches store action to reset streams
+   * - Clears selected streams and fields
+   * - Resets filter configurations
+   * - Sets stream type from route or defaults to 'logs'
+   * - Calls resetQueryData() and resetSearchAroundData() for related cleanup
+   *
+   * @example
+   * ```typescript
+   * resetStreamData();
+   * // All stream data, queries, and search around context are now reset
+   * ```
+   */
+  const resetStreamData = (): void => {
+    // Reset store stream data
+    store.dispatch("resetStreams", {});
+
+    // Clear stream selections and fields
+    searchObj.data.stream.selectedStream = [];
+    searchObj.data.stream.selectedStreamFields = [];
+    searchObj.data.stream.selectedFields = [];
+
+    // Reset filter configurations
+    searchObj.data.stream.filterField = "";
+    searchObj.data.stream.addToFilter = "";
+    searchObj.data.stream.functions = [];
+
+    // Set stream type from route or default to logs
+    searchObj.data.stream.streamType =
+      (router.currentRoute.value.query.stream_type as string) || "logs";
+
+    // Clear stream lists
+    searchObj.data.stream.streamLists = [];
+
+    // Reset related data
+    resetQueryData();
+    resetSearchAroundData();
+  };
+
   return {
     // Reactive state
     searchObj,
@@ -242,8 +387,13 @@ export const searchState = () => {
     fieldValues,
     notificationMsg,
     ftsFields,
-    resetSearchObj,
     initialLogsState,
+    resetSearchObj,
+    resetHistogramError,
+    resetQueryData,
+    resetSearchAroundData,
+    resetFunctions,
+    resetStreamData,
   };
 };
 

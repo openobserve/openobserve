@@ -108,6 +108,10 @@ let {
   searchAggData,
   initialQueryPayload,
   streamSchemaFieldsIndexMapping,
+  resetHistogramError,
+  resetQueryData,
+  resetFunctions,
+  resetStreamData,
 } = searchState();
 
 const useLogs = () => {
@@ -242,12 +246,12 @@ const useLogs = () => {
     useLocalLogFilterField(selectedFields);
   };
 
-  function resetFunctions() {
-    store.dispatch("setFunctions", []);
-    searchObj.data.transforms = [];
-    searchObj.data.stream.functions = [];
-    return;
-  }
+  // function resetFunctions() {
+  //   store.dispatch("setFunctions", []);
+  //   searchObj.data.transforms = [];
+  //   searchObj.data.stream.functions = [];
+  //   return;
+  // }
 
   const getFunctions = async () => {
     try {
@@ -304,38 +308,38 @@ const useLogs = () => {
     }
   };
 
-  function resetStreamData() {
-    store.dispatch("resetStreams", {});
-    searchObj.data.stream.selectedStream = [];
-    searchObj.data.stream.selectedStreamFields = [];
-    searchObj.data.stream.selectedFields = [];
-    searchObj.data.stream.filterField = "";
-    searchObj.data.stream.addToFilter = "";
-    searchObj.data.stream.functions = [];
-    searchObj.data.stream.streamType =
-      (router.currentRoute.value.query.stream_type as string) || "logs";
-    searchObj.data.stream.streamLists = [];
-    resetQueryData();
-    // reset search around data
-    searchObj.data.searchAround.indexTimestamp = -1;
-    searchObj.data.searchAround.size = 0;
-  }
+  // function resetStreamData() {
+  //   store.dispatch("resetStreams", {});
+  //   searchObj.data.stream.selectedStream = [];
+  //   searchObj.data.stream.selectedStreamFields = [];
+  //   searchObj.data.stream.selectedFields = [];
+  //   searchObj.data.stream.filterField = "";
+  //   searchObj.data.stream.addToFilter = "";
+  //   searchObj.data.stream.functions = [];
+  //   searchObj.data.stream.streamType =
+  //     (router.currentRoute.value.query.stream_type as string) || "logs";
+  //   searchObj.data.stream.streamLists = [];
+  //   resetQueryData();
+  //   // reset search around data
+  //   searchObj.data.searchAround.indexTimestamp = -1;
+  //   searchObj.data.searchAround.size = 0;
+  // }
 
-  function resetQueryData() {
-    // searchObj.data.queryResults = {};
-    searchObj.data.sortedQueryResults = [];
-    // searchObj.data.histogram = {
-    //   xData: [],
-    //   yData: [],
-    //   chartParams: {},
-    // };
-    // searchObj.data.resultGrid.columns = [];
-    searchObj.data.resultGrid.currentPage = 1;
-    searchObj.runQuery = false;
-    searchObj.data.errorMsg = "";
-    searchObj.data.errorDetail = "";
-    searchObj.data.countErrorMsg = "";
-  }
+  // function resetQueryData() {
+  //   // searchObj.data.queryResults = {};
+  //   searchObj.data.sortedQueryResults = [];
+  //   // searchObj.data.histogram = {
+  //   //   xData: [],
+  //   //   yData: [],
+  //   //   chartParams: {},
+  //   // };
+  //   // searchObj.data.resultGrid.columns = [];
+  //   searchObj.data.resultGrid.currentPage = 1;
+  //   searchObj.runQuery = false;
+  //   searchObj.data.errorMsg = "";
+  //   searchObj.data.errorDetail = "";
+  //   searchObj.data.countErrorMsg = "";
+  // }
 
   async function loadStreamLists(selectStream: boolean = true) {
     try {
@@ -6473,11 +6477,11 @@ const useLogs = () => {
     searchObjDebug["histogramEndTime"] = performance.now();
   };
 
-  const resetHistogramError = () => {
-    searchObj.data.histogram.errorMsg = "";
-    searchObj.data.histogram.errorCode = 0;
-    searchObj.data.histogram.errorDetail = "";
-  };
+  // const resetHistogramError = () => {
+  //   searchObj.data.histogram.errorMsg = "";
+  //   searchObj.data.histogram.errorCode = 0;
+  //   searchObj.data.histogram.errorDetail = "";
+  // };
 
   const shouldShowHistogram = (parsedSQL: any) => {
     return ((isHistogramDataMissing(searchObj) && isHistogramEnabled(searchObj) && (!searchObj.meta.sqlMode || isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
@@ -6947,7 +6951,6 @@ const useLogs = () => {
     searchObj,
     searchAggData,
     getStreams,
-    resetStreamData,
     updatedLocalLogFilterField,
     getFunctions,
     getStreamList,
