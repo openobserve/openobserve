@@ -422,7 +422,7 @@ describe("AppSessions.vue", () => {
       expect(mockStreams.getStream).toHaveBeenCalledWith("_sessionreplay", "logs", true);
     });
 
-    it.skip("should get sessions data when component is mounted", async () => {
+    it("should get sessions data when component is mounted", async () => {
       expect(mockQueryFunctions.buildQueryPayload).toHaveBeenCalled();
     });
 
