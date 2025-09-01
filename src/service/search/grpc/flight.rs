@@ -315,6 +315,15 @@ pub async fn search(
         scan_stats.add(&stats);
     }
 
+    // due to we rewrite empty exec in rewrite match_all
+    let mut visitor = NewEmptyExecVisitor::default();
+    if physical_plan.visit(&mut visitor).is_err() || !visitor.has_empty_exec() {
+        return Err(Error::Message(
+            "flight->search: physical plan visit error: there is no EmptyTable".to_string(),
+        ));
+    }
+    let empty_exec = visitor.plan();
+
     // if the stream type is enrichment tables and the enrich mode is true, we need to load
     // enrichment data from db to datafusion tables
     if stream_type == StreamType::EnrichmentTables && req.query_identifier.enrich_mode {
@@ -378,10 +387,6 @@ fn optimizer_physical_plan(
     index_condition_ref: Arc<Mutex<Option<IndexCondition>>>,
     _index_optimizer_rule_ref: Arc<Mutex<Option<IndexOptimizeMode>>>,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
-    let cfg = config::get_config();
-    if !cfg.common.inverted_index_enabled || cfg.common.feature_query_without_index {
-        return Ok(plan);
-    }
     let index_rule = IndexRule::new(index_fields.iter().cloned().collect(), index_condition_ref);
     let plan = index_rule.optimize(plan, ctx.state().config_options())?;
 

@@ -68,6 +68,10 @@ impl PhysicalOptimizerRule for IndexRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+        let cfg = config::get_config();
+        if !cfg.common.inverted_index_enabled || cfg.common.feature_query_without_index {
+            return Ok(plan);
+        }
         let mut rewriter =
             IndexOptimizer::new(self.index_fields.clone(), self.index_condition.clone());
         plan.rewrite(&mut rewriter).data()

@@ -19,7 +19,7 @@ use arrow_schema::{DataType, Schema, SchemaRef};
 use config::get_config;
 use datafusion::{
     common::{
-        Result,
+        Result, project_schema,
         tree_node::{
             Transformed, TransformedResult, TreeNode, TreeNodeRecursion, TreeNodeRewriter,
         },
@@ -34,15 +34,21 @@ use datafusion::{
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
         ExecutionPlan,
-        expressions::{BinaryExpr as PhysicalBinaryExpr, BinaryExpr, LikeExpr, lit},
+        expressions::{BinaryExpr, LikeExpr},
         filter::FilterExec,
     },
     scalar::ScalarValue,
 };
 
-use crate::service::search::datafusion::udf::{
-    fuzzy_match_udf,
-    match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+use crate::service::search::datafusion::{
+    distributed_plan::empty_exec::NewEmptyExec,
+    optimizer::physical_optimizer::utils::{
+        disjunction, extract_column, extract_int64_literal, extract_string_literal,
+    },
+    udf::{
+        fuzzy_match_udf,
+        match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+    },
 };
 
 /// Physical optimization rule that rewrites match_all() to LIKE expressions
@@ -100,13 +106,27 @@ impl TreeNodeRewriter for PlanRewriter {
                 return Ok(Transformed::no(plan));
             }
 
+            // Rewrite the filter datasource projection
+            let mut add_fst_fields_to_projection = AddFstFieldsToProjection::new(
+                self.fields.iter().map(|f| f.0.clone()).collect(),
+                filter.projection().cloned(),
+                filter.schema(),
+            );
+            let input = filter
+                .input()
+                .clone()
+                .rewrite(&mut add_fst_fields_to_projection)?
+                .data;
+
             // Apply expression rewriter to the predicate
             let mut expr_rewriter =
-                MatchAllRewriter::new(filter.input().schema().clone(), self.fields.clone());
+                MatchAllRewriter::new(input.schema().clone(), self.fields.clone());
             let rewritten_predicate = predicate.clone().rewrite(&mut expr_rewriter).data()?;
 
             // Create new filter with rewritten predicate
-            let new_filter = FilterExec::try_new(rewritten_predicate, filter.input().clone())?;
+            let new_filter = FilterExec::try_new(rewritten_predicate, input)?;
+            let new_filter = new_filter
+                .with_projection(add_fst_fields_to_projection.filter_projection.clone())?;
             return Ok(Transformed::yes(Arc::new(new_filter)));
         }
         Ok(Transformed::no(plan))
@@ -256,50 +276,6 @@ fn rewrite_match_all_physical(
     }
 }
 
-fn extract_string_literal(expr: &Arc<dyn PhysicalExpr>) -> Result<String> {
-    if let Some(literal) = expr.as_any().downcast_ref::<Literal>() {
-        match literal.value() {
-            ScalarValue::Utf8(Some(s)) => Ok(s.clone()),
-            ScalarValue::Utf8View(Some(s)) => Ok(s.to_string()),
-            ScalarValue::LargeUtf8(Some(s)) => Ok(s.clone()),
-            _ => Err(DataFusionError::Internal(format!(
-                "Expected string literal, got: {:?}",
-                literal.value()
-            ))),
-        }
-    } else {
-        Err(DataFusionError::Internal(
-            "Expected literal expression for string argument".to_string(),
-        ))
-    }
-}
-
-fn extract_column(expr: &Arc<dyn PhysicalExpr>) -> Result<Column> {
-    if let Some(column) = expr.as_any().downcast_ref::<Column>() {
-        Ok(column.clone())
-    } else {
-        Err(DataFusionError::Internal(
-            "Expected column expression".to_string(),
-        ))
-    }
-}
-
-fn extract_int64_literal(expr: &Arc<dyn PhysicalExpr>) -> Result<i64> {
-    if let Some(literal) = expr.as_any().downcast_ref::<Literal>() {
-        match literal.value() {
-            ScalarValue::Int64(Some(s)) => Ok(*s),
-            _ => Err(DataFusionError::Internal(format!(
-                "Expected int64 literal, got: {:?}",
-                literal.value()
-            ))),
-        }
-    } else {
-        Err(DataFusionError::Internal(
-            "Expected literal expression for int64 argument".to_string(),
-        ))
-    }
-}
-
 // create like expr with not null physical
 fn create_like_expr_with_not_null_physical(
     schema: &Schema,
@@ -317,11 +293,7 @@ fn create_like_expr_with_not_null_physical(
         pattern,
     ));
 
-    Arc::new(PhysicalBinaryExpr::new(
-        is_not_null,
-        Operator::And,
-        like_expr,
-    ))
+    Arc::new(BinaryExpr::new(is_not_null, Operator::And, like_expr))
 }
 
 // check if the expr contains match_all function
@@ -348,22 +320,82 @@ fn is_match_all_physical(expr: &Arc<dyn PhysicalExpr>) -> bool {
     }
 }
 
-// combine all exprs with OR operator
-fn disjunction(
-    predicates: impl IntoIterator<Item = Arc<dyn PhysicalExpr>>,
-) -> Arc<dyn PhysicalExpr> {
-    disjunction_opt(predicates).unwrap_or_else(|| lit(true))
+// add fst fields to the projection
+struct AddFstFieldsToProjection {
+    fields: Vec<String>,
+    pub filter_projection: Option<Vec<usize>>,
+    filter_schema: SchemaRef,
 }
 
-fn disjunction_opt(
-    predicates: impl IntoIterator<Item = Arc<dyn PhysicalExpr>>,
-) -> Option<Arc<dyn PhysicalExpr>> {
-    predicates
-        .into_iter()
-        .fold(None, |acc, predicate| match acc {
-            None => Some(predicate),
-            Some(acc) => Some(Arc::new(BinaryExpr::new(acc, Operator::Or, predicate))),
-        })
+impl AddFstFieldsToProjection {
+    pub fn new(
+        fields: Vec<String>,
+        filter_projection: Option<Vec<usize>>,
+        filter_schema: SchemaRef,
+    ) -> Self {
+        Self {
+            fields,
+            filter_projection,
+            filter_schema,
+        }
+    }
+}
+
+impl TreeNodeRewriter for AddFstFieldsToProjection {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, expr: Self::Node) -> Result<Transformed<Self::Node>> {
+        if let Some(empty_exec) = expr.as_any().downcast_ref::<NewEmptyExec>() {
+            let schema = empty_exec.full_schema();
+            let mut parquet_projection = self
+                .fields
+                .iter()
+                .map(|f| schema.index_of(f).unwrap())
+                .collect::<Vec<_>>();
+            if let Some(projection) = empty_exec.projection() {
+                parquet_projection.extend(projection.iter().copied());
+            }
+            parquet_projection.sort();
+            parquet_projection.dedup();
+
+            let mut filter_projection = match self.filter_projection.as_ref() {
+                // if filter projection is not None, we should use it
+                Some(projection) => projection
+                    .iter()
+                    .filter_map(|i| parquet_projection.iter().position(|f| f == i))
+                    .collect::<Vec<_>>(),
+                // if filter projection is None, we should use filter schema as projection
+                None => self
+                    .filter_schema
+                    .fields()
+                    .iter()
+                    .map(|f| schema.index_of(f.name()).unwrap())
+                    .filter_map(|i| parquet_projection.iter().position(|f| *f == i))
+                    .collect::<Vec<_>>(),
+            };
+            filter_projection.sort();
+            filter_projection.dedup();
+            self.filter_projection = Some(filter_projection);
+
+            let projected_schema = project_schema(&schema, Some(&parquet_projection))?;
+            let new_empty_exec = NewEmptyExec::new(
+                empty_exec.name(),
+                projected_schema,
+                Some(&parquet_projection),
+                empty_exec.filters(),
+                empty_exec.limit(),
+                empty_exec.sorted_by_time(),
+                empty_exec.full_schema(),
+            );
+
+            return Ok(Transformed::new(
+                Arc::new(new_empty_exec) as Self::Node,
+                true,
+                TreeNodeRecursion::Stop,
+            ));
+        }
+        Ok(Transformed::no(expr))
+    }
 }
 
 #[cfg(test)]
@@ -379,7 +411,7 @@ mod tests {
             record_batch::RecordBatch,
         },
         assert_batches_eq,
-        datasource::MemTable,
+        catalog::MemTable,
         execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
         prelude::{SessionConfig, SessionContext},
     };
@@ -389,31 +421,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_rewrite_match_physical() {
-        let sqls = [
-            (
-                "select * from t where match_all('open')",
-                vec![
-                    "+------------+-------------+-------------+",
-                    "| _timestamp | name        | log         |",
-                    "+------------+-------------+-------------+",
-                    "| 1          | open        | o2          |",
-                    "| 3          | openobserve | openobserve |",
-                    "+------------+-------------+-------------+",
-                ],
-            ),
-            // TODO:change schema in tablescan to add full text search field
-            // (
-            //     "select _timestamp from t where match_all('open')",
-            //     vec![
-            //         "+------------+",
-            //         "| _timestamp |",
-            //         "+------------+",
-            //         "| 1          |",
-            //         "| 3          |",
-            //         "+------------+",
-            //     ],
-            // ),
-        ];
+        let sqls = [(
+            "select * from t where match_all('open')",
+            vec![
+                "+------------+-------------+-------------+",
+                "| _timestamp | name        | log         |",
+                "+------------+-------------+-------------+",
+                "| 1          | open        | o2          |",
+                "| 3          | openobserve | openobserve |",
+                "+------------+-------------+-------------+",
+            ],
+        )];
 
         let schema = if get_config().common.utf8_view_enabled {
             Arc::new(Schema::new(vec![
