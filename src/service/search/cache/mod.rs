@@ -1153,12 +1153,28 @@ pub async fn check_cache_v2(
                     cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
 
-                MultiCachedQueryResponse {
+                let order_by = v.order_by;
+
+                // Handle histogram interval and file path modifications like check_cache does
+                let mut discard_interval = -1;
+                if let Some(interval) = v.histogram_interval {
+                    file_path = format!("{file_path}_{interval}_{ts_column}");
+                    discard_interval = interval * 1000 * 1000; // in microseconds
+                }
+
+                let mut multi_resp = MultiCachedQueryResponse {
                     ts_column,
                     is_descending,
-                    file_path,
+                    order_by,
+                    file_path: file_path.clone(),
                     ..Default::default()
+                };
+
+                if discard_interval > -1 {
+                    multi_resp.histogram_interval = discard_interval / 1000 / 1000;
                 }
+
+                multi_resp
             }
             Err(e) => {
                 log::error!("[trace_id {trace_id}]: Error parsing sql: {e:?}");

@@ -39,6 +39,7 @@ pub async fn write_results_to_cache(
     start_time: i64,
     end_time: i64,
     accumulated_results: &mut Vec<SearchResultType>,
+    limit: i64,
 ) -> Result<(), infra::errors::Error> {
     if accumulated_results.is_empty() {
         return Ok(());
@@ -62,19 +63,35 @@ pub async fn write_results_to_cache(
         }
     }
 
-    let merged_response = cache::merge_response(
-        &c_resp.trace_id,
-        &mut cached_responses,
-        &mut search_responses,
-        &c_resp.ts_column,
-        c_resp.limit,
-        c_resp.is_descending,
-        c_resp.took,
-        c_resp.order_by,
-    );
+    let merged_response = if c_resp.has_cached_data {
+        cache::merge_response(
+            &c_resp.trace_id,
+            &mut cached_responses,
+            &mut search_responses,
+            &c_resp.ts_column,
+            c_resp.limit,
+            c_resp.is_descending,
+            c_resp.took,
+            c_resp.order_by,
+        )
+    } else {
+        // Merge the search response for all the partitions
+        let took = search_responses.iter().map(|r| r.took).sum();
+        cache::merge_response(
+            &c_resp.trace_id,
+            &mut vec![],
+            &mut search_responses,
+            &c_resp.ts_column,
+            limit,
+            c_resp.is_descending,
+            took,
+            c_resp.order_by,
+        )
+    };
 
     // Update: Don't cache any partial results
-    let should_cache_results = merged_response.new_start_time.is_none()
+    let should_cache_results = c_resp.cache_query_response
+        && merged_response.new_start_time.is_none()
         && merged_response.new_end_time.is_none()
         && merged_response.function_error.is_empty()
         && !merged_response.hits.is_empty();
@@ -474,7 +491,15 @@ pub async fn write_partial_results_to_cache(
                 "[HTTP2_STREAM trace_id {trace_id}] Search cancelled, writing results to cache",
             );
             // write the result to cache
-            match write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await {
+            match write_results_to_cache(
+                c_resp,
+                start_time,
+                end_time,
+                accumulated_results,
+                c_resp.limit,
+            )
+            .await
+            {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!(

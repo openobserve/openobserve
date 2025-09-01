@@ -69,6 +69,7 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name"),
         ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
         ("is_multi_stream_search" = bool, Query, description = "Indicate is search is for multi stream"),
+        ("is_refresh_cache" = bool, Query, description = "Indicates that the query should not use the cache for processing but also needs to refresh the cache once the query is completed"),
     ),
     request_body(content = String, description = "Search query", content_type = "application/json", example = json!({
         "sql": "select * from logs LIMIT 10",
@@ -132,6 +133,12 @@ pub async fn search_http2_stream(
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let is_ui_histogram = get_is_ui_histogram_from_request(&query);
     let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
+    let is_refresh_cache = get_is_refresh_cache_from_request(&query);
+    let use_cache = if is_refresh_cache {
+        false
+    } else {
+        get_use_cache_from_request(&query)
+    };
 
     // Parse the search request
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
@@ -307,7 +314,8 @@ pub async fn search_http2_stream(
     }
 
     // Set use_cache from query params
-    req.use_cache = get_use_cache_from_request(&query);
+    req.use_cache = use_cache;
+    req.is_refresh_cache = is_refresh_cache;
 
     // Set search type if not set
     if req.search_type.is_none() {

@@ -135,7 +135,7 @@ pub async fn process_search_stream_request(
 
     if req.query.from == 0 && !req.query.track_total_hits && req.query.streaming_id.is_none() {
         // check cache for the first page
-        let c_resp = match search_cache::check_cache_v2(
+        let mut c_resp = match search_cache::check_cache_v2(
             &trace_id,
             &org_id,
             stream_type,
@@ -379,6 +379,19 @@ pub async fn process_search_stream_request(
                 return;
             }
         }
+
+        // Clean cache before writing new cache
+        if req.is_refresh_cache {
+            let _is_deleted =
+                crate::service::search::cluster::cacher::delete_cached_results_by_time_range(
+                    c_resp.file_path.clone(),
+                    req.query.start_time,
+                    req.query.end_time,
+                )
+                .await;
+            c_resp.cache_query_response = true;
+        }
+
         // Step 3: Write to results cache
         // cache only if from is 0 and is not an aggregate_query
         if req.query.from == 0
@@ -387,6 +400,7 @@ pub async fn process_search_stream_request(
                 start_time,
                 end_time,
                 &mut accumulated_results,
+                req.query.size,
             )
             .instrument(search_span.clone())
             .await
