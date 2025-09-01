@@ -916,6 +916,7 @@ export default defineComponent({
       addStreamDialog.value.show = true;
       track("Button Click", {
         button: "Add Stream",
+        pageTitle: "Stream Explorer",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
         page: "Streams",
