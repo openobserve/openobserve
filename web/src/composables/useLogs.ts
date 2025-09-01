@@ -4898,17 +4898,17 @@ const useLogs = () => {
     }
   };
 
-  function quoteTableNameDirectly(sql: string, streamName: string) {
-    // This regular expression looks for the FROM keyword followed by
-    // an optional schema name, a table name, and handles optional spaces.
-    // It captures the table name to be replaced with double quotes.
-    const regex = new RegExp(`FROM\\s+${streamName}`, "gi");
+  // function quoteTableNameDirectly(sql: string, streamName: string) {
+  //   // This regular expression looks for the FROM keyword followed by
+  //   // an optional schema name, a table name, and handles optional spaces.
+  //   // It captures the table name to be replaced with double quotes.
+  //   const regex = new RegExp(`FROM\\s+${streamName}`, "gi");
 
-    // Replace the captured table name with the same name enclosed in double quotes
-    const modifiedSql = sql.replace(regex, `FROM "${streamName}"`);
+  //   // Replace the captured table name with the same name enclosed in double quotes
+  //   const modifiedSql = sql.replace(regex, `FROM "${streamName}"`);
 
-    return modifiedSql;
-  }
+  //   return modifiedSql;
+  // }
 
   const getRegionInfo = () => {
     searchService.get_regions().then((res) => {
@@ -5058,28 +5058,28 @@ const useLogs = () => {
     return selectedFields;
   };
 
-  function getFieldsWithStreamNames() {
-    const fieldMap: any = {};
+  // function getFieldsWithStreamNames() {
+  //   const fieldMap: any = {};
 
-    searchObj.data.streamResults.list
-      .filter((stream: any) =>
-        searchObj.data.stream.selectedStream.includes(stream.name),
-      )
-      .forEach((stream: any) => {
-        stream.schema.forEach((field: any) => {
-          const fieldKey = field.name;
-          const fieldValue = `${stream.name}`;
+  //   searchObj.data.streamResults.list
+  //     .filter((stream: any) =>
+  //       searchObj.data.stream.selectedStream.includes(stream.name),
+  //     )
+  //     .forEach((stream: any) => {
+  //       stream.schema.forEach((field: any) => {
+  //         const fieldKey = field.name;
+  //         const fieldValue = `${stream.name}`;
 
-          // Add the fieldValue to the corresponding fieldKey in the map
-          if (!fieldMap[fieldKey]) {
-            fieldMap[fieldKey] = [];
-          }
-          fieldMap[fieldKey].push(fieldValue);
-        });
-      });
+  //         // Add the fieldValue to the corresponding fieldKey in the map
+  //         if (!fieldMap[fieldKey]) {
+  //           fieldMap[fieldKey] = [];
+  //         }
+  //         fieldMap[fieldKey].push(fieldValue);
+  //       });
+  //     });
 
-    return fieldMap;
-  }
+  //   return fieldMap;
+  // }
 
   const getFilterExpressionByFieldType = (
     field: string | number,
@@ -5920,16 +5920,16 @@ const useLogs = () => {
     }
   }
 
-  const updatePageCountSearchSize = (queryReq: SearchRequestPayload) => {
-    try{
-      if(shouldGetPageCount(queryReq, fnParsedSQL())) {
-        queryReq.query.size = queryReq.query.size + 1;
-      }
-    } catch(e: any) {
-      console.error("Error while updating page count search size", e);
-      return queryReq.query.size;
-    }
-  }
+  // const updatePageCountSearchSize = (queryReq: SearchRequestPayload) => {
+  //   try{
+  //     if(shouldGetPageCount(queryReq, fnParsedSQL())) {
+  //       queryReq.query.size = queryReq.query.size + 1;
+  //     }
+  //   } catch(e: any) {
+  //     console.error("Error while updating page count search size", e);
+  //     return queryReq.query.size;
+  //   }
+  // }
 
   const handleHistogramStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
     
@@ -6591,9 +6591,9 @@ const useLogs = () => {
     );
   }
 
-  function isSingleStreamSelected(searchObj: any) {
-    return searchObj.data.stream.selectedStream.length <= 1;
-  }
+  // function isSingleStreamSelected(searchObj: any) {
+  //   return searchObj.data.stream.selectedStream.length <= 1;
+  // }
 
   function isNonAggregatedSQLMode(searchObj: any, parsedSQL: any) {
     return !(
@@ -6916,36 +6916,36 @@ const useLogs = () => {
     }
   };
 
-  const handlePageCountError = (err: any) => {
-    searchObj.loading = false;
-    let trace_id = "";
-    searchObj.data.countErrorMsg = "Error while retrieving total events: ";
-    if (err.response != undefined) {
-      if (err.response.data.hasOwnProperty("trace_id")) {
-        trace_id = err.response.data?.trace_id;
-      }
-    } else {
-      if (err.hasOwnProperty("trace_id")) {
-        trace_id = err?.trace_id;
-      }
-    }
+  // const handlePageCountError = (err: any) => {
+  //   searchObj.loading = false;
+  //   let trace_id = "";
+  //   searchObj.data.countErrorMsg = "Error while retrieving total events: ";
+  //   if (err.response != undefined) {
+  //     if (err.response.data.hasOwnProperty("trace_id")) {
+  //       trace_id = err.response.data?.trace_id;
+  //     }
+  //   } else {
+  //     if (err.hasOwnProperty("trace_id")) {
+  //       trace_id = err?.trace_id;
+  //     }
+  //   }
 
-    const customMessage = logsErrorMessage(err?.response?.data.code);
-    searchObj.data.errorCode = err?.response?.data.code;
+  //   const customMessage = logsErrorMessage(err?.response?.data.code);
+  //   searchObj.data.errorCode = err?.response?.data.code;
 
-    notificationMsg.value = searchObj.data.countErrorMsg;
+  //   notificationMsg.value = searchObj.data.countErrorMsg;
 
-    if (err?.request?.status >= 429) {
-      notificationMsg.value = err?.response?.data?.message;
-      searchObj.data.countErrorMsg += err?.response?.data?.message;
-    }
+  //   if (err?.request?.status >= 429) {
+  //     notificationMsg.value = err?.response?.data?.message;
+  //     searchObj.data.countErrorMsg += err?.response?.data?.message;
+  //   }
 
-    if (trace_id) {
-      searchObj.data.countErrorMsg += " TraceID:" + trace_id;
-      notificationMsg.value += " TraceID:" + trace_id;
-      trace_id = "";
-    }
-  };
+  //   if (trace_id) {
+  //     searchObj.data.countErrorMsg += " TraceID:" + trace_id;
+  //     notificationMsg.value += " TraceID:" + trace_id;
+  //     trace_id = "";
+  //   }
+  // };
 
   const isActionsEnabled = computed(() => {
     return (config.isEnterprise == "true" || config.isCloud == "true") && store.state.zoConfig.actions_enabled;
