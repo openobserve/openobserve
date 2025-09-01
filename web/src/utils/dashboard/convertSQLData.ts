@@ -2760,7 +2760,7 @@ export const convertSQLData = async (
   }
 
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
-  //only check for vertical side only
+  //only check for vertical side only (right legends) and when legends are not scrollable
   if (
     legendConfig.orient == "vertical" &&
     panelSchema.config?.show_legends &&
@@ -2923,7 +2923,7 @@ const calculateBottomLegendHeight = (
 
   // Constants for legend sizing
   const LEGEND_ITEM_HEIGHT = 20; // Height per legend item row
-  const LEGEND_PADDING = 20; // Top and bottom padding
+  const LEGEND_PADDING = 10; // Top and bottom padding
   const LEGEND_ICON_WIDTH = 14; // Width of legend icon/symbol
   const LEGEND_ICON_MARGIN = 8; // Margin between icon and text
   const LEGEND_ITEM_MARGIN = 20; // Horizontal margin between legend items
@@ -2938,9 +2938,9 @@ const calculateBottomLegendHeight = (
       return sum + name.toString().length;
     }, 0);
     const avgTextLength = totalTextLength / seriesData.length;
-    // Estimate width: roughly 8 pixels per character, constrained by min/max
+    // Estimate width: roughly 7 pixels per character, constrained by min/max
     avgTextWidth = Math.min(
-      Math.max(avgTextLength * 8, MIN_TEXT_WIDTH),
+      Math.max(avgTextLength * 7, MIN_TEXT_WIDTH),
       MAX_TEXT_WIDTH,
     );
   }
@@ -2959,7 +2959,7 @@ const calculateBottomLegendHeight = (
   // Calculate total height
   const totalHeight = numRows * LEGEND_ITEM_HEIGHT + LEGEND_PADDING;
 
-  return Math.max(totalHeight, 40); // Minimum height of 40px
+  return Math.max(totalHeight, 50); // Minimum height of 40px
 };
 
 /**
@@ -3018,8 +3018,8 @@ const calculateRightLegendWidth = (
   // Total width reserved for legends
   const totalLegendWidth = cols * perColumnWidth + HORIZONTAL_PADDING * 2;
 
-  // Allow using up to 70% of chart width to fully show legends
-  return Math.min(totalLegendWidth, Math.floor(chartWidth * 0.7));
+  // Allow using up to 80% of chart width to fully show legends
+  return Math.min(totalLegendWidth, Math.floor(chartWidth * 0.8));
 };
 
 const showTrellisConfig = (type: string) => {
