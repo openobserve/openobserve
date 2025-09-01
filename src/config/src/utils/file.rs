@@ -17,10 +17,12 @@ use std::{
     fs::{File, Metadata, metadata},
     io::{Read, Seek, Write},
     ops::Range,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use async_recursion::async_recursion;
+use async_walkdir::WalkDir;
+use futures::StreamExt;
 
 #[inline(always)]
 pub fn get_file_meta(path: impl AsRef<Path>) -> Result<Metadata, std::io::Error> {
@@ -80,6 +82,48 @@ pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Err
     std::fs::rename(temp_file, file)?;
 
     Ok(())
+}
+
+pub async fn scan_files_filtered<P, F>(
+    root: P,
+    filter: F,
+    limit: Option<usize>,
+) -> Result<Vec<String>, std::io::Error>
+where
+    P: AsRef<Path>,
+    F: Fn(PathBuf) -> bool + Send + Clone + 'static,
+{
+    let walker = WalkDir::new(root).filter(move |entry| {
+        let path = entry.path().to_path_buf();
+        let filter = filter.clone();
+        async move {
+            if path.is_dir() && !filter(path) {
+                async_walkdir::Filtering::IgnoreDir
+            } else {
+                async_walkdir::Filtering::Continue
+            }
+        }
+    });
+
+    let walker = walker.filter_map(|item| async {
+        item.ok()
+            .map(|dir_entry| {
+                dir_entry
+                    .path()
+                    .canonicalize()
+                    .ok()
+                    .and_then(|cpath| cpath.to_str().map(String::from))
+            })
+            .flatten()
+    });
+
+    let files = if let Some(limit_count) = limit {
+        walker.take(limit_count).collect().await
+    } else {
+        walker.collect().await
+    };
+
+    Ok(files)
 }
 
 #[inline(always)]

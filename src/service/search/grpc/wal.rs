@@ -13,10 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::Path, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use arrow::array::{ArrayRef, new_null_array};
 use arrow_schema::{DataType, Field};
+use chrono::{DateTime, TimeZone, Utc, offset::LocalResult};
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -25,7 +29,7 @@ use config::{
         stream::{FileKey, StreamParams, StreamPartition},
     },
     utils::{
-        file::{is_exists, scan_files},
+        file::{is_exists, scan_files_filtered},
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
         record_batch_ext::concat_batches,
         size::bytes_to_human_readable,
@@ -575,7 +579,67 @@ async fn get_file_list_inner(
         "{}/files/{}/{}/{}/",
         wal_dir, query.org_id, query.stream_type, query.stream_name
     );
-    let files = scan_files(&pattern, file_ext, None).unwrap_or_default();
+    let files = if let Some((start_time, end_time)) = query
+        .time_range
+        .map(|(s, e)| DateTime::from_timestamp_micros(s).zip(DateTime::from_timestamp_micros(e)))
+        .flatten()
+    {
+        let skip_count = AsRef::<Path>::as_ref(&pattern).components().count();
+        let extension_pattern = file_ext.to_string();
+        let filter = move |path: PathBuf| {
+            let mut components = path
+                .components()
+                .skip(skip_count)
+                .map(|c| c.as_os_str())
+                .filter_map(|osc| osc.to_str());
+
+            let year = components
+                .next()
+                .map(|c| c.parse::<i32>().ok())
+                .flatten()
+                .unwrap_or_default();
+            let month = components
+                .next()
+                .map(|c| c.parse::<u32>().ok())
+                .flatten()
+                .unwrap_or_default();
+            let day = components
+                .next()
+                .map(|c| c.parse::<u32>().ok())
+                .flatten()
+                .unwrap_or_default();
+            let hour = components
+                .next()
+                .map(|c| c.parse::<u32>().ok())
+                .flatten()
+                .unwrap_or_default();
+
+            let date_range_check = if 0 == year {
+                return false;
+            } else {
+                if let LocalResult::Single(datetime) =
+                    Utc.with_ymd_and_hms(year, month, day, hour, 0, 0)
+                {
+                    datetime >= start_time && datetime <= end_time
+                } else {
+                    false
+                }
+            };
+
+            date_range_check
+                && (!path.is_file()
+                    || path
+                        .extension()
+                        .map(|extension| extension.to_str().map(|s| s == extension_pattern))
+                        .flatten()
+                        .unwrap_or_default())
+        };
+
+        scan_files_filtered(&pattern, filter, None).await?
+    } else {
+        scan_files_filtered(&pattern, |_| true, None).await?
+    };
+
     let files = files
         .iter()
         .map(|f| {
