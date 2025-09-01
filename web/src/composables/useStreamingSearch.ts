@@ -202,6 +202,8 @@ const useHttpStreaming = () => {
         url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
       if (meta?.fallback_order_by_col)
         url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
+      if (meta?.is_refresh_cache)
+        url += `&is_refresh_cache=${meta?.is_refresh_cache}`;
       if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
     } else if (type === "values") {
       const fieldsString = meta?.fields.join(",");

@@ -32,6 +32,7 @@ const search = {
       tab_id,
       tab_name,
       is_ui_histogram,
+      is_refresh_cache=false,
     }: {
       org_identifier: string;
       query: any;
@@ -45,6 +46,7 @@ const search = {
       tab_id?: string;
       tab_name?: string;
       is_ui_histogram?: boolean;
+      is_refresh_cache?: boolean;
     },
     search_type: string = "ui",
     is_multi_stream_search: boolean = false,
@@ -64,6 +66,7 @@ const search = {
     if (tab_id) url += `&tab_id=${tab_id}`;
     if (tab_name) url += `&tab_name=${encodeURIComponent(tab_name)}`;
     if (is_ui_histogram) url += `&is_ui_histogram=${is_ui_histogram}`;
+    if( is_refresh_cache ) url += `&is_refresh_cache=${is_refresh_cache}`;
     if (is_multi_stream_search) url += `&is_multi_stream_search=${is_multi_stream_search}`;
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
@@ -74,6 +77,7 @@ const search = {
       if (run_id) url += `&run_id=${run_id}`;
       if (tab_id) url += `&tab_id=${tab_id}`;
       if (tab_name) url += `&tab_name=${encodeURIComponent(tab_name)}`;
+      if (is_refresh_cache) url += `&is_refresh_cache=${is_refresh_cache}`;
       if (query.hasOwnProperty("aggs")) {
         return http({ headers: { traceparent } }).post(url, {
           ...query.query,

@@ -257,6 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :folderId="route.query.folder"
         :reportId="reportId"
         :currentTimeObj="currentTimeObjPerPanel"
+        :shouldRefreshWithoutCacheObj="shouldRefreshWithoutCachePerPanel"
         :selectedDateForViewPanel="selectedDate"
         @onDeletePanel="onDeletePanel"
         @onMovePanel="onMovePanel"
@@ -1122,10 +1123,17 @@ export default defineComponent({
     });
 
     const currentTimeObjPerPanel = ref({});
+    const shouldRefreshWithoutCachePerPanel = ref({});
 
-    const refreshPanelRequest = (panelId) => {
+    const refreshPanelRequest = (panelId, shouldRefreshWithoutCache) => {
       // Set the panel ID to be refreshed
       panelIdToBeRefreshed.value = panelId;
+
+      // Store the shouldRefreshWithoutCache value for this panel
+      shouldRefreshWithoutCachePerPanel.value = {
+        ...shouldRefreshWithoutCachePerPanel.value,
+        [panelId]: shouldRefreshWithoutCache || false,
+      };
 
       // when the date changes from the picker, update the current time object for the dashboard
       if (selectedDate.value && dateTimePicker.value) {
@@ -1198,6 +1206,7 @@ export default defineComponent({
       selectedDate,
       currentTimeObj,
       currentTimeObjPerPanel,
+      shouldRefreshWithoutCachePerPanel,
       refreshInterval,
       // ----------------
       refreshData,
