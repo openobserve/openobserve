@@ -51,6 +51,12 @@ const mockDashboardPanelData = {
     currentQueryIndex: 0,
   },
   meta: {
+    dateTime: {
+      startTime: Date.now() - 86400000, // 24 hours ago
+      endTime: Date.now(),
+      type: "relative",
+      period: "1d"
+    },
     stream: {
       customQueryFields: [{ name: "custom_field" }],
       vrlFunctionFieldList: [],
