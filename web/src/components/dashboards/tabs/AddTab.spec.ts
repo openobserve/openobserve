@@ -58,6 +58,14 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
+// Mock console methods
+global.console = {
+  ...console,
+  error: vi.fn(),
+  warn: vi.fn(),
+  log: vi.fn()
+};
+
 // Mock composables  
 const mockShowPositiveNotification = vi.fn();
 const mockShowErrorNotification = vi.fn();
@@ -165,13 +173,16 @@ describe("AddTab", () => {
     
     mockAddTab.mockResolvedValue({ tabId: "new-tab", name: "New Tab" });
     mockEditTab.mockResolvedValue({ tabId: "edit-tab", name: "Edited Tab" });
-    mockGetDashboard.mockResolvedValue({
+    
+    // Return the dashboard data synchronously to prevent undefined parsing
+    const mockDashboardData = {
       dashboardId: "test-dashboard-id",
       tabs: [
         { tabId: "tab1", name: "Tab 1", panels: [] },
         { tabId: "tab2", name: "Tab 2", panels: [] },
       ],
-    });
+    };
+    mockGetDashboard.mockResolvedValue(mockDashboardData);
   });
 
   afterEach(() => {
@@ -409,8 +420,9 @@ describe("AddTab", () => {
     it("should load dashboard data in edit mode", async () => {
       wrapper = createWrapper({ editMode: true, tabId: "tab1" });
       
-      // Give time for loadDashboardData to complete
+      // Wait for loadDashboardData to complete
       await wrapper.vm.$nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
       
       expect(mockGetDashboard).toHaveBeenCalledWith(
         mockStore,
@@ -424,6 +436,7 @@ describe("AddTab", () => {
       
       // Wait for component to load dashboard data
       await wrapper.vm.$nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
       
       // Now update the name
       wrapper.vm.tabData.name = "Updated Tab";
@@ -723,8 +736,11 @@ describe("AddTab", () => {
   });
 
   describe("Component Lifecycle", () => {
-    it("should load dashboard data on component creation in edit mode", () => {
+    it("should load dashboard data on component creation in edit mode", async () => {
       wrapper = createWrapper({ editMode: true, tabId: "tab1" });
+      
+      // Wait for async loadDashboardData to be called
+      await wrapper.vm.$nextTick();
       
       expect(mockGetDashboard).toHaveBeenCalled();
     });
