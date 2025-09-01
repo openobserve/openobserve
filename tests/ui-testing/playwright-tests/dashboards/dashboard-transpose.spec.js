@@ -54,7 +54,7 @@ test.describe("dashboard UI testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("should display the correct data before and after transposing in the table chart", async ({
+  test("should display the correct data before and after transposing in the table chart", async ({
     page,
   }) => {
     const pm = new PageManager(page);
