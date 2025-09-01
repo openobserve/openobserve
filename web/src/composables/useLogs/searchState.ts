@@ -22,6 +22,44 @@ import {
   DEFAULT_SEARCH_AGG_DATA,
 } from "@/utils/logs/constants";
 
+interface HistogramData {
+  xData: any[];
+  yData: any[];
+  chartParams: {
+    title: string;
+    unparsed_x_data: any[];
+    timezone: string;
+  };
+  errorMsg: string;
+  errorCode: number;
+  errorDetail: string;
+}
+
+interface SearchObjectData {
+  errorMsg: string;
+  stream: {
+    streamLists: any[];
+    selectedStream: string[];
+    selectedStreamFields: any[];
+  };
+  queryResults: any;
+  sortedQueryResults: any[];
+  histogram: HistogramData;
+  tempFunctionContent: string;
+  query: string;
+  editorValue: string;
+  savedViews: any[];
+}
+
+interface SearchObject {
+  organizationIdentifier: string;
+  config: any;
+  communicationMethod: string;
+  meta: any;
+  data: SearchObjectData;
+  runQuery: boolean;
+}
+
 /**
  * Reactive state management for logs functionality
  * Contains all reactive state variables used across logs components
@@ -30,7 +68,9 @@ export const searchState = () => {
   const store = useStore();
 
   // Main search object containing all search state
-  const searchObj: any = reactive(Object.assign({}, DEFAULT_LOGS_CONFIG));
+  const searchObj = reactive(
+    Object.assign({}, DEFAULT_LOGS_CONFIG),
+  ) as SearchObject;
 
   // Debug data for search operations
   const searchObjDebug = reactive(Object.assign({}, DEFAULT_SEARCH_DEBUG_DATA));
@@ -54,24 +94,47 @@ export const searchState = () => {
   const ftsFields: any = ref([]);
 
   /**
-   * This function is used to initialize the logs state from the store which was cached in the store
-   * Dont do any other effects than initializing the logs state in this function, such as loading data, etc.
-   * @returns Promise<boolean>,
+   * Initializes the logs state from cached store data.
+   *
+   * This function restores the search object state from the Vuex store cache,
+   * including organization identifier, configuration, meta data, and search results.
+   * It performs deep cloning to prevent reference issues and resets specific properties
+   * like refresh interval and query results to ensure clean state initialization.
+   *
+   * @returns Promise that resolves to true when initialization is complete
+   *
+   * @example
+   * ```typescript
+   * await initialLogsState();
+   * // Search state is now initialized from store cache
+   * ```
    */
-  const initialLogsState = async () => {
-    // Dont do any other effects than initializing the logs state in this function, such as loading data, etc.
-    if (store.state.logs.isInitialized) {
-      try {
-        const state = store.getters["logs/getLogs"];
-        searchObj.organizationIdentifier = state.organizationIdentifier;
-        searchObj.config = JSON.parse(JSON.stringify(state.config));
-        searchObj.communicationMethod = state.communicationMethod;
-        await nextTick();
-        searchObj.meta = JSON.parse(JSON.stringify({
+  const initialLogsState = async (): Promise<boolean | undefined> => {
+    if (!store.state.logs.isInitialized) {
+      return undefined;
+    }
+
+    try {
+      const state = store.getters["logs/getLogs"];
+
+      // Initialize basic properties
+      searchObj.organizationIdentifier = state.organizationIdentifier;
+      searchObj.config = JSON.parse(JSON.stringify(state.config));
+      searchObj.communicationMethod = state.communicationMethod;
+
+      await nextTick();
+
+      // Initialize meta with reset refresh interval
+      searchObj.meta = JSON.parse(
+        JSON.stringify({
           ...state.meta,
           refreshInterval: 0,
-        }));
-        searchObj.data = JSON.parse(JSON.stringify({
+        }),
+      );
+
+      // Initialize data with default histogram structure
+      searchObj.data = JSON.parse(
+        JSON.stringify({
           ...JSON.parse(JSON.stringify(state.data)),
           queryResults: {},
           sortedQueryResults: [],
@@ -87,50 +150,87 @@ export const searchState = () => {
             errorCode: 0,
             errorDetail: "",
           },
-        }));
-        await nextTick();
-        searchObj.data.queryResults = JSON.parse(JSON.stringify(state.data.queryResults));
-        searchObj.data.sortedQueryResults = JSON.parse(JSON.stringify(state.data.sortedQueryResults));
-        searchObj.data.histogram = JSON.parse(JSON.stringify(state.data.histogram));
-        await nextTick();
-        // Dont do any other effects than initializing the logs state in this function, such as loading data, etc.
-      } catch (e: any) {
-        console.error("Error while initializing logs state", e?.message);
-        searchObj.organizationIdentifier = store.state?.selectedOrganization?.identifier;
-        resetSearchObj();
-      } finally {
-        return Promise.resolve(true);
-      }
-    }
-  }
+        }),
+      );
 
-  const resetSearchObj = () => {
-  
-      searchObj.data.errorMsg = "No stream found in selected organization!";
-      searchObj.data.stream.streamLists = [];
-      searchObj.data.stream.selectedStream = [];
-      searchObj.data.stream.selectedStreamFields = [];
-      searchObj.data.queryResults = {};
-      searchObj.data.sortedQueryResults = [];
-      searchObj.data.histogram = {
-        xData: [],
-        yData: [],
-        chartParams: {
-          title: "",
-          unparsed_x_data: [],
-          timezone: "",
-        },
-        errorCode: 0,
-        errorMsg: "",
-        errorDetail: "",
-      };
-      searchObj.data.tempFunctionContent = "";
-      searchObj.data.query = "";
-      searchObj.data.editorValue = "";
-      searchObj.meta.sqlMode = false;
-      searchObj.runQuery = false;
-      searchObj.data.savedViews = [];
+      await nextTick();
+
+      // Restore cached query results and histogram data
+      searchObj.data.queryResults = JSON.parse(
+        JSON.stringify(state.data.queryResults),
+      );
+      searchObj.data.sortedQueryResults = JSON.parse(
+        JSON.stringify(state.data.sortedQueryResults),
+      );
+      searchObj.data.histogram = JSON.parse(
+        JSON.stringify(state.data.histogram),
+      );
+
+      await nextTick();
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      console.error("Error while initializing logs state:", errorMessage);
+
+      // Fallback to current organization and reset state
+      searchObj.organizationIdentifier =
+        store.state?.selectedOrganization?.identifier || "";
+      resetSearchObj();
+    } finally {
+      // eslint-disable-next-line no-unsafe-finally
+      return Promise.resolve(true);
+    }
+  };
+
+  /**
+   * Resets the search object to its default state.
+   *
+   * This function clears all search-related data including streams, query results,
+   * histogram data, queries, and various search configurations. It's typically used
+   * when switching organizations, handling errors, or performing a complete reset
+   * of the search interface.
+   *
+   * @example
+   * ```typescript
+   * resetSearchObj();
+   * // Search object is now reset to default state
+   * ```
+   */
+  const resetSearchObj = (): void => {
+    // Reset error message and stream data
+    searchObj.data.errorMsg = "No stream found in selected organization!";
+    searchObj.data.stream.streamLists = [];
+    searchObj.data.stream.selectedStream = [];
+    searchObj.data.stream.selectedStreamFields = [];
+
+    // Clear query results
+    searchObj.data.queryResults = {};
+    searchObj.data.sortedQueryResults = [];
+
+    // Reset histogram to default state
+    searchObj.data.histogram = {
+      xData: [],
+      yData: [],
+      chartParams: {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "",
+      },
+      errorCode: 0,
+      errorMsg: "",
+      errorDetail: "",
     };
+
+    // Clear query and editor content
+    searchObj.data.tempFunctionContent = "";
+    searchObj.data.query = "";
+    searchObj.data.editorValue = "";
+
+    // Reset search configuration
+    searchObj.meta.sqlMode = false;
+    searchObj.runQuery = false;
+    searchObj.data.savedViews = [];
+  };
 
   return {
     // Reactive state
