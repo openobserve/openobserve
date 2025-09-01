@@ -2765,56 +2765,70 @@ export const convertSQLData = async (
     legendConfig.orient == "vertical" &&
     panelSchema.config?.show_legends &&
     panelSchema.type != "gauge" &&
-    panelSchema.type != "metric"
+    panelSchema.type != "metric" &&
+    panelSchema?.config?.legends_position == "right" &&
+    (panelSchema?.config?.legends_scrollable == null ||
+      panelSchema?.config?.legends_scrollable === "scroll")
   ) {
+    // Prefer explicit legend width if provided in config
     let legendWidth;
-
     if (
       panelSchema.config.legend_width &&
       !isNaN(parseFloat(panelSchema.config.legend_width.value))
-      // ["px", "%"].includes(panelSchema.config.legend_width.unit)
+       // ["px", "%"].includes(panelSchema.config.legend_width.unit)
     ) {
-      if (panelSchema.config.legend_width.unit === "%") {
-        // If in percentage, calculate percentage of the chartPanelRef width
-        const percentage = panelSchema.config.legend_width.value / 100;
-        legendWidth = chartPanelRef.value?.offsetWidth * percentage;
-      } else {
-        // If in pixels, use the provided value
-        legendWidth = panelSchema.config.legend_width.value;
-      }
-    } else {
-      let maxValue: string;
-      if (panelSchema.type === "pie" || panelSchema.type === "donut") {
-        maxValue = options.series[0].data.reduce((max: any, it: any) => {
-          return max.length < it?.name?.length ? it?.name : max;
-        }, "");
-      } else {
-        maxValue = options.series.reduce((max: any, it: any) => {
-          return max.length < it?.name?.length ? it?.name : max;
-        }, "");
-      }
-
-      // If legend_width is not provided or has invalid format, calculate it based on other criteria
       legendWidth =
-        Math.min(
-          chartPanelRef.value?.offsetWidth / 3,
-          calculateWidthText(maxValue) + 60,
-        ) ?? 20;
+        panelSchema.config.legend_width.unit === "%"
+          ? (chartPanelRef.value?.offsetWidth || 0) *
+            (panelSchema.config.legend_width.value / 100)
+          : panelSchema.config.legend_width.value;
+    } else {
+      // Dynamically compute width to ensure legends do not overlap the chart
+      legendWidth = calculateRightLegendWidth(
+        options.series?.length || 0,
+        chartPanelRef.value?.offsetWidth || 800,
+        chartPanelRef.value?.offsetHeight || 400,
+        options.series || [],
+        panelSchema?.config?.legends_scrollable === "scroll",
+      );
     }
 
+    // Reserve space on the right so that the plot shrinks horizontally
     options.grid.right = legendWidth;
-    options.legend.textStyle.width = legendWidth - 55;
+    // Constrain legend text to the reserved space to avoid overflow
+    options.legend.textStyle.width = Math.max(legendWidth - 55, 60);
+    // Explicitly bound the legend area to the reserved right-side width
+    const containerWidth = chartPanelRef.value?.offsetWidth || 0;
+    const legendLeftPx = Math.max(containerWidth - legendWidth, 0);
+    options.legend.left = legendLeftPx;
+    options.legend.right = 0;
   }
 
   //check if is there any data else filter out axis or series data
   // for metric, gauge we does not have data field
   if (!["metric", "gauge"].includes(panelSchema.type)) {
     options.series = options.series.filter((it: any) => it.data?.length);
-    if (panelSchema.type == "h-bar" || panelSchema.type == "h-stacked") {
-      options.xAxis = options.xAxis;
-    } else if (!["pie", "donut"].includes(panelSchema.type)) {
-      options.yAxis = options.yAxis;
-    }
+  }
+
+  // Apply dynamic legend height for bottom legends if conditions are met
+  if (
+    panelSchema?.config?.show_legends &&
+    panelSchema?.config?.legends_scrollable !== "scroll" &&
+    panelSchema?.config?.legends_position !== "right"
+  ) {
+    console.log("Dynamic legend height calculation triggered", panelSchema);
+
+    // Get chart width from chartPanelRef
+    const chartWidth = chartPanelRef.value?.offsetWidth || 800;
+    // Count legend items from series data
+    const legendCount = options.series?.length || 0;
+    // Calculate dynamic height for bottom legends
+    const dynamicHeight = calculateBottomLegendHeight(
+      legendCount,
+      chartWidth,
+      options.series || [],
+    );
+    options.grid.bottom = dynamicHeight;
   }
 
   // allowed to zoom, only if timeseries
@@ -2891,6 +2905,121 @@ const largestLabel = (data: any) => {
   }, "");
 
   return largestlabel;
+};
+
+/**
+ * Calculates the height needed for legends when positioned at the bottom
+ * @param {number} legendCount - Number of legend items
+ * @param {number} chartWidth - Width of the chart container
+ * @param {any[]} seriesData - Series data to get actual legend names
+ * @returns {number} Height in pixels needed for the legend section
+ */
+const calculateBottomLegendHeight = (
+  legendCount: number,
+  chartWidth: number,
+  seriesData: any[] = [],
+): number => {
+  if (legendCount === 0) return 0;
+
+  // Constants for legend sizing
+  const LEGEND_ITEM_HEIGHT = 20; // Height per legend item row
+  const LEGEND_PADDING = 20; // Top and bottom padding
+  const LEGEND_ICON_WIDTH = 14; // Width of legend icon/symbol
+  const LEGEND_ICON_MARGIN = 8; // Margin between icon and text
+  const LEGEND_ITEM_MARGIN = 20; // Horizontal margin between legend items
+  const MIN_TEXT_WIDTH = 50; // Minimum text width per legend item
+  const MAX_TEXT_WIDTH = 150; // Maximum text width per legend item
+
+  // Calculate average text width based on actual series names
+  let avgTextWidth = MIN_TEXT_WIDTH;
+  if (seriesData.length > 0) {
+    const totalTextLength = seriesData.reduce((sum, series) => {
+      const name = series.name || series.seriesName || "";
+      return sum + name.toString().length;
+    }, 0);
+    const avgTextLength = totalTextLength / seriesData.length;
+    // Estimate width: roughly 8 pixels per character, constrained by min/max
+    avgTextWidth = Math.min(
+      Math.max(avgTextLength * 8, MIN_TEXT_WIDTH),
+      MAX_TEXT_WIDTH,
+    );
+  }
+
+  // Calculate total width needed per legend item
+  const itemWidth =
+    LEGEND_ICON_WIDTH + LEGEND_ICON_MARGIN + avgTextWidth + LEGEND_ITEM_MARGIN;
+
+  // Calculate how many items can fit per row
+  const availableWidth = chartWidth - LEGEND_PADDING * 2;
+  const itemsPerRow = Math.max(1, Math.floor(availableWidth / itemWidth));
+
+  // Calculate number of rows needed
+  const numRows = Math.ceil(legendCount / itemsPerRow);
+
+  // Calculate total height
+  const totalHeight = numRows * LEGEND_ITEM_HEIGHT + LEGEND_PADDING;
+
+  return Math.max(totalHeight, 40); // Minimum height of 40px
+};
+
+/**
+ * Calculates the width needed for legends when positioned on the right
+ * Keeps chart height unchanged and ensures legends do not overlap the plot
+ * @param {number} legendCount - Number of legend items
+ * @param {number} chartWidth - Width of the chart container
+ * @param {number} chartHeight - Height of the chart container
+ * @param {any[]} seriesData - Series data to get actual legend names
+ * @returns {number} Width in pixels to reserve on the right
+ */
+const calculateRightLegendWidth = (
+  legendCount: number,
+  chartWidth: number,
+  chartHeight: number,
+  seriesData: any[] = [],
+  isScrollable: boolean = false,
+): number => {
+  if (legendCount === 0) return 0;
+
+  // Sizing constants
+  const LEGEND_ROW_HEIGHT = 18; // per line height
+  const LEGEND_ICON_WIDTH = 14;
+  const LEGEND_ICON_MARGIN = 8;
+  const HORIZONTAL_PADDING = 24; // left+right padding for legend area
+  const VERTICAL_PADDING = 16;
+  const MIN_TEXT_WIDTH = 80;
+  const MAX_TEXT_WIDTH = 360; // allow wider names
+
+  // Longest text width to avoid truncation
+  let longestTextWidth = MIN_TEXT_WIDTH;
+  if (seriesData.length > 0) {
+    longestTextWidth = seriesData.reduce((max, series) => {
+      const name = (series.name || series.seriesName || "").toString();
+      const width = calculateWidthText(name);
+      return Math.max(max, width);
+    }, MIN_TEXT_WIDTH);
+    longestTextWidth = Math.min(
+      Math.max(longestTextWidth, MIN_TEXT_WIDTH),
+      MAX_TEXT_WIDTH,
+    );
+  }
+
+  // Width per legend column (icon + gap + text)
+  const perColumnWidth =
+    LEGEND_ICON_WIDTH + LEGEND_ICON_MARGIN + longestTextWidth;
+
+  // Determine rows that fit vertically and required columns
+  const availableHeight = Math.max(
+    chartHeight - VERTICAL_PADDING * 2,
+    LEGEND_ROW_HEIGHT,
+  );
+  const rows = Math.max(1, Math.floor(availableHeight / LEGEND_ROW_HEIGHT));
+  const cols = isScrollable ? 1 : Math.ceil(legendCount / rows);
+
+  // Total width reserved for legends
+  const totalLegendWidth = cols * perColumnWidth + HORIZONTAL_PADDING * 2;
+
+  // Allow using up to 70% of chart width to fully show legends
+  return Math.min(totalLegendWidth, Math.floor(chartWidth * 0.7));
 };
 
 const showTrellisConfig = (type: string) => {

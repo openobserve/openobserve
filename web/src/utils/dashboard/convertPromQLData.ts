@@ -884,6 +884,23 @@ export const convertPromQLData = async (
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
+  // Apply dynamic legend height for bottom legends if conditions are met
+  if (
+    panelSchema?.config?.show_legends &&
+    panelSchema?.config?.legends_scrollable !== "scroll"
+  ) {
+    // Get chart width from chartPanelRef
+    const chartWidth = chartPanelRef.value?.offsetWidth || 800;
+    // Count legend items from series data
+    const legendCount = options.series?.length || 0;
+    // Calculate dynamic height for bottom legends
+    const dynamicHeight = calculateBottomLegendHeight(
+      legendCount,
+      chartWidth,
+      options.series || [],
+    );
+    options.grid.bottom = dynamicHeight;
+  }
   // promql query will be always timeseries except gauge and metric text chart.
   // console.timeEnd("convertPromQLData");
   return {
@@ -963,7 +980,60 @@ const getLegendPosition = (legendPosition: string) => {
       return "horizontal";
   }
 };
+/**
+ * Calculates the height needed for legends when positioned at the bottom
+ * @param {number} legendCount - Number of legend items
+ * @param {number} chartWidth - Width of the chart container
+ * @param {any[]} seriesData - Series data to get actual legend names
+ * @returns {number} Height in pixels needed for the legend section
+ */
+const calculateBottomLegendHeight = (
+  legendCount: number,
+  chartWidth: number,
+  seriesData: any[] = [],
+): number => {
+  if (legendCount === 0) return 0;
 
+  // Constants for legend sizing
+  const LEGEND_ITEM_HEIGHT = 20; // Height per legend item row
+  const LEGEND_PADDING = 20; // Top and bottom padding
+  const LEGEND_ICON_WIDTH = 14; // Width of legend icon/symbol
+  const LEGEND_ICON_MARGIN = 8; // Margin between icon and text
+  const LEGEND_ITEM_MARGIN = 20; // Horizontal margin between legend items
+  const MIN_TEXT_WIDTH = 50; // Minimum text width per legend item
+  const MAX_TEXT_WIDTH = 150; // Maximum text width per legend item
+
+  // Calculate average text width based on actual series names
+  let avgTextWidth = MIN_TEXT_WIDTH;
+  if (seriesData.length > 0) {
+    const totalTextLength = seriesData.reduce((sum, series) => {
+      const name = series.name || series.seriesName || "";
+      return sum + name.toString().length;
+    }, 0);
+    const avgTextLength = totalTextLength / seriesData.length;
+    // Estimate width: roughly 8 pixels per character, constrained by min/max
+    avgTextWidth = Math.min(
+      Math.max(avgTextLength * 8, MIN_TEXT_WIDTH),
+      MAX_TEXT_WIDTH,
+    );
+  }
+
+  // Calculate total width needed per legend item
+  const itemWidth =
+    LEGEND_ICON_WIDTH + LEGEND_ICON_MARGIN + avgTextWidth + LEGEND_ITEM_MARGIN;
+
+  // Calculate how many items can fit per row
+  const availableWidth = chartWidth - LEGEND_PADDING * 2;
+  const itemsPerRow = Math.max(1, Math.floor(availableWidth / itemWidth));
+
+  // Calculate number of rows needed
+  const numRows = Math.ceil(legendCount / itemsPerRow);
+
+  // Calculate total height
+  const totalHeight = numRows * LEGEND_ITEM_HEIGHT + LEGEND_PADDING;
+
+  return Math.max(totalHeight, 40); // Minimum height of 40px
+};
 /**
  * Returns the props object based on the given chart type.
  *
