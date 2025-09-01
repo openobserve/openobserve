@@ -1063,7 +1063,8 @@ pub async fn search_partition(
         is_histogram,
     );
 
-    if cfg.common.align_partitions_for_index && is_use_inverted_index(&Arc::new(sql)) {
+    // TODO: how to recover this feature
+    if cfg.common.align_partitions_for_index {
         step *= step_factor;
     }
 
@@ -1490,15 +1491,4 @@ pub fn generate_search_schema_diff(
     }
 
     diff_fields
-}
-
-// inverted index only support single table
-pub fn is_use_inverted_index(sql: &Arc<Sql>) -> bool {
-    if sql.stream_names.len() != 1 {
-        return false;
-    }
-
-    let cfg = get_config();
-    cfg.common.inverted_index_enabled
-        && sql.index_condition.is_some()
 }

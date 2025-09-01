@@ -107,10 +107,6 @@ impl IndexCondition {
     pub fn add_condition(&mut self, condition: Condition) {
         self.conditions.push(condition);
     }
-
-    pub fn merge(&mut self, index_condition: IndexCondition) {
-        self.conditions.extend(index_condition.conditions);
-    }
 }
 
 impl Debug for IndexCondition {
@@ -148,6 +144,7 @@ impl IndexCondition {
     }
 
     // get the fields use for search in tantivy
+    #[allow(unused)]
     pub fn get_tantivy_fields(&self) -> HashSet<String> {
         self.conditions
             .iter()
@@ -1751,21 +1748,6 @@ mod tests {
             index_condition.conditions[0],
             Condition::Equal(ref field, ref value) if field == "field1" && value == "value1"
         ));
-    }
-
-    #[test]
-    fn test_index_condition_add_index_condition() {
-        let mut index_condition1 = IndexCondition::new();
-        index_condition1
-            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-
-        let mut index_condition2 = IndexCondition::new();
-        index_condition2
-            .add_condition(Condition::Equal("field2".to_string(), "value2".to_string()));
-
-        index_condition1.merge(index_condition2);
-
-        assert_eq!(index_condition1.conditions.len(), 2);
     }
 
     #[test]

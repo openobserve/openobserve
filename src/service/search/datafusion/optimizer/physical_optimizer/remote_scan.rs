@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::meta::{cluster::NodeInfo, inverted_index::IndexOptimizeMode};
+use config::meta::cluster::NodeInfo;
 use datafusion::{
     common::{
         Result, TableReference,
@@ -40,7 +40,6 @@ use crate::service::search::{
         },
         optimizer::{context::RemoteScanContext, utils::is_place_holder_or_empty},
     },
-    index::IndexCondition,
     request::Request,
     sql::Sql,
 };
@@ -77,8 +76,6 @@ pub fn generate_remote_scan_rules(
         nodes,
         partitioned_file_lists,
         equal_keys,
-        sql.index_condition.clone(),
-        sql.index_optimize_mode.clone(),
         is_leader,
         context,
     ))
@@ -97,8 +94,6 @@ impl RemoteScanRule {
         nodes: Vec<Arc<dyn NodeInfo>>,
         file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
-        index_condition: Option<IndexCondition>,
-        index_optimize_mode: Option<IndexOptimizeMode>,
         is_leader: bool,
         opentelemetry_context: opentelemetry::Context,
     ) -> Self {
@@ -107,8 +102,6 @@ impl RemoteScanRule {
             nodes,
             file_id_lists,
             equal_keys,
-            index_condition,
-            index_optimize_mode,
             is_leader,
             opentelemetry_context,
         );
