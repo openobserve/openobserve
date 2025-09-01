@@ -441,19 +441,6 @@
     "internalLabel": "Opmerking: Gebruik deze optie als de collector is geïnstalleerd in hetzelfde cluster als O2",
     "redirectionIngestionMsg": "Opmerking: Om toegang te krijgen tot andere pagina's dan de IAM, moet de gegevensinvoer binnen de huidige organisatie worden gestart."
   },
-  "syslog": {
-    "stream": "Streamen",
-    "organization": "Organisatie",
-    "subnets": "Subnetten",
-    "deleteRoute": "Route verwijderen",
-    "syslog_addroute": "Route toevoegen",
-    "save": "Opslaan",
-    "cancel": "annuleren",
-    "delete": "Verwijderen",
-    "edit": "Bewerken",
-    "on": "Inschakelen",
-    "off": "Uitschakelen"
-  },
   "dashboard": {
     "selectField": "Veld",
     "selectIndex": "Streamen",
