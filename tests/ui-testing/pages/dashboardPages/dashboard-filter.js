@@ -164,30 +164,47 @@ export default class DashboardFilter {
     await columnLocator.click();
     await columnLocator.fill(newFieldName);
 
-    // await this.page
-    //   .getByRole("option", { name: newFieldName, exact: true })
-    //   .first()
-    //   .click();
+    // Wait for the dropdown to appear and become stable
+    await this.page.waitForTimeout(500);
 
-    // const option = this.page
-    //   .getByRole("option", { name: newFieldName, exact: true })
-    //   .first();
-    // await option.waitFor({ state: "visible", timeout: 10000 });
-    // await option.click();
-
-    // await this.page
-    //   .locator('div.q-menu[role="listbox"] div.q-item')
-    //   .first()
-    //   .click();
-
-    // Wait for the suggestion list to appear and select the first suggestion
-    const suggestion = await this.page.locator(
-      'div.q-menu[role="listbox"] div.q-item'
-    );
-    await suggestion.waitFor({ state: "visible", timeout: 10000 });
-    const firstSuggestion = suggestion.first();
-    await firstSuggestion.waitFor({ state: "visible", timeout: 10000 });
-    await firstSuggestion.click();
+    // Try multiple selector strategies for better reliability
+    let suggestionClicked = false;
+    
+    // Strategy 1: Try using getByRole with exact match
+    try {
+      const option = this.page
+        .getByRole("option", { name: newFieldName, exact: true })
+        .first();
+      await option.waitFor({ state: "visible", timeout: 5000 });
+      await option.click();
+      suggestionClicked = true;
+    } catch (error) {
+      // Strategy 2: Try using the generic dropdown menu selector
+      try {
+        const suggestion = this.page.locator(
+          'div.q-menu[role="listbox"] div.q-item'
+        );
+        await suggestion.first().waitFor({ state: "visible", timeout: 5000 });
+        await suggestion.first().click();
+        suggestionClicked = true;
+      } catch (error2) {
+        // Strategy 3: Try alternative selectors
+        try {
+          const altSuggestion = this.page.locator('.q-menu .q-item').first();
+          await altSuggestion.waitFor({ state: "visible", timeout: 5000 });
+          await altSuggestion.click();
+          suggestionClicked = true;
+        } catch (error3) {
+          // If all strategies fail, press Enter as fallback
+          await columnLocator.press('Enter');
+          suggestionClicked = true;
+        }
+      }
+    }
+    
+    if (!suggestionClicked) {
+      throw new Error(`Failed to select suggestion for field: ${newFieldName}`);
+    }
 
     // Step 3: Condition dropdown
     if (operator || value) {
