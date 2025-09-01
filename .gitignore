@@ -33,3 +33,4 @@ tests/ui-testing/playwright-tests/utils/auth/user.json
 /test-results
 tests/ui-testing/playwright-tests/utils/README.md
 /tests/ui-testing/test-archives
+/tests/ui-testing/playwright-tests/test-logs

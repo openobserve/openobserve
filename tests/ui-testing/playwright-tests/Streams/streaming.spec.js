@@ -1,5 +1,5 @@
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
-const PageManager = require('../../pages/page-manager.js');
+import { PageManager } from '../../pages/page-manager.js';
 
 test.describe.configure({ mode: 'parallel' });
 
