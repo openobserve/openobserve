@@ -80,7 +80,7 @@ import useActions from "./useActions";
 import useStreamingSearch from "./useStreamingSearch";
 
 import { searchState } from "@/composables/useLogs/searchState";
-import { INTERVAL_MAP } from "@/utils/logs/constants";
+import { INTERVAL_MAP, DEFAULT_LOGS_CONFIG } from "@/utils/logs/constants";
 import { fnParsedSQL, fnUnparsedSQL } from "@/composables/useLogs/logsUtils";
 
 // TODO OK:
@@ -98,10 +98,11 @@ const {
   closeSocketBasedOnRequestId,
 } = useSearchWebSocket();
 
+
 const { fetchQueryDataWithHttpStream } = useStreamingSearch();
 
 const searchPartitionMap = reactive<{ [key: string]: number }>({});
-const {
+let {
   searchObj,
   searchObjDebug,
   searchAggData,
@@ -145,7 +146,7 @@ const useLogs = () => {
   });
 
   const clearSearchObj = () => {
-    searchObj = reactive(Object.assign({}, JSON.parse(JSON.stringify(defaultObject))));
+    searchObj = reactive(Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_LOGS_CONFIG))));
   };
 
   /**
@@ -153,81 +154,81 @@ const useLogs = () => {
    * Dont do any other effects than initializing the logs state in this function, such as loading data, etc.
    * @returns Promise<boolean>,
    */
-  const initialLogsState = async () => {
-    // Dont do any other effects than initializing the logs state in this function, such as loading data, etc.
-    if (store.state.logs.isInitialized) {
-      try {
-        const state = store.getters["logs/getLogs"];
-        searchObj.organizationIdentifier = state.organizationIdentifier;
-        searchObj.config = JSON.parse(JSON.stringify(state.config));
-        searchObj.communicationMethod = state.communicationMethod;
-        await nextTick();
-        searchObj.meta = JSON.parse(JSON.stringify({
-          ...state.meta,
-          refreshInterval: 0,
-        }));
-        searchObj.data = JSON.parse(JSON.stringify({
-          ...JSON.parse(JSON.stringify(state.data)),
-          queryResults: {},
-          sortedQueryResults: [],
-          histogram: {
-            xData: [],
-            yData: [],
-            chartParams: {
-              title: "",
-              unparsed_x_data: [],
-              timezone: "",
-            },
-            errorMsg: "",
-            errorCode: 0,
-            errorDetail: "",
-          },
-        }));
-        await nextTick();
-        await getStreamList(false);
-        searchObj.data.queryResults = JSON.parse(JSON.stringify(state.data.queryResults));
-        searchObj.data.sortedQueryResults = JSON.parse(JSON.stringify(state.data.sortedQueryResults));
-        searchObj.data.histogram = JSON.parse(JSON.stringify(state.data.histogram));
-        updateGridColumns();
-        await nextTick();
-        // Dont do any other effects than initializing the logs state in this function, such as loading data, etc.
-      } catch (e: any) {
-        console.error("Error while initializing logs state", e?.message);
-        searchObj.organizationIdentifier = store.state?.selectedOrganization?.identifier;
-        resetSearchObj();
-      } finally {
-        return Promise.resolve(true);
-      }
-    }
-  }
+  // const initialLogsState = async () => {
+  //   // Dont do any other effects than initializing the logs state in this function, such as loading data, etc.
+  //   if (store.state.logs.isInitialized) {
+  //     try {
+  //       const state = store.getters["logs/getLogs"];
+  //       searchObj.organizationIdentifier = state.organizationIdentifier;
+  //       searchObj.config = JSON.parse(JSON.stringify(state.config));
+  //       searchObj.communicationMethod = state.communicationMethod;
+  //       await nextTick();
+  //       searchObj.meta = JSON.parse(JSON.stringify({
+  //         ...state.meta,
+  //         refreshInterval: 0,
+  //       }));
+  //       searchObj.data = JSON.parse(JSON.stringify({
+  //         ...JSON.parse(JSON.stringify(state.data)),
+  //         queryResults: {},
+  //         sortedQueryResults: [],
+  //         histogram: {
+  //           xData: [],
+  //           yData: [],
+  //           chartParams: {
+  //             title: "",
+  //             unparsed_x_data: [],
+  //             timezone: "",
+  //           },
+  //           errorMsg: "",
+  //           errorCode: 0,
+  //           errorDetail: "",
+  //         },
+  //       }));
+  //       await nextTick();
+  //       await getStreamList(false);
+  //       searchObj.data.queryResults = JSON.parse(JSON.stringify(state.data.queryResults));
+  //       searchObj.data.sortedQueryResults = JSON.parse(JSON.stringify(state.data.sortedQueryResults));
+  //       searchObj.data.histogram = JSON.parse(JSON.stringify(state.data.histogram));
+  //       updateGridColumns();
+  //       await nextTick();
+  //       // Dont do any other effects than initializing the logs state in this function, such as loading data, etc.
+  //     } catch (e: any) {
+  //       console.error("Error while initializing logs state", e?.message);
+  //       searchObj.organizationIdentifier = store.state?.selectedOrganization?.identifier;
+  //       resetSearchObj();
+  //     } finally {
+  //       return Promise.resolve(true);
+  //     }
+  //   }
+  // }
 
-  const resetSearchObj = () => {
-    // searchObj = reactive(Object.assign({}, defaultObject));
-    searchObj.data.errorMsg = "No stream found in selected organization!";
-    searchObj.data.stream.streamLists = [];
-    searchObj.data.stream.selectedStream = [];
-    searchObj.data.stream.selectedStreamFields = [];
-    searchObj.data.queryResults = {};
-    searchObj.data.sortedQueryResults = [];
-    searchObj.data.histogram = {
-      xData: [],
-      yData: [],
-      chartParams: {
-        title: "",
-        unparsed_x_data: [],
-        timezone: "",
-      },
-      errorCode: 0,
-      errorMsg: "",
-      errorDetail: "",
-    };
-    searchObj.data.tempFunctionContent = "";
-    searchObj.data.query = "";
-    searchObj.data.editorValue = "";
-    searchObj.meta.sqlMode = false;
-    searchObj.runQuery = false;
-    searchObj.data.savedViews = [];
-  };
+  // const resetSearchObj = () => {
+
+  //   searchObj.data.errorMsg = "No stream found in selected organization!";
+  //   searchObj.data.stream.streamLists = [];
+  //   searchObj.data.stream.selectedStream = [];
+  //   searchObj.data.stream.selectedStreamFields = [];
+  //   searchObj.data.queryResults = {};
+  //   searchObj.data.sortedQueryResults = [];
+  //   searchObj.data.histogram = {
+  //     xData: [],
+  //     yData: [],
+  //     chartParams: {
+  //       title: "",
+  //       unparsed_x_data: [],
+  //       timezone: "",
+  //     },
+  //     errorCode: 0,
+  //     errorMsg: "",
+  //     errorDetail: "",
+  //   };
+  //   searchObj.data.tempFunctionContent = "";
+  //   searchObj.data.query = "";
+  //   searchObj.data.editorValue = "";
+  //   searchObj.meta.sqlMode = false;
+  //   searchObj.runQuery = false;
+  //   searchObj.data.savedViews = [];
+  // };
 
   const updatedLocalLogFilterField = (): void => {
     const identifier: string = searchObj.organizationIdentifier || "default";
@@ -6946,7 +6947,6 @@ const useLogs = () => {
     searchObj,
     searchAggData,
     getStreams,
-    resetSearchObj,
     resetStreamData,
     updatedLocalLogFilterField,
     getFunctions,
