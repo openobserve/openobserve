@@ -253,6 +253,8 @@ import type { Ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 
+import { extractTimestamps } from "@/composables/useLogs/logsUtils";
+
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
@@ -287,7 +289,7 @@ export default defineComponent({
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const searchDateTimeRef = ref(null);
     const wrapText = ref(true);
-    const { searchObj, extractTimestamps } = useLogs();
+    const { searchObj } = useLogs();
     const dataToBeLoaded: any = ref([]);
     const dateTimeToBeSent = ref({
       valueType: "relative",
