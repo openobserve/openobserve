@@ -396,6 +396,7 @@ import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import useAiChat from "@/composables/useAiChat";
 import queryService from "@/services/search";
 import { fnParsedSQL, fnUnparsedSQL } from "@/composables/useLogs/logsUtils";
+import { resetSearchObj } from "@/composables/useLogs/searchState";
 
 export default defineComponent({
   name: "PageSearch",
@@ -561,7 +562,6 @@ export default defineComponent({
       restoreUrlQueryParams,
       handleRunQuery,
       generateHistogramData,
-      resetSearchObj,
       resetStreamData,
       getHistogramQueryData,
       generateHistogramSkeleton,
@@ -911,6 +911,9 @@ export default defineComponent({
           store.dispatch("logs/setIsInitialized", true);
         } else {
           await initialLogsState();
+          await getStreamList(false);
+          updateGridColumns();
+          await nextTick();
         }
 
         if (isCloudEnvironment()) {
@@ -2239,7 +2242,6 @@ export default defineComponent({
       redirectBackToLogs,
       handleRunQuery,
       refreshTimezone,
-      resetSearchObj,
       resetStreamData,
       getHistogramQueryData,
       generateHistogramSkeleton,
