@@ -109,7 +109,6 @@ impl TreeNodeRewriter for PlanRewriter {
             // Rewrite the filter datasource projection
             let mut add_fst_fields_to_projection = AddFstFieldsToProjection::new(
                 self.fields.iter().map(|f| f.0.clone()).collect(),
-                filter.projection().cloned(),
                 filter.schema(),
             );
             let input = filter
@@ -320,7 +319,6 @@ fn is_match_all_physical(expr: &Arc<dyn PhysicalExpr>) -> bool {
     }
 }
 
-// add fst fields to the projection
 struct AddFstFieldsToProjection {
     fields: Vec<String>,
     pub filter_projection: Option<Vec<usize>>,
@@ -328,14 +326,10 @@ struct AddFstFieldsToProjection {
 }
 
 impl AddFstFieldsToProjection {
-    pub fn new(
-        fields: Vec<String>,
-        filter_projection: Option<Vec<usize>>,
-        filter_schema: SchemaRef,
-    ) -> Self {
+    pub fn new(fields: Vec<String>, filter_schema: SchemaRef) -> Self {
         Self {
             fields,
-            filter_projection,
+            filter_projection: None,
             filter_schema,
         }
     }
@@ -344,9 +338,12 @@ impl AddFstFieldsToProjection {
 impl TreeNodeRewriter for AddFstFieldsToProjection {
     type Node = Arc<dyn ExecutionPlan>;
 
-    fn f_up(&mut self, expr: Self::Node) -> Result<Transformed<Self::Node>> {
-        if let Some(empty_exec) = expr.as_any().downcast_ref::<NewEmptyExec>() {
+    fn f_up(&mut self, plan: Self::Node) -> Result<Transformed<Self::Node>> {
+        if let Some(empty_exec) = plan.as_any().downcast_ref::<NewEmptyExec>() {
             let schema = empty_exec.full_schema();
+            // used for read field from parquet file, because match_all function do not include
+            // the field in argument, so when we rewrite match_all function, we need to add
+            // the field to the projection
             let mut parquet_projection = self
                 .fields
                 .iter()
@@ -358,25 +355,19 @@ impl TreeNodeRewriter for AddFstFieldsToProjection {
             parquet_projection.sort();
             parquet_projection.dedup();
 
-            let mut filter_projection = match self.filter_projection.as_ref() {
-                // if filter projection is not None, we should use it
-                Some(projection) => projection
-                    .iter()
-                    .filter_map(|i| parquet_projection.iter().position(|f| f == i))
-                    .collect::<Vec<_>>(),
-                // if filter projection is None, we should use filter schema as projection
-                None => self
-                    .filter_schema
-                    .fields()
-                    .iter()
-                    .map(|f| schema.index_of(f.name()).unwrap())
-                    .filter_map(|i| parquet_projection.iter().position(|f| *f == i))
-                    .collect::<Vec<_>>(),
-            };
+            // based on filter schema, create new filter projection
+            let mut filter_projection = self
+                .filter_schema
+                .fields()
+                .iter()
+                .map(|f| schema.index_of(f.name()).unwrap())
+                .filter_map(|i| parquet_projection.iter().position(|f| *f == i))
+                .collect::<Vec<_>>();
             filter_projection.sort();
             filter_projection.dedup();
             self.filter_projection = Some(filter_projection);
 
+            // create new NewEmptyExec with new projection
             let projected_schema = project_schema(&schema, Some(&parquet_projection))?;
             let new_empty_exec = NewEmptyExec::new(
                 empty_exec.name(),
@@ -394,7 +385,7 @@ impl TreeNodeRewriter for AddFstFieldsToProjection {
                 TreeNodeRecursion::Stop,
             ));
         }
-        Ok(Transformed::no(expr))
+        Ok(Transformed::no(plan))
     }
 }
 
