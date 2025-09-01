@@ -102,7 +102,6 @@ hashlink.workspace = true
 hashbrown.workspace = true
 hex.workspace = true
 http-auth-basic = "0.3"
-ipnetwork.workspace = true
 itertools.workspace = true
 jsonwebtoken = "9.3"
 log.workspace = true
@@ -142,7 +141,6 @@ snap.workspace = true
 sqlparser.workspace = true
 strum.workspace = true
 svix-ksuid.workspace = true
-syslog_loose = "0.21"
 thiserror.workspace = true
 time.workspace = true
 tikv-jemallocator = { version = "0.6", optional = true }
@@ -282,7 +280,6 @@ hashlink = "0.10"
 hashbrown = { version = "0.15", features = ["serde"] }
 hex = "0.4"
 indexmap = { version = "2.7", features = ["serde"] }
-ipnetwork = "0.20"
 itertools = "0.13"
 lettre = { version = "0.11", default-features = false, features = [
     "builder",

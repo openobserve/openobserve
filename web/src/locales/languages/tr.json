@@ -441,19 +441,6 @@
     "internalLabel": "Not: Toplayıcı O2 ile aynı kümeye kuruluysa bu seçeneği kullanın",
     "redirectionIngestionMsg": "Not: IAM dışındaki sayfalara erişmek için, veri alımının geçerli kuruluş içinde başlatılması gerekir."
   },
-  "syslog": {
-    "stream": "Akış",
-    "organization": "Organizasyon",
-    "subnets": "Alt ağlar",
-    "deleteRoute": "Rotayı Sil",
-    "syslog_addroute": "Rota Ekle",
-    "save": "Kaydet",
-    "cancel": "iptal",
-    "delete": "Sil",
-    "edit": "Düzenle",
-    "on": "Aç",
-    "off": "Kapat"
-  },
   "dashboard": {
     "selectField": "Tarla",
     "selectIndex": "Akış",
