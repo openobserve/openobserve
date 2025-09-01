@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="para">
             {{
               t("invitation.confirmAcceptMsg", {
-                org: selectedInvitation?.organization_name,
+                org: selectedInvitation?.org_name,
               })
             }}
           </div>
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="para">
             {{
               t("invitation.confirmRejectMsg", {
-                org: selectedInvitation?.organization_name,
+                org: selectedInvitation?.org_name,
               })
             }}
           </div>
