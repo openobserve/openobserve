@@ -576,11 +576,9 @@ async fn get_file_list_inner(
         "{}/files/{}/{}/{}/",
         wal_dir, query.org_id, query.stream_type, query.stream_name
     );
-    let files = if let Some((start_time, end_time)) = query
-        .time_range
-        .map(|(s, e)| DateTime::from_timestamp_micros(s).zip(DateTime::from_timestamp_micros(e)))
-        .flatten()
-    {
+    let files = if let Some((start_time, end_time)) = query.time_range.and_then(|(s, e)| {
+        DateTime::from_timestamp_micros(s).zip(DateTime::from_timestamp_micros(e))
+    }) {
         let skip_count = AsRef::<Path>::as_ref(&pattern).components().count();
         let extension_pattern = file_ext.to_string();
         let filter =

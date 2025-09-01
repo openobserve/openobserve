@@ -85,6 +85,30 @@ pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Err
     Ok(())
 }
 
+/// Creates a closure that filters file paths based on a datetime range extracted
+/// from the directory structure.
+///
+/// This function is designed to work with a directory hierarchy where dates are
+/// embedded in the path, such as `/base/path/YYYY/MM/DD/HH/`. It constructs
+/// a filter that checks if the date derived from a path falls within the
+/// specified `start_time` and `end_time`.
+///
+/// The filter also ensures that if the path points to a file, its extension
+/// matches the provided `extension_pattern`.
+///
+/// # Arguments
+///
+/// * `start_time` - The inclusive start of the datetime range for the filter.
+/// * `end_time` - The inclusive end of the datetime range for the filter.
+/// * `extension_pattern` - The file extension to match (e.g., "json").
+/// * `skip_count` - The number of initial path components to skip before starting to parse the date
+///   parts (year, month, etc.).
+///
+/// # Returns
+///
+/// A closure that takes a `PathBuf` and returns `true` if the path matches the
+/// criteria, and `false` otherwise. This closure is `Send`, `Clone`, and
+/// `'static`.
 pub fn wal_dir_datetime_filter_builder(
     start_time: DateTime<Utc>,
     end_time: DateTime<Utc>,
@@ -100,23 +124,19 @@ pub fn wal_dir_datetime_filter_builder(
 
         let year = components
             .next()
-            .map(|c| c.parse::<i32>().ok())
-            .flatten()
+            .and_then(|c| c.parse::<i32>().ok())
             .unwrap_or_default();
         let month = components
             .next()
-            .map(|c| c.parse::<u32>().ok())
-            .flatten()
+            .and_then(|c| c.parse::<u32>().ok())
             .unwrap_or(start_time.month());
         let day = components
             .next()
-            .map(|c| c.parse::<u32>().ok())
-            .flatten()
+            .and_then(|c| c.parse::<u32>().ok())
             .unwrap_or(start_time.day());
         let hour = components
             .next()
-            .map(|c| c.parse::<u32>().ok())
-            .flatten()
+            .and_then(|c| c.parse::<u32>().ok())
             .unwrap_or(start_time.hour());
 
         let date_range_check = if 0 == year {
@@ -133,12 +153,40 @@ pub fn wal_dir_datetime_filter_builder(
             && (!path.is_file()
                 || path
                     .extension()
-                    .map(|extension| extension.to_str().map(|s| s == extension_pattern))
-                    .flatten()
+                    .and_then(|extension| extension.to_str().map(|s| s == extension_pattern))
                     .unwrap_or_default())
     }
 }
 
+/// Asynchronously scans a directory tree and returns a vector of canonicalized file paths
+/// that match a given filter.
+///
+/// This function walks the directory starting from `root`, applying a filter to each
+/// entry. It uses `async_walkdir` for efficient, non-blocking directory traversal.
+/// The filter logic determines whether to continue the walk, ignore a directory,
+/// or ignore a file.
+///
+/// For entries that pass the filter and are files, their paths are canonicalized
+/// to produce absolute paths.
+///
+/// # Type Parameters
+///
+/// * `P` - A type that can be referenced as a `Path`, e.g., `&str` or `PathBuf`.
+/// * `F` - A closure that takes a `PathBuf` and returns a boolean.
+///
+/// # Arguments
+///
+/// * `root` - The path to the root directory to start the scan from.
+/// * `filter` - An asynchronous closure that is called for each entry in the directory. It should
+///   return `true` to keep an entry or `false` to discard it. If a directory is discarded, its
+///   contents will not be visited.
+/// * `limit` - An optional `usize` to limit the number of file paths collected.
+///
+/// # Returns
+///
+/// A `Result` containing either:
+/// - `Ok(Vec<String>)`: A vector of canonicalized file path strings.
+/// - `Err(std::io::Error)`: An I/O error that occurred during scanning.
 pub async fn scan_files_filtered<P, F>(
     root: P,
     filter: F,
@@ -149,6 +197,10 @@ where
     F: Fn(PathBuf) -> bool + Send + Clone + 'static,
 {
     let walker = WalkDir::new(root).filter(move |entry| {
+        // Interestingly, entry.path(), although a PathBuf itself, won't move into async block as
+        // expected. By the time the async block starts running, it becomes garbled. I
+        // suppose, the PathBuf stack struct gets reused. So the fix for this is to clone()
+        // - which goes against my understanding of Rust!
         let path = entry.path().clone();
         let filter = filter.clone();
         async move {
@@ -164,19 +216,17 @@ where
     });
 
     let walker = walker.filter_map(|item| async {
-        item.ok()
-            .map(|dir_entry| {
-                let pb = dir_entry.path();
+        item.ok().and_then(|dir_entry| {
+            let pb = dir_entry.path();
 
-                if !pb.is_file() {
-                    None
-                } else {
-                    pb.canonicalize()
-                        .ok()
-                        .and_then(|cpath| cpath.to_str().map(String::from))
-                }
-            })
-            .flatten()
+            if !pb.is_file() {
+                None
+            } else {
+                pb.canonicalize()
+                    .ok()
+                    .and_then(|cpath| cpath.to_str().map(String::from))
+            }
+        })
     });
 
     let files = if let Some(limit_count) = limit {
