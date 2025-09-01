@@ -1486,6 +1486,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
+import { fnParsedSQL, fnUnparsedSQL } from "@/composables/useLogs/logsUtils";
 
 const defaultValue: any = () => {
   return {
@@ -1652,8 +1653,6 @@ export default defineComponent({
       buildSearch,
       resetStreamData,
       loadStreamLists,
-      fnParsedSQL,
-      fnUnparsedSQL,
       onStreamChange,
       moveItemsToTop,
       validateFilterForMultiStream,
