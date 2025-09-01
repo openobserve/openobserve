@@ -99,10 +99,82 @@ export function useReo() {
     });
   };
 
+  const getPageTitle = (routeName: string) => {
+    const routeTitles: { [key: string]: string } = {
+      home: 'OpenObserve - Home',
+      logs: 'OpenObserve - Logs',
+      metrics: 'OpenObserve - Metrics', 
+      traces: 'OpenObserve - Traces',
+      traceDetails: 'OpenObserve - Trace Details',
+      logstreams: 'OpenObserve - Streams',
+      streamExplorer: 'OpenObserve - Stream Explorer',
+      dashboards: 'OpenObserve - Dashboards',
+      viewDashboard: 'OpenObserve - View Dashboard',
+      importDashboard: 'OpenObserve - Import Dashboard',
+      addPanel: 'OpenObserve - Add Panel',
+      alertList: 'OpenObserve - Alerts',
+      functionList: 'OpenObserve - Functions',
+      enrichmentTables: 'OpenObserve - Enrichment Tables',
+      pipelines: 'OpenObserve - Pipelines',
+      pipelineEditor: 'OpenObserve - Pipeline Editor',
+      createPipeline: 'OpenObserve - Create Pipeline',
+      importPipeline: 'OpenObserve - Import Pipeline',
+      RUM: 'OpenObserve - Real User Monitoring',
+      Sessions: 'OpenObserve - RUM Sessions',
+      SessionViewer: 'OpenObserve - Session Viewer',
+      ErrorTracking: 'OpenObserve - RUM Errors',
+      ErrorViewer: 'OpenObserve - Error Viewer',
+      RumPerformance: 'OpenObserve - RUM Performance',
+      reports: 'OpenObserve - Reports',
+      createReport: 'OpenObserve - Create Report',
+      about: 'OpenObserve - About'
+    };
+
+    return routeTitles[routeName] || `OpenObserve - ${routeName || 'Page'}`;
+  };
+
+  let lastTrackedPath = '';
+  
+  const setupRouterTracking = (router: any) => {
+    if (!router) return;
+    
+    router.afterEach((to: any) => {
+      if (enableAnalytics && reoInstance) {
+        // Prevent duplicate tracking for the same path
+        if (to.fullPath === lastTrackedPath) {
+          return;
+        }
+        
+        lastTrackedPath = to.fullPath;
+        
+        // Generate page title based on route name, but don't set it
+        // (let the natural page title changes happen)
+        const pageTitle = getPageTitle(to.name);
+        
+        track("Page View", {
+          page: to.fullPath,
+          pageTitle: pageTitle,
+          referrer: document.referrer || window.location.href
+        });
+      }
+    });
+  };
+
+  const setupPageTitles = (router: any) => {
+    if (!router) return;
+    
+    router.afterEach((to: any) => {
+      const pageTitle = getPageTitle(to.name);
+      document.title = pageTitle;
+    });
+  };
+
   return {
     reoInit,
     identify,
     track,
+    setupRouterTracking,
+    setupPageTitles,
     isLoaded,
   };
 }

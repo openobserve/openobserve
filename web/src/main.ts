@@ -49,9 +49,12 @@ app
 // const router = createRouter(store);
 app.use(store).use(router);
 
-const { reoInit } = useReo();
+const { reoInit, setupPageTitles } = useReo();
 
 reoInit();
+
+// Setup dynamic page titles for better analytics tracking
+setupPageTitles(router);
 
 
 // app.use(SearchPlugin);
