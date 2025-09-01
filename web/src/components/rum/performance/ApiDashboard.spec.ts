@@ -82,6 +82,14 @@ vi.mock("vue-i18n", () => ({
   })
 }));
 
+// Mock console methods
+global.console = {
+  ...console,
+  error: vi.fn(),
+  warn: vi.fn(),
+  log: vi.fn()
+};
+
 // i18n is handled by mock
 
 describe("ApiDashboard", () => {
@@ -179,24 +187,12 @@ describe("ApiDashboard", () => {
 
   describe("Component Initialization", () => {
     it("should render component with default props", () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.vm).toBeTruthy();
-      
-      consoleWarnSpy.mockRestore();
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
 
     it("should initialize with correct default props", () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       wrapper = createWrapper();
       expect(wrapper.vm.$props.dateTime).toEqual({
         startTime: 1234567890,
@@ -208,17 +204,9 @@ describe("ApiDashboard", () => {
         startTime: 1234567890,
         endTime: 1234568000
       });
-      
-      consoleWarnSpy.mockRestore();
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
 
     it("should accept custom props", () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       const customProps = {
         dateTime: {
           startTime: 1609459200,
@@ -235,17 +223,9 @@ describe("ApiDashboard", () => {
       wrapper = createWrapper(customProps);
       expect(wrapper.vm.$props.dateTime).toEqual(customProps.dateTime);
       expect(wrapper.vm.$props.selectedDate).toEqual(customProps.selectedDate);
-      
-      consoleWarnSpy.mockRestore();
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
 
     it("should initialize reactive data correctly", () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       wrapper = createWrapper();
       expect(wrapper.vm.currentDashboardData).toBeTruthy();
       expect(wrapper.vm.currentDashboardData.data).toBeDefined();
@@ -254,10 +234,6 @@ describe("ApiDashboard", () => {
       expect(wrapper.vm.eventLog).toEqual([]);
       expect(wrapper.vm.refreshInterval).toBe(0);
       expect(wrapper.vm.variablesData.value).toEqual({ isVariablesLoading: false, values: [] });
-      
-      consoleWarnSpy.mockRestore();
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -332,9 +308,6 @@ describe("ApiDashboard", () => {
     });
 
     it("should handle dashboard schema conversion", async () => {
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       const convertModule = await import("@/utils/dashboard/convertDashboardSchemaVersion");
       const mockConvert = vi.mocked(convertModule.convertDashboardSchemaVersion);
       
@@ -347,15 +320,9 @@ describe("ApiDashboard", () => {
       
       expect(mockConvert).toHaveBeenCalled();
       expect(wrapper.vm.currentDashboardData.data).toBeTruthy();
-      
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
 
     it("should initialize variables data when no variables exist", async () => {
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       // Test the scenario where loadDashboard initializes variablesData when no variables exist
       // First ensure variablesData.value exists
       if (!wrapper.vm.variablesData.value) {
@@ -379,15 +346,9 @@ describe("ApiDashboard", () => {
       // Verify the initialization happened
       expect(wrapper.vm.variablesData.value.isVariablesLoading).toBe(false);
       expect(wrapper.vm.variablesData.value.values).toEqual([]);
-      
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
 
     it("should not modify variables data when variables exist", async () => {
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       // Ensure variablesData.value exists before setting
       if (!wrapper.vm.variablesData.value) {
         wrapper.vm.variablesData.value = { isVariablesLoading: true, values: ["existing"] };
@@ -406,9 +367,6 @@ describe("ApiDashboard", () => {
       
       // When variables exist with length > 0, variablesData should not be modified
       expect(wrapper.vm.variablesData.value).toEqual({ isVariablesLoading: true, values: ["existing"] });
-      
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -441,9 +399,6 @@ describe("ApiDashboard", () => {
     });
 
     it("should handle variables data updates", () => {
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       // Test that variablesData can be updated
       const newData = { isVariablesLoading: true, values: [{ variable1: "value1", variable2: "value2" }] };
       
@@ -454,15 +409,9 @@ describe("ApiDashboard", () => {
       wrapper.vm.variablesData.value = newData;
       
       expect(wrapper.vm.variablesData.value).toEqual(newData);
-      
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
 
     it("should maintain variables data structure", () => {
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       const testData = { isVariablesLoading: false, values: [] };
       
       // Ensure variablesData.value exists before setting
@@ -476,15 +425,9 @@ describe("ApiDashboard", () => {
       expect(wrapper.vm.variablesData.value).toHaveProperty('values');
       expect(wrapper.vm.variablesData.value.isVariablesLoading).toBe(false);
       expect(wrapper.vm.variablesData.value.values).toEqual([]);
-      
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
 
     it("should handle RenderDashboardCharts variablesData event", async () => {
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       const renderComponent = wrapper.findComponent({ name: "RenderDashboardCharts" });
       const newVariablesData = { isVariablesLoading: true, values: [{ testVariable: "testValue" }] };
       
@@ -494,9 +437,6 @@ describe("ApiDashboard", () => {
       // Verify the component still exists and functions
       expect(renderComponent.exists()).toBe(true);
       expect(wrapper.exists()).toBe(true);
-      
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -543,10 +483,6 @@ describe("ApiDashboard", () => {
     });
 
     it("should handle prop changes", async () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       const newSelectedDate = {
         startTime: 1234567999,
         endTime: 1234568999
@@ -556,26 +492,14 @@ describe("ApiDashboard", () => {
       await nextTick();
       
       expect(wrapper.props('selectedDate')).toEqual(newSelectedDate);
-      
-      consoleWarnSpy.mockRestore();
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
 
     it("should maintain component state on prop changes", async () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       await wrapper.setProps({ selectedDate: defaultProps.selectedDate });
       await nextTick();
       
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.vm).toBeTruthy();
-      
-      consoleWarnSpy.mockRestore();
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -606,42 +530,18 @@ describe("ApiDashboard", () => {
 
   describe("Props Validation", () => {
     it("should handle empty dateTime prop", () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       wrapper = createWrapper({ dateTime: {} });
       expect(wrapper.vm.$props.dateTime).toEqual({});
-      
-      consoleWarnSpy.mockRestore();
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
 
     it("should handle empty selectedDate prop", () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       wrapper = createWrapper({ selectedDate: {} });
       expect(wrapper.vm.$props.selectedDate).toEqual({});
-      
-      consoleWarnSpy.mockRestore();
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
 
     it("should handle undefined props gracefully", () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       wrapper = createWrapper({ dateTime: undefined, selectedDate: undefined });
       expect(wrapper.exists()).toBe(true);
-      
-      consoleWarnSpy.mockRestore();
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -692,18 +592,12 @@ describe("ApiDashboard", () => {
     });
 
     it("should handle search service errors gracefully", async () => {
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
       const searchModule = await import("@/services/search");
       const mockSearchService = vi.mocked(searchModule.default);
       mockSearchService.search.mockRejectedValue(new Error("API Error"));
       
       // The component should not crash when search fails
       expect(wrapper.exists()).toBe(true);
-      
-      consoleLogSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
   });
 });

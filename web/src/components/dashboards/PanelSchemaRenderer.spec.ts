@@ -161,6 +161,14 @@ vi.mock("@/components/common/LoadingProgress.vue", () => ({
   },
 }));
 
+// Mock console methods
+global.console = {
+  ...console,
+  error: vi.fn(),
+  warn: vi.fn(),
+  log: vi.fn()
+};
+
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
