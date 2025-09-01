@@ -429,7 +429,6 @@ pub struct Config {
     pub nats: Nats,
     pub s3: S3,
     pub sns: Sns,
-    pub tcp: TCP,
     pub prom: Prometheus,
     pub profiling: Profiling,
     pub smtp: Smtp,
@@ -644,22 +643,6 @@ pub struct Grpc {
     pub tls_cert_path: String,
     #[env_config(name = "ZO_GRPC_TLS_KEY_PATH", default = "")]
     pub tls_key_path: String,
-}
-
-#[derive(EnvConfig, Default)]
-pub struct TCP {
-    #[env_config(name = "ZO_TCP_PORT", default = 5514)]
-    pub tcp_port: u16,
-    #[env_config(name = "ZO_UDP_PORT", default = 5514)]
-    pub udp_port: u16,
-    #[env_config(name = "ZO_TCP_TLS_ENABLED", default = false)]
-    pub tcp_tls_enabled: bool,
-    #[env_config(name = "ZO_TCP_TLS_CERT_PATH", default = "")]
-    pub tcp_tls_cert_path: String,
-    #[env_config(name = "ZO_TCP_TLS_KEY_PATH", default = "")]
-    pub tcp_tls_key_path: String,
-    #[env_config(name = "ZO_TCP_TLS_CA_CERT_PATH", default = "")]
-    pub tcp_tls_ca_cert_path: String,
 }
 
 #[derive(PartialEq, Default)]
@@ -2056,10 +2039,6 @@ pub fn init() -> Config {
         panic!("common config error: {e}")
     }
 
-    if let Err(e) = check_tcp_tls_config(&mut cfg) {
-        panic!("syslog config error: {e}")
-    }
-
     // check data path config
     if let Err(e) = check_path_config(&mut cfg) {
         panic!("data path config error: {e}");
@@ -2891,19 +2870,6 @@ fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
                 return Err(anyhow::anyhow!("invalid master encryption key: {e}"));
             }
         }
-    }
-    Ok(())
-}
-
-fn check_tcp_tls_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.tcp.tcp_tls_enabled
-        && (cfg.tcp.tcp_tls_cert_path.is_empty()
-            || cfg.tcp.tcp_tls_key_path.is_empty()
-            || cfg.tcp.tcp_tls_ca_cert_path.is_empty())
-    {
-        return Err(anyhow::anyhow!(
-            "ZO_TCP_TLS_CERT_PATH, ZO_TCP_TLS_KEY_PATH and ZO_TCP_TLS_CA_CERT_PATH must be set when ZO_TCP_TLS_ENABLED is true"
-        ));
     }
     Ok(())
 }
