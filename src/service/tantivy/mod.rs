@@ -67,8 +67,10 @@ pub(crate) async fn create_tantivy_index(
         return Ok(0);
     };
 
-    if get_config().cache_latest_files.cache_index
-        && get_config().cache_latest_files.download_from_node
+    let cfg = get_config();
+    if cfg.cache_latest_files.enabled
+        && cfg.cache_latest_files.cache_index
+        && cfg.cache_latest_files.download_from_node
     {
         infra::cache::file_data::disk::set(
             TRACE_ID_FOR_CACHE_LATEST_FILE,
