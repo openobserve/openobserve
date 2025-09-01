@@ -441,19 +441,6 @@
     "internalLabel": "Nota: usa questa opzione, se il collector è installato nello stesso cluster di O2",
     "redirectionIngestionMsg": "Nota: per accedere a pagine diverse da IAM, l'inserimento dei dati deve essere avviato all'interno dell'organizzazione corrente."
   },
-  "syslog": {
-    "stream": "Streaming",
-    "organization": "Organizzazione",
-    "subnets": "Sottoreti",
-    "deleteRoute": "Elimina percorso",
-    "syslog_addroute": "Aggiungi percorso",
-    "save": "Salva",
-    "cancel": "annullare",
-    "delete": "Elimina",
-    "edit": "Modifica",
-    "on": "Attiva",
-    "off": "Spegnere"
-  },
   "dashboard": {
     "selectField": "Campo",
     "selectIndex": "Streaming",
