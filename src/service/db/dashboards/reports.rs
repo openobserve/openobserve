@@ -268,3 +268,50 @@ mod super_cluster {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::dashboards::reports::{
+        Report, ReportDashboard, ReportDestination, ReportFrequency, ReportFrequencyType,
+        ReportMediaType, ReportTimerange,
+    };
+
+    fn create_test_report() -> Report {
+        Report {
+            name: "test_report".to_string(),
+            org_id: "test_org".to_string(),
+            title: "Test Report".to_string(),
+            description: "Test description".to_string(),
+            dashboards: vec![ReportDashboard {
+                dashboard: "test_dashboard".to_string(),
+                folder: "default".to_string(),
+                tabs: vec![],
+                variables: vec![],
+                timerange: ReportTimerange::default(),
+            }],
+            destinations: vec![ReportDestination::Email("test@example.com".to_string())],
+            frequency: ReportFrequency::default(),
+            enabled: true,
+            start: chrono::Utc::now().timestamp_micros(),
+            message: "Test message".to_string(),
+            media_type: ReportMediaType::Pdf,
+            timezone: "UTC".to_string(),
+            tz_offset: 0,
+            created_at: config::meta::dashboards::datetime_now(),
+            updated_at: None,
+            owner: "test_owner".to_string(),
+            last_edited_by: "test_editor".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_report_creation() {
+        let report = create_test_report();
+        assert_eq!(report.name, "test_report");
+        assert_eq!(report.org_id, "test_org");
+        assert_eq!(report.title, "Test Report");
+        assert!(report.enabled);
+        assert_eq!(report.destinations.len(), 1);
+        assert_eq!(report.frequency.frequency_type, ReportFrequencyType::Weeks);
+    }
+}
