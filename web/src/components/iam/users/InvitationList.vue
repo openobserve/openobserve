@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="qTable"
       :rows="invitations"
       :columns="columns"
-      row-key="id"
+      row-key="token"
       :pagination="pagination"
       class="o2-quasar-table"
       :class="
