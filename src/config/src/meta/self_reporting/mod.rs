@@ -458,7 +458,7 @@ mod tests {
         assert!(!runner.should_process());
 
         // Wait for timeout
-        tokio::time::sleep(Duration::from_millis(150));
+        std::thread::sleep(Duration::from_millis(150));
 
         // Should process after timeout
         assert!(runner.should_process());
