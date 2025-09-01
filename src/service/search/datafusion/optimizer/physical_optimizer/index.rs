@@ -69,7 +69,7 @@ impl PhysicalOptimizerRule for IndexRule {
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let cfg = config::get_config();
-        if !cfg.common.inverted_index_enabled || cfg.common.feature_query_without_index {
+        if !cfg.common.inverted_index_enabled {
             return Ok(plan);
         }
         let mut rewriter =

@@ -786,8 +786,6 @@ pub struct Common {
     pub feature_query_infer_schema: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
     pub feature_query_exclude_all: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_WITHOUT_INDEX", default = false)]
-    pub feature_query_without_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
     pub feature_query_remove_filter_with_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]

@@ -190,7 +190,6 @@ pub async fn search(
         work_group: work_group.clone(),
         use_inverted_index: index_condition.is_some()
             && cfg.common.inverted_index_enabled
-            && !cfg.common.feature_query_without_index
             && !index_condition.as_ref().unwrap().is_condition_all(),
     });
 
