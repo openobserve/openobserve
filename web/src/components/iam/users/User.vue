@@ -218,6 +218,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
 import { getRoles } from "@/services/iam";
+import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -240,6 +241,7 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
+    const { track } = useReo();
     const resultTotal = ref<number>(0);
     const showUpdateUserDialog: any = ref(false);
     const showAddUserDialog: any = ref(false);
@@ -616,6 +618,10 @@ export default defineComponent({
           true,
         );
       } else {
+        track("Button Click", {
+          button: "Add User",
+          page: "Users"
+        });
         addUser({}, false);
         router.push({
           name: "users",

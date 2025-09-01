@@ -667,6 +667,7 @@ import {
   verifyOrganizationStatus,
 } from "@/utils/zincutils";
 import { getFoldersListByType } from "@/utils/commons";
+import { useReo } from "@/services/reodotdev_analytics";
 import type { Alert, AlertListItem } from "@/ts/interfaces/index";
 import {
   outlinedDelete,
@@ -709,6 +710,7 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const router = useRouter();
+    const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});
     const toBeClonedAlert: Ref<any> = ref({});
     const showAddAlertDialog: any = ref(false);
@@ -1375,6 +1377,10 @@ export default defineComponent({
         if (!props.row) {
         isUpdated.value = false;
         action = "Add Alert";
+        track("Button Click", {
+          button: "Add Alert",
+          page: "Alerts"
+        });
         await router.push({
           name: "alertList",
           query: {
