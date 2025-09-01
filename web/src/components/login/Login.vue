@@ -296,13 +296,7 @@ export default defineComponent({
                 //we need to call the identify function from reo.dev
                 await identify({
                   username: name.value,
-                  type: "email",
-                  other_identities:[
-                    {
-                      type: "sso",
-                      username: name.value,
-                    }
-                  ]
+                  type: "email"
                 });
                 //set user info into localstorage & store
                 useLocalUserInfo(encodedUserInfo);
