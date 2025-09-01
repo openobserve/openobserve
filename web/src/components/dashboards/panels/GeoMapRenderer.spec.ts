@@ -119,6 +119,14 @@ vi.mock("vuex", () => ({
   }),
 }));
 
+// Mock console methods
+global.console = {
+  ...console,
+  error: vi.fn(),
+  warn: vi.fn(),
+  log: vi.fn()
+};
+
 // Mock window resize with callback tracking
 let windowResizeCallback: Function | null = null;
 let addEventListenerSpy: any;
