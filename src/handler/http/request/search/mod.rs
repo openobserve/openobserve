@@ -281,6 +281,7 @@ pub async fn search(
         req.query.sql = sql;
     };
     req.use_cache = use_cache;
+    req.is_refresh_cache = is_refresh_cache;
 
     // get stream name
     let stream_names = match resolve_stream_names(&req.query.sql) {
