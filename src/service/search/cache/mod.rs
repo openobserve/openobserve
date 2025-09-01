@@ -265,6 +265,7 @@ pub async fn search(
             req.query.end_time
         );
 
+        // do search
         let mut tasks = Vec::new();
         let partition_num = c_resp.deltas.len();
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
@@ -337,7 +338,6 @@ pub async fn search(
         }
     };
 
-    // do search
     let took_time = start.elapsed().as_secs_f64();
     log::info!(
         "{}",
