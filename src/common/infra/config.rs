@@ -36,12 +36,10 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc;
 use vector_enrichment::TableRegistry;
 
-#[allow(deprecated)]
 use crate::{
     common::meta::{
         maxmind::MaxmindClient,
         organization::{Organization, OrganizationSetting},
-        syslog::SyslogRoute,
     },
     service::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
@@ -75,9 +73,6 @@ pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, db_scheduler::Trigge
     Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, Template>> = Lazy::new(Default::default);
 pub static DESTINATIONS: Lazy<RwHashMap<String, Destination>> = Lazy::new(Default::default);
-#[allow(deprecated)]
-pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(Default::default);
-pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
 pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(Default::default);
 pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
@@ -234,10 +229,6 @@ mod tests {
         let users_rum_token = USERS_RUM_TOKEN.clone();
         assert_eq!(users_rum_token.len(), 0);
 
-        // Test syslog enabled flag
-        let syslog_enabled = SYSLOG_ENABLED.clone();
-        assert!(!*syslog_enabled.read());
-
         // Test enrichment registry
         let registry = ENRICHMENT_REGISTRY.clone();
         assert!(!std::ptr::eq(registry.as_ref(), std::ptr::null()));
@@ -376,22 +367,6 @@ mod tests {
             let read_guard = ent_table.read();
             assert!(read_guard.is_none());
         }
-    }
-
-    #[test]
-    fn test_syslog_enabled() {
-        let syslog_enabled = SYSLOG_ENABLED.clone();
-
-        // Test initial state
-        assert!(!*syslog_enabled.read());
-
-        // Test write access
-        *syslog_enabled.write() = true;
-        assert!(*syslog_enabled.read());
-
-        // Reset to original state
-        *syslog_enabled.write() = false;
-        assert!(!*syslog_enabled.read());
     }
 
     #[test]

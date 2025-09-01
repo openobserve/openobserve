@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom xmlns="http://cyclonedx.org/schema/bom/1.3" serialNumber="urn:uuid:2ae312bd-f864-4254-a96b-117f13a911b1" version="1">
+<bom xmlns="http://cyclonedx.org/schema/bom/1.3" serialNumber="urn:uuid:2945ac2d-6aab-4267-9c02-43e70b19f253" version="1">
   <metadata>
-    <timestamp>2025-09-01T05:40:24.268857000Z</timestamp>
+    <timestamp>2025-09-01T05:40:24.293049000Z</timestamp>
     <tools>
       <tool>
         <vendor>CycloneDX</vendor>
@@ -9,19 +9,19 @@
         <version>0.5.7</version>
       </tool>
     </tools>
-    <component type="library" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/wal#0.1.0">
-      <name>wal</name>
+    <component type="library" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/flight#0.1.0">
+      <name>flight</name>
       <version>0.1.0</version>
       <scope>required</scope>
       <licenses>
         <expression>AGPL-3.0</expression>
       </licenses>
-      <purl>pkg:cargo/wal@0.1.0?download_url=file://.</purl>
+      <purl>pkg:cargo/flight@0.1.0?download_url=file://.</purl>
       <components>
-        <component type="library" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/wal#0.1.0 bin-target-0">
-          <name>wal</name>
+        <component type="library" bom-ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/flight#0.1.0 bin-target-0">
+          <name>flight</name>
           <version>0.1.0</version>
-          <purl>pkg:cargo/wal@0.1.0?download_url=file://.#src/lib.rs</purl>
+          <purl>pkg:cargo/flight@0.1.0?download_url=file://.#src/lib.rs</purl>
         </component>
       </components>
     </component>
@@ -758,6 +758,28 @@
         <expression>Apache-2.0</expression>
       </licenses>
       <purl>pkg:cargo/arrow-data@55.2.0</purl>
+      <externalReferences>
+        <reference type="website">
+          <url>https://github.com/apache/arrow-rs</url>
+        </reference>
+        <reference type="vcs">
+          <url>https://github.com/apache/arrow-rs</url>
+        </reference>
+      </externalReferences>
+    </component>
+    <component type="library" bom-ref="registry+https://github.com/rust-lang/crates.io-index#arrow-flight@55.2.0">
+      <author>Apache Arrow &lt;dev@arrow.apache.org&gt;</author>
+      <name>arrow-flight</name>
+      <version>55.2.0</version>
+      <description>Apache Arrow Flight</description>
+      <scope>required</scope>
+      <hashes>
+        <hash alg="SHA-256">5cb3e1d2b441e6d1d5988e3f7c4523c9466b18ef77d7c525d92d36d4cad49fbe</hash>
+      </hashes>
+      <licenses>
+        <expression>Apache-2.0</expression>
+      </licenses>
+      <purl>pkg:cargo/arrow-flight@55.2.0</purl>
       <externalReferences>
         <reference type="website">
           <url>https://github.com/apache/arrow-rs</url>
@@ -15927,6 +15949,21 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#utoipa@4.2.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#vrl@0.22.0" />
     </dependency>
+    <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/flight#0.1.0">
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow@55.2.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-flight@55.2.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-schema@55.2.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.10.0" />
+      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/config#0.1.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#datafusion@49.0.2" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#flatbuffers@25.2.10" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures@0.3.31" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#parking_lot@0.12.3" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde@1.0.219" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.142" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tokio@1.46.1" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic@0.12.3" />
+    </dependency>
     <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/proto#0.1.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#async-trait@0.1.88" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#datafusion@49.0.2" />
@@ -15939,17 +15976,6 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tokio@1.46.1" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic@0.12.3" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic-build@0.11.0" />
-    </dependency>
-    <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/wal#0.1.0">
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#byteorder@1.5.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.10.0" />
-      <dependency ref="path+file:///Users/hengfeiyang/code/rust/github.com/openobserve/openobserve/src/config#0.1.0" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#crc32fast@1.4.2" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#log@0.4.22" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#parking_lot@0.12.3" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#snafu@0.7.5" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#snap@1.1.1" />
-      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tempfile@3.14.0" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#adler2@2.0.0" />
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#aead@0.5.2">
@@ -16073,6 +16099,19 @@
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-schema@55.2.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#half@2.6.0" />
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#num@0.4.3" />
+    </dependency>
+    <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-flight@55.2.0">
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-array@55.2.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-buffer@55.2.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-cast@55.2.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-ipc@55.2.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-schema@55.2.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#bytes@1.10.0" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#futures@0.3.31" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost@0.13.4" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#prost-types@0.13.4" />
+      <dependency ref="registry+https://github.com/rust-lang/crates.io-index#tonic@0.12.3" />
     </dependency>
     <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-ipc@55.2.0">
       <dependency ref="registry+https://github.com/rust-lang/crates.io-index#arrow-array@55.2.0" />

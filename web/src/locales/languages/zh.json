@@ -441,19 +441,6 @@
     "internalLabel": "注意：如果收集器与 O2 安装在同一个集群中，则使用此选项",
     "redirectionIngestionMsg": "注意：要访问除 IAM 以外的页面，必须在当前组织内启动数据摄取。"
   },
-  "syslog": {
-    "stream": "数据流",
-    "organization": "组织",
-    "subnets": "子网",
-    "deleteRoute": "删除规则",
-    "syslog_addroute": "添加规则",
-    "save": "保存",
-    "cancel": "取消",
-    "delete": "删除",
-    "edit": "编辑",
-    "on": "开启",
-    "off": "关闭"
-  },
   "dashboard": {
     "selectField": "字段",
     "selectIndex": "数据流",

@@ -270,10 +270,6 @@ mod tests {
         e2e_handle_derived_stream_evaluation_failure().await;
         e2e_cleanup_test_pipeline().await;
 
-        // syslog
-        e2e_post_syslog_route().await;
-        e2e_list_syslog_routes().await;
-
         // others
         e2e_health_check().await;
         e2e_config().await;
@@ -2436,59 +2432,6 @@ mod tests {
         .await;
         let req = test::TestRequest::get()
             .uri("/config")
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-    }
-
-    async fn e2e_post_syslog_route() {
-        let auth = setup();
-        let body_str = r#"{
-                                "orgId": "acceptLogs",
-                                "streamName":"syslog",
-                                "subnets": [
-                                            "192.168.0.0/16",
-                                            "127.0.0.0/8",
-                                            "172.16.0.0/12"
-                                        ]
-                            }"#;
-
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/syslog-routes", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-    }
-
-    async fn e2e_list_syslog_routes() {
-        let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/syslog-routes", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();

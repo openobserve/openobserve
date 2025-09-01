@@ -565,19 +565,6 @@
     "iis": "IIS",
     "pubsub": "Pub/Subログ"
   },
-  "syslog": {
-    "stream": "ストリーム",
-    "organization": "組織",
-    "subnets": "サブネット",
-    "deleteRoute": "ルートを削除",
-    "syslog_addroute": "ルートを追加",
-    "save": "保存",
-    "cancel": "キャンセル",
-    "delete": "削除",
-    "edit": "編集",
-    "on": "オンにする",
-    "off": "オフにする"
-  },
   "dashboard": {
     "selectField": "フィールド",
     "selectIndex": "ストリーム",
