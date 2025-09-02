@@ -94,8 +94,8 @@ describe("SearchBar", () => {
               { name: "service_name", type: "Utf8" },
             ],
           });
-        }
-      )
+        },
+      ),
     );
 
     mockSearchObj = {
@@ -258,17 +258,23 @@ describe("SearchBar", () => {
     });
 
     it("should render syntax guide component", () => {
-      const syntaxGuide = wrapper.find('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
+      const syntaxGuide = wrapper.find(
+        '[data-test="logs-search-bar-sql-mode-toggle-btn"]',
+      );
       expect(syntaxGuide.exists()).toBe(true);
     });
 
     it("should render date time picker", () => {
-      const dateTime = wrapper.find('[data-test="logs-search-bar-date-time-dropdown"]');
+      const dateTime = wrapper.find(
+        '[data-test="logs-search-bar-date-time-dropdown"]',
+      );
       expect(dateTime.exists()).toBe(true);
     });
 
     it("should render run query button", () => {
-      const runQueryBtn = wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
+      const runQueryBtn = wrapper.find(
+        '[data-test="logs-search-bar-refresh-btn"]',
+      );
       expect(runQueryBtn.exists()).toBe(true);
       expect(runQueryBtn.text()).toContain("Run query");
     });
@@ -279,7 +285,9 @@ describe("SearchBar", () => {
     });
 
     it("should render share link button", () => {
-      const shareBtn = wrapper.find('[data-test="logs-search-bar-share-link-btn"]');
+      const shareBtn = wrapper.find(
+        '[data-test="logs-search-bar-share-link-btn"]',
+      );
       expect(shareBtn.exists()).toBe(true);
     });
 
@@ -294,10 +302,12 @@ describe("SearchBar", () => {
 
   describe("Button interactions", () => {
     it("should emit searchdata when run query button is clicked", async () => {
-      const runQueryBtn = wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
-      
+      const runQueryBtn = wrapper.find(
+        '[data-test="logs-search-bar-refresh-btn"]',
+      );
+
       await runQueryBtn.trigger("click");
-      
+
       expect(wrapper.emitted("searchdata")).toBeTruthy();
       expect(wrapper.emitted("searchdata")).toHaveLength(1);
     });
@@ -305,17 +315,21 @@ describe("SearchBar", () => {
     it("should not emit searchdata when loading is true", async () => {
       await wrapper.setProps({ isLoading: true });
       await wrapper.vm.$nextTick();
-      
-      const runQueryBtn = wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
+
+      const runQueryBtn = wrapper.find(
+        '[data-test="logs-search-bar-refresh-btn"]',
+      );
       // Check if button has disabled class or aria-disabled instead of disable attribute
       expect(runQueryBtn.classes()).toContain("disabled");
     });
 
     it("should emit shareLink when share button is clicked", async () => {
-      const shareBtn = wrapper.find('[data-test="logs-search-bar-share-link-btn"]');
-      
+      const shareBtn = wrapper.find(
+        '[data-test="logs-search-bar-share-link-btn"]',
+      );
+
       await shareBtn.trigger("click");
-      
+
       expect(wrapper.emitted("shareLink")).toBeTruthy();
       expect(wrapper.emitted("shareLink")).toHaveLength(1);
     });
@@ -323,10 +337,10 @@ describe("SearchBar", () => {
     it("should reset filters when reset button is clicked", async () => {
       wrapper.vm.searchObj.data.editorValue = "test query";
       wrapper.vm.searchObj.data.advanceFiltersQuery = "test filter";
-      
+
       const resetBtn = wrapper.find(".reset-filters");
       await resetBtn.trigger("click");
-      
+
       expect(wrapper.vm.searchObj.data.editorValue).toBe("");
       expect(wrapper.vm.searchObj.data.advanceFiltersQuery).toBe("");
     });
@@ -334,7 +348,7 @@ describe("SearchBar", () => {
     it("should disable download button when no results", async () => {
       wrapper.vm.searchObj.data.queryResults.hits = [];
       await wrapper.vm.$nextTick();
-      
+
       const downloadBtn = wrapper.find(".download-logs-btn");
       expect(downloadBtn.classes()).toContain("disabled");
     });
@@ -348,11 +362,15 @@ describe("SearchBar", () => {
         type: "absolute",
         userChangedValue: true,
       };
-      
+
       await wrapper.vm.updateDateTime(newDateTime);
-      
-      expect(wrapper.vm.searchObj.data.datetime.startTime).toBe(newDateTime.startTime);
-      expect(wrapper.vm.searchObj.data.datetime.endTime).toBe(newDateTime.endTime);
+
+      expect(wrapper.vm.searchObj.data.datetime.startTime).toBe(
+        newDateTime.startTime,
+      );
+      expect(wrapper.vm.searchObj.data.datetime.endTime).toBe(
+        newDateTime.endTime,
+      );
       expect(wrapper.vm.searchObj.data.datetime.type).toBe("absolute");
     });
 
@@ -362,16 +380,16 @@ describe("SearchBar", () => {
         type: "relative",
         userChangedValue: true,
       };
-      
+
       await wrapper.vm.updateDateTime(relativeDateTimeChange);
-      
+
       expect(wrapper.vm.searchObj.data.datetime.type).toBe("relative");
       expect(wrapper.vm.searchObj.data.datetime.relativeTimePeriod).toBe("1h");
     });
 
     it("should emit timezone change event", async () => {
       await wrapper.vm.updateTimezone();
-      
+
       expect(wrapper.emitted("onChangeTimezone")).toBeTruthy();
     });
   });
@@ -384,9 +402,9 @@ describe("SearchBar", () => {
         triggerAutoComplete: vi.fn(),
       };
       wrapper.vm.queryEditorRef = mockQueryEditor;
-      
+
       await wrapper.vm.updateQueryValue("SELECT * FROM traces");
-      
+
       // The updateQueryValue function updates autoComplete but doesn't set editorValue directly
       // editorValue is set via the query editor component's v-model
       expect(wrapper.vm.searchObj.data.editorValue).toBe("");
@@ -397,9 +415,9 @@ describe("SearchBar", () => {
         setValue: vi.fn(),
       };
       wrapper.vm.queryEditorRef = mockQueryEditor;
-      
+
       await wrapper.vm.setEditorValue("test query");
-      
+
       expect(mockQueryEditor.setValue).toHaveBeenCalledWith("test query");
     });
 
@@ -407,10 +425,10 @@ describe("SearchBar", () => {
       // Test that the component responds to run-query events
       // Since we're using stubbed components, we'll test the searchData method directly
       expect(typeof wrapper.vm.searchData).toBe("function");
-      
+
       wrapper.vm.searchData();
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.emitted("searchdata")).toBeTruthy();
     });
   });
@@ -426,19 +444,27 @@ describe("SearchBar", () => {
         { trace_id: "test", service: "test-service" },
       ];
       await wrapper.vm.$nextTick();
-      
+
       const downloadBtn = wrapper.find(".download-logs-btn");
       expect(downloadBtn.exists()).toBe(true);
-      
+
       // Test the downloadLogs method exists and can be called
       expect(typeof wrapper.vm.downloadLogs).toBe("function");
-      
+
       // Call the download method directly to test functionality
       const downloadSpy = vi.spyOn(wrapper.vm, "downloadLogs");
       wrapper.vm.downloadLogs();
-      
+
       expect(downloadSpy).toHaveBeenCalled();
       downloadSpy.mockRestore();
+    });
+
+    it("should handle empty query results in downloadLogs", async () => {
+      wrapper.vm.searchObj.data.queryResults.hits = [];
+
+      await flushPromises();
+
+      expect(() => wrapper.vm.downloadLogs()).toThrow();
     });
   });
 
@@ -446,10 +472,10 @@ describe("SearchBar", () => {
     it("should handle stream selection in SQL mode", async () => {
       // Test SQL mode functionality without parser dependency
       wrapper.vm.searchObj.meta.sqlMode = true;
-      
+
       const initialSqlMode = wrapper.vm.searchObj.meta.sqlMode;
       expect(initialSqlMode).toBe(true);
-      
+
       // Test that when in SQL mode, the component behaves correctly
       wrapper.vm.searchObj.meta.sqlMode = false;
       expect(wrapper.vm.searchObj.meta.sqlMode).toBe(false);
@@ -460,29 +486,29 @@ describe("SearchBar", () => {
     it("should add filter to query", async () => {
       wrapper.vm.searchObj.data.editorValue = "SELECT * FROM traces";
       wrapper.vm.searchObj.data.stream.addToFilter = "service_name='test'";
-      
+
       await wrapper.vm.$nextTick();
-      
+
       // Trigger the watcher
       wrapper.vm.searchObj.data.stream.addToFilter = "service_name='updated'";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("");
     });
 
     it("should handle null filter values correctly", async () => {
       wrapper.vm.searchObj.data.editorValue = "";
-      
+
       // Mock the queryEditorRef
       const mockSetValue = vi.fn();
       wrapper.vm.queryEditorRef = {
         setValue: mockSetValue,
       };
-      
+
       wrapper.vm.searchObj.data.stream.addToFilter = "field='null'";
-      
+
       await wrapper.vm.$nextTick();
-      
+
       // The filter should be processed and added to query
       expect(mockSetValue).toHaveBeenCalled();
     });
@@ -496,13 +522,13 @@ describe("SearchBar", () => {
         refresh: vi.fn(),
       };
       wrapper.vm.dateTimeRef = mockDateTimeRef;
-      
+
       wrapper.vm.searchObj.data.datetime.type = "relative";
       wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "1h";
-      
+
       // Manually call onActivated hook logic
       await wrapper.vm.$nextTick();
-      
+
       // Since onActivated is called, we expect these methods to be available
       expect(mockDateTimeRef.setRelativeTime).toBeDefined();
       expect(mockDateTimeRef.refresh).toBeDefined();
@@ -514,13 +540,13 @@ describe("SearchBar", () => {
         setRelativeTime: vi.fn(),
       };
       wrapper.vm.dateTimeRef = mockDateTimeRef;
-      
+
       wrapper.vm.searchObj.data.datetime.type = "absolute";
       wrapper.vm.searchObj.data.datetime.startTime = Date.now() - 3600000;
       wrapper.vm.searchObj.data.datetime.endTime = Date.now();
-      
+
       await wrapper.vm.$nextTick();
-      
+
       expect(mockDateTimeRef.setAbsoluteTime).toBeDefined();
     });
   });
@@ -528,7 +554,7 @@ describe("SearchBar", () => {
   describe("Error handling", () => {
     it("should handle missing query editor ref gracefully", async () => {
       wrapper.vm.queryEditorRef = null;
-      
+
       expect(() => wrapper.vm.setEditorValue("test")).not.toThrow();
       expect(() => wrapper.vm.updateQuery()).not.toThrow();
     });
@@ -536,7 +562,7 @@ describe("SearchBar", () => {
     it("should handle empty search results for download", async () => {
       wrapper.vm.searchObj.data.queryResults.hits = [];
       await wrapper.vm.$nextTick();
-      
+
       const downloadBtn = wrapper.find(".download-logs-btn");
       expect(downloadBtn.classes()).toContain("disabled");
     });
@@ -550,17 +576,19 @@ describe("SearchBar", () => {
           selectedValues: [],
         },
       };
-      
+
       await wrapper.setProps({ fieldValues: newFieldValues });
-      
+
       expect(wrapper.props("fieldValues")).toEqual(newFieldValues);
     });
 
     it("should handle isLoading prop", async () => {
       await wrapper.setProps({ isLoading: true });
       await wrapper.vm.$nextTick();
-      
-      const runQueryBtn = wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
+
+      const runQueryBtn = wrapper.find(
+        '[data-test="logs-search-bar-refresh-btn"]',
+      );
       expect(runQueryBtn.classes()).toContain("disabled");
     });
   });
@@ -577,10 +605,12 @@ describe("SearchBar", () => {
 
       // Simulate onActivated hook being called
       await wrapper.vm.$nextTick();
-      
+
       // Test the logic that would be in onActivated
       if (wrapper.vm.searchObj.data.datetime.type === "relative") {
-        mockDateTimeRef.setRelativeTime(wrapper.vm.searchObj.data.datetime.relativeTimePeriod);
+        mockDateTimeRef.setRelativeTime(
+          wrapper.vm.searchObj.data.datetime.relativeTimePeriod,
+        );
         mockDateTimeRef.refresh();
       }
 
@@ -601,13 +631,13 @@ describe("SearchBar", () => {
       if (wrapper.vm.searchObj.data.datetime.type !== "relative") {
         mockDateTimeRef.setAbsoluteTime(
           wrapper.vm.searchObj.data.datetime.startTime,
-          wrapper.vm.searchObj.data.datetime.endTime
+          wrapper.vm.searchObj.data.datetime.endTime,
         );
       }
 
       expect(mockDateTimeRef.setAbsoluteTime).toHaveBeenCalledWith(
         wrapper.vm.searchObj.data.datetime.startTime,
-        wrapper.vm.searchObj.data.datetime.endTime
+        wrapper.vm.searchObj.data.datetime.endTime,
       );
     });
   });
@@ -634,21 +664,18 @@ describe("SearchBar", () => {
     it("should handle SQL mode with stream switching", async () => {
       // Setup SQL mode
       wrapper.vm.searchObj.meta.sqlMode = true;
-      
+
       // Mock parser
       const mockParser = {
         astify: vi.fn().mockReturnValue({
-          from: [{ table: "new_stream" }]
+          from: [{ table: "new_stream" }],
         }),
       };
-      
+
       // Mock getStream function
       const mockGetStream = vi.fn().mockResolvedValue({
         name: "new_stream",
-        schema: [
-          { name: "field1" },
-          { name: "field2" }
-        ]
+        schema: [{ name: "field1" }, { name: "field2" }],
       });
 
       wrapper.vm.parser = mockParser;
@@ -656,20 +683,25 @@ describe("SearchBar", () => {
       // Test the updateQueryValue logic for SQL mode
       const value = "SELECT * FROM new_stream";
       wrapper.vm.searchObj.data.parsedQuery = mockParser.astify(value);
-      
+
       expect(mockParser.astify).toHaveBeenCalledWith(value);
-      expect(wrapper.vm.searchObj.data.parsedQuery.from[0].table).toBe("new_stream");
+      expect(wrapper.vm.searchObj.data.parsedQuery.from[0].table).toBe(
+        "new_stream",
+      );
     });
 
     it("should notify when stream is not found", async () => {
       wrapper.vm.searchObj.meta.sqlMode = true;
-      
+
       // Test stream not found scenario
-      wrapper.vm.searchObj.data.stream.selectedStream = { label: "", value: "" };
+      wrapper.vm.searchObj.data.stream.selectedStream = {
+        label: "",
+        value: "",
+      };
       wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
-      
-      const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
-      
+
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+
       // Simulate the notification call
       wrapper.vm.$q.notify({
         message: "Stream not found",
@@ -694,20 +726,20 @@ describe("SearchBar", () => {
         setDateType: vi.fn(),
       };
       wrapper.vm.dateTimeRef = mockDateTimeRef;
-      
+
       // Setup query range restriction
       wrapper.vm.searchObj.data.datetime.queryRangeRestrictionInHour = 24;
       wrapper.vm.searchObj.data.stream.selectedStream = { length: 1 };
 
       const endTime = Date.now() * 1000; // Convert to microseconds
-      const startTime = endTime - (25 * 60 * 60 * 1000000); // 25 hours ago
-      
+      const startTime = endTime - 25 * 60 * 60 * 1000000; // 25 hours ago
+
       const value = {
         valueType: "absolute",
         endTime: endTime,
         startTime: startTime,
         selectedDate: { from: "2024-01-01" },
-        selectedTime: { startTime: "00:00" }
+        selectedTime: { startTime: "00:00" },
       };
 
       // Test the range restriction logic
@@ -720,12 +752,16 @@ describe("SearchBar", () => {
         value.selectedDate.hasOwnProperty("from") &&
         value.selectedTime.hasOwnProperty("startTime")
       ) {
-        const newStartTime = parseInt(value.endTime) - 
-          wrapper.vm.searchObj.data.datetime.queryRangeRestrictionInHour * 60 * 60 * 1000000;
+        const newStartTime =
+          parseInt(value.endTime) -
+          wrapper.vm.searchObj.data.datetime.queryRangeRestrictionInHour *
+            60 *
+            60 *
+            1000000;
 
         if (parseInt(newStartTime) > parseInt(value.startTime)) {
           value.startTime = newStartTime;
-          
+
           expect(value.startTime).toBe(newStartTime);
         }
       }
@@ -736,19 +772,23 @@ describe("SearchBar", () => {
       wrapper.vm.searchObj.data.stream.selectedStream = { length: 1 };
 
       const endTime = Date.now() * 1000;
-      const startTime = endTime - (12 * 60 * 60 * 1000000); // 12 hours ago (within 24h limit)
-      
+      const startTime = endTime - 12 * 60 * 60 * 1000000; // 12 hours ago (within 24h limit)
+
       const value = {
         valueType: "absolute",
         endTime: endTime,
         startTime: startTime,
         selectedDate: { from: "2024-01-01" },
-        selectedTime: { startTime: "00:00" }
+        selectedTime: { startTime: "00:00" },
       };
 
       const originalStartTime = value.startTime;
-      const newStartTime = parseInt(value.endTime) - 
-        wrapper.vm.searchObj.data.datetime.queryRangeRestrictionInHour * 60 * 60 * 1000000;
+      const newStartTime =
+        parseInt(value.endTime) -
+        wrapper.vm.searchObj.data.datetime.queryRangeRestrictionInHour *
+          60 *
+          60 *
+          1000000;
 
       // Should not modify since it's within range
       if (parseInt(newStartTime) <= parseInt(value.startTime)) {
@@ -794,25 +834,36 @@ describe("SearchBar", () => {
         field2: {
           selectedValues: ["value3"],
           searchKeyword: "search",
-        }
+        },
       };
 
       // Test the resetFilters logic for field values
-      Object.values(wrapper.vm.searchObj.data.stream.fieldValues).forEach((field) => {
-        field.selectedValues = [];
-        field.searchKeyword = "";
-      });
+      Object.values(wrapper.vm.searchObj.data.stream.fieldValues).forEach(
+        (field) => {
+          field.selectedValues = [];
+          field.searchKeyword = "";
+        },
+      );
 
-      expect(wrapper.vm.searchObj.data.stream.fieldValues.field1.selectedValues).toEqual([]);
-      expect(wrapper.vm.searchObj.data.stream.fieldValues.field1.searchKeyword).toBe("");
-      expect(wrapper.vm.searchObj.data.stream.fieldValues.field2.selectedValues).toEqual([]);
-      expect(wrapper.vm.searchObj.data.stream.fieldValues.field2.searchKeyword).toBe("");
+      expect(
+        wrapper.vm.searchObj.data.stream.fieldValues.field1.selectedValues,
+      ).toEqual([]);
+      expect(
+        wrapper.vm.searchObj.data.stream.fieldValues.field1.searchKeyword,
+      ).toBe("");
+      expect(
+        wrapper.vm.searchObj.data.stream.fieldValues.field2.selectedValues,
+      ).toEqual([]);
+      expect(
+        wrapper.vm.searchObj.data.stream.fieldValues.field2.searchKeyword,
+      ).toBe("");
     });
   });
 
   describe("Filter query building logic", () => {
     it("should build query with filter when query has pipe separator", () => {
-      wrapper.vm.searchObj.data.editorValue = "SELECT * FROM traces | WHERE field1='value1'";
+      wrapper.vm.searchObj.data.editorValue =
+        "SELECT * FROM traces | WHERE field1='value1'";
       wrapper.vm.searchObj.data.stream.addToFilter = "field2='value2'";
 
       // Test the filter query building logic
@@ -828,7 +879,9 @@ describe("SearchBar", () => {
         wrapper.vm.searchObj.data.query = currentQuery.join("| ");
       }
 
-      expect(wrapper.vm.searchObj.data.query).toBe("SELECT * FROM traces |  WHERE field1='value1' and field2='value2'");
+      expect(wrapper.vm.searchObj.data.query).toBe(
+        "SELECT * FROM traces |  WHERE field1='value1' and field2='value2'",
+      );
     });
 
     it("should build query with filter when query has empty pipe section", () => {
@@ -845,12 +898,14 @@ describe("SearchBar", () => {
         wrapper.vm.searchObj.data.query = currentQuery.join("| ");
       }
 
-      expect(wrapper.vm.searchObj.data.query).toBe("SELECT * FROM traces | field1='value1'");
+      expect(wrapper.vm.searchObj.data.query).toBe(
+        "SELECT * FROM traces | field1='value1'",
+      );
     });
 
     it("should handle filter with null values correctly", () => {
       wrapper.vm.searchObj.data.stream.addToFilter = "field='null'";
-      
+
       let filter = wrapper.vm.searchObj.data.stream.addToFilter;
       const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
 
