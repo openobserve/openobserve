@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw-flex tw-items-center tw-gap-2">
-    <img style="width: 24px; height: 24px;" :src="icon" alt="icon" />
+    <img v-if="showIcon" style="width: 24px; height: 24px;" :src="icon" alt="icon" />
     <span class="title-text">
       {{ title }}
     </span>
@@ -41,6 +41,10 @@ export default defineComponent({
     iconPath:{
       type: String,
       default: "",
+    },
+    showIcon: {
+      type: Boolean,
+      default: true,
     }
   },
   setup(props, { emit }) {
