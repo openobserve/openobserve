@@ -178,22 +178,29 @@ export default class DashboardFilter {
     await columnLocator.click();
     await columnLocator.fill(newFieldName);
 
-    // ✅ Improved: Wait directly for option instead of menu
+    // ✅ Step 2: Select option with 3 fallback locators
     let optionSelected = false;
-    try {
-      // Try q-item first
-      const firstSuggestion = this.page
-        .locator('div.q-menu[role="listbox"] div.q-item')
-        .first();
-      await firstSuggestion.waitFor({ state: "visible", timeout: 5000 });
-      await firstSuggestion.click();
-      optionSelected = true;
-    } catch (e) {
-      // Fallback: getByText
-      const fallbackOption = this.page.getByText(newFieldName, { exact: true });
-      await fallbackOption.waitFor({ state: "visible", timeout: 5000 });
-      await fallbackOption.click();
-      optionSelected = true;
+
+    // Locator 1: Role based
+    const roleOption = this.page
+      .getByRole("option", { name: newFieldName, exact: true })
+      .first();
+    // Locator 2: Text based
+    const textOption = this.page.getByText(newFieldName, { exact: true });
+    // Locator 3: Fallback q-item
+    const qItemOption = this.page
+      .locator('div.q-menu[role="listbox"] div.q-item')
+      .first();
+
+    for (const locator of [roleOption, textOption, qItemOption]) {
+      try {
+        await locator.waitFor({ state: "visible", timeout: 5000 });
+        await locator.click({ timeout: 3000 });
+        optionSelected = true;
+        break;
+      } catch (e) {
+        // continue to next locator
+      }
     }
 
     if (!optionSelected) {
