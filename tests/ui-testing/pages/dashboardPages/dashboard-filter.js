@@ -137,8 +137,7 @@ export default class DashboardFilter {
       await option.click();
     }
   }
-
-  // Add filter condition with dynamic ,Group inside group filter
+  //
   async addGroupFilterCondition(index, newFieldName, operator, value) {
     const idx = String(index);
 
@@ -179,15 +178,27 @@ export default class DashboardFilter {
     await columnLocator.click();
     await columnLocator.fill(newFieldName);
 
-    // Wait for suggestions menu and select first option
-    const suggestionMenu = this.page.locator('div.q-menu[role="listbox"]');
-    await suggestionMenu.waitFor({ state: "visible", timeout: 10000 });
+    // ✅ Improved: Wait directly for option instead of menu
+    let optionSelected = false;
+    try {
+      // Try q-item first
+      const firstSuggestion = this.page
+        .locator('div.q-menu[role="listbox"] div.q-item')
+        .first();
+      await firstSuggestion.waitFor({ state: "visible", timeout: 5000 });
+      await firstSuggestion.click();
+      optionSelected = true;
+    } catch (e) {
+      // Fallback: getByText
+      const fallbackOption = this.page.getByText(newFieldName, { exact: true });
+      await fallbackOption.waitFor({ state: "visible", timeout: 5000 });
+      await fallbackOption.click();
+      optionSelected = true;
+    }
 
-    const firstSuggestion = this.page
-      .locator('div.q-menu[role="listbox"] div.q-item')
-      .first();
-    await firstSuggestion.waitFor({ state: "visible", timeout: 10000 });
-    await firstSuggestion.click();
+    if (!optionSelected) {
+      throw new Error(`Failed to select dropdown option: ${newFieldName}`);
+    }
 
     // Step 3: Condition dropdown with improved reliability
     if (operator || value) {
