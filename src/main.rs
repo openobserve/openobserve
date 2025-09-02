@@ -334,14 +334,14 @@ async fn main() -> Result<(), anyhow::Error> {
             .expect("grpc runtime init failed");
         let _guard = rt.enter();
         rt.block_on(async move {
-            if config::cluster::LOCAL_NODE.is_router() {
-                init_router_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx)
-                    .await
-                    .expect("router gRPC server init failed");
+            let ret = if config::cluster::LOCAL_NODE.is_router() {
+                init_router_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
             } else {
-                init_common_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx)
-                    .await
-                    .expect("router gRPC server init failed");
+                init_common_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
+            };
+            if let Err(e) = ret {
+                log::error!("gRPC server init failed: {:?}", e);
+                std::process::exit(1);
             }
         });
     });
