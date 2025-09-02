@@ -203,6 +203,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     {
         o2_enterprise::enterprise::license::start_license_check(
             get_license_check_lock,
+            crate::service::self_reporting::search::get_usage,
             LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role(),
         )
         .await;
