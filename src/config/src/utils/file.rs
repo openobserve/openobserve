@@ -89,7 +89,7 @@ pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Err
 /// from the directory structure.
 ///
 /// This function is designed to work with a directory hierarchy where dates are
-/// embedded in the path, such as `/base/path/YYYY/MM/DD/HH/`. It constructs
+/// embedded in the path, such as `/skippable/base/path/YYYY/MM/DD/HH/`. It constructs
 /// a filter that checks if the date derived from a path falls within the
 /// specified `start_time` and `end_time`.
 ///
@@ -118,37 +118,49 @@ pub fn wal_dir_datetime_filter_builder(
     move |path: PathBuf| {
         let mut components = path
             .components()
-            .skip(skip_count + 1)   // For a given <stream_name> there are multiple <thread_id's> 
-                                                                        // underwhich datetime folders happen
+            .skip(skip_count)
             .map(|c| c.as_os_str())
             .filter_map(|osc| osc.to_str());
 
-        let year = components
-            .next()
-            .and_then(|c| c.parse::<i32>().ok())
-            .unwrap_or_default();
-        let month = components
-            .next()
-            .and_then(|c| c.parse::<u32>().ok())
-            .unwrap_or(start_time.month());
-        let day = components
-            .next()
-            .and_then(|c| c.parse::<u32>().ok())
-            .unwrap_or(start_time.day());
-        let hour = components
-            .next()
-            .and_then(|c| c.parse::<u32>().ok())
-            .unwrap_or(start_time.hour());
+        let year = match components.next().map(|c| c.parse::<i32>()) {
+            Some(Ok(y @ 1901..=9999)) => y, // A plausible year
+            Some(_) => return false,        // Parsed, but not a plausible year
+            None => return true,            /* Not present or failed to parse, could be a
+                                              * skippable path */
+        };
 
-        let date_range_check = if 0 == year {
-            return false;
-        } else {
+        let month = match components.next().map(|c| c.parse::<u32>()) {
+            Some(Ok(m @ 1..=12)) => m,
+            Some(_) => return false,    // Parsed, but invalid month number
+            None => start_time.month(), // Not present or failed to parse
+        };
+
+        let month_days = [31u32, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        let days = month_days[month as usize] + if month == 2 && year % 4 == 0 { 1 } else { 0 };
+        let day = match components.next().map(|c| c.parse::<u32>()) {
+            Some(Ok(day)) => {
+                if 1 <= day && day <= days {
+                    day
+                } else {
+                    return false;
+                }
+            }
+            Some(_) => return false,
+            None => start_time.day(),
+        };
+
+        let hour = match components.next().map(|c| c.parse::<u32>()) {
+            Some(Ok(hour @ 0..24)) => hour,
+            Some(_) => return false,
+            None => start_time.hour(),
+        };
+
+        let date_range_check =
             if let Some(datetime) = Utc.with_ymd_and_hms(year, month, day, hour, 0, 0).single() {
                 datetime >= start_time && datetime <= end_time
             } else {
                 false
-            }
-        };
+            };
 
         date_range_check
             && (!path.is_file()
@@ -611,6 +623,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_scan_files_filtered_basic() {
+        let threads: Vec<_> = (1..2).collect();
         let years = vec![2025];
         let months: Vec<_> = (9..=10).collect();
         let days: Vec<_> = (8..=11).collect();
@@ -622,35 +635,39 @@ mod tests {
 
         let root = temp_dir.path();
 
-        for year in years {
-            for month in &months {
-                for day in &days {
-                    for hour in &hours {
-                        tokio::fs::create_dir_all(format!(
-                            "{}/{}/{}/{}/{}",
-                            root.display(),
-                            year,
-                            month,
-                            day,
-                            hour
-                        ))
-                        .await
-                        .expect("Pretest setup failure");
+        for thread in threads {
+            for year in &years {
+                for month in &months {
+                    for day in &days {
+                        for hour in &hours {
+                            tokio::fs::create_dir_all(format!(
+                                "{}/{}/{}/{}/{}/{}",
+                                root.display(),
+                                thread,
+                                year,
+                                month,
+                                day,
+                                hour
+                            ))
+                            .await
+                            .expect("Pretest setup failure");
 
-                        for filename in &filenames {
-                            for extension in &extensions {
-                                tokio::fs::File::create(format!(
-                                    "{}/{}/{}/{}/{}/{}.{}",
-                                    root.display(),
-                                    year,
-                                    month,
-                                    day,
-                                    hour,
-                                    filename,
-                                    extension
-                                ))
-                                .await
-                                .expect("Pretest setup failure");
+                            for filename in &filenames {
+                                for extension in &extensions {
+                                    tokio::fs::File::create(format!(
+                                        "{}/{}/{}/{}/{}/{}/{}.{}",
+                                        root.display(),
+                                        thread,
+                                        year,
+                                        month,
+                                        day,
+                                        hour,
+                                        filename,
+                                        extension
+                                    ))
+                                    .await
+                                    .expect("Pretest setup failure");
+                                }
                             }
                         }
                     }
@@ -665,7 +682,7 @@ mod tests {
             start_time,
             end_time,
             "parquet".to_string(),
-            PathBuf::from(root).components().count(),
+            PathBuf::from(root).components().count() + 1,
         );
         let files = scan_files_filtered(root, filter, None)
             .await

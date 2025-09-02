@@ -581,8 +581,14 @@ async fn get_file_list_inner(
     }) {
         let skip_count = AsRef::<Path>::as_ref(&pattern).components().count();
         let extension_pattern = file_ext.to_string();
-        let filter =
-            wal_dir_datetime_filter_builder(start_time, end_time, extension_pattern, skip_count);
+        // Skip count is the number of segments in the cannonicalised path before
+        // <YY>/<MM>/<DD>/<HH>/<file> appear
+        let filter = wal_dir_datetime_filter_builder(
+            start_time,
+            end_time,
+            extension_pattern,
+            skip_count + 1,
+        );
 
         scan_files_filtered(&pattern, filter, None).await?
     } else {
