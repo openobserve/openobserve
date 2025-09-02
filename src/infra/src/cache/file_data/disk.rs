@@ -269,6 +269,7 @@ impl FileData {
     }
 
     async fn gc(&mut self, trace_id: &str, need_release_size: usize) -> Result<(), anyhow::Error> {
+        let start = std::time::Instant::now();
         log::info!(
             "[CacheType:{} trace_id {trace_id}] File disk cache start gc {}/{}, need to release {} bytes",
             self.file_type,
@@ -350,9 +351,10 @@ impl FileData {
             drop(r);
         }
         log::info!(
-            "[CacheType:{} trace_id {trace_id}] File disk cache gc done, released {} bytes",
+            "[CacheType:{} trace_id {trace_id}] File disk cache gc done, released {} bytes, took={}",
             self.file_type,
-            release_size
+            release_size,
+            start.elapsed().as_millis()
         );
 
         Ok(())
