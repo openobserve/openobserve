@@ -94,27 +94,25 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
                     return Ok(TreeNodeRecursion::Continue);
                 }
             }
-            println!("\nnot simple distinct, stop visiting\n");
             // if not simple distinct, stop visiting
             self.simple_distinct = None;
             return Ok(TreeNodeRecursion::Stop);
         } else if let Some(aggregate) = node.as_any().downcast_ref::<AggregateExec>() {
             // check if the group by is simple distinct,
             // only one group by field, no aggregate function
-            if aggregate.group_expr().expr().len() == 1 && aggregate.aggr_expr().is_empty() {
-                if let Some((group_expr, _)) = aggregate.group_expr().expr().first() {
-                    let column_name = get_column_name(group_expr);
-                    println!("\ncolumn_name: {}\n", column_name);
-                    if is_column(group_expr)
-                        && self.index_fields.contains(column_name)
-                        && let Some(simple_distinct) = &self.simple_distinct
-                        && simple_distinct.0 == column_name
-                    {
-                        return Ok(TreeNodeRecursion::Continue);
-                    }
+            if aggregate.group_expr().expr().len() == 1
+                && aggregate.aggr_expr().is_empty()
+                && let Some((group_expr, _)) = aggregate.group_expr().expr().first()
+            {
+                let column_name = get_column_name(group_expr);
+                if is_column(group_expr)
+                    && self.index_fields.contains(column_name)
+                    && let Some(simple_distinct) = &self.simple_distinct
+                    && simple_distinct.0 == column_name
+                {
+                    return Ok(TreeNodeRecursion::Continue);
                 }
             }
-            println!("\nnot simple distinct, stop visiting for aggregate\n");
             // if not simple distinct, stop visiting
             self.simple_distinct = None;
             return Ok(TreeNodeRecursion::Stop);
@@ -132,7 +130,6 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
             || node.name() == "WindowAggExec"
         {
             // if encounter complex plan, stop visiting
-            println!("\nnot simple distinct, stop visiting for complex plan\n");
             self.simple_distinct = None;
             return Ok(TreeNodeRecursion::Stop);
         }

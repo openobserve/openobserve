@@ -402,10 +402,10 @@ fn optimizer_physical_plan(
     let mut plan = index_rule.optimize(plan, ctx.state().config_options())?;
 
     let index_condition = index_condition_ref.lock().clone();
-    if index_condition.is_some() {
+    if let Some(index_condition) = index_condition {
         let index_optimizer_rule = IndexOptimizeRule::new(
             index_fields,
-            index_condition.unwrap(),
+            index_condition,
             index_optimizer_rule_ref.clone(),
         );
         plan = index_optimizer_rule.optimize(plan, ctx.state().config_options())?;

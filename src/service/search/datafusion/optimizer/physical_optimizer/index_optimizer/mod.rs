@@ -112,7 +112,11 @@ impl TreeNodeRewriter for IndexOptimizer {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, plan: Self::Node) -> Result<Transformed<Self::Node>> {
-        if let Some(_) = plan.as_any().downcast_ref::<SortPreservingMergeExec>() {
+        if plan
+            .as_any()
+            .downcast_ref::<SortPreservingMergeExec>()
+            .is_some()
+        {
             // TODO: check if the str_match() field is order by and group by filed
             if let Some(index_optimize_mode) =
                 is_simple_distinct(Arc::clone(&plan), self.index_fields.clone())
