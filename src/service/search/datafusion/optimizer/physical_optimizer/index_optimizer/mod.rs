@@ -31,9 +31,15 @@ use datafusion::{
 use parking_lot::Mutex;
 
 mod count;
+mod distinct;
+mod histogram;
+mod select;
+mod topn;
 
 use crate::service::search::{
-    datafusion::optimizer::physical_optimizer::index_optimizer::count::is_simple_count,
+    datafusion::optimizer::physical_optimizer::index_optimizer::{
+        count::is_simple_count, distinct::is_simple_distinct,
+    },
     index::IndexCondition,
 };
 
@@ -106,14 +112,20 @@ impl TreeNodeRewriter for IndexOptimizer {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, plan: Self::Node) -> Result<Transformed<Self::Node>> {
-        if let Some(_sort_merge) = plan.as_any().downcast_ref::<SortPreservingMergeExec>() {
-            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
+        if let Some(_) = plan.as_any().downcast_ref::<SortPreservingMergeExec>() {
+            if let Some(index_optimize_mode) =
+                is_simple_distinct(Arc::clone(&plan), self.index_fields.clone())
+            {
+                *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
+                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+            }
+            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
         } else if plan.as_any().downcast_ref::<AggregateExec>().is_some() {
             if let Some(index_optimize_mode) = is_simple_count(Arc::clone(&plan)) {
                 *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
             }
-            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
+            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
         }
         Ok(Transformed::no(plan))
     }

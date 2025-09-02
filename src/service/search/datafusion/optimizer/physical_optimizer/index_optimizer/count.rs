@@ -74,7 +74,6 @@ impl<'n> TreeNodeVisitor<'n> for SimpleCountVisitor {
                 self.is_simple_count = false;
                 return Ok(TreeNodeRecursion::Stop);
             }
-        // if encounter complex plan, stop visiting
         } else if node.name() == "HashJoinExec"
             || node.name() == "RecursiveQueryExec"
             || node.name() == "UnionExec"
@@ -88,6 +87,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleCountVisitor {
             || node.name() == "BoundedWindowAggExec"
             || node.name() == "WindowAggExec"
         {
+            // if encounter complex plan, stop visiting
             self.is_simple_count = false;
             return Ok(TreeNodeRecursion::Stop);
         }

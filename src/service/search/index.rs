@@ -899,12 +899,26 @@ fn get_value(expr: &Expr) -> String {
     }
 }
 
+// TODO: duplication with datafusion/optimizer/physical_optimizer/utils.rs
 fn is_physical_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    expr.as_any().downcast_ref::<Column>().is_some()
+    if expr.as_any().downcast_ref::<Column>().is_some() {
+        true
+    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
+        is_physical_column(expr.expr())
+    } else {
+        false
+    }
 }
 
+// TODO: duplication with datafusion/optimizer/physical_optimizer/utils.rs
 fn get_physical_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
-    expr.as_any().downcast_ref::<Column>().unwrap().name()
+    if let Some(expr) = expr.as_any().downcast_ref::<Column>() {
+        expr.name()
+    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
+        get_physical_column_name(expr.expr())
+    } else {
+        "__o2_unknown_column__"
+    }
 }
 
 fn is_physical_value(expr: &Arc<dyn PhysicalExpr>) -> bool {

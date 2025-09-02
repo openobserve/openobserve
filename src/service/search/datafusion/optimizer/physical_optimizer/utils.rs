@@ -23,7 +23,7 @@ use datafusion::{
         PhysicalExpr,
         expressions::{Column, Literal},
     },
-    physical_plan::expressions::{BinaryExpr, lit},
+    physical_plan::expressions::{BinaryExpr, CastExpr, lit},
     scalar::ScalarValue,
 };
 
@@ -87,4 +87,28 @@ fn disjunction_opt(
             None => Some(predicate),
             Some(acc) => Some(Arc::new(BinaryExpr::new(acc, Operator::Or, predicate))),
         })
+}
+
+pub fn is_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
+    if expr.as_any().downcast_ref::<Column>().is_some() {
+        true
+    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
+        is_column(expr.expr())
+    } else {
+        false
+    }
+}
+
+pub fn get_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
+    if let Some(expr) = expr.as_any().downcast_ref::<Column>() {
+        expr.name()
+    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
+        get_column_name(expr.expr())
+    } else {
+        "__o2_unknown_column__"
+    }
+}
+
+pub fn is_value(expr: &Arc<dyn PhysicalExpr>) -> bool {
+    expr.as_any().downcast_ref::<Literal>().is_some()
 }

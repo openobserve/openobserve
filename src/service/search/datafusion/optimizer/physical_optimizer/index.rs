@@ -29,7 +29,7 @@ use datafusion::{
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
         ExecutionPlan, PhysicalExpr,
-        expressions::{BinaryExpr, CastExpr, Column, InListExpr, Literal, NotExpr},
+        expressions::{BinaryExpr, Column, InListExpr, NotExpr},
         filter::FilterExec,
         projection::ProjectionExec,
     },
@@ -37,10 +37,13 @@ use datafusion::{
 use parking_lot::Mutex;
 
 use crate::service::search::{
-    datafusion::udf::{
-        MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
-        STR_MATCH_UDF_NAME,
-        match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+    datafusion::{
+        optimizer::physical_optimizer::utils::{get_column_name, is_column, is_value},
+        udf::{
+            MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+            STR_MATCH_UDF_NAME,
+            match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+        },
     },
     index::{Condition, IndexCondition},
 };
@@ -233,30 +236,6 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
         return false;
     }
     true
-}
-
-fn is_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    if expr.as_any().downcast_ref::<Column>().is_some() {
-        true
-    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
-        is_column(expr.expr())
-    } else {
-        false
-    }
-}
-
-fn get_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
-    if let Some(expr) = expr.as_any().downcast_ref::<Column>() {
-        expr.name()
-    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
-        get_column_name(expr.expr())
-    } else {
-        "__o2_unknown_column__"
-    }
-}
-
-fn is_value(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    expr.as_any().downcast_ref::<Literal>().is_some()
 }
 
 fn is_only_timestamp_filter(expr: &[Arc<dyn PhysicalExpr>]) -> bool {
