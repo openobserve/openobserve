@@ -25,6 +25,11 @@ use crate::errors::{Error, Result};
 pub mod nats;
 pub mod nop;
 
+pub enum RetentionPolicy {
+    Interest,
+    Limits,
+}
+
 static DEFAULT: OnceCell<Box<dyn Queue>> = OnceCell::const_new();
 static SUPER_CLUSTER: OnceCell<Box<dyn Queue>> = OnceCell::const_new();
 
@@ -57,6 +62,11 @@ async fn init_super_cluster() -> Box<dyn Queue> {
 #[async_trait]
 pub trait Queue: Sync + Send + 'static {
     async fn create(&self, topic: &str) -> Result<()>;
+    async fn create_with_retention_policy(
+        &self,
+        topic: &str,
+        retention_policy: RetentionPolicy,
+    ) -> Result<()>;
     async fn publish(&self, topic: &str, value: Bytes) -> Result<()>;
     async fn consume(&self, topic: &str) -> Result<Arc<mpsc::Receiver<Message>>>;
     async fn purge(&self, topic: &str, sequence: usize) -> Result<()>;

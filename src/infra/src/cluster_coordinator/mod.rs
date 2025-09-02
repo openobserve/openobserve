@@ -17,8 +17,60 @@ pub mod alerts;
 pub mod destinations;
 pub mod pipelines;
 
-use crate::db::Db;
+use std::sync::Arc;
 
+use bytes::Bytes;
+use tokio::sync::mpsc;
+
+use crate::{
+    db::Db,
+    errors::Error,
+    queue::{self, RetentionPolicy},
+};
+
+pub const INTERNAL_COORDINATOR_STREAM: &str = "internal_coordinator";
 pub async fn get_coordinator() -> &'static Box<dyn Db> {
     super::db::get_coordinator().await
+}
+
+pub async fn create_internal_coordinator_stream() -> Result<(), Error> {
+    let queue = queue::get_queue().await;
+    queue
+        .create_with_retention_policy(INTERNAL_COORDINATOR_STREAM, RetentionPolicy::Interest)
+        .await
+}
+
+/// `event` should be a json string. The message will be published to the internal coordinator
+/// stream.
+pub async fn publish_internal_coordinator_event(payload: Vec<u8>) -> Result<(), Error> {
+    let queue = queue::get_queue().await;
+    queue
+        .publish(INTERNAL_COORDINATOR_STREAM, Bytes::from(payload))
+        .await
+}
+
+pub async fn subscribe_internal_coordinator_event<F, Fut>(callback: F) -> Result<(), Error>
+where
+    F: Fn(Vec<u8>) -> Fut,
+    Fut: Future<Output = Result<(), anyhow::Error>>,
+{
+    let queue = queue::get_queue().await;
+    let mut receiver: Arc<mpsc::Receiver<super::queue::Message>> = queue
+        .consume(INTERNAL_COORDINATOR_STREAM)
+        .await
+        .unwrap_or_else(|_| {
+            panic!("failed to subscribe to topic \"{INTERNAL_COORDINATOR_STREAM}\"")
+        });
+    let receiver = Arc::get_mut(&mut receiver)
+        .unwrap_or_else(|| panic!("failed to get mutable reference to receiver"));
+    while let Some(message) = receiver.recv().await {
+        if let Err(e) = callback(message.message().to_vec()).await {
+            log::error!("failed to process internal coordinator event: {}", e);
+        } else {
+            message.ack().await.unwrap_or_else(|e| {
+                log::error!("failed to ack internal coordinator event: {}", e);
+            });
+        }
+    }
+    Ok(())
 }
