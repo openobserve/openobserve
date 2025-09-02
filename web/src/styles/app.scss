@@ -422,16 +422,16 @@
 }
 .o2-table-checkbox-light{
   .q-checkbox__inner--truthy .q-checkbox__bg, .q-checkbox__inner--indet .q-checkbox__bg {
-    background: #826AF9 !important;
-    border: 2px solid #826AF9 !important;
+    background: #575FC5 !important;
+    border: 2px solid #575FC5 !important;
   }
 }
 
 
 .o2-table-checkbox-dark{
   .q-checkbox__inner--truthy .q-checkbox__bg, .q-checkbox__inner--indet .q-checkbox__bg {
-    background: #9E86FF !important;
-    border: 2px solid #9E86FF !important;
+    background: #575FC5 !important;
+    border: 2px solid #575FC5 !important;
   }
 }
 
@@ -458,13 +458,13 @@
 
 .o2-radio-button-light{
   .q-radio__inner--truthy{
-    color: #7B61FF !important;
+    color: #575FC5 !important;
   }
 }
 
 .o2-radio-button-dark{
   .q-radio__inner--truthy{
-    color: #9E86FF !important;
+    color: #575FC5 !important;
   }
 }
 
@@ -542,14 +542,14 @@
 }
 //this is done because we need to select the search input when it is focused
 .o2-search-input-light.q-field--focused .q-field__control {
-  outline: 2px solid #7B61FF !important;
+  outline: 2px solid #575FC5 !important;
   box-shadow: none !important;
   background-color: #FFFFFF !important;
   border-radius: 4px !important;
 }
 
 .o2-search-input-dark.q-field--focused .q-field__control {
-  outline: 2px solid #7B61FF !important;
+  outline: 2px solid #575FC5 !important;
   box-shadow: none !important;
   background-color: #2B2D30 !important;
   border-radius: 4px !important;
