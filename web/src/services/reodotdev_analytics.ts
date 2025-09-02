@@ -5,10 +5,6 @@ import config from "../aws-exports";
 interface IdentityPayload {
   username: string;
   type: "linkedin" | "github" | "email" | "google" | "others" | "sso";
-  other_identities?: Array<{
-    username: string;
-    type: "linkedin" | "github" | "email" | "google" | "others" | "sso";
-  }>;
   firstname?: string;
   lastname?: string;
   company?: string;
