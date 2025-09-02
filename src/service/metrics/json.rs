@@ -46,10 +46,7 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{
-            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_write_partition_key,
-            write_file,
-        },
+        ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
         pipeline::batch_execution::ExecutablePipeline,
         schema::check_for_schema,
         self_reporting::report_request_usage_stats,
@@ -57,16 +54,6 @@ use crate::{
 };
 
 pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse> {
-    // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
-        log::error!("Metrics ingestion error: {e}");
-        return Ok(IngestionResponse {
-            code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
-            status: vec![],
-            error: Some(e.to_string()),
-        });
-    }
-
     let start = std::time::Instant::now();
     let started_at = now_micros();
 

@@ -41,7 +41,6 @@ use crate::{
     common::meta::ingestion::{BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus},
     service::{
         format_stream_name,
-        ingestion::check_ingestion_allowed,
         pipeline::batch_execution::{ExecutablePipeline, ExecutablePipelineBulkInputs},
         schema::{get_future_discard_error, get_upto_discard_error},
     },
@@ -60,9 +59,6 @@ pub async fn ingest(
 ) -> Result<BulkResponse> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-
-    // check system resource
-    check_ingestion_allowed(org_id, StreamType::Logs, None).await?;
 
     // let mut errors = false;
     let mut bulk_res = BulkResponse {

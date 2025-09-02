@@ -15,15 +15,12 @@
 use std::io::{BufRead, BufReader};
 
 use actix_web::web;
-use config::{get_config, meta::stream::StreamType, utils::json};
+use config::{get_config, utils::json};
 use hashbrown::HashMap;
 use infra::errors::Result;
 use serde::Deserialize;
 
-use crate::{
-    common::meta::ingestion::{HecResponse, HecStatus, IngestionRequest},
-    service::ingestion::check_ingestion_allowed,
-};
+use crate::common::meta::ingestion::{HecResponse, HecStatus, IngestionRequest};
 
 #[derive(Deserialize, Clone)]
 struct HecEntry {
@@ -39,14 +36,6 @@ pub async fn ingest(
     body: web::Bytes,
     user_email: &str,
 ) -> Result<HecResponse> {
-    // check system resource
-    if check_ingestion_allowed(org_id, StreamType::Logs, None)
-        .await
-        .is_err()
-    {
-        return Ok(HecStatus::InvalidIndex.into());
-    }
-
     let cfg = get_config();
 
     let default = &cfg.common.default_hec_stream;

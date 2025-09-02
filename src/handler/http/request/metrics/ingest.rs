@@ -47,6 +47,7 @@ use crate::{
 #[post("/{org_id}/ingest/metrics/_json")]
 pub async fn json(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
+
     Ok(match metrics::json::ingest(&org_id, body).await {
         Ok(v) => HttpResponse::Ok().json(v),
         Err(e) => {
@@ -80,6 +81,7 @@ pub async fn otlp_metrics_write(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
+
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     if content_type.eq(CONTENT_TYPE_PROTO) {
         metrics::otlp::otlp_proto(&org_id, body).await

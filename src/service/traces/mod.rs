@@ -53,9 +53,7 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         format_stream_name,
-        ingestion::{
-            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, grpc::get_val, write_file,
-        },
+        ingestion::{TriggerAlertData, evaluate_trigger, grpc::get_val, write_file},
         logs::O2IngestJsonData,
         metadata::{
             MetadataItem, MetadataType,
@@ -144,17 +142,6 @@ pub async fn handle_otlp_request(
     req_type: OtlpRequestType,
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
-    // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
-        log::error!("[TRACES:OTLP] ingestion error: {e}");
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE,
-                e,
-            )),
-        );
-    }
-
     #[cfg(feature = "cloud")]
     {
         match super::organization::is_org_in_free_trial_period(org_id).await {
@@ -573,17 +560,6 @@ pub async fn ingest_json(
     req_type: OtlpRequestType,
     traces_stream_name: &str,
 ) -> Result<HttpResponse, Error> {
-    // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
-        log::error!("[TRACES:JSON] ingestion error: {e}");
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE,
-                e,
-            )),
-        );
-    }
-
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
