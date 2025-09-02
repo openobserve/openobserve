@@ -1162,6 +1162,9 @@ export default defineComponent({
       if (!searchObj.data.traceDetails.selectedTrace) {
         return;
       }
+
+      store.dispatch("logs/setIsInitialized", false);
+
       const stream: string =
         searchObj.data.traceDetails.selectedLogStreams.join(",");
       const from =
