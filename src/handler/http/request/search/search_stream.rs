@@ -62,6 +62,8 @@ use crate::{
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchStreamHttp2",
+    summary = "Stream search results",
+    description = "Executes a search query and streams the results back in real-time using HTTP/2 server-sent events. This is ideal for large result sets or long-running queries where you want to receive data as it becomes available rather than waiting for the complete response. Results are streamed as JSON objects separated by newlines.",
     security(
         ("Authorization"= [])
     ),
@@ -78,7 +80,7 @@ use crate::{
     })),
     responses(
         (status = 200, description = "Success", content_type = "text/event-stream"),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/_search_stream")]
@@ -520,6 +522,8 @@ pub async fn report_to_audit(
     context_path = "/api",
     tag = "Search",
     operation_id = "ValuesStreamHttp2",
+    summary = "Get field values with HTTP/2 streaming",
+    description = "Retrieves field values from logs using HTTP/2 streaming for real-time results",
     security(
         ("Authorization"= [])
     ),
@@ -534,7 +538,7 @@ pub async fn report_to_audit(
     })),
     responses(
         (status = 200, description = "Success", content_type = "text/event-stream"),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/_values_stream")]

@@ -37,6 +37,10 @@ use crate::{
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionBulk",
+    summary = "Bulk ingest logs (Elasticsearch compatible)",
+    description = "Ingests multiple log records in bulk using Elasticsearch-compatible NDJSON format. Each line contains \
+                   either an index/create action followed by the document data. This endpoint provides high-throughput \
+                   ingestion for applications migrating from or integrating with Elasticsearch.",
     security(
         ("Authorization"= [])
     ),
@@ -45,8 +49,8 @@ use crate::{
     ),
     request_body(content = String, description = "Ingest data (ndjson)", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = BulkResponse, example = json!({"took":2,"errors":true,"items":[{"index":{"_index":"olympics","_id":1,"status":200,"error":{"type":"Too old data, only last 5 hours data can be ingested. Data discarded.","reason":"Too old data, only last 5 hours data can be ingested. Data discarded.","index_uuid":"1","shard":"1","index":"olympics"},"original_record":{"athlete":"CHASAPIS, Spiridon","city":"BER","country":"USA","discipline":"Swimming","event":"100M Freestyle For Sailors","gender":"Men","medal":"Silver","onemore":1,"season":"summer","sport":"Aquatics","year":1986}}}]})),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"took":2,"errors":true,"items":[{"index":{"_index":"olympics","_id":1,"status":200,"error":{"type":"Too old data, only last 5 hours data can be ingested. Data discarded.","reason":"Too old data, only last 5 hours data can be ingested. Data discarded.","index_uuid":"1","shard":"1","index":"olympics"},"original_record":{"athlete":"CHASAPIS, Spiridon","city":"BER","country":"USA","discipline":"Swimming","event":"100M Freestyle For Sailors","gender":"Men","medal":"Silver","onemore":1,"season":"summer","sport":"Aquatics","year":1986}}}]})),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/_bulk")]
@@ -69,7 +73,10 @@ pub async fn bulk(
     let mut resp = match logs::bulk::ingest(**thread_id, &org_id, body, user_email).await {
         Ok(v) => MetaHttpResponse::json(v),
         Err(e) => {
-            log::error!("Error processing request {org_id}/_bulk: {e}");
+            // we do not want to log trial period expired errors
+            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+                log::error!("Error processing request {org_id}/_bulk: {e}");
+            }
             if matches!(e, infra::errors::Error::ResourceError(_)) {
                 HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                     http::StatusCode::SERVICE_UNAVAILABLE,
@@ -97,6 +104,10 @@ pub async fn bulk(
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionMulti",
+    summary = "Ingest logs via multi-line JSON",
+    description = "Ingests log data using multi-line JSON format where each line contains a separate JSON object \
+                   representing a log record. This format is efficient for streaming applications and tools that \
+                   generate logs in newline-delimited JSON format.",
     security(
         ("Authorization"= [])
     ),
@@ -106,8 +117,8 @@ pub async fn bulk(
     ),
     request_body(content = String, description = "Ingest data (multiple line json)", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/{stream_name}/_multi")]
@@ -143,7 +154,10 @@ pub async fn multi(
             _ => MetaHttpResponse::json(v),
         },
         Err(e) => {
-            log::error!("Error processing request {org_id}/{stream_name}/_multi: {e}");
+            // we do not want to log trial period expired errors
+            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+                log::error!("Error processing request {org_id}/{stream_name}/_multi: {e}");
+            }
             if matches!(e, infra::errors::Error::ResourceError(_)) {
                 HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                     http::StatusCode::SERVICE_UNAVAILABLE,
@@ -171,6 +185,10 @@ pub async fn multi(
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionJson",
+    summary = "Ingest logs via JSON array",
+    description = "Ingests log data using a JSON array format where multiple log records are submitted as an array in a \
+                   single request. This is ideal for batch processing scenarios where applications collect multiple \
+                   log entries before sending them together for improved efficiency.",
     security(
         ("Authorization"= [])
     ),
@@ -180,8 +198,8 @@ pub async fn multi(
     ),
     request_body(content = String, description = "Ingest data (json array)", content_type = "application/json", example = json!([{"Year": 1896, "City": "Athens", "Sport": "Aquatics", "Discipline": "Swimming", "Athlete": "Alfred", "Country": "HUN"},{"Year": 1896, "City": "Athens", "Sport": "Aquatics", "Discipline": "Swimming", "Athlete": "HERSCHMANN", "Country":"CHN"}])),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/{stream_name}/_json")]
@@ -217,7 +235,10 @@ pub async fn json(
             _ => MetaHttpResponse::json(v),
         },
         Err(e) => {
-            log::error!("Error processing request {org_id}/{stream_name}/_json: {e}");
+            // we do not want to log trial period expired errors
+            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+                log::error!("Error processing request {org_id}/{stream_name}/_json: {e}");
+            }
             if matches!(e, infra::errors::Error::ResourceError(_)) {
                 HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                     http::StatusCode::SERVICE_UNAVAILABLE,
@@ -245,6 +266,10 @@ pub async fn json(
     context_path = "/api",
     tag = "Logs",
     operation_id = "AWSLogsIngestion",
+    summary = "Ingest logs from AWS Kinesis Firehose",
+    description = "Ingests log data from AWS Kinesis Data Firehose in the native Kinesis format. This endpoint handles \
+                   the specific request/response structure expected by Kinesis Firehose, making it seamless to \
+                   stream AWS CloudWatch logs and other AWS services directly into OpenObserve.",
     security(
         ("Authorization"= [])
     ),
@@ -255,7 +280,7 @@ pub async fn json(
     request_body(content = KinesisFHRequest, description = "Ingest data (json array)", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = KinesisFHIngestionResponse, example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f","timestamp": 1578090903599_i64})),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse, example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "errorMessage": "error processing request"})),
+        (status = 500, description = "Failure", content_type = "application/json", body = (), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "errorMessage": "error processing request"})),
     )
 )]
 #[post("/{org_id}/{stream_name}/_kinesis_firehose")]
@@ -289,7 +314,10 @@ pub async fn handle_kinesis_request(
                 error_message: None,
             }),
             Err(e) => {
-                log::error!("Error processing kinesis request: {e}");
+                // we do not want to log trial period expired errors
+                if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+                    log::error!("Error processing kinesis request: {e}");
+                }
                 if matches!(e, infra::errors::Error::ResourceError(_)) {
                     HttpResponse::ServiceUnavailable().json(KinesisFHIngestionResponse {
                         request_id,
@@ -331,7 +359,10 @@ pub async fn handle_gcp_request(
         {
             Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
-                log::error!("Error processing request {org_id}/{stream_name}/_gcp: {e:?}");
+                // we do not want to log trial period expired errors
+                if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+                    log::error!("Error processing request {org_id}/{stream_name}/_gcp: {e:?}");
+                }
                 if matches!(e, infra::errors::Error::ResourceError(_)) {
                     HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                         http::StatusCode::SERVICE_UNAVAILABLE,
@@ -351,10 +382,14 @@ pub async fn handle_gcp_request(
     context_path = "/api",
     tag = "Logs",
     operation_id = "PostLogs",
+    summary = "Ingest logs via OTLP",
+    description = "Ingests log data using OpenTelemetry Protocol (OTLP) format. Supports both Protocol Buffers and JSON \
+                   content types for OTLP log ingestion. This is the standard endpoint for OpenTelemetry SDK and \
+                   collector integrations to send structured log data with trace correlation.",
     request_body(content = String, description = "ExportLogsServiceRequest", content_type = "application/x-protobuf"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200})),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/v1/logs")]
@@ -415,9 +450,12 @@ pub async fn otlp_logs_write(
     {
         Ok(v) => v,
         Err(e) => {
-            log::error!(
-                "Error processing otlp {content_type} logs write request {org_id}/{in_stream_name:?}: {e:?}"
-            );
+            // we do not want to log trial period expired errors
+            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+                log::error!(
+                    "Error processing otlp {content_type} logs write request {org_id}/{in_stream_name:?}: {e:?}"
+                );
+            }
             if matches!(e, infra::errors::Error::ResourceError(_)) {
                 HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                     http::StatusCode::SERVICE_UNAVAILABLE,
@@ -438,6 +476,10 @@ pub async fn otlp_logs_write(
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionHec",
+    summary = "Ingest logs via Splunk HEC format",
+    description = "Ingests log data using Splunk HTTP Event Collector (HEC) format, providing compatibility with Splunk \
+                   forwarders and applications. This endpoint accepts the standard HEC JSON format, making it easy to \
+                   migrate from or integrate with existing Splunk deployments.",
     security(
         ("Authorization"= [])
     ),
@@ -476,7 +518,10 @@ pub async fn hec(
             }
         }
         Err(e) => {
-            log::error!("Error processing request {org_id}/_hec: {e}");
+            // we do not want to log trial period expired errors
+            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+                log::error!("Error processing request {org_id}/_hec: {e}");
+            }
             let res = HecResponse::from(HecStatus::Custom(e.to_string(), 400));
             if matches!(e, infra::errors::Error::ResourceError(_)) {
                 HttpResponse::ServiceUnavailable().json(res)

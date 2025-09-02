@@ -59,7 +59,7 @@ pub async fn process_token(
         TokenValidationResponse,
         Option<TokenData<HashMap<String, Value>>>,
     ),
-) -> Option<bool> {
+) -> Option<(bool, bool)> {
     let dec_token = res.1.unwrap();
 
     let user_email = res.0.user_email.to_owned();
@@ -561,8 +561,9 @@ pub fn format_role_name_only(role: &str) -> String {
 }
 
 #[cfg(feature = "cloud")]
-pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
+pub async fn check_and_add_to_org(user_email: &str, name: &str) -> (bool, bool) {
     use config::{ider, utils::json};
+    use o2_enterprise::enterprise::cloud::OrgInviteStatus;
     use o2_openfga::authorizer::authz::save_org_tuples;
 
     use crate::service::users::{add_admin_to_org, create_new_user};
@@ -572,6 +573,19 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
     let mut tuples_to_add = HashMap::new();
     let (first_name, last_name) = name.split_once(' ').unwrap_or((name, ""));
     let db_user = db::user::get_user_by_email(user_email).await;
+    let now = chrono::Utc::now().timestamp_micros();
+    let pending_invites = match db::user::list_user_invites(user_email).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error in listing invites for {user_email} : {e}");
+            vec![]
+        }
+    };
+    let pending_invites = pending_invites
+        .into_iter()
+        .filter(|invite| invite.status == OrgInviteStatus::Pending && invite.expires_at > now)
+        .next()
+        .is_some();
     if db_user.is_none() {
         is_new_user = true;
         match create_new_user(DBUser {
@@ -594,7 +608,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
             }
             Err(e) => {
                 log::error!("Error adding user to the database: {}", e);
-                return is_new_user;
+                return (is_new_user, pending_invites);
             }
         }
     }
@@ -610,6 +624,10 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
             existing_orgs[0].org_name.to_owned(),
             existing_orgs[0].role.to_string(),
         ),
+        // if there are some pending invites, we do not want to create any orgs for the user
+        _ if pending_invites => {
+            return (is_new_user, pending_invites);
+        }
         _ => {
             // Create a default org for the user
             let org = Organization {
@@ -697,7 +715,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
             .await;
     }
 
-    is_new_user
+    (is_new_user, pending_invites)
 }
 
 #[cfg(feature = "enterprise")]
@@ -873,8 +891,7 @@ mod tests {
             assert_eq!(
                 format_role_name_only(input),
                 expected,
-                "Failed for input: {}",
-                input
+                "Failed for input: {input}"
             );
         }
     }
@@ -896,6 +913,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     fn test_format_role_name_consistency() {
         let org = "test_org";
         let role = "admin-role";

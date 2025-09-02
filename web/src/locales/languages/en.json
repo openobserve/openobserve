@@ -317,6 +317,24 @@
     "customRole": "Custom Roles",
     "description": "Description"
   },
+  "invitation": {
+    "pendingInvitations": "Pending Invitations",
+    "organizationName": "Organization Name",
+    "role": "Role",
+    "invitedBy": "Invited By",
+    "expiry": "Expiry",
+    "actions": "Actions",
+    "accept": "Accept",
+    "reject": "Reject",
+    "cancel": "Cancel",
+    "confirmAcceptHead": "Accept Invitation",
+    "confirmAcceptMsg": "Are you sure you want to join {org}?",
+    "confirmRejectHead": "Reject Invitation",
+    "confirmRejectMsg": "Are you sure you want to reject the invitation to join {org}?",
+    "expired": "Expired",
+    "expiresToday": "Expires Today",
+    "daysLeft": "{days} days left"
+  },
   "serviceAccounts": {
     "header": "Service Accounts",
     "search": "Search Service Account",

@@ -37,15 +37,20 @@ fn validate_meta_org_access(org_id: &str) -> Result<(), infra::errors::Error> {
     context_path = "/api",
     tag = "Domain Management",
     operation_id = "GetDomainManagementConfig",
+    summary = "Get domain management configuration",
+    description = "Retrieves the current domain management configuration for custom domain settings and SSL certificate \
+                   management. Only accessible by the meta organization for security and control purposes. Returns \
+                   domain configuration including DNS settings, certificate status, and routing configurations for \
+                   enterprise domain management.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name (must be meta org)"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = DomainManagementResponse),
-        (status = 403, description = "Forbidden", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "Not Found", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Internal Server Error", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+        (status = 404, description = "Not Found", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/domain_management")]
@@ -76,16 +81,21 @@ pub async fn get_domain_management_config(path: web::Path<String>) -> Result<Htt
     context_path = "/api",
     tag = "Domain Management",
     operation_id = "SetDomainManagementConfig",
+    summary = "Configure domain management settings",
+    description = "Updates the domain management configuration for custom domain settings, SSL certificates, and DNS \
+                   routing. Only accessible by the meta organization for security and administrative control. Allows \
+                   configuration of custom domains, certificate management, and traffic routing for enterprise \
+                   deployments with custom branding and domain requirements.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name (must be meta org)"),
     ),
-    request_body(content = DomainManagementRequest, description = "Domain management configuration", content_type = "application/json"),
+    request_body(content = Object, description = "Domain management configuration", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = DomainOperationResponse),
-        (status = 400, description = "Bad Request", content_type = "application/json", body = HttpResponse),
-        (status = 403, description = "Forbidden", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Internal Server Error", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Bad Request", content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/domain_management")]

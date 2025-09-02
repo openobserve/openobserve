@@ -98,6 +98,8 @@ struct PatternTestResponse {
 #[utoipa::path(
     post,
     context_path = "/api",
+    summary = "Create a new regex pattern",
+    description = "Stores a new regular expression pattern for log processing and data extraction",
     request_body(
         content = PatternCreateRequest,
         description = "re_pattern to add",
@@ -186,6 +188,8 @@ pub async fn save(
 #[utoipa::path(
     get,
     context_path = "/api",
+    summary = "Get regex pattern by ID",
+    description = "Retrieves a specific regex pattern using its unique identifier",
     params(
         ("id" = String, Path, description = "id of the pattern to retrieve", example = "12345")
     ),
@@ -230,6 +234,8 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
 #[utoipa::path(
     get,
     context_path = "/api",
+    summary = "List all regex patterns for organization",
+    description = "Lists all regex patterns available within the specified organization",
     responses(
         (
             status = 200,
@@ -267,6 +273,8 @@ pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
 #[utoipa::path(
     delete,
     context_path = "/api",
+    summary = "Delete regex pattern by ID",
+    description = "Removes a regex pattern from the system using its identifier",
     params(
         ("id" = String, Path, description = "id of the pattern to delete", example = "12345")
     ),
@@ -335,6 +343,8 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 #[utoipa::path(
     put,
     context_path = "/api",
+    summary = "Update regex pattern by ID",
+    description = "Modifies an existing regex pattern's configuration and rules",
     params(
         ("id" = String, Path, description = "id of the pattern to update", example = "12345")
     ),
@@ -411,6 +421,8 @@ pub async fn update(
 #[utoipa::path(
     post,
     context_path = "/api",
+    summary = "Test regex pattern against sample data",
+    description = "Tests a regex pattern against sample input strings to validate pattern matching",
     request_body(
         content = PatternTestRequest,
         description = "re_pattern to test and strings to test against",

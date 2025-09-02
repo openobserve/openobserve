@@ -62,6 +62,11 @@ impl From<ReportError> for HttpResponse {
     context_path = "/api",
     tag = "Reports",
     operation_id = "CreateReport",
+    summary = "Create dashboard report",
+    description = "Creates a new automated dashboard report configuration. Reports can be scheduled to automatically \
+                   generate and distribute dashboard snapshots via email or other notification channels. Includes \
+                   support for custom time ranges, recipient lists, delivery schedules, and output formats to keep \
+                   stakeholders informed of key metrics and trends.",
     security(
         ("Authorization" = [])
     ),
@@ -77,8 +82,8 @@ impl From<ReportError> for HttpResponse {
         }),
     ),
     responses(
-        (status = StatusCode::CREATED, description = "Report created", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+        (status = StatusCode::CREATED, description = "Report created", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
 )]
 #[post("/{org_id}/reports")]
@@ -106,6 +111,11 @@ pub async fn create_report(
     context_path = "/api",
     tag = "Reports",
     operation_id = "UpdateReport",
+    summary = "Update dashboard report",
+    description = "Updates an existing dashboard report configuration. Allows modification of report parameters including \
+                   schedule, recipients, dashboard selection, time ranges, and delivery options. Changes take effect on \
+                   the next scheduled execution, ensuring report distribution continues with updated settings and content \
+                   selection.",
     security(
         ("Authorization" = [])
     ),
@@ -118,9 +128,9 @@ pub async fn create_report(
         description = "Report details",
     ),
     responses(
-        (status = StatusCode::OK, description = "Report updated", body = HttpResponse),
-        (status = StatusCode::NOT_FOUND, description = "Report not found", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the report", body = HttpResponse),
+        (status = StatusCode::OK, description = "Report updated", body = ()),
+        (status = StatusCode::NOT_FOUND, description = "Report not found", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the report", body = ()),
     ),
 )]
 #[put("/{org_id}/reports/{name}")]
@@ -145,6 +155,11 @@ async fn update_report(
     context_path = "/api",
     tag = "Reports",
     operation_id = "ListReports",
+    summary = "List dashboard reports",
+    description = "Retrieves a list of all dashboard reports configured for the organization. Optionally filter by folder \
+                   or dashboard to get specific report subsets. Returns report metadata including schedules, status, \
+                   destinations, and execution history to help administrators manage automated reporting and monitor \
+                   delivery performance.",
     security(
         ("Authorization" = [])
     ),
@@ -237,6 +252,11 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
     context_path = "/api",
     tag = "Reports",
     operation_id = "GetReport",
+    summary = "Get dashboard report",
+    description = "Retrieves the complete configuration and details for a specific dashboard report. Returns report \
+                   parameters including schedule settings, dashboard selection, recipient lists, delivery options, and \
+                   execution status. Used for reviewing existing report configurations before making modifications or \
+                   troubleshooting delivery issues.",
     security(
         ("Authorization" = [])
     ),
@@ -246,7 +266,7 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
     ),
     responses(
         (status = StatusCode::OK, body = Report),
-        (status = StatusCode::NOT_FOUND, description = "Report not found", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Report not found", body = ()),
     ),
 )]
 #[get("/{org_id}/reports/{name}")]
@@ -265,6 +285,10 @@ async fn get_report(path: web::Path<(String, String)>) -> Result<HttpResponse, E
     context_path = "/api",
     tag = "Reports",
     operation_id = "DeleteReport",
+    summary = "Delete dashboard report",
+    description = "Removes a dashboard report configuration from the organization. This action cancels any scheduled \
+                   report deliveries and permanently removes the report configuration. Recipients will no longer receive \
+                   automated report deliveries, and the report configuration cannot be recovered once deleted.",
     security(
         ("Authorization" = [])
     ),
@@ -273,9 +297,9 @@ async fn get_report(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ("name" = String, Path, description = "Report name"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Success", body = HttpResponse),
-        (status = StatusCode::NOT_FOUND, description = "NotFound", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = HttpResponse),
+        (status = StatusCode::OK, description = "Success", body = ()),
+        (status = StatusCode::NOT_FOUND, description = "NotFound", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
 )]
 #[delete("/{org_id}/reports/{name}")]
@@ -297,6 +321,11 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
     context_path = "/api",
     tag = "Report",
     operation_id = "EnableReport",
+    summary = "Enable or disable dashboard report",
+    description = "Enables or disables automated execution of a dashboard report. When disabled, scheduled report \
+                   deliveries are paused but the configuration is preserved. When re-enabled, report deliveries resume \
+                   according to the configured schedule. Useful for temporarily stopping report distribution without \
+                   losing the complete report setup.",
     security(
         ("Authorization"= [])
     ),
@@ -306,9 +335,9 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
         ("value" = bool, Query, description = "Enable or disable report"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/reports/{name}/enable")]
@@ -340,6 +369,11 @@ async fn enable_report(
     context_path = "/api",
     tag = "Reports",
     operation_id = "TriggerReport",
+    summary = "Manually trigger dashboard report",
+    description = "Manually triggers immediate execution of a dashboard report outside of its regular schedule. Generates \
+                   the report with current data and delivers it to configured destinations. Useful for ad-hoc reporting \
+                   needs, testing report configurations, or providing immediate updates to stakeholders between scheduled \
+                   deliveries.",
     security(
         ("Authorization"= [])
     ),
@@ -348,9 +382,9 @@ async fn enable_report(
         ("name" = String, Path, description = "Report name"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/reports/{name}/trigger")]

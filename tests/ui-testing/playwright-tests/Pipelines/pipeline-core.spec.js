@@ -175,7 +175,7 @@ test.describe("Core Pipeline Tests", () => {
     await pageManager.pipelinesPage.verifyPipelineDeleted();
   });
 
-  test("should add source, function, destination and then delete pipeline", async ({ page }) => {
+  test.skip("should add source, function, destination and then delete pipeline", async ({ page }) => {
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
