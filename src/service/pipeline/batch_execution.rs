@@ -248,13 +248,13 @@ impl ExecutablePipeline {
         stream_name: Option<String>,
     ) -> Result<HashMap<StreamParams, Vec<(usize, Value)>>> {
         let batch_size = records.len();
-        
+
         // Early return if no records to process
         if batch_size == 0 {
             log::debug!("[Pipeline] {} : empty batch, returning early", self.name);
             return Ok(HashMap::new());
         }
-        
+
         let pipeline_name = self.name.clone();
         log::debug!(
             "[Pipeline] {} : process batch of size {}",
