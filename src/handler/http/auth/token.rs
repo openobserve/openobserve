@@ -69,10 +69,17 @@ pub async fn token_validator(
                 let is_member_subscription = path_columns
                     .get(1)
                     .is_some_and(|p| p.eq(&"member_subscription"));
+                // this is for /invites call, which is only based on user, similar to
+                // member subscription. Furthermore, because we are listing the invites of
+                // that particular user only, we can skip other checks, and allow listing
+                let is_list_invite_call = path_columns.len() <= 2
+                    && path_columns.first().is_some_and(|p| p.eq(&"invites"))
+                    && (auth_info.method.eq("GET") || auth_info.method.eq("DELETE"));
                 let path_suffix = path_columns.last().unwrap_or(&"");
                 if path_suffix.eq(&"organizations")
                     || path_suffix.eq(&"clusters")
                     || is_member_subscription
+                    || is_list_invite_call
                 {
                     let db_user = db::user::get_db_user(user_id).await;
                     user = match db_user {
@@ -104,6 +111,33 @@ pub async fn token_validator(
                     }
                 };
                 match user {
+                    // specifically for list invite call, even if the user is not present
+                    // in db, which can be the case when a new user is joining o2 cloud for first
+                    // time we can get None. if the API call is specifically
+                    // /invite, then it should be ok to allow, because we list
+                    // invite based on the user email got from sso provider, and
+                    // nothing else. Similarly for accepting invite, we will not have the
+                    // user in db anymore, and the fn checks based on email and token, so ok to
+                    // bypass
+                    None if (is_list_invite_call || is_member_subscription) => {
+                        let mut req = req;
+
+                        if req.method().eq(&Method::POST)
+                            && !req.headers().contains_key("content-type")
+                        {
+                            req.headers_mut().insert(
+                                header::CONTENT_TYPE,
+                                header::HeaderValue::from_static(
+                                    "application/x-www-form-urlencoded",
+                                ),
+                            );
+                        }
+                        req.headers_mut().insert(
+                            header::HeaderName::from_static("user_id"),
+                            header::HeaderValue::from_str(&res.0.user_email).unwrap(),
+                        );
+                        Ok(req)
+                    }
                     Some(user) => {
                         // / Hack for prometheus, need support POST and check the header
                         let mut req = req;

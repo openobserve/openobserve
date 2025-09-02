@@ -618,15 +618,15 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                         "is_valid": res.0.is_valid,
                     }))
                     .unwrap();
-                    let is_new_usr = process_token(res)
-                        .await
-                        .map(|new_user| format!("&new_user_login={new_user}"));
+                    let url_params = process_token(res).await.map(|(new_user, pending_invites)| {
+                        format!("&new_user_login={new_user}&pending_invites={pending_invites}")
+                    });
                     login_url = format!(
                         "{}#id_token={}.{}{}",
                         login_data.url,
                         ID_TOKEN_HEADER,
                         base64::encode(&id_token),
-                        is_new_usr.unwrap_or_default()
+                        url_params.unwrap_or_default()
                     );
                 }
                 Err(e) => {

@@ -820,7 +820,51 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
 #[get("/invites")]
 pub async fn list_invitations(user_email: UserEmail) -> Result<HttpResponse, Error> {
     let user_id = user_email.user_id.as_str();
-    users::list_user_invites(user_id).await
+    users::list_user_invites(user_id, true).await
+}
+
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "UserInvitations",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("token" = String, Path, description = "invitation token"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+    )
+)]
+#[delete("/invites/{token}")]
+pub async fn decline_invitation(
+    user_email: UserEmail,
+    path: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    use crate::service::organization;
+
+    let token = path.into_inner();
+    let user_id = user_email.user_id.as_str();
+
+    match organization::decline_invitation(user_id, &token).await {
+        Ok(_) => Ok(HttpResponse::Ok()
+            .json(serde_json::json!({"message":"Invitation declined successfully"}))),
+
+        Err(err) => {
+            Ok(HttpResponse::BadRequest().json(serde_json::json!({"message": err.to_string()})))
+        }
+    }
+}
+
+#[cfg(not(feature = "cloud"))]
+#[delete("/invites/{token}")]
+pub async fn decline_invitation(
+    _user_email: UserEmail,
+    _path: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
 #[cfg(not(feature = "cloud"))]
