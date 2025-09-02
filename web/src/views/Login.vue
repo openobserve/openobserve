@@ -15,26 +15,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <login v-if="user.email == ''" />
+  <login v-if="user.email == '' && !showInvitations" />
+  <div v-if="showInvitations && config.isCloud == 'true'">
+    <div class="flex relative-position tw-px-3 tw-pt-2">
+      <img
+        class="appLogo"
+        loading="lazy"
+        :src="
+          store?.state?.theme == 'dark'
+            ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+            : getImageURL('images/common/openobserve_latest_light_2.svg')
+        "
+      />
+    </div>
+    <invitation-list
+      v-if="showInvitations"
+      :user-email="user.email"
+      @invitations-processed="handleInvitationsProcessed"
+    />
+  </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, onBeforeMount, ref } from "vue";
 import { useRouter } from "vue-router";
 import Login from "@/components/login/Login.vue";
+import InvitationList from "@/components/iam/users/InvitationList.vue";
 import config from "@/aws-exports";
 import configService from "@/services/config";
 import { useStore } from "vuex";
-import { getUserInfo, getDecodedUserInfo, checkCallBackValues } from "@/utils/zincutils";
+import {
+  getUserInfo,
+  getDecodedUserInfo,
+  checkCallBackValues,
+} from "@/utils/zincutils";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
-import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
+import {
+  useLocalCurrentUser,
+  useLocalOrganization,
+  invalidateLoginData,
+  useLocalUserInfo,
+  getImageURL,
+} from "@/utils/zincutils";
 import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "LoginPage",
   components: {
     Login,
+    InvitationList,
   },
   setup() {
     const store = useStore();
@@ -42,6 +72,11 @@ export default defineComponent({
     const selectedOrg = ref({});
     const q = useQuasar();
     const router: any = useRouter();
+    const showInvitations = ref(false);
+    const invitedOrg = ref<{ identifier: string; name: string }>({
+      identifier: "",
+      name: "",
+    });
 
     onBeforeMount(async () => {
       if (!router?.currentRoute.value.hash) {
@@ -64,67 +99,106 @@ export default defineComponent({
      * redirect user to the page where user was redirected from
      */
     const getDefaultOrganization = () => {
-      organizationsService.list(0, 100000, "id", false, "").then((res: any) => {
-        const localOrg: any = useLocalOrganization();
-        let tempDefaultOrg = {};
-        let localOrgFlag = false;
-        if (
-          localOrg.value != null &&
-          localOrg.value.user_email !== store.state.userInfo.email
-        ) {
-          localOrg.value = null;
-          useLocalOrganization("");
-        }
-
-        store.dispatch("setOrganizations", res.data.data);
-
-        orgOptions.value = res.data.data.map(
-          (data: {
-            id: any;
-            name: any;
-            type: any;
-            identifier: any;
-            UserObj: any;
-          }) => {
-            let optiondata: any = {
-              label: data.name,
-              id: data.id,
-              identifier: data.identifier,
-              user_email: store.state.userInfo.email,
-            };
-
-            if (
-              (Object.keys(selectedOrg.value).length == 0 &&
-                (data.type == "default" || data.id == "1") &&
-                store.state.userInfo.email == data.UserObj.email) ||
-              res.data.data.length == 1
-            ) {
-              localOrgFlag = true;
-              selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
-              useLocalOrganization(selectedOrg.value);
-              store.dispatch("setSelectedOrganization", selectedOrg.value);
-            }
-
-            if (data.type == "default") {
-              tempDefaultOrg = optiondata;
-            }
-
-            return optiondata;
+      organizationsService
+        .list(0, 100000, "id", false, "")
+        .then((res: any) => {
+          const localOrg: any = useLocalOrganization();
+          let tempDefaultOrg = {};
+          let localOrgFlag = false;
+          if (
+            localOrg.value != null &&
+            localOrg.value.user_email !== store.state.userInfo.email
+          ) {
+            localOrg.value = null;
+            useLocalOrganization("");
           }
-        );
 
-        if (localOrgFlag == false) {
-          selectedOrg.value = tempDefaultOrg;
-          useLocalOrganization(tempDefaultOrg);
-          store.dispatch("setSelectedOrganization", tempDefaultOrg);
-        }
-        //here check if the config.Iscloud is true and the redirectURI is there any new_user_login == true
-        if(config.isCloud == 'true' && checkCallBackValues(router.currentRoute.value.hash, "new_user_login") == "true"){
-          localStorage.setItem("isFirstTimeLogin", "true");
-        }
-        redirectUser();
-        
-      });
+          store.dispatch("setOrganizations", res.data.data);
+
+          orgOptions.value = res.data.data.map(
+            (data: {
+              id: any;
+              name: any;
+              type: any;
+              identifier: any;
+              UserObj: any;
+            }) => {
+              let optiondata: any = {
+                label: data.name,
+                id: data.id,
+                identifier: data.identifier,
+                user_email: store.state.userInfo.email,
+              };
+
+              if (
+                invitedOrg.value?.identifier &&
+                invitedOrg.value?.identifier === data.identifier
+              ) {
+                selectedOrg.value = optiondata;
+                useLocalOrganization(optiondata);
+                store.dispatch("setSelectedOrganization", optiondata);
+              } else if (
+                (Object.keys(selectedOrg.value).length == 0 &&
+                  (data.type == "default" || data.id == "1") &&
+                  store.state.userInfo.email == data.UserObj.email) ||
+                res.data.data.length == 1
+              ) {
+                localOrgFlag = true;
+                selectedOrg.value = localOrg.value
+                  ? localOrg.value
+                  : optiondata;
+                useLocalOrganization(selectedOrg.value);
+                store.dispatch("setSelectedOrganization", selectedOrg.value);
+              }
+
+              if (data.type == "default") {
+                tempDefaultOrg = optiondata;
+              }
+
+              return optiondata;
+            },
+          );
+
+          if (localOrgFlag == false && !invitedOrg.value?.identifier) {
+            selectedOrg.value = tempDefaultOrg;
+            useLocalOrganization(tempDefaultOrg);
+            store.dispatch("setSelectedOrganization", tempDefaultOrg);
+          }
+          //here check if the config.Iscloud is true and the redirectURI is there any new_user_login == true
+          if (
+            config.isCloud == "true" &&
+            checkCallBackValues(
+              router.currentRoute.value.hash,
+              "new_user_login",
+            ) == "true"
+          ) {
+            localStorage.setItem("isFirstTimeLogin", "true");
+          }
+
+          // Check for pending invites
+          redirectUser();
+        })
+        .catch((e: any) => {
+          console.log("Error while fetching organizations", e);
+          if (e.response?.status === 403) {
+            signout();
+          }
+        });
+    };
+
+    const signout = () => {
+      if (config?.isEnterprise == "true" || config?.isCloud == "true") {
+        invalidateLoginData();
+      }
+
+      store.dispatch("logout");
+      useLocalCurrentUser("", true);
+      useLocalUserInfo("", true);
+
+      router.push("/login");
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     };
 
     /**
@@ -145,6 +219,18 @@ export default defineComponent({
       }
     };
 
+    const handleInvitationsProcessed = (data: any) => {
+      showInvitations.value = false;
+      if (data.accepted) {
+        // User accepted an invitation, set the organization and follow normal flow
+        invitedOrg.value = data.organization;
+        getDefaultOrganization();
+      } else {
+        // User rejected all invitations, proceed with normal flow
+        getDefaultOrganization();
+      }
+    };
+
     return {
       q,
       store,
@@ -152,6 +238,9 @@ export default defineComponent({
       router,
       redirectUser,
       getDefaultOrganization,
+      showInvitations,
+      handleInvitationsProcessed,
+      getImageURL,
     };
   },
   data() {
@@ -161,6 +250,7 @@ export default defineComponent({
         cognito_sub: "",
         first_name: "",
         last_name: "",
+        sub_key: "",
       },
       userInfo: {
         email: "",
@@ -177,25 +267,39 @@ export default defineComponent({
      * set the user info to the vuex store
      * else call the verify and create user method as user is not registered
      */
+
     if (this.$route.hash) {
       configService
         .get_config()
         .then(async (res) => {
           this.store.commit("setZoConfig", res.data);
           const token = getUserInfo(this.$route.hash);
+
           if (token !== null && token.email != null) {
             this.user.email = token.email;
             this.user.cognito_sub = token.sub;
             this.user.first_name = token.given_name ? token.given_name : "";
             this.user.last_name = token.family_name ? token.family_name : "";
           }
-
           const sessionUserInfo = getDecodedUserInfo();
           const d = new Date();
           this.userInfo =
             sessionUserInfo !== null
               ? JSON.parse(sessionUserInfo as string)
               : null;
+
+          // Check for pending invites before login
+          if (
+            config.isCloud == "true" &&
+            checkCallBackValues(
+              this.router.currentRoute.value.hash,
+              "pending_invites",
+            ) == "true"
+          ) {
+            this.showInvitations = true;
+            return;
+          }
+
           if (
             (this.userInfo !== null &&
               this.userInfo.hasOwnProperty("pgdata")) ||
@@ -258,3 +362,19 @@ export default defineComponent({
   },
 });
 </script>
+<style lang="scss" scoped>
+.appLogo {
+  width: auto;
+  max-width: 200px;
+  height: 40px;
+  max-height: 40px;
+  cursor: pointer;
+
+  &__mini {
+    margin-right: 0.25rem;
+    // margin-left: 0.25rem;
+    height: 30px;
+    width: 30px;
+  }
+}
+</style>
