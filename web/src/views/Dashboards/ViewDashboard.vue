@@ -121,21 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="dashboard-icons hideOnPrintMode"
               size="sm"
             />
-            <q-btn
-              v-if="config.isEnterprise == 'true' && arePanelsLoading"
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
-              size="sm"
-              no-caps
-              icon="cancel"
-              @click="cancelQuery"
-              data-test="dashboard-cancel-btn"
-              color="negative"
-            >
-              <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              v-else
+             <q-btn
+             v-if="!config.isEnterprise"
               :outline="isVariablesChanged ? false : true"
               class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
@@ -155,6 +142,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}
               </q-tooltip>
             </q-btn>
+            <q-btn-group
+              v-if="config.isEnterprise"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+            >
+              <q-btn
+                :outline="!arePanelsLoading && (isVariablesChanged ? false : true)"
+                :flat="arePanelsLoading"
+                class="dashboard-icons hideOnPrintMode"
+                size="sm"
+                no-caps
+                :icon="arePanelsLoading ? 'cancel' : 'refresh'"
+                @click="onRefreshBtnClick"
+                :data-test="arePanelsLoading ? 'dashboard-cancel-btn' : 'dashboard-refresh-btn'"
+                :color="arePanelsLoading ? 'negative' : (isVariablesChanged ? 'warning' : '')"
+                :text-color="arePanelsLoading ? 'negative' : (store.state.theme == 'dark' ? 'white' : 'dark')"
+                :disable="arePanelsLoading && !config.isEnterprise"
+              >
+                <q-tooltip>
+                  {{
+                    arePanelsLoading
+                      ? t("panel.cancel")
+                      : (isVariablesChanged
+                          ? "Refresh to apply latest variable changes"
+                          : "Refresh")
+                  }}
+                </q-tooltip>
+              </q-btn>
+              
+              <q-btn-dropdown
+                :outline="!arePanelsLoading && (isVariablesChanged ? false : true)"
+                flat
+                class="q-px-xs"
+                size="sm"
+                no-caps
+                auto-close
+                :disable="arePanelsLoading"
+                :color="arePanelsLoading ? 'negative' : (isVariablesChanged ? 'warning' : '')"
+                :text-color="arePanelsLoading ? 'negative' : (store.state.theme == 'dark' ? 'white' : 'dark')"
+                dropdown-icon="keyboard_arrow_down"
+              >
+                <q-list>
+                  <q-item clickable @click="refreshData(true)" :disable="arePanelsLoading">
+                    <q-item-section avatar>
+                      <q-icon name="refresh" />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label>Refresh Without Using Cache</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </q-list>
+              </q-btn-dropdown>
+            </q-btn-group>
 
             <ExportDashboard
               v-if="!isFullscreen"
@@ -837,10 +876,22 @@ export default defineComponent({
       });
     };
 
-    const refreshData = () => {
+    const refreshData = (withoutCache = false) => {
       if (!arePanelsLoading.value) {
         // Generate new run ID for whole dashboard refresh
         generateNewDashboardRunId();
+
+        
+        // Set shouldRefreshWithoutCache to false for all panels
+        const allPanelIds = [];
+        currentDashboardData.data.tabs?.forEach((tab: any) => {
+          tab.panels?.forEach((panel: any) => {
+            allPanelIds.push(panel.id);
+            shouldRefreshWithoutCachePerPanel.value[panel.id] = withoutCache;
+          });
+        });
+
+        // Refresh the dashboard
         dateTimePicker.value.refresh();
       }
     };
@@ -1190,6 +1241,15 @@ export default defineComponent({
       }
     });
 
+    const onRefreshBtnClick = () => {
+      if (config.isEnterprise == 'true' && arePanelsLoading.value) {
+        cancelQuery()
+      } else {
+        refreshData();
+      }
+
+    };
+
     return {
       currentDashboardData,
       toggleFullscreen,
@@ -1256,6 +1316,7 @@ export default defineComponent({
       saveJsonDashboard,
       setTimeForVariables,
       runId,
+      onRefreshBtnClick,
     };
   },
 });
