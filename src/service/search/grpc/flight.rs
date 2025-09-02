@@ -196,6 +196,13 @@ pub async fn search(
             && !index_condition.as_ref().unwrap().is_condition_all(),
     });
 
+    log::info!(
+        "[trace_id {trace_id}] flight->search: use_inverted_index: {}, index_condition: {:?}, index_optimizer_rule: {:?}",
+        query_params.use_inverted_index,
+        index_condition,
+        idx_optimize_rule
+    );
+
     // search in object storage
     let mut tantivy_file_list = Vec::new();
     if !req.search_info.file_id_list.is_empty() {
