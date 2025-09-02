@@ -18,17 +18,24 @@ use std::{collections::HashSet, sync::Arc};
 use config::meta::inverted_index::IndexOptimizeMode;
 use datafusion::{
     common::{
-        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter}, Result
+        Result,
+        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter},
     },
     config::ConfigOptions,
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
-        aggregates::{AggregateExec, AggregateMode}, ExecutionPlan
+        ExecutionPlan, aggregates::AggregateExec,
+        sorts::sort_preserving_merge::SortPreservingMergeExec,
     },
 };
 use parking_lot::Mutex;
 
-use crate::service::search::index::IndexCondition;
+mod count;
+
+use crate::service::search::{
+    datafusion::optimizer::physical_optimizer::index_optimizer::count::is_simple_count,
+    index::IndexCondition,
+};
 
 #[derive(Default, Debug)]
 pub struct IndexOptimizeRule {
@@ -98,12 +105,16 @@ impl IndexOptimizer {
 impl TreeNodeRewriter for IndexOptimizer {
     type Node = Arc<dyn ExecutionPlan>;
 
-    fn f_up(&mut self, node: Self::Node) -> Result<Transformed<Self::Node>> {
-        if let Some(agg) = node.as_any().downcast_ref::<AggregateExec>()
-            && *agg.mode() == AggregateMode::Partial
-        {
-            return Ok(Transformed::new(node, false, TreeNodeRecursion::Stop));
+    fn f_up(&mut self, plan: Self::Node) -> Result<Transformed<Self::Node>> {
+        if let Some(_sort_merge) = plan.as_any().downcast_ref::<SortPreservingMergeExec>() {
+            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
+        } else if plan.as_any().downcast_ref::<AggregateExec>().is_some() {
+            if let Some(index_optimize_mode) = is_simple_count(Arc::clone(&plan)) {
+                *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
+                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+            }
+            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
         }
-        Ok(Transformed::no(node))
+        Ok(Transformed::no(plan))
     }
 }

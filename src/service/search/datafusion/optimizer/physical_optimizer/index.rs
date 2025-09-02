@@ -15,6 +15,7 @@
 
 use std::{collections::HashSet, sync::Arc};
 
+use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     common::{
         Result,
@@ -68,13 +69,22 @@ impl PhysicalOptimizerRule for IndexRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        let cfg = config::get_config();
-        if !cfg.common.inverted_index_enabled {
+        if !config::get_config().common.inverted_index_enabled {
             return Ok(plan);
         }
+
         let mut rewriter =
             IndexOptimizer::new(self.index_fields.clone(), self.index_condition.clone());
-        plan.rewrite(&mut rewriter).data()
+        let plan = plan.rewrite(&mut rewriter).data()?;
+
+        // if all filter can be used in index, we can
+        // use index optimizer rule to optimize the query
+        if self.index_condition.lock().is_none() && rewriter.can_optimize {
+            *self.index_condition.lock() = Some(IndexCondition {
+                conditions: vec![Condition::All()],
+            });
+        }
+        Ok(plan)
     }
 
     fn name(&self) -> &str {
@@ -89,6 +99,7 @@ impl PhysicalOptimizerRule for IndexRule {
 struct IndexOptimizer {
     index_fields: HashSet<String>,
     index_condition: Arc<Mutex<Option<IndexCondition>>>,
+    can_optimize: bool,
 }
 
 impl IndexOptimizer {
@@ -99,6 +110,7 @@ impl IndexOptimizer {
         Self {
             index_fields,
             index_condition,
+            can_optimize: false,
         }
     }
 }
@@ -121,6 +133,12 @@ impl TreeNodeRewriter for IndexOptimizer {
 
             if !index_conditions.is_empty() {
                 *self.index_condition.lock() = Some(index_conditions);
+            }
+
+            // if all filter can be used in index, we can
+            // use index optimizer rule to optimize the query
+            if is_only_timestamp_filter(&other_conditions) {
+                self.can_optimize = true;
             }
 
             let plan = construct_filter_exec(filter, other_conditions)?;
@@ -239,4 +257,32 @@ fn get_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
 
 fn is_value(expr: &Arc<dyn PhysicalExpr>) -> bool {
     expr.as_any().downcast_ref::<Literal>().is_some()
+}
+
+fn is_only_timestamp_filter(expr: &[Arc<dyn PhysicalExpr>]) -> bool {
+    expr.iter().all(is_timestamp_filter)
+}
+
+fn is_timestamp_filter(expr: &Arc<dyn PhysicalExpr>) -> bool {
+    if let Some(expr) = expr.as_any().downcast_ref::<BinaryExpr>() {
+        match expr.op() {
+            Operator::Gt | Operator::GtEq | Operator::Lt | Operator::LtEq => {
+                let column = if is_value(expr.left()) && is_column(expr.right()) {
+                    get_column_name(expr.right())
+                } else if is_value(expr.right()) && is_column(expr.left()) {
+                    get_column_name(expr.left())
+                } else {
+                    return false;
+                };
+
+                if column != TIMESTAMP_COL_NAME {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    } else {
+        return false;
+    }
+    true
 }

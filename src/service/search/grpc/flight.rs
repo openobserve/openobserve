@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use ::datafusion::{
     common::tree_node::TreeNode, datasource::TableProvider, physical_plan::ExecutionPlan,
@@ -54,7 +54,8 @@ use crate::service::{
             },
             exec::{DataFusionContextBuilder, register_udf},
             optimizer::physical_optimizer::{
-                index::IndexRule, rewrite_match::RewriteMatchPhysical,
+                index::IndexRule, index_optimizer::IndexOptimizeRule,
+                rewrite_match::RewriteMatchPhysical,
             },
             table_provider::{enrich_table::EnrichTable, uniontable::NewUnionTable},
         },
@@ -394,10 +395,21 @@ fn optimizer_physical_plan(
     fst_fields: Vec<String>,
     index_fields: Vec<String>,
     index_condition_ref: Arc<Mutex<Option<IndexCondition>>>,
-    _index_optimizer_rule_ref: Arc<Mutex<Option<IndexOptimizeMode>>>,
+    index_optimizer_rule_ref: Arc<Mutex<Option<IndexOptimizeMode>>>,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
-    let index_rule = IndexRule::new(index_fields.iter().cloned().collect(), index_condition_ref);
-    let plan = index_rule.optimize(plan, ctx.state().config_options())?;
+    let index_fields: HashSet<String> = index_fields.iter().cloned().collect();
+    let index_rule = IndexRule::new(index_fields.clone(), index_condition_ref.clone());
+    let mut plan = index_rule.optimize(plan, ctx.state().config_options())?;
+
+    let index_condition = index_condition_ref.lock().clone();
+    if index_condition.is_some() {
+        let index_optimizer_rule = IndexOptimizeRule::new(
+            index_fields,
+            index_condition,
+            index_optimizer_rule_ref.clone(),
+        );
+        plan = index_optimizer_rule.optimize(plan, ctx.state().config_options())?;
+    }
 
     let rewrite_match_rule = RewriteMatchPhysical::new(
         fst_fields
