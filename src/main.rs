@@ -586,7 +586,10 @@ async fn init_common_grpc_server(
             log::info!("gRPC server starts shutting down");
         })
         .await
-        .expect("gRPC server init failed");
+        .map_err(|e| {
+            log::error!("gRPC server failed to start: {}", e);
+            anyhow::anyhow!("gRPC server initialization failed: {}", e)
+        })?;
     stopped_tx.send(()).ok();
     Ok(())
 }
@@ -638,7 +641,10 @@ async fn init_router_grpc_server(
             log::info!("gRPC server starts shutting down");
         })
         .await
-        .expect("gRPC server init failed");
+        .map_err(|e| {
+            log::error!("gRPC router server failed to start: {}", e);
+            anyhow::anyhow!("gRPC router server initialization failed: {}", e)
+        })?;
     stopped_tx.send(()).ok();
     Ok(())
 }
