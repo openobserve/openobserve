@@ -517,6 +517,9 @@ watch(
   () => {
     emits("update:columnOrder", columnOrder.value, props.columns);
   },
+  {
+    immediate: true,
+  },
 );
 
 let table: any = useVueTable({
