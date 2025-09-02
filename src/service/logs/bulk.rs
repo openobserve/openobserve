@@ -427,6 +427,7 @@ pub async fn ingest(
                                 req_stats.records = stream_pl_results.len() as i64;
                                 req_stats.response_time = 0.0;
                                 
+                                // we report the data flowing through the pipeline here
                                 crate::service::self_reporting::report_request_usage_stats(
                                     req_stats,
                                     org_id,

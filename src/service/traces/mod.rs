@@ -466,6 +466,35 @@ pub async fn handle_otlp_request(
                         continue;
                     }
 
+                    let destination_stream = stream_params.stream_name.to_string();
+
+                    // Report pipeline destination usage for realtime pipeline
+                    if destination_stream != traces_stream_name {
+                        // Only report if this is a different destination stream (pipeline output)
+                        let data_size = stream_pl_results
+                            .iter()
+                            .map(|(_, record)| record.to_string().len() as f64)
+                            .sum::<f64>() / config::SIZE_IN_MB;
+                        
+                        if data_size > 0.0 {
+                            let mut req_stats = config::meta::self_reporting::usage::RequestStats::default();
+                            req_stats.size = data_size;
+                            req_stats.records = stream_pl_results.len() as i64;
+                            req_stats.response_time = 0.0;
+                            
+                            crate::service::self_reporting::report_request_usage_stats(
+                                req_stats,
+                                org_id,
+                                &stream_params.stream_name,
+                                stream_params.stream_type,
+                                config::meta::self_reporting::usage::UsageType::Pipeline,
+                                0, // No additional functions beyond pipeline
+                                chrono::Utc::now().timestamp_micros(),
+                            )
+                            .await;
+                        }
+                    }
+
                     for (idx, mut res) in stream_pl_results {
                         // get json object
                         let record_val = match res.take() {
