@@ -144,12 +144,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn>
             <q-btn-group
               v-if="config.isEnterprise"
-              :class="['dashboard-icons q-ml-sm hideOnPrintMode', arePanelsLoading ? '' : 'no-border']"
+              class="dashboard-icons q-ml-sm hideOnPrintMode no-border refresh-btn-group"
             >
             <q-btn
                 :outline="!arePanelsLoading && (isVariablesChanged ? false : true)"
                 :flat="arePanelsLoading"
-                class="dashboard-icons hideOnPrintMode"
+                class="dashboard-icons hideOnPrintMode apply-btn-refresh"
                 size="sm"
                 no-caps
                 :icon="arePanelsLoading ? 'cancel' : 'refresh'"
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               
               <q-btn-dropdown
                 :outline="!arePanelsLoading && (isVariablesChanged ? false : true)"
-                class="q-px-xs no-border apply-btn-dropdown"
+                class="q-px-xs apply-btn-dropdown"
                 :flat="arePanelsLoading"
                 size="sm"
                 no-caps
@@ -180,15 +180,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disable="arePanelsLoading"
                 :color="arePanelsLoading ? 'negative' : (isVariablesChanged ? 'warning' : '')"
                 :text-color="arePanelsLoading ? 'negative' : (store.state.theme == 'dark' ? 'white' : 'dark')"
-                dropdown-icon="keyboard_arrow_down"
+                menu-anchor="bottom middle"
+                menu-self="top left"
               >
                 <q-list>
                   <q-item clickable @click="refreshData(true)" :disable="arePanelsLoading">
                     <q-item-section avatar>
-                      <q-icon name="refresh" />
+                      <q-icon size="xs" name="refresh" style="align-items: baseline; padding: 0px;" />
                     </q-item-section>
                     <q-item-section>
-                      <q-item-label>Refresh Without Using Cache</q-item-label>
+                      <q-item-label style="font-size: 12px; align-items: baseline; padding: 0px;">Refresh Without Using Cache</q-item-label>
                     </q-item-section>
                   </q-item>
                 </q-list>
@@ -1376,8 +1377,53 @@ export default defineComponent({
   background-color: $accent !important;
 }
 
-.apply-btn-dropdown{
+/* Outline state borders */
+.refresh-btn-group .apply-btn-refresh.q-btn--outline::before {
+  border-right: none !important;
+}
+
+.refresh-btn-group .apply-btn-dropdown.q-btn--outline::before {
+  border-left: 1px solid $border-color !important;
+}
+
+/* Flat state borders (when loading/cancel) - using pseudo-elements to avoid layout shifts */
+.refresh-btn-group .apply-btn-refresh.q-btn--flat::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   border: 1px solid $border-color !important;
-  border-left: none !important;
+  border-right: none !important;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.refresh-btn-group .apply-btn-dropdown.q-btn--flat::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid $border-color !important;
+  border-left: 1px solid $border-color !important;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.apply-btn-refresh{
+  border-top-left-radius: 4px !important;
+  border-bottom-left-radius: 4px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.apply-btn-dropdown{
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-top-right-radius: 4px !important;
+  border-bottom-right-radius: 4px !important;
 }
 </style>

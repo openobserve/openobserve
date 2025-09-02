@@ -127,10 +127,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-list>
                 <q-item clickable @click="runQuery(true)">
                   <q-item-section avatar>
-                    <q-icon name="refresh" />
+                    <q-icon size="xs" name="refresh" style="align-items: baseline; padding: 0px;" />
                   </q-item-section>
                   <q-item-section>
-                    <q-item-label>Apply Without Using Cache</q-item-label>
+                    <q-item-label style="font-size: 12px; align-items: baseline; padding: 0px;">Apply Without Using Cache</q-item-label>
                   </q-item-section>
                 </q-item>
               </q-list>
