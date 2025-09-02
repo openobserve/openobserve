@@ -32,6 +32,8 @@ use crate::{
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "CreateAnnotations",
+    summary = "Create timed annotations for dashboard",
+    description = "Creates new timed annotations for specific panels within a dashboard",
     path = "/{org_id}/dashboards/{dashboard_id}/annotations",
     security(
         ("Authorization" = [])
@@ -84,6 +86,8 @@ pub async fn create_annotations(
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "GetAnnotations",
+    summary = "Get timed annotations for dashboard",
+    description = "Retrieves timed annotations for dashboard panels within a specified time range",
     path = "/{org_id}/dashboards/{dashboard_id}/annotations",
     security(
         ("Authorization" = [])
@@ -144,6 +148,8 @@ pub async fn get_annotations(
     tag = "Dashboards",
     context_path = "/api",
     operation_id = "DeleteAnnotations",
+    summary = "Delete timed annotations from dashboard",
+    description = "Removes timed annotations from dashboard panels based on specified criteria",
     path = "/{org_id}/dashboards/{dashboard_id}/annotations",
     security(
         ("Authorization" = [])
@@ -194,6 +200,8 @@ pub async fn delete_annotations(
     tag = "Dashboards",
     context_path = "/api",
     operation_id = "UpdateAnnotations",
+    summary = "Update timed annotation",
+    description = "Updates an existing timed annotation with new content or metadata",
     path = "/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}",
     security(
         ("Authorization" = [])
@@ -248,6 +256,8 @@ pub async fn update_annotations(
     tag = "Dashboards",
     context_path = "/api",
     operation_id = "RemoveTimedAnnotationFromPanel",
+    summary = "Remove timed annotation from panel",
+    description = "Removes a specific timed annotation from a dashboard panel",
     path = "/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}",
     security(
         ("Authorization" = [])

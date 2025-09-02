@@ -30,6 +30,10 @@ use {
     context_path = "/api",
     tag = "Clusters",
     operation_id = "ListClusters",
+    summary = "List available clusters",
+    description = "Retrieves a list of all available clusters organized by region. Each region contains a list of cluster names \
+                   that can be used for data processing and storage. This information is useful for understanding your \
+                   deployment topology and selecting appropriate clusters for workload distribution.",
     security(
         ("Authorization"= [])
     ),

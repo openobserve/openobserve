@@ -34,8 +34,10 @@ use crate::{
 #[utoipa::path(
     post,
     context_path = "/api",
+    summary = "Create short URL",
+    description = "Generates a shortened URL from a longer original URL. This is useful for creating more manageable links for dashboards, reports, or search queries that can be easily shared via email, chat, or documentation. The short URL remains valid and can be used to redirect back to the original destination.",
     request_body(
-        content = ShortenUrlRequest,
+        content = Object,
         description = "The original URL to shorten",
         content_type = "application/json",
         example = json!({
@@ -90,6 +92,8 @@ pub struct RetrieveQuery {
 #[utoipa::path(
     get,
     context_path = "/short",
+    summary = "Resolve short URL",
+    description = "Resolves a shortened URL back to its original destination. By default, this endpoint redirects the user to the original URL. When the 'type=ui' query parameter is provided, it returns the original URL as JSON instead of performing a redirect. This is useful for applications that need to inspect or validate URLs before navigation.",
     params(
         ("short_id" = String, Path, description = "The short ID to retrieve the original URL", example = "ddbffcea3ad44292"),
         ("type" = Option<String>, Query, description = "Response type - if 'ui', returns JSON object instead of redirect", example = "ui")

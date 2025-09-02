@@ -45,6 +45,9 @@ use crate::{
     context_path = "/api",
     tag = "Alerts",
     operation_id = "SaveAlert",
+    summary = "Create alert (deprecated)",
+    description = "Creates a new alert for the specified stream. This endpoint is deprecated; please use the newer \
+                   alert management endpoints for better functionality and support.",
     security(
         ("Authorization"= [])
     ),
@@ -54,8 +57,8 @@ use crate::{
       ),
     request_body(content = Alert, description = "Alert data", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/{stream_name}/alerts")]
@@ -97,6 +100,9 @@ pub async fn save_alert(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "UpdateAlert",
+    summary = "Update alert (deprecated)",
+    description = "Updates an existing alert with new configuration settings. This endpoint is deprecated; please use \
+                   the newer alert management endpoints for improved functionality and better error handling.",
     security(
         ("Authorization"= [])
     ),
@@ -107,8 +113,8 @@ pub async fn save_alert(
       ),
     request_body(content = Alert, description = "Alert data", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/{stream_name}/alerts/{alert_name}")]
@@ -138,6 +144,9 @@ pub async fn update_alert(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "ListStreamAlerts",
+    summary = "List stream alerts (deprecated)",
+    description = "Retrieves all alerts configured for a specific stream. This endpoint is deprecated; please use the \
+                   newer alert management endpoints for enhanced filtering and better performance.",
     security(
         ("Authorization"= [])
     ),
@@ -146,8 +155,8 @@ pub async fn update_alert(
         ("stream_name" = String, Path, description = "Stream name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/{stream_name}/alerts")]
@@ -194,6 +203,10 @@ async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest)
     context_path = "/api",
     tag = "Alerts",
     operation_id = "ListAlerts",
+    summary = "List all alerts (deprecated)",
+    description = "Retrieves all alerts in the organization across all streams. Supports filtering by owner, enabled \
+                   status, stream type, and stream name. This endpoint is deprecated; please use the newer alert \
+                   management endpoints for better filtering capabilities and improved performance.",
     security(
         ("Authorization"= [])
     ),
@@ -201,7 +214,7 @@ async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest)
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[get("/{org_id}/alerts")]
@@ -300,6 +313,10 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetAlert",
+    summary = "Get alert details (deprecated)",
+    description = "Retrieves detailed information about a specific alert including its configuration, trigger conditions, \
+                   and execution status. This endpoint is deprecated; please use the newer alert management endpoints \
+                   for enhanced functionality and better data structure.",
     security(
         ("Authorization"= [])
     ),
@@ -310,7 +327,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = Alert),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/{stream_name}/alerts/{alert_name}")]
@@ -351,6 +368,10 @@ async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) 
     context_path = "/api",
     tag = "Alerts",
     operation_id = "DeleteAlert",
+    summary = "Delete alert (deprecated)",
+    description = "Permanently removes an alert and stops its monitoring and notification functionality. This endpoint is \
+                   deprecated; please use the newer alert management endpoints for better error handling and \
+                   confirmation responses.",
     security(
         ("Authorization"= [])
     ),
@@ -360,9 +381,9 @@ async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) 
         ("alert_name" = String, Path, description = "Alert name"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[delete("/{org_id}/{stream_name}/alerts/{alert_name}")]
@@ -384,6 +405,10 @@ async fn delete_alert(path: web::Path<(String, String, String)>, req: HttpReques
     context_path = "/api",
     tag = "Alerts",
     operation_id = "EnableAlert",
+    summary = "Enable/disable alert (deprecated)",
+    description = "Enables or disables an alert's monitoring and notification functionality. When disabled, the alert \
+                   will not trigger or send notifications. This endpoint is deprecated; please use the newer alert \
+                   management endpoints for better state management and validation.",
     security(
         ("Authorization"= [])
     ),
@@ -394,9 +419,9 @@ async fn delete_alert(path: web::Path<(String, String, String)>, req: HttpReques
         ("value" = bool, Query, description = "Enable or disable alert"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/{stream_name}/alerts/{alert_name}/enable")]
@@ -424,6 +449,10 @@ async fn enable_alert(path: web::Path<(String, String, String)>, req: HttpReques
     context_path = "/api",
     tag = "Alerts",
     operation_id = "TriggerAlert",
+    summary = "Manually trigger alert (deprecated)",
+    description = "Manually triggers an alert to test its notification functionality and validate the configured \
+                   destinations. This is useful for testing alert configurations without waiting for actual \
+                   conditions. This endpoint is deprecated; please use the newer alert management endpoints.",
     security(
         ("Authorization"= [])
     ),
@@ -433,9 +462,9 @@ async fn enable_alert(path: web::Path<(String, String, String)>, req: HttpReques
         ("alert_name" = String, Path, description = "Alert name"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/{stream_name}/alerts/{alert_name}/trigger")]

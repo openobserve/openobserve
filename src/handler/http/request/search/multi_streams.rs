@@ -59,9 +59,11 @@ use crate::{
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchSQL",
+    summary = "Search across multiple streams",
+    description = "Executes SQL queries that can span across multiple data streams within the organization. This enables cross-stream analytics, joins, and aggregations to analyze data relationships and patterns across different log streams, metrics, or traces. The query engine automatically handles data from different streams and returns unified results.",
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(
-        content = SearchRequest,
+        content = Object,
         description = "Search query",
         content_type = "application/json",
         example = json!({
@@ -79,7 +81,7 @@ use crate::{
             status = 200,
             description = "Success",
             content_type = "application/json",
-            body = SearchResponse,
+            body = Object,
             example = json!({
             "took": 155,
             "hits": [
@@ -110,13 +112,13 @@ use crate::{
             status = 400,
             description = "Failure",
             content_type = "application/json",
-            body = HttpResponse,
+            body = (),
         ),
         (
             status = 500,
             description = "Failure",
             content_type = "application/json",
-            body = HttpResponse,
+            body = (),
         )
     )
 )]
@@ -637,12 +639,14 @@ pub async fn search_multi(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchPartitionMulti",
+    summary = "Search partition data across multiple streams",
+    description = "Executes search queries across partitioned data in multiple log streams",
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
     ),
     request_body(
-        content = SearchRequest,
+        content = Object,
         description = "Search query",
         content_type = "application/json",
         example = json!({
@@ -656,7 +660,7 @@ pub async fn search_multi(
             status = 200,
             description = "Success",
             content_type = "application/json",
-            body = SearchResponse,
+            body = Object,
             example = json!({
             "took": 155,
             "file_num": 10,
@@ -672,13 +676,13 @@ pub async fn search_multi(
             status = 400,
             description = "Failure",
             content_type = "application/json",
-            body = HttpResponse,
+            body = (),
         ),
         (
             status = 500,
             description = "Failure",
             content_type = "application/json",
-            body = HttpResponse,
+            body = (),
         )
     )
 )]
@@ -810,6 +814,8 @@ pub async fn _search_partition_multi(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchAroundMulti",
+    summary = "Search around specific record across multiple streams",
+    description = "Searches for log entries around a specific record across multiple data streams",
     security(
         ("Authorization"= [])
     ),
@@ -821,7 +827,7 @@ pub async fn _search_partition_multi(
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -846,7 +852,7 @@ pub async fn _search_partition_multi(
             "size": 10,
             "scan_size": 28943
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/{stream_names}/_around_multi")]

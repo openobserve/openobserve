@@ -320,9 +320,10 @@ pub struct RegionInfo<T> {
 /// 1. Regions at the top level as object keys
 /// 2. Clusters within each region as object keys
 /// 3. Nodes as arrays directly under each cluster
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, ToSchema)]
 pub struct NodeListResponse {
     #[serde(flatten)]
+    #[schema(value_type = Object)]
     pub regions: std::collections::HashMap<String, RegionInfo<Vec<Node>>>,
 }
 
@@ -360,7 +361,7 @@ impl NodeListResponse {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug, ToSchema)]
 pub struct ClusterInfo {
     pub pending_jobs: u64,
 }
@@ -370,8 +371,9 @@ pub struct ClusterInfo {
 /// Contains a three-level hierarchy with a flat format:
 /// 1. Regions at the top level as object keys
 /// 2. Clusters within each region as object keys
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, ToSchema)]
 pub struct ClusterInfoResponse {
+    #[schema(value_type = Object)]
     pub regions: std::collections::HashMap<String, RegionInfo<ClusterInfo>>,
 }
 

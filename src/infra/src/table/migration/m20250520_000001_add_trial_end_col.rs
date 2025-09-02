@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "cloud")]
 use config::utils::time::day_micros;
 use sea_orm_migration::prelude::*;
 
@@ -21,8 +22,9 @@ pub struct Migration;
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
-    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        add_updated_at_column(manager).await?;
+    async fn up(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        #[cfg(feature = "cloud")]
+        add_updated_at_column(_manager).await?;
         Ok(())
     }
 
@@ -32,6 +34,7 @@ impl MigrationTrait for Migration {
     }
 }
 
+#[cfg(feature = "cloud")]
 async fn add_updated_at_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
     let end = chrono::Utc::now().timestamp_micros() + day_micros(14);
     if matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
@@ -69,6 +72,7 @@ async fn add_updated_at_column(manager: &SchemaManager<'_>) -> Result<(), DbErr>
 
 /// Identifiers used in queries on the folders table.
 #[derive(DeriveIden)]
+#[cfg(feature = "cloud")]
 pub(super) enum Organizations {
     Table,
     TrialEndsAt,

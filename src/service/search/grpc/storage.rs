@@ -1528,4 +1528,204 @@ mod tests {
         assert!(!result.is_empty());
         assert!(result.contains("file_1_10"));
     }
+
+    #[test]
+    fn test_get_cache_entry_row_ids_bitvec_small_percent() {
+        use config::meta::bitvec::BitVec;
+
+        use crate::service::search::grpc::utils::TantivyResult;
+
+        let mut bitvec = BitVec::repeat(false, 4);
+        bitvec.set(0, true);
+        bitvec.set(2, true);
+        let result = TantivyResult::RowIdsBitVec(2, bitvec);
+        let percent = 0.5; // Less than 1.0, should use roaring bitmap
+        let parquet_rows = 4;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            tantivy_result_cache::CacheEntry::RowIdsRoaring(num_rows, roaring, rows) => {
+                assert_eq!(num_rows, 2);
+                assert_eq!(rows, 4);
+                assert_eq!(roaring.len(), 2); // Should contain positions 0 and 2
+                assert!(roaring.contains(0));
+                assert!(roaring.contains(2));
+            }
+            _ => panic!("Expected RowIdsRoaring cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_row_ids_bitvec_large_percent() {
+        use config::meta::bitvec::BitVec;
+
+        use crate::service::search::grpc::utils::TantivyResult;
+
+        let mut bitvec = BitVec::repeat(false, 4);
+        bitvec.set(0, true);
+        bitvec.set(1, true);
+        bitvec.set(3, true);
+        let result = TantivyResult::RowIdsBitVec(3, bitvec);
+        let percent = 2.0; // Greater than 1.0, should use bitvec
+        let parquet_rows = 4;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            tantivy_result_cache::CacheEntry::RowIdsBitVec(num_rows, returned_bitvec) => {
+                assert_eq!(num_rows, 3);
+                assert_eq!(returned_bitvec.len(), 4);
+                assert_eq!(returned_bitvec.get(0).unwrap(), true);
+                assert_eq!(returned_bitvec.get(1).unwrap(), true);
+                assert_eq!(returned_bitvec.get(2).unwrap(), false);
+                assert_eq!(returned_bitvec.get(3).unwrap(), true);
+            }
+            _ => panic!("Expected RowIdsBitVec cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_count() {
+        use crate::service::search::grpc::utils::TantivyResult;
+
+        let result = TantivyResult::Count(42);
+        let percent = 1.0;
+        let parquet_rows = 100;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            tantivy_result_cache::CacheEntry::Count(count) => {
+                assert_eq!(count, 42);
+            }
+            _ => panic!("Expected Count cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_histogram() {
+        use crate::service::search::grpc::utils::TantivyResult;
+
+        let histogram_data = vec![1, 2, 3, 4];
+        let result = TantivyResult::Histogram(histogram_data.clone());
+        let percent = 1.0;
+        let parquet_rows = 100;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            tantivy_result_cache::CacheEntry::Histogram(histogram) => {
+                assert_eq!(histogram, histogram_data);
+            }
+            _ => panic!("Expected Histogram cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_distinct() {
+        use std::collections::HashSet;
+
+        use crate::service::search::grpc::utils::TantivyResult;
+
+        let mut distinct_values = HashSet::new();
+        distinct_values.insert("value1".to_string());
+        distinct_values.insert("value2".to_string());
+        let result = TantivyResult::Distinct(distinct_values.clone());
+        let percent = 1.0;
+        let parquet_rows = 100;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            tantivy_result_cache::CacheEntry::Distinct(distinct) => {
+                assert_eq!(distinct, distinct_values);
+            }
+            _ => panic!("Expected Distinct cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_into_chunks_exact_divisible() {
+        let v = vec![1, 2, 3, 4, 5, 6];
+        let chunks = into_chunks(v, 2);
+
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], vec![1, 2]);
+        assert_eq!(chunks[1], vec![3, 4]);
+        assert_eq!(chunks[2], vec![5, 6]);
+    }
+
+    #[test]
+    fn test_into_chunks_empty_vector() {
+        let v: Vec<i32> = vec![];
+        let chunks = into_chunks(v, 3);
+
+        assert_eq!(chunks.len(), 0);
+    }
+
+    #[test]
+    fn test_into_chunks_chunk_size_larger_than_vector() {
+        let v = vec![1, 2];
+        let chunks = into_chunks(v, 5);
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], vec![1, 2]);
+    }
+
+    #[test]
+    fn test_repartition_sorted_groups_empty() {
+        let groups: Vec<Vec<FileKey>> = vec![];
+        let result = repartition_sorted_groups(groups, 2);
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_repartition_sorted_groups_no_split_needed() {
+        let groups = vec![vec![create_file_key(1, 10)], vec![create_file_key(11, 20)]];
+        let expect_group_elements = 2;
+        let result = repartition_sorted_groups(groups.clone(), expect_group_elements);
+
+        // Should remain unchanged since groups are already small enough
+        assert_eq!(result, groups);
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_single_file() {
+        let files = vec![create_file_key(1, 10)];
+        let partition_num = 3;
+        let groups = group_files_by_time_range(files, partition_num);
+
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].len(), 1);
+        assert_eq!(groups[0][0].key, "file_1_10");
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_no_overlap_many_partitions() {
+        let files = vec![
+            create_file_key(1, 10),
+            create_file_key(11, 20),
+            create_file_key(21, 30),
+        ];
+        let partition_num = 10; // More partitions than files
+        let groups = group_files_by_time_range(files, partition_num);
+
+        // Should create separate groups for non-overlapping files
+        assert_eq!(groups.len(), 3);
+        for group in &groups {
+            assert_eq!(group.len(), 1); // Each file should be in its own group
+        }
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_many_single_element_groups() {
+        let file_groups = vec![
+            vec![create_file_key(1, 10)],
+            vec![create_file_key(11, 20)],
+            vec![create_file_key(21, 30)],
+        ];
+        let result = regroup_tantivy_files(file_groups);
+
+        assert_eq!(result.len(), 1); // Max group length is 1
+        assert_eq!(result[0].len(), 3); // Should contain all files
+        assert_eq!(result[0][0].key, "file_1_10");
+        assert_eq!(result[0][1].key, "file_11_20");
+        assert_eq!(result[0][2].key, "file_21_30");
+    }
 }
