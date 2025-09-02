@@ -1,0 +1,289 @@
+// Color System
+// Light Mode Grays
+$o2-gray-100: #FFFFFF;
+$o2-gray-200: #F7F8FA;
+$o2-gray-300: #E8ECF0;
+$o2-gray-400: #DFE1E5;
+$o2-gray-500: #D3D5DB;
+$o2-gray-600: #C9CCD6;
+$o2-gray-700: #A8ADBD;
+$o2-gray-800: #818594;
+$o2-gray-900: #6C707E;
+$o2-gray-1000: #5A5D6B;
+$o2-gray-1100: #494B57;
+$o2-gray-1200: #383A42;
+$o2-gray-1300: #27282E;
+$o2-gray-1400: #19191E;
+
+// Dark Mode Grays
+$o2-dark-gray-100: #1E1F22;
+$o2-dark-gray-200: #2B2D30;
+$o2-dark-gray-300: #393840;
+$o2-dark-gray-400: #43454A;
+$o2-dark-gray-500: #4E5157;
+$o2-dark-gray-600: #5A5D63;
+$o2-dark-gray-700: #6F737A;
+$o2-dark-gray-800: #868A91;
+$o2-dark-gray-900: #9DA0A8;
+$o2-dark-gray-1000: #B4B8BF;
+$o2-dark-gray-1100: #CEDDD6;
+$o2-dark-gray-1200: #DFE1E5;
+$o2-dark-gray-1300: #F0F1F2;
+$o2-dark-gray-1400: #FFFFFF;
+
+// Light Mode Iris
+$o2-iris-100: #FCFDFF;
+$o2-iris-200: #F7F9FE;
+$o2-iris-300: #EFF1FD;
+$o2-iris-400: #E4E9FE;
+$o2-iris-500: #D7DEFE;
+$o2-iris-600: #C8D0F9;
+$o2-iris-700: #B3BDF1;
+$o2-iris-800: #97A3E7;
+$o2-iris-900: #6B76E3;
+$o2-iris-1000: #6069D3;
+$o2-iris-1100: #575FC5;
+$o2-iris-1200: #282D5D;
+$o2-iris-1300: #DBE1FD;
+
+// Dark Mode Iris
+$o2-dark-iris-100: #171924;
+$o2-dark-iris-200: #181829;
+$o2-dark-iris-300: #22264A;
+$o2-dark-iris-400: #292E63;
+$o2-dark-iris-500: #313772;
+$o2-dark-iris-600: #3A4180;
+$o2-dark-iris-700: #454D93;
+$o2-dark-iris-800: #525BAD;
+$o2-dark-iris-900: #6B76E3;
+$o2-dark-iris-1000: #6069D3;
+$o2-dark-iris-1100: #A1AFFF;
+$o2-dark-iris-1200: #DBE1FD;
+
+// Light Mode Blue
+$o2-blue-100: #F5F8FE;
+$o2-blue-200: #EDF3FF;
+$o2-blue-300: #D4E2FF;
+$o2-blue-400: #C2D6FC;
+$o2-blue-500: #A0BDF8;
+$o2-blue-600: #88ADF7;
+$o2-blue-700: #588CF3;
+$o2-blue-800: #4682FA;
+$o2-blue-900: #3369D6;
+$o2-blue-1000: #315FBD;
+$o2-blue-1100: #2E55A3;
+
+// Dark Mode Blue (same colors in both modes according to Figma)
+$o2-dark-blue-100: #F5F8FE;
+$o2-dark-blue-200: #EDF3FF;
+$o2-dark-blue-300: #D4E2FF;
+$o2-dark-blue-400: #C2D6FC;
+$o2-dark-blue-500: #A0BDF8;
+$o2-dark-blue-600: #88ADF7;
+$o2-dark-blue-700: #588CF3;
+$o2-dark-blue-800: #4682FA;
+$o2-dark-blue-900: #3369D6;
+$o2-dark-blue-1000: #315FBD;
+$o2-dark-blue-1100: #2E55A3;
+
+// Light Mode Green
+$o2-green-100: #F2FCF3;
+$o2-green-200: #E6F7E9;
+$o2-green-300: #C5E5CC;
+$o2-green-400: #AFDBB8;
+$o2-green-500: #89C398;
+$o2-green-600: #55A76A;
+$o2-green-700: #369650;
+$o2-green-800: #208A3C;
+$o2-green-900: #1F8039;
+$o2-green-1000: #1F7536;
+$o2-green-1100: #1E6B33;
+
+// Dark Mode Green
+$o2-dark-green-100: #253627;
+$o2-dark-green-200: #375239;
+$o2-dark-green-300: #436946;
+$o2-dark-green-400: #4E8052;
+$o2-dark-green-500: #57965C;
+$o2-dark-green-600: #5FAD65;
+$o2-dark-green-700: #73BD79;
+$o2-dark-green-800: #89CC8E;
+$o2-dark-green-900: #A0DBA5;
+$o2-dark-green-1000: #B9EBBD;
+$o2-dark-green-1100: #D4FAD7;
+
+// Light Mode Yellow
+$o2-yellow-100: #FFFAEB;
+$o2-yellow-200: #FFF6DE;
+$o2-yellow-300: #FFF1D1;
+$o2-yellow-400: #FEEBB1;
+$o2-yellow-500: #FED277;
+$o2-yellow-600: #FDBD3D;
+$o2-yellow-700: #FFAF0F;
+$o2-yellow-800: #DF9303;
+$o2-yellow-900: #C27D04;
+$o2-yellow-1000: #A46704;
+
+// Dark Mode Yellow
+$o2-dark-yellow-100: #3D3223;
+$o2-dark-yellow-200: #5E4D33;
+$o2-dark-yellow-300: #826A41;
+$o2-dark-yellow-400: #9E814A;
+$o2-dark-yellow-500: #BA9752;
+$o2-dark-yellow-600: #D6AE58;
+$o2-dark-yellow-700: #F2C55C;
+$o2-dark-yellow-800: #F5D273;
+$o2-dark-yellow-900: #F7DE8B;
+$o2-dark-yellow-1000: #FCEBA4;
+
+// Light Mode Red
+$o2-red-100: #FFF7F7;
+$o2-red-200: #FFF2F3;
+$o2-red-300: #FAD4D8;
+$o2-red-400: #F2B6BB;
+$o2-red-500: #ED99A1;
+$o2-red-600: #E46A76;
+$o2-red-700: #E55765;
+$o2-red-800: #DB3B4B;
+$o2-red-900: #CC3645;
+$o2-red-1000: #BC303E;
+$o2-red-1100: #AD2B38;
+
+// Dark Mode Red
+$o2-dark-red-100: #402929;
+$o2-dark-red-200: #5E3838;
+$o2-dark-red-300: #7A4343;
+$o2-dark-red-400: #9C4E4E;
+$o2-dark-red-500: #BD5757;
+$o2-dark-red-600: #DB5C5C;
+$o2-dark-red-700: #E37774;
+$o2-dark-red-800: #EB938D;
+$o2-dark-red-900: #F2B1AA;
+$o2-dark-red-1000: #F7CCC6;
+$o2-dark-red-1100: #FAE3DE;
+
+// Light Mode Orange
+$o2-orange-100: #FFF4EB;
+$o2-orange-200: #FCE6D6;
+$o2-orange-300: #F9D2B6;
+$o2-orange-400: #F2B181;
+$o2-orange-500: #EC8F4C;
+$o2-orange-600: #E56D17;
+$o2-orange-700: #CE6117;
+$o2-orange-800: #B85516;
+$o2-orange-900: #A14916;
+
+// Dark Mode Orange
+$o2-dark-orange-100: #402929;
+$o2-dark-orange-200: #5E3838;
+$o2-dark-orange-300: #7A4343;
+$o2-dark-orange-400: #9C4E4E;
+$o2-dark-orange-500: #BD5757;
+$o2-dark-orange-600: #DB5C5C;
+$o2-dark-orange-700: #E37774;
+$o2-dark-orange-800: #EB938D;
+$o2-dark-orange-900: #F2B1AA;
+
+// Light Mode Purple
+$o2-purple-100: #FAF5FF;
+$o2-purple-200: #EFE5FF;
+$o2-purple-300: #DCCBFB;
+$o2-purple-400: #BFA1E8;
+$o2-purple-500: #A177F4;
+$o2-purple-600: #834DF0;
+$o2-purple-700: #7444D4;
+$o2-purple-800: #643CB8;
+$o2-purple-900: #55339C;
+
+// Dark Mode Purple
+$o2-dark-purple-100: #2F2936;
+$o2-dark-purple-200: #433358;
+$o2-dark-purple-300: #583D7A;
+$o2-dark-purple-400: #6C469C;
+$o2-dark-purple-500: #8150BE;
+$o2-dark-purple-600: #955AE0;
+$o2-dark-purple-700: #A571E6;
+$o2-dark-purple-800: #B589EC;
+$o2-dark-purple-900: #C4A0F3;
+
+// Light Mode Teal
+$o2-teal-100: #F2FCFC;
+$o2-teal-200: #DAF4F5;
+$o2-teal-300: #B6E4E5;
+$o2-teal-400: #7BCCCF;
+$o2-teal-500: #7BCCCF;
+$o2-teal-600: #039BA1;
+$o2-teal-700: #058B90;
+$o2-teal-800: #077A7F;
+$o2-teal-900: #096A6E;
+
+// Dark Mode Teal
+$o2-dark-teal-100: #1D3838;
+$o2-dark-teal-200: #1E4D4A;
+$o2-dark-teal-300: #20635D;
+$o2-dark-teal-400: #21786F;
+$o2-dark-teal-500: #238E82;
+$o2-dark-teal-600: #24A394;
+$o2-dark-teal-700: #42B1A4;
+$o2-dark-teal-800: #60C0B5;
+$o2-dark-teal-900: #9BDDD6;
+
+// Semantic Colors - Light Mode
+:root {
+  // Backgrounds
+  --o2-primary-background: #{$o2-gray-100};  // White background
+  --o2-secondary-background: #{$o2-iris-200}; // Light iris background
+  --o2-muted-background: #{$o2-gray-300};    // Subtle gray background
+  
+  // Text Colors
+  --o2-text-primary: #{$o2-gray-1400};      // Main text color
+  --o2-text-secondary: #{$o2-gray-1000};    // Less prominent text
+  --o2-text-muted: #{$o2-gray-900};         // Muted text
+  
+  // Component Colors
+  --o2-card-background: #{$o2-gray-100};    // Card background
+  --o2-card-text: #{$o2-gray-1400};         // Card text color
+  --o2-popover-background: #{$o2-gray-100};  // Popover background
+  --o2-popover-text: #{$o2-gray-1400};      // Popover text
+  
+  // Borders & Dividers
+  --o2-border: #{$o2-gray-300};             // Standard borders
+  --o2-border-input: #{$o2-gray-500};       // Input field borders
+  
+  // Interactive Elements
+  --o2-primary-color: #{$o2-iris-1100};     // Primary actions/buttons
+  --o2-primary-foreground: #{$o2-gray-100}; // Text on primary color
+  --o2-hover-accent: #{$o2-iris-400};       // Hover state accent
+  --o2-destructive-foreground: #{$o2-gray-100}; // Text on destructive buttons
+  --o2-focus-ring: #{$o2-iris-1200};        // Focus state indicator
+}
+
+// Semantic Colors - Dark Mode
+.body--dark {
+  // Backgrounds
+  --o2-primary-background: #{$o2-dark-gray-1400};  // Dark mode background
+  --o2-secondary-background: #{$o2-dark-gray-1300}; // Secondary background
+  --o2-muted-background: #{$o2-dark-gray-1100};    // Muted background
+  
+  // Text Colors
+  --o2-text-primary: #{$o2-dark-gray-300};    // Main text in dark mode
+  --o2-text-secondary: #{$o2-dark-gray-700};  // Secondary text
+  --o2-text-muted: #{$o2-dark-gray-900};      // Muted text
+  
+  // Component Colors
+  --o2-card-background: #{$o2-dark-gray-1300}; // Card background
+  --o2-card-text: #{$o2-dark-gray-300};        // Card text
+  --o2-popover-background: #{$o2-dark-gray-1300}; // Popover background
+  --o2-popover-text: #{$o2-dark-gray-300};     // Popover text
+  
+  // Borders & Dividers
+  --o2-border: #{$o2-dark-gray-1200};         // Standard borders
+  --o2-border-input: #{$o2-dark-gray-1000};   // Input borders
+  
+  // Interactive Elements
+  --o2-primary-color: #{$o2-dark-iris-1000};  // Primary actions
+  --o2-primary-foreground: #{$o2-dark-gray-100}; // Text on primary
+  --o2-hover-accent: #{$o2-dark-iris-1000};   // Hover accents
+  --o2-destructive-foreground: #{$o2-dark-gray-100}; // Destructive text
+  --o2-focus-ring: #{$o2-dark-iris-600};      // Focus indicators
+}

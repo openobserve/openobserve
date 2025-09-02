@@ -83,7 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!editTable"
               data-test="edit-table-btn"
               label="Edit Quota"
-              class="border title-height"
+              flat
+              class="border title-height o2-secondary-button tw-h-[36px]"
+              :class="store.state.theme == 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               no-caps
               :disable="activeTab == 'role-limits' && !expandedRow"
               @click="editTableWithInput"
@@ -105,18 +107,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-list-search-input"
               v-model="searchQuery"
               borderless
-              filled
-              dense
-              class="no-border input-width"
+              flat
+              class="no-border input-width o2-search-input"
+              :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
               :placeholder="
                 {
                   'api-limits': t('quota.api-search'),
                   'role-limits': t('quota.role-search'),
                 }[activeTab]
               "
+
             >
               <template #prepend>
-                <q-icon name="search" class="cursor-pointer" />
+                <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
               </template>
             </q-input>
             <q-select
@@ -484,22 +487,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <NoData />
       </div>
       <div
-        class="flex justify-end w-full tw-ml-auto floating-buttons q-pr-md"
+        class="flex justify-end w-full tw-ml-auto floating-buttons q-pr-md tw-py-2"
         v-if="editTable && activeType == 'table'"
       >
         <q-btn
           label="Cancel"
-          class="border q-ml-md title-height"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="cancelChanges"
         />
         <q-btn
           label="Save Changes"
-          class="text-bold no-border q-ml-md"
-          :color="Object.keys(changedValues).length > 0 ? 'secondary' : 'grey'"
+          class="o2-primary-button no-border tw-h-[36px]"
           :disable="Object.keys(changedValues).length === 0"
-          padding="sm md"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           @click="saveChanges"
         />
       </div>
@@ -509,17 +514,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-btn
           label="Cancel"
-          class="border q-ml-md title-height"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="cancelJsonChanges"
           :disable="isSavingJson"
         />
         <q-btn
           :label="isSavingJson ? 'Saving Changes...' : 'Save Changes'"
-          class="text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm md"
+          class="o2-primary-button no-border tw-h-[36px]"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           @click="saveJsonChanges"
           :disable="isSavingJson"
         />
