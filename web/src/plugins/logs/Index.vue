@@ -395,7 +395,13 @@ import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import useAiChat from "@/composables/useAiChat";
 import queryService from "@/services/search";
-import { fnParsedSQL, fnUnparsedSQL } from "@/composables/useLogs/logsUtils";
+import {
+  fnParsedSQL,
+  fnUnparsedSQL,
+  isDistinctQuery,
+  isWithQuery,
+  isLimitQuery,
+} from "@/composables/useLogs/logsUtils";
 import searchState from "@/composables/useLogs/searchState";
 
 export default defineComponent({
@@ -570,14 +576,11 @@ export default defineComponent({
       getFunctions,
       extractFields,
       resetHistogramWithError,
-      isLimitQuery,
       enableRefreshInterval,
       buildWebSocketPayload,
       initializeSearchConnection,
       addTraceId,
       sendCancelSearchMessage,
-      isDistinctQuery,
-      isWithQuery,
       getStream,
       clearSearchObj,
       setCommunicationMethod,
