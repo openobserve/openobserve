@@ -157,6 +157,11 @@ struct Rum {
 #[utoipa::path(
     path = "/healthz",
     tag = "Meta",
+    operation_id = "HealthCheck",
+    summary = "System health check",
+    description = "Performs a basic health check to verify that the OpenObserve service is running and responding to \
+                   requests. Returns a simple status indicator that can be used by load balancers, monitoring systems, \
+                   and orchestration platforms to determine service availability and readiness.",
     responses(
         (status = 200, description="Status OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"}))
     )
@@ -179,6 +184,11 @@ pub async fn healthz_head() -> Result<HttpResponse, Error> {
 #[utoipa::path(
     path = "/schedulez",
     tag = "Meta",
+    operation_id = "SchedulerHealthCheck",
+    summary = "Scheduler node health check",
+    description = "Checks the health and scheduling availability of the current node. Returns success only if the node \
+                   is both online and enabled for task scheduling. Used by cluster management systems to determine \
+                   which nodes are available for workload distribution and background job processing.",
     responses(
         (status = 200, description="Status OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"})),
         (status = 404, description="Status Not OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "not ok"})),

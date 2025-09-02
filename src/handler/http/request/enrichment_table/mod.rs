@@ -32,6 +32,8 @@ use crate::{
     context_path = "/api",
     tag = "Functions",
     operation_id = "CreateUpdateEnrichmentTable",
+    summary = "Create or update enrichment table",
+    description = "Creates a new enrichment table or updates existing table data for log enrichment",
     security(
         ("Authorization" = [])
     ),
@@ -40,8 +42,8 @@ use crate::{
         ("table_name" = String, Path, description = "Table name"),
     ),
     responses(
-        (status = StatusCode::CREATED, description = "Saved enrichment table", body = HttpResponse),
-        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = HttpResponse),
+        (status = StatusCode::CREATED, description = "Saved enrichment table", body = ()),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = ()),
     ),
 )]
 #[post("/{org_id}/enrichment_tables/{table_name}")]

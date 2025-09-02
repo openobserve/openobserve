@@ -891,8 +891,7 @@ mod tests {
             assert_eq!(
                 format_role_name_only(input),
                 expected,
-                "Failed for input: {}",
-                input
+                "Failed for input: {input}"
             );
         }
     }
@@ -914,6 +913,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     fn test_format_role_name_consistency() {
         let org = "test_org";
         let role = "admin-role";

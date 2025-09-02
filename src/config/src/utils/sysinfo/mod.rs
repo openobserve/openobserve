@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 pub mod cgroup;
 pub mod cpu;
@@ -24,7 +25,7 @@ pub mod os;
 
 pub use net::TcpConnState;
 
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct NodeMetrics {
     pub cpu_total: usize,
     pub cpu_usage: f32,

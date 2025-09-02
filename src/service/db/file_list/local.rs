@@ -98,3 +98,70 @@ pub async fn remove_removing(file: &str) -> Result<()> {
     REMOVING_FILES.write().await.remove(file);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_exist_pending_delete() {
+        // Test with non-existent file
+        let exists = exist_pending_delete("non_existent_file.parquet").await;
+        assert!(!exists);
+
+        // Add a file and test it exists
+        let test_file = "test_file_exist.parquet";
+        PENDING_DELETE_FILES
+            .write()
+            .await
+            .insert(test_file.to_string());
+
+        let exists = exist_pending_delete(test_file).await;
+        assert!(exists);
+
+        // Clean up
+        PENDING_DELETE_FILES.write().await.remove(test_file);
+    }
+
+    #[test]
+    fn test_static_variables() {
+        // Test that static variables are accessible
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            let pending_count = PENDING_DELETE_FILES.read().await.len();
+            let removing_count = REMOVING_FILES.read().await.len();
+
+            // Just verify they're accessible (counts can be anything)
+            // Counts are usize so they're always >= 0, just verify they exist
+            let _ = pending_count;
+            let _ = removing_count;
+        });
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_access() {
+        let test_file = "concurrent_test.parquet";
+
+        // Test concurrent read/write access doesn't deadlock
+        let tasks: Vec<_> = (0..10)
+            .map(|i| {
+                let file = format!("{test_file}_{i}");
+                tokio::spawn(async move {
+                    let _ = add_removing(&file).await;
+                    let _ = remove_removing(&file).await;
+                })
+            })
+            .collect();
+
+        // Wait for all tasks to complete
+        for task in tasks {
+            task.await.unwrap();
+        }
+
+        // All files should be removed
+        let removing_files = REMOVING_FILES.read().await;
+        for i in 0..10 {
+            let file = format!("{test_file}_{i}");
+            assert!(!removing_files.contains(&file));
+        }
+    }
+}

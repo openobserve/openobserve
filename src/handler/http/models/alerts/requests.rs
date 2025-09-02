@@ -39,6 +39,7 @@ pub struct UpdateAlertRequestBody(pub Alert);
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct MoveAlertsRequestBody {
     /// IDs of the alerts to move.
+    #[schema(value_type = Vec<String>)]
     pub alert_ids: Vec<Ksuid>,
 
     /// Indicates the folder to which alerts should be moved.

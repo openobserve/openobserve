@@ -36,6 +36,8 @@ use crate::{
     context_path = "/api",
     tag = "Ai",
     operation_id = "Chat",
+    summary = "Generate AI chat response",
+    description = "Generates an AI-powered response to user queries and requests",
     security(
         ("Authorization" = [])
     ),
@@ -56,8 +58,8 @@ use crate::{
     ),
     responses(
         (status = StatusCode::OK, description = "Chat response", body = PromptResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = MetaHttpResponse),
-        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = MetaHttpResponse),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
 )]
 #[post("/{org_id}/ai/chat")]
@@ -93,6 +95,8 @@ struct TraceInfo {
     context_path = "/api",
     tag = "Ai",
     operation_id = "ChatStream",
+    summary = "Generate streaming AI chat response",
+    description = "Generates an AI response with real-time streaming for improved user experience",
     security(
         ("Authorization" = [])
     ),
@@ -112,9 +116,9 @@ struct TraceInfo {
         }),
     ),
     responses(
-        (status = StatusCode::OK, description = "Chat response", body = HttpResponse),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = MetaHttpResponse),
-        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = MetaHttpResponse),
+        (status = StatusCode::OK, description = "Chat response", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
 )]
 #[post("/{org_id}/ai/chat_stream")]

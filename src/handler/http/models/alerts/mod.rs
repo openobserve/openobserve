@@ -31,6 +31,7 @@ use utoipa::ToSchema;
 pub struct Alert {
     #[serde(default)]
     #[schema(read_only)]
+    #[schema(value_type = Option<String>)]
     pub id: Option<Ksuid>,
 
     #[serde(default)]
@@ -154,6 +155,7 @@ pub struct QueryCondition {
     #[serde(default)]
     #[serde(rename = "type")]
     pub query_type: QueryType,
+    #[schema(value_type = Option<Object>)]
     pub conditions: Option<meta_alerts::ConditionList>,
     pub sql: Option<String>,
     pub promql: Option<String>,

@@ -38,6 +38,8 @@ use crate::{
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "GetSavedView",
+    summary = "Get saved view",
+    description = "Retrieves a specific saved search view by its ID. Saved views allow users to store and reuse complex search queries, filters, and visualization settings. The view contains all the necessary information to recreate the exact search state, including query parameters, time ranges, and display configurations.",
     security(
         ("Authorization"= [])
     ),
@@ -52,8 +54,8 @@ use crate::{
             "view_name": "view-name",
             "payload": "base64-encoded-object-as-sent-by-frontend"
         })),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/savedviews/{view_id}")]
@@ -76,6 +78,8 @@ pub async fn get_view(path: web::Path<(String, String)>) -> Result<HttpResponse,
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "ListSavedViews",
+    summary = "List saved views",
+    description = "Retrieves a list of all saved search views for the organization. This provides an overview of all stored queries and visualizations that users have created and saved for reuse. Each view includes basic metadata such as name and ID, allowing users to identify and select the views they want to load.",
     security(
         ("Authorization"= [])
     ),
@@ -83,14 +87,14 @@ pub async fn get_view(path: web::Path<(String, String)>) -> Result<HttpResponse,
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = ViewsWithoutData, example = json!([{
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!([{
                 "org_id": "some-org-id",
                 "view_name": "view-name",
                 "view_id": "view-id",
                 "payload": "base-64-encoded-versioned-payload"
         }])),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/savedviews")]
@@ -109,6 +113,8 @@ pub async fn get_views(path: web::Path<String>) -> Result<HttpResponse, Error> {
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "DeleteSavedViews",
+    summary = "Delete saved view",
+    description = "Permanently removes a saved search view from the organization. This action deletes the stored query configuration, visualization settings, and all associated metadata. Once deleted, the view cannot be recovered, so use this operation carefully when cleaning up unused or outdated saved views.",
     security(
         ("Authorization"= [])
     ),
@@ -121,8 +127,8 @@ pub async fn get_views(path: web::Path<String>) -> Result<HttpResponse, Error> {
             "org_id": "some-org-id",
             "view_id": "view_id",
         }])),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[delete("/{org_id}/savedviews/{view_id}")]
@@ -147,6 +153,8 @@ pub async fn delete_view(path: web::Path<(String, String)>) -> Result<HttpRespon
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "CreateSavedViews",
+    summary = "Create a new saved view",
+    description = "Creates a saved search view with specified query parameters and filters",
     security(
         ("Authorization"= [])
     ),
@@ -159,8 +167,8 @@ pub async fn delete_view(path: web::Path<(String, String)>) -> Result<HttpRespon
             "org_id": "some-org-id",
             "view_id": "view_id",
         }])),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/savedviews")]
@@ -190,6 +198,8 @@ pub async fn create_view(
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "UpdateSavedViews",
+    summary = "Update an existing saved view",
+    description = "Updates the configuration and parameters of an existing saved search view",
     security(
         ("Authorization"= [])
     ),
@@ -205,8 +215,8 @@ pub async fn create_view(
             "view_id": "view-id",
             "payload": "base-64-encoded-versioned-payload"
         }])),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[put("/{org_id}/savedviews/{view_id}")]
