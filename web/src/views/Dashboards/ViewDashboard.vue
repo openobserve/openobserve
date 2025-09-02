@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
                 :outline="!arePanelsLoading && (isVariablesChanged ? false : true)"
                 :flat="arePanelsLoading"
-                class="dashboard-icons hideOnPrintMode apply-btn-refresh"
+                class="dashboard-icons q-px-sm hideOnPrintMode apply-btn-refresh"
                 size="sm"
                 no-caps
                 :icon="arePanelsLoading ? 'cancel' : 'refresh'"
@@ -172,8 +172,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               
               <q-btn-dropdown
                 :outline="!arePanelsLoading && (isVariablesChanged ? false : true)"
-                class="q-px-xs apply-btn-dropdown"
+                class="apply-btn-dropdown"
                 :flat="arePanelsLoading"
+                padding="0px"
                 size="sm"
                 no-caps
                 auto-close
