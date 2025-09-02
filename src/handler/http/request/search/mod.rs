@@ -34,7 +34,7 @@ use error_utils::map_error_to_http_response;
 use hashbrown::HashMap;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
-use utils::check_stream_permissions;
+use utils::{check_stream_permissions, check_stream_write_permissions};
 #[cfg(feature = "cloud")]
 use {crate::service::organization::is_org_in_free_trial_period, actix_web::http::StatusCode};
 
@@ -348,6 +348,13 @@ pub async fn search(
         #[cfg(feature = "enterprise")]
         if let Some(res) =
             check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
+        {
+            return Ok(res);
+        }
+
+        #[cfg(feature = "enterprise")]
+        if let Some(res) =
+            check_stream_write_permissions(&stream_name, &org_id, &user_id, &stream_type).await
         {
             return Ok(res);
         }

@@ -37,7 +37,9 @@ use tracing::Span;
 #[cfg(feature = "enterprise")]
 use crate::{
     common::meta::search::AuditContext,
-    handler::http::request::search::utils::check_stream_permissions,
+    handler::http::request::search::utils::{
+        check_stream_permissions, check_stream_write_permissions,
+    },
     service::self_reporting::audit,
 };
 use crate::{
@@ -380,6 +382,13 @@ pub async fn search_http2_stream(
             }
             return res;
         }
+
+        #[cfg(feature = "enterprise")]
+        if let Some(res) =
+            check_stream_write_permissions(&stream_name, &org_id, &user_id, &stream_type).await
+        {
+            return res;
+        }
     }
 
     // Hack for limit in query
@@ -574,6 +583,11 @@ pub async fn values_http2_stream(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let mut stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let is_refresh_cache = get_is_refresh_cache_from_request(&query);
+    let use_cache = if is_refresh_cache {
+        false
+    } else {
+        get_use_cache_from_request(&query)
+    };
 
     #[cfg(feature = "enterprise")]
     let body_bytes = String::from_utf8_lossy(&body).to_string();
@@ -614,7 +628,7 @@ pub async fn values_http2_stream(
     }
 
     // Get use_cache from query params
-    values_req.use_cache = get_use_cache_from_request(&query);
+    values_req.use_cache = use_cache;
 
     let keyword = match query.get("keyword") {
         None => "".to_string(),
