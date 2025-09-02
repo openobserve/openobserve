@@ -34,8 +34,8 @@ use crate::{
 };
 
 pub async fn get_cached_results(
-    file_path: &str,
     trace_id: &str,
+    file_path: &str,
     cache_req: CacheQueryRequest,
 ) -> Vec<CachedQueryResponse> {
     let mut res: Vec<_> = vec![];
