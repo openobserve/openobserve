@@ -405,7 +405,7 @@ fn optimizer_physical_plan(
     if index_condition.is_some() {
         let index_optimizer_rule = IndexOptimizeRule::new(
             index_fields,
-            index_condition,
+            index_condition.unwrap(),
             index_optimizer_rule_ref.clone(),
         );
         plan = index_optimizer_rule.optimize(plan, ctx.state().config_options())?;

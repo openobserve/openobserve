@@ -46,14 +46,14 @@ use crate::service::search::{
 #[derive(Default, Debug)]
 pub struct IndexOptimizeRule {
     index_fields: HashSet<String>,
-    index_condition: Option<IndexCondition>,
+    index_condition: IndexCondition,
     index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
 }
 
 impl IndexOptimizeRule {
     pub fn new(
         index_fields: HashSet<String>,
-        index_condition: Option<IndexCondition>,
+        index_condition: IndexCondition,
         index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
     ) -> Self {
         Self {
@@ -90,14 +90,14 @@ impl PhysicalOptimizerRule for IndexOptimizeRule {
 
 struct IndexOptimizer {
     index_fields: HashSet<String>,
-    index_condition: Option<IndexCondition>,
+    index_condition: IndexCondition,
     index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
 }
 
 impl IndexOptimizer {
     pub fn new(
         index_fields: HashSet<String>,
-        index_condition: Option<IndexCondition>,
+        index_condition: IndexCondition,
         index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
     ) -> Self {
         Self {
@@ -113,6 +113,7 @@ impl TreeNodeRewriter for IndexOptimizer {
 
     fn f_up(&mut self, plan: Self::Node) -> Result<Transformed<Self::Node>> {
         if let Some(_) = plan.as_any().downcast_ref::<SortPreservingMergeExec>() {
+            // TODO: check if the str_match() field is order by and group by filed
             if let Some(index_optimize_mode) =
                 is_simple_distinct(Arc::clone(&plan), self.index_fields.clone())
             {
