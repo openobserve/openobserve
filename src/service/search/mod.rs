@@ -1503,3 +1503,21 @@ pub fn is_use_inverted_index(sql: &Arc<Sql>) -> bool {
         && !cfg.common.feature_query_without_index
         && sql.index_condition.is_some()
 }
+
+#[inline]
+pub fn check_search_allowed() -> Result<(), Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        // this is installation level limit for all orgs combined
+        if !o2_enterprise::enterprise::license::ingestion_allowed() {
+            Err(Error::IngestionError(
+                "installation has exceeded its search quota".to_string(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    Ok(())
+}

@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, get, post, web};
+use actix_web::{HttpRequest, HttpResponse, get, http::StatusCode, post, web};
 use arrow_schema::Schema;
 use chrono::Utc;
 use config::{
@@ -225,6 +225,16 @@ pub async fn search(
 
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
+
+    #[cfg(feature = "enterprise")]
+    {
+        if crate::service::search::check_search_allowed().is_err() {
+            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                StatusCode::FORBIDDEN,
+                "installation has exceeded the search quota".to_string(),
+            )));
+        }
+    }
 
     #[cfg(feature = "cloud")]
     {
@@ -506,6 +516,16 @@ pub async fn around_v1(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
+    #[cfg(feature = "enterprise")]
+    {
+        if crate::service::search::check_search_allowed().is_err() {
+            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                StatusCode::FORBIDDEN,
+                "installation has exceeded the search quota".to_string(),
+            )));
+        }
+    }
+
     let (org_id, stream_name) = path.into_inner();
     let http_span = if get_config().common.tracing_search_enabled {
         tracing::info_span!(
@@ -619,6 +639,16 @@ pub async fn around_v2(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
+    #[cfg(feature = "enterprise")]
+    {
+        if crate::service::search::check_search_allowed().is_err() {
+            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                StatusCode::FORBIDDEN,
+                "installation has exceeded the search quota".to_string(),
+            )));
+        }
+    }
+
     let (org_id, stream_name) = path.into_inner();
     let http_span = if get_config().common.tracing_search_enabled {
         tracing::info_span!(
@@ -714,6 +744,16 @@ pub async fn values(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+
+    #[cfg(feature = "enterprise")]
+    {
+        if crate::service::search::check_search_allowed().is_err() {
+            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                StatusCode::FORBIDDEN,
+                "installation has exceeded the search quota".to_string(),
+            )));
+        }
+    }
 
     let user_id = in_req
         .headers()
@@ -1358,6 +1398,16 @@ pub async fn search_partition(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
+
+    #[cfg(feature = "enterprise")]
+    {
+        if crate::service::search::check_search_allowed().is_err() {
+            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                StatusCode::FORBIDDEN,
+                "installation has exceeded the search quota".to_string(),
+            )));
+        }
+    }
 
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!("/api/{org_id}/_search_partition", org_id = org_id.clone())
