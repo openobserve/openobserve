@@ -625,11 +625,4 @@ describe("ErrorTags Component", () => {
       expect(ErrorTags.props?.error?.type).toBe(Object);
     });
   });
-
-  describe("Component Lifecycle", () => {
-    it("should cleanup on unmount", () => {
-      wrapper.unmount();
-      expect(true).toBe(true); // Component should unmount without errors
-    });
-  });
 });

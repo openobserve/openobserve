@@ -77,7 +77,9 @@ describe("ErrorEventDescription Component", () => {
   describe("Error Type Description", () => {
     it("should display error message for error type", () => {
       const description = wrapper.find(".description");
-      expect(description.text()).toBe("Cannot read property 'foo' of undefined");
+      expect(description.text()).toBe(
+        "Cannot read property 'foo' of undefined",
+      );
     });
 
     it("should display error message with correct font size", () => {
@@ -311,11 +313,15 @@ describe("ErrorEventDescription Component", () => {
   describe("Computed Property", () => {
     it("should have getDescription computed property", () => {
       expect(wrapper.vm.getDescription).toBeDefined();
-      expect(wrapper.vm.getDescription).toBe("Cannot read property 'foo' of undefined");
+      expect(wrapper.vm.getDescription).toBe(
+        "Cannot read property 'foo' of undefined",
+      );
     });
 
     it("should reactively update when column changes", async () => {
-      expect(wrapper.vm.getDescription).toBe("Cannot read property 'foo' of undefined");
+      expect(wrapper.vm.getDescription).toBe(
+        "Cannot read property 'foo' of undefined",
+      );
 
       await wrapper.setProps({
         column: {
@@ -473,16 +479,15 @@ describe("ErrorEventDescription Component", () => {
   });
 
   describe("Component Lifecycle", () => {
-    it("should cleanup on unmount", () => {
-      wrapper.unmount();
-      expect(true).toBe(true); // Component should unmount without errors
-    });
-
     it("should handle rapid prop changes", async () => {
       const columns = [
         { type: "error", error_message: "Error 1" },
         { type: "resource", resource_url: "https://api1.com" },
-        { type: "action", _oo_action_target_text: "Click", _oo_action_target_selector: ".btn" },
+        {
+          type: "action",
+          _oo_action_target_text: "Click",
+          _oo_action_target_selector: ".btn",
+        },
         { type: "view", view_url: "/page" },
       ];
 

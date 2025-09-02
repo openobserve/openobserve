@@ -103,7 +103,16 @@ describe("PlayerEventsSidebar Component", () => {
                 <input v-model="modelValue" @input="$emit('update:model-value', $event.target.value)" />
               </div>
             `,
-            props: ["modelValue", "size", "filled", "borderless", "dense", "clearable", "debounce", "placeholder"],
+            props: [
+              "modelValue",
+              "size",
+              "filled",
+              "borderless",
+              "dense",
+              "clearable",
+              "debounce",
+              "placeholder",
+            ],
             emits: ["update:model-value"],
           },
           "q-select": {
@@ -114,7 +123,17 @@ describe("PlayerEventsSidebar Component", () => {
                 </select>
               </div>
             `,
-            props: ["modelValue", "options", "behavior", "multiple", "filled", "borderless", "dense", "emit-value", "size"],
+            props: [
+              "modelValue",
+              "options",
+              "behavior",
+              "multiple",
+              "filled",
+              "borderless",
+              "dense",
+              "emit-value",
+              "size",
+            ],
             emits: ["update:model-value"],
           },
           "q-separator": {
@@ -165,7 +184,7 @@ describe("PlayerEventsSidebar Component", () => {
     it("should pass correct tabs configuration", () => {
       const appTabs = wrapper.findComponent({ name: "AppTabs" });
       const tabs = appTabs.props("tabs");
-      
+
       expect(tabs).toHaveLength(2);
       expect(tabs[0].label).toBe("Breadcrumbs");
       expect(tabs[0].value).toBe("breadcrumbs");
@@ -180,7 +199,7 @@ describe("PlayerEventsSidebar Component", () => {
     it("should handle tab switching", async () => {
       const appTabs = wrapper.findComponent({ name: "AppTabs" });
       await appTabs.vm.$emit("update:active-tab", "tags");
-      
+
       expect(wrapper.vm.activeTab).toBe("tags");
     });
   });
@@ -227,7 +246,9 @@ describe("PlayerEventsSidebar Component", () => {
     it("should display location with location icon", () => {
       const locationSection = wrapper.find(".event-metadata");
       expect(locationSection.text()).toContain("New York, USA");
-      const locationIcon = locationSection.find('[data-test="q-icon"].location_on');
+      const locationIcon = locationSection.find(
+        '[data-test="q-icon"].location_on',
+      );
       expect(locationIcon.exists()).toBe(true);
     });
 
@@ -237,7 +258,7 @@ describe("PlayerEventsSidebar Component", () => {
       });
       wrapper.vm.activeTab = "tags";
       await wrapper.vm.$nextTick();
-      
+
       const emailSection = wrapper.find(".event-metadata");
       expect(emailSection.text()).toContain("Unknown User");
     });
@@ -298,7 +319,9 @@ describe("PlayerEventsSidebar Component", () => {
 
     it("should display event name", () => {
       const firstEvent = wrapper.find(".event-container");
-      expect(firstEvent.text()).toContain("TypeError: Cannot read property 'foo'");
+      expect(firstEvent.text()).toContain(
+        "TypeError: Cannot read property 'foo'",
+      );
     });
 
     it("should apply error styling to error events", () => {
@@ -314,8 +337,12 @@ describe("PlayerEventsSidebar Component", () => {
     });
 
     it("should have correct event title attribute", () => {
-      const firstEventName = wrapper.find(".event-container .inline:last-child");
-      expect(firstEventName.attributes("title")).toBe("TypeError: Cannot read property 'foo'");
+      const firstEventName = wrapper.find(
+        ".event-container .inline:last-child",
+      );
+      expect(firstEventName.attributes("title")).toBe(
+        "TypeError: Cannot read property 'foo'",
+      );
     });
   });
 
@@ -326,7 +353,11 @@ describe("PlayerEventsSidebar Component", () => {
     });
 
     it("should have default selected event types", () => {
-      expect(wrapper.vm.selectedEventTypes).toEqual(["error", "action", "view"]);
+      expect(wrapper.vm.selectedEventTypes).toEqual([
+        "error",
+        "action",
+        "view",
+      ]);
     });
 
     it("should have correct event options", () => {
@@ -341,7 +372,7 @@ describe("PlayerEventsSidebar Component", () => {
       wrapper.vm.searchEvent = "Button";
       wrapper.vm.searchEvents("Button");
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.filteredEvents).toHaveLength(1);
       expect(wrapper.vm.filteredEvents[0].name).toBe("Button click on submit");
     });
@@ -350,7 +381,7 @@ describe("PlayerEventsSidebar Component", () => {
       wrapper.vm.selectedEventTypes = ["error"];
       wrapper.vm.searchEvents("");
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.filteredEvents).toHaveLength(1);
       expect(wrapper.vm.filteredEvents[0].type).toBe("error");
     });
@@ -358,7 +389,7 @@ describe("PlayerEventsSidebar Component", () => {
     it("should be case insensitive for search", async () => {
       wrapper.vm.searchEvents("BUTTON");
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.filteredEvents).toHaveLength(1);
       expect(wrapper.vm.filteredEvents[0].name).toBe("Button click on submit");
     });
@@ -366,14 +397,14 @@ describe("PlayerEventsSidebar Component", () => {
     it("should handle null search value", async () => {
       wrapper.vm.searchEvents(null);
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.filteredEvents).toHaveLength(3);
     });
 
     it("should handle empty search value", async () => {
       wrapper.vm.searchEvents("");
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.filteredEvents).toHaveLength(3);
     });
 
@@ -381,7 +412,7 @@ describe("PlayerEventsSidebar Component", () => {
       wrapper.vm.selectedEventTypes = ["action", "view"];
       wrapper.vm.searchEvents("click");
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.filteredEvents).toHaveLength(1);
       expect(wrapper.vm.filteredEvents[0].type).toBe("action");
     });
@@ -396,7 +427,7 @@ describe("PlayerEventsSidebar Component", () => {
     it("should emit event when event is clicked", async () => {
       const firstEvent = wrapper.find(".event-container");
       await firstEvent.trigger("click");
-      
+
       const emittedEvents = wrapper.emitted("event-emitted");
       expect(emittedEvents).toBeDefined();
       expect(emittedEvents).toHaveLength(1);
@@ -406,7 +437,7 @@ describe("PlayerEventsSidebar Component", () => {
     it("should emit correct event data", async () => {
       const eventContainers = wrapper.findAll(".event-container");
       await eventContainers[1].trigger("click");
-      
+
       const emittedEvents = wrapper.emitted("event-emitted");
       expect(emittedEvents![0]).toEqual(["event-click", mockEvents[1]]);
     });
@@ -415,7 +446,7 @@ describe("PlayerEventsSidebar Component", () => {
       const eventContainers = wrapper.findAll(".event-container");
       await eventContainers[0].trigger("click");
       await eventContainers[1].trigger("click");
-      
+
       const emittedEvents = wrapper.emitted("event-emitted");
       expect(emittedEvents).toHaveLength(2);
     });
@@ -424,27 +455,36 @@ describe("PlayerEventsSidebar Component", () => {
   describe("Props Integration", () => {
     it("should watch events prop changes", async () => {
       const newEvents = [
-        { id: "new1", type: "error", name: "New error", displayTime: "11:00", relativeTime: 6000 },
+        {
+          id: "new1",
+          type: "error",
+          name: "New error",
+          displayTime: "11:00",
+          relativeTime: 6000,
+        },
       ];
-      
+
       await wrapper.setProps({ events: newEvents });
-      
+
       expect(wrapper.vm.filteredEvents).toEqual(newEvents);
     });
 
     it("should update filtered events when events prop changes", async () => {
       const initialLength = wrapper.vm.filteredEvents.length;
-      
-      const newEvents = [...mockEvents, {
-        id: "event4",
-        type: "action",
-        name: "New action",
-        displayTime: "10:40",
-        relativeTime: 6000,
-      }];
-      
+
+      const newEvents = [
+        ...mockEvents,
+        {
+          id: "event4",
+          type: "action",
+          name: "New action",
+          displayTime: "10:40",
+          relativeTime: 6000,
+        },
+      ];
+
       await wrapper.setProps({ events: newEvents });
-      
+
       expect(wrapper.vm.filteredEvents.length).toBe(initialLength + 1);
     });
 
@@ -463,10 +503,12 @@ describe("PlayerEventsSidebar Component", () => {
     it("should have correct layout structure for breadcrumbs", async () => {
       wrapper.vm.activeTab = "breadcrumbs";
       await wrapper.vm.$nextTick();
-      
-      const controlsSection = wrapper.find(".flex.items-center.justify-between");
+
+      const controlsSection = wrapper.find(
+        ".flex.items-center.justify-between",
+      );
       const eventsList = wrapper.find(".events-list");
-      
+
       expect(controlsSection.exists()).toBe(true);
       expect(eventsList.exists()).toBe(true);
     });
@@ -516,7 +558,7 @@ describe("PlayerEventsSidebar Component", () => {
 
     it("should have cursor pointer on clickable events", () => {
       const eventContainers = wrapper.findAll(".event-container");
-      eventContainers.forEach(container => {
+      eventContainers.forEach((container) => {
         expect(container.classes()).toContain("cursor-pointer");
       });
     });
@@ -536,33 +578,40 @@ describe("PlayerEventsSidebar Component", () => {
         displayTime: "11:00",
         relativeTime: 7000,
       };
-      
+
       await wrapper.setProps({ events: [longEvent] });
-      
+
       const eventName = wrapper.find(".event-container .inline:last-child");
       expect(eventName.attributes("title")).toBe(longEvent.name);
     });
   });
 
   describe("Component Lifecycle", () => {
-    it("should cleanup on unmount", () => {
-      wrapper.unmount();
-      expect(true).toBe(true); // Component should unmount without errors
-    });
-
     it("should maintain filtering state through prop updates", async () => {
       wrapper.vm.selectedEventTypes = ["error"];
       wrapper.vm.searchEvent = "Type";
-      
+
       const newEvents = [
-        { id: "new1", type: "error", name: "TypeError: test", displayTime: "11:00", relativeTime: 6000 },
-        { id: "new2", type: "action", name: "Button click", displayTime: "11:01", relativeTime: 6100 },
+        {
+          id: "new1",
+          type: "error",
+          name: "TypeError: test",
+          displayTime: "11:00",
+          relativeTime: 6000,
+        },
+        {
+          id: "new2",
+          type: "action",
+          name: "Button click",
+          displayTime: "11:01",
+          relativeTime: 6100,
+        },
       ];
-      
+
       await wrapper.setProps({ events: newEvents });
       wrapper.vm.searchEvents("Type");
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.filteredEvents).toHaveLength(1);
       expect(wrapper.vm.filteredEvents[0].type).toBe("error");
     });

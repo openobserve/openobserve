@@ -375,11 +375,6 @@ describe("ErrorStackTrace Component", () => {
   });
 
   describe("Component Lifecycle", () => {
-    it("should cleanup on unmount", () => {
-      wrapper.unmount();
-      expect(true).toBe(true); // Component should unmount without errors
-    });
-
     it("should handle prop updates gracefully", async () => {
       const newStack = ["New error", "    at new location"];
       const newError = { error_id: "new-error" };

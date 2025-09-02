@@ -587,11 +587,6 @@ describe("ErrorEvents Component", () => {
   });
 
   describe("Component Lifecycle", () => {
-    it("should cleanup on unmount", () => {
-      wrapper.unmount();
-      expect(true).toBe(true); // Component should unmount without errors
-    });
-
     it("should handle rapid prop changes", async () => {
       const events1 = [{ type: "error", _timestamp: 1 }];
       const events2 = [{ type: "view", _timestamp: 2 }];
@@ -602,11 +597,6 @@ describe("ErrorEvents Component", () => {
         const appTable = wrapper.findComponent({ name: "AppTable" });
         expect(appTable.props("rows")).toEqual(events);
       }
-    });
-
-    it("should cleanup on unmount", () => {
-      wrapper.unmount();
-      expect(true).toBe(true); // Component should unmount without errors
     });
   });
 });

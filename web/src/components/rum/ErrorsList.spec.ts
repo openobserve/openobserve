@@ -42,7 +42,10 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
       if (duration < 3600) return `${Math.floor(duration / 60)}m`;
       return `${Math.floor(duration / 3600)}h`;
     }),
-    mergeRoutes: vi.fn((route1, route2) => [...(route1 || []), ...(route2 || [])]),
+    mergeRoutes: vi.fn((route1, route2) => [
+      ...(route1 || []),
+      ...(route2 || []),
+    ]),
   };
 });
 
@@ -78,7 +81,8 @@ vi.mock("@/components/rum/AppTable.vue", () => ({
 vi.mock("@/components/rum/ErrorDetail.vue", () => ({
   default: {
     name: "ErrorDetail",
-    template: '<div data-test="error-detail">{{ column.error || "No Error" }}</div>',
+    template:
+      '<div data-test="error-detail">{{ column.error || "No Error" }}</div>',
     props: ["column"],
   },
 }));
@@ -148,7 +152,9 @@ describe("ErrorsList Component", () => {
     it("should render splitter layout", () => {
       expect(wrapper.find('[data-test="splitter"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="before-section"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="separator-section"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="separator-section"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.find('[data-test="after-section"]').exists()).toBe(true);
     });
 
@@ -162,7 +168,9 @@ describe("ErrorsList Component", () => {
       const beforeSection = wrapper.find('[data-test="before-section"]');
       const afterSection = wrapper.find('[data-test="after-section"]');
 
-      expect(beforeSection.find('[data-test="index-list"]').exists()).toBe(true);
+      expect(beforeSection.find('[data-test="index-list"]').exists()).toBe(
+        true,
+      );
       expect(afterSection.find('[data-test="app-table"]').exists()).toBe(true);
     });
 
@@ -172,12 +180,16 @@ describe("ErrorsList Component", () => {
 
     it("should pass IndexList to before slot", () => {
       const beforeSection = wrapper.find('[data-test="before-section"]');
-      expect(beforeSection.findComponent({ name: "IndexList" }).exists()).toBe(true);
+      expect(beforeSection.findComponent({ name: "IndexList" }).exists()).toBe(
+        true,
+      );
     });
 
     it("should pass AppTable to after slot", () => {
       const afterSection = wrapper.find('[data-test="after-section"]');
-      expect(afterSection.findComponent({ name: "AppTable" }).exists()).toBe(true);
+      expect(afterSection.findComponent({ name: "AppTable" }).exists()).toBe(
+        true,
+      );
     });
   });
 
@@ -199,8 +211,10 @@ describe("ErrorsList Component", () => {
 
   describe("Columns Configuration", () => {
     it("should have error column with correct properties", () => {
-      const errorColumn = wrapper.vm.columns.find((col: any) => col.name === "error");
-      
+      const errorColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "error",
+      );
+
       expect(errorColumn).toBeDefined();
       expect(errorColumn.label).toBe("Error");
       expect(errorColumn.align).toBe("left");
@@ -210,8 +224,10 @@ describe("ErrorsList Component", () => {
     });
 
     it("should have type column with correct properties", () => {
-      const typeColumn = wrapper.vm.columns.find((col: any) => col.name === "type");
-      
+      const typeColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "type",
+      );
+
       expect(typeColumn).toBeDefined();
       expect(typeColumn.label).toBe("Session Type");
       expect(typeColumn.align).toBe("left");
@@ -219,8 +235,10 @@ describe("ErrorsList Component", () => {
     });
 
     it("should have time_spent column with correct properties", () => {
-      const timeSpentColumn = wrapper.vm.columns.find((col: any) => col.name === "time_spent");
-      
+      const timeSpentColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "time_spent",
+      );
+
       expect(timeSpentColumn).toBeDefined();
       expect(timeSpentColumn.label).toBe("Time Spent");
       expect(timeSpentColumn.align).toBe("left");
@@ -229,8 +247,10 @@ describe("ErrorsList Component", () => {
     });
 
     it("should have error_count column with correct properties", () => {
-      const errorCountColumn = wrapper.vm.columns.find((col: any) => col.name === "error_count");
-      
+      const errorCountColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "error_count",
+      );
+
       expect(errorCountColumn).toBeDefined();
       expect(errorCountColumn.label).toBe("Error Count");
       expect(errorCountColumn.align).toBe("left");
@@ -238,8 +258,10 @@ describe("ErrorsList Component", () => {
     });
 
     it("should have initial_view_name column with correct properties", () => {
-      const initialViewColumn = wrapper.vm.columns.find((col: any) => col.name === "initial_view_name");
-      
+      const initialViewColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "initial_view_name",
+      );
+
       expect(initialViewColumn).toBeDefined();
       expect(initialViewColumn.label).toBe("Initial View Name");
       expect(initialViewColumn.align).toBe("left");
@@ -249,50 +271,62 @@ describe("ErrorsList Component", () => {
 
   describe("Column Functions", () => {
     it("should handle error column field function", () => {
-      const errorColumn = wrapper.vm.columns.find((col: any) => col.name === "error");
+      const errorColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "error",
+      );
       const mockRow = { error: "Test error message" };
-      
+
       expect(errorColumn.field(mockRow)).toBe("Test error message");
       expect(errorColumn.prop(mockRow)).toBe("Test error message");
     });
 
     it("should handle type column field function", () => {
-      const typeColumn = wrapper.vm.columns.find((col: any) => col.name === "type");
+      const typeColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "type",
+      );
       const mockRow = { type: "javascript" };
-      
+
       expect(typeColumn.field(mockRow)).toBe("javascript");
       expect(typeColumn.prop(mockRow)).toBe("javascript");
     });
 
     it("should handle time_spent column field function with formatting", () => {
-      const timeSpentColumn = wrapper.vm.columns.find((col: any) => col.name === "time_spent");
+      const timeSpentColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "time_spent",
+      );
       const mockRow = { time_spent: "120000000" }; // 120 seconds in nanoseconds
-      
+
       const result = timeSpentColumn.field(mockRow);
       expect(result).toBe("2m"); // formatDuration should convert 120s to 2m
     });
 
     it("should handle time_spent column sort function", () => {
-      const timeSpentColumn = wrapper.vm.columns.find((col: any) => col.name === "time_spent");
+      const timeSpentColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "time_spent",
+      );
       const rowA = { time_spent: "100000000" };
       const rowB = { time_spent: "200000000" };
-      
+
       const result = timeSpentColumn.sort(null, null, rowA, rowB);
       expect(result).toBe(-100000000); // 100000000 - 200000000
     });
 
     it("should handle error_count column field function", () => {
-      const errorCountColumn = wrapper.vm.columns.find((col: any) => col.name === "error_count");
+      const errorCountColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "error_count",
+      );
       const mockRow = { error_count: "5" };
-      
+
       expect(errorCountColumn.field(mockRow)).toBe("5");
       expect(errorCountColumn.prop(mockRow)).toBe("5");
     });
 
     it("should handle initial_view_name column field function", () => {
-      const initialViewColumn = wrapper.vm.columns.find((col: any) => col.name === "initial_view_name");
+      const initialViewColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "initial_view_name",
+      );
       const mockRow = { initial_view_name: "HomePage" };
-      
+
       expect(initialViewColumn.field(mockRow)).toBe("HomePage");
       expect(initialViewColumn.prop(mockRow)).toBe("HomePage");
     });
@@ -359,14 +393,22 @@ describe("ErrorsList Component", () => {
       };
 
       // Test that our columns can handle the Session interface
-      const errorColumn = wrapper.vm.columns.find((col: any) => col.name === "error");
-      const typeColumn = wrapper.vm.columns.find((col: any) => col.name === "type");
-      const timeSpentColumn = wrapper.vm.columns.find((col: any) => col.name === "time_spent");
+      const errorColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "error",
+      );
+      const typeColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "type",
+      );
+      const timeSpentColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "time_spent",
+      );
 
       expect(() => errorColumn.field(mockSession)).not.toThrow();
       expect(() => typeColumn.field(mockSession)).not.toThrow();
       expect(() => timeSpentColumn.field(mockSession)).not.toThrow();
-      expect(() => timeSpentColumn.sort(null, null, mockSession, mockSession)).not.toThrow();
+      expect(() =>
+        timeSpentColumn.sort(null, null, mockSession, mockSession),
+      ).not.toThrow();
     });
   });
 
@@ -378,7 +420,7 @@ describe("ErrorsList Component", () => {
 
     it("should render translated column labels", () => {
       const columns = wrapper.vm.columns;
-      
+
       expect(columns[0].label).toBe("Error");
       expect(columns[1].label).toBe("Session Type");
       expect(columns[2].label).toBe("Time Spent");
@@ -415,17 +457,21 @@ describe("ErrorsList Component", () => {
     });
 
     it("should handle column field functions with missing properties", () => {
-      const typeColumn = wrapper.vm.columns.find((col: any) => col.name === "type");
+      const typeColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "type",
+      );
       const emptyRow = {};
-      
+
       expect(() => typeColumn.field(emptyRow)).not.toThrow();
       expect(typeColumn.field(emptyRow)).toBeUndefined();
     });
 
     it("should handle time_spent formatting with invalid values", () => {
-      const timeSpentColumn = wrapper.vm.columns.find((col: any) => col.name === "time_spent");
+      const timeSpentColumn = wrapper.vm.columns.find(
+        (col: any) => col.name === "time_spent",
+      );
       const invalidRow = { time_spent: "invalid" };
-      
+
       expect(() => timeSpentColumn.field(invalidRow)).not.toThrow();
     });
   });
@@ -446,13 +492,6 @@ describe("ErrorsList Component", () => {
     it("should work with i18n integration", () => {
       expect(wrapper.vm.t).toBeDefined();
       expect(typeof wrapper.vm.t).toBe("function");
-    });
-  });
-
-  describe("Component Lifecycle", () => {
-    it("should cleanup on unmount", () => {
-      wrapper.unmount();
-      expect(true).toBe(true); // Component should unmount without errors
     });
   });
 

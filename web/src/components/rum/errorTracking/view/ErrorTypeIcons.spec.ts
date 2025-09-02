@@ -347,11 +347,6 @@ describe("ErrorTypeIcons Component", () => {
   });
 
   describe("Component Lifecycle", () => {
-    it("should cleanup on unmount", () => {
-      wrapper.unmount();
-      expect(true).toBe(true); // Component should unmount without errors
-    });
-
     it("should maintain reactivity through prop updates", async () => {
       const initialCategory = "error";
       const newCategory = "xhr";

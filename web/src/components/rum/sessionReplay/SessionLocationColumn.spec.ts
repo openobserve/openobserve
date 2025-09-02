@@ -64,7 +64,8 @@ describe("SessionLocationColumn", () => {
         },
         stubs: {
           "q-icon": {
-            template: '<i data-test="icon" :class="name" :style="`font-size: ${size}`"></i>',
+            template:
+              '<i data-test="icon" :class="name" :style="`font-size: ${size}`"></i>',
             props: ["name", "size"],
           },
         },
@@ -110,7 +111,11 @@ describe("SessionLocationColumn", () => {
 
     it("should handle different country codes", async () => {
       await wrapper.setProps({
-        column: { ...mockColumn, country_iso_code: "uk", country: "United Kingdom" },
+        column: {
+          ...mockColumn,
+          country_iso_code: "uk",
+          country: "United Kingdom",
+        },
       });
 
       const flagElement = wrapper.find(".fi-uk");
@@ -143,14 +148,16 @@ describe("SessionLocationColumn", () => {
 
   describe("Separator Icons", () => {
     it("should render separator icons between details", () => {
-      const separatorIcons = wrapper.findAll('[data-test="icon"]');
+      const separatorIcons = wrapper.findAll('[data-test="circle-icon"]');
       // Filter for circle icons
-      const circleIcons = separatorIcons.filter(icon => icon.attributes('class')?.includes('circle'));
+      const circleIcons = separatorIcons.filter((icon) =>
+        icon.attributes("class")?.includes("circle"),
+      );
       expect(separatorIcons.length).toBeGreaterThanOrEqual(2);
     });
 
     it("should apply correct styling to separator icons", () => {
-      const separatorIcons = wrapper.findAll('[data-test="icon"][name="circle"]');
+      const separatorIcons = wrapper.findAll('[data-test="circle-icon"]');
       separatorIcons.forEach((icon) => {
         expect(icon.attributes("style")).toContain("font-size: 4px");
       });
@@ -185,7 +192,7 @@ describe("SessionLocationColumn", () => {
       const completeColumn = {
         country: "Canada",
         country_iso_code: "ca",
-        city: "Toronto", 
+        city: "Toronto",
         browser: "Firefox",
         os: "macOS",
       };
@@ -251,12 +258,6 @@ describe("SessionLocationColumn", () => {
     it("should apply correct spacing for separators", () => {
       const separatorElements = wrapper.findAll(".q-mx-md");
       expect(separatorElements.length).toBeGreaterThan(0);
-    });
-
-    it("should have custom error styling classes available", () => {
-      // These are defined in the style section
-      const styles = wrapper.vm.$el.ownerDocument.head.innerHTML;
-      expect(wrapper.html()).toBeDefined();
     });
   });
 

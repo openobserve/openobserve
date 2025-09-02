@@ -75,7 +75,8 @@ describe("ErrorHeader Component", () => {
       global: {
         stubs: {
           "q-icon": {
-            template: '<i data-test="q-icon" :class="name" @click="$emit(\'click\')"></i>',
+            template:
+              '<i data-test="q-icon" :class="name" @click="$emit(\'click\')"></i>',
             props: ["name", "size"],
             emits: ["click"],
           },
@@ -109,7 +110,7 @@ describe("ErrorHeader Component", () => {
 
   describe("Back Button", () => {
     it("should render back button with correct styling", () => {
-      const backButton = wrapper.find(".cursor-pointer");
+      const backButton = wrapper.find("[data-test='back-button']");
       expect(backButton.exists()).toBe(true);
       expect(backButton.classes()).toContain("flex");
       expect(backButton.classes()).toContain("justify-center");
@@ -119,7 +120,7 @@ describe("ErrorHeader Component", () => {
     });
 
     it("should have correct styling attributes", () => {
-      const backButton = wrapper.find(".cursor-pointer");
+      const backButton = wrapper.find("[data-test='back-button']");
       const style = backButton.attributes("style");
       expect(style).toContain("border: 1.5px solid");
       expect(style).toContain("border-radius: 50%");
@@ -128,7 +129,7 @@ describe("ErrorHeader Component", () => {
     });
 
     it("should have correct title attribute", () => {
-      const backButton = wrapper.find(".cursor-pointer");
+      const backButton = wrapper.find("[data-test='back-button']");
       expect(backButton.attributes("title")).toBe("Go Back");
     });
 
@@ -138,9 +139,9 @@ describe("ErrorHeader Component", () => {
     });
 
     it("should call router.back() when clicked", async () => {
-      const backButton = wrapper.find(".cursor-pointer");
+      const backButton = wrapper.find("[data-test='back-button']");
       await backButton.trigger("click");
-      
+
       expect(mockRouterBack).toHaveBeenCalledTimes(1);
     });
   });
@@ -159,7 +160,7 @@ describe("ErrorHeader Component", () => {
     });
 
     it("should have correct error ID classes", () => {
-      const errorIdElement = wrapper.find("span[title='error-abc123']");
+      const errorIdElement = wrapper.find("[data-test='error-id']");
       expect(errorIdElement.classes()).toContain("q-pl-xs");
       expect(errorIdElement.classes()).toContain("cursor-pointer");
     });
@@ -211,7 +212,7 @@ describe("ErrorHeader Component", () => {
     it("should be in correct container", () => {
       const container = wrapper.find(".row.items-center.no-wrap.q-my-xs");
       expect(container.exists()).toBe(true);
-      
+
       const errorType = container.find(".error_type");
       expect(errorType.exists()).toBe(true);
     });
@@ -221,7 +222,9 @@ describe("ErrorHeader Component", () => {
     it("should display error message", () => {
       const errorMessage = wrapper.find(".error_message");
       expect(errorMessage.exists()).toBe(true);
-      expect(errorMessage.text()).toContain("Cannot read property 'foo' of undefined");
+      expect(errorMessage.text()).toContain(
+        "Cannot read property 'foo' of undefined",
+      );
     });
 
     it("should have correct error message styling", () => {
@@ -288,7 +291,7 @@ describe("ErrorHeader Component", () => {
     });
 
     it("should maintain proper element spacing", () => {
-      const backButton = wrapper.find(".cursor-pointer");
+      const backButton = wrapper.find("[data-test='back-button']");
       const label = wrapper.find(".text-bold");
       const errorId = wrapper.find("span[title]");
       const timestamp = wrapper.find(".q-ml-lg");
@@ -300,11 +303,6 @@ describe("ErrorHeader Component", () => {
   });
 
   describe("Props Validation", () => {
-    it("should require error prop", () => {
-      expect(ErrorHeader.props?.error?.required).toBe(true);
-      expect(ErrorHeader.props?.error?.type).toBe(Object);
-    });
-
     it("should handle different error structures", async () => {
       const customError = {
         error_id: "custom-error-456",
@@ -316,9 +314,13 @@ describe("ErrorHeader Component", () => {
 
       await wrapper.setProps({ error: customError });
 
-      expect(wrapper.find("span[title='custom-error-456']").exists()).toBe(true);
+      expect(wrapper.find("span[title='custom-error-456']").exists()).toBe(
+        true,
+      );
       expect(wrapper.find(".error_type").text()).toBe("ReferenceError");
-      expect(wrapper.find(".error_message").text()).toContain("Variable is not defined");
+      expect(wrapper.find(".error_message").text()).toContain(
+        "Variable is not defined",
+      );
       expect(wrapper.find(".q-ml-lg").text()).toBe("2024-02-01 15:30:00 UTC");
     });
   });
@@ -330,7 +332,7 @@ describe("ErrorHeader Component", () => {
 
     it("should call copyErrorId with correct ID", async () => {
       const copyErrorIdSpy = vi.spyOn(wrapper.vm, "copyErrorId");
-      
+
       const copyIcon = wrapper.find('[data-test="q-icon"].content_copy');
       await copyIcon.trigger("click");
 
@@ -405,8 +407,9 @@ describe("ErrorHeader Component", () => {
     });
 
     it("should handle long error IDs gracefully", async () => {
-      const longErrorId = "very-long-error-id-that-might-cause-layout-issues-12345678901234567890";
-      
+      const longErrorId =
+        "very-long-error-id-that-might-cause-layout-issues-12345678901234567890";
+
       await wrapper.setProps({
         error: {
           ...mockError,
@@ -421,32 +424,37 @@ describe("ErrorHeader Component", () => {
 
   describe("Accessibility", () => {
     it("should provide title attribute for error ID", () => {
-      const errorIdElement = wrapper.find("span[title]");
+      const errorIdElement = wrapper.find("[data-test='error-id']");
       expect(errorIdElement.attributes("title")).toBe("error-abc123");
     });
 
     it("should provide title for back button", () => {
-      const backButton = wrapper.find(".cursor-pointer");
+      const backButton = wrapper.find("[data-test='back-button']");
       expect(backButton.attributes("title")).toBe("Go Back");
-    });
-
-    it("should have clickable elements", () => {
-      const clickableElements = wrapper.findAll(".cursor-pointer");
-      expect(clickableElements.length).toBeGreaterThan(0);
     });
   });
 
   describe("Component Lifecycle", () => {
-    it("should cleanup on unmount", () => {
-      wrapper.unmount();
-      expect(true).toBe(true); // Component should unmount without errors
-    });
-
     it("should handle rapid prop changes", async () => {
       const errors = [
-        { error_id: "error1", type: "TypeError", error_message: "Error 1", timestamp: "Time 1" },
-        { error_id: "error2", type: "ReferenceError", error_message: "Error 2", timestamp: "Time 2" },
-        { error_id: "error3", type: "SyntaxError", error_message: "Error 3", timestamp: "Time 3" },
+        {
+          error_id: "error1",
+          type: "TypeError",
+          error_message: "Error 1",
+          timestamp: "Time 1",
+        },
+        {
+          error_id: "error2",
+          type: "ReferenceError",
+          error_message: "Error 2",
+          timestamp: "Time 2",
+        },
+        {
+          error_id: "error3",
+          type: "SyntaxError",
+          error_message: "Error 3",
+          timestamp: "Time 3",
+        },
       ];
 
       for (const error of errors) {

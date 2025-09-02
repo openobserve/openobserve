@@ -108,7 +108,7 @@ describe("ErrorDetail Component", () => {
       await wrapper.setProps({
         column: { ...mockColumn, error_type: null },
       });
-      
+
       const errorType = wrapper.find(".error_type");
       expect(errorType.text()).toBe("Error");
     });
@@ -118,7 +118,7 @@ describe("ErrorDetail Component", () => {
       await wrapper.setProps({
         column: columnWithoutErrorType,
       });
-      
+
       const errorType = wrapper.find(".error_type");
       expect(errorType.text()).toBe("Error");
     });
@@ -138,7 +138,9 @@ describe("ErrorDetail Component", () => {
     it("should render error message", () => {
       const errorMessage = wrapper.find(".error_message");
       expect(errorMessage.exists()).toBe(true);
-      expect(errorMessage.text()).toBe("Cannot read property 'foo' of undefined");
+      expect(errorMessage.text()).toBe(
+        "Cannot read property 'foo' of undefined",
+      );
     });
 
     it("should have correct classes", () => {
@@ -151,14 +153,16 @@ describe("ErrorDetail Component", () => {
 
     it("should have title attribute with full message", () => {
       const errorMessage = wrapper.find(".error_message");
-      expect(errorMessage.attributes("title")).toBe("Cannot read property 'foo' of undefined");
+      expect(errorMessage.attributes("title")).toBe(
+        "Cannot read property 'foo' of undefined",
+      );
     });
 
     it("should handle empty error message", async () => {
       await wrapper.setProps({
         column: { ...mockColumn, error_message: "" },
       });
-      
+
       const errorMessage = wrapper.find(".error_message");
       expect(errorMessage.text()).toBe("");
     });
@@ -171,7 +175,9 @@ describe("ErrorDetail Component", () => {
     });
 
     it("should display error handling status", () => {
-      const errorHandlingDiv = wrapper.find(".error_time .unhandled_error, .error_time .handled_error");
+      const errorHandlingDiv = wrapper.find(
+        ".error_time .unhandled_error, .error_time .handled_error",
+      );
       expect(errorHandlingDiv.text().trim()).toBe("unhandled");
     });
 
@@ -186,7 +192,7 @@ describe("ErrorDetail Component", () => {
       await wrapper.setProps({
         column: { ...mockColumn, error_handling: "handled" },
       });
-      
+
       const errorHandlingDiv = wrapper.find(".handled_error");
       expect(errorHandlingDiv.exists()).toBe(true);
       expect(errorHandlingDiv.classes()).toContain("text-grey-8");
@@ -196,7 +202,7 @@ describe("ErrorDetail Component", () => {
       await wrapper.setProps({
         column: { ...mockColumn, service: null },
       });
-      
+
       const serviceSpan = wrapper.find(".error_time span.text-grey-8");
       expect(serviceSpan.exists()).toBe(true);
     });
@@ -204,12 +210,18 @@ describe("ErrorDetail Component", () => {
 
   describe("Timestamp Display", () => {
     it("should display formatted timestamp", () => {
-      const timestampSpan = wrapper.find(".error_time span.text-grey-8:last-child");
-      expect(timestampSpan.text().trim()).toBe("Jan 01, 2024 10:00:00.000 +0000");
+      const timestampSpan = wrapper.find(
+        ".error_time span.text-grey-8:last-child",
+      );
+      expect(timestampSpan.text().trim()).toBe(
+        "Jan 01, 2024 10:00:00.000 +0000",
+      );
     });
 
     it("should show schedule icon", () => {
-      const scheduleIcon = wrapper.find(".error_time .q-icon, .error_time [class*='schedule']");
+      const scheduleIcon = wrapper.find(
+        ".error_time .q-icon, .error_time [class*='schedule']",
+      );
       expect(scheduleIcon.exists()).toBe(true);
     });
 
@@ -217,9 +229,13 @@ describe("ErrorDetail Component", () => {
       await wrapper.setProps({
         column: { ...mockColumn, zo_sql_timestamp: 1609459200000000 }, // 2021-01-01
       });
-      
-      const timestampSpan = wrapper.find(".error_time span.text-grey-8:last-child");
-      expect(timestampSpan.text().trim()).toBe("Jan 01, 2024 10:00:00.000 +0000");
+
+      const timestampSpan = wrapper.find(
+        ".error_time span.text-grey-8:last-child",
+      );
+      expect(timestampSpan.text().trim()).toBe(
+        "Jan 01, 2024 10:00:00.000 +0000",
+      );
     });
   });
 
@@ -227,7 +243,7 @@ describe("ErrorDetail Component", () => {
     it("should emit event when error type is clicked", async () => {
       const errorType = wrapper.find(".error_type");
       await errorType.trigger("click");
-      
+
       const emittedEvents = wrapper.emitted("event-emitted");
       expect(emittedEvents).toBeDefined();
       expect(emittedEvents).toHaveLength(1);
@@ -245,7 +261,7 @@ describe("ErrorDetail Component", () => {
       const errorType = wrapper.find(".error_type");
       await errorType.trigger("click");
       await errorType.trigger("click");
-      
+
       const emittedEvents = wrapper.emitted("event-emitted");
       expect(emittedEvents).toHaveLength(2);
     });
@@ -267,10 +283,10 @@ describe("ErrorDetail Component", () => {
       };
 
       await wrapper.setProps({ column: customColumn });
-      
+
       const errorType = wrapper.find(".error_type");
       const errorMessage = wrapper.find(".error_message");
-      
+
       expect(errorType.text()).toBe("ReferenceError");
       expect(errorMessage.text()).toBe("undefined variable");
     });
@@ -280,7 +296,9 @@ describe("ErrorDetail Component", () => {
     it("should call getFormattedDate with correct parameters", () => {
       // The timestamp is divided by 1000 to convert from microseconds to milliseconds
       const expectedTimestamp = Math.floor(mockColumn.zo_sql_timestamp / 1000);
-      expect(wrapper.vm.getFormattedDate(expectedTimestamp)).toBe("Jan 01, 2024 10:00:00.000 +0000");
+      expect(wrapper.vm.getFormattedDate(expectedTimestamp)).toBe(
+        "Jan 01, 2024 10:00:00.000 +0000",
+      );
     });
 
     it("should handle edge cases in date formatting", () => {
@@ -293,11 +311,11 @@ describe("ErrorDetail Component", () => {
     it("should have proper element hierarchy", () => {
       const container = wrapper.find(".error_details");
       expect(container.exists()).toBe(true);
-      
+
       const errorType = container.find(".error_type");
       const errorMessage = container.find(".error_message");
       const errorTime = container.find(".error_time");
-      
+
       expect(errorType.exists()).toBe(true);
       expect(errorMessage.exists()).toBe(true);
       expect(errorTime.exists()).toBe(true);
@@ -306,7 +324,7 @@ describe("ErrorDetail Component", () => {
     it("should maintain proper spacing classes", () => {
       const errorMessage = wrapper.find(".error_message");
       const errorTime = wrapper.find(".error_time");
-      
+
       expect(errorMessage.classes()).toContain("q-mt-xs");
       expect(errorTime.classes()).toContain("q-mt-xs");
     });
@@ -315,8 +333,10 @@ describe("ErrorDetail Component", () => {
   describe("CSS Classes and Styling", () => {
     it("should apply correct text colors", () => {
       const serviceSpan = wrapper.find(".error_time span.text-grey-8");
-      const timestampSpan = wrapper.find(".error_time span.text-grey-8:last-child");
-      
+      const timestampSpan = wrapper.find(
+        ".error_time span.text-grey-8:last-child",
+      );
+
       expect(serviceSpan.classes()).toContain("text-grey-8");
       if (timestampSpan.exists()) {
         expect(timestampSpan.classes()).toContain("text-grey-8");
@@ -347,7 +367,7 @@ describe("ErrorDetail Component", () => {
     it("should have appropriate cursor indicators", () => {
       const errorType = wrapper.find(".error_type");
       const errorMessage = wrapper.find(".error_message");
-      
+
       expect(errorType.classes()).toContain("cursor-pointer");
       expect(errorMessage.classes()).toContain("cursor-pointer");
     });
@@ -371,18 +391,18 @@ describe("ErrorDetail Component", () => {
           plugins: [i18n],
         },
       });
-      
+
       expect(nullWrapper.exists()).toBe(true);
       nullWrapper.unmount();
     });
 
     it("should handle undefined properties in column", async () => {
-      await wrapper.setProps({ 
-        column: { 
-          zo_sql_timestamp: mockColumn.zo_sql_timestamp 
-        } 
+      await wrapper.setProps({
+        column: {
+          zo_sql_timestamp: mockColumn.zo_sql_timestamp,
+        },
       });
-      
+
       const errorType = wrapper.find(".error_type");
       expect(errorType.text()).toBe("Error");
     });
@@ -390,29 +410,24 @@ describe("ErrorDetail Component", () => {
     it("should handle missing timestamp", async () => {
       const { zo_sql_timestamp, ...columnWithoutTimestamp } = mockColumn;
       await wrapper.setProps({ column: columnWithoutTimestamp });
-      
+
       expect(() => wrapper.vm.getFormattedDate()).not.toThrow();
     });
   });
 
   describe("Component Lifecycle", () => {
-    it("should cleanup on unmount", () => {
-      wrapper.unmount();
-      expect(true).toBe(true); // Component should unmount without errors
-    });
-
     it("should maintain state through prop updates", async () => {
       const newColumn = {
         ...mockColumn,
         error_type: "SyntaxError",
         error_message: "Unexpected token",
       };
-      
+
       await wrapper.setProps({ column: newColumn });
-      
+
       const errorType = wrapper.find(".error_type");
       const errorMessage = wrapper.find(".error_message");
-      
+
       expect(errorType.text()).toBe("SyntaxError");
       expect(errorMessage.text()).toBe("Unexpected token");
     });

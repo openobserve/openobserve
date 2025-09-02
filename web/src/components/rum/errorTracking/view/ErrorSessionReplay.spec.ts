@@ -120,17 +120,17 @@ describe("ErrorSessionReplay Component", () => {
     });
 
     it("should display session_id tag", () => {
-      const sessionIdTag = wrapper.findAll('[data-test="error-tag"]').find(
-        tag => tag.text().includes("session_id")
-      );
+      const sessionIdTag = wrapper
+        .findAll('[data-test="error-tag"]')
+        .find((tag) => tag.text().includes("session_id"));
       expect(sessionIdTag).toBeDefined();
       expect(sessionIdTag?.text()).toContain("session-abc123");
     });
 
     it("should display view_id tag", () => {
-      const viewIdTag = wrapper.findAll('[data-test="error-tag"]').find(
-        tag => tag.text().includes("view_id")
-      );
+      const viewIdTag = wrapper
+        .findAll('[data-test="error-tag"]')
+        .find((tag) => tag.text().includes("view_id"));
       expect(viewIdTag).toBeDefined();
       expect(viewIdTag?.text()).toContain("view-def456");
     });
@@ -315,14 +315,16 @@ describe("ErrorSessionReplay Component", () => {
 
   describe("Error Tags Integration", () => {
     it("should pass correct props to ErrorTag components", () => {
-      const errorTagComponents = wrapper.findAllComponents({ name: "ErrorTag" });
+      const errorTagComponents = wrapper.findAllComponents({
+        name: "ErrorTag",
+      });
       expect(errorTagComponents.length).toBe(2);
 
       const sessionIdTag = errorTagComponents.find(
-        component => component.props("tag").key === "session_id"
+        (component) => component.props("tag").key === "session_id",
       );
       const viewIdTag = errorTagComponents.find(
-        component => component.props("tag").key === "view_id"
+        (component) => component.props("tag").key === "view_id",
       );
 
       expect(sessionIdTag).toBeDefined();
@@ -447,14 +449,9 @@ describe("ErrorSessionReplay Component", () => {
   });
 
   describe("Component Lifecycle", () => {
-    it("should cleanup on unmount", () => {
-      wrapper.unmount();
-      expect(true).toBe(true); // Component should unmount without errors
-    });
-
     it("should handle multiple navigation calls", async () => {
       const playButton = wrapper.find(".play-button");
-      
+
       await playButton.trigger("click");
       await playButton.trigger("click");
       await playButton.trigger("click");
@@ -466,7 +463,7 @@ describe("ErrorSessionReplay Component", () => {
   describe("Performance", () => {
     it("should efficiently update computed properties", async () => {
       const initialTags = wrapper.vm.getSessionTags;
-      
+
       // Change unrelated prop
       await wrapper.setProps({
         error: {

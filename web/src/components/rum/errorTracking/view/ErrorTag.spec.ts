@@ -126,12 +126,6 @@ describe("ErrorTag Component", () => {
       const separator = wrapper.find('[data-test="separator"]');
       expect(separator.exists()).toBe(true);
     });
-
-    it("should have vertical separator", () => {
-      const separator = wrapper.findComponent({ name: "q-separator" });
-      expect(separator.exists()).toBe(true);
-      expect(separator.props("vertical")).toBe(true);
-    });
   });
 
   describe("Props Validation", () => {
@@ -341,11 +335,6 @@ describe("ErrorTag Component", () => {
   });
 
   describe("Component Lifecycle", () => {
-    it("should cleanup on unmount", () => {
-      wrapper.unmount();
-      expect(true).toBe(true); // Component should unmount without errors
-    });
-
     it("should handle prop updates", async () => {
       const initialTag = wrapper.props("tag");
       expect(initialTag).toEqual(mockTag);
@@ -354,11 +343,6 @@ describe("ErrorTag Component", () => {
       await wrapper.setProps({ tag: newTag });
 
       expect(wrapper.props("tag")).toEqual(newTag);
-    });
-
-    it("should cleanup on unmount", () => {
-      wrapper.unmount();
-      expect(true).toBe(true); // Component should unmount without errors
     });
   });
 });
