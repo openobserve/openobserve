@@ -20,7 +20,15 @@ import {
   ParsedSQLResult,
   TimePeriodUnit,
 } from "@/ts/interfaces";
-import { TIME_MULTIPLIERS, } from "@/utils/logs/constants";
+import { TIME_MULTIPLIERS } from "@/utils/logs/constants";
+
+interface SQLColumn {
+  expr?: {
+    type: string;
+    name?: string;
+  };
+  as?: string;
+}
 
 const { searchObj } = searchState();
 let parser: Parser | null = new Parser();
@@ -36,12 +44,12 @@ const DEFAULT_PARSED_RESULT: ParsedSQLResult = {
 
 /**
  * Parses a SQL query string into a structured AST (Abstract Syntax Tree) object.
- * 
+ *
  * This function takes a SQL query string, removes comment lines (lines starting with '--'),
  * and parses it using the DataFusion SQL parser to return a structured object containing
  * the query components like columns, tables, conditions, etc.
- * 
- * @param queryString - The SQL query string to parse. If empty or not provided, 
+ *
+ * @param queryString - The SQL query string to parse. If empty or not provided,
  *                      it will use the query from searchObj.data.query
  * @returns A ParsedSQLResult object containing structured SQL components:
  *          - columns: Array of selected columns
@@ -50,7 +58,7 @@ const DEFAULT_PARSED_RESULT: ParsedSQLResult = {
  *          - limit: LIMIT clause (null if none)
  *          - groupby: GROUP BY clauses (null if none)
  *          - where: WHERE conditions (null if none)
- * 
+ *
  * @example
  * ```typescript
  * const result = fnParsedSQL("SELECT name, age FROM users WHERE age > 25");
@@ -80,23 +88,23 @@ export const fnParsedSQL = (queryString: string = ""): ParsedSQLResult => {
 
 /**
  * Converts a parsed SQL AST object back into a SQL query string.
- * 
+ *
  * This function takes a structured SQL object (typically returned by fnParsedSQL)
  * and converts it back into a valid SQL query string using the DataFusion SQL parser.
- * 
+ *
  * @param parsedObj - The parsed SQL object to convert back to string.
  *                    Can be a ParsedSQLResult interface or any AST object
  *                    from the SQL parser
  * @returns A SQL query string representation of the parsed object.
  *          Returns empty string if parsing fails or input is invalid
- * 
+ *
  * @example
  * ```typescript
  * const parsedSQL = fnParsedSQL("SELECT * FROM users");
  * const sqlString = fnUnparsedSQL(parsedSQL);
  * console.log(sqlString); // "SELECT * FROM users"
  * ```
- * 
+ *
  * @example
  * ```typescript
  * // Handle conversion errors gracefully
@@ -190,4 +198,258 @@ export const extractTimestamps = (
     from: fromTimestamp,
     to: toTimestamp,
   };
+};
+
+/**
+ * Determines if a SQL query contains aggregation functions or GROUP BY clauses.
+ *
+ * This function checks for aggregation by examining both the parsed column expressions
+ * for aggregation functions (like COUNT, SUM, AVG) and the raw query string for
+ * GROUP BY keywords. It's used to determine whether a query requires aggregation
+ * processing or can be handled as a simple select query.
+ *
+ * @param columns - Array of parsed SQL column objects from the query AST
+ * @returns true if aggregation is detected, false otherwise
+ *
+ * @example
+ * ```typescript
+ * // Query with aggregation function
+ * const parsedQuery = fnParsedSQL("SELECT COUNT(*) FROM users");
+ * const hasAgg = hasAggregation(parsedQuery.columns);
+ * console.log(hasAgg); // true
+ *
+ * // Query with GROUP BY
+ * searchObj.data.query = "SELECT name FROM users GROUP BY department";
+ * const hasGroupBy = hasAggregation([]);
+ * console.log(hasGroupBy); // true
+ *
+ * // Simple select query
+ * const simpleQuery = hasAggregation([{ expr: { type: 'column' } }]);
+ * console.log(simpleQuery); // false
+ * ```
+ */
+export const hasAggregation = (columns: SQLColumn[]): boolean => {
+  // Check for aggregation functions in column expressions
+  if (columns && Array.isArray(columns)) {
+    for (const column of columns) {
+      if (column?.expr?.type === "aggr_func") {
+        return true;
+      }
+    }
+  }
+
+  // Check for GROUP BY clause in the raw query string
+  const currentQuery = searchObj?.data?.query || "";
+  if (currentQuery.toLowerCase().includes("group by")) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
+ * Determines if a parsed SQL query contains a LIMIT clause.
+ *
+ * This function checks whether the parsed SQL AST includes a LIMIT clause
+ * with valid values. It's used to identify queries that restrict the number
+ * of returned results, which affects result processing and pagination behavior.
+ *
+ * @param parsedSQL - The parsed SQL AST object (typically from fnParsedSQL)
+ * @returns true if a LIMIT clause with values is present, false otherwise
+ *
+ * @example
+ * ```typescript
+ * const query1 = fnParsedSQL("SELECT * FROM users LIMIT 10");
+ * console.log(isLimitQuery(query1)); // true
+ *
+ * const query2 = fnParsedSQL("SELECT * FROM users");
+ * console.log(isLimitQuery(query2)); // false
+ *
+ * // Handle null/undefined input
+ * console.log(isLimitQuery(null)); // false
+ * ```
+ */
+export const isLimitQuery = (
+  parsedSQL: ParsedSQLResult | null = null,
+): boolean => {
+  return Boolean(
+    parsedSQL?.limit &&
+      parsedSQL.limit.value &&
+      Array.isArray(parsedSQL.limit.value) &&
+      parsedSQL.limit.value.length > 0,
+  );
+};
+
+/**
+ * Determines if a parsed SQL query contains a DISTINCT clause.
+ *
+ * This function checks whether the parsed SQL AST includes a DISTINCT modifier
+ * in the SELECT statement. DISTINCT queries eliminate duplicate rows from
+ * results, which affects query execution and result processing strategies.
+ *
+ * @param parsedSQL - The parsed SQL AST object (typically from fnParsedSQL)
+ * @returns true if DISTINCT clause is present, false otherwise
+ *
+ * @example
+ * ```typescript
+ * const query1 = fnParsedSQL("SELECT DISTINCT name FROM users");
+ * console.log(isDistinctQuery(query1)); // true
+ *
+ * const query2 = fnParsedSQL("SELECT name FROM users");
+ * console.log(isDistinctQuery(query2)); // false
+ *
+ * // Handle null/undefined input
+ * console.log(isDistinctQuery(null)); // false
+ * ```
+ */
+export const isDistinctQuery = (
+  parsedSQL: ParsedSQLResult | any = null,
+): boolean => {
+  return parsedSQL?.distinct?.type === "DISTINCT";
+};
+
+/**
+ * Determines if a parsed SQL query contains WITH clauses (Common Table Expressions).
+ *
+ * This function checks whether the parsed SQL AST includes WITH clauses,
+ * also known as Common Table Expressions (CTEs). WITH clauses allow for
+ * complex query structuring and temporary result set definitions.
+ *
+ * @param parsedSQL - The parsed SQL AST object (typically from fnParsedSQL)
+ * @returns true if WITH clauses are present, false otherwise
+ *
+ * @example
+ * ```typescript
+ * const query1 = fnParsedSQL(`
+ *   WITH user_stats AS (SELECT COUNT(*) as total FROM users)
+ *   SELECT * FROM user_stats
+ * `);
+ * console.log(isWithQuery(query1)); // true
+ *
+ * const query2 = fnParsedSQL("SELECT * FROM users");
+ * console.log(isWithQuery(query2)); // false
+ *
+ * // Handle null/undefined input
+ * console.log(isWithQuery(null)); // false
+ * ```
+ */
+export const isWithQuery = (
+  parsedSQL: ParsedSQLResult | any = null,
+): boolean => {
+  return Boolean(
+    parsedSQL?.with &&
+      Array.isArray(parsedSQL.with) &&
+      parsedSQL.with.length > 0,
+  );
+};
+
+// Todo: Duplicate function in IndexList.vue same for removeTraceId
+/**
+ * Adds a trace ID to the appropriate trace ID collection based on communication method.
+ *
+ * This function adds a trace ID to either the HTTP request trace IDs or WebSocket
+ * trace IDs array, depending on the current communication method. It prevents
+ * duplicate trace IDs by checking if the ID already exists before adding it.
+ * This is essential for tracking ongoing search operations and preventing
+ * duplicate request handling.
+ *
+ * @param traceId - The unique trace identifier to add to the collection.
+ *                  Must be a non-empty string representing a valid trace ID
+ * @returns void - No return value, modifies searchObj state directly
+ *
+ * @example
+ * ```typescript
+ * // Add trace ID for HTTP communication
+ * searchObj.communicationMethod = "http";
+ * addTraceId("trace-123-456-789");
+ * console.log(searchObj.data.searchRequestTraceIds); // ["trace-123-456-789"]
+ *
+ * // Add trace ID for WebSocket communication
+ * searchObj.communicationMethod = "ws";
+ * addTraceId("ws-trace-456-789");
+ * console.log(searchObj.data.searchWebSocketTraceIds); // ["ws-trace-456-789"]
+ *
+ * // Attempting to add duplicate trace ID (no-op)
+ * addTraceId("trace-123-456-789"); // Won't add duplicate
+ * ```
+ *
+ * @throws {Error} Implicitly throws if traceId is not a string or searchObj is undefined
+ */
+export const addTraceId = (traceId: string): void => {
+  // Validate input parameter
+  if (!traceId || typeof traceId !== "string") {
+    console.error("addTraceId: traceId must be a non-empty string");
+    return;
+  }
+
+  // Determine target array based on communication method
+  const isWebSocket = searchObj.communicationMethod === "ws";
+  const targetTraceIds = isWebSocket
+    ? searchObj.data.searchWebSocketTraceIds
+    : searchObj.data.searchRequestTraceIds;
+
+  // Early return if trace ID already exists (prevent duplicates)
+  if (targetTraceIds.includes(traceId)) {
+    return;
+  }
+
+  // Add trace ID to the appropriate collection
+  targetTraceIds.push(traceId);
+};
+
+/**
+ * Removes a trace ID from the appropriate trace ID collection based on communication method.
+ *
+ * This function removes a specific trace ID from either the HTTP request trace IDs
+ * or WebSocket trace IDs array, depending on the current communication method.
+ * It uses the filter method to create a new array without the specified trace ID,
+ * which is essential for cleanup when search operations complete or are cancelled.
+ *
+ * @param traceId - The unique trace identifier to remove from the collection.
+ *                  Must be a string representing the trace ID to be removed
+ * @returns void - No return value, modifies searchObj state directly
+ *
+ * @example
+ * ```typescript
+ * // Remove trace ID from HTTP communication
+ * searchObj.communicationMethod = "http";
+ * searchObj.data.searchRequestTraceIds = ["trace-123", "trace-456"];
+ * removeTraceId("trace-123");
+ * console.log(searchObj.data.searchRequestTraceIds); // ["trace-456"]
+ *
+ * // Remove trace ID from WebSocket communication
+ * searchObj.communicationMethod = "ws";
+ * searchObj.data.searchWebSocketTraceIds = ["ws-123", "ws-456"];
+ * removeTraceId("ws-123");
+ * console.log(searchObj.data.searchWebSocketTraceIds); // ["ws-456"]
+ *
+ * // Attempting to remove non-existent trace ID (no effect)
+ * removeTraceId("non-existent-id"); // Array remains unchanged
+ * ```
+ *
+ * @throws {Error} Implicitly throws if searchObj or its data properties are undefined
+ */
+export const removeTraceId = (traceId: string): void => {
+  // Validate input parameter
+  if (!traceId || typeof traceId !== "string") {
+    console.error("removeTraceId: traceId must be a non-empty string");
+    return;
+  }
+
+  // Determine which trace ID collection to modify based on communication method
+  const isWebSocket = searchObj.communicationMethod === "ws";
+
+  if (isWebSocket) {
+    // Remove trace ID from WebSocket trace IDs array
+    searchObj.data.searchWebSocketTraceIds =
+      searchObj.data.searchWebSocketTraceIds.filter(
+        (existingTraceId: string) => existingTraceId !== traceId,
+      );
+  } else {
+    // Remove trace ID from HTTP request trace IDs array
+    searchObj.data.searchRequestTraceIds =
+      searchObj.data.searchRequestTraceIds.filter(
+        (existingTraceId: string) => existingTraceId !== traceId,
+      );
+  }
 };
