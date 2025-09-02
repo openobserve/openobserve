@@ -43,6 +43,10 @@ use crate::{
     context_path = "/api",
     tag = "ServiceAccounts",
     operation_id = "ServiceAccountsList",
+    summary = "List service accounts",
+    description = "Retrieves a list of all service accounts in the organization. Service accounts are special user accounts \
+                   designed for automated systems and applications to authenticate and access resources without human \
+                   intervention. Each service account has an associated API token for programmatic access.",
     security(
         ("Authorization"= [])
     ),
@@ -50,7 +54,7 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[get("/{org_id}/service_accounts")]
@@ -97,6 +101,11 @@ pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpRes
     context_path = "/api",
     tag = "ServiceAccounts",
     operation_id = "ServiceAccountSave",
+    summary = "Create service account",
+    description = "Creates a new service account for automated systems and applications. Service accounts provide a secure way \
+                   for non-human users to authenticate and access resources programmatically. Each service account is \
+                   automatically assigned an API token that can be used for authentication in automated workflows and \
+                   integrations.",
     security(
         ("Authorization"= [])
     ),
@@ -105,7 +114,7 @@ pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpRes
     ),
     request_body(content = ServiceAccountRequest, description = "ServiceAccount data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[post("/{org_id}/service_accounts")]
@@ -140,6 +149,10 @@ pub async fn save(
     context_path = "/api",
     tag = "ServiceAccounts",
     operation_id = "ServiceAccountUpdate",
+    summary = "Update service account",
+    description = "Updates an existing service account's information such as first name and last name. You can also rotate the \
+                   API token by adding the 'rotateToken=true' query parameter, which generates a new authentication token \
+                   while invalidating the old one. This is useful for security maintenance and credential rotation policies.",
     security(
         ("Authorization"= [])
     ),
@@ -149,7 +162,7 @@ pub async fn save(
     ),
     request_body(content = UpdateServiceAccountRequest, description = "Service Account data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[put("/{org_id}/service_accounts/{email_id}")]
@@ -217,6 +230,8 @@ pub async fn update(
     context_path = "/api",
     tag = "ServiceAccounts",
     operation_id = "RemoveServiceAccount",
+    summary = "Delete service account",
+    description = "Permanently removes a service account from the organization. This action immediately invalidates the associated API token and revokes all access permissions for the service account. Use this when decommissioning automated systems or cleaning up unused accounts. This operation cannot be undone.",
     security(
         ("Authorization"= [])
     ),
@@ -225,8 +240,8 @@ pub async fn update(
         ("email_id" = String, Path, description = "Service Account email id"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[delete("/{org_id}/service_accounts/{email_id}")]
@@ -246,15 +261,19 @@ pub async fn delete(
     context_path = "/api",
      tag = "ServiceAccounts",
     operation_id = "GetServiceAccountToken",
+    summary = "Get service account API token",
+    description = "Retrieves the current API token for a specific service account. The API token is used for authenticating automated systems and applications when making API requests. Keep tokens secure and rotate them regularly for security best practices. If the token is compromised, use the update endpoint with rotateToken=true to generate a new one.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("org_id" = String, Path, description = "Organization name"),
+        ("email_id" = String, Path, description = "Service Account email id"),
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = APIToken),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/service_accounts/{email_id}")]

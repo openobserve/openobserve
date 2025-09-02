@@ -32,6 +32,7 @@ pub struct ListReportsResponseBody(pub Vec<ListReportsResponseBodyItem>);
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct ListReportsResponseBodyItem {
+    #[schema(value_type = String)]
     pub report_id: Ksuid,
     pub folder_id: String,
     pub folder_name: String,

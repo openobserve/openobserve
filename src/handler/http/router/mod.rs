@@ -375,8 +375,12 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(users::delete)
         .service(users::update)
         .service(users::add_user_to_org)
-        .service(users::list_invitations)
-        .service(users::list_roles)
+        .service(users::list_roles);
+
+    #[cfg(not(feature = "cloud"))]
+    let service = service.service(users::list_invitations);
+
+    let service = service
         .service(organization::org::organizations)
         .service(organization::settings::get)
         .service(organization::settings::create)

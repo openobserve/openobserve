@@ -406,10 +406,11 @@ mod tests {
 
     #[test]
     fn test_convert_to_vrl_float() {
-        let value = json::Value::Number(serde_json::Number::from_f64(3.14).unwrap());
+        let value =
+            json::Value::Number(serde_json::Number::from_f64(std::f64::consts::PI).unwrap());
         let vrl_value = convert_to_vrl(&value);
         match vrl_value {
-            vrl::value::Value::Float(f) => assert_eq!(f.into_inner(), 3.14),
+            vrl::value::Value::Float(f) => assert_eq!(f.into_inner(), std::f64::consts::PI),
             _ => panic!("Expected float value"),
         }
     }

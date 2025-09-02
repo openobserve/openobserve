@@ -136,10 +136,11 @@ impl fmt::Display for HTTPType {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 #[serde(default)]
 #[serde(rename_all = "snake_case")]
 pub struct Template {
+    #[schema(value_type = Option<String>)]
     pub id: Option<svix_ksuid::Ksuid>,
     pub org_id: String,
     pub name: String,
@@ -149,7 +150,7 @@ pub struct Template {
     pub body: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum TemplateType {
     #[default]

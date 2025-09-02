@@ -279,6 +279,7 @@ pub struct QueryCondition {
     #[serde(default)]
     #[serde(rename = "type")]
     pub query_type: QueryType,
+    #[schema(value_type = Option<Object>)]
     pub conditions: Option<ConditionList>,
     pub sql: Option<String>,
     pub promql: Option<String>,              // (cpu usage / cpu total)
@@ -292,7 +293,7 @@ pub struct QueryCondition {
     pub multi_time_range: Option<Vec<CompareHistoricData>>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum ConditionList {
     OrNode {

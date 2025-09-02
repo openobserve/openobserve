@@ -126,7 +126,7 @@ mod tests {
             let record = create_test_record();
 
             // Test function exists and handles the record
-            let result = emit_put_event(&record).await;
+            let result = crate::service::db::distinct_values::emit_put_event(&record).await;
             // Would succeed if super cluster is disabled
             assert!(result.is_ok() || result.is_err());
         }
@@ -135,13 +135,17 @@ mod tests {
         async fn test_emit_delete_event() {
             let record = create_test_record();
 
-            let result = emit_delete_event(&record).await;
+            let result = crate::service::db::distinct_values::emit_delete_event(&record).await;
             assert!(result.is_ok() || result.is_err());
         }
 
         #[tokio::test]
         async fn test_emit_batch_delete_event() {
-            let result = emit_batch_delete_event(&OriginType::Stream, "test_id").await;
+            let result = crate::service::db::distinct_values::emit_batch_delete_event(
+                &OriginType::Stream,
+                "test_id",
+            )
+            .await;
             assert!(result.is_ok() || result.is_err());
         }
     }

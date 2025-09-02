@@ -42,13 +42,15 @@ use crate::{
     context_path = "/api",
     tag = "Traces",
     operation_id = "PostTraces",
+    summary = "Ingest trace data",
+    description = "Accepts and processes distributed tracing data from applications and services. Supports both Protocol Buffers and JSON formats for OTLP (OpenTelemetry Protocol) trace ingestion. Use this endpoint to send trace spans, timing information, and service dependency data for observability and performance monitoring.",
     security(
         ("Authorization"= [])
     ),
     request_body(content = String, description = "ExportTraceServiceRequest", content_type = "application/x-protobuf"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200})),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/traces")]
@@ -101,6 +103,8 @@ async fn handle_req(
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetLatestTraces",
+    summary = "Get recent trace data",
+    description = "Retrieves the most recent trace data from a specific stream within a time range. Returns trace summaries including trace IDs, span counts, service names, and timing information. You can filter results and control pagination to analyze distributed system performance and identify bottlenecks or errors in your applications.",
     security(
         ("Authorization"= [])
     ),
@@ -115,7 +119,7 @@ async fn handle_req(
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -129,8 +133,8 @@ async fn handle_req(
                 }
             ]
         })),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/{stream_name}/traces/latest")]
