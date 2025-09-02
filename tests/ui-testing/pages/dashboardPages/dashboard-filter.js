@@ -2,6 +2,19 @@ export default class DashboardFilter {
   constructor(page) {
     this.page = page;
   }
+
+  // Helper method for retrying flaky operations
+  // async retryOperation(operation, maxRetries = 3, delay = 1000) {
+  //   for (let i = 0; i < maxRetries; i++) {
+  //     try {
+  //       await operation();
+  //       return;
+  //     } catch (error) {
+  //       if (i === maxRetries - 1) throw error;
+  //       await this.page.waitForTimeout(delay);
+  //     }
+  //   }
+  // }
   // Add filter condition
 
   async addFilterCondition(
@@ -129,9 +142,9 @@ export default class DashboardFilter {
   async addGroupFilterCondition(index, newFieldName, operator, value) {
     const idx = String(index);
 
-    // Step 1: Get the dynamic label
+    // Step 1: Get the dynamic label with improved reliability
     const dynamicLabelLocator = this.page.locator("div.field_label").nth(index);
-    await dynamicLabelLocator.waitFor({ state: "visible" });
+    await dynamicLabelLocator.waitFor({ state: "visible", timeout: 10000 });
 
     const textContent = await dynamicLabelLocator.evaluate((el) => {
       return Array.from(el.childNodes)
@@ -140,19 +153,21 @@ export default class DashboardFilter {
         .join("");
     });
 
-    await dynamicLabelLocator.waitFor({ state: "visible" });
-
     const fieldLabelLocator = this.page.locator(
       `[data-test="dashboard-add-condition-label-${idx}-${textContent}"]`
     );
+    await fieldLabelLocator.waitFor({ state: "visible", timeout: 10000 });
     await fieldLabelLocator.click();
 
-    // Step 2: Handle multiple matching elements for column dropdown
+    // Step 2: Handle column dropdown with improved reliability
     const allColumnLocators = this.page.locator(
       `[data-test="dashboard-add-condition-column-${idx}\\}"]`
     );
-    const count = await allColumnLocators.count();
+    await allColumnLocators
+      .first()
+      .waitFor({ state: "visible", timeout: 10000 });
 
+    const count = await allColumnLocators.count();
     const columnLocator =
       count === 1
         ? allColumnLocators.first()
@@ -160,47 +175,30 @@ export default class DashboardFilter {
         ? allColumnLocators.first()
         : allColumnLocators.last();
 
+    await columnLocator.waitFor({ state: "visible", timeout: 10000 });
     await columnLocator.click();
     await columnLocator.fill(newFieldName);
 
-    // ✅ Improved option selection with fallback logic
-    let optionSelected = false;
-    try {
-      const suggestion = this.page.locator(
-        'div.q-menu[role="listbox"] div.q-item'
-      );
-      await suggestion.waitFor({ state: "visible", timeout: 5000 });
-      const firstSuggestion = suggestion.first();
-      await firstSuggestion.waitFor({ state: "visible", timeout: 5000 });
-      await firstSuggestion.click();
-      optionSelected = true;
-    } catch (e) {
-      try {
-        await this.page
-          .getByRole("option", { name: newFieldName, exact: true })
-          .first()
-          .click();
-        optionSelected = true;
-      } catch (err1) {
-        await this.page.getByText(newFieldName, { exact: true }).click();
-        optionSelected = true;
-      }
-    }
+    // Wait for suggestions menu and select first option
+    const suggestionMenu = this.page.locator('div.q-menu[role="listbox"]');
+    await suggestionMenu.waitFor({ state: "visible", timeout: 10000 });
 
-    if (!optionSelected) {
-      throw new Error(`Failed to select field option: ${newFieldName}`);
-    }
+    const firstSuggestion = this.page
+      .locator('div.q-menu[role="listbox"] div.q-item')
+      .first();
+    await firstSuggestion.waitFor({ state: "visible", timeout: 10000 });
+    await firstSuggestion.click();
 
-    // Step 3: Condition dropdown
+    // Step 3: Condition dropdown with improved reliability
     if (operator || value) {
       const conditionLocator = this.page.locator(
         `[data-test="dashboard-add-condition-condition-${idx}"]`
       );
+      await conditionLocator.waitFor({ state: "visible", timeout: 10000 });
       await conditionLocator.click();
-      await conditionLocator.click(); // safety click
     }
 
-    // Step 4: Operator dropdown
+    // Step 4: Operator dropdown with proper waits
     if (operator) {
       const operatorLocator =
         index === 0
@@ -211,26 +209,31 @@ export default class DashboardFilter {
               .locator('[data-test="dashboard-add-condition-operator"]')
               .last();
 
+      await operatorLocator.waitFor({ state: "visible", timeout: 10000 });
       await operatorLocator.click();
-      await this.page
+
+      const operatorOption = this.page
         .getByRole("option", { name: operator, exact: true })
-        .first()
-        .click();
+        .first();
+      await operatorOption.waitFor({ state: "visible", timeout: 10000 });
+      await operatorOption.click();
     }
 
-    // Step 5: Fill value field
+    // Step 5: Fill value field with enhanced reliability
     if (value) {
       const valueInput =
         index === 0
           ? this.page.locator('[data-test="common-auto-complete"]').first()
           : this.page.locator('[data-test="common-auto-complete"]').last();
 
+      await valueInput.waitFor({ state: "visible", timeout: 10000 });
       await valueInput.click();
       await valueInput.fill(value);
 
       const suggestion = this.page
         .locator('[data-test="common-auto-complete-option"]')
         .first();
+      await suggestion.waitFor({ state: "visible", timeout: 10000 });
       await suggestion.click();
     } else if (operator && newFieldName) {
       const expectedError = `Filter: ${newFieldName}: Condition value required`;
