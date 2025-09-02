@@ -77,11 +77,15 @@ async fn handle_req(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
+    let content_type = req
+        .headers()
+        .get("Content-Type")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("application/json");
     let in_stream_name = req
         .headers()
         .get(&get_config().grpc.stream_header_key)
-        .map(|header| header.to_str().unwrap());
+        .and_then(|header| header.to_str().ok());
     if content_type.eq(CONTENT_TYPE_PROTO) {
         traces::otlp_proto(&org_id, body, in_stream_name).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
@@ -213,6 +217,7 @@ pub async fn get_latest_traces(
         Some(v) => v.to_string(),
         None => "".to_string(),
     };
+
     let from = query
         .get("from")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
@@ -230,6 +235,36 @@ pub async fn get_latest_traces(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
     if end_time == 0 {
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
+    }
+    // default/traces/latest?filter=trace_id=%2701990a31c98e72cbb5e38df024e7adef%27&
+    // start_time=1756811970952000&end_time=1756812870952000&from=0&size=25
+    // filter=trace_id=%2701990a31c98e72cbb5e38df024e7adef%27%20and%20service_name%20=%27all%27
+
+    let search_trace_id = query.get("trace_id").map(|v| v.to_string());
+    let start_time_from_trace_id = if let Some(trace_id) = search_trace_id {
+        config::ider::get_start_time_from_trace_id(&trace_id).unwrap_or(0)
+    } else if filter.contains("trace_id=") {
+        // Safely extract trace_id from filter string
+        let trace_id = filter
+            .split("trace_id=")
+            .nth(1)
+            .and_then(|s| s.split("&").next())
+            .and_then(|s| s.split(" ").next())
+            .map(|s| s.replace("'", "").replace("\"", ""))
+            .filter(|s| !s.is_empty());
+
+        if let Some(trace_id) = trace_id {
+            config::ider::get_start_time_from_trace_id(&trace_id).unwrap_or(0)
+        } else {
+            0
+        }
+    } else {
+        0
+    };
+
+    if start_time_from_trace_id > 0 {
+        start_time = start_time_from_trace_id - 30 * 1_000_000; //30 seconds eariler
+        end_time = start_time_from_trace_id + 3600 * 1_000_000; //1 hour later
     }
 
     let max_query_range = crate::common::utils::stream::get_max_query_range(
