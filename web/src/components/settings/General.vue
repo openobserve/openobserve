@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- platform settings section -->
     <div class="tw-mx-4">
-      <GroupHeader title="Platform Settings" :iconPath="store.state.theme == 'dark' ? 'images/common/platform_settings_dark.svg' : 'images/common/platform_settings_light.svg'"/>
+      <GroupHeader title="Platform Settings" :showIcon="false" />
       <div class="tw-w-full tw-flex tw-flex-col">
         <q-form @submit.stop="onSubmit.execute">
           <!-- scape interval section -->
@@ -137,12 +137,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.selectedOrganization.identifier
       "
     >
-      <div class="q-px-md q-py-md">
-        <div class="text-body1 text-bold">
-          {{ t("settings.enterpriseTitle") }}
-        </div>
+      <div class="q-px-md q-py-sm">
+        <GroupHeader title="Enterprise Features" :showIcon="false" />
       </div>
-      <q-separator />
       <div class="q-mx-lg">
         <div class="q-gutter-sm row q-mt-xs">
           <div
