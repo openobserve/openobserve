@@ -160,115 +160,44 @@ export default class DashboardFilter {
         ? allColumnLocators.first()
         : allColumnLocators.last();
 
-    // More robust field selection approach
     await columnLocator.click();
+    await columnLocator.fill(newFieldName);
 
-    // Ensure field is focused and ready for input
-    await columnLocator.focus();
-    await this.page.waitForTimeout(300);
-
-    // Clear existing content and enter new field name
-    await this.page.keyboard.press("Control+a"); // Select all
-    await this.page.keyboard.type(newFieldName);
-
-    // Wait for suggestions to load
-    await this.page.waitForTimeout(1000);
-
-    // Use a more deterministic approach to select from dropdown
-    const maxRetries = 5;
-    let success = false;
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    // ✅ Improved option selection with fallback logic
+    let optionSelected = false;
+    try {
+      const suggestion = this.page.locator(
+        'div.q-menu[role="listbox"] div.q-item'
+      );
+      await suggestion.waitFor({ state: "visible", timeout: 5000 });
+      const firstSuggestion = suggestion.first();
+      await firstSuggestion.waitFor({ state: "visible", timeout: 5000 });
+      await firstSuggestion.click();
+      optionSelected = true;
+    } catch (e) {
       try {
-        // Wait for dropdown to be present
-        const dropdownExists = await this.page
-          .locator('div.q-menu[role="listbox"]')
-          .isVisible();
-
-        if (dropdownExists) {
-          // Get all dropdown options
-          const options = this.page.locator(
-            'div.q-menu[role="listbox"] div.q-item'
-          );
-          const optionCount = await options.count();
-
-          if (optionCount > 0) {
-            // Try to find exact match first
-            const exactMatch = options.filter({
-              hasText: new RegExp(
-                `^${newFieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`
-              ),
-            });
-            const exactCount = await exactMatch.count();
-
-            if (exactCount > 0) {
-              await exactMatch.first().click();
-              success = true;
-              break;
-            } else {
-              // If no exact match, click the first option
-              await options.first().click();
-              success = true;
-              break;
-            }
-          }
-        }
-
-        // If dropdown not visible, try keyboard selection
-        await this.page.keyboard.press("ArrowDown");
-        await this.page.waitForTimeout(200);
-        await this.page.keyboard.press("Enter");
-
-        // Check if selection was successful by verifying dropdown closed
-        await this.page.waitForTimeout(500);
-        const stillVisible = await this.page
-          .locator('div.q-menu[role="listbox"]')
-          .isVisible();
-        if (!stillVisible) {
-          success = true;
-          break;
-        }
-      } catch (error) {
-        console.log(`Attempt ${attempt} failed: ${error.message}`);
-        if (attempt === maxRetries) {
-          // Last resort: just press Enter
-          await this.page.keyboard.press("Enter");
-          success = true;
-          break;
-        }
-        await this.page.waitForTimeout(500); // Wait before retry
+        await this.page
+          .getByRole("option", { name: newFieldName, exact: true })
+          .first()
+          .click();
+        optionSelected = true;
+      } catch (err1) {
+        await this.page.getByText(newFieldName, { exact: true }).click();
+        optionSelected = true;
       }
     }
 
-    if (!success) {
-      throw new Error(
-        `Failed to select field after ${maxRetries} attempts: ${newFieldName}`
-      );
+    if (!optionSelected) {
+      throw new Error(`Failed to select field option: ${newFieldName}`);
     }
-
-    // Additional wait to ensure selection is processed
-    await this.page.waitForTimeout(500);
 
     // Step 3: Condition dropdown
     if (operator || value) {
       const conditionLocator = this.page.locator(
         `[data-test="dashboard-add-condition-condition-${idx}"]`
       );
-
-      // Wait for element to be ready for interaction
-      // await conditionLocator.waitFor({
-      //   state: "visible",
-      //   timeout: 10000,
-      // });
-
-      // Simple and reliable approach - just wait for visibility and click
-      await conditionLocator.waitFor({ state: "visible", timeout: 15000 });
-      
-      // Scroll into view if needed
-      await conditionLocator.scrollIntoViewIfNeeded();
-      
-      // Click when ready - Playwright will automatically wait for element to be actionable
-      await conditionLocator.click({ timeout: 15000 });
+      await conditionLocator.click();
+      await conditionLocator.click(); // safety click
     }
 
     // Step 4: Operator dropdown
