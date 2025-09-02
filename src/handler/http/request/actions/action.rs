@@ -63,8 +63,6 @@ fn validate_environment_variables(env_vars: &HashMap<String, String>) -> Result<
 }
 
 /// Delete Action
-///
-/// #{"ratelimit_module":"Actions", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Actions",
@@ -83,6 +81,9 @@ fn validate_environment_variables(env_vars: &HashMap<String, String>) -> Result<
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json",body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/actions/{ksuid}")]
@@ -107,8 +108,6 @@ pub async fn delete_action(path: web::Path<(String, Ksuid)>) -> Result<HttpRespo
 }
 
 /// Serve Action zip file
-///
-/// #{"ratelimit_module":"Actions", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Actions",
@@ -128,6 +127,9 @@ pub async fn delete_action(path: web::Path<(String, Ksuid)>) -> Result<HttpRespo
     responses(
         (status = 200, description = "Success", content_type = "application/zip", body = String),
         (status = 400, description = "Error",   content_type = "application/json",body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/actions/download/{ksuid}")]
@@ -158,8 +160,6 @@ pub async fn serve_action_zip(path: web::Path<(String, Ksuid)>) -> Result<HttpRe
 }
 
 /// Update Action
-///
-/// #{"ratelimit_module":"Actions", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Actions",
@@ -180,6 +180,9 @@ pub async fn serve_action_zip(path: web::Path<(String, Ksuid)>) -> Result<HttpRe
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/actions/{action_id}")]
@@ -235,8 +238,6 @@ pub async fn update_action_details(
 }
 
 /// List Actions
-///
-/// #{"ratelimit_module":"Actions", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Actions",
@@ -256,6 +257,9 @@ pub async fn update_action_details(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/actions")]
@@ -287,8 +291,6 @@ pub async fn list_actions(path: web::Path<String>) -> Result<HttpResponse, Error
 }
 
 /// Get single Action
-///
-/// #{"ratelimit_module":"Actions", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Actions",
@@ -308,6 +310,9 @@ pub async fn list_actions(path: web::Path<String>) -> Result<HttpResponse, Error
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/actions/{action_id}")]
@@ -341,7 +346,6 @@ pub async fn get_action_from_id(path: web::Path<(String, String)>) -> Result<Htt
 /// Upload a zipped action file and process it.
 /// This endpoint allows uploading a ZIP file containing an action, which will be extracted,
 /// processed, and executed.
-/// #{"ratelimit_module":"Actions", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Actions",
@@ -361,6 +365,9 @@ pub async fn get_action_from_id(path: web::Path<(String, String)>) -> Result<Htt
         (status = 200, description = "Action processed successfully", content_type = "application/json", body = String),
         (status = 400, description = "Error processing action", content_type = "application/json", body = String),
         (status = 500, description = "Internal server error", content_type = "application/json", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/actions/upload")]

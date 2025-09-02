@@ -158,8 +158,7 @@ impl From<RatelimitError> for HttpResponse {
 }
 
 /// listApiModule
-///
-/// #{"ratelimit_module":"Ratelimit", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Ratelimit",
@@ -175,6 +174,9 @@ impl From<RatelimitError> for HttpResponse {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Ratelimit", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/ratelimit/api_modules")]
@@ -207,8 +209,7 @@ pub async fn api_modules(path: web::Path<String>) -> Result<HttpResponse, Error>
 }
 
 /// listModuleRatelimitRule
-///
-/// #{"ratelimit_module":"Ratelimit", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Ratelimit",
@@ -225,6 +226,9 @@ pub async fn api_modules(path: web::Path<String>) -> Result<HttpResponse, Error>
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Ratelimit", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/ratelimit/module_list")]
@@ -274,8 +278,7 @@ pub async fn list_module_ratelimit(
 }
 
 /// listRoleRatelimitRule
-///
-/// #{"ratelimit_module":"Ratelimit", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Ratelimit",
@@ -293,6 +296,9 @@ pub async fn list_module_ratelimit(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Ratelimit", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/ratelimit/role_list")]
@@ -360,8 +366,7 @@ pub async fn list_role_ratelimit(
 }
 
 /// UpdateRatelimitRule
-///
-/// #{"ratelimit_module":"Ratelimit", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Ratelimit",
@@ -381,6 +386,9 @@ pub async fn list_role_ratelimit(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Ratelimit", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/ratelimit/update")]

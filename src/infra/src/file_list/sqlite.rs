@@ -361,7 +361,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
         let pool = CLIENT_RO.clone();
-        let ret = if flattened.is_some() {
+        let ret = if let Some(flattened) = flattened {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
@@ -370,7 +370,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
                 "#,
             )
             .bind(stream_key)
-            .bind(flattened.unwrap())
+            .bind(flattened)
             .fetch_all(&pool)
             .await
         } else {
@@ -493,7 +493,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
             }
             partitions
         };
-        log::debug!("file_list day_partitions: {:?}", day_partitions);
+        log::debug!("file_list day_partitions: {day_partitions:?}");
 
         let mut tasks = Vec::with_capacity(day_partitions.len());
 

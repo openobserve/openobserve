@@ -198,12 +198,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     /// Deletes the Trigger job matching the given parameters
     async fn delete(&self, org: &str, module: TriggerModule, key: &str) -> Result<()> {
         let pool = CLIENT.clone();
-        log::debug!(
-            "Deleting scheduled job for org: {}, module: {}, key: {}",
-            org,
-            module,
-            key
-        );
+        log::debug!("Deleting scheduled job for org: {org}, module: {module}, key: {key}",);
         DB_QUERY_NUMS
             .with_label_values(&["delete", "scheduled_jobs"])
             .inc();

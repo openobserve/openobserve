@@ -69,8 +69,7 @@ pub async fn remote_write(
 }
 
 /// prometheus instant queries
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
 #[utoipa::path(
     context_path = "/api",
@@ -113,6 +112,9 @@ pub async fn remote_write(
             }
         })),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query")]
@@ -228,8 +230,7 @@ async fn query(
 }
 
 /// prometheus range queries
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
 #[utoipa::path(
     context_path = "/api",
@@ -282,6 +283,9 @@ async fn query(
             }
         })),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query_range")]
@@ -309,8 +313,7 @@ pub async fn query_range_post(
 }
 
 /// prometheus query exemplars
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-exemplars
 #[utoipa::path(
     context_path = "/api",
@@ -375,6 +378,9 @@ pub async fn query_range_post(
             ]
         })),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query_exemplars")]
@@ -529,8 +535,7 @@ async fn query_range(
 }
 
 /// prometheus query metric metadata
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 #[utoipa::path(
     context_path = "/api",
@@ -572,6 +577,9 @@ async fn query_range(
             }
         })),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/metadata")]
@@ -593,8 +601,7 @@ pub async fn metadata(
 }
 
 /// prometheus finding series by label matchers
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
 #[utoipa::path(
     context_path = "/api",
@@ -633,6 +640,9 @@ pub async fn metadata(
             ]
         })),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/series")]
@@ -739,8 +749,7 @@ async fn series(
 }
 
 /// prometheus getting label names
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#getting-label-names
 #[utoipa::path(
     context_path = "/api",
@@ -785,6 +794,9 @@ async fn series(
             ]
         })),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/labels")]
@@ -839,8 +851,7 @@ async fn labels(
 }
 
 /// prometheus query label values
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-label-values
 #[utoipa::path(
     context_path = "/api",
@@ -867,6 +878,9 @@ async fn labels(
             ]
         })),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/label/{label_name}/values")]
@@ -955,8 +969,7 @@ fn validate_metadata_params(
 }
 
 /// prometheus formatting query expressions
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#formatting-query-expressions
 #[utoipa::path(
     context_path = "/api",
@@ -976,6 +989,9 @@ fn validate_metadata_params(
             "data" : "foo / bar"
         })),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/format_query")]

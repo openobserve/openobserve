@@ -54,8 +54,7 @@ use crate::service::organization::is_org_in_free_trial_period;
 
 // 1. submit
 /// SearchSQL
-///
-/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",
@@ -83,6 +82,9 @@ use crate::service::organization::is_org_in_free_trial_period;
         (status = 200, description = "Search Job submitted successfully", body = Object),
         (status = 400, description = "Bad Request", body = Object),
         (status = 500, description = "Internal Server Error", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/search_jobs")]
@@ -221,8 +223,7 @@ pub async fn submit_job(
 
 // 2. status_all
 /// ListSearchJobs
-///
-/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",
@@ -255,6 +256,9 @@ pub async fn submit_job(
             "result_path": "/path/to/result"
         }])),
         (status = 400, description = "Bad Request", body = Object)
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/search_jobs")]
@@ -279,8 +283,7 @@ pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Erro
 
 // 3. status
 /// GetSearchJobStatus
-///
-/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",
@@ -312,6 +315,9 @@ pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Erro
             "result_path": "/path/to/result"
         })),
         (status = 400, description = "Bad Request", body = Object)
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/search_jobs/{job_id}/status")]
@@ -353,8 +359,7 @@ pub async fn get_status(
 
 // 4. cancel
 /// CancelSearchJob
-///
-/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",
@@ -374,6 +379,9 @@ pub async fn get_status(
             "message": "[Job_Id: abc123] Running Search Job cancelled successfully."
         })),
         (status = 400, description = "Bad Request", body = Object)
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"}))
     )
 )]
 #[post("/{org_id}/search_jobs/{job_id}/cancel")]
@@ -411,8 +419,7 @@ pub async fn cancel_job(
 
 // 5. get
 /// GetSearchJobResult
-///
-/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",
@@ -440,6 +447,9 @@ pub async fn cancel_job(
         })),
         (status = 400, description = "Bad Request", body = Object),
         (status = 404, description = "Not Found", body = Object)
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/search_jobs/{job_id}/result")]
@@ -506,8 +516,7 @@ pub async fn get_job_result(
 
 // 6. delete
 /// DeleteSearchJob
-///
-/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",
@@ -528,6 +537,9 @@ pub async fn get_job_result(
         })),
         (status = 400, description = "Bad Request", body = Object),
         (status = 404, description = "Not Found", body = Object)
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/search_jobs/{job_id}")]
@@ -580,8 +592,7 @@ pub async fn delete_job(
 
 // 7. retry
 /// RetrySearchJob
-///
-/// #{"ratelimit_module":"Search Jobs", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",
@@ -602,6 +613,9 @@ pub async fn delete_job(
         })),
         (status = 400, description = "Bad Request", body = Object),
         (status = 403, description = "Forbidden - Job cannot be retried", body = Object)
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"}))
     )
 )]
 #[post("/{org_id}/search_jobs/{job_id}/retry")]

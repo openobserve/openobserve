@@ -41,7 +41,7 @@ pub async fn add(entry: PatternEntry) -> Result<PatternEntry, anyhow::Error> {
             ));
         }
         Err(e) => {
-            log::error!("error while saving pattern to db : {}", e);
+            log::error!("error while saving pattern to db : {e}");
             return Err(anyhow::anyhow!(e));
         }
     }
@@ -314,7 +314,7 @@ pub async fn watch_patterns() -> Result<(), anyhow::Error> {
                         continue;
                     }
                     Err(e) => {
-                        log::error!("Error getting value: {}", e);
+                        log::error!("Error getting value: {e}");
                         continue;
                     }
                 };
@@ -366,8 +366,7 @@ pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
                     Some(v) => v,
                     None => {
                         log::error!(
-                            "expected value with pattern association message, found none, event : {:?}",
-                            ev
+                            "expected value with pattern association message, found none, event : {ev:?}"
                         );
                         continue;
                     }
@@ -378,8 +377,7 @@ pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
                         Ok(v) => v,
                         Err(e) => {
                             log::error!(
-                                "error deserializing pattern association message : error: {e} event: {:?}",
-                                ev
+                                "error deserializing pattern association message : error: {e} event: {ev:?}"
                             );
                             continue;
                         }

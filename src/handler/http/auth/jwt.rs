@@ -825,7 +825,7 @@ mod tests {
         };
 
         let result = process_token((validation_response, Some(token_data))).await;
-        assert!(result.is_none() || result == Some(false));
+        assert!(result.is_none() || result == Some((false, false)));
     }
 
     #[test]

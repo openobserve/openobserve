@@ -24,8 +24,6 @@ use {
 };
 
 /// ListClusters
-///
-/// #{"ratelimit_module":"Clusters", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Clusters",
@@ -39,6 +37,9 @@ use {
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HashMap<String, Vec<String>>),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Clusters", "operation": "get"}))
     )
 )]
 #[get("/clusters")]
