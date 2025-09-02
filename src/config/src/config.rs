@@ -2598,7 +2598,6 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         && !cfg.common.metrics_cache_enabled
         && !cfg.common.feature_query_streaming_aggs
     {
-    if cfg.common.is_local_storage {
         cfg.disk_cache.enabled = false;
     }
 
