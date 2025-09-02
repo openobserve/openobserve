@@ -144,9 +144,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn>
             <q-btn-group
               v-if="config.isEnterprise"
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              :class="['dashboard-icons q-ml-sm hideOnPrintMode', arePanelsLoading ? '' : 'no-border']"
             >
-              <q-btn
+            <q-btn
                 :outline="!arePanelsLoading && (isVariablesChanged ? false : true)"
                 :flat="arePanelsLoading"
                 class="dashboard-icons hideOnPrintMode"
@@ -172,8 +172,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               
               <q-btn-dropdown
                 :outline="!arePanelsLoading && (isVariablesChanged ? false : true)"
-                flat
-                class="q-px-xs"
+                class="q-px-xs no-border apply-btn-dropdown"
+                :flat="arePanelsLoading"
                 size="sm"
                 no-caps
                 auto-close
@@ -1374,5 +1374,10 @@ export default defineComponent({
 
 .folder-name:hover {
   background-color: $accent !important;
+}
+
+.apply-btn-dropdown{
+  border: 1px solid $border-color !important;
+  border-left: none !important;
 }
 </style>
