@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tag-block row items-center no-wrap q-mr-sm q-mt-sm">
     <div class="q-px-md">{{ tag.key }}</div>
-    <q-separator vertical />
+    <q-separator data-test="separator" vertical />
     <div class="q-px-md tag-bg" style="word-break: break-all">
       {{ tag.value }}
     </div>

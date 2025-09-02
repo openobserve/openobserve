@@ -104,7 +104,7 @@ export default defineComponent({
     const topSlowResources = ref([]);
     const topHeavyResources = ref([]);
     const topErrorResources = ref([]);
-    const variablesData = ref(null);
+    const variablesData = ref({ isVariablesLoading: true, values: [] });
 
     const refDateTime: any = ref(null);
     const refreshInterval = ref(0);
@@ -133,12 +133,14 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       // emit window resize event to trigger the layout
-      apiDashboardChartsRef.value.layoutUpdate();
+      if (apiDashboardChartsRef.value) {
+        apiDashboardChartsRef.value.layoutUpdate();
 
-      // Dashboards gets overlapped as we have used keep alive
-      // Its an internal bug of vue-grid-layout
-      // So adding settimeout of 1 sec to fix the issue
-      apiDashboardChartsRef.value.layoutUpdate();
+        // Dashboards gets overlapped as we have used keep alive
+        // Its an internal bug of vue-grid-layout
+        // So adding settimeout of 1 sec to fix the issue
+        apiDashboardChartsRef.value.layoutUpdate();
+      }
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -168,7 +170,7 @@ export default defineComponent({
             query: req,
             page_type: "logs",
           },
-          "RUM"
+          "RUM",
         )
         .then((res) => {
           res.data.hits.slice(0, topCount).forEach((element: any) => {
@@ -206,7 +208,7 @@ export default defineComponent({
             query: req,
             page_type: "logs",
           },
-          "RUM"
+          "RUM",
         )
         .then((res) => {
           res.data.hits.forEach((element: any) => {
@@ -244,7 +246,7 @@ export default defineComponent({
             query: req,
             page_type: "logs",
           },
-          "RUM"
+          "RUM",
         )
         .then((res) => {
           res.data.hits.forEach((element: any) => {
@@ -278,8 +280,10 @@ export default defineComponent({
           currentDashboardData.data?.variables?.list.length
         )
       ) {
-        variablesData.value.isVariablesLoading = false;
-        variablesData.value.values = [];
+        if (variablesData.value) {
+          variablesData.value.isVariablesLoading = false;
+          variablesData.value.values = [];
+        }
       }
     };
 
@@ -294,7 +298,7 @@ export default defineComponent({
           getTopHeavyResources();
           getTopSlowResources();
         }
-      }
+      },
     );
 
     return {
@@ -313,6 +317,14 @@ export default defineComponent({
       apiDashboard,
       isLoading,
       apiDashboardChartsRef,
+      updateLayout,
+      getTopSlowResources,
+      getTopHeavyResources,
+      getTopErrorResources,
+      getVariablesString,
+      topSlowResources,
+      topHeavyResources,
+      topErrorResources,
     };
   },
 });
