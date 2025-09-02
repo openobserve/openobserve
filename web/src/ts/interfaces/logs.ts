@@ -59,3 +59,44 @@ export interface ParsedSQLResult {
 }
 
 export type TimePeriodUnit = "s" | "m" | "h" | "d" | "w" | "M";
+
+export interface SearchAroundParams {
+  key: string;
+  size: number;
+  body: any;
+}
+
+export interface StreamField {
+  name: string;
+  streams: string[];
+}
+
+export interface SearchAroundResponse {
+  from: number;
+  scan_size: number;
+  took: number;
+  hits: any[];
+}
+
+export interface SearchAroundError {
+  response?: {
+    data: {
+      error: string;
+      error_detail?: string;
+      code?: number;
+      message?: string;
+      trace_id?: string;
+    };
+    status?: number;
+  };
+  request?: {
+    status: number;
+  };
+  message: string;
+  trace_id?: string;
+}
+
+export interface TraceContext {
+  traceparent: string;
+  traceId: string;
+}

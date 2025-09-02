@@ -14,67 +14,36 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { searchState } from "@/composables/useLogs/searchState";
-import { fnParsedSQL, fnUnparsedSQL } from "@/composables/useLogs/logsUtils";
+import {
+  fnParsedSQL,
+  fnUnparsedSQL,
+  addTraceId,
+  removeTraceId,
+} from "@/composables/useLogs/logsUtils";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { logsErrorMessage } from "@/utils/common";
 import useLogs from "@/composables/useLogs";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
-
-interface SearchAroundParams {
-  key: string;
-  size: number;
-  body: any;
-}
-
-interface StreamField {
-  name: string;
-  streams: string[];
-}
-
-interface SearchAroundResponse {
-  from: number;
-  scan_size: number;
-  took: number;
-  hits: any[];
-}
-
-interface SearchAroundError {
-  response?: {
-    data: {
-      error: string;
-      error_detail?: string;
-      code?: number;
-      message?: string;
-      trace_id?: string;
-    };
-    status?: number;
-  };
-  request?: {
-    status: number;
-  };
-  message: string;
-  trace_id?: string;
-}
-
-interface TraceContext {
-  traceparent: string;
-  traceId: string;
-}
+import {
+  SearchAroundParams,
+  StreamField,
+  SearchAroundResponse,
+  SearchAroundError,
+  TraceContext,
+} from "@/ts/interfaces";
 
 export const useSearchAround = () => {
   const store = useStore();
   const { searchObj } = searchState();
   const {
     shouldAddFunctionToSearch,
-    addTraceId,
     extractFields,
     generateHistogramSkeleton,
     generateHistogramData,
     updateGridColumns,
     filterHitsColumns,
     notificationMsg,
-    removeTraceId,
     showErrorNotification,
   } = useLogs();
 
