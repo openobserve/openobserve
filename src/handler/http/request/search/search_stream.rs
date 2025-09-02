@@ -56,8 +56,7 @@ use crate::{
     service::{search::streaming::process_search_stream_request, setup_tracing_with_trace_id},
 };
 /// Search HTTP2 streaming endpoint
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -80,6 +79,9 @@ use crate::{
     responses(
         (status = 200, description = "Success", content_type = "text/event-stream"),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[post("/{org_id}/_search_stream")]
@@ -215,11 +217,7 @@ pub async fn search_http2_stream(
     let mut sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
         Ok(sql) => sql,
         Err(e) => {
-            log::error!(
-                "[trace_id: {}] Error getting histogram interval: {:?}",
-                trace_id,
-                e
-            );
+            log::error!("[trace_id: {trace_id}] Error getting histogram interval: {e:?}");
 
             #[cfg(feature = "enterprise")]
             let error_message = e.to_string();
@@ -273,7 +271,7 @@ pub async fn search_http2_stream(
                 sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
                     Ok(v) => v,
                     Err(e) => {
-                        log::error!("[trace_id: {}] Error parsing sql: {:?}", trace_id, e);
+                        log::error!("[trace_id: {trace_id}] Error parsing sql: {e:?}");
 
                         #[cfg(feature = "enterprise")]
                         let error_message = e.to_string();
@@ -508,8 +506,7 @@ pub async fn report_to_audit(
 }
 
 /// Values  HTTP2 streaming endpoint
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -530,6 +527,9 @@ pub async fn report_to_audit(
     responses(
         (status = 200, description = "Success", content_type = "text/event-stream"),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[post("/{org_id}/_values_stream")]

@@ -2443,7 +2443,7 @@ impl StreamResponses {
                         streaming_id: streaming_id.clone(),
                     };
                     let metadata_data = serde_json::to_string(&metadata).unwrap_or_else(|_| {
-                        log::error!("Failed to serialize metadata: {:?}", metadata);
+                        log::error!("Failed to serialize metadata: {metadata:?}");
                         String::new()
                     });
                     let metadata_bytes = format_event("search_response_metadata", &metadata_data);
@@ -2453,7 +2453,7 @@ impl StreamResponses {
                         hits: results.hits.clone(),
                     };
                     let hits_data = serde_json::to_string(&hits).unwrap_or_else(|_| {
-                        log::error!("Failed to serialize hits: {:?}", hits);
+                        log::error!("Failed to serialize hits: {hits:?}");
                         String::new()
                     });
                     let hits_bytes = format_event("search_response_hits", &hits_data);

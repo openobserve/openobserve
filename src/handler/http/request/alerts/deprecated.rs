@@ -38,8 +38,6 @@ use crate::{
 };
 
 /// CreateAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"create"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -59,6 +57,9 @@ use crate::{
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/{stream_name}/alerts")]
@@ -93,8 +94,6 @@ pub async fn save_alert(
 }
 
 /// UpdateAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -115,6 +114,9 @@ pub async fn save_alert(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/{stream_name}/alerts/{alert_name}")]
@@ -137,8 +139,6 @@ pub async fn update_alert(
 }
 
 /// ListStreamAlerts
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"list"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -157,6 +157,9 @@ pub async fn update_alert(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/{stream_name}/alerts")]
@@ -196,8 +199,6 @@ async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest)
 }
 
 /// ListAlerts
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"list"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -215,6 +216,9 @@ async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest)
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/alerts")]
@@ -306,8 +310,6 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
 }
 
 /// GetAlertByName
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"get"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -328,6 +330,9 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = Alert),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/{stream_name}/alerts/{alert_name}")]
@@ -361,8 +366,6 @@ async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) 
 }
 
 /// DeleteAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"delete"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -384,6 +387,9 @@ async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) 
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/{stream_name}/alerts/{alert_name}")]
@@ -398,8 +404,6 @@ async fn delete_alert(path: web::Path<(String, String, String)>, req: HttpReques
 }
 
 /// EnableAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -422,6 +426,9 @@ async fn delete_alert(path: web::Path<(String, String, String)>, req: HttpReques
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/{stream_name}/alerts/{alert_name}/enable")]
@@ -442,8 +449,6 @@ async fn enable_alert(path: web::Path<(String, String, String)>, req: HttpReques
 }
 
 /// TriggerAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[deprecated]
 #[utoipa::path(
     context_path = "/api",
@@ -465,6 +470,9 @@ async fn enable_alert(path: web::Path<(String, String, String)>, req: HttpReques
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/{stream_name}/alerts/{alert_name}/trigger")]

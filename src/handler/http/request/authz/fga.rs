@@ -25,8 +25,6 @@ use crate::common::meta::{
 
 #[cfg(feature = "enterprise")]
 /// CreateRoles
-///
-/// #{"ratelimit_module":"Roles", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
@@ -43,6 +41,9 @@ use crate::common::meta::{
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/roles")]
@@ -94,6 +95,9 @@ pub async fn create_role(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/roles")]
@@ -106,8 +110,6 @@ pub async fn create_role(
 
 #[cfg(feature = "enterprise")]
 /// DeleteRole
-///
-/// #{"ratelimit_module":"Roles", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
@@ -124,6 +126,9 @@ pub async fn create_role(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/roles/{role_id}")]
@@ -155,6 +160,9 @@ pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpRespon
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/roles/{role_id}")]
@@ -164,8 +172,6 @@ pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpRespo
 
 #[cfg(feature = "enterprise")]
 /// ListRoles
-///
-/// #{"ratelimit_module":"Roles", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
@@ -181,6 +187,9 @@ pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpRespo
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/roles")]
@@ -243,6 +252,9 @@ pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<Ht
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/roles")]
@@ -255,8 +267,6 @@ pub async fn get_roles(
 
 #[cfg(feature = "enterprise")]
 /// UpdateRoles
-///
-/// #{"ratelimit_module":"Roles", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
@@ -274,6 +284,9 @@ pub async fn get_roles(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/roles/{role_id}")]
@@ -329,8 +342,6 @@ pub async fn update_role(
 
 #[cfg(feature = "enterprise")]
 /// GetResourcePermission
-///
-/// #{"ratelimit_module":"Roles", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
@@ -390,8 +401,6 @@ pub async fn get_role_permissions(
 
 #[cfg(feature = "enterprise")]
 /// GetRoleUsers
-///
-/// #{"ratelimit_module":"Roles", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
@@ -447,8 +456,6 @@ pub async fn get_users_with_role(
 
 #[cfg(feature = "enterprise")]
 /// GetUserRoles
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -501,8 +508,6 @@ pub async fn get_roles_for_user(_path: web::Path<(String, String)>) -> Result<Ht
 
 #[cfg(feature = "enterprise")]
 /// GetUserGroups
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -558,8 +563,6 @@ pub async fn get_groups_for_user(
 
 #[cfg(feature = "enterprise")]
 /// CreateGroup
-///
-/// #{"ratelimit_module":"Groups", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Groups",
@@ -630,8 +633,6 @@ pub async fn create_group(
 
 #[cfg(feature = "enterprise")]
 /// UpdateGroup
-///
-/// #{"ratelimit_module":"Groups", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Groups",
@@ -704,8 +705,6 @@ pub async fn update_group(
 
 #[cfg(feature = "enterprise")]
 /// ListGroups
-///
-/// #{"ratelimit_module":"Groups", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Groups",
@@ -795,8 +794,6 @@ pub async fn get_groups(_path: web::Path<String>) -> Result<HttpResponse, Error>
 
 #[cfg(feature = "enterprise")]
 /// GetGroup
-///
-/// #{"ratelimit_module":"Groups", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Groups",
@@ -849,8 +846,6 @@ pub async fn get_group_details(_path: web::Path<(String, String)>) -> Result<Htt
 
 #[cfg(feature = "enterprise")]
 /// GetResources
-///
-/// #{"ratelimit_module":"Resources", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Resources",
@@ -909,8 +904,6 @@ pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, E
 
 #[cfg(feature = "enterprise")]
 /// DeleteGroup
-///
-/// #{"ratelimit_module":"Groups", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Groups",
