@@ -24,20 +24,21 @@ use datafusion::{
     physical_plan::{ExecutionPlan, aggregates::AggregateExec},
 };
 
-// check if the plan is like:
-// select count(*) from stream
-// or select count(*) as cnt from stream
-// plan:
-//   ProjectionExec: expr=[count(Int64(1))@0 as count(*)]
-//     GlobalLimitExec: skip=0, fetch=100
-//       AggregateExec: mode=Final, gby=[], aggr=[count(Int64(1))]
-//         CoalescePartitionsExec
-//           AggregateExec: mode=Partial, gby=[], aggr=[count(Int64(1))]
-//             ProjectionExec: expr=[]
-//               CoalesceBatchesExec: target_batch_size=8192
-//                 FilterExec: _timestamp@0 >= 175256100000000 AND _timestamp@0 < 17525610000000000
-//                   CooperativeExec
-//                     NewEmptyExec: name="default"
+#[rustfmt::skip]
+/// check if the plan is like:
+/// select count(*) from stream
+/// or select count(*) as cnt from stream
+/// example plan:
+///   ProjectionExec: expr=[count(Int64(1))@0 as count(*)]
+///     GlobalLimitExec: skip=0, fetch=100
+///       AggregateExec: mode=Final, gby=[], aggr=[count(Int64(1))]
+///         CoalescePartitionsExec
+///           AggregateExec: mode=Partial, gby=[], aggr=[count(Int64(1))]
+///             ProjectionExec: expr=[]
+///               CoalesceBatchesExec: target_batch_size=8192
+///                 FilterExec: _timestamp@0 >= 175256100000000 AND _timestamp@0 < 17525610000000000
+///                   CooperativeExec
+///                     NewEmptyExec: name="default"
 pub(crate) fn is_simple_count(plan: Arc<dyn ExecutionPlan>) -> Option<IndexOptimizeMode> {
     let mut visitor = SimpleCountVisitor::new();
     let _ = plan.visit(&mut visitor);

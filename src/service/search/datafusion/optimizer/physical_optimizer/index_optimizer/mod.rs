@@ -38,7 +38,7 @@ mod topn;
 
 use crate::service::search::{
     datafusion::optimizer::physical_optimizer::index_optimizer::{
-        count::is_simple_count, distinct::is_simple_distinct,
+        count::is_simple_count, distinct::is_simple_distinct, topn::is_simple_topn,
     },
     index::IndexCondition,
 };
@@ -117,7 +117,14 @@ impl TreeNodeRewriter for IndexOptimizer {
             .downcast_ref::<SortPreservingMergeExec>()
             .is_some()
         {
-            // TODO: check if the str_match() field is order by and group by filed
+            // Check for SimpleTopN first
+            if let Some(index_optimize_mode) =
+                is_simple_topn(Arc::clone(&plan), self.index_fields.clone())
+            {
+                *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
+                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+            }
+            // Check for SimpleDistinct
             if let Some(index_optimize_mode) =
                 is_simple_distinct(Arc::clone(&plan), self.index_fields.clone())
             {

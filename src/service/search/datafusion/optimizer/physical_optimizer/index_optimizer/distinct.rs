@@ -34,7 +34,7 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::utils::{
 #[rustfmt::skip]
 /// SimpleDistinct(String, usize, bool): select name from table where str_match(name, 'a') order by name asc limit 10;
 /// condition：name is index field, group by name, order by name asc, have limit, and where only the str_match()(expect _timestamp)
-/// RemoteScanExec: input_partitions=output_partitions=1
+/// example plan:
 ///   SortPreservingMergeExec: [kubernetes_namespace_name@0 ASC NULLS LAST], fetch=10
 ///     SortExec: TopK(fetch=10), expr=[kubernetes_namespace_name@0 ASC NULLS LAST], preserve_partitioning=[true]
 ///       AggregateExec: mode=FinalPartitioned, gby=[kubernetes_namespace_name@0 as kubernetes_namespace_name], aggr=[]
