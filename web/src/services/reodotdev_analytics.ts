@@ -19,7 +19,7 @@ let reoInstance: any = null;
 
 const clientID = config.REO_CLIENT_KEY || "";
 const source = "app";
-const enableAnalytics = config.enableAnalytics === "true";
+const enableAnalytics = config.enableAnalytics === "true" && config.isCloud === "true";
 
 // queue for events fired before SDK is ready
 const eventQueue: Array<{ type: "track" | "identify"; args: any[] }> = [];
@@ -44,7 +44,6 @@ function flushQueue() {
 export function useReo() {
   const reoInit = async () => {
     if (!enableAnalytics) {
-      console.info("Analytics disabled by config.");
       return;
     }
 
@@ -63,7 +62,6 @@ export function useReo() {
 
   const identify = (identity: IdentityPayload) => {
     if (!enableAnalytics) {
-      console.info("Analytics disabled. Skipping identify.");
       return Promise.resolve();
     }
 
@@ -83,7 +81,6 @@ export function useReo() {
 
   const track = (eventName: string, payload?: Record<string, any>) => {
     if (!enableAnalytics) {
-      console.info("Analytics disabled. Skipping track.");
       return;
     }
 
