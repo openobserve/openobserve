@@ -2593,6 +2593,11 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     let cache_dir = cache_dir.to_str().unwrap();
 
     // disable disk cache for local disk storage
+    if cfg.common.is_local_storage
+        && !cfg.common.result_cache_enabled
+        && !cfg.common.metrics_cache_enabled
+        && !cfg.common.feature_query_streaming_aggs
+    {
     if cfg.common.is_local_storage {
         cfg.disk_cache.enabled = false;
     }
