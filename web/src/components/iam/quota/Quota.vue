@@ -83,7 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!editTable"
               data-test="edit-table-btn"
               label="Edit Quota"
-              class="border title-height"
+              flat
+              class="border title-height o2-secondary-button tw-h-[36px]"
+              :class="store.state.theme == 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               no-caps
               :disable="activeTab == 'role-limits' && !expandedRow"
               @click="editTableWithInput"
@@ -105,18 +107,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-list-search-input"
               v-model="searchQuery"
               borderless
-              filled
-              dense
-              class="no-border input-width"
+              flat
+              class="no-border input-width o2-search-input"
+              :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
               :placeholder="
                 {
                   'api-limits': t('quota.api-search'),
                   'role-limits': t('quota.role-search'),
                 }[activeTab]
               "
+
             >
               <template #prepend>
-                <q-icon name="search" class="cursor-pointer" />
+                <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
               </template>
             </q-input>
             <q-select
