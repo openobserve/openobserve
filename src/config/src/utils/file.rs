@@ -102,7 +102,9 @@ pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Err
 /// * `end_time` - The inclusive end of the datetime range for the filter.
 /// * `extension_pattern` - The file extension to match (e.g., "json").
 /// * `skip_count` - The number of initial path components to skip before starting to parse the date
-///   parts (year, month, etc.).
+///   parts (year, month, etc.). This is not guaranteed to be the same as
+///   "$WAL_ROOT/files/<org_id>/<stream_type>/<stream_name>/" as there can be more skippable
+///   segments after <stream_name> which may only be decided by the use of the API.
 ///
 /// # Returns
 ///
@@ -631,9 +633,14 @@ mod tests {
         let filenames: Vec<_> = vec!["a", "b", "c", "d"];
         let extensions = vec!["parquet", "blink"];
 
-        let temp_dir = tempfile::tempdir().expect("Temp dir");
+        let wal_root = tempfile::tempdir().expect("Temp dir");
 
-        let root = temp_dir.path();
+        let inner_path = wal_root
+            .path()
+            .join("files")
+            .join("<org_id>")
+            .join("<stream_type>")
+            .join("<stream_name>");
 
         for thread in threads {
             for year in &years {
@@ -642,7 +649,7 @@ mod tests {
                         for hour in &hours {
                             tokio::fs::create_dir_all(format!(
                                 "{}/{}/{}/{}/{}/{}",
-                                root.display(),
+                                inner_path.display(),
                                 thread,
                                 year,
                                 month,
@@ -656,7 +663,7 @@ mod tests {
                                 for extension in &extensions {
                                     tokio::fs::File::create(format!(
                                         "{}/{}/{}/{}/{}/{}/{}.{}",
-                                        root.display(),
+                                        inner_path.display(),
                                         thread,
                                         year,
                                         month,
@@ -682,9 +689,9 @@ mod tests {
             start_time,
             end_time,
             "parquet".to_string(),
-            PathBuf::from(root).components().count() + 1,
+            inner_path.components().count() + 1,
         );
-        let files = scan_files_filtered(root, filter, None)
+        let files = scan_files_filtered(inner_path, filter, None)
             .await
             .expect("Basic Test Failure");
 
