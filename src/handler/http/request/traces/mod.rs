@@ -101,6 +101,8 @@ async fn handle_req(
 }
 
 /// GetLatestTraces
+///
+/// #{"ratelimit_module":"Traces", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Traces",
@@ -137,9 +139,6 @@ async fn handle_req(
         })),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
-    ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/{stream_name}/traces/latest")]
@@ -263,7 +262,7 @@ pub async fn get_latest_traces(
     };
 
     if start_time_from_trace_id > 0 {
-        start_time = start_time_from_trace_id - 30 * 1_000_000; //30 seconds eariler
+        start_time = start_time_from_trace_id - 60 * 1_000_000; //60 seconds earlier
         end_time = start_time_from_trace_id + 3600 * 1_000_000; //1 hour later
     }
 

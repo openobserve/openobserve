@@ -488,13 +488,10 @@ describe("zincutils", () => {
         expect(uuid1).not.toBe(uuid2);
       });
 
-      it("should generate time-ordered UUID v7s", () => {
+      it("should generate time-ordered UUID v7s", async () => {
         const uuid1 = getUUIDv7();
-        // Small delay to ensure different timestamps
-        const start = Date.now();
-        while (Date.now() - start < 1) {
-          // Wait for at least 1ms
-        }
+        // Use a proper delay instead of busy-waiting
+        await new Promise(resolve => setTimeout(resolve, 2));
         const uuid2 = getUUIDv7();
         
         // UUID v7 should be lexicographically sortable by time
