@@ -28,9 +28,10 @@ use config::{
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache,
+    cluster_coordinator::events::{SchemaAction, SchemaEvent},
     schema::{
-        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-        SchemaCache, unwrap_stream_settings,
+        SCHEMA_KEY, STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST,
+        STREAM_SETTINGS, SchemaCache, unwrap_stream_settings,
     },
 };
 #[cfg(feature = "enterprise")]
@@ -216,8 +217,8 @@ pub async fn list(
     drop(r);
 
     let db_key = match stream_type {
-        None => format!("/schema/{org_id}/"),
-        Some(stream_type) => format!("/schema/{org_id}/{stream_type}/"),
+        None => format!("{SCHEMA_KEY}{org_id}/"),
+        Some(stream_type) => format!("{SCHEMA_KEY}{org_id}/{stream_type}/"),
     };
     let items = db::list(&db_key).await?;
     let mut schemas: HashMap<(String, StreamType), Vec<(Bytes, i64)>> =
@@ -275,7 +276,7 @@ pub async fn list(
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = "/schema/";
+    let key = SCHEMA_KEY;
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -291,169 +292,15 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         log::debug!("[Schema:watch] Received event: {:?}", ev);
         match ev {
             db::Event::Put(ev) => {
-                let key_columns = ev.key.split('/').collect::<Vec<&str>>();
-                let (ev_key, ev_start_dt) = if key_columns.len() > 5 {
-                    (
-                        key_columns[..5].join("/"),
-                        key_columns[5].parse::<i64>().unwrap_or(0),
-                    )
-                } else {
-                    (ev.key.to_string(), ev.start_dt.unwrap_or_default())
-                };
-
-                let item_key = ev_key.strip_prefix(key).unwrap();
-                let r = STREAM_SCHEMAS.read().await;
-                let prev_start_dt = if let Some(schemas) = r.get(&item_key.to_owned()) {
-                    let idx = if schemas.len() >= 2 {
-                        schemas.len() - 2
-                    } else {
-                        0
-                    };
-                    schemas[idx].0
-                } else {
-                    0
-                };
-                drop(r);
-                let ts_range = if ev_start_dt == 0 && prev_start_dt == 0 {
-                    None
-                } else if ev_start_dt == 0 || (prev_start_dt > 0 && ev_start_dt > prev_start_dt) {
-                    Some((prev_start_dt, now_micros()))
-                } else {
-                    Some((ev_start_dt, now_micros()))
-                };
-
-                let mut schema_versions =
-                    match db::list_values_by_start_dt(&format!("{ev_key}/"), ts_range).await {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("[Schema:watch] Error getting value: {}", e);
-                            continue;
-                        }
-                    };
-                if schema_versions.is_empty() {
-                    log::warn!("[Schema:watch] No schema versions found, skip");
-                    continue;
+                let item_key = ev.key.strip_prefix(key).unwrap();
+                if let Err(e) = handle_update(item_key, ev.start_dt).await {
+                    log::error!("[Schema:watch] Error handling update: {}", e);
                 }
-                let latest_start_dt = schema_versions.last().unwrap().0;
-                let mut latest_schema: Vec<Schema> =
-                    match json::from_slice(&schema_versions.last().unwrap().1) {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!(
-                                "[Schema:watch] Error parsing schema, key: {}, error: {}",
-                                item_key,
-                                e
-                            );
-                            continue;
-                        }
-                    };
-                if latest_schema.is_empty() {
-                    log::warn!("[Schema:watch] Latest schema is empty, skip");
-                    continue;
-                }
-                let latest_schema = latest_schema.pop().unwrap();
-                let settings = unwrap_stream_settings(&latest_schema).unwrap_or_default();
-                if settings.store_original_data || settings.index_original_data {
-                    if let dashmap::Entry::Vacant(entry) =
-                        STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
-                    {
-                        entry.insert(SnowflakeIdGenerator::new(
-                            LOCAL_NODE_ID.load(Ordering::Relaxed),
-                        ));
-                    }
-                }
-                let mut w = STREAM_SETTINGS.write().await;
-                w.insert(item_key.to_string(), settings);
-                infra::schema::set_stream_settings_atomic(w.clone());
-                drop(w);
-                let mut w = STREAM_SCHEMAS_LATEST.write().await;
-                w.insert(
-                    item_key.to_string(),
-                    SchemaCache::new(latest_schema.clone()),
-                );
-                drop(w);
-                // remove latest, already parsed it
-                _ = schema_versions.pop().unwrap();
-                // parse other versions
-                let schema_versions = itertools::chain(
-                    schema_versions.into_iter().map(|(start_dt, data)| {
-                        (
-                            start_dt,
-                            json::from_slice::<Vec<Schema>>(&data)
-                                .unwrap()
-                                .pop()
-                                .unwrap(),
-                        )
-                    }),
-                    // add latest version here
-                    vec![(latest_start_dt, latest_schema)],
-                )
-                .collect::<Vec<_>>();
-                let mut w = STREAM_SCHEMAS.write().await;
-                w.entry(item_key.to_string())
-                    .and_modify(|existing_vec| {
-                        existing_vec.retain(|(v, _)| schema_versions.iter().all(|(v1, _)| v1 != v));
-                        existing_vec.extend(schema_versions.clone())
-                    })
-                    .or_insert(schema_versions);
-                drop(w);
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let columns = item_key.split('/').collect::<Vec<&str>>();
-                let org_id = columns[0];
-                let stream_type = StreamType::from(columns[1]);
-                let stream_name = columns[2];
-                let start_dt = match columns.get(3) {
-                    Some(start_dt) => start_dt.parse::<i64>().unwrap_or_default(),
-                    None => 0,
-                };
-                if start_dt > 0 {
-                    // delete only one version
-                    continue;
-                }
-                let mut w = STREAM_SCHEMAS.write().await;
-                w.remove(item_key);
-                w.shrink_to_fit();
-                drop(w);
-                let mut w = STREAM_SCHEMAS_LATEST.write().await;
-                w.remove(item_key);
-                w.shrink_to_fit();
-                drop(w);
-                {
-                    STREAM_RECORD_ID_GENERATOR.remove(item_key);
-                    STREAM_RECORD_ID_GENERATOR.shrink_to_fit();
-                }
-                let mut w = STREAM_SETTINGS.write().await;
-                w.remove(item_key);
-                w.shrink_to_fit();
-                infra::schema::set_stream_settings_atomic(w.clone());
-                drop(w);
-                cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
-                if let Err(e) =
-                    super::compact::files::del_offset(org_id, stream_type, stream_name).await
-                {
-                    log::error!("[Schema:watch] del_offset: {}", e);
-                }
-
-                if stream_type.eq(&StreamType::EnrichmentTables) && is_local_disk_storage() {
-                    let data_dir = format!(
-                        "{}files/{org_id}/{stream_type}/{stream_name}",
-                        get_config().common.data_wal_dir
-                    );
-                    let path = std::path::Path::new(&data_dir);
-                    if path.exists() {
-                        if let Err(e) = tokio::fs::remove_dir_all(path).await {
-                            log::error!("[Schema:watch] remove_dir_all: {}", e);
-                        };
-                    }
-                }
-                if stream_type.eq(&StreamType::EnrichmentTables) {
-                    if let Err(e) =
-                        config::utils::enrichment_local_cache::delete(org_id, stream_name).await
-                    {
-                        log::error!("[Schema:watch] delete local enrichment file error: {}", e);
-                    }
+                if let Err(e) = handle_delete(item_key).await {
+                    log::error!("[Schema:watch] Error handling delete: {}", e);
                 }
             }
             db::Event::Empty => {}
@@ -462,8 +309,182 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn handle_schema_event(event: SchemaEvent) -> Result<(), anyhow::Error> {
+    match event.action {
+        SchemaAction::Update => handle_update(&event.key, event.start_dt).await,
+        SchemaAction::Delete => handle_delete(&event.key).await,
+    }
+}
+
+async fn handle_update(key: &str, start_dt: Option<i64>) -> Result<(), anyhow::Error> {
+    // The key should be like org_id/stream_type/stream_name/start_dt
+    let key_columns = key.split('/').collect::<Vec<&str>>();
+    let (item_key, ev_start_dt) = if key_columns.len() > 3 {
+        (
+            key_columns[..3].join("/"),
+            key_columns[3].parse::<i64>().unwrap_or(0),
+        )
+    } else {
+        (key.to_string(), start_dt.unwrap_or_default())
+    };
+
+    let r = STREAM_SCHEMAS.read().await;
+    let prev_start_dt = if let Some(schemas) = r.get(&item_key.to_owned()) {
+        let idx = if schemas.len() >= 2 {
+            schemas.len() - 2
+        } else {
+            0
+        };
+        schemas[idx].0
+    } else {
+        0
+    };
+    drop(r);
+    let ts_range = if ev_start_dt == 0 && prev_start_dt == 0 {
+        None
+    } else if ev_start_dt == 0 || (prev_start_dt > 0 && ev_start_dt > prev_start_dt) {
+        Some((prev_start_dt, now_micros()))
+    } else {
+        Some((ev_start_dt, now_micros()))
+    };
+
+    let mut schema_versions =
+        // The key is like org_id/stream_type/stream_name/start_dt
+        // So the prefix should be /schema/
+        match db::list_values_by_start_dt(&format!("{SCHEMA_KEY}{item_key}/"), ts_range).await {
+            Ok(val) => val,
+            Err(e) => {
+                log::error!("[Schema:watch] Error getting value: {}", e);
+                return Err(anyhow::anyhow!("Error getting value: {}", e));
+            }
+        };
+    if schema_versions.is_empty() {
+        log::warn!("[Schema:watch] No schema versions found, skip");
+        return Ok(());
+    }
+    let latest_start_dt = schema_versions.last().unwrap().0;
+    let mut latest_schema: Vec<Schema> = match json::from_slice(&schema_versions.last().unwrap().1)
+    {
+        Ok(val) => val,
+        Err(e) => {
+            log::error!(
+                "[Schema:watch] Error parsing schema, key: {}, error: {}",
+                item_key,
+                e
+            );
+            return Err(anyhow::anyhow!("Error parsing schema: {}", e));
+        }
+    };
+    if latest_schema.is_empty() {
+        log::warn!("[Schema:watch] Latest schema is empty, skip");
+        return Ok(());
+    }
+    let latest_schema = latest_schema.pop().unwrap();
+    let settings = unwrap_stream_settings(&latest_schema).unwrap_or_default();
+    if settings.store_original_data || settings.index_original_data {
+        if let dashmap::Entry::Vacant(entry) =
+            STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
+        {
+            entry.insert(SnowflakeIdGenerator::new(
+                LOCAL_NODE_ID.load(Ordering::Relaxed),
+            ));
+        }
+    }
+    let mut w = STREAM_SETTINGS.write().await;
+    w.insert(item_key.to_string(), settings);
+    infra::schema::set_stream_settings_atomic(w.clone());
+    drop(w);
+    let mut w = STREAM_SCHEMAS_LATEST.write().await;
+    w.insert(
+        item_key.to_string(),
+        SchemaCache::new(latest_schema.clone()),
+    );
+    drop(w);
+    // remove latest, already parsed it
+    _ = schema_versions.pop().unwrap();
+    // parse other versions
+    let schema_versions = itertools::chain(
+        schema_versions.into_iter().map(|(start_dt, data)| {
+            (
+                start_dt,
+                json::from_slice::<Vec<Schema>>(&data)
+                    .unwrap()
+                    .pop()
+                    .unwrap(),
+            )
+        }),
+        // add latest version here
+        vec![(latest_start_dt, latest_schema)],
+    )
+    .collect::<Vec<_>>();
+    let mut w = STREAM_SCHEMAS.write().await;
+    w.entry(item_key.to_string())
+        .and_modify(|existing_vec| {
+            existing_vec.retain(|(v, _)| schema_versions.iter().all(|(v1, _)| v1 != v));
+            existing_vec.extend(schema_versions.clone())
+        })
+        .or_insert(schema_versions);
+    drop(w);
+    Ok(())
+}
+
+async fn handle_delete(item_key: &str) -> Result<(), anyhow::Error> {
+    let columns = item_key.split('/').collect::<Vec<&str>>();
+    let org_id = columns[0];
+    let stream_type = StreamType::from(columns[1]);
+    let stream_name = columns[2];
+    let start_dt = match columns.get(3) {
+        Some(start_dt) => start_dt.parse::<i64>().unwrap_or_default(),
+        None => 0,
+    };
+    if start_dt > 0 {
+        // delete only one version
+        return Ok(());
+    }
+    let mut w = STREAM_SCHEMAS.write().await;
+    w.remove(item_key);
+    w.shrink_to_fit();
+    drop(w);
+    let mut w = STREAM_SCHEMAS_LATEST.write().await;
+    w.remove(item_key);
+    w.shrink_to_fit();
+    drop(w);
+    {
+        STREAM_RECORD_ID_GENERATOR.remove(item_key);
+        STREAM_RECORD_ID_GENERATOR.shrink_to_fit();
+    }
+    let mut w = STREAM_SETTINGS.write().await;
+    w.remove(item_key);
+    w.shrink_to_fit();
+    infra::schema::set_stream_settings_atomic(w.clone());
+    drop(w);
+    cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
+    if let Err(e) = super::compact::files::del_offset(org_id, stream_type, stream_name).await {
+        log::error!("[Schema:watch] del_offset: {}", e);
+    }
+
+    if stream_type.eq(&StreamType::EnrichmentTables) && is_local_disk_storage() {
+        let data_dir = format!(
+            "{}files/{org_id}/{stream_type}/{stream_name}",
+            get_config().common.data_wal_dir
+        );
+        let path = std::path::Path::new(&data_dir);
+        if path.exists() {
+            if let Err(e) = tokio::fs::remove_dir_all(path).await {
+                log::error!("[Schema:watch] remove_dir_all: {}", e);
+            };
+        }
+    }
+    if stream_type.eq(&StreamType::EnrichmentTables) {
+        if let Err(e) = config::utils::enrichment_local_cache::delete(org_id, stream_name).await {
+            log::error!("[Schema:watch] delete local enrichment file error: {}", e);
+        }
+    }
+    Ok(())
+}
+
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db_key = "/schema/";
+    let db_key = SCHEMA_KEY;
     let items = db::list(db_key).await?;
     let items_num = items.len();
     let mut schemas: HashMap<String, Vec<(i64, Bytes)>> = HashMap::with_capacity(items_num);

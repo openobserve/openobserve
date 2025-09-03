@@ -24,15 +24,19 @@ use config::{
     },
 };
 use infra::{
-    cache::stats, cluster_coordinator::publish_internal_coordinator_event, db as infra_db,
+    cache::stats,
+    cluster_coordinator::{
+        events::{EnrichmentTableAction, EnrichmentTableEvent, InternalCoordinatorEvent},
+        publish,
+    },
+    db as infra_db,
 };
-use serde::{Deserialize, Serialize};
 use vrl::prelude::NotNan;
 
 use crate::{
     common::infra::config::ENRICHMENT_TABLES,
     service::{
-        db::{self as db_service, internal_coordinator_stream::InternalCoordinatorEvent},
+        db::{self as db_service},
         enrichment::StreamTable,
         search as SearchService,
     },
@@ -42,19 +46,6 @@ use crate::{
 pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
 pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
 pub const ENRICHMENT_TABLE_EVENTS_TOPIC: &str = "enrichment_table_events";
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EnrichmentTableEvent {
-    pub action: EnrichmentTableAction,
-    pub org_id: String,
-    pub name: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum EnrichmentTableAction {
-    Update,
-    Delete,
-}
 
 pub async fn get_enrichment_table_data(
     org_id: &str,
@@ -364,7 +355,7 @@ async fn publish_event(event: EnrichmentTableEvent) -> Result<(), infra::errors:
     let payload = json::to_vec(&event).map_err(|e| {
         infra::errors::Error::Message(format!("Failed to serialize enrichment table event: {}", e))
     })?;
-    publish_internal_coordinator_event(payload).await?;
+    publish(payload).await?;
     log::debug!("Published enrichment table event: {:?}", event);
     Ok(())
 }

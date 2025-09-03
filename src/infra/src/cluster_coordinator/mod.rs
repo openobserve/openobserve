@@ -15,11 +15,13 @@
 
 pub mod alerts;
 pub mod destinations;
+pub mod events;
 pub mod pipelines;
 
 use std::sync::Arc;
 
 use bytes::Bytes;
+use config::get_config;
 use tokio::sync::mpsc;
 
 use crate::{
@@ -28,12 +30,15 @@ use crate::{
     queue::{self, RetentionPolicy},
 };
 
-pub const INTERNAL_COORDINATOR_STREAM: &str = "internal_coordinator";
+pub const INTERNAL_COORDINATOR_STREAM: &str = "coordinator_events";
 pub async fn get_coordinator() -> &'static Box<dyn Db> {
     super::db::get_coordinator().await
 }
 
-pub async fn create_internal_coordinator_stream() -> Result<(), Error> {
+pub async fn create_stream() -> Result<(), Error> {
+    if get_config().common.local_mode {
+        return Ok(());
+    }
     let queue = queue::get_queue().await;
     queue
         .create_with_retention_policy(INTERNAL_COORDINATOR_STREAM, RetentionPolicy::Interest)
@@ -42,18 +47,24 @@ pub async fn create_internal_coordinator_stream() -> Result<(), Error> {
 
 /// `event` should be a json string. The message will be published to the internal coordinator
 /// stream.
-pub async fn publish_internal_coordinator_event(payload: Vec<u8>) -> Result<(), Error> {
+pub async fn publish(payload: Vec<u8>) -> Result<(), Error> {
+    if get_config().common.local_mode {
+        return Ok(());
+    }
     let queue = queue::get_queue().await;
     queue
         .publish(INTERNAL_COORDINATOR_STREAM, Bytes::from(payload))
         .await
 }
 
-pub async fn subscribe_internal_coordinator_event<F, Fut>(callback: F) -> Result<(), Error>
+pub async fn subscribe<F, Fut>(callback: F) -> Result<(), Error>
 where
     F: Fn(Vec<u8>) -> Fut,
     Fut: Future<Output = Result<(), anyhow::Error>>,
 {
+    if get_config().common.local_mode {
+        return Ok(());
+    }
     let queue = queue::get_queue().await;
     let mut receiver: Arc<mpsc::Receiver<super::queue::Message>> = queue
         .consume(INTERNAL_COORDINATOR_STREAM)

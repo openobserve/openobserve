@@ -14,14 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::cluster::LOCAL_NODE;
-use serde::{Deserialize, Serialize};
-
-use super::enrichment_table::EnrichmentTableEvent;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum InternalCoordinatorEvent {
-    EnrichmentTable(EnrichmentTableEvent),
-}
+use infra::cluster_coordinator::events::InternalCoordinatorEvent;
 
 pub async fn handle_internal_coordinator_event(payload: Vec<u8>) -> Result<(), anyhow::Error> {
     let event: InternalCoordinatorEvent = match serde_json::from_slice(&payload) {
@@ -39,6 +32,13 @@ pub async fn handle_internal_coordinator_event(payload: Vec<u8>) -> Result<(), a
             if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager()
             {
                 super::enrichment_table::handle_enrichment_table_event(event).await
+            } else {
+                Ok(())
+            }
+        }
+        InternalCoordinatorEvent::Schema(event) => {
+            if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() {
+                super::schema::handle_schema_event(event).await
             } else {
                 Ok(())
             }

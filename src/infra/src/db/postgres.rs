@@ -18,6 +18,7 @@ use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{
+    get_config,
     metrics::{DB_QUERY_NUMS, DB_QUERY_TIME},
     utils::{hash::Sum64, util::zero_or},
 };
@@ -30,7 +31,10 @@ use sqlx::{
 use tokio::sync::{OnceCell, mpsc};
 
 use super::{DBIndex, IndexStatement};
-use crate::errors::*;
+use crate::{
+    errors::*,
+    schema::{SCHEMA_KEY, schema_delete_event, schema_update_event},
+};
 
 pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false, false));
 pub static CLIENT_RO: Lazy<Pool<Postgres>> = Lazy::new(|| connect(true, false));
@@ -199,10 +203,25 @@ impl super::Db for PostgresDb {
 
         // event watch
         if need_watch {
-            let cluster_coordinator = super::get_coordinator().await;
-            cluster_coordinator
-                .put(key, Bytes::from(""), true, start_dt)
-                .await?;
+            // Check for local mode only if key starts with SCHEMA_KEY
+            // this is because only schema is broadcasted through the coordinator queue.
+            let local_mode = if key.starts_with(SCHEMA_KEY) {
+                get_config().common.local_mode
+            } else {
+                false
+            };
+            if !local_mode && key.starts_with(SCHEMA_KEY) {
+                if let Err(e) =
+                    crate::schema::publish_event(schema_update_event(key, start_dt)).await
+                {
+                    log::error!("[POSTGRES] send event error: {}", e);
+                }
+            } else {
+                let cluster_coordinator = super::get_coordinator().await;
+                cluster_coordinator
+                    .put(key, Bytes::from(""), true, start_dt)
+                    .await?;
+            }
         }
         DB_QUERY_TIME
             .with_label_values(&["put_item", "meta"])
@@ -364,15 +383,28 @@ impl super::Db for PostgresDb {
 
         // event watch
         if need_watch {
+            let local_mode = if key.starts_with(SCHEMA_KEY) {
+                get_config().common.local_mode
+            } else {
+                false
+            };
             let start_dt = if need_watch_dt > 0 {
                 Some(need_watch_dt)
             } else {
                 start_dt
             };
-            let cluster_coordinator = super::get_coordinator().await;
-            cluster_coordinator
-                .put(key, Bytes::from(""), true, start_dt)
-                .await?;
+            if !local_mode && key.starts_with(SCHEMA_KEY) {
+                if let Err(e) =
+                    crate::schema::publish_event(schema_update_event(key, start_dt)).await
+                {
+                    log::error!("[POSTGRES] send event error: {}", e);
+                }
+            } else {
+                let cluster_coordinator = super::get_coordinator().await;
+                cluster_coordinator
+                    .put(key, Bytes::from(""), true, start_dt)
+                    .await?;
+            }
         }
 
         Ok(())
@@ -387,6 +419,12 @@ impl super::Db for PostgresDb {
     ) -> Result<()> {
         // event watch
         if need_watch {
+            // Check for local mode only if key starts with SCHEMA_KEY
+            let local_mode = if key.starts_with(SCHEMA_KEY) {
+                get_config().common.local_mode
+            } else {
+                false
+            };
             // find all keys then send event
             let items = if with_prefix {
                 self.list_keys(key).await?
@@ -396,7 +434,13 @@ impl super::Db for PostgresDb {
             let cluster_coordinator = super::get_coordinator().await;
             tokio::task::spawn(async move {
                 for key in items {
-                    if let Err(e) = cluster_coordinator
+                    if key.starts_with(SCHEMA_KEY) && !local_mode {
+                        if let Err(e) =
+                            crate::schema::publish_event(schema_delete_event(&key, start_dt)).await
+                        {
+                            log::error!("[POSTGRES] send event error: {}", e);
+                        }
+                    } else if let Err(e) = cluster_coordinator
                         .delete(&key, false, true, start_dt)
                         .await
                     {

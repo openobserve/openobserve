@@ -144,12 +144,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // Except router it will run on every node. That is because this nats queue is supposed
         // to be common for all the event types like enrichment table/schema etc.
         tokio::task::spawn(async move {
-            let _ = infra::cluster_coordinator::subscribe_internal_coordinator_event(
-                async move |payload| {
-                    db::internal_coordinator_stream::handle_internal_coordinator_event(payload)
-                        .await
-                },
-            )
+            let _ = infra::cluster_coordinator::subscribe(async move |payload| {
+                db::internal_coordinator_stream::handle_internal_coordinator_event(payload).await
+            })
             .await;
         });
     }
