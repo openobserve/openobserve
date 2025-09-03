@@ -150,16 +150,20 @@ pub async fn get_latest_traces(
     let cfg = get_config();
 
     let (org_id, stream_name) = path.into_inner();
-    let http_span = if cfg.common.tracing_search_enabled {
-        tracing::info_span!(
+    let (http_span, trace_id) = if cfg.common.tracing_search_enabled {
+        let uuid_v7_trace_id = config::ider::generate_trace_id();
+        let span = tracing::info_span!(
             "/api/{org_id}/{stream_name}/traces/latest",
             org_id = org_id.clone(),
-            stream_name = stream_name.clone()
-        )
+            stream_name = stream_name.clone(),
+            trace_id = uuid_v7_trace_id.clone()
+        );
+
+        (span, uuid_v7_trace_id)
     } else {
-        Span::none()
+        let trace_id = get_or_create_trace_id(in_req.headers(), &Span::none());
+        (Span::none(), trace_id)
     };
-    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
     let user_id = in_req
         .headers()
         .get("user_id")
