@@ -1158,7 +1158,6 @@ const searchData = () => {
   }
 
   runQueryFn();
-  indexListRef.value.filterExpandedFieldValues();
 
   if (config.isCloud == "true") {
     segment.track("Button Click", {
