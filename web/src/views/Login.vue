@@ -176,14 +176,16 @@ export default defineComponent({
           ) {
             localStorage.setItem("isFirstTimeLogin", "true");
           }
-
-          // Check for pending invites
-          redirectUser();
           //this will identify the user for reo.dev
           identify({
             username: store.state.userInfo.email,
-            type: "sso"
+            type: "email"
           });
+          // Check for pending invites
+          setTimeout(() => {
+            redirectUser();
+          }, 800);
+
         })
         .catch((e: any) => {
           console.log("Error while fetching organizations", e);

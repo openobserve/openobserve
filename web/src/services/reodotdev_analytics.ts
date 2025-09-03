@@ -15,7 +15,7 @@ let reoInstance: any = null;
 
 const clientID = config.REO_CLIENT_KEY || "";
 const source = "app";
-const enableAnalytics = config.enableAnalytics === "true" && config.isCloud === "true";
+const enableAnalytics = config.enableAnalytics === "true" && config.isCloud === "false";
 
 // queue for events fired before SDK is ready
 const eventQueue: Array<{ type: "track" | "identify"; args: any[] }> = [];
@@ -68,11 +68,6 @@ export function useReo() {
     }
 
     reoInstance.identify(identity);
-    
-    // Return a promise that resolves after a fixed delay
-    return new Promise<void>((resolve) => {
-      setTimeout(resolve, 800); 
-    });
   };
 
   const track = (eventName: string, payload?: Record<string, any>) => {
