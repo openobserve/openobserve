@@ -23,7 +23,6 @@ import {
   DEFAULT_SEARCH_DEBUG_DATA,
   DEFAULT_SEARCH_AGG_DATA,
 } from "@/utils/logs/constants";
-import { constant } from "lodash-es";
 
 interface HistogramData {
   xData: any[];
@@ -114,6 +113,7 @@ const streamSchemaFieldsIndexMapping = ref<{ [key: string]: number }>({});
 export const searchState = () => {
   const store = useStore();
   const router = useRouter();
+  // const { t } = useI18n();
 
   // Field values reference
   const fieldValues = ref();
