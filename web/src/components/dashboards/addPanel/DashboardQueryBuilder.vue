@@ -27,9 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       style="display: flex; flex-direction: row; width: 100%"
       class="q-pl-md"
-      v-if="
-        dashboardPanelData.data.type != 'metric'
-      "
     >
       <div style="flex: 1">
         <div style="display: flex; flex-direction: row">
@@ -112,134 +109,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     :label="xLabel[index]"
                     class="q-pl-sm"
-                    :data-test="`dashboard-x-item-${itemX?.column}`"
+                    :data-test="`dashboard-x-item-${itemX?.alias}`"
                   >
                     <q-menu
-                      class="q-pa-md"
-                      :data-test="`dashboard-x-item-${itemX?.column}-menu`"
+                      :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
+                      class="field-function-menu-popup"
                     >
-                      <div>
-                        <div class="">
-                          <div
-                            v-if="
-                              !dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].customQuery &&
-                              !dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.x[index].isDerived
-                            "
-                            class="q-mr-xs q-mb-sm"
-                          >
-                            <q-select
+                      <div style="padding: 3px 16px 16px 16px; width: 771px">
+                        <div>
+                          <div class="q-mr-xs q-mb-sm">
+                            <DynamicFunctionPopUp
                               v-model="
                                 dashboardPanelData.data.queries[
                                   dashboardPanelData.layout.currentQueryIndex
-                                ].fields.x[index].aggregationFunction
+                                ].fields.x[index]
                               "
-                              :options="triggerOperatorsWithHistogram"
-                              dense
-                              filled
-                              emit-value
-                              map-options
-                              :label="t('common.aggregation')"
-                              data-test="dashboard-x-item-dropdown"
-                            >
-                              <template v-slot:append>
-                                <q-icon
-                                  name="close"
-                                  size="small"
-                                  @click.stop.prevent="
-                                    dashboardPanelData.data.queries[
-                                      dashboardPanelData.layout.currentQueryIndex
-                                    ].fields.x[index].aggregationFunction = null
-                                  "
-                                  class="cursor-pointer"
-                                />
-                              </template>
-                            </q-select>
+                              :allowAggregation="false"
+                              :customQuery="
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].customQuery
+                              "
+                            />
                           </div>
-                        </div>
-                        <!-- histogram interval if auto sql and aggregation function is histogram-->
-                        <div
-                          v-if="
-                            !dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].customQuery &&
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields?.x[index]?.aggregationFunction ===
-                              'histogram' &&
-                            !dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.x[index].isDerived
-                          "
-                          class="q-mb-sm"
-                        >
-                          <!-- histogram interval for sql queries -->
-                          <HistogramIntervalDropDown
-                            v-if="!promqlMode"
-                            :model-value="
-                              getHistoramIntervalField(
-                                dashboardPanelData.data.queries[
-                                  dashboardPanelData.layout.currentQueryIndex
-                                ].fields?.x[index],
-                              )
-                            "
-                            @update:modelValue="
-                              (newValue: any) => {
-                                dashboardPanelData.data.queries[
-                                  dashboardPanelData.layout.currentQueryIndex
-                                ].fields.x[index].args[0].value =
-                                  newValue.value;
-                              }
-                            "
-                          />
-                        </div>
-                        <q-input
-                          dense
-                          filled
-                          data-test="dashboard-x-item-input"
-                          :label="t('common.label')"
-                          v-model="
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.x[index].label
-                          "
-                        />
-                        <div
-                          v-if="dashboardPanelData.data.type === 'table'"
-                          class="q-mt-sm q-mb-sm"
-                        >
-                          <q-checkbox
-                            v-model="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.x[index].treatAsNonTimestamp
-                            "
-                            :label="'Mark this field as non-timestamp'"
-                            dense
-                          />
-                        </div>
-
-                        <div
-                          v-if="
-                            !dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].customQuery &&
-                            dashboardPanelData.data.queryType == 'sql' &&
-                            !dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.x[index].isDerived
-                          "
-                        >
-                          <SortByBtnGrp
-                            :fieldObj="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields?.x[index]
-                            "
-                          />
                         </div>
                       </div>
                     </q-menu>
@@ -248,8 +140,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="height: 100%"
                     size="xs"
                     dense
-                    :data-test="`dashboard-x-item-${itemX?.column}-remove`"
-                    @click="removeXAxisItem(itemX?.column)"
+                    :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
+                    @click="removeXAxisItemByIndex(index)"
                     icon="close"
                   />
                 </div>
@@ -378,121 +270,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     :label="bLabel[index]"
                     class="q-pl-sm"
-                    :data-test="`dashboard-b-item-${itemB?.column}`"
+                    :data-test="`dashboard-b-item-${itemB?.alias}`"
                   >
                     <q-menu
-                      class="q-pa-md"
-                      :data-test="`dashboard-b-item-${itemB?.column}-menu`"
+                      :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
+                      class="field-function-menu-popup"
                     >
-                      <div>
-                        <div class="">
-                          <div
-                            v-if="
-                              !dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].customQuery &&
-                              !dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.breakdown[index].isDerived
-                            "
-                            class="q-mr-xs q-mb-sm"
-                          >
-                            <q-select
+                      <div style="padding: 3px 16px 16px 16px; width: 771px">
+                        <div>
+                          <div class="q-mr-xs q-mb-sm">
+                            <DynamicFunctionPopUp
                               v-model="
                                 dashboardPanelData.data.queries[
                                   dashboardPanelData.layout.currentQueryIndex
-                                ].fields.breakdown[index].aggregationFunction
+                                ].fields.breakdown[index]
                               "
-                              :options="triggerOperatorsWithHistogram"
-                              dense
-                              filled
-                              emit-value
-                              map-options
-                              :label="t('common.aggregation')"
-                              data-test="dashboard-b-item-dropdown"
-                            >
-                              <template v-slot:append>
-                                <q-icon
-                                  name="close"
-                                  size="small"
-                                  @click.stop.prevent="
-                                    dashboardPanelData.data.queries[
-                                      dashboardPanelData.layout.currentQueryIndex
-                                    ].fields.breakdown[
-                                      index
-                                    ].aggregationFunction = null
-                                  "
-                                  class="cursor-pointer"
-                                />
-                              </template>
-                            </q-select>
+                              :allowAggregation="false"
+                              :customQuery="
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].customQuery
+                              "
+                            />
                           </div>
-                        </div>
-                        <!-- histogram interval if auto sql and aggregation function is histogram-->
-                        <div
-                          v-if="
-                            !dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].customQuery &&
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields?.breakdown[index]?.aggregationFunction ===
-                              'histogram' &&
-                            !dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.breakdown[index].isDerived
-                          "
-                          class="q-mb-sm"
-                        >
-                          <!-- histogram interval for sql queries -->
-                          <HistogramIntervalDropDown
-                            v-if="!promqlMode"
-                            :model-value="
-                              getHistoramIntervalField(
-                                dashboardPanelData.data.queries[
-                                  dashboardPanelData.layout.currentQueryIndex
-                                ].fields?.breakdown[index],
-                              )
-                            "
-                            @update:modelValue="
-                              (newValue: any) => {
-                                dashboardPanelData.data.queries[
-                                  dashboardPanelData.layout.currentQueryIndex
-                                ].fields.breakdown[index].args[0].value =
-                                  newValue.value;
-                              }
-                            "
-                          />
-                        </div>
-                        <q-input
-                          dense
-                          filled
-                          data-test="dashboard-b-item-input"
-                          :label="t('common.label')"
-                          v-model="
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.breakdown[index].label
-                          "
-                        />
-                        <div
-                          v-if="
-                            !dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].customQuery &&
-                            dashboardPanelData.data.queryType == 'sql' &&
-                            !dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.breakdown[index].isDerived
-                          "
-                        >
-                          <SortByBtnGrp
-                            :fieldObj="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields?.breakdown[index]
-                            "
-                          />
                         </div>
                       </div>
                     </q-menu>
@@ -501,8 +301,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="height: 100%"
                     size="xs"
                     dense
-                    :data-test="`dashboard-b-item-${itemB?.column}-remove`"
-                    @click="removeBreakdownItem(itemB?.column)"
+                    :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
+                    @click="removeBreakdownItemByIndex(index)"
                     icon="close"
                   />
                 </div>
@@ -608,206 +408,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :no-wrap="true"
                 size="sm"
                 :label="yLabel[index]"
-                :data-test="`dashboard-y-item-${itemY?.column}`"
+                :data-test="`dashboard-y-item-${itemY?.alias}`"
                 class="q-pl-sm"
               >
                 <q-menu
-                  class="q-pa-md"
-                  :data-test="`dashboard-y-item-${itemY?.column}-menu`"
+                  :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
+                  class="field-function-menu-popup"
                 >
-                  <div>
-                    <div class="row q-mb-sm" style="align-items: center">
-                      <div
-                        v-if="
-                          !dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery &&
-                          !dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.y[index].isDerived
-                        "
-                        class="q-mr-xs"
-                        style="width: 160px"
-                      >
-                        <q-select
+                  <div style="padding: 3px 16px 16px 16px; width: 771px">
+                    <div>
+                      <div class="q-mr-xs q-mb-sm">
+                        <DynamicFunctionPopUp
                           v-model="
                             dashboardPanelData.data.queries[
                               dashboardPanelData.layout.currentQueryIndex
-                            ].fields.y[index].aggregationFunction
+                            ].fields.y[index]
                           "
-                          :options="
+                          :allowAggregation="
                             dashboardPanelData.data.type == 'heatmap'
-                              ? triggerOperatorsWithHistogram
-                              : triggerOperators
+                              ? false
+                              : true
                           "
-                          dense
-                          filled
-                          emit-value
-                          map-options
-                          :label="t('common.aggregation')"
-                          data-test="dashboard-y-item-dropdown"
-                        >
-                          <template v-slot:append>
-                            <div
-                              v-if="dashboardPanelData.data.type == 'heatmap'"
-                            >
-                              <q-icon
-                                name="close"
-                                size="small"
-                                @click.stop.prevent="
-                                  dashboardPanelData.data.queries[
-                                    dashboardPanelData.layout.currentQueryIndex
-                                  ].fields.y[index].aggregationFunction = null
-                                "
-                                class="cursor-pointer"
-                              />
-                            </div>
-                          </template>
-                        </q-select>
-                      </div>
-                      <div
-                        class="color-input-wrapper"
-                        v-if="
-                          !['table', 'pie'].includes(
-                            dashboardPanelData.data.type,
-                          )
-                        "
-                      >
-                        <input
-                          type="color"
-                          data-test="dashboard-y-item-color"
-                          v-model="
+                          :customQuery="
                             dashboardPanelData.data.queries[
                               dashboardPanelData.layout.currentQueryIndex
-                            ].fields.y[index].color
+                            ].customQuery
                           "
                         />
                       </div>
-                    </div>
-                    <!-- histogram interval if auto sql and aggregation function is histogram-->
-                    <div
-                      v-if="
-                        !dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery &&
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields?.y[index]?.aggregationFunction ===
-                          'histogram' &&
-                        !dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.y[index].isDerived
-                      "
-                      class="q-mb-sm"
-                    >
-                      <!-- histogram interval for sql queries -->
-                      <HistogramIntervalDropDown
-                        v-if="!promqlMode"
-                        :model-value="
-                          getHistoramIntervalField(
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.y[index],
-                          )
-                        "
-                        @update:modelValue="
-                          (newValue: any) => {
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.y[index].args[0].value = newValue.value;
-                          }
-                        "
-                      />
-                    </div>
-                    <q-input
-                      dense
-                      filled
-                      :label="t('common.label')"
-                      data-test="dashboard-y-item-input"
-                      v-model="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.y[index].label
-                      "
-                    />
-                    <div
-                      v-if="dashboardPanelData.data.type === 'table'"
-                      class="q-mt-sm q-mb-sm"
-                    >
-                      <q-checkbox
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.y[index].treatAsNonTimestamp
-                        "
-                        :label="'Mark this field as non-timestamp'"
-                        dense
-                      />
-                    </div>
-                    <div
-                      style="width: 100%"
-                      class="tw-mb-2"
-                      v-if="dashboardPanelData.data.type != 'heatmap'"
-                    >
-                      <span class="tw-block tw-mb-1 tw-font-bold">Having</span>
-
-                      <q-btn
-                        dense
-                        outline
-                        color="primary"
-                        icon="add"
-                        label="Add"
-                        @click="toggleHavingFilter(index, 'y')"
-                        v-if="!isHavingFilterVisible(index, 'y')"
-                      />
-
-                      <div
-                        class="tw-flex tw-space-x-2 tw-mt-2 tw-items-center"
-                        v-if="isHavingFilterVisible(index, 'y')"
-                      >
-                        <q-select
-                          dense
-                          filled
-                          v-model="getHavingCondition(index, 'y').operator"
-                          :options="operators"
-                          style="width: 30%"
-                        />
-
-                        <q-input
-                          dense
-                          filled
-                          v-model.number="getHavingCondition(index, 'y').value"
-                          style="width: 50%"
-                          type="number"
-                          placeholder="Value"
-                        />
-
-                        <q-btn
-                          dense
-                          flat
-                          icon="close"
-                          @click="cancelHavingFilter(index, 'y')"
-                        />
-                      </div>
-                    </div>
-                    <div
-                      v-if="
-                        !dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery &&
-                        dashboardPanelData.data.queryType == 'sql' &&
-                        !dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.y[index].isDerived
-                      "
-                    >
-                      <SortByBtnGrp
-                        :fieldObj="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields?.y[index]
-                        "
-                      />
                     </div>
                   </div>
                 </q-menu>
@@ -816,8 +444,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="height: 100%"
                 size="xs"
                 dense
-                :data-test="`dashboard-y-item-${itemY?.column}-remove`"
-                @click="removeYAxisItem(itemY?.column)"
+                :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
+                @click="removeYAxisItemByIndex(index)"
                 icon="close"
               />
             </div>
@@ -918,136 +546,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   color="primary"
                   size="sm"
                   :label="zLabel[index]"
-                  :data-test="`dashboard-z-item-${itemZ?.column}`"
+                  :data-test="`dashboard-z-item-${itemZ?.alias}`"
                   class="q-pl-sm"
                 >
                   <q-menu
-                    class="q-pa-md"
-                    :data-test="`dashboard-z-item-${itemZ?.column}-menu`"
+                    :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
+                    class="field-function-menu-popup"
                   >
-                    <div>
-                      <div class="row q-mb-sm" style="align-items: center">
-                        <div
-                          v-if="
-                            !dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].customQuery &&
-                            !dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.z[index].isDerived
-                          "
-                          class="q-mr-xs"
-                          style="width: 160px"
-                        >
-                          <q-select
+                    <div style="padding: 3px 16px 16px 16px; width: 771px">
+                      <div>
+                        <div class="q-mr-xs q-mb-sm">
+                          <DynamicFunctionPopUp
                             v-model="
                               dashboardPanelData.data.queries[
                                 dashboardPanelData.layout.currentQueryIndex
-                              ].fields.z[index].aggregationFunction
+                              ].fields.z[index]
                             "
-                            :options="triggerOperators"
-                            dense
-                            filled
-                            emit-value
-                            map-options
-                            :label="t('common.aggregation')"
-                            data-test="dashboard-z-item-dropdown"
-                          ></q-select>
-                        </div>
-                        <div
-                          class="color-input-wrapper"
-                          v-if="
-                            !['table', 'pie'].includes(
-                              dashboardPanelData.data.type,
-                            )
-                          "
-                        >
-                          <input
-                            type="color"
-                            data-test="dashboard-z-item-color"
-                            v-model="
+                            :allowAggregation="true"
+                            :customQuery="
                               dashboardPanelData.data.queries[
                                 dashboardPanelData.layout.currentQueryIndex
-                              ].fields.z[index].color
+                              ].customQuery
                             "
                           />
                         </div>
-                      </div>
-                      <q-input
-                        dense
-                        filled
-                        :label="t('common.label')"
-                        data-test="dashboard-z-item-input"
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.z[index].label
-                        "
-                      />
-                      <div style="width: 100%" class="tw-mb-2">
-                        <span class="tw-block tw-mb-1 tw-font-bold"
-                          >Having</span
-                        >
-
-                        <q-btn
-                          dense
-                          outline
-                          color="primary"
-                          icon="add"
-                          label="Add"
-                          @click="toggleHavingFilter(index, 'z')"
-                          v-if="!isHavingFilterVisible(index, 'z')"
-                        />
-
-                        <div
-                          class="tw-flex tw-space-x-2 tw-mt-2 tw-items-center"
-                          v-if="isHavingFilterVisible(index, 'z')"
-                        >
-                          <q-select
-                            dense
-                            filled
-                            v-model="getHavingCondition(index, 'z').operator"
-                            :options="operators"
-                            style="width: 30%"
-                          />
-
-                          <q-input
-                            dense
-                            filled
-                            v-model.number="
-                              getHavingCondition(index, 'z').value
-                            "
-                            style="width: 50%"
-                            type="number"
-                            placeholder="Value"
-                          />
-
-                          <q-btn
-                            dense
-                            flat
-                            icon="close"
-                            @click="cancelHavingFilter(index, 'z')"
-                          />
-                        </div>
-                      </div>
-                      <div
-                        v-if="
-                          !dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery &&
-                          dashboardPanelData.data.queryType == 'sql' &&
-                          !dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.z[index].isDerived
-                        "
-                      >
-                        <SortByBtnGrp
-                          :fieldObj="
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields?.z[index]
-                          "
-                        />
                       </div>
                     </div>
                   </q-menu>
@@ -1056,8 +578,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="height: 100%"
                   size="xs"
                   dense
-                  :data-test="`dashboard-z-item-${itemZ?.column}-remove`"
-                  @click="removeZAxisItem(itemZ?.column)"
+                  :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
+                  @click="removeZAxisItemByIndex(index)"
                   icon="close"
                 />
               </div>
@@ -1083,6 +605,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </span>
     <q-separator />
+    <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
+    <q-separator />
     <!-- filters container -->
     <DashboardFiltersOption
       :dashboardData="dashboardData"
@@ -1102,7 +626,6 @@ import {
   computed,
   inject,
   nextTick,
-  onMounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
@@ -1110,25 +633,26 @@ import { getImageURL } from "../../../utils/zincutils";
 import DashboardGeoMapsQueryBuilder from "./DashboardGeoMapsQueryBuilder.vue";
 import DashboardMapsQueryBuilder from "./DashboardMapsQueryBuilder.vue";
 import DashboardSankeyChartBuilder from "./DashboardSankeyChartBuilder.vue";
-import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
-import { useStore } from "vuex";
+import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
+import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
+import { buildSQLQueryFromInput } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
   components: {
     DashboardGeoMapsQueryBuilder,
-    SortByBtnGrp,
-    HistogramIntervalDropDown,
     DashboardMapsQueryBuilder,
     DashboardSankeyChartBuilder,
     CommonAutoComplete,
     SanitizedHtmlRenderer,
     DashboardFiltersOption,
+    DashboardJoinsOption,
+    DynamicFunctionPopUp,
   },
   props: ["dashboardData"],
   setup(props) {
@@ -1149,17 +673,16 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const store = useStore();
     const {
       dashboardPanelData,
       addXAxisItem,
       addYAxisItem,
       addZAxisItem,
       addBreakDownAxisItem,
-      removeXAxisItem,
-      removeYAxisItem,
-      removeZAxisItem,
-      removeBreakdownItem,
+      removeXAxisItemByIndex,
+      removeYAxisItemByIndex,
+      removeZAxisItemByIndex,
+      removeBreakdownItemByIndex,
       addFilteredItem,
       promqlMode,
       updateArrayAlias,
@@ -1170,68 +693,6 @@ export default defineComponent({
       cleanupDraggingFields,
       selectedStreamFieldsBasedOnUserDefinedSchema,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
-
-    // Initialize treatAsNonTimestamp for existing fields (only for table charts)
-    const initializeTreatAsNonTimestamp = () => {
-      const currentQuery =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ];
-
-      // Check if this is a new panel (no ID means it's new)
-      const isNewPanel = !dashboardPanelData.data.id;
-
-      // Helper: set treatAsNonTimestamp for X/Y fields only
-      const setTreatAsNonTimestampForField = (field: any) => {
-        // Always ensure treatAsNonTimestamp is set for existing panels
-        if (isNewPanel) {
-          // For new panels: set based on field name
-          // For timestamp fields: treatAsNonTimestamp = false (unchecked)
-          // For non-timestamp fields: treatAsNonTimestamp = true (checked)
-          field.treatAsNonTimestamp =
-            field.column === store.state.zoConfig.timestamp_column
-              ? false
-              : true;
-        } else {
-          // For existing panels: only set if treatAsNonTimestamp is not already defined
-          // This preserves the saved values from the database
-          if (
-            field.treatAsNonTimestamp === undefined ||
-            field.treatAsNonTimestamp === null
-          ) {
-            field.treatAsNonTimestamp = false;
-          }
-        }
-      };
-
-      // Only X and Y axes for table charts
-      if (currentQuery?.fields?.x) {
-        currentQuery.fields.x.forEach((field: any) => {
-          setTreatAsNonTimestampForField(field);
-        });
-      }
-      if (currentQuery?.fields?.y) {
-        currentQuery.fields.y.forEach((field: any) => {
-          setTreatAsNonTimestampForField(field);
-        });
-      }
-    };
-
-    onMounted(() => {
-      nextTick(() => {
-        initializeTreatAsNonTimestamp();
-      });
-    });
-
-    watch(
-      () => dashboardPanelData.data.type,
-      (newType: string, oldType: string) => {
-        if (newType !== oldType) {
-          // Reset treatAsNonTimestamp when chart type changes
-          initializeTreatAsNonTimestamp();
-        }
-      },
-    );
 
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
@@ -1261,28 +722,6 @@ export default defineComponent({
       { label: t("dashboard.histogram"), value: "histogram" },
     ];
 
-    // v-model for histogram interval
-    // if no args object in the field, set it with object with interval = null
-    const getHistoramIntervalField = (field: any) => {
-      // if no interval is set, set it to null
-      if (!field.args) {
-        field.args = [
-          {
-            value: null,
-          },
-        ];
-        return { value: null, label: "Auto" };
-      } else if (field?.args?.length === 0) {
-        field?.args?.push({
-          value: null,
-        });
-
-        return { value: null, label: "Auto" };
-      }
-
-      return { value: field?.args[0]?.value, label: field?.args[0]?.value };
-    };
-
     watch(
       () => dashboardPanelData.meta.dragAndDrop.dragging,
       (newVal: boolean, oldVal: boolean) => {
@@ -1298,6 +737,10 @@ export default defineComponent({
     );
 
     const onDrop = (e: any, targetAxis: string, droppedAtIndex: number) => {
+      e.stopPropagation();
+      const dragSourceIndex =
+        dashboardPanelData.meta.dragAndDrop.dragSourceIndex;
+
       // reorder items if source and target are same
       if (dashboardPanelData.meta.dragAndDrop.dragSource === targetAxis) {
         // we need to reorder the item
@@ -1336,7 +779,7 @@ export default defineComponent({
               addBreakDownAxisItem(dragElement);
               break;
             case "f":
-              addFilteredItem(dragElement?.name);
+              addFilteredItem(dragElement);
               break;
           }
           reorderItems(
@@ -1348,104 +791,97 @@ export default defineComponent({
           // move the item from field list to axis
           const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
-          const dragName =
-            selectedStreamFieldsBasedOnUserDefinedSchema.value.find(
-              (item: any) => item?.name === dragElement?.column,
-            );
-          const customDragName =
-            dashboardPanelData.meta.stream.customQueryFields.find(
-              (item: any) => item?.name === dragElement?.column,
-            );
+          // find first arg which is of type field
+          const firstFieldTypeArg = dragElement?.args?.find(
+            (arg: any) => arg?.type === "field",
+          )?.value;
 
-          if (dragName || customDragName) {
-            const axisArray = getAxisArray(targetAxis);
-            const duplicateName = axisArray.some(
-              (item: any) => item.column === (dragName || customDragName).name,
-            );
+          if (!firstFieldTypeArg) {
+            showErrorNotification("Without field, not able to drag");
+            cleanupDraggingFields();
+            return;
+          }
 
-            if (duplicateName) {
-              const errorMessage = `Field '${
-                (dragName || customDragName).name
-              }' already exists in '${targetAxis}' axis.`;
+          const fieldObj = {
+            name: firstFieldTypeArg.field,
+            streamAlias: firstFieldTypeArg.streamAlias,
+          };
+
+          const axisArray = getAxisArray(targetAxis);
+
+          if (targetAxis !== "f") {
+            if (
+              (targetAxis === "x" && isAddXAxisNotAllowed.value) ||
+              (targetAxis === "y" && isAddYAxisNotAllowed.value) ||
+              (targetAxis === "z" && isAddZAxisNotAllowed.value) ||
+              (targetAxis === "breakdown" && isAddBreakdownNotAllowed.value)
+            ) {
+              let maxAllowedAxisFields;
+
+              switch (dashboardPanelData.data.type) {
+                case "pie":
+                case "donut":
+                case "heatmap":
+                  maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
+                  break;
+                case "metric":
+                  maxAllowedAxisFields = targetAxis === "x" ? 0 : 1;
+                  break;
+                case "table":
+                  maxAllowedAxisFields = 0;
+                  break;
+                case "area-stacked":
+                case "stacked":
+                case "h-stacked":
+                  maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
+                  break;
+                default:
+                  maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
+                  break;
+              }
+
+              const errorMessage = `Max ${maxAllowedAxisFields} field(s) in ${targetAxis.toUpperCase()}-Axis is allowed.`;
 
               showErrorNotification(errorMessage);
               cleanupDraggingFields();
               return;
             }
 
-            if (targetAxis !== "f") {
-              if (
-                (targetAxis === "x" && isAddXAxisNotAllowed.value) ||
-                (targetAxis === "y" && isAddYAxisNotAllowed.value) ||
-                (targetAxis === "z" && isAddZAxisNotAllowed.value) ||
-                (targetAxis === "breakdown" && isAddBreakdownNotAllowed.value)
-              ) {
-                let maxAllowedAxisFields;
-
-                switch (dashboardPanelData.data.type) {
-                  case "pie":
-                  case "donut":
-                  case "heatmap":
-                    maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
-                    break;
-                  case "metric":
-                    maxAllowedAxisFields = targetAxis === "x" ? 0 : 1;
-                    break;
-                  case "table":
-                    maxAllowedAxisFields = 0;
-                    break;
-                  case "area-stacked":
-                  case "stacked":
-                  case "h-stacked":
-                    maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
-                    break;
-                  default:
-                    maxAllowedAxisFields = targetAxis === "x" ? 1 : 1;
-                    break;
-                }
-
-                const errorMessage = `Max ${maxAllowedAxisFields} field(s) in ${targetAxis.toUpperCase()}-Axis is allowed.`;
-
-                showErrorNotification(errorMessage);
-                cleanupDraggingFields();
-                return;
-              }
-
-              // Remove from the original axis
-              const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
-              if (dragSource === "x") {
-                removeXAxisItem((dragName || customDragName).name);
-              } else if (dragSource === "y") {
-                removeYAxisItem((dragName || customDragName).name);
-              } else if (dragSource === "z") {
-                removeZAxisItem((dragName || customDragName).name);
-              } else if (dragSource === "breakdown") {
-                removeBreakdownItem((dragName || customDragName).name);
-              }
+            // Remove from the original axis
+            const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
+            if (dragSource === "x") {
+              removeXAxisItemByIndex(dragSourceIndex);
+            } else if (dragSource === "y") {
+              removeYAxisItemByIndex(dragSourceIndex);
+            } else if (dragSource === "z") {
+              removeZAxisItemByIndex(dragSourceIndex);
+            } else if (dragSource === "breakdown") {
+              removeBreakdownItemByIndex(dragSourceIndex);
             }
-
-            if (targetAxis === "f") {
-              return;
-            }
-
-            // Add to the new axis
-            if (targetAxis === "x") {
-              addXAxisItem(dragName || customDragName);
-            } else if (targetAxis === "y") {
-              addYAxisItem(dragName || customDragName);
-            } else if (targetAxis === "z") {
-              addZAxisItem(dragName || customDragName);
-            } else if (targetAxis === "breakdown") {
-              addBreakDownAxisItem(dragName || customDragName);
-            }
-            reorderItems(
-              targetAxis,
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields[targetAxis]?.length - 1 || 0,
-              droppedAtIndex,
-            );
           }
+
+          if (targetAxis === "f") {
+            return;
+          }
+
+          // Add to the new axis
+          if (targetAxis === "x") {
+            addXAxisItem(fieldObj);
+          } else if (targetAxis === "y") {
+            addYAxisItem(fieldObj);
+          } else if (targetAxis === "z") {
+            addZAxisItem(fieldObj);
+          } else if (targetAxis === "breakdown") {
+            addBreakDownAxisItem(fieldObj);
+          }
+          reorderItems(
+            targetAxis,
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields[targetAxis]?.length - 1 || 0,
+            droppedAtIndex,
+          );
+
           updateArrayAlias();
         }
       }
@@ -1603,14 +1039,18 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
       ) {
-        return field?.column;
+        return field?.alias;
       }
-      if (field?.aggregationFunction) {
-        const aggregation = field?.aggregationFunction?.toUpperCase();
-        return `${aggregation}(${field?.column})`;
-      } else {
-        return field?.column;
-      }
+      return buildSQLQueryFromInput(
+        field,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.joins?.length
+          ? dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields?.stream
+          : "",
+      );
     };
 
     const xLabel = computed(() => {
@@ -1645,82 +1085,22 @@ export default defineComponent({
       return zFields.map(commonBtnLabel);
     });
 
-    const operators = ["=", "<>", ">=", "<=", ">", "<"];
-
-    const isHavingFilterVisible = (index: any, axis: any) => {
-      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
-      const currentField =
-        dashboardPanelData.data.queries[currentQueryIndex].fields[axis][index];
-
-      const isVisible = !!currentField?.havingConditions?.length;
-      return isVisible;
-    };
-
-    const toggleHavingFilter = async (index: any, axis: any) => {
-      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
-      const currentField =
-        dashboardPanelData.data.queries[currentQueryIndex].fields[axis][index];
-
-      if (!currentField.havingConditions) {
-        currentField.havingConditions = [];
-      }
-
-      if (!currentField.havingConditions.length) {
-        currentField.havingConditions.push({ operator: null, value: null });
-      }
-
-      await nextTick();
-    };
-
-    const cancelHavingFilter = async (index: any, axis: any) => {
-      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
-      const currentField =
-        dashboardPanelData.data.queries[currentQueryIndex].fields[axis][index];
-
-      currentField.havingConditions = [];
-
-      await nextTick();
-    };
-
-    const getHavingCondition = (index: any, axis: any) => {
-      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
-      const currentField =
-        dashboardPanelData.data.queries[currentQueryIndex].fields[axis][index];
-
-      return (
-        currentField.havingConditions?.[0] || { operator: null, value: null }
-      );
-    };
-
     return {
       showXAxis,
       t,
       panelName,
       panelDesc,
       dashboardPanelData,
-      removeXAxisItem,
-      removeYAxisItem,
-      removeZAxisItem,
-      removeBreakdownItem,
+      removeXAxisItemByIndex,
+      removeYAxisItemByIndex,
+      removeZAxisItemByIndex,
+      removeBreakdownItemByIndex,
       triggerOperators,
       pagination: ref({
         rowsPerPage: 0,
       }),
       model: ref([]),
       tab: ref("General"),
-      options: [
-        "=",
-        "<>",
-        ">=",
-        "<=",
-        ">",
-        "<",
-        "IN",
-        "Contains",
-        "Not Contains",
-        "Is Null",
-        "Is Not Null",
-      ],
       getImageURL,
       onDrop,
       onDragStart,
@@ -1738,13 +1118,7 @@ export default defineComponent({
       zLabel,
       bLabel,
       onFieldDragStart,
-      getHistoramIntervalField,
       onDragEnd,
-      operators,
-      isHavingFilterVisible,
-      toggleHavingFilter,
-      cancelHavingFilter,
-      getHavingCondition,
     };
   },
 });
@@ -2028,5 +1402,15 @@ export default defineComponent({
 .q-field--dense .q-field__control,
 .q-field--dense .q-field__marginal {
   height: 34px;
+}
+
+.field-function-menu-popup {
+  width: 771px !important;
+  height: 323px;
+  border-radius: 4px;
+  border: 1px solid #d5d5d5;
+  background: #fff;
+  box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.05);
+  padding: 16px;
 }
 </style>

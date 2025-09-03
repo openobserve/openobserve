@@ -97,7 +97,7 @@ export const addLabelToSQlQuery = async (
 
   if (operator === "match_all") {
     condition = `match_all(${formatValue(value)})`;
-  } else if (operator === "str_match" || operator === "Contains") {
+  } else if (operator === "str_match") {
     condition = `str_match(${label}, ${formatValue(value)})`;
   } else if (operator === "str_match_ignore_case") {
     condition = `str_match_ignore_case(${label}, ${formatValue(value)})`;
@@ -107,10 +107,10 @@ export const addLabelToSQlQuery = async (
     condition = `re_not_match(${label}, ${formatValue(value)})`;
   } else {
     switch (operator) {
-      // case "Contains":
-      //   operator = "LIKE";
-      //   value = "%" + escapeSingleQuotes(value) + "%";
-      //   break;
+      case "Contains":
+        operator = "LIKE";
+        value = "%" + escapeSingleQuotes(value) + "%";
+        break;
       case "Not Contains":
         operator = "NOT LIKE";
         value = "%" + escapeSingleQuotes(value) + "%";
@@ -296,27 +296,6 @@ export function extractFields(parsedAst: any, timeField: string) {
         column?.expr?.args?.value[0]?.column?.expr?.value ?? timeField;
       field.aggregationFunction =
         column?.expr?.name?.name[0]?.value?.toLowerCase() ?? "histogram";
-
-      if (field.aggregationFunction === "approx_percentile_cont") {
-        // check 2nd argument of function
-        if (
-          column?.expr?.args?.value[1]?.value === "0.5" ||
-          column?.expr?.args?.value[1]?.value === "0.50"
-        ) {
-          field.aggregationFunction = "p50";
-        } else if (
-          column?.expr?.args?.value[1]?.value === "0.9" ||
-          column?.expr?.args?.value[1]?.value === "0.90"
-        ) {
-          field.aggregationFunction = "p90";
-        } else if (column?.expr?.args?.value[1]?.value === "0.95") {
-          field.aggregationFunction = "p95";
-        } else if (column?.expr?.args?.value[1]?.value === "0.99") {
-          field.aggregationFunction = "p99";
-        } else {
-          throw new Error("Unsupported percentile value");
-        }
-      }
     }
 
     field.alias = column?.as ?? field?.column ?? timeField;
@@ -775,81 +754,384 @@ export const convertQueryIntoSingleLine = async (query: any) => {
   }
 };
 
+// // List of known aggregation functions
+// const aggregationFunctions = new Set([
+//   "count",
+//   "count-distinct",
+//   "sum",
+//   "avg",
+//   "min",
+//   "max",
+//   "p50",
+//   "p90",
+//   "p95",
+//   "p99",
+// ]);
 
-export const getStreamNameFromQuery = async (query: any) => {
-  let streamName = null;
-  try {
-    await importSqlParser();
-    try {
-      if(query && query != ""){
-        const parsedQuery = parser?.astify(query);
-        if (parsedQuery?.with) {
-            let withObj = parsedQuery.with;
-            withObj.forEach((obj: any) => {
-              // Recursively extract table names from the WITH statement with depth protection
-              const MAX_RECURSION_DEPTH = 50; // Prevent stack overflow
-              const visitedNodes = new WeakSet(); // Prevent circular references - more efficient for objects
-              
-              const extractTablesFromNode = (node: any, depth: number = 0) => {
-                if (!node || depth > MAX_RECURSION_DEPTH) {
-                  if (depth > MAX_RECURSION_DEPTH) {
-                    console.warn("Maximum recursion depth reached while parsing SQL query");
-                  }
-                  return;
-                }
-                
-                // Use WeakSet for efficient circular reference detection
-                if (typeof node === 'object' && node !== null) {
-                  if (visitedNodes.has(node)) {
-                    return; // Skip already visited nodes
-                  }
-                  visitedNodes.add(node);
-                }
-                
-                // Check if current node has a from clause
-                if (node.from && Array.isArray(node.from)) {
-                  node.from.forEach((stream: any) => {
-                    if (stream.table) {
-                      streamName = stream.table;
-                    }
-                    // Handle subquery in FROM clause
-                    if (stream.expr && stream.expr.ast) {
-                      extractTablesFromNode(stream.expr.ast, depth + 1);
-                    }
-                  });
-                }
-                
-                // Check for nested subqueries in WHERE clause
-                if (node.where && node.where.right && node.where.right.ast) {
-                  extractTablesFromNode(node.where.right.ast, depth + 1);
-                }
-                
-                // Check for nested subqueries in SELECT expressions
-                if (node.columns && Array.isArray(node.columns)) {
-                  node.columns.forEach((col: any) => {
-                    if (col.expr && col.expr.ast) {
-                      extractTablesFromNode(col.expr.ast, depth + 1);
-                    }
-                  });
-                }
-              };
-              
-              // Start extraction from the WITH statement
-              extractTablesFromNode(obj?.stmt);
-            });
-          }
-          else{
-            streamName = parsedQuery?.from[0]?.table;
-          }
-      }
-    } catch (error) {
-      console.log(error,'error parsing sql query');
-    }
-    return streamName;
-  } catch (error) {
-    return null;
+// // Helper function to process function arguments
+// const processFunctionArgs = (args: any[]) => {
+//   return {
+//     type: "expr_list",
+//     value: args.map((arg) => {
+//       if (!arg || !arg.type)
+//         return { type: "default", value: "unknown_column" };
+
+//       switch (arg.type) {
+//         case "field":
+//           return {
+//             type: "column_ref",
+//             table: null,
+//             column: arg.value?.field || "unknown_column",
+//           };
+
+//         case "number":
+//           return {
+//             type: "number",
+//             value: arg.value ?? 0,
+//           };
+
+//         case "string":
+//           return {
+//             type: "string",
+//             value: arg.value || "",
+//           };
+
+//         case "function":
+//           return processField(arg.value); // Recursively process nested functions
+
+//         default:
+//           return { type: "default", value: "unknown_column" };
+//       }
+//     }),
+//   };
+// };
+
+// // Helper function to process fields for SELECT clause
+// const processField: any = (field: any) => {
+//   if (!field || !field.alias) return null; // Ignore invalid fields
+
+//   if (field.functionName) {
+//     const functionNameLower = field.functionName.toLowerCase();
+//     const isAggregation = aggregationFunctions.has(functionNameLower);
+
+//     console.log(isAggregation, "isAggregation", field);
+
+//     return {
+//       type: "expr",
+//       expr: {
+//         type: isAggregation ? "aggr_func" : "function",
+//         name: isAggregation
+//           ? field.functionName.toUpperCase()
+//           : { name: [{ type: "default", value: field.functionName }] },
+//         args: processFunctionArgs(field.args || []),
+//         over: null,
+//       },
+//       as: field.alias,
+//     };
+//   } else {
+//     return {
+//       type: "expr",
+//       expr: {
+//         type: "column_ref",
+//         table: null,
+//         column: field.column || "unknown_column",
+//       },
+//       as: field.alias,
+//     };
+//   }
+// };
+
+// // Main function to build SQL query using AST
+// export async function buildSQLQueryWithParser(
+//   fields: any,
+//   joins: any[],
+// ): Promise<string> {
+//   // import parser
+//   await importSqlParser();
+
+//   console.log(
+//     parser.astify(
+//       "select histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 from default group by x_axis_1 order by x_axis_1",
+//     ),
+//     "parser.astify",
+//   );
+
+//   const ast: any = {
+//     type: "select",
+//     columns: [],
+//     from: [{ db: null, table: fields?.stream || "unknown_table", as: null }],
+//     where: null,
+//     groupby: null,
+//     orderby: null,
+//     joins: [],
+//   };
+
+//   // Process X-Axis Fields
+//   if (Array.isArray(fields?.x)) {
+//     fields.x.forEach((xField: any) => {
+//       const processedField = processField(xField);
+//       if (processedField) ast.columns.push(processedField);
+//     });
+//   }
+
+//   // Process Y-Axis Fields
+//   if (Array.isArray(fields?.y)) {
+//     fields.y.forEach((yField: any) => {
+//       const processedField = processField(yField);
+//       if (processedField) ast.columns.push(processedField);
+//     });
+//   }
+
+//   console.log(ast, "AST");
+
+//   const sql = parser.sqlify(ast);
+//   return sql.replace(/`/g, '"');
+// }
+
+// List of known aggregation functions
+const aggregationFunctions = new Set([
+  "count",
+  "count-distinct",
+  "sum",
+  "avg",
+  "min",
+  "max",
+  "p50",
+  "p90",
+  "p95",
+  "p99",
+]);
+
+// Helper function to process function arguments
+const processFunctionArgs = (args: any[], isAggregation: boolean) => {
+  if (isAggregation) {
+    // Aggregation functions need a single `expr` argument
+    return {
+      distinct: null,
+      expr: {
+        type: "column_ref",
+        table: null,
+        column: args[0]?.value?.field || args[0]?.value || "unknown_column",
+      },
+      orderby: null,
+      separator: null,
+    };
+  } else {
+    // Regular functions need an `expr_list`
+    return {
+      type: "expr_list",
+      value: args.map((arg) => ({
+        type: "column_ref",
+        table: null,
+        column: arg.value?.field || arg.value || "unknown_column",
+      })),
+    };
   }
 };
 
-// Export internal functions for testing
-export { formatValue, parseCondition, convertWhereToFilter, extractFilters, extractTableName };
+// Helper function to process fields for SELECT clause
+const processField = (field: any) => {
+  if (!field || !field.alias) return null; // Ignore invalid fields
+
+  if (field.functionName) {
+    const functionNameLower = field.functionName.toLowerCase();
+    const isAggregation = aggregationFunctions.has(functionNameLower);
+
+    return {
+      type: "expr",
+      expr: {
+        type: isAggregation ? "aggr_func" : "function",
+        name: isAggregation
+          ? field.functionName.toUpperCase()
+          : { name: [{ type: "default", value: field.functionName }] },
+        args: processFunctionArgs(field.args || [], isAggregation),
+        over: null,
+      },
+      as: field.alias,
+    };
+  } else {
+    return {
+      type: "expr",
+      expr: {
+        type: "column_ref",
+        table: null,
+        column: field.column || "unknown_column",
+      },
+      as: field.alias,
+    };
+  }
+};
+
+function buildJoinConditions(conditions: any[]) {
+  if (!conditions || conditions.length === 0) return null;
+
+  if (conditions.length === 1) {
+    return createBinaryExpr(conditions[0]);
+  }
+
+  let conditionTree = createBinaryExpr(conditions[0]);
+
+  for (let i = 1; i < conditions.length; i++) {
+    conditionTree = {
+      type: "binary_expr",
+      operator: "AND",
+      left: conditionTree,
+      right: createBinaryExpr(conditions[i]),
+    };
+  }
+
+  return conditionTree;
+}
+
+function createBinaryExpr(condition: any) {
+  return {
+    type: "binary_expr",
+    operator: condition.operation,
+    left: {
+      type: "column_ref",
+      table: condition.leftField.streamAlias || null,
+      column: { expr: { type: "default", value: condition.leftField.field } },
+    },
+    right: {
+      type: "column_ref",
+      table: condition.rightField.streamAlias || null,
+      column: { expr: { type: "default", value: condition.rightField.field } },
+    },
+  };
+}
+
+// Main function to build SQL query using AST
+export async function buildSQLQueryWithParser(
+  fields: any,
+  joins: any[],
+): Promise<string> {
+  // Import parser
+  await importSqlParser();
+
+  const ast: any = {
+    with: null,
+    type: "select",
+    options: null,
+    distinct: { type: null },
+    columns: [],
+    from: [],
+    where: null,
+    groupby: { columns: [] },
+    having: null,
+    orderby: [],
+    limit: { separator: "", value: [] },
+    window: null,
+  };
+
+  const groupByFields: any[] = [];
+
+  // Main table reference
+  if (fields?.stream) {
+    ast.from.push({
+      db: null,
+      table: fields.stream,
+      as: null,
+    });
+  }
+
+  // Process X-Axis Fields (Included in GROUP BY & ORDER BY if applicable)
+  if (Array.isArray(fields?.x)) {
+    fields.x.forEach((xField: any) => {
+      const processedField = processField(xField);
+      if (processedField) {
+        ast.columns.push(processedField);
+        groupByFields.push({
+          type: "column_ref",
+          table: null,
+          column: xField.alias || xField.column || "unknown_column",
+        });
+
+        // Handle ORDER BY for X-axis
+        if (xField.sortBy) {
+          ast.orderby.push({
+            expr: {
+              type: "column_ref",
+              table: null,
+              column: xField.alias || xField.column || "unknown_column",
+            },
+            type: xField.sortBy.toLowerCase() === "desc" ? "DESC" : "ASC",
+          });
+        }
+      }
+    });
+  }
+
+  // Process Breakdown Fields (Included in GROUP BY & ORDER BY if applicable)
+  if (Array.isArray(fields?.breakdown)) {
+    fields.breakdown.forEach((breakdownField: any) => {
+      const processedField = processField(breakdownField);
+      if (processedField) {
+        ast.columns.push(processedField);
+        groupByFields.push({
+          type: "column_ref",
+          table: null,
+          column:
+            breakdownField.alias || breakdownField.column || "unknown_column",
+        });
+
+        // Handle ORDER BY for Breakdown
+        if (breakdownField.sortBy) {
+          ast.orderby.push({
+            expr: {
+              type: "column_ref",
+              table: null,
+              column:
+                breakdownField.alias ||
+                breakdownField.column ||
+                "unknown_column",
+            },
+            type:
+              breakdownField.sortBy.toLowerCase() === "desc" ? "DESC" : "ASC",
+          });
+        }
+      }
+    });
+  }
+
+  // Process Y-Axis Fields (These may have ORDER BY)
+  if (Array.isArray(fields?.y)) {
+    fields.y.forEach((yField: any) => {
+      const processedField = processField(yField);
+      if (processedField) {
+        ast.columns.push(processedField);
+        if (yField.sortBy) {
+          ast.orderby.push({
+            expr: {
+              type: "column_ref",
+              table: null,
+              column: yField.alias || yField.column || "unknown_column",
+            },
+            type: yField.sortBy.toLowerCase() === "desc" ? "DESC" : "ASC",
+          });
+        }
+      }
+    });
+  }
+
+  // Assign GROUP BY fields if there are any
+  if (groupByFields.length > 0) {
+    ast.groupby = groupByFields;
+  }
+
+  // Process Joins
+  if (Array.isArray(joins)) {
+    joins.forEach((join: any) => {
+      ast.from.push({
+        db: null,
+        table: join.stream,
+        as: join.streamAlias,
+        join: join.joinType.toUpperCase() + " JOIN",
+        on: buildJoinConditions(join.conditions),
+      });
+    });
+  }
+
+  // Convert AST to SQL
+  const sql = parser.sqlify(ast);
+  return sql.replace(/`/g, '"'); // Replace backticks with double quotes for consistency
+}

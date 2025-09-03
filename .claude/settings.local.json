@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git fetch:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(git merge:*)",
+      "Bash(git diff:*)",
+      "Bash(git add:*)",
+      "Bash(git checkout:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

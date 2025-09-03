@@ -37,7 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         borderless
         dense
         class="q-mb-xs"
-        :readonly="dashboardPanelDataPageKey === 'logs'"
       ></q-select>
       <q-select
         v-model="
@@ -69,7 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'metric_icon_present'
             : ''
         "
-        :readonly="dashboardPanelDataPageKey === 'logs'"
       >
         <template
           v-if="
@@ -138,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             sortable: true,
           },
         ]"
-        :rows="data.currentFieldsList"
+        :rows="flattenGroupedFields"
         v-model:pagination="pagination"
         row-key="column"
         :filter="dashboardPanelData.meta.stream.filterField"
@@ -176,6 +174,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <div
+                v-if="props?.row?.isGroup"
+                class="tw-pl-2 tw-py-1 tw-font-semibold tw-bg-gray-200"
+              >
+                {{ props?.row?.groupName }}
+              </div>
+              <div
+                v-else
                 class="field_overlay"
                 :title="props.row.name"
                 :data-test="`field-list-item-${
@@ -191,7 +196,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="field_label"
                   :draggable="
-                    !hideAllFieldsSelection &&
                     !(
                       promqlMode ||
                       (dashboardPanelData.data.queries[
@@ -207,7 +211,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     color="grey-13"
                     :class="[
                       'q-mr-xs',
-                      !hideAllFieldsSelection &&
                       !(
                         promqlMode ||
                         (dashboardPanelData.data.queries[
@@ -238,7 +241,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="field_icons"
                   v-if="
-                    !hideAllFieldsSelection &&
                     !(
                       promqlMode ||
                       (dashboardPanelData.data.queries[
@@ -318,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                     padding="sm"
-                    @click="addFilteredItem(props.row.name)"
+                    @click="addFilteredItem(props.row)"
                     data-test="dashboard-add-filter-data"
                   >
                     <div>+F</div>
@@ -327,7 +329,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="field_icons"
                   v-if="
-                    !hideAllFieldsSelection &&
                     !(
                       promqlMode ||
                       (dashboardPanelData.data.queries[
@@ -387,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                     padding="sm"
-                    @click="addFilteredItem(props.row.name)"
+                    @click="addFilteredItem(props.row)"
                     data-test="dashboard-add-filter-data"
                   >
                     <div>+F</div>
@@ -396,7 +397,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="field_icons"
                   v-if="
-                    !hideAllFieldsSelection &&
                     !(
                       promqlMode ||
                       (dashboardPanelData.data.queries[
@@ -434,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-btn>
                   <q-btn
                     padding="sm"
-                    @click="addFilteredItem(props.row.name)"
+                    @click="addFilteredItem(props.row)"
                     data-test="dashboard-add-filter-data"
                   >
                     <div>+F</div>
@@ -444,7 +444,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="field_icons"
                   v-if="
-                    !hideAllFieldsSelection &&
                     !(
                       promqlMode ||
                       (dashboardPanelData.data.queries[
@@ -504,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                     padding="sm"
-                    @click="addFilteredItem(props.row.name)"
+                    @click="addFilteredItem(props.row)"
                     data-test="dashboard-add-filter-data"
                   >
                     <div>+F</div>
@@ -549,9 +548,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="8px"
               color="white"
               text-color="primary"
-              @update:model-value="toggleSchema"
               :options="userDefinedSchemaBtnGroupOption"
             >
+              <!-- @update:model-value="toggleSchema" -->
               <template v-slot:user_defined_slot>
                 <q-icon name="person"></q-icon>
                 <q-icon name="schema"></q-icon>
@@ -678,7 +677,7 @@ import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "FieldList",
-  props: ["editMode", "hideAllFieldsSelection"],
+  props: ["editMode"],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey: any = inject(
       "dashboardPanelDataPageKey",
@@ -714,7 +713,7 @@ export default defineComponent({
       // schemaList: [],
       // indexOptions: [],
       streamType: ["logs", "metrics", "traces"],
-      currentFieldsList: [],
+      // currentFieldsList: [],
     });
     const filteredStreams = ref([]);
     const {
@@ -738,7 +737,7 @@ export default defineComponent({
       addTarget,
       addValue,
       cleanupDraggingFields,
-      selectedStreamFieldsBasedOnUserDefinedSchema,
+      updateGroupedFields,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const { getStreams, getStream } = useStreams();
     const { showErrorNotification } = useNotifications();
@@ -763,9 +762,6 @@ export default defineComponent({
       )?.metrics_meta?.metric_type;
     });
 
-    // computed property to set default value as false
-    const hideAllFieldsSelection = computed(() => props.hideAllFieldsSelection ?? false);
-
     // get stream list
     const streamDataLoading = useLoading(async (stream_type: any) => {
       await getStreamList(stream_type);
@@ -783,11 +779,9 @@ export default defineComponent({
     // watch the stream type and load the stream list
     watch(
       () =>
-        [
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream_type,
-        ],
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type,
       async () => {
         loadStreamsListBasedOnType();
       },
@@ -838,7 +832,7 @@ export default defineComponent({
             dashboardPanelData.meta.stream.streamResultsType
         ) {
           try {
-            await extractFields();
+            // await extractFields();
 
             // if promql mode
             // NOTE: For the metrics page, we added one watch that resets the query on stream change.
@@ -921,45 +915,130 @@ export default defineComponent({
         }
       },
     );
+
     // update the current list fields if any of the lists changes
     watch(
       () => [
-        store.state.zoConfig.user_defined_schemas_enabled,
-        dashboardPanelData.meta.stream.selectedStreamFields,
         dashboardPanelData.meta.stream.customQueryFields,
-        dashboardPanelData.meta.stream.userDefinedSchema,
-        dashboardPanelData.meta.stream.useUserDefinedSchemas,
         dashboardPanelData.meta.stream.vrlFunctionFieldList,
       ],
       () => {
-        data.currentFieldsList = [];
-        // if user defined schema is enabled, use user defined schema
-        // else use selectedStreamFields
-
-        if (
-          store.state.zoConfig.user_defined_schemas_enabled &&
-          dashboardPanelData.meta.stream.userDefinedSchema.length > 0 &&
-          dashboardPanelData.meta.stream.useUserDefinedSchemas ==
-            "user_defined_schema"
-        ) {
-          data.currentFieldsList = [
-            ...dashboardPanelData.meta.stream.customQueryFields,
-            ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
-            ...dashboardPanelData.meta.stream.userDefinedSchema,
-          ];
-        } else {
-          data.currentFieldsList = [
-            ...dashboardPanelData.meta.stream.customQueryFields,
-            ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
-            ...dashboardPanelData.meta.stream.selectedStreamFields,
-          ];
-        }
-
         // set the custom query fields length
         customQueryFieldsLength.value =
           dashboardPanelData.meta.stream.customQueryFields.length +
           dashboardPanelData.meta.stream.vrlFunctionFieldList.length;
       },
+    );
+
+    const flattenGroupedFields = computed(() => {
+      const flattenedFields: any[] = [];
+
+      dashboardPanelData.meta.stream.customQueryFields.forEach((field: any) => {
+        flattenedFields.push({
+          name: field.name,
+          type: field.type,
+          isGroup: false,
+        });
+      });
+
+      dashboardPanelData.meta.stream.vrlFunctionFieldList.forEach(
+        (field: any) => {
+          flattenedFields.push({
+            name: field.name,
+            type: field.type,
+            isGroup: false,
+          });
+        },
+      );
+
+      dashboardPanelData.meta.streamFields.groupedFields.forEach(
+        (group: any) => {
+          // Add a group header row
+          flattenedFields.push({
+            isGroup: true,
+            groupName: group.name,
+          });
+
+          if (
+            group.settings.hasOwnProperty("defined_schema_fields") &&
+            group.settings.defined_schema_fields.length > 0
+          ) {
+            // add the user defined fields
+            // _timestamp field + user defined fields + all_fields_name
+
+            // add _timestamp field
+            flattenedFields.push({
+              name: store.state.zoConfig?.timestamp_column,
+              type: "Int64",
+              stream: group.name,
+              streamAlias: group.stream_alias,
+              isGroup: false,
+            });
+
+            // add user defined fields
+            for (const field of group.schema) {
+              if (
+                store.state.zoConfig.user_defined_schemas_enabled &&
+                group.settings.hasOwnProperty("defined_schema_fields") &&
+                group.settings.defined_schema_fields.length > 0
+              ) {
+                if (group.settings.defined_schema_fields.includes(field.name)) {
+                  // push as a user defined schema
+                  flattenedFields.push({
+                    ...field,
+                    stream: group.name,
+                    streamAlias: group.stream_alias,
+                    isGroup: false,
+                  });
+                }
+              }
+            }
+
+            // add all_fields_name
+            flattenedFields.push({
+              name: store.state.zoConfig?.all_fields_name,
+              type: "Utf8",
+              stream: group.name,
+              streamAlias: group.stream_alias,
+              isGroup: false,
+            });
+          } else {
+            // use schema of the group
+            // Add the fields in the group, including the group name
+            group.schema.forEach((field: any) => {
+              flattenedFields.push({
+                ...field,
+                stream: group.name,
+                streamAlias: group.stream_alias,
+                isGroup: false,
+              });
+            });
+          }
+        },
+      );
+
+      return flattenedFields;
+    });
+
+    watch(
+      () => ({
+        stream:
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream,
+        streamType:
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream_type,
+        joins:
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].joins,
+      }),
+      () => {
+        updateGroupedFields();
+      },
+      { deep: true },
     );
 
     watch(
@@ -986,47 +1065,25 @@ export default defineComponent({
         dashboardPanelData.meta.stream.streamResultsType = stream_type;
       });
     };
+
     const filterFieldFn = (rows: any, terms: any) => {
-      let filtered = [];
-
-      if (terms != "") {
-        terms = terms.toLowerCase();
-
-        // loop on custom query fields
-        for (
-          let i = 0;
-          i < dashboardPanelData.meta.stream.customQueryFields.length;
-          i++
-        ) {
-          if (
-            dashboardPanelData.meta.stream.customQueryFields[i]["name"]
-              .toLowerCase()
-              .includes(terms)
-          ) {
-            filtered.push(dashboardPanelData.meta.stream.customQueryFields[i]);
-          }
-        }
-
-        // update custom query fields length
-        customQueryFieldsLength.value = filtered.length;
-
-        for (
-          let i = 0;
-          i < selectedStreamFieldsBasedOnUserDefinedSchema.value.length;
-          i++
-        ) {
-          if (
-            selectedStreamFieldsBasedOnUserDefinedSchema.value[i]["name"]
-              .toLowerCase()
-              .includes(terms)
-          ) {
-            filtered.push(
-              selectedStreamFieldsBasedOnUserDefinedSchema.value[i],
-            );
-          }
-        }
+      if (!terms || terms.trim() === "") {
+        return rows;
       }
-      return filtered;
+
+      const searchTerm = terms.toLowerCase();
+
+      const filteredRows = rows.filter((row: any) => {
+        // Always include group headers
+        if (row.isGroup) {
+          return true;
+        }
+
+        // Filter fields based on name
+        return row.name.toLowerCase().includes(searchTerm);
+      });
+
+      return filteredRows;
     };
 
     const mutationHandler: any = (mutationRecords: any) => {};
@@ -1067,123 +1124,95 @@ export default defineComponent({
       });
     };
 
-    async function loadStreamFields(streamName: string) {
-      try {
-        if (streamName != "") {
-          return await getStream(
-            streamName,
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream_type ?? "logs",
-            true,
-          ).then((res) => {
-            return res;
-          });
-        } else {
-        }
-        return;
-      } catch (e: any) {
-        console.log("Error while loading stream fields");
-      }
-    }
+    // async function extractFields() {
+    //   try {
+    //     dashboardPanelData.meta.stream.selectedStreamFields = [];
+    //     const schemaFields: any = [];
+    //     let userDefineSchemaSettings: any = [];
 
-    async function extractFields() {
-      try {
-        dashboardPanelData.meta.stream.selectedStreamFields = [];
-        const schemaFields: any = [];
-        let userDefineSchemaSettings: any = [];
+    //     if (
+    //       dashboardPanelData.meta.stream.streamResults.length > 0 &&
+    //       dashboardPanelData.meta.stream.streamResultsType ===
+    //         dashboardPanelData.data.queries[
+    //           dashboardPanelData.layout.currentQueryIndex
+    //         ].fields.stream_type
+    //     ) {
+    //       for (const stream of dashboardPanelData.meta.stream.streamResults) {
+    //         if (
+    //           dashboardPanelData.data.queries[
+    //             dashboardPanelData.layout.currentQueryIndex
+    //           ].fields.stream == stream.name
+    //         ) {
+    //           // check for schema exist in the object or not
+    //           // if not pull the schema from server.
+    //           if (!stream.hasOwnProperty("schema")) {
+    //             const streamData: any = await loadStreamFields(stream.name);
+    //             const streamSchema: any = streamData.schema;
+    //             if (streamSchema == undefined) {
+    //               return;
+    //             }
+    //             stream.settings = streamData.settings;
+    //             stream.schema = streamSchema;
+    //           }
 
-        if (
-          dashboardPanelData.meta.stream.streamResults.length > 0 &&
-          dashboardPanelData.meta.stream.streamResultsType ===
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream_type
-        ) {
-          for (const stream of dashboardPanelData.meta.stream.streamResults) {
-            if (
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.stream == stream.name
-            ) {
-              // check for schema exist in the object or not
-              // if not pull the schema from server.
-              // Also check if schema is an empty array
-              if (
-                !stream.hasOwnProperty("schema") ||
-                (Array.isArray(stream.schema) && stream.schema.length === 0)
-              ) {
-                const streamData: any = await loadStreamFields(stream.name);
-                const streamSchema: any = streamData.schema;
-                if (
-                  !streamSchema ||
-                  (Array.isArray(streamSchema) && streamSchema.length === 0)
-                ) {
-                  stream.schema = [];
-                  return;
-                }
-                stream.settings = streamData.settings;
-                stream.schema = streamSchema;
-              }
+    //           // create a schema field mapping based on field name to avoid iteration over object.
+    //           // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
+    //           for (const field of stream.schema) {
+    //             if (
+    //               store.state.zoConfig.user_defined_schemas_enabled &&
+    //               stream.settings.hasOwnProperty("defined_schema_fields") &&
+    //               stream.settings.defined_schema_fields.length > 0
+    //             ) {
+    //               if (
+    //                 stream.settings.defined_schema_fields.includes(field.name)
+    //               ) {
+    //                 // push as a user defined schema
+    //                 userDefineSchemaSettings.push(field);
+    //               }
+    //               schemaFields.push(field);
+    //             } else {
+    //               schemaFields.push(field);
+    //             }
+    //           }
 
-              // create a schema field mapping based on field name to avoid iteration over object.
-              // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
-              for (const field of stream.schema) {
-                if (
-                  store.state.zoConfig.user_defined_schemas_enabled &&
-                  stream.settings.hasOwnProperty("defined_schema_fields") &&
-                  stream.settings.defined_schema_fields.length > 0
-                ) {
-                  if (
-                    stream.settings.defined_schema_fields.includes(field.name)
-                  ) {
-                    // push as a user defined schema
-                    userDefineSchemaSettings.push(field);
-                  }
-                  schemaFields.push(field);
-                } else {
-                  schemaFields.push(field);
-                }
-              }
+    //           dashboardPanelData.meta.stream.selectedStreamFields =
+    //             schemaFields ?? [];
 
-              dashboardPanelData.meta.stream.selectedStreamFields =
-                schemaFields ?? [];
+    //           if (
+    //             stream.settings.hasOwnProperty("defined_schema_fields") &&
+    //             stream.settings.defined_schema_fields.length > 0
+    //           ) {
+    //             dashboardPanelData.meta.stream.hasUserDefinedSchemas = true;
+    //             // set user defined schema
+    //             // 1) Timestamp field
+    //             // 2) selected user defined schema fields
+    //             // 3) all_fields_name fields
+    //             dashboardPanelData.meta.stream.userDefinedSchema = [
+    //               {
+    //                 name: store.state.zoConfig?.timestamp_column,
+    //                 type: "Int64",
+    //               },
+    //               ...(userDefineSchemaSettings ?? []),
+    //               {
+    //                 name: store.state.zoConfig?.all_fields_name,
+    //                 type: "Utf8",
+    //               },
+    //             ];
+    //           } else {
+    //             dashboardPanelData.meta.stream.hasUserDefinedSchemas = false;
+    //             dashboardPanelData.meta.stream.userDefinedSchema = [];
+    //           }
+    //         }
+    //       }
+    //     }
+    //   } catch (e: any) {
+    //     console.log("Error while extracting fields");
+    //   }
+    // }
 
-              if (
-                stream.settings.hasOwnProperty("defined_schema_fields") &&
-                stream.settings.defined_schema_fields.length > 0
-              ) {
-                dashboardPanelData.meta.stream.hasUserDefinedSchemas = true;
-                // set user defined schema
-                // 1) Timestamp field
-                // 2) selected user defined schema fields
-                // 3) all_fields_name fields
-                dashboardPanelData.meta.stream.userDefinedSchema = [
-                  {
-                    name: store.state.zoConfig?.timestamp_column,
-                    type: "Int64",
-                  },
-                  ...(userDefineSchemaSettings ?? []),
-                  {
-                    name: store.state.zoConfig?.all_fields_name,
-                    type: "Utf8",
-                  },
-                ];
-              } else {
-                dashboardPanelData.meta.stream.hasUserDefinedSchemas = false;
-                dashboardPanelData.meta.stream.userDefinedSchema = [];
-              }
-            }
-          }
-        }
-      } catch (e: any) {
-        console.log("Error while extracting fields");
-      }
-    }
-
-    const toggleSchema = async () => {
-      await extractFields();
-    };
+    // const toggleSchema = async () => {
+    //   await extractFields();
+    // };
 
     return {
       dashboardPanelDataPageKey,
@@ -1226,10 +1255,11 @@ export default defineComponent({
       selectedMetricTypeIcon,
       onDragEnd,
       customQueryFieldsLength,
-      toggleSchema,
+      // toggleSchema,
       userDefinedSchemaBtnGroupOption,
       pagination,
-      hideAllFieldsSelection,
+      // groupedFields,
+      flattenGroupedFields,
       pagesNumber: computed(() => {
         return Math.ceil(
           dashboardPanelData.meta.stream.selectedStreamFields.length /

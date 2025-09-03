@@ -1,6 +1,6 @@
 import { date } from "quasar";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
-import { getColorPalette } from "./colorPalette";
+import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 
 const units: any = {
   bytes: [
@@ -238,87 +238,6 @@ export const getUnitValue = (
 };
 
 /**
- * Applies user-configured series-to-color mappings to the given series list and
- * ensures auto-generated colors do not conflict with configured colors.
- *
- * - Enforces configured colors for mapped series names
- * - Tracks colors already in use (configured + existing on series)
- * - Reassigns auto-generated colors that collide with configured ones to the
- *   next available color from the theme palette; if exhausted, uses an HSL fallback
- *
- * This function mutates the provided `series` array in place.
- */
-export const applySeriesColorMappings = (
-  series: any[],
-  colorBySeries:
-    | Array<{ value: string; color: string | null }>
-    | undefined
-    | null,
-  theme: string,
-): void => {
-  if (!Array.isArray(series) || !colorBySeries?.length) return;
-
-  const configuredSeriesToColor = new Map<string, string>();
-  const configuredColors = new Set<string>();
-  for (const mapping of colorBySeries) {
-    if (mapping?.value && mapping?.color) {
-      configuredSeriesToColor.set(String(mapping.value), String(mapping.color));
-      configuredColors.add(String(mapping.color));
-    }
-  }
-
-  if (configuredSeriesToColor.size === 0) return;
-
-  const usedColors = new Set<string>(configuredColors);
-
-  const getSeriesColor = (s: any): string | undefined =>
-    s?.color ?? s?.itemStyle?.color;
-  const setSeriesColor = (s: any, clr: string) => {
-    if (!s) return;
-    if (s.color !== undefined) s.color = clr;
-    if (s.itemStyle?.color !== undefined) s.itemStyle.color = clr;
-  };
-
-  // Enforce configured colors and collect currently used colors
-  series.forEach((s: any) => {
-    const mapped = configuredSeriesToColor.get(s?.name);
-    if (mapped) {
-      setSeriesColor(s, mapped);
-      usedColors.add(mapped);
-    } else {
-      const current = getSeriesColor(s);
-      if (current) usedColors.add(current);
-    }
-  });
-
-  // Generate a unique non-conflicting color
-  const generateUniqueColor = (
-    used: Set<string>,
-    themeName: string,
-  ): string => {
-    const palette = getColorPalette(themeName);
-    for (const c of palette) {
-      if (!used.has(c)) return c;
-    }
-    const hue = (used.size * 137.508) % 360;
-    const saturation = 70 + (used.size % 20);
-    const lightness = 45 + (used.size % 20);
-    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-  };
-
-  // Reassign auto-generated colors that collide with configured colors
-  series.forEach((s: any) => {
-    if (configuredSeriesToColor.has(s?.name)) return;
-    const current = getSeriesColor(s);
-    if (current && configuredColors.has(current)) {
-      const next = generateUniqueColor(usedColors, theme);
-      usedColors.add(next);
-      setSeriesColor(s, next);
-    }
-  });
-};
-
-/**
  * Formats a unit value.
  *
  * @param {any} obj - The object containing the value and unit.
@@ -358,35 +277,12 @@ export const isTimeSeries = (sample: any) => {
   });
 };
 
-// Check if the sample is timestamp (16 digit microseconds)
-/**
- * Checks if the sample is timestamp (16 digit microseconds) based on treatAsNonTimestamp object.
- * treatAsNonTimestamp: { value: true | false | null | undefined | "auto" }
- * - If treatAsNonTimestamp.value === true (not timestamp field): Return false
- * - If treatAsNonTimestamp.value === false (timestamp field): Check if all values are 16 digits, return true if they are
- * - If treatAsNonTimestamp.value === null or undefined (auto mode): Check if all values are 16 digits, return true if they are
- * - Otherwise: Return false
- */
-export const isTimeStamp = (sample: any, treatAsNonTimestamp: any) => {
+//Check if the sample is timestamp
+export const isTimeStamp = (sample: any) => {
   const microsecondsPattern = /^\d{16}$/;
-
-  // If treatAsNonTimestamp is true (not timestamp field), return false
-  if (treatAsNonTimestamp === true) {
-    return false;
-  }
-
-  // If treatAsNonTimestamp is false (timestamp field), check if all values are 16 digit numbers
-  if (treatAsNonTimestamp === false) {
-    return sample.every((value: any) =>
-      microsecondsPattern.test(value?.toString()),
-    );
-  }
-  // If treatAsNonTimestamp is null or undefined, check if all values are 16 digits
-  if (treatAsNonTimestamp === null || treatAsNonTimestamp === undefined) {
-    return sample.every((value: any) =>
-      microsecondsPattern.test(value?.toString()),
-    );
-  }
+  return sample.every((value: any) =>
+    microsecondsPattern.test(value?.toString()),
+  );
 };
 
 export function convertOffsetToSeconds(
@@ -558,31 +454,31 @@ export const calculateOptimalFontSize = (text: string, canvasWidth: number) => {
  */
 function validateConditions(conditions: any, errors: any) {
   conditions.forEach((it: any) => {
-    if (it?.filterType === "condition") {
+    if (it.filterType === "condition") {
       // If the condition is a list, check if at least 1 item is selected
-      if (it?.type == "list" && !it?.values?.length) {
+      if (it.type == "list" && !it.values?.length) {
         errors.push(
           `Filter: ${it.column}: Select at least 1 item from the list`,
         );
       }
 
-      if (it?.type == "condition") {
+      if (it.type == "condition") {
         // Check if condition operator is selected
-        if (it?.operator == null) {
-          errors.push(`Filter: ${it?.column}: Operator selection required`);
+        if (it.operator == null) {
+          errors.push(`Filter: ${it.column}: Operator selection required`);
         }
 
         // Check if condition value is required based on the operator
         if (
-          !["Is Null", "Is Not Null"].includes(it?.operator) &&
-          (it?.value == null || it?.value == "")
+          !["Is Null", "Is Not Null"].includes(it.operator) &&
+          (it.value == null || it.value == "")
         ) {
-          errors.push(`Filter: ${it?.column}: Condition value required`);
+          errors.push(`Filter: ${it.column}: Condition value required`);
         }
       }
-    } else if (it?.filterType === "group") {
+    } else if (it.filterType === "group") {
       // Recursively validate the conditions in the group
-      validateConditions(it?.conditions ?? [], errors);
+      validateConditions(it.conditions, errors);
     }
   });
 }
@@ -602,61 +498,40 @@ const validateChartFieldsConfiguration = (
   errors: string[],
   xAxisLabel: string = "X-Axis",
   yAxisLabel: string = "Y-Axis",
-  pageKey: string = "dashboard",
 ) => {
+  if (!chartType || !fields) {
+    return;
+  }
+
   switch (chartType) {
     case "donut":
     case "pie": {
       if (fields?.y?.length > 1 || fields?.y?.length === 0) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : "Add one value field for donut and pie charts";
-        errors.push(errorMsg);
+        errors.push("Add one value field for donut and pie charts");
       }
 
       if (fields?.x?.length > 1 || fields?.x?.length === 0) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract label field from the query."
-            : "Add one label field for donut and pie charts";
-        errors.push(errorMsg);
+        errors.push("Add one label field for donut and pie charts");
       }
       break;
     }
     case "metric": {
       if (fields?.y?.length > 1 || fields?.y?.length === 0) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : "Add one value field for metric charts";
-        errors.push(errorMsg);
+        errors.push("Add one value field for metric charts");
       }
 
       if (fields?.x?.length) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Grouping field is not allowed for Metric chart"
-            : `${xAxisLabel} field is not allowed for Metric chart`;
-        errors.push(errorMsg);
+        errors.push(`${xAxisLabel} field is not allowed for Metric chart`);
       }
       break;
     }
     case "gauge": {
       if (fields?.y?.length !== 1) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : "Add one value field for gauge chart";
-        errors.push(errorMsg);
+        errors.push("Add one value field for gauge chart");
       }
       // gauge can have zero or one label
       if (fields?.x?.length !== 1 && fields?.x?.length !== 0) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract grouping field from the query."
-            : "Add one label field for gauge chart";
-        errors.push(errorMsg);
+        errors.push("Add one label field for gauge chart");
       }
       break;
     }
@@ -666,148 +541,86 @@ const validateChartFieldsConfiguration = (
     case "scatter":
     case "bar": {
       if (fields?.y?.length < 1) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : `Add at least one field for the ${yAxisLabel}`;
-        errors.push(errorMsg);
+        errors.push(`Add at least one field for the ${yAxisLabel}`);
       }
 
       if (fields?.x?.length > 1 || fields?.x?.length === 0) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract grouping field from the query."
-            : `Add one fields for the ${xAxisLabel}`;
-        errors.push(errorMsg);
+        errors.push(`Add one fields for the ${xAxisLabel}`);
       }
       break;
     }
     case "table": {
       if (fields?.y?.length === 0 && fields?.x?.length === 0) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract fields from the query."
-            : `Add at least one field on ${xAxisLabel} or ${yAxisLabel}`;
-        errors.push(errorMsg);
+        errors.push(`Add at least one field on ${xAxisLabel} or ${yAxisLabel}`);
       }
       break;
     }
     case "heatmap": {
       if (fields?.y?.length === 0) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract grouping field from the query."
-            : `Add at least one field for the ${yAxisLabel}`;
-        errors.push(errorMsg);
+        errors.push(`Add at least one field for the ${yAxisLabel}`);
       }
 
       if (fields?.x?.length === 0) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract second level grouping field from the query."
-            : `Add one field for the ${xAxisLabel}`;
-        errors.push(errorMsg);
+        errors.push(`Add one field for the ${xAxisLabel}`);
       }
 
       if (fields?.z?.length === 0) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : "Add one field for the Z-Axis";
-        errors.push(errorMsg);
+        errors.push("Add one field for the Z-Axis");
       }
       break;
     }
     case "stacked":
     case "h-stacked": {
       if (fields?.y?.length === 0) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : `Add at least one field for the ${yAxisLabel}`;
-        errors.push(errorMsg);
+        errors.push(`Add at least one field for the ${yAxisLabel}`);
       }
       if (fields?.x?.length !== 1 || fields?.breakdown?.length !== 1) {
-        const breakdownErrMsg =
-          pageKey === "logs"
-            ? "Unable to extract grouping field from the query."
-            : `Add exactly one field on the ${xAxisLabel} and breakdown for stacked and h-stacked charts`;
-        errors.push(breakdownErrMsg);
+        errors.push(
+          `Add exactly one field on the ${xAxisLabel} and breakdown for stacked and h-stacked charts`,
+        );
       }
       break;
     }
     case "area-stacked": {
       if (fields?.y?.length > 1 || fields?.y?.length === 0) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : `Add exactly one field on ${yAxisLabel} for area-stacked charts`;
-        errors.push(errorMsg);
+        errors.push(
+          `Add exactly one field on ${yAxisLabel} for area-stacked charts`,
+        );
       }
       if (fields?.x?.length !== 1 || fields?.breakdown?.length !== 1) {
-        const breakdownErrMsg =
-          pageKey === "logs"
-            ? "Unable to extract grouping field from the query."
-            : `Add exactly one field on the ${xAxisLabel} and breakdown for area-stacked charts`;
-        errors.push(breakdownErrMsg);
+        errors.push(
+          `Add exactly one field on the ${xAxisLabel} and breakdown for area-stacked charts`,
+        );
       }
       break;
     }
     case "geomap": {
       if (fields?.latitude == null) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract latitude field from the query."
-            : "Add one field for the latitude";
-        errors.push(errorMsg);
+        errors.push("Add one field for the latitude");
       }
       if (fields?.longitude == null) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract longitude field from the query."
-            : "Add one field for the longitude";
-        errors.push(errorMsg);
+        errors.push("Add one field for the longitude");
       }
       break;
     }
     case "sankey": {
       if (fields?.source == null) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract source field from the query."
-            : "Add one field for the source";
-        errors.push(errorMsg);
+        errors.push("Add one field for the source");
       }
       if (fields?.target == null) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract target field from the query."
-            : "Add one field for the target";
-        errors.push(errorMsg);
+        errors.push("Add one field for the target");
       }
       if (fields?.value == null) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : "Add one field for the value";
-        errors.push(errorMsg);
+        errors.push("Add one field for the value");
       }
       break;
     }
     case "maps": {
       if (fields?.name == null) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract name field from the query."
-            : "Add one field for the name";
-        errors.push(errorMsg);
+        errors.push("Add one field for the name");
       }
       if (fields?.value_for_maps == null) {
-        const errorMsg =
-          pageKey === "logs"
-            ? "Unable to extract value field from the query."
-            : "Add one field for the value";
-        errors.push(errorMsg);
+        errors.push("Add one field for the value");
       }
       break;
     }
@@ -815,12 +628,600 @@ const validateChartFieldsConfiguration = (
       break;
   }
 
-  // Check filter conditions validity
-  if (fields?.filter?.conditions?.length) {
-    // Validate the conditions
-    validateConditions(fields?.filter?.conditions ?? [], errors);
+  // need to validate all the fields based on the selected aggregation function
+  // get all the fields that are not derived and type is build
+  const aggregationFunctionError = [
+    ...(fields?.y ?? []),
+    ...(fields?.x ?? []),
+    ...(fields?.breakdown ?? []),
+    ...(fields?.z ?? []),
+    fields?.source ?? null,
+    fields?.target ?? null,
+    fields?.value ?? null,
+    fields?.name ?? null,
+    fields?.value_for_maps ?? null,
+    fields?.latitude ?? null,
+    fields?.longitude ?? null,
+  ]?.filter((it: any) => it && !it?.isDerived && it?.type == "build");
+
+  if (aggregationFunctionError?.length) {
+    //  loop on each fields config
+    // compare with function validation schema
+    // if validation fails, push error
+    aggregationFunctionError?.forEach((it: any) => {
+      // get the selected function schema
+      const selectedFunction: any = functionValidation?.find(
+        (fn: any) => fn?.functionName === (it?.functionName ?? null),
+      );
+
+      // if function is not found, push error
+      if (!selectedFunction) {
+        errors.push(`${it.alias || "Field"}: Invalid aggregation function`);
+        return; // Skip further validation if function is invalid
+      }
+
+      //  check if args are valid based on selected function schema
+      const args = it.args;
+      const argsDefinition = selectedFunction.args;
+
+      // NOTE: Need to consider the case where there can be optional arguments or there can be N number of arguments
+      // WARNING: This needs to be test properly
+      // Proper validation of arguments
+      const allowAddArgAtValue = selectedFunction.allowAddArgAt;
+      const hasVariableArgs = !!allowAddArgAtValue;
+
+      // Parse the allowAddArgAt value to determine variable argument position
+      let variableArgPosition = -1;
+      if (hasVariableArgs) {
+        if (allowAddArgAtValue === "n") {
+          variableArgPosition = 0; // All arguments can be variable
+        } else if (allowAddArgAtValue.startsWith("n-")) {
+          // Format is "n-1", "n-2", etc.
+          const offset = parseInt(allowAddArgAtValue.substring(2));
+          variableArgPosition = argsDefinition.length - offset;
+        }
+      }
+
+      // Special handling for functions with min requirements
+      // Find the argDefinition that has the min property
+      const minArgDef = argsDefinition.find((def: any) => "min" in def);
+      const minPosition = minArgDef ? argsDefinition.indexOf(minArgDef) : -1;
+
+      // If min is specified and position is valid, check the requirement
+      if (minArgDef && minPosition !== -1) {
+        // For variable args, we count all arguments from the variable position
+        const relevantArgsCount =
+          hasVariableArgs && variableArgPosition <= minPosition
+            ? args.length - variableArgPosition + 1 // +1 because we count the variable position itself
+            : args.length;
+
+        if (relevantArgsCount < minArgDef.min) {
+          errors.push(
+            `${it.alias || "Field"}: Requires at least ${minArgDef.min} arguments`,
+          );
+        }
+      }
+
+      // Validate all provided arguments have correct types
+      args.forEach((arg: any, index: number) => {
+        if (!arg) return; // Skip undefined args
+
+        // Determine which arg definition to use for validation
+        let argDefIndex = index;
+
+        // For variable arguments
+        if (hasVariableArgs && index >= variableArgPosition) {
+          // Use the definition at the variable position
+          argDefIndex = variableArgPosition;
+        }
+
+        // Handle out-of-bounds index for non-variable args or unknown formats
+        if (argDefIndex >= argsDefinition.length) {
+          if (!hasVariableArgs) {
+            errors.push(`${it.alias || "Field"}: Too many arguments provided`);
+            return;
+          }
+          // Default to the variable argument definition
+          argDefIndex = variableArgPosition;
+        }
+
+        const allowedTypes = argsDefinition[argDefIndex].type.map(
+          (t: any) => t.value,
+        );
+
+        // Check if current argument type is among the allowed types
+        if (arg && !allowedTypes.includes(arg.type)) {
+          errors.push(
+            `${it.alias || "Field"}: Argument ${index + 1} has invalid type (expected: ${allowedTypes.join(" or ")})`,
+          );
+          return;
+        }
+
+        // TODO: Need to handle all other types of arguments
+        // Additional validation for field type arguments
+        if (arg.type === "field") {
+          // Validate field value structure
+          if (
+            !arg.value ||
+            typeof arg.value !== "object" ||
+            !("field" in arg.value)
+          ) {
+            errors.push(
+              `${it.alias || "Field"}: Argument ${index + 1} is a field but haven't selected any field`,
+            );
+          }
+        }
+      });
+
+      // Check for missing required arguments
+      argsDefinition.forEach((argDef: any, index: number) => {
+        // Skip checking variable arg positions except the first instance
+        if (hasVariableArgs && index > variableArgPosition) return;
+
+        if (argDef.required && (index >= args.length || !args[index])) {
+          errors.push(
+            `${it.alias || "Field"}: Missing required argument at position ${index + 1}`,
+          );
+        }
+      });
+    });
   }
 };
+
+// export const validateSQLPanelFields = (
+//   panelData: any,
+//   queryIndex: number,
+//   currentXLabel: any,
+//   currentYLabel: any,
+//   errors: string[],
+//   isFieldsValidationRequired: boolean = true,
+// ) => {
+//   // check if fields validation is required
+//   if (isFieldsValidationRequired === false) {
+//     return;
+//   }
+
+//   switch (panelData?.type) {
+//     case "donut":
+//     case "pie": {
+//       if (
+//         panelData?.queries[queryIndex].fields.y.length > 1 ||
+//         panelData?.queries[queryIndex].fields.y.length == 0
+//       ) {
+//         errors.push("Add one value field for donut and pie charts");
+//       }
+
+//       if (
+//         panelData?.queries[queryIndex].fields.x.length > 1 ||
+//         panelData?.queries[queryIndex].fields.x.length == 0
+//       ) {
+//         errors.push("Add one label field for donut and pie charts");
+//       }
+
+//       break;
+//     }
+//     case "metric": {
+//       if (
+//         panelData.queries[queryIndex].fields.y.length > 1 ||
+//         panelData.queries[queryIndex].fields.y.length == 0
+//       ) {
+//         errors.push("Add one value field for metric charts");
+//       }
+
+//       if (panelData.queries[queryIndex].fields.x.length) {
+//         errors.push(`${currentXLabel} field is not allowed for Metric chart`);
+//       }
+
+//       break;
+//     }
+//     case "gauge": {
+//       if (panelData.queries[queryIndex].fields.y.length != 1) {
+//         errors.push("Add one value field for gauge chart");
+//       }
+//       // gauge can have zero or one label
+//       if (
+//         panelData.queries[queryIndex].fields.x.length != 1 &&
+//         panelData.queries[queryIndex].fields.x.length != 0
+//       ) {
+//         errors.push(`Add one label field for gauge chart`);
+//       }
+
+//       break;
+//     }
+//     case "h-bar":
+//     case "area":
+//     case "line":
+//     case "scatter":
+//     case "bar": {
+//       if (panelData.queries[queryIndex].fields.y.length < 1) {
+//         errors.push("Add at least one field for the Y-Axis");
+//       }
+
+//       if (
+//         panelData.queries[queryIndex].fields.x.length > 1 ||
+//         panelData.queries[queryIndex].fields.x.length == 0
+//       ) {
+//         errors.push(`Add one fields for the X-Axis`);
+//       }
+
+//       break;
+//     }
+//     case "table": {
+//       if (
+//         panelData.queries[queryIndex].fields.y.length == 0 &&
+//         panelData.queries[queryIndex].fields.x.length == 0
+//       ) {
+//         errors.push("Add at least one field on X-Axis or Y-Axis");
+//       }
+
+//       break;
+//     }
+//     case "heatmap": {
+//       if (panelData.queries[queryIndex].fields.y.length == 0) {
+//         errors.push("Add at least one field for the Y-Axis");
+//       }
+
+//       if (panelData.queries[queryIndex].fields.x.length == 0) {
+//         errors.push(`Add one field for the X-Axis`);
+//       }
+
+//       if (panelData.queries[queryIndex].fields.z.length == 0) {
+//         errors.push(`Add one field for the Z-Axis`);
+//       }
+
+//       break;
+//     }
+//     case "stacked":
+//     case "h-stacked": {
+//       if (panelData.queries[queryIndex].fields.y.length == 0) {
+//         errors.push("Add at least one field for the Y-Axis");
+//       }
+//       if (
+//         panelData.queries[queryIndex].fields.x.length != 1 ||
+//         panelData.queries[queryIndex].fields.breakdown.length != 1
+//       ) {
+//         errors.push(
+//           `Add exactly one fields on the X-Axis and breakdown for stacked and h-stacked charts`,
+//         );
+//       }
+
+//       break;
+//     }
+//     case "area-stacked": {
+//       if (
+//         panelData.queries[queryIndex].fields.y.length > 1 ||
+//         panelData.queries[queryIndex].fields.y.length == 0
+//       ) {
+//         errors.push("Add exactly one field on Y-Axis for area-stacked charts");
+//       }
+//       if (
+//         panelData.queries[queryIndex].fields.x.length != 1 ||
+//         panelData.queries[queryIndex].fields.breakdown.length != 1
+//       ) {
+//         errors.push(
+//           `Add exactly one fields on the X-Axis and breakdown for stacked, area-stacked and h-stacked charts`,
+//         );
+//       }
+
+//       break;
+//     }
+//     case "geomap": {
+//       if (panelData.queries[queryIndex].fields.latitude == null) {
+//         errors.push("Add one field for the latitude");
+//       }
+//       if (panelData.queries[queryIndex].fields.longitude == null) {
+//         errors.push("Add one field for the longitude");
+//       }
+//       break;
+//     }
+
+//     case "sankey": {
+//       if (panelData.queries[queryIndex].fields.source == null) {
+//         errors.push("Add one field for the source");
+//       }
+//       if (panelData.queries[queryIndex].fields.target == null) {
+//         errors.push("Add one field for the target");
+//       }
+//       if (panelData.queries[queryIndex].fields.value == null) {
+//         errors.push("Add one field for the value");
+//       }
+//       break;
+//     }
+//     case "maps": {
+//       if (panelData.queries[queryIndex].fields.name == null) {
+//         errors.push("Add one field for the name");
+//       }
+//       if (panelData.queries[queryIndex].fields.value_for_maps == null) {
+//         errors.push("Add one field for the value");
+//       }
+//       break;
+//     }
+//     default:
+//       break;
+//   }
+
+//   // check if aggregation function is selected or not
+//   if (panelData?.type && !(panelData?.type == "heatmap")) {
+//     const aggregationFunctionError = panelData.queries[
+//       queryIndex
+//     ].fields.y.filter(
+//       (it: any) =>
+//         !it.isDerived &&
+//         it.type == "build" &&
+//         (it.functionName == null || it.functionName == ""),
+//     );
+//     if (
+//       panelData.queries[queryIndex].fields.y.length &&
+//       aggregationFunctionError.length
+//     ) {
+//       errors.push(
+//         ...aggregationFunctionError.map(
+//           (it: any) =>
+//             `${currentYLabel}: ${it.column}: Aggregation function required`,
+//         ),
+//       );
+//     }
+//   }
+
+//   // check if labels are there for y axis items
+//   const labelError = panelData?.queries?.[queryIndex]?.fields?.y?.filter(
+//     (it: any) => it?.label == null || it?.label == "",
+//   );
+//   if (
+//     panelData?.queries?.[queryIndex]?.fields?.y?.length &&
+//     labelError?.length
+//   ) {
+//     errors.push(
+//       ...labelError.map(
+//         (it: any) => `${currentYLabel}: ${it.column}: Label required`,
+//       ),
+//     );
+//   }
+
+//   if (panelData?.queries?.[queryIndex]?.fields?.filter?.conditions?.length) {
+//     // Validate the top-level conditions
+//     validateConditions(
+//       panelData?.queries?.[queryIndex]?.fields?.filter?.conditions,
+//       errors,
+//     );
+//   }
+// };
+
+export function buildSQLQueryFromInput(
+  fields: any,
+  defaultStream: any,
+): string {
+  // Handle undefined or null fields
+  if (!fields) {
+    return "";
+  }
+
+  // if fields type is raw, return rawQuery
+  if (fields.type === "raw") {
+    return `${fields?.rawQuery ?? ""}`;
+  }
+
+  // Extract functionName and args from the input with fallbacks
+  const functionName = fields.functionName;
+  const args = Array.isArray(fields.args) ? fields.args : [];
+
+  // Find the function definition based on the functionName
+  const selectedFunction = functionValidation.find(
+    (fn: any) => fn.functionName === (functionName ?? null),
+  );
+
+  // If the function is not found, return empty string instead of throwing
+  if (!selectedFunction) {
+    return "";
+  }
+
+  // Validate the provided args against the function's argument definitions
+  const argsDefinition = selectedFunction.args;
+
+  if (!argsDefinition || argsDefinition.length === 0) {
+    return `${functionName}()`; // If no args are required, return the function call
+  }
+
+  const sqlArgs = [];
+  for (let i = 0; i < args.length; i++) {
+    // Skip if arg is undefined or null
+    if (!args[i]) {
+      continue;
+    }
+
+    const argValue = args[i]?.value;
+    const argType = args[i]?.type;
+
+    if (argValue === undefined || argValue === null) {
+      continue;
+    }
+
+    // Add the argument to the SQL query
+    if (argType === "field") {
+      // Handle case where field object might be incomplete
+      if (!argValue.field) {
+        continue;
+      }
+      // If the argument type is "field", do not wrap with quotes
+      sqlArgs.push(
+        argValue.streamAlias
+          ? argValue.streamAlias + "." + argValue.field
+          : defaultStream
+            ? defaultStream + "." + argValue.field
+            : argValue.field,
+      );
+    } else if (argType === "string" || argType === "histogramInterval") {
+      // Wrap strings in quotes if they are not already wrapped
+      if (
+        typeof argValue === "string" &&
+        !argValue.startsWith("'") &&
+        !argValue.endsWith("'")
+      ) {
+        sqlArgs.push(`'${argValue}'`);
+      } else {
+        sqlArgs.push(argValue);
+      }
+    } else if (argType === "number") {
+      // Add numbers as-is
+      sqlArgs.push(argValue);
+    } else if (argType === "function") {
+      // Recursively build the SQL query for the nested function
+      try {
+        const nestedFunctionQuery = buildSQLQueryFromInput(
+          argValue,
+          defaultStream,
+        );
+        if (nestedFunctionQuery) {
+          sqlArgs.push(nestedFunctionQuery);
+        }
+      } catch (error) {
+        // If nested function fails, just skip this argument
+        continue;
+      }
+    } else {
+      // Skip unsupported argument types instead of throwing
+      continue;
+    }
+  }
+
+  // If no valid arguments were found, return minimal query
+  if (sqlArgs.length === 0 && argsDefinition.length > 0) {
+    return "";
+  }
+
+  // Special handling for specific functions
+  switch (functionName) {
+    case "count-distinct":
+      return `count(distinct(${sqlArgs.join(", ")}))`;
+    case "p50":
+      return `approx_percentile_cont(${sqlArgs.join(", ")}, 0.5)`;
+    case "p90":
+      return `approx_percentile_cont(${sqlArgs.join(", ")}, 0.9)`;
+    case "p95":
+      return `approx_percentile_cont(${sqlArgs.join(", ")}, 0.95)`;
+    case "p99":
+      return `approx_percentile_cont(${sqlArgs.join(", ")}, 0.99)`;
+  }
+
+  // Construct the SQL query string
+  // if the function is not null, return the function call statement
+  // else return the first argument(if function is null, always only one argument will be there)
+  return functionName
+    ? `${functionName}(${sqlArgs.join(", ")})`
+    : sqlArgs.length > 0
+      ? `${sqlArgs[0]}`
+      : "";
+}
+
+export function buildSQLJoinsFromInput(
+  joins: any[],
+  defaultStream: any,
+): string {
+  if (!joins || joins.length === 0) {
+    return ""; // No joins, return empty string
+  }
+
+  let joinClauses: string[] = [];
+
+  for (const join of joins) {
+    const { stream, streamAlias, joinType, conditions } = join;
+
+    if (!stream || !joinType || !conditions || conditions.length === 0) {
+      // Invalid join, skip it and continue to the next one
+      continue;
+    }
+
+    let joinConditionStrings: string[] = [];
+
+    for (const condition of conditions) {
+      const { leftField, rightField, operation, logicalOperator } = condition;
+
+      if (!leftField?.field || !rightField?.field || !operation) {
+        // Invalid condition, skip it and continue to the next one
+        continue;
+      }
+
+      const leftFieldStr = leftField.streamAlias
+        ? `${leftField.streamAlias}.${leftField.field}`
+        : defaultStream
+          ? `${defaultStream}.${leftField.field}`
+          : leftField.field;
+
+      const rightFieldStr = rightField.streamAlias
+        ? `${rightField.streamAlias}.${rightField.field}`
+        : defaultStream
+          ? `${defaultStream}.${rightField.field}`
+          : rightField.field;
+
+      joinConditionStrings.push(
+        `${leftFieldStr} ${operation} ${rightFieldStr}`,
+      );
+    }
+
+    // Skip joins with no valid conditions
+    if (joinConditionStrings.length === 0) {
+      continue;
+    }
+
+    // Combine conditions with logical operators (e.g., AND, OR)
+    const joinConditionsSQL = joinConditionStrings.join(" AND ");
+
+    // Construct the JOIN SQL statement
+    joinClauses.push(
+      `${joinType.toUpperCase()} JOIN "${stream}" AS ${streamAlias ?? defaultStream} ON ${joinConditionsSQL}`,
+    );
+  }
+
+  // Only return empty string if there are no valid joins after processing
+  if (joinClauses.length === 0) {
+    return "";
+  }
+
+  return joinClauses.join(" ");
+}
+
+export function addMissingArgs(fields: any): any {
+  const { functionName, args } = fields;
+
+  // Find the function definition in functionValidation
+  const functionDef = functionValidation.find(
+    (fn: any) => fn.functionName === (functionName ?? null),
+  );
+
+  if (!functionDef) {
+    return fields;
+  }
+
+  const updatedArgs = [...args]; // Clone the existing args array
+
+  // Iterate through the function definition's arguments
+  functionDef.args.forEach((argDef: any, index: number) => {
+    const isArgProvided = updatedArgs?.[index]?.type
+      ? argDef.type.map((t: any) => t.value).includes(updatedArgs[index]?.type)
+      : false;
+
+    if (!isArgProvided) {
+      // If the argument is missing, add it
+      const argType = argDef.type[0].value; // Always take the first type
+      const defaultValue =
+        argDef.defaultValue !== undefined
+          ? argDef.defaultValue
+          : argType === "field"
+            ? {}
+            : "";
+
+      updatedArgs.push({
+        type: argType,
+        value: defaultValue,
+      });
+    }
+  });
+
+  return {
+    ...fields,
+    args: updatedArgs,
+  };
+}
 
 /**
  * Validates the fields configuration for SQL panels
@@ -838,7 +1239,6 @@ export const validateSQLPanelFields = (
   currentYLabel: string,
   errors: string[],
   isFieldsValidationRequired: boolean = true,
-  pageKey?: string,
 ) => {
   if (isFieldsValidationRequired) {
     // Validate fields configuration based on chart type
@@ -848,7 +1248,6 @@ export const validateSQLPanelFields = (
       errors,
       currentXLabel,
       currentYLabel,
-      pageKey,
     );
   }
 };
@@ -927,6 +1326,58 @@ const validatePanelContentByType = (panel: any, errors: string[]) => {
   }
 };
 
+const validateJoinField = (join: any, errors: string[], joinIndex: number) => {
+  // validate stream
+  if (!join?.stream) {
+    errors.push(`Join #${joinIndex + 1}: Stream is required`);
+  }
+
+  // validate join type
+  if (!join?.joinType) {
+    errors.push(`Join #${joinIndex + 1}: Join type is required`);
+  }
+
+  // validate conditions
+  // at least one condition is required
+  // and each condition should have leftField, rightField, operation
+  if (!join?.conditions || join?.conditions?.length === 0) {
+    errors.push(`Join #${joinIndex + 1}: Conditions are required`);
+  }
+
+  // validate each condition
+  join?.conditions?.forEach((condition: any, conditionIndex: number) => {
+    // validate leftField
+    if (!condition?.leftField?.field) {
+      errors.push(
+        `Join #${joinIndex + 1}: Condition #${conditionIndex + 1}: Left field is required`,
+      );
+    }
+
+    // validate rightField
+    if (!condition?.rightField?.field) {
+      errors.push(
+        `Join #${joinIndex + 1}: Condition #${conditionIndex + 1}: Right field is required`,
+      );
+    }
+
+    // validate operation
+    if (!condition?.operation) {
+      errors.push(
+        `Join #${joinIndex + 1}: Condition #${conditionIndex + 1}: Operation is required`,
+      );
+    }
+  });
+};
+
+const validateJoinFields = (joins: any, errors: string[]) => {
+  // validate join fields
+  if (joins) {
+    joins.forEach((join: any, index: number) =>
+      validateJoinField(join, errors, index),
+    );
+  }
+};
+
 /**
  * Validates panel fields without validating stream field existence
  *
@@ -948,6 +1399,17 @@ const validatePanelFields = (panel: any, errors: string[] = []) => {
       panel?.queries?.[currentQueryIndex]?.fields ?? {},
       errors,
     );
+
+    // Check filter conditions validity
+    if (
+      panel?.queries?.[currentQueryIndex]?.fields?.filter?.conditions?.length
+    ) {
+      // Validate the conditions
+      validateConditions(
+        panel?.queries?.[currentQueryIndex]?.fields?.filter?.conditions ?? [],
+        errors,
+      );
+    }
   }
 
   return errors;
@@ -1032,7 +1494,6 @@ export const validatePanel = (
   errors: string[] = [],
   isFieldsValidationRequired: boolean = true,
   allStreamFields: any[] = [],
-  pageKey: string = "dashboard",
 ) => {
   // Get current query index
   const currentQueryIndex = panelData?.layout?.currentQueryIndex || 0;
@@ -1107,7 +1568,12 @@ export const validatePanel = (
       currentYLabel,
       errors,
       isFieldsValidationRequired,
-      pageKey,
+    );
+
+    // validate join fields
+    validateJoinFields(
+      panelData?.data?.queries?.[currentQueryIndex]?.joins,
+      errors,
     );
 
     // Validate fields against streams if field validation is required
@@ -1153,12 +1619,12 @@ const validateCustomQueryFields = (
   );
 
   if (customQueryXFieldError.length) {
-    errors.push(
-      ...customQueryXFieldError.map(
-        (it: any) =>
-          `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`,
-      ),
-    );
+    // errors.push(
+    //   ...customQueryXFieldError.map(
+    //     (it: any) =>
+    //       `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`,
+    //   ),
+    // );
   }
 
   const customQueryYFieldError = panelData?.data?.queries?.[
@@ -1172,12 +1638,12 @@ const validateCustomQueryFields = (
   );
 
   if (customQueryYFieldError.length) {
-    errors.push(
-      ...customQueryYFieldError.map(
-        (it: any) =>
-          `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`,
-      ),
-    );
+    // errors.push(
+    //   ...customQueryYFieldError.map(
+    //     (it: any) =>
+    //       `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`,
+    //   ),
+    // );
   }
 };
 
@@ -1201,12 +1667,12 @@ const validateStreamFields = (
   );
 
   if (customQueryXFieldError.length) {
-    errors.push(
-      ...customQueryXFieldError.map(
-        (it: any) =>
-          `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid for selected stream`,
-      ),
-    );
+    // errors.push(
+    //   ...customQueryXFieldError.map(
+    //     (it: any) =>
+    //       `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid for selected stream`,
+    //   ),
+    // );
   }
 
   const customQueryYFieldError = panelData?.data?.queries?.[
@@ -1216,12 +1682,12 @@ const validateStreamFields = (
   );
 
   if (customQueryYFieldError.length) {
-    errors.push(
-      ...customQueryYFieldError.map(
-        (it: any) =>
-          `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid for selected stream`,
-      ),
-    );
+    // errors.push(
+    //   ...customQueryYFieldError.map(
+    //     (it: any) =>
+    //       `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid for selected stream`,
+    //   ),
+    // );
   }
 };
 
