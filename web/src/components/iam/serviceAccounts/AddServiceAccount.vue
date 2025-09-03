@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator />
       <div>
         <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-
           <q-input
             v-if="!beingUpdated"
             v-model="formData.email"
@@ -104,19 +103,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
+import { defineComponent, ref, onActivated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
-import userServiece from "@/services/users";
-import {
-  getImageURL,
-  useLocalCurrentUser,
-  useLocalUserInfo,
-  invlidateLoginData,
-} from "@/utils/zincutils";
-import config from "@/aws-exports";
+import { getImageURL } from "@/utils/zincutils";
 import service_accounts from "@/services/service_accounts";
 
 const defaultValue: any = () => {
@@ -139,7 +131,7 @@ export default defineComponent({
     isUpdated: {
       type: Boolean,
       default: false,
-    }
+    },
   },
   emits: ["update:modelValue", "updated", "cancel:hideform"],
   setup(props) {
@@ -160,7 +152,6 @@ export default defineComponent({
     onActivated(() => {
       formData.value.organization = store.state.selectedOrganization.identifier;
     });
-
 
     return {
       t,
@@ -188,12 +179,11 @@ export default defineComponent({
       this.modelValue.email != ""
     ) {
       this.beingUpdated = true;
-      this.formData = {...this.modelValue};
+      this.formData = { ...this.modelValue };
       this.firstName = this.modelValue?.first_name;
     }
   },
   methods: {
-
     onSubmit() {
       const dismiss = this.$q.notify({
         spinner: true,
@@ -201,7 +191,8 @@ export default defineComponent({
         timeout: 2000,
       });
       let selectedOrg = this.store.state.selectedOrganization.identifier;
-      this.formData.organization = this.store.state.selectedOrganization.identifier;
+      this.formData.organization =
+        this.store.state.selectedOrganization.identifier;
       if (selectedOrg == "other") {
         selectedOrg = encodeURIComponent(this.formData.other_organization);
       }
@@ -212,12 +203,12 @@ export default defineComponent({
         service_accounts
           .update(this.formData, selectedOrg, userEmail)
           .then((res: any) => {
-              this.formData.email = userEmail;
-              this.$emit("updated", res.data, this.formData, "updated");
+            this.formData.email = userEmail;
+            this.$emit("updated", res.data, this.formData, "updated");
           })
           .catch((err: any) => {
-            if(err.response?.status != 403){
-              if(err?.response?.data?.message ) {
+            if (err.response?.status != 403) {
+              if (err?.response?.data?.message) {
                 this.$q.notify({
                   color: "negative",
                   message: err?.response?.data?.message,
@@ -225,30 +216,30 @@ export default defineComponent({
                 });
               }
             }
-            
+
             dismiss();
             this.formData.email = userEmail;
           });
       } else {
-          service_accounts
-            .create(this.formData, selectedOrg)
-            .then((res: any) => {
-              dismiss();
-              this.$emit("updated", res.data, this.formData, "created");
-            })
-            .catch((err: any) => {
-              if(err.response?.status != 403){
-                if(err?.response?.data?.message ) {
-                  this.$q.notify({
-                    color: "negative",
-                    message: err?.response?.data?.message,
-                    timeout: 2000,
-                  });
-                }
+        service_accounts
+          .create(this.formData, selectedOrg)
+          .then((res: any) => {
+            dismiss();
+            this.$emit("updated", res.data, this.formData, "created");
+          })
+          .catch((err: any) => {
+            if (err.response?.status != 403) {
+              if (err?.response?.data?.message) {
+                this.$q.notify({
+                  color: "negative",
+                  message: err?.response?.data?.message,
+                  timeout: 2000,
+                });
               }
-              
-              dismiss();
-            });
+            }
+
+            dismiss();
+          });
       }
     },
   },

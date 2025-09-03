@@ -23,5 +23,4 @@ pub mod index_optimize;
 pub mod match_all;
 pub mod partition_column;
 pub mod pickup_where;
-pub mod prefix_column;
 pub mod utils;

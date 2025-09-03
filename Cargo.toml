@@ -102,7 +102,6 @@ hashlink.workspace = true
 hashbrown.workspace = true
 hex.workspace = true
 http-auth-basic = "0.3"
-ipnetwork.workspace = true
 itertools.workspace = true
 jsonwebtoken = "9.3"
 log.workspace = true
@@ -142,7 +141,6 @@ snap.workspace = true
 sqlparser.workspace = true
 strum.workspace = true
 svix-ksuid.workspace = true
-syslog_loose = "0.21"
 thiserror.workspace = true
 time.workspace = true
 tikv-jemallocator = { version = "0.6", optional = true }
@@ -282,7 +280,6 @@ hashlink = "0.10"
 hashbrown = { version = "0.15", features = ["serde"] }
 hex = "0.4"
 indexmap = { version = "2.7", features = ["serde"] }
-ipnetwork = "0.20"
 itertools = "0.13"
 lettre = { version = "0.11", default-features = false, features = [
     "builder",
@@ -381,15 +378,15 @@ tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-log = "0.2"
 tracing-opentelemetry = "0.27"
-tracing-subscriber = { version = "0.3.0", features = [
+tracing-subscriber = { version = "0.3.20", features = [
     "env-filter",
     "json",
     "registry",
 ] }
 url = "2.5"
 urlencoding = "2.1"
-utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
-utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
+utoipa = { version = "5", features = ["actix_extras", "openapi_extensions"] }
+utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "063cabbbf4bc6f75794fa0ccd3b0bd5c074f0e35" }
 vrl = { version = "0.22", features = ["value", "compiler", "test"] }
 zip = "3.0.0"

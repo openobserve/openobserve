@@ -18,7 +18,7 @@ use std::{fmt::Debug, pin::Pin, task::Poll};
 use arrow::array::RecordBatch;
 use arrow_flight::{FlightData, error::Result};
 use arrow_schema::SchemaRef;
-use config::utils::size::bytes_to_human_readable;
+use config::{meta::search::ScanStats, utils::size::bytes_to_human_readable};
 use datafusion::physical_plan::metrics::{BaselineMetrics, RecordOutput};
 use flight::{
     common::{CustomMessage, FlightMessage},
@@ -37,6 +37,7 @@ pub struct FlightDecoderStream {
     inner: FlightDataDecoder,
     metrics: BaselineMetrics,
     query_context: QueryContext,
+    scan_stats: ScanStats,
 }
 
 impl FlightDecoderStream {
@@ -51,12 +52,14 @@ impl FlightDecoderStream {
             inner: FlightDataDecoder::new(inner, Some(schema), metrics.clone()),
             metrics,
             query_context,
+            scan_stats: ScanStats::default(),
         }
     }
 
-    pub fn process_custom_message(&self, message: CustomMessage) {
+    pub fn process_custom_message(&mut self, message: CustomMessage) {
         match message {
             CustomMessage::ScanStats(stats) => {
+                self.scan_stats.add(&stats);
                 self.query_context.scan_stats.lock().add(&stats);
             }
             CustomMessage::Metrics(metrics) => {
@@ -124,7 +127,6 @@ impl Drop for FlightDecoderStream {
             node,
             is_super,
             is_querier,
-            scan_stats,
             start,
             num_rows,
             ..
@@ -135,7 +137,7 @@ impl Drop for FlightDecoderStream {
         } else {
             "follower".to_string()
         };
-        let scan_stats = { *scan_stats.lock() };
+        let scan_stats = self.scan_stats;
 
         log::info!(
             "{}",

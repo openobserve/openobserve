@@ -22,18 +22,21 @@ pub mod registry;
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct KeyAddRequest {
     pub name: String,
+    #[schema(value_type = Object)]
     pub key: HttpKey,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct KeyGetResponse {
     pub name: String,
+    #[schema(value_type = Object)]
     pub key: HttpKey,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct KeyInfo {
     pub name: String,
+    #[schema(value_type = Object)]
     pub key: HttpKey,
 }
 

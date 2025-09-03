@@ -203,6 +203,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             } else {
                 json::from_slice(&item_value).unwrap()
             };
+            organizations::invalidate_cache(Some(item_key)).await;
             ORGANIZATIONS
                 .clone()
                 .write()
@@ -227,6 +228,7 @@ pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
         log::error!("Error saving org: {e}");
         return Err(anyhow::anyhow!("Error saving org: {}", e));
     }
+    organizations::invalidate_cache(Some(&entry.identifier)).await;
 
     let key = format!("{}{}", ORG_KEY_PREFIX, entry.identifier);
     let _ = put_into_db_coordinator(&key, json::to_vec(entry).unwrap().into(), true, None).await;
@@ -244,6 +246,7 @@ pub async fn rename_org(org_id: &str, new_name: &str) -> Result<Organization, an
         log::error!("Error updating org: {e}");
         return Err(anyhow::anyhow!("Error updating org: {}", e));
     }
+    organizations::invalidate_cache(Some(org_id)).await;
     let org = get_org(org_id).await?;
     let key = format!("{ORG_KEY_PREFIX}{org_id}");
     let _ = put_into_db_coordinator(&key, json::to_vec(&org).unwrap().into(), true, None).await;
@@ -283,6 +286,7 @@ pub async fn delete_org(org_id: &str) -> Result<(), anyhow::Error> {
         log::error!("Error deleting org: {e}");
         return Err(anyhow::anyhow!("Error deleting org: {}", e));
     }
+    organizations::invalidate_cache(Some(org_id)).await;
     #[cfg(feature = "enterprise")]
     super_cluster::organization_delete(&format!("{ORG_KEY_PREFIX}{org_id}")).await?;
     Ok(())

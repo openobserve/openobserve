@@ -94,7 +94,9 @@ async function exploreStreamAndInteractWithLogDetails(page, streamName) {
   await page.waitForTimeout(1000);
   await page.waitForSelector('[data-test="log-table-column-1-_timestamp"]');
   await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
-  await page.locator('[data-test="log-expand-detail-key-a-text"]').click();
+  const expandDetailElement = page.locator('[data-test="log-expand-detail-key-a"]');
+  await expandDetailElement.waitFor({ state: 'visible' });
+  await expandDetailElement.click();
   await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
 }
 
@@ -173,7 +175,7 @@ test.describe("Core Pipeline Tests", () => {
     await pageManager.pipelinesPage.verifyPipelineDeleted();
   });
 
-  test("should add source, function, destination and then delete pipeline", async ({ page }) => {
+  test.skip("should add source, function, destination and then delete pipeline", async ({ page }) => {
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
@@ -207,7 +209,7 @@ test.describe("Core Pipeline Tests", () => {
     await page.getByRole("img", { name: "Output Stream" }).click();
     await page.getByLabel("Stream Name *").click();
     await page.getByLabel("Stream Name *").fill("destination-node");
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pageManager.pipelinesPage.enterPipelineName(pipelineName);

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-mr-lg row items-center">
         <img
           :src="ip"
-          alt="Chrome"
+          alt="IP"
           class="col-6 q-mr-sm"
           style="height: 30px; width: 30px"
         />
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-mx-lg items-center">
         <img
           :src="osIcon"
-          alt="Chrome"
+          alt="OS"
           class="q-mr-md inline-block"
           style="height: auto; width: 30px"
         />

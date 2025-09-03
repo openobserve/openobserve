@@ -146,10 +146,7 @@ impl SchedulerWorker {
             let trigger_key = trigger.module_key.to_string();
             if let Err(e) = handle_triggers(&trace_id, trigger).await {
                 log::error!(
-                    "[SCHEDULER] trace_id: {} Error handling trigger key {}: {}",
-                    trace_id,
-                    trigger_key,
-                    e
+                    "[SCHEDULER] trace_id: {trace_id} Error handling trigger key {trigger_key}: {e}"
                 );
             }
         });

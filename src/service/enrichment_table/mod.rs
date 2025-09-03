@@ -358,7 +358,7 @@ pub async fn delete_enrichment_table(
     }
 
     if let Err(e) = delete_from_file_list(org_id, stream_type, stream_name, time_range).await {
-        log::error!("Error deleting enrichment table from file list: {}", e);
+        log::error!("Error deleting enrichment table from file list: {e}");
     }
 
     // delete stream schema cache
@@ -476,7 +476,7 @@ pub async fn cleanup_enrichment_table_resources(
 
     // delete stream key
     if let Err(e) = db::enrichment_table::delete(org_id, stream_name).await {
-        log::error!("Error deleting enrichment table: {}", e);
+        log::error!("Error deleting enrichment table: {e}");
     }
 
     // delete stream stats cache
@@ -498,7 +498,7 @@ pub async fn delete_from_file_list(
     )
     .await
     .map_err(|e| {
-        log::error!("[ENRICHMENT_TABLE] delete_from_file_list failed: {}", e);
+        log::error!("[ENRICHMENT_TABLE] delete_from_file_list failed: {e}");
         e
     })?;
 
@@ -522,10 +522,7 @@ pub async fn delete_from_file_list(
             .await
             {
                 log::error!(
-                    "[ENRICHMENT_TABLE] Error broadcasting enrichment table {}/{} file list delete event: {}",
-                    org_id,
-                    stream_name,
-                    e
+                    "[ENRICHMENT_TABLE] Error broadcasting enrichment table {org_id}/{stream_name} file list delete event: {e}"
                 );
             }
             // let _ = o2_enterprise::enterprise::super_cluster::queue::file_list_delete(
