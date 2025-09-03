@@ -13,6 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { useQuasar } from "quasar";
+import { computed } from "vue";
+import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+import config from "@/aws-exports";
+import { b64EncodeUnicode } from "@/utils/zincUtils";
+
+import {
+  encodeVisualizationConfig,
+  getVisualizationConfig,
+} from "@/composables/useLogs/logsVisualization";
+
 import { searchState } from "@/composables/useLogs/searchState";
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import {
@@ -32,6 +44,8 @@ interface SQLColumn {
 
 const { searchObj } = searchState();
 let parser: Parser | null = new Parser();
+const q = useQuasar();
+const router = useRouter();
 
 const DEFAULT_PARSED_RESULT: ParsedSQLResult = {
   columns: [],
@@ -452,4 +466,218 @@ export const removeTraceId = (traceId: string): void => {
         (existingTraceId: string) => existingTraceId !== traceId,
       );
   }
+};
+
+export const shouldAddFunctionToSearch = () => {
+  if (!isActionsEnabled.value)
+    return (
+      searchObj.data.tempFunctionContent != "" &&
+      searchObj.meta.showTransformEditor
+    );
+
+  return (
+    searchObj.data.transformType === "function" &&
+    searchObj.data.tempFunctionContent != ""
+  );
+};
+
+export const addTransformToQuery = (queryReq: any) => {
+  if (shouldAddFunctionToSearch()) {
+    queryReq.query["query_fn"] =
+      b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
+  }
+
+  // Add action ID if it exists
+  if (
+    searchObj.data.transformType === "action" &&
+    searchObj.data.selectedTransform?.id
+  ) {
+    queryReq.query["action_id"] = searchObj.data.selectedTransform.id;
+  }
+};
+
+export const isActionsEnabled = computed(() => {
+  const store = useStore();
+  return (
+    (config.isEnterprise == "true" || config.isCloud == "true") &&
+    store.state.zoConfig.actions_enabled
+  );
+});
+
+/**
+ * Helper function to calculate width of the column based on its content(from first 5 rows)
+ * @param context - Canvas Context to calculate width of column using its content
+ * @param field - Field name for which width needs to be calculated
+ * @returns - Width of the column
+ */
+export const getColumnWidth = (context: any, field: string) => {
+  // Font of table header
+  context.font = "bold 14px sans-serif";
+  let max = context.measureText(field).width + 16;
+
+  // Font of the table content
+  context.font = "12px monospace";
+  let width = 0;
+  try {
+    for (let i = 0; i < 5; i++) {
+      if (searchObj.data.queryResults.hits?.[i]?.[field]) {
+        width = context.measureText(
+          searchObj.data.queryResults.hits[i][field],
+        ).width;
+
+        if (width > max) max = width;
+      }
+    }
+  } catch (err) {
+    console.log("Error while calculation column width");
+  }
+
+  max += 24; // 24px padding
+
+  if (max > 800) return 800;
+
+  if (max < 150) return 150;
+
+  return max;
+};
+
+export const showCancelSearchNotification = () => {
+  q.notify({
+    message: "Running query cancelled successfully",
+    color: "positive",
+    position: "bottom",
+    timeout: 4000,
+  });
+};
+
+export const generateURLQuery = (
+  isShareLink: boolean = false,
+  dashboardPanelData: any = null,
+) => {
+  const date = searchObj.data.datetime;
+  const store = useStore();
+
+  const query: any = {};
+
+  if (searchObj.data.stream.streamType) {
+    query["stream_type"] = searchObj.data.stream.streamType;
+  }
+
+  if (
+    searchObj.data.stream.selectedStream.length > 0 &&
+    typeof searchObj.data.stream.selectedStream != "object"
+  ) {
+    query["stream"] = searchObj.data.stream.selectedStream.join(",");
+  } else if (
+    typeof searchObj.data.stream.selectedStream == "object" &&
+    searchObj.data.stream.selectedStream.hasOwnProperty("value")
+  ) {
+    query["stream"] = searchObj.data.stream.selectedStream.value;
+  } else {
+    query["stream"] = searchObj.data.stream.selectedStream.join(",");
+  }
+
+  if (date.type == "relative") {
+    if (isShareLink) {
+      query["from"] = date.startTime;
+      query["to"] = date.endTime;
+    } else {
+      query["period"] = date.relativeTimePeriod;
+    }
+  } else if (date.type == "absolute") {
+    query["from"] = date.startTime;
+    query["to"] = date.endTime;
+  }
+
+  query["refresh"] = searchObj.meta.refreshInterval;
+
+  if (searchObj.data.query) {
+    query["sql_mode"] = searchObj.meta.sqlMode;
+    query["query"] = b64EncodeUnicode(searchObj.data.query.trim());
+  }
+
+  //add the function editor toggle is true or false
+  //it will help to retain the function editor state when we refresh the page
+  query["fn_editor"] = searchObj.meta.showTransformEditor;
+  if (
+    searchObj.data.transformType === "function" &&
+    searchObj.data.tempFunctionContent != ""
+  ) {
+    query["functionContent"] = b64EncodeUnicode(
+      searchObj.data.tempFunctionContent.trim(),
+    );
+  }
+
+  // TODO : Add type in query params for all types
+  if (searchObj.meta.pageType !== "logs") {
+    query["type"] = searchObj.meta.pageType;
+  }
+
+  query["defined_schemas"] = searchObj.meta.useUserDefinedSchemas;
+  query["org_identifier"] = store.state.selectedOrganization.identifier;
+  query["quick_mode"] = searchObj.meta.quickMode;
+  query["show_histogram"] = searchObj.meta.showHistogram;
+
+  if (
+    store.state.zoConfig?.super_cluster_enabled &&
+    searchObj.meta?.regions?.length
+  ) {
+    query["regions"] = searchObj.meta.regions.join(",");
+  }
+
+  if (
+    store.state.zoConfig?.super_cluster_enabled &&
+    searchObj.meta?.clusters?.length
+  ) {
+    query["clusters"] = searchObj.meta.clusters.join(",");
+  }
+
+  if (searchObj.meta.logsVisualizeToggle) {
+    query["logs_visualize_toggle"] = searchObj.meta.logsVisualizeToggle;
+  }
+
+  // Preserve visualization data in URL
+  // - If in visualize mode and panel data is provided, encode the dashboardPanelData
+  if (
+    searchObj.meta.logsVisualizeToggle === "visualize" &&
+    dashboardPanelData
+  ) {
+    const visualizationData = getVisualizationConfig(dashboardPanelData);
+    if (visualizationData) {
+      const encoded = encodeVisualizationConfig(visualizationData);
+      if (encoded) {
+        query["visualization_data"] = encoded;
+      }
+    }
+  } else {
+    // else preserve existing visualization data from the current URL
+    const existingEncodedConfig = router.currentRoute.value?.query
+      ?.visualization_data as string | undefined;
+    if (existingEncodedConfig) {
+      query["visualization_data"] = existingEncodedConfig;
+    }
+  }
+
+  return query;
+};
+
+export const updateUrlQueryParams = (dashboardPanelData: any = null) => {
+  const query = generateURLQuery(false, dashboardPanelData);
+  if (
+    (Object.hasOwn(query, "type") && query.type == "search_history_re_apply") ||
+    query.type == "search_scheduler"
+  ) {
+    delete query.type;
+  }
+  router.push({ query });
+};
+
+export const isNonAggregatedSQLMode = (searchObj: any, parsedSQL: any) => {
+  return !(
+    searchObj.meta.sqlMode &&
+    (isLimitQuery(parsedSQL) ||
+      isDistinctQuery(parsedSQL) ||
+      isWithQuery(parsedSQL) ||
+      !searchObj.data.queryResults.is_histogram_eligible)
+  );
 };
