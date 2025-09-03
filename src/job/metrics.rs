@@ -106,7 +106,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             log::error!("Error update parquet metrics: {e}");
         }
         if let Err(e) = update_parquet_metadata_cache_metrics().await {
-            log::error!("Error update parquet metadata cache metrics: {}", e);
+            log::error!("Error update parquet metadata cache metrics: {e}");
         }
     }
 }

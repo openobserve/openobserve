@@ -18,6 +18,8 @@ use std::{
     io::Error,
 };
 
+#[cfg(feature = "cloud")]
+use actix_web::delete;
 use actix_web::{HttpRequest, HttpResponse, Result, get, http, post, put, web};
 use config::meta::cluster::NodeInfo;
 #[cfg(feature = "enterprise")]
@@ -27,6 +29,7 @@ use {
     crate::common::meta::organization::OrganizationInvites,
     crate::common::meta::organization::{
         AllOrgListDetails, AllOrganizationResponse, ExtendTrialPeriodRequest,
+        OrganizationInviteUserRecord,
     },
     o2_enterprise::enterprise::cloud::list_customer_billings,
 };
@@ -48,17 +51,21 @@ use crate::{
 };
 
 /// GetOrganizations
-///
-/// #{"ratelimit_module":"Organizations", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetUserOrganizations",
+    summary = "Get user's organizations",
+    description = "Retrieves a list of all organizations that the authenticated user has access to, including organization details, permissions, and subscription information. Root users can see all organizations in the system.",
     security(
         ("Authorization"= [])
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = OrganizationResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "list"}))
     )
 )]
 #[get("/organizations")]
@@ -153,6 +160,8 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetAllOrganizations",
+    summary = "Get all organizations (meta only)",
+    description = "Retrieves a comprehensive list of all organizations in the system with detailed information including subscription types, trial periods, and creation dates. Only accessible through the '_meta' organization for administrative purposes.",
     security(
         ("Authorization"= [])
     ),
@@ -238,12 +247,13 @@ pub async fn all_organizations(
 }
 
 /// GetOrganizationSummary
-///
-/// #{"ratelimit_module":"Summary", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetOrganizationSummary",
+    summary = "Get organization summary",
+    description = "Retrieves comprehensive summary statistics and information about an organization including data ingestion metrics, storage usage, stream counts, and other key performance indicators useful for monitoring organization health and usage.",
     security(
         ("Authorization"= [])
     ),
@@ -251,7 +261,10 @@ pub async fn all_organizations(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = OrgSummary),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Summary", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/summary")]
@@ -262,12 +275,13 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
 }
 
 /// GetIngestToken
-///
-/// #{"ratelimit_module":"Ingestion Token", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetOrganizationUserIngestToken",
+    summary = "Get user's ingestion token",
+    description = "Retrieves the current ingestion token (passcode) for the authenticated user within the specified organization. This token is used to authenticate data ingestion requests and can be used with various ingestion endpoints.",
     security(
         ("Authorization"= [])
     ),
@@ -276,7 +290,10 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Ingestion Token", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/passcode")]
@@ -300,12 +317,13 @@ async fn get_user_passcode(
 }
 
 /// UpdateIngestToken
-///
-/// #{"ratelimit_module":"Ingestion Token", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "UpdateOrganizationUserIngestToken",
+    summary = "Update user's ingestion token",
+    description = "Generates a new ingestion token (passcode) for the authenticated user within the specified organization. The old token will be invalidated and all ingestion processes using the old token will need to be updated with the new token.",
     security(
         ("Authorization"= [])
     ),
@@ -314,7 +332,10 @@ async fn get_user_passcode(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Ingestion Token", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/passcode")]
@@ -338,12 +359,13 @@ async fn update_user_passcode(
 }
 
 /// GetRumIngestToken
-///
-/// #{"ratelimit_module":"Rumtokens", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetOrganizationUserRumIngestToken",
+    summary = "Get user's RUM ingestion token",
+    description = "Retrieves the current Real User Monitoring (RUM) ingestion token for the authenticated user within the specified organization. This token is specifically used for ingesting RUM data from web applications and mobile apps.",
     security(
         ("Authorization"= [])
     ),
@@ -352,7 +374,10 @@ async fn update_user_passcode(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Rumtokens", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/rumtoken")]
@@ -376,12 +401,13 @@ async fn get_user_rumtoken(
 }
 
 /// UpdateRumIngestToken
-///
-/// #{"ratelimit_module":"Rumtokens", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "UpdateOrganizationUserRumIngestToken",
+    summary = "Update user's RUM ingestion token",
+    description = "Generates a new Real User Monitoring (RUM) ingestion token for the authenticated user within the specified organization. The old RUM token will be invalidated and all RUM data collection processes using the old token will need to be updated.",
     security(
         ("Authorization"= [])
     ),
@@ -390,7 +416,10 @@ async fn get_user_rumtoken(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Rumtokens", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/rumtoken")]
@@ -414,12 +443,13 @@ async fn update_user_rumtoken(
 }
 
 /// CreateRumIngestToken
-///
-/// #{"ratelimit_module":"Rumtokens", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "CreateOrganizationUserRumIngestToken",
+    summary = "Create user's RUM ingestion token",
+    description = "Creates a new Real User Monitoring (RUM) ingestion token for the authenticated user within the specified organization. This endpoint is used when no RUM token exists yet and you need to generate the initial token for RUM data collection.",
     security(
         ("Authorization"= [])
     ),
@@ -428,7 +458,10 @@ async fn update_user_rumtoken(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Rumtokens", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/rumtoken")]
@@ -452,18 +485,22 @@ async fn create_user_rumtoken(
 }
 
 /// CreateOrganization
-///
-/// #{"ratelimit_module":"Organizations", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "CreateOrganization",
+    summary = "Create new organization",
+    description = "Creates a new organization with the specified configuration and settings. The authenticated user will be automatically added as an owner of the newly created organization and can then invite other users and configure the organization.",
     security(
         ("Authorization"= [])
     ),
     request_body(content = Organization, description = "Organization data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "create"}))
     )
 )]
 #[post("/organizations")]
@@ -486,12 +523,14 @@ async fn create_org(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "ExtendTrialPeriod",
+    summary = "Extend organization trial period",
+    description = "Extends the trial period for a specified organization to a new end date. This administrative endpoint allows extending trial periods for organizations, giving them more time to evaluate the service before requiring a paid subscription.",
     security(
         ("Authorization"= [])
     ),
     request_body(content = ExtendTrialPeriodRequest, description = "Extend free trial request", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "text"),
+        (status = 200, description = "Success", content_type = "text", body = String),
     )
 )]
 #[put("/{org_id}/extend_trial_period")]
@@ -499,6 +538,8 @@ async fn extend_trial_period(
     org_id: web::Path<String>,
     req: web::Json<ExtendTrialPeriodRequest>,
 ) -> Result<HttpResponse, Error> {
+    use crate::service::db::organization::ORG_KEY_PREFIX;
+
     let req = req.into_inner();
     let org = org_id.into_inner();
     if org != "_meta" {
@@ -524,13 +565,19 @@ async fn extend_trial_period(
         )));
     }
 
-    match infra::table::organizations::set_trial_period_end(&req.org_id, req.new_end_date).await {
+    let ret = match infra::table::organizations::set_trial_period_end(&req.org_id, req.new_end_date)
+        .await
+    {
         Ok(_) => Ok(HttpResponse::Ok().body("success")),
         Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST,
             err.to_string(),
         ))),
-    }
+    };
+
+    let key = format!("{ORG_KEY_PREFIX}{}", req.org_id);
+    let _ = infra::db::put_into_db_coordinator(&key, Default::default(), true, None).await;
+    ret
 }
 
 /// RenameOrganization
@@ -538,6 +585,8 @@ async fn extend_trial_period(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "RenameOrganization",
+    summary = "Rename organization",
+    description = "Changes the display name of an organization. The organization identifier remains unchanged, but the human-readable name is updated. This helps with organization management and branding without affecting API integrations or data access.",
     security(
         ("Authorization"= [])
     ),
@@ -578,6 +627,8 @@ async fn rename_org(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetOrganizationMemberInvites",
+    summary = "Get pending organization invites",
+    description = "Retrieves a list of all pending invitations for the organization. Shows invitations that have been sent but not yet accepted, allowing administrators to track and manage the invitation process for new team members.",
     security(
         ("Authorization"= [])
     ),
@@ -599,7 +650,7 @@ pub async fn get_org_invites(path: web::Path<String>) -> Result<HttpResponse, Er
         Ok(result) => {
             let result: Vec<_> = result
                 .into_iter()
-                .filter(|invite| invite.status != InviteStatus::Accepted)
+                .filter(|invite| invite.status == InviteStatus::Pending)
                 .collect();
             Ok(HttpResponse::Ok().json(result))
         }
@@ -614,6 +665,8 @@ pub async fn get_org_invites(path: web::Path<String>) -> Result<HttpResponse, Er
     context_path = "/api",
     tag = "Organizations",
     operation_id = "InviteOrganizationMembers",
+    summary = "Invite users to organization",
+    description = "Sends invitations to one or more users to join the organization. Invited users will receive email invitations with links to accept and join the organization with the specified roles and permissions.",
     security(
         ("Authorization"= [])
     ),
@@ -641,12 +694,42 @@ pub async fn generate_org_invite(
     }
 }
 
+/// RemoveOrganizationInvite
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "RemoveOrganizationInvite",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+        ("id" = String, Path, description = "invitation token"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Organization),
+    )
+)]
+#[delete("/{org_id}/invites/{token}")]
+pub async fn delete_org_invite(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let (org_id, token) = path.into_inner();
+
+    let result = organization::delete_invite_by_token(&org_id, &token).await;
+    match result {
+        Ok(_) => Ok(HttpResponse::Ok().json("success")),
+        Err(err) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
+    }
+}
 /// AcceptOrganizationInvite
 #[cfg(feature = "cloud")]
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "AcceptOrganizationInvite",
+    summary = "Accept organization invitation",
+    description = "Accepts a pending organization invitation using the invitation token received via email. This adds the user to the organization with the roles and permissions specified in the original invitation.",
     security(
         ("Authorization"= [])
     ),
@@ -690,6 +773,8 @@ async fn accept_org_invite(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetMetaOrganizationNodeList",
+    summary = "Get cluster node list",
+    description = "Retrieves a hierarchical list of all nodes in the OpenObserve cluster organized by regions and clusters, with detailed information about each node including versions and roles. Useful for monitoring cluster health and managing distributed deployments.",
     security(
         ("Authorization"= [])
     ),
@@ -699,8 +784,8 @@ async fn accept_org_invite(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = NodeListResponse),
-        (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = ()),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/node/list")]
@@ -777,6 +862,8 @@ pub async fn node_list_impl(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetMetaOrganizationClusterInfo",
+    summary = "Get cluster information",
+    description = "Retrieves comprehensive information about the OpenObserve cluster organized by regions and clusters, including workload information, pending jobs, and resource utilization metrics. Essential for monitoring cluster performance and identifying bottlenecks.",
     security(
         ("Authorization"= [])
     ),
@@ -786,8 +873,8 @@ pub async fn node_list_impl(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = ClusterInfoResponse),
-        (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = ()),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/cluster/info")]

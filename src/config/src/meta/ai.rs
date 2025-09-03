@@ -17,8 +17,9 @@ use std::fmt::Display;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum PromptType {
     #[default]

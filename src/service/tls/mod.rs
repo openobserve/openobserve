@@ -96,66 +96,6 @@ pub fn reqwest_client_tls_config() -> Result<reqwest::Client, anyhow::Error> {
     todo!()
 }
 
-pub fn tcp_tls_server_config() -> Result<rustls::ServerConfig, anyhow::Error> {
-    let cfg = config::get_config();
-    let cert_file = &mut BufReader::new(std::fs::File::open(&cfg.tcp.tcp_tls_cert_path).map_err(
-        |e| {
-            anyhow::anyhow!(
-                "Failed to open TLS certificate file {}: {}",
-                &cfg.tcp.tcp_tls_cert_path,
-                e
-            )
-        },
-    )?);
-    let key_file =
-        &mut BufReader::new(std::fs::File::open(&cfg.tcp.tcp_tls_key_path).map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to open TLS key file {}: {}",
-                &cfg.tcp.tcp_tls_key_path,
-                e
-            )
-        })?);
-
-    let cert_chain = certs(cert_file);
-
-    let tls_config = rustls::ServerConfig::builder_with_protocol_versions(rustls::DEFAULT_VERSIONS)
-        .with_no_client_auth()
-        .with_single_cert(
-            cert_chain.try_collect::<_, Vec<_>, _>()?,
-            private_key(key_file)?.unwrap(),
-        )?;
-
-    Ok(tls_config)
-}
-
-pub fn tcp_tls_self_connect_client_config() -> Result<Arc<rustls::ClientConfig>, anyhow::Error> {
-    let cfg = config::get_config();
-    let config = if cfg.tcp.tcp_tls_enabled {
-        let mut cert_store = webpki_roots_cert_store();
-        let cert_file = &mut BufReader::new(
-            std::fs::File::open(&cfg.tcp.tcp_tls_ca_cert_path).map_err(|e| {
-                anyhow::anyhow!(
-                    "Failed to open TLS CA certificate file {}: {}",
-                    &cfg.tcp.tcp_tls_ca_cert_path,
-                    e
-                )
-            })?,
-        );
-        let cert_chain = certs(cert_file);
-        cert_store.add_parsable_certificates(cert_chain.try_collect::<_, Vec<_>, _>()?);
-
-        rustls::ClientConfig::builder()
-            .with_root_certificates(cert_store)
-            .with_no_client_auth()
-    } else {
-        rustls::ClientConfig::builder()
-            .with_root_certificates(webpki_roots_cert_store())
-            .with_no_client_auth()
-    };
-
-    Ok(Arc::new(config))
-}
-
 pub fn get_server_url_from_cert(cert: &[u8]) -> Result<String, anyhow::Error> {
     match parse_x509_certificate(cert) {
         Ok((_, certificate)) => {

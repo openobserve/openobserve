@@ -874,6 +874,7 @@ export default defineComponent({
           refresh: "0",
           query: "",
           type: "stream_explorer",
+          quick_mode: store.state.zoConfig.quick_mode_enabled ? "true" : "false",
           org_identifier: store.state.selectedOrganization.identifier,
           ...dateTime,
         },

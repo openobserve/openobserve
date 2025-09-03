@@ -947,7 +947,7 @@ const getLegendPosition = (legendPosition: string) => {
  * @param {string} type - The chart type.
  * @return {object} The props object for the given chart type.
  */
-const getPropsByChartTypeForSeries = (type: string) => {
+export const getPropsByChartTypeForSeries = (type: string) => {
   switch (type) {
     case "bar":
       return {

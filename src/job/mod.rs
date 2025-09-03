@@ -22,12 +22,9 @@ use o2_openfga::config::get_config as get_openfga_config;
 use regex::Regex;
 
 use crate::{
-    common::{
-        infra::config::SYSLOG_ENABLED,
-        meta::{
-            organization::DEFAULT_ORG,
-            user::{UserOrgRole, UserRequest},
-        },
+    common::meta::{
+        organization::DEFAULT_ORG,
+        user::{UserOrgRole, UserRequest},
     },
     service::{db, self_reporting, users},
 };
@@ -49,7 +46,6 @@ pub(crate) mod pipeline;
 mod promql;
 mod promql_self_consume;
 mod stats;
-pub(crate) mod syslog_server;
 
 pub use file_downloader::{download_from_node, queue_download};
 pub use file_list_dump::FILE_LIST_SCHEMA;
@@ -119,6 +115,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::user::watch());
     tokio::task::spawn(db::org_users::watch());
     tokio::task::spawn(db::organization::watch());
+
+    #[cfg(feature = "cloud")]
+    tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
 
     // check version
     db::metas::version::set()
@@ -235,12 +234,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::alerts::alert::cache()
         .await
         .expect("alerts cache failed");
-    #[allow(deprecated)]
-    db::syslog::cache().await.expect("syslog cache failed");
-    #[allow(deprecated)]
-    db::syslog::cache_syslog_settings()
-        .await
-        .expect("syslog settings cache failed");
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::domain_management::db::cache()
         .await
@@ -335,19 +328,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // Shouldn't serve request until initialization finishes
     log::info!("Job initialization complete");
-
-    // Syslog server start
-    #[allow(deprecated)]
-    tokio::task::spawn(db::syslog::watch());
-    #[allow(deprecated)]
-    tokio::task::spawn(db::syslog::watch_syslog_settings());
-
-    let start_syslog = *SYSLOG_ENABLED.read();
-    if start_syslog {
-        syslog_server::run(start_syslog, true)
-            .await
-            .expect("syslog server run failed");
-    }
 
     Ok(())
 }

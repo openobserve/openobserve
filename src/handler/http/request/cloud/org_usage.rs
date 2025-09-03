@@ -25,6 +25,8 @@ use crate::{handler::http::models::billings::GetOrgUsageResponseBody, service::o
     context_path = "/api",
     tag = "Billings",
     operation_id = "GetUsageData",
+    summary = "Get organization usage data",
+    description = "Retrieves detailed usage metrics and statistics for the specified organization",
     security(
         ("Authorization" = [])
     ),
@@ -34,8 +36,8 @@ use crate::{handler::http::models::billings::GetOrgUsageResponseBody, service::o
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = GetOrgUsageResponseBody),
-        (status = 404, description = "Organization usage not found", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "Organization usage not found", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
 )]
 #[get("/{org_id}/billings/data_usage/{usage_date}")]

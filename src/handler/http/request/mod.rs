@@ -46,8 +46,6 @@ pub mod service_accounts;
 pub mod short_url;
 pub mod status;
 pub mod stream;
-#[deprecated(since = "0.15.0", note = "syslog is deprecated")]
-pub mod syslog;
 pub mod traces;
 pub mod users;
 
