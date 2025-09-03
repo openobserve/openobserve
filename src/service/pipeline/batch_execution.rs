@@ -263,11 +263,24 @@ impl ExecutablePipeline {
         let (error_sender, mut error_receiver) =
             channel::<(String, String, String, Option<String>)>(batch_size);
 
+        // usage_channel
+        let (usage_sender, usage_receiver) =
+            channel::<super::usage_tracker::PipelineUsageEvent>(batch_size);
+
+        // spawn usage tracker task
+        let usage_tracker = tokio::spawn(super::usage_tracker::pipeline_usage_tracker(
+            org_id.to_string(),
+            self.id.clone(),
+            self.name.clone(),
+            stream_name.clone(),
+            usage_receiver,
+        ));
+
         let mut node_senders = HashMap::new();
         let mut node_receivers = HashMap::new();
 
         for node_id in &self.sorted_nodes {
-            let (sender, receiver) = channel::<(usize, Value, bool)>(batch_size);
+            let (sender, receiver) = channel::<PipelineItem>(batch_size);
             node_senders.insert(node_id.to_string(), sender);
             node_receivers.insert(node_id.to_string(), receiver);
         }
@@ -286,6 +299,7 @@ impl ExecutablePipeline {
                 .collect();
             let result_sender_cp = node.children.is_empty().then_some(result_sender.clone());
             let error_sender_cp = error_sender.clone();
+            let usage_sender_cp = usage_sender.clone();
             let vrl_runtime: Option<(VRLResultResolver, bool)> = self.vrl_map.get(node_id).cloned();
             let pipeline_name = pipeline_name.clone();
             let stream_name = stream_name.clone();
@@ -302,6 +316,7 @@ impl ExecutablePipeline {
                 vrl_runtime,
                 result_sender_cp,
                 error_sender_cp,
+                usage_sender_cp,
                 pipeline_name,
                 stream_name,
             ));
@@ -348,7 +363,13 @@ impl ExecutablePipeline {
         };
         let source_sender = node_senders.remove(&self.source_node_id).unwrap();
         for (idx, record) in records.into_iter().enumerate() {
-            if let Err(send_err) = source_sender.send((idx, record, flattened)).await {
+            let pipeline_item = PipelineItem {
+                idx,
+                record,
+                flattened,
+                reported: false,
+            };
+            if let Err(send_err) = source_sender.send(pipeline_item).await {
                 log::error!(
                     "[Pipeline]: Error sending original records into source Node for {send_err}"
                 );
@@ -358,12 +379,18 @@ impl ExecutablePipeline {
         drop(source_sender);
         drop(result_sender);
         drop(error_sender);
+        drop(usage_sender);
         drop(node_senders);
         log::debug!("[Pipeline]: All records send into pipeline for processing");
 
         // Wait for all node tasks to complete
         if let Err(e) = try_join_all(node_tasks).await {
             log::error!("[Pipeline] node processing jobs failed: {e}");
+        }
+
+        // Wait for usage tracker to complete (channel will close when usage_sender is dropped)
+        if let Err(e) = usage_tracker.await {
+            log::error!("[Pipeline] usage tracker task failed: {e}");
         }
 
         // Publish errors if received any
@@ -539,17 +566,26 @@ impl Default for ExecutablePipelineTraceInputs {
     }
 }
 
+#[derive(Debug, Clone)]
+struct PipelineItem {
+    idx: usize,
+    record: Value,
+    flattened: bool,
+    reported: bool,
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn process_node(
     pipeline_id: String,
     node_idx: usize,
     org_id: String,
     node: ExecutableNode,
-    mut receiver: Receiver<(usize, Value, bool)>,
-    mut child_senders: Vec<Sender<(usize, Value, bool)>>,
+    mut receiver: Receiver<PipelineItem>,
+    mut child_senders: Vec<Sender<PipelineItem>>,
     vrl_runtime: Option<(VRLResultResolver, bool)>,
     result_sender: Option<Sender<(usize, StreamParams, Value)>>,
     error_sender: Sender<(String, String, String, Option<String>)>,
+    usage_sender: Sender<super::usage_tracker::PipelineUsageEvent>,
     pipeline_name: String,
     stream_name: Option<String>,
 ) -> Result<()> {
@@ -562,7 +598,13 @@ async fn process_node(
                 // leaf node: `result_sender` guaranteed to be Some()
                 // send received results directly via `result_sender` for collection
                 let result_sender = result_sender.unwrap();
-                while let Some((idx, mut record, flattened)) = receiver.recv().await {
+                while let Some(pipeline_item) = receiver.recv().await {
+                    let PipelineItem {
+                        idx,
+                        mut record,
+                        flattened,
+                        ..
+                    } = pipeline_item;
                     if !flattened {
                         record = match flatten::flatten_with_level(
                             record,
@@ -635,7 +677,7 @@ async fn process_node(
                 log::debug!("[Pipeline]: source node {node_idx} starts processing");
                 // source stream node: send received record to all its children
                 while let Some(item) = receiver.recv().await {
-                    send_to_children(&mut child_senders, item, "StreamNode").await;
+                    send_to_children(&mut child_senders, item, "StreamNode", &usage_sender).await;
                     count += 1;
                 }
                 log::debug!(
@@ -645,7 +687,13 @@ async fn process_node(
         }
         NodeData::Condition(condition_params) => {
             log::debug!("[Pipeline]: cond node {node_idx} starts processing");
-            while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
+            while let Some(pipeline_item) = receiver.recv().await {
+                let PipelineItem {
+                    idx,
+                    mut record,
+                    mut flattened,
+                    reported: _,
+                } = pipeline_item;
                 // value must be flattened before condition params can take effect
                 if !flattened {
                     record = match flatten::flatten_with_level(
@@ -677,8 +725,14 @@ async fn process_node(
                 {
                     send_to_children(
                         &mut child_senders,
-                        (idx, record, flattened),
+                        PipelineItem {
+                            idx,
+                            record,
+                            flattened,
+                            reported: false,
+                        },
                         "ConditionNode",
+                        &usage_sender,
                     )
                     .await;
                     count += 1;
@@ -691,7 +745,13 @@ async fn process_node(
             let mut runtime = crate::service::ingestion::init_functions_runtime();
             let stream_name = stream_name.unwrap_or("pipeline".to_string());
             let mut result_array_records = Vec::new();
-            while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
+            while let Some(pipeline_item) = receiver.recv().await {
+                let PipelineItem {
+                    idx,
+                    mut record,
+                    mut flattened,
+                    reported: _,
+                } = pipeline_item;
                 if let Some((vrl_runtime, is_result_array_vrl)) = &vrl_runtime {
                     if func_params.after_flatten && !flattened {
                         record = match flatten::flatten_with_level(
@@ -754,8 +814,14 @@ async fn process_node(
                         flattened = false; // since apply_vrl_fn can produce unflattened data
                         send_to_children(
                             &mut child_senders,
-                            (idx, record, flattened),
+                            PipelineItem {
+                                idx,
+                                record,
+                                flattened,
+                                reported: false,
+                            },
                             "FunctionNode",
+                            &usage_sender,
                         )
                         .await;
                     } else {
@@ -802,8 +868,14 @@ async fn process_node(
                     // use usize::MAX as a flag to disregard original_value
                     send_to_children(
                         &mut child_senders,
-                        (usize::MAX, record.clone(), false),
+                        PipelineItem {
+                            idx: usize::MAX,
+                            record: record.clone(),
+                            flattened: false,
+                            reported: false,
+                        },
                         "FunctionNode",
+                        &usage_sender,
                     )
                     .await;
                 }
@@ -814,7 +886,7 @@ async fn process_node(
             // source node for Scheduled pipeline. Directly send to children nodes
             log::debug!("[Pipeline]: query node {node_idx} starts processing");
             while let Some(item) = receiver.recv().await {
-                send_to_children(&mut child_senders, item, "QueryNode").await;
+                send_to_children(&mut child_senders, item, "QueryNode", &usage_sender).await;
                 count += 1;
             }
             log::debug!("[Pipeline]: query node {node_idx} done processing {count} records");
@@ -831,7 +903,12 @@ async fn process_node(
             let max_ts = (Utc::now()
                 + chrono::Duration::try_hours(cfg.limit.ingest_allowed_in_future).unwrap())
             .timestamp_micros();
-            while let Some((_, mut record, flattened)) = receiver.recv().await {
+            while let Some(pipeline_item) = receiver.recv().await {
+                let PipelineItem {
+                    mut record,
+                    flattened,
+                    ..
+                } = pipeline_item;
                 // handle timestamp before sending to remote_write service
                 if !flattened {
                     record = match flatten::flatten_with_level(
@@ -964,14 +1041,17 @@ async fn process_node(
                                 let data_size = records_to_write
                                     .iter()
                                     .map(|record| record.to_string().len() as f64)
-                                    .sum::<f64>() / config::SIZE_IN_MB;
-                                
+                                    .sum::<f64>()
+                                    / config::SIZE_IN_MB;
+
                                 if data_size > 0.0 {
-                                    let mut req_stats = config::meta::self_reporting::usage::RequestStats::default();
-                                    req_stats.size = data_size;
-                                    req_stats.records = records_to_write.len() as i64;
-                                    req_stats.response_time = 0.0;
-                                    
+                                    let req_stats = config::meta::self_reporting::usage::RequestStats {
+                                        size: data_size,
+                                        records: records_to_write.len() as i64,
+                                        response_time: 0.0,
+                                        ..config::meta::self_reporting::usage::RequestStats::default()
+                                    };
+
                                     crate::service::self_reporting::report_request_usage_stats(
                                         req_stats,
                                         &org_id,
@@ -1066,10 +1146,29 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
 }
 
 async fn send_to_children(
-    child_senders: &mut [Sender<(usize, Value, bool)>],
-    item: (usize, Value, bool),
+    child_senders: &mut [Sender<PipelineItem>],
+    mut item: PipelineItem,
     node_type: &str,
+    usage_sender: &Sender<super::usage_tracker::PipelineUsageEvent>,
 ) {
+    // Report usage if item has not been reported yet
+    if !item.reported && child_senders.len() > 1 {
+        // At this point we are creating a new branch in the pipeline, which means data
+        // multiplication This needs to be tracked for usage and priced accordingly as
+        // separate pipeline processing
+        let data_size = item.record.to_string().len() as f64;
+        let usage_event = super::usage_tracker::PipelineUsageEvent {
+            idx: item.idx,
+            data_size,
+        };
+
+        if let Err(e) = usage_sender.send(usage_event).await {
+            log::error!("[Pipeline]: {node_type} failed to report usage: {e}");
+        } else {
+            item.reported = true;
+        }
+    }
+
     if child_senders.len() == 1 {
         // HACK to avoid cloning
         if let Err(send_err) = child_senders[0].send(item).await {
