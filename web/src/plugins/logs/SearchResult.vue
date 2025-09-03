@@ -331,6 +331,7 @@ import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
 import useLogs from "../../composables/useLogs";
+import {searchStream} from "@/composables/useLogs/searchStream";
 import { convertLogData } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useRouter } from "vue-router";
@@ -525,6 +526,7 @@ export default defineComponent({
     const disableMoreErrorDetails = ref(false);
     const router = useRouter();
     const { searchAroundData } = useSearchAround();
+    const { refreshPagination } = searchStream();
 
     const {
       searchObj,
@@ -534,7 +536,6 @@ export default defineComponent({
       filterHitsColumns,
       reorderSelectedFields,
       getFilterExpressionByFieldType,
-      refreshPagination,
       refreshJobPagination,
     } = useLogs();
 
