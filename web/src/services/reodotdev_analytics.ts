@@ -15,7 +15,7 @@ let reoInstance: any = null;
 
 const clientID = config.REO_CLIENT_KEY || "";
 const source = "app";
-const enableAnalytics = config.enableAnalytics === "true" && config.isCloud === "false";
+const enableAnalytics = config.enableAnalytics === "true" && config.isCloud === "true";
 
 // queue for events fired before SDK is ready
 const eventQueue: Array<{ type: "track" | "identify"; args: any[] }> = [];
