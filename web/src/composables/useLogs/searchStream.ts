@@ -20,10 +20,18 @@ import {
   isDistinctQuery,
   isWithQuery,
   isLimitQuery,
+  extractTimestamps,
+  addTransformToQuery,
+  addTraceId,
+  removeTraceId,
+  showCancelSearchNotification,
+  updateUrlQueryParams,
+  isNonAggregatedSQLMode,
 } from "@/composables/useLogs/logsUtils";
-import { generateTraceContext } from "@/utils/zincutils";
+import useNotifications from "@/composables/useNotifications";
+import useSearchWebSocket from "@/composables/useSearchWebSocket";
+import useStreamingSearch from "@/composables/useStreamingSearch";
 import { logsErrorMessage } from "@/utils/common";
-import useLogs from "@/composables/useLogs";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import {
@@ -33,19 +41,75 @@ import {
   WebSocketErrorResponse,
 } from "@/ts/interfaces/query";
 
+import {
+  updateFieldValues,
+  extractFields,
+  updateGridColumns,
+  filterHitsColumns,
+  resetFieldValues,
+} from "@/composables/useLogs/streamFieldUtils";
+import {
+  getHistogramTitle,
+  generateHistogramData,
+  resetHistogramWithError,
+  generateHistogramSkeleton,
+  setMultiStreamHistogramQuery,
+  isHistogramEnabled,
+} from "@/composables/useLogs/histogramUtils";
+
+import {
+  convertDateToTimestamp,
+  getConsumableRelativeTime,
+} from "@/utils/date";
+
+import {
+  useLocalLogFilterField,
+  b64EncodeUnicode,
+  b64DecodeUnicode,
+  formatSizeFromMB,
+  timestampToTimezoneDate,
+  histogramDateTimezone,
+  useLocalWrapContent,
+  useLocalTimezone,
+  useLocalInterestingFields,
+  useLocalSavedView,
+  convertToCamelCase,
+  getFunctionErrorMessage,
+  getUUID,
+  getWebSocketUrl,
+  generateTraceContext,
+  arraysMatch,
+  isWebSocketEnabled,
+  isStreamingEnabled,
+  addSpacesToOperators,
+  deepCopy
+} from "@/utils/zincutils";
+
 export const searchStream = () => {
   let histogramResults: any = [];
+  const { showErrorNotification } = useNotifications();
 
   const store = useStore();
   const router = useRouter();
   let {
     searchObj,
+    searchObjDebug,
     searchAggData,
     resetQueryData,
     notificationMsg,
     initialQueryPayload,
+    searchPartitionMap,
+    resetHistogramError,
   } = searchState();
-  const { buildSearch, addTransformToQuery, setDateTime } = useLogs();
+
+  const {
+    fetchQueryDataWithWebSocket,
+    sendSearchMessageBasedOnRequestId,
+    cancelSearchQueryBasedOnRequestId,
+    closeSocketBasedOnRequestId,
+  } = useSearchWebSocket();
+
+  const { fetchQueryDataWithHttpStream } = useStreamingSearch();
 
   const getQueryReq = (isPagination: boolean) => {
     if (!isPagination) {
@@ -72,9 +136,11 @@ export const searchStream = () => {
       Number.isNaN(searchObj.data.datetime.endTime) ||
       Number.isNaN(searchObj.data.datetime.startTime)
     ) {
-      setDateTime(
-        (router.currentRoute.value?.query?.period as string) || "15m",
-      );
+      const period =
+        (router.currentRoute.value?.query?.period as string) || "15m";
+      const extractedDate: any = extractTimestamps(period);
+      searchObj.data.datetime.startTime = extractedDate.from;
+      searchObj.data.datetime.endTime = extractedDate.to;
     }
 
     const queryReq: SearchRequestPayload = buildSearch();
@@ -383,6 +449,19 @@ export const searchStream = () => {
     refreshPagination(true);
 
     processPostPaginationData();
+  };
+
+  const processPostPaginationData = () => {
+    updateFieldValues();
+
+    //extract fields from query response
+    extractFields();
+
+    //update grid columns
+    updateGridColumns();
+
+    filterHitsColumns();
+    searchObj.data.histogram.chartParams.title = getHistogramTitle();
   };
 
   const handleStreamingMetadata = (
@@ -1283,26 +1362,6 @@ export const searchStream = () => {
     }
   };
 
-  // Bhargav Todo: duplicate function in index.vue
-  function isHistogramEnabled(searchObj: any) {
-    return (
-      searchObj.meta.refreshHistogram &&
-      !searchObj.loadingHistogram &&
-      searchObj.meta.showHistogram
-    );
-  }
-
-  // useLogs.ts
-  function isNonAggregatedSQLMode(searchObj: any, parsedSQL: any) {
-    return !(
-      searchObj.meta.sqlMode &&
-      (isLimitQuery(parsedSQL) ||
-        isDistinctQuery(parsedSQL) ||
-        isWithQuery(parsedSQL) ||
-        !searchObj.data.queryResults.is_histogram_eligible)
-    );
-  }
-
   function isHistogramDataMissing(searchObj: any) {
     return !searchObj.data.queryResults?.aggs?.length;
   }
@@ -1560,6 +1619,85 @@ export const searchStream = () => {
     ) {
       searchObj.data.histogram.errorMsg =
         "Histogram search query was cancelled";
+    }
+  };
+
+  const handleSearchReset = async (data: any, traceId?: string) => {
+    // reset query data
+    try {
+      if (data.type === "search") {
+        if (!data.isPagination) {
+          resetQueryData();
+          searchObj.data.queryResults = {};
+        }
+
+        // reset searchAggData
+        searchAggData.total = 0;
+        searchAggData.hasAggregation = false;
+        searchObj.meta.showDetailTab = false;
+        searchObj.meta.searchApplied = true;
+        searchObj.data.functionError = "";
+
+        searchObj.data.errorCode = 0;
+
+        if (!data.isPagination) {
+          // Histogram reset
+          searchObj.data.histogram = {
+            xData: [],
+            yData: [],
+            chartParams: {
+              title: "",
+              unparsed_x_data: [],
+              timezone: "",
+            },
+            errorCode: 0,
+            errorMsg: "",
+            errorDetail: "",
+          };
+          resetHistogramError();
+        }
+
+        const payload = buildWebSocketPayload(
+          data.queryReq,
+          data.isPagination,
+          "search",
+        );
+
+        initializeSearchConnection(payload);
+        addTraceId(payload.traceId);
+      }
+
+      if (data.type === "histogram" || data.type === "pageCount") {
+        searchObj.data.queryResults.aggs = [];
+        searchObj.data.histogram = {
+          xData: [],
+          yData: [],
+          chartParams: {
+            title: "",
+            unparsed_x_data: [],
+            timezone: "",
+          },
+          errorCode: 0,
+          errorMsg: "",
+          errorDetail: "",
+        };
+
+        resetHistogramError();
+
+        searchObj.loadingHistogram = true;
+
+        if (data.type === "histogram") await generateHistogramSkeleton();
+
+        if (data.type === "histogram") histogramResults = [];
+
+        const payload = buildWebSocketPayload(data.queryReq, false, data.type);
+
+        initializeSearchConnection(payload);
+
+        addTraceId(payload.traceId);
+      }
+    } catch (e: any) {
+      console.error("Error while resetting search", e);
     }
   };
 
