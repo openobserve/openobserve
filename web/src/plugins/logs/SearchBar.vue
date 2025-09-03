@@ -834,7 +834,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </q-btn-dropdown>
             </q-btn-group>
-            <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'">
+            <div class="tw-flex tw-items-center" v-if="searchObj.meta.logsVisualizeToggle === 'visualize'">
               <q-btn
                 v-if="
                   config.isEnterprise == 'true' &&
@@ -859,7 +859,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disable="disable"
                 >{{ t("search.runQuery") }}</q-btn
                 >
-                <!-- <q-separator  class="tw-h-[29px] tw-w-[1px]" /> -->
+              <q-separator  class="tw-h-[29px] tw-w-[1px]" />
               <q-btn-dropdown
                 flat
                 class="tw-h-[29px] search-button-dropdown"
@@ -873,7 +873,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
               >
                 <q-btn
-                  data-test="logs-search-bar-refresh-btn"
+                  data-test="logs-visualize-search-bar-refresh-btn"
                   data-cy="search-bar-visuzlie-hard-refresh-button"
                   dense
                   flat
@@ -881,10 +881,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="'Refresh Cache and Run Query'"
                   class="q-pa-sm search-button tw-rounded-r-none tw-text-[12px]"
                   @click="handleRunQueryFn(true)"
-                  :disable="
-                    config.isEnterprise == 'true' &&
-                    visualizeSearchRequestTraceIds.length
-                  "
+                  :disable="disable"
                 >
                   <q-icon name="refresh" class="q-mr-xs" />
                   Refresh Cache and Run Query</q-btn
