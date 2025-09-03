@@ -38,7 +38,8 @@ mod topn;
 
 use crate::service::search::{
     datafusion::optimizer::physical_optimizer::index_optimizer::{
-        count::is_simple_count, distinct::is_simple_distinct, histogram::is_simple_histogram, select::is_simple_select, topn::is_simple_topn
+        count::is_simple_count, distinct::is_simple_distinct, histogram::is_simple_histogram,
+        select::is_simple_select, topn::is_simple_topn,
     },
     index::IndexCondition,
 };
