@@ -207,12 +207,12 @@ export default class LogsVisualise {
 
   //open query editor
   async openQueryEditor() {
-    await this.page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox').click();
+    await this.page.locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea').click();
   }
 
   //fill query editor
   async fillQueryEditor(sqlQuery) {
-    const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox');
+    const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea');
     await queryEditor.waitFor({ state: "visible", timeout: 5000 });
     await queryEditor.click();
     await queryEditor.fill(sqlQuery);
