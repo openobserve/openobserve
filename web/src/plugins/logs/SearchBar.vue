@@ -1948,9 +1948,8 @@ export default defineComponent({
               if (localInterestingFields.value != null) {
                 localFields = localInterestingFields.value;
               }
-              for (const stream of searchObj.data.stream.selectedStreamFields) {
-                // If the field is not the timestamp column, add it to the interesting field list
-                // As timestamp column is default interesting field, we don't need to add it to the local storage
+              for (const stream of searchObj.data.stream
+                ?.selectedStreamFields || []) {
                 if (
                   stream.name == col &&
                   !searchObj.data.stream.interestingFieldList.includes(col) &&
@@ -1977,18 +1976,8 @@ export default defineComponent({
             }
           }
 
-          // Add timestamp column to the interesting field list, as it is default interesting field
-          if (
-            !searchObj.data.stream.interestingFieldList.includes(
-              store.state.zoConfig?.timestamp_column,
-            )
-          ) {
-            searchObj.data.stream.interestingFieldList.unshift(
-              store.state.zoConfig?.timestamp_column,
-            );
-          }
-
-          for (const item of searchObj.data.stream.selectedStreamFields) {
+          for (const item of searchObj.data.stream?.selectedStreamFields ||
+            []) {
             if (
               searchObj.data.stream.interestingFieldList.includes(item.name)
             ) {
