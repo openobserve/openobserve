@@ -250,7 +250,7 @@ pub struct PanelConfig {
     show_legends: bool,
     legends_position: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    legends_scrollable: Option<String>,
+    legends_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     unit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
