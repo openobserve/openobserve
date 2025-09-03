@@ -86,15 +86,8 @@ export class ManagementPage {
     const isChecked = await this.page.$eval(toggleSelector, (toggle) => {
       return toggle.getAttribute("aria-checked") === "true";
     });
-
-    // Log the current state
-    console.log(
-      `Streaming is currently ${isChecked ? "enabled" : "disabled"}.`
-    );
-
     // If the Streaming is not enabled, click to enable it
     if (!isChecked) {
-      console.log("Enabling Streaming...");
       await this.page.click(toggleSelector);
 
       // Optionally, wait for a brief moment to ensure the toggle action is completed
@@ -143,13 +136,8 @@ export class ManagementPage {
       return toggle.getAttribute("aria-checked") === "true";
     });
 
-    console.log(
-      `Streaming is currently ${isChecked ? "enabled" : "disabled"}.`
-    );
-
     // If Streaming is enabled, click to disable it
     if (isChecked) {
-      console.log("Disabling Streaming...");
       await this.page.click(toggleSelector);
       await this.page.waitForTimeout(500); // allow UI to update
 
