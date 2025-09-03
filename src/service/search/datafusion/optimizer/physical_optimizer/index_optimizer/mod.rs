@@ -38,8 +38,7 @@ mod topn;
 
 use crate::service::search::{
     datafusion::optimizer::physical_optimizer::index_optimizer::{
-        count::is_simple_count, distinct::is_simple_distinct, histogram::is_simple_histogram,
-        topn::is_simple_topn,
+        count::is_simple_count, distinct::is_simple_distinct, histogram::is_simple_histogram, select::is_simple_select, topn::is_simple_topn
     },
     index::IndexCondition,
 };
@@ -133,9 +132,16 @@ impl TreeNodeRewriter for IndexOptimizer {
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
             }
             // Check for SimpleDistinct
-            if let Some(index_optimize_mode) =
-                is_simple_distinct(Arc::clone(&plan), self.index_fields.clone())
-            {
+            if let Some(index_optimize_mode) = is_simple_distinct(
+                Arc::clone(&plan),
+                self.index_fields.clone(),
+                self.index_condition.clone(),
+            ) {
+                *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
+                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+            }
+            // Check for SimpleSelect
+            if let Some(index_optimize_mode) = is_simple_select(Arc::clone(&plan)) {
                 *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
             }

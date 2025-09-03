@@ -207,6 +207,10 @@ impl IndexCondition {
     // the simple str match condition is like str_match(field, 'value')
     // use for check if the distinct query can be optimized
     pub fn is_simple_str_match(&self, field: &str) -> bool {
+        if self.is_condition_all() {
+            return true;
+        }
+
         if self.conditions.len() != 1 {
             return false;
         }

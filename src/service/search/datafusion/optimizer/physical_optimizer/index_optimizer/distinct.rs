@@ -27,8 +27,9 @@ use datafusion::{
     },
 };
 
-use crate::service::search::datafusion::optimizer::physical_optimizer::utils::{
-    get_column_name, is_column,
+use crate::service::search::{
+    datafusion::optimizer::physical_optimizer::utils::{get_column_name, is_column},
+    index::IndexCondition,
 };
 
 #[rustfmt::skip]
@@ -45,15 +46,16 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::utils::{
 ///                 FilterExec: _timestamp@0 >= 17296550822151 AND _timestamp@0 < 172965508891538700, projection=[kubernetes_namespace_name@1]
 ///                   CooperativeExec
 ///                     NewEmptyExec: name="default", projection=["_timestamp", "kubernetes_namespace_name"]
-pub(crate) fn is_simple_distinct(plan: Arc<dyn ExecutionPlan>, index_fields: HashSet<String>) -> Option<IndexOptimizeMode> {
+pub(crate) fn is_simple_distinct(plan: Arc<dyn ExecutionPlan>, index_fields: HashSet<String>, index_condition: IndexCondition) -> Option<IndexOptimizeMode> {
     let mut visitor = SimpleDistinctVisitor::new(index_fields);
     let _ = plan.visit(&mut visitor);
-    if let Some((field, fetch, ascend)) = visitor.simple_distinct {
-        Some(IndexOptimizeMode::SimpleDistinct(
-            field,
-            fetch,
-            ascend,
-        ))
+    if let Some((field, fetch, ascend)) = visitor.simple_distinct 
+        && index_condition.is_simple_str_match(&field) {
+            Some(IndexOptimizeMode::SimpleDistinct(
+                    field,
+                    fetch,
+                    ascend,
+                ))
     } else {
         None
     }
