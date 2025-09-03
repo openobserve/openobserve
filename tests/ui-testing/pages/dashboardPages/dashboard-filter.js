@@ -141,7 +141,7 @@ export default class DashboardFilter {
   async addGroupFilterCondition(index, newFieldName, operator, value) {
     const idx = String(index);
 
-    // Step 1: Get the dynamic label with improved reliability
+    // Step 1: Get the dynamic label
     const dynamicLabelLocator = this.page.locator("div.field_label").nth(index);
     await dynamicLabelLocator.waitFor({ state: "visible", timeout: 10000 });
 
@@ -158,41 +158,39 @@ export default class DashboardFilter {
     await fieldLabelLocator.waitFor({ state: "visible", timeout: 10000 });
     await fieldLabelLocator.click();
 
-    // Step 2: Handle column dropdown with combobox (reliable way)
-    const combobox = this.page.getByRole("combobox", {
-      name: "Filters on Field",
-    });
+    // Step 2: Handle column dropdown
+    const allColumnLocators = this.page.locator(
+      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
+    );
+    await allColumnLocators
+      .first()
+      .waitFor({ state: "visible", timeout: 10000 });
 
-    await combobox.waitFor({ state: "visible", timeout: 10000 });
-    await combobox.fill(newFieldName);
+    const count = await allColumnLocators.count();
+    const columnLocator =
+      count === 1
+        ? allColumnLocators.first()
+        : index === 0
+        ? allColumnLocators.first()
+        : allColumnLocators.last();
 
-    // Wait for options to load
-    await this.page.waitForSelector('[role="option"]', { timeout: 10000 });
+    await columnLocator.click();
+    await columnLocator.fill(newFieldName);
 
-    // Try selecting using multiple strategies to reduce flakiness
-    const optionLocators = [
-      this.page.getByRole("option", { name: newFieldName, exact: true }),
-      this.page.getByText(newFieldName, { exact: true }),
-      this.page.locator('div.q-menu[role="listbox"] div.q-item').first(),
-    ];
+    // Wait for the dropdown listbox (aria-controls points to it)
+    const listBoxId = await columnLocator.getAttribute("aria-controls");
+    const listBoxLocator = this.page.locator(`#${listBoxId}`);
 
-    let selected = false;
-    for (const locator of optionLocators) {
-      try {
-        await locator.waitFor({ state: "visible", timeout: 10000 });
-        await locator.click();
-        selected = true;
-        break;
-      } catch (e) {
-        // ignore and try next locator
-      }
-    }
+    // Ensure listbox appears
+    await listBoxLocator.waitFor({ state: "visible", timeout: 5000 });
 
-    // Fallback to keyboard selection if none of the locators worked
-    if (!selected) {
-      await combobox.press("ArrowDown");
-      await combobox.press("Enter");
-    }
+    // Find the option inside the listbox
+    const optionLocator = listBoxLocator
+      .locator('[role="option"]')
+      .filter({ hasText: newFieldName });
+
+    // Click option safely
+    await optionLocator.first().click({ timeout: 5000 });
 
     // Step 3: Condition dropdown
     if (operator || value) {
@@ -214,38 +212,37 @@ export default class DashboardFilter {
               .locator('[data-test="dashboard-add-condition-operator"]')
               .last();
 
-      await operatorLocator.waitFor({ state: "visible", timeout: 10000 });
       await operatorLocator.click();
 
-      const operatorOption = this.page
-        .getByRole("option", { name: operator, exact: true })
-        .first();
-      await operatorOption.waitFor({ state: "visible", timeout: 10000 });
+      const operatorOption = this.page.getByRole("option", {
+        name: operator,
+        exact: true,
+      });
+      await operatorOption.waitFor({ state: "visible", timeout: 5000 });
       await operatorOption.click();
     }
 
-    // Step 5: Fill value field
+    // Step 5: Fill value
     if (value) {
       const valueInput =
         index === 0
           ? this.page.locator('[data-test="common-auto-complete"]').first()
           : this.page.locator('[data-test="common-auto-complete"]').last();
 
-      await valueInput.waitFor({ state: "visible", timeout: 10000 });
       await valueInput.click();
       await valueInput.fill(value);
 
       const suggestion = this.page
         .locator('[data-test="common-auto-complete-option"]')
         .first();
-      await suggestion.waitFor({ state: "visible", timeout: 10000 });
+      await suggestion.waitFor({ state: "visible", timeout: 5000 });
       await suggestion.click();
     } else if (operator && newFieldName) {
       const expectedError = `Filter: ${newFieldName}: Condition value required`;
       const errorMessage = this.page
         .locator("div")
         .filter({ hasText: expectedError });
-      // Optional: Assert here if needed
+      // optional assertion here
     }
   }
 }
