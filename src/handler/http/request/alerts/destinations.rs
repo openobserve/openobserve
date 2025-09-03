@@ -36,8 +36,6 @@ impl From<DestinationError> for HttpResponse {
 }
 
 /// CreateDestination
-///
-/// #{"ratelimit_module":"Destinations", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -57,6 +55,9 @@ impl From<DestinationError> for HttpResponse {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/alerts/destinations")]
@@ -81,8 +82,6 @@ pub async fn save_destination(
 }
 
 /// UpdateDestination
-///
-/// #{"ratelimit_module":"Destinations", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -102,6 +101,9 @@ pub async fn save_destination(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/alerts/destinations/{destination_name}")]
@@ -121,8 +123,6 @@ pub async fn update_destination(
 }
 
 /// GetDestination
-///
-/// #{"ratelimit_module":"Destinations", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -141,6 +141,9 @@ pub async fn update_destination(
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = Destination),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()), 
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/alerts/destinations/{destination_name}")]
@@ -153,8 +156,6 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
 }
 
 /// ListDestinations
-///
-/// #{"ratelimit_module":"Destinations", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -174,6 +175,9 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<Destination>),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/alerts/destinations")]
@@ -219,8 +223,6 @@ async fn list_destinations(
 }
 
 /// DeleteDestination
-///
-/// #{"ratelimit_module":"Destinations", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -241,6 +243,9 @@ async fn list_destinations(
         (status = 409, description = "Conflict", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/alerts/destinations/{destination_name}")]

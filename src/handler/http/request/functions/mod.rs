@@ -19,8 +19,7 @@ use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
 use config::meta::function::{FunctionList, TestVRLRequest, Transform};
 
 /// CreateFunction
-///
-/// #{"ratelimit_module":"Functions", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -40,6 +39,9 @@ use config::meta::function::{FunctionList, TestVRLRequest, Transform};
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/functions")]
@@ -55,8 +57,7 @@ pub async fn save_function(
 }
 
 /// ListFunctions
-///
-/// #{"ratelimit_module":"Functions", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -74,6 +75,9 @@ pub async fn save_function(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = FunctionList),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/functions")]
@@ -110,8 +114,7 @@ async fn list_functions(
 }
 
 /// DeleteFunction
-///
-/// #{"ratelimit_module":"Functions", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -132,6 +135,9 @@ async fn list_functions(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/functions/{name}")]
@@ -141,8 +147,7 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
 }
 
 /// UpdateFunction
-///
-/// #{"ratelimit_module":"Functions", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -163,6 +168,9 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/functions/{name}")]
@@ -179,8 +187,7 @@ pub async fn update_function(
 }
 
 /// FunctionPipelineDependency
-///
-/// #{"ratelimit_module":"Functions", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -201,6 +208,9 @@ pub async fn update_function(
         (status = 200, description = "Success", content_type = "application/json", body = FunctionList),
         (status = 404, description = "Function not found", content_type = "application/json", body = ()),
         (status = 500, description = "Internal server error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/functions/{name}")]

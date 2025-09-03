@@ -241,7 +241,7 @@ impl super::Db for NatsDb {
                 )));
             }
         };
-        log::info!("Acquired lock for cluster key: {}", lock_key);
+        log::info!("Acquired lock for cluster key: {lock_key}");
 
         // get value and update
         let value = self.get_key_value(key).await.ok();
@@ -374,7 +374,7 @@ impl super::Db for NatsDb {
         if keys.is_empty() {
             return Ok(vec![]);
         }
-        log::debug!("list_values prefix: {}, keys: {:?}", prefix, keys);
+        log::debug!("list_values prefix: {prefix}, keys: {keys:?}");
 
         let values = futures::stream::iter(keys)
             .map(|key| async move {

@@ -35,7 +35,7 @@ pub fn init() {
 
 pub fn reload_machine_id() {
     let machine_id = super::cluster::LOCAL_NODE_ID.load(Ordering::Relaxed);
-    log::info!("init ider with machine_id: {}", machine_id);
+    log::info!("init ider with machine_id: {machine_id}");
     let new_ider = SnowflakeIdGenerator::new(machine_id);
     let mut w = IDER.lock();
     _ = std::mem::replace(&mut *w, new_ider);

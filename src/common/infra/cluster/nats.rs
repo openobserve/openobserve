@@ -251,10 +251,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     if node_ids.iter().filter(|&v| *v == node.id).count() > 1 {
         let new_node_id = super::generate_node_id(node_ids);
         node.id = new_node_id;
-        log::warn!(
-            "[CLUSTER] node id is duplicated, generate new node id: {}",
-            new_node_id
-        );
+        log::warn!("[CLUSTER] node id is duplicated, generate new node id: {new_node_id}");
         // update local id
         LOCAL_NODE_ID.store(new_node_id, Ordering::Relaxed);
         // reset snowflake id generator

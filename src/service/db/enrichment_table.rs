@@ -61,12 +61,7 @@ pub async fn get_enrichment_table_data(
         local_mode: Some(true),
         is_refresh_cache: false,
     };
-    log::info!(
-        "get enrichment table {}/{} data req start time: {}",
-        org_id,
-        name,
-        start_time
-    );
+    log::info!("get enrichment table {org_id}/{name} data req start time: {start_time}");
     // do search
     match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
         Ok(res) => {
@@ -77,12 +72,7 @@ pub async fn get_enrichment_table_data(
             }
         }
         Err(err) => {
-            log::error!(
-                "get enrichment table {}/{} data error: {:?}",
-                org_id,
-                name,
-                err
-            );
+            log::error!("get enrichment table {org_id}/{name} data error: {err:?}");
             Ok(vec![])
         }
     }

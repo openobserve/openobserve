@@ -24,8 +24,6 @@ use crate::{
 };
 
 /// ListPrompts
-///
-/// #{"ratelimit_module":"Prompt", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Ai",
@@ -43,6 +41,9 @@ use crate::{
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Prompt", "operation": "list"}))
+    )
 )]
 #[get("/{org_id}/ai/prompts")]
 pub async fn list_prompts(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
@@ -61,8 +62,6 @@ pub async fn list_prompts(org_id: web::Path<String>) -> Result<HttpResponse, Err
 }
 
 /// GetPrompt
-///
-/// #{"ratelimit_module":"Prompt", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Ai",
@@ -82,6 +81,9 @@ pub async fn list_prompts(org_id: web::Path<String>) -> Result<HttpResponse, Err
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Prompt", "operation": "get"}))
+    )
 )]
 #[get("/{org_id}/ai/prompts/{prompt_type}")]
 pub async fn get_prompt(path: web::Path<(String, PromptType)>) -> Result<HttpResponse, Error> {
@@ -101,8 +103,6 @@ pub async fn get_prompt(path: web::Path<(String, PromptType)>) -> Result<HttpRes
 }
 
 /// UpdatePrompt
-///
-/// #{"ratelimit_module":"Prompt", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Ai",
@@ -128,6 +128,9 @@ pub async fn get_prompt(path: web::Path<(String, PromptType)>) -> Result<HttpRes
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Prompt", "operation": "update"}))
+    )
 )]
 #[put("/{org_id}/ai/prompts")]
 pub async fn update_prompt(

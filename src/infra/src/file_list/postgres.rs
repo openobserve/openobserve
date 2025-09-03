@@ -403,7 +403,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
             .with_label_values(&["query", "file_list"])
             .inc();
         let start = std::time::Instant::now();
-        let ret = if flattened.is_some() {
+        let ret = if let Some(flattened) = flattened {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
@@ -412,7 +412,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
                 "#
                 )
                 .bind(stream_key)
-                .bind(flattened.unwrap())
+                .bind(flattened)
                 .fetch_all(&pool).await
         } else {
             let (time_start, time_end) = time_range.unwrap_or((0, 0));
@@ -555,7 +555,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
             }
             partitions
         };
-        log::debug!("file_list day_partitions: {:?}", day_partitions);
+        log::debug!("file_list day_partitions: {day_partitions:?}");
 
         let mut tasks = Vec::with_capacity(day_partitions.len());
 

@@ -35,8 +35,7 @@ use crate::{
 };
 
 /// Organization specific settings
-///
-/// #{"ratelimit_module":"Settings", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -55,6 +54,9 @@ use crate::{
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/settings")]
@@ -129,8 +131,7 @@ async fn create(
 }
 
 /// Retrieve organization specific settings
-///
-/// #{"ratelimit_module":"Settings", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -148,6 +149,9 @@ async fn create(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/settings")]

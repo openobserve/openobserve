@@ -51,8 +51,7 @@ use crate::{
 };
 
 /// GetOrganizations
-///
-/// #{"ratelimit_module":"Organizations", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -64,6 +63,9 @@ use crate::{
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = OrganizationResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "list"}))
     )
 )]
 #[get("/organizations")]
@@ -245,8 +247,7 @@ pub async fn all_organizations(
 }
 
 /// GetOrganizationSummary
-///
-/// #{"ratelimit_module":"Summary", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -261,6 +262,9 @@ pub async fn all_organizations(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Summary", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/summary")]
@@ -271,8 +275,7 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
 }
 
 /// GetIngestToken
-///
-/// #{"ratelimit_module":"Ingestion Token", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -288,6 +291,9 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Ingestion Token", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/passcode")]
@@ -311,8 +317,7 @@ async fn get_user_passcode(
 }
 
 /// UpdateIngestToken
-///
-/// #{"ratelimit_module":"Ingestion Token", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -328,6 +333,9 @@ async fn get_user_passcode(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Ingestion Token", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/passcode")]
@@ -351,8 +359,7 @@ async fn update_user_passcode(
 }
 
 /// GetRumIngestToken
-///
-/// #{"ratelimit_module":"Rumtokens", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -368,6 +375,9 @@ async fn update_user_passcode(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Rumtokens", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/rumtoken")]
@@ -391,8 +401,7 @@ async fn get_user_rumtoken(
 }
 
 /// UpdateRumIngestToken
-///
-/// #{"ratelimit_module":"Rumtokens", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -408,6 +417,9 @@ async fn get_user_rumtoken(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Rumtokens", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/rumtoken")]
@@ -431,8 +443,7 @@ async fn update_user_rumtoken(
 }
 
 /// CreateRumIngestToken
-///
-/// #{"ratelimit_module":"Rumtokens", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -448,6 +459,9 @@ async fn update_user_rumtoken(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Rumtokens", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/rumtoken")]
@@ -471,8 +485,7 @@ async fn create_user_rumtoken(
 }
 
 /// CreateOrganization
-///
-/// #{"ratelimit_module":"Organizations", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -485,6 +498,9 @@ async fn create_user_rumtoken(
     request_body(content = Organization, description = "Organization data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "create"}))
     )
 )]
 #[post("/organizations")]

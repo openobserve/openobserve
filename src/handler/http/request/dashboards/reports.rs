@@ -56,8 +56,7 @@ impl From<ReportError> for HttpResponse {
 }
 
 /// CreateReport
-///
-/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
@@ -85,6 +84,9 @@ impl From<ReportError> for HttpResponse {
         (status = StatusCode::CREATED, description = "Report created", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "create"}))
+    )
 )]
 #[post("/{org_id}/reports")]
 pub async fn create_report(
@@ -105,8 +107,7 @@ pub async fn create_report(
 }
 
 /// UpdateReport
-///
-/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
@@ -132,6 +133,9 @@ pub async fn create_report(
         (status = StatusCode::NOT_FOUND, description = "Report not found", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the report", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"}))
+    )
 )]
 #[put("/{org_id}/reports/{name}")]
 async fn update_report(
@@ -149,8 +153,7 @@ async fn update_report(
 }
 
 /// ListReports
-///
-/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
@@ -169,6 +172,9 @@ async fn update_report(
     responses(
         (status = StatusCode::OK, body = Vec<Report>),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "list"}))
+    )
 )]
 #[get("/{org_id}/reports")]
 async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
@@ -246,8 +252,7 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
 }
 
 /// GetReport
-///
-/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
@@ -268,6 +273,9 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
         (status = StatusCode::OK, body = Report),
         (status = StatusCode::NOT_FOUND, description = "Report not found", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "get"}))
+    )
 )]
 #[get("/{org_id}/reports/{name}")]
 async fn get_report(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
@@ -279,8 +287,7 @@ async fn get_report(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 }
 
 /// DeleteReport
-///
-/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",
@@ -301,6 +308,9 @@ async fn get_report(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         (status = StatusCode::NOT_FOUND, description = "NotFound", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"}))
+    )
 )]
 #[delete("/{org_id}/reports/{name}")]
 async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
@@ -315,8 +325,7 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
 }
 
 /// EnableReport
-///
-/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Report",
@@ -363,8 +372,7 @@ async fn enable_report(
 }
 
 /// TriggerReport
-///
-/// #{"ratelimit_module":"Reports", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Reports",

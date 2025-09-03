@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <div class="q-pt-sm q-pb-xs flex justify-start">
         <div
+          data-test="back-button"
           class="flex justify-center items-center q-mr-md cursor-pointer"
           style="
             border: 1.5px solid;
@@ -32,7 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
         <span class="text-bold">Event ID:</span>
-        <span :title="error.error_id" class="q-pl-xs cursor-pointer"
+        <span
+          data-test="error-id"
+          :title="error.error_id"
+          class="q-pl-xs cursor-pointer"
           >{{ error.error_id }}
           <q-icon
             size="12px"

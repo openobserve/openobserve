@@ -97,8 +97,6 @@ async fn handle_req(
 }
 
 /// GetLatestTraces
-///
-/// #{"ratelimit_module":"Traces", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Traces",
@@ -135,6 +133,9 @@ async fn handle_req(
         })),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/{stream_name}/traces/latest")]

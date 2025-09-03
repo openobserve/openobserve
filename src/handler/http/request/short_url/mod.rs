@@ -29,8 +29,6 @@ use crate::{
 };
 
 /// Shorten a URL
-///
-/// #{"ratelimit_module":"ShortUrl", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     post,
     context_path = "/api",
@@ -55,6 +53,9 @@ use crate::{
             })
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "ShortUrl", "operation": "create"}))
     ),
     tag = "Short Url"
 )]
@@ -87,8 +88,6 @@ pub struct RetrieveQuery {
 }
 
 /// Retrieve the original URL from a short_id
-///
-/// #{"ratelimit_module":"ShortUrl", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     get,
     context_path = "/short",
@@ -104,6 +103,9 @@ pub struct RetrieveQuery {
         )),
         (status = 200, description = "JSON response when type=ui", body = String, content_type = "application/json"),
         (status = 404, description = "Short URL not found", content_type = "text/plain")
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "ShortUrl", "operation": "get"}))
     ),
     tag = "Short Url"
 )]

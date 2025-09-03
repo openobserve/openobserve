@@ -378,7 +378,7 @@ tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-log = "0.2"
 tracing-opentelemetry = "0.27"
-tracing-subscriber = { version = "0.3.0", features = [
+tracing-subscriber = { version = "0.3.20", features = [
     "env-filter",
     "json",
     "registry",

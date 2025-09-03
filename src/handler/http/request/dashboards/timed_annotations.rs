@@ -25,8 +25,7 @@ use crate::{
 };
 
 /// Create Timed Annotations
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     post,
     context_path = "/api",
@@ -52,6 +51,9 @@ use crate::{
         ),
         (status = 500, description = "Failed to create timed annotations", content_type = "application/json")
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"}))
+    )
 )]
 #[post("/{org_id}/dashboards/{dashboard_id}/annotations")]
 pub async fn create_annotations(
@@ -79,8 +81,7 @@ pub async fn create_annotations(
 }
 
 /// Get Timed Annotations
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     get,
     context_path = "/api",
@@ -105,6 +106,9 @@ pub async fn create_annotations(
         (status = 400, description = "Invalid query parameters", content_type = "application/json"),
         (status = 500, description = "Failed to get timed annotations", content_type = "application/json")
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"}))
+    )
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}/annotations")]
 pub async fn get_annotations(
@@ -141,8 +145,7 @@ pub async fn get_annotations(
 }
 
 /// Delete Timed Annotations
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     delete,
     tag = "Dashboards",
@@ -166,6 +169,9 @@ pub async fn get_annotations(
         ),
         (status = 500, description = "Failed to delete timed annotations", content_type = "application/json")
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"}))
+    )
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}/annotations")]
 pub async fn delete_annotations(
@@ -193,8 +199,7 @@ pub async fn delete_annotations(
 }
 
 /// Update Timed Annotations
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     put,
     tag = "Dashboards",
@@ -218,6 +223,9 @@ pub async fn delete_annotations(
         ),
         (status = 500, description = "Failed to update timed annotations", content_type = "application/json")
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"}))
+    )
 )]
 #[put("/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}")]
 pub async fn update_annotations(
@@ -249,8 +257,7 @@ pub async fn update_annotations(
 }
 
 /// Delete Timed Annotation Panels
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     delete,
     tag = "Dashboards",
@@ -274,6 +281,9 @@ pub async fn update_annotations(
         ),
         (status = 500, description = "Failed to remove timed annotation from panels", content_type = "application/json")
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"}))
+    )
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}")]
 pub async fn delete_annotation_panels(
