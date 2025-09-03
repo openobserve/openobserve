@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             />
              <q-btn
-             v-if="!config.isEnterprise"
+             v-if="config.isEnterprise === 'false'"
               :outline="isVariablesChanged ? false : true"
               class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-tooltip>
             </q-btn>
             <q-btn-group
-              v-if="config.isEnterprise"
+              v-if="config.isEnterprise === 'true'"
               class="dashboard-icons q-ml-sm hideOnPrintMode no-border refresh-btn-group"
             >
             <q-btn
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="arePanelsLoading ? 'dashboard-cancel-btn' : 'dashboard-refresh-btn'"
                 :color="arePanelsLoading ? 'negative' : (isVariablesChanged ? 'warning' : '')"
                 :text-color="arePanelsLoading ? 'negative' : (store.state.theme == 'dark' ? 'white' : 'dark')"
-                :disable="arePanelsLoading && !config.isEnterprise"
+                :disable="arePanelsLoading && config.isEnterprise === 'false'"
               >
                 <q-tooltip>
                   {{

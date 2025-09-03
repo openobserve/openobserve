@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
         >
           <q-btn
-            v-if="!config.isEnterprise"
+            v-if="config.isEnterprise === 'false'"
             class="q-ml-md text-bold"
             data-test="dashboard-apply"
             padding="sm lg"
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="() => runQuery(false)"
           />
           <q-btn-group
-            v-if="config.isEnterprise"
+            v-if="config.isEnterprise === 'true'"
             class="q-ml-md"
           >
             <q-btn
