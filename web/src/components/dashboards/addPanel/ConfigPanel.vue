@@ -324,6 +324,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type != 'gauge' &&
           dashboardPanelData.data.type != 'geomap' &&
           dashboardPanelData.data.config.show_legends &&
+          dashboardPanelData.data.type != 'pie' &&
+          dashboardPanelData.data.type != 'donut' &&
           dashboardPanelData.data.type != 'sankey' &&
           dashboardPanelData.data.type != 'maps'
         "
@@ -1300,6 +1302,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <q-toggle
+        v-if="
+          dashboardPanelData.data.config.show_legends &&
+          dashboardPanelData.data.type != 'table' &&
+          dashboardPanelData.data.type != 'pie' &&
+          dashboardPanelData.data.type != 'donut' &&
+          dashboardPanelData.data.type != 'heatmap' &&
+          dashboardPanelData.data.type != 'metric' &&
+          dashboardPanelData.data.type != 'gauge' &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.type != 'sankey' &&
+          dashboardPanelData.data.type != 'maps'
+        "
         v-model="dashboardPanelData.data.config.show_gridlines"
         label="Show Gridlines"
         data-test="dashboard-config-show-gridlines"
