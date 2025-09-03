@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 struct LicenseResponse {
     key: Option<String>,
     license: Option<License>,
+    installation_id: String,
     expired: bool,
     search_used: f64,
     ingestion_used: f64,
@@ -27,6 +28,7 @@ pub async fn get_license_info() -> HttpResponse {
     let res = LicenseResponse {
         key,
         license,
+        installation_id: config::get_instance_id(),
         expired: license_expired().await,
         search_used: search_used(),
         ingestion_used: ingestion_used(),
