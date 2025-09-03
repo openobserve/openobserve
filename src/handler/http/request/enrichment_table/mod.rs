@@ -26,8 +26,7 @@ use crate::{
 };
 
 /// CreateEnrichmentTable
-///
-/// #{"ratelimit_module":"Enrichment Table", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
@@ -45,6 +44,9 @@ use crate::{
         (status = StatusCode::CREATED, description = "Saved enrichment table", body = ()),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Enrichment Table", "operation": "create"}))
+    )
 )]
 #[post("/{org_id}/enrichment_tables/{table_name}")]
 pub async fn save_enrichment_table(

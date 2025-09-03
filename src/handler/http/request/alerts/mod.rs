@@ -83,8 +83,6 @@ impl From<AlertError> for HttpResponse {
 }
 
 /// CreateAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -102,6 +100,9 @@ impl From<AlertError> for HttpResponse {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"}))
     )
 )]
 #[post("/v2/{org_id}/alerts")]
@@ -135,8 +136,6 @@ pub async fn create_alert(
 }
 
 /// GetAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -154,6 +153,9 @@ pub async fn create_alert(
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = GetAlertResponseBody),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/{alert_id}")]
@@ -175,8 +177,6 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 }
 
 /// ExportAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -194,6 +194,9 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = GetAlertResponseBody),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/{alert_id}/export")]
@@ -215,8 +218,6 @@ pub async fn export_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 }
 
 /// UpdateAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -235,6 +236,9 @@ pub async fn export_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
 #[put("/v2/{org_id}/alerts/{alert_id}")]
@@ -258,8 +262,6 @@ pub async fn update_alert(
 }
 
 /// DeleteAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -277,6 +279,9 @@ pub async fn update_alert(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"}))
     )
 )]
 #[delete("/v2/{org_id}/alerts/{alert_id}")]
@@ -291,8 +296,6 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 }
 
 /// ListAlerts
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -308,6 +311,9 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = ListAlertsResponseBody),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
     )
 )]
 #[get("/v2/{org_id}/alerts")]
@@ -354,8 +360,6 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
 }
 
 /// EnableAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -374,6 +378,9 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/{alert_id}/enable")]
@@ -397,8 +404,6 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
 }
 
 /// TriggerAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -417,6 +422,9 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/{alert_id}/trigger")]
@@ -431,8 +439,6 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 }
 
 /// MoveAlerts
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -451,6 +457,9 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/move")]

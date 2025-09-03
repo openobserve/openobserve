@@ -21,8 +21,7 @@ use hashbrown::HashMap;
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
 
 /// GetValue
-///
-/// #{"ratelimit_module":"Key Values", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
@@ -41,6 +40,9 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
     responses(
         (status = 200, description = "Success",  content_type = "text/plain", body = String),
         (status = 404, description = "NotFound", content_type = "text/plain", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/kv/{key}")]
@@ -57,8 +59,7 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
 }
 
 /// SetValue
-///
-/// #{"ratelimit_module":"Key Values", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
@@ -78,6 +79,9 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
     responses(
         (status = 200, description = "Success", content_type = "text/plain", body = String),
         (status = 500, description = "Failure", content_type = "text/plain", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/kv/{key}")]
@@ -101,8 +105,7 @@ pub async fn set(
 }
 
 /// RemoveValue
-///
-/// #{"ratelimit_module":"Key Values", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
@@ -121,6 +124,9 @@ pub async fn set(
     responses(
         (status = 200, description = "Success",  content_type = "text/plain", body = String),
         (status = 404, description = "NotFound", content_type = "text/plain", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/kv/{key}")]
@@ -137,8 +143,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 }
 
 /// ListKeys
-///
-/// #{"ratelimit_module":"Key Values", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
@@ -156,6 +161,9 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/kv")]

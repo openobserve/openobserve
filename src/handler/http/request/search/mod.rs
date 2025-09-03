@@ -157,8 +157,7 @@ async fn can_use_distinct_stream(
 }
 
 /// SearchStreamData
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -210,6 +209,9 @@ async fn can_use_distinct_stream(
         })),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[post("/{org_id}/_search")]
@@ -447,8 +449,7 @@ pub async fn search(
 }
 
 /// SearchAround
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -493,6 +494,9 @@ pub async fn search(
             "scan_size": 28943
         })),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/{stream_name}/_around")]
@@ -548,8 +552,7 @@ pub async fn around_v1(
 }
 
 /// SearchAroundV2
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -603,6 +606,9 @@ pub async fn around_v1(
             "scan_size": 28943
         })),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[post("/{org_id}/{stream_name}/_around")]
@@ -659,8 +665,7 @@ pub async fn around_v2(
 }
 
 /// SearchTopNValues
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -695,6 +700,9 @@ pub async fn around_v2(
         })),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/{stream_name}/_values")]
@@ -1305,8 +1313,7 @@ async fn values_v1(
 }
 
 /// SearchStreamPartition
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -1338,6 +1345,9 @@ async fn values_v1(
         })),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[post("/{org_id}/_search_partition")]
@@ -1445,8 +1455,7 @@ pub async fn search_partition(
 }
 
 /// Search History
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -1509,6 +1518,9 @@ pub async fn search_partition(
         })),
         (status = 400, description = "Bad Request - Invalid parameters or body", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[post("/{org_id}/_search_history")]

@@ -37,6 +37,8 @@ use {
     o2_openfga::config::get_config as get_openfga_config,
 };
 
+#[cfg(feature = "cloud")]
+use crate::common::meta::user::UserList;
 use crate::{
     common::{
         meta::{
@@ -54,8 +56,6 @@ use crate::{
 pub mod service_accounts;
 
 /// ListUsers
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -73,6 +73,9 @@ pub mod service_accounts;
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/users")]
@@ -117,8 +120,6 @@ pub async fn list(
 }
 
 /// CreateUser
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -137,6 +138,9 @@ pub async fn list(
     request_body(content = PostUserRequest, description = "User data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/users")]
@@ -176,8 +180,6 @@ pub async fn save(
 }
 
 /// UpdateUser
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -197,6 +199,9 @@ pub async fn save(
     request_body(content = UpdateUser, description = "User data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/users/{email_id}")]
@@ -245,8 +250,6 @@ pub async fn update(
 }
 
 /// AddUserToOrganization
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -265,6 +268,9 @@ pub async fn update(
     request_body(content = UserRoleRequest, description = "User role", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/users/{email_id}")]
@@ -300,8 +306,6 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
     auth_cookie
 }
 /// RemoveUserFromOrganization
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -320,6 +324,9 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/users/{email_id}")]
@@ -333,8 +340,6 @@ pub async fn delete(
 }
 
 /// AuthenticateUser
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
 context_path = "/auth",
     tag = "Auth",
@@ -347,6 +352,9 @@ context_path = "/auth",
     request_body(content = SignInUser, description = "User login", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = SignInResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"}))
     )
 )]
 #[post("/login")]
@@ -734,8 +742,6 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
 }
 
 /// ListUserRoles
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -753,6 +759,9 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/users/roles")]

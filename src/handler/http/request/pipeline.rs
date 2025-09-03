@@ -37,8 +37,7 @@ impl From<PipelineError> for HttpResponse {
 }
 
 /// CreatePipeline
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipeline",
@@ -55,6 +54,9 @@ impl From<PipelineError> for HttpResponse {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/pipelines")]
@@ -85,8 +87,7 @@ pub async fn save_pipeline(
 }
 
 /// ListPipelines
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -101,6 +102,9 @@ pub async fn save_pipeline(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = PipelineList),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/pipelines")]
@@ -152,8 +156,7 @@ async fn list_pipelines(
 }
 
 /// GetStreamsWithPipeline
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -168,6 +171,9 @@ async fn list_pipelines(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = PipelineList),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/pipelines/streams")]
@@ -180,8 +186,7 @@ async fn list_streams_with_pipeline(path: web::Path<String>) -> Result<HttpRespo
 }
 
 /// DeletePipeline
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -198,6 +203,9 @@ async fn list_streams_with_pipeline(path: web::Path<String>) -> Result<HttpRespo
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/pipelines/{pipeline_id}")]
@@ -213,8 +221,7 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
 }
 
 /// UpdatePipeline
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -231,6 +238,9 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/pipelines")]
@@ -246,8 +256,7 @@ pub async fn update_pipeline(pipeline: web::Json<Pipeline>) -> Result<HttpRespon
 }
 
 /// EnablePipeline
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
@@ -266,6 +275,9 @@ pub async fn update_pipeline(pipeline: web::Json<Pipeline>) -> Result<HttpRespon
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/pipelines/{pipeline_id}/enable")]
