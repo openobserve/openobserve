@@ -15,7 +15,6 @@
 
 use std::{collections::HashSet, sync::Arc};
 
-use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     common::{
         Result,
@@ -38,7 +37,9 @@ use parking_lot::Mutex;
 
 use crate::service::search::{
     datafusion::{
-        optimizer::physical_optimizer::utils::{get_column_name, is_column, is_value},
+        optimizer::physical_optimizer::utils::{
+            get_column_name, is_column, is_only_timestamp_filter, is_value,
+        },
         udf::{
             MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
             STR_MATCH_UDF_NAME,
@@ -140,7 +141,7 @@ impl TreeNodeRewriter for IndexOptimizer {
 
             // if all filter can be used in index, we can
             // use index optimizer rule to optimize the query
-            if is_only_timestamp_filter(&other_conditions) {
+            if is_only_timestamp_filter(&other_conditions.iter().collect::<Vec<_>>()) {
                 self.can_optimize = true;
             }
 
@@ -232,34 +233,6 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
         };
     } else if let Some(expr) = expr.as_any().downcast_ref::<NotExpr>() {
         return is_expr_valid_for_index(expr.arg(), index_fields);
-    } else {
-        return false;
-    }
-    true
-}
-
-fn is_only_timestamp_filter(expr: &[Arc<dyn PhysicalExpr>]) -> bool {
-    expr.iter().all(is_timestamp_filter)
-}
-
-fn is_timestamp_filter(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    if let Some(expr) = expr.as_any().downcast_ref::<BinaryExpr>() {
-        match expr.op() {
-            Operator::Gt | Operator::GtEq | Operator::Lt | Operator::LtEq => {
-                let column = if is_value(expr.left()) && is_column(expr.right()) {
-                    get_column_name(expr.right())
-                } else if is_value(expr.right()) && is_column(expr.left()) {
-                    get_column_name(expr.left())
-                } else {
-                    return false;
-                };
-
-                if column != TIMESTAMP_COL_NAME {
-                    return false;
-                }
-            }
-            _ => return false,
-        }
     } else {
         return false;
     }

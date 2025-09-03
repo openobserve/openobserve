@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     common::Result,
     error::DataFusionError,
@@ -111,4 +112,32 @@ pub fn get_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
 
 pub fn is_value(expr: &Arc<dyn PhysicalExpr>) -> bool {
     expr.as_any().downcast_ref::<Literal>().is_some()
+}
+
+pub fn is_only_timestamp_filter(expr: &[&Arc<dyn PhysicalExpr>]) -> bool {
+    expr.iter().all(|expr| is_timestamp_filter(expr))
+}
+
+fn is_timestamp_filter(expr: &Arc<dyn PhysicalExpr>) -> bool {
+    if let Some(expr) = expr.as_any().downcast_ref::<BinaryExpr>() {
+        match expr.op() {
+            Operator::Gt | Operator::GtEq | Operator::Lt | Operator::LtEq => {
+                let column = if is_value(expr.left()) && is_column(expr.right()) {
+                    get_column_name(expr.right())
+                } else if is_value(expr.right()) && is_column(expr.left()) {
+                    get_column_name(expr.left())
+                } else {
+                    return false;
+                };
+
+                if column != TIMESTAMP_COL_NAME {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    } else {
+        return false;
+    }
+    true
 }

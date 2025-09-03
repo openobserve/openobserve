@@ -44,15 +44,17 @@ use crate::service::search::{
     index::IndexCondition,
 };
 
+/// this use in query follower to generate [`IndexOptimizeMode`]
+/// this is used for optimizer that do not need global information
 #[derive(Default, Debug)]
-pub struct IndexOptimizeRule {
+pub struct FollowerIndexOptimizerule {
     time_range: (i64, i64),
     index_fields: HashSet<String>,
     index_condition: IndexCondition,
     index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
 }
 
-impl IndexOptimizeRule {
+impl FollowerIndexOptimizerule {
     pub fn new(
         time_range: (i64, i64),
         index_fields: HashSet<String>,
@@ -68,13 +70,13 @@ impl IndexOptimizeRule {
     }
 }
 
-impl PhysicalOptimizerRule for IndexOptimizeRule {
+impl PhysicalOptimizerRule for FollowerIndexOptimizerule {
     fn optimize(
         &self,
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        let mut rewriter = IndexOptimizer::new(
+        let mut rewriter = FollowerIndexOptimizer::new(
             self.time_range,
             self.index_fields.clone(),
             self.index_condition.clone(),
@@ -93,14 +95,14 @@ impl PhysicalOptimizerRule for IndexOptimizeRule {
     }
 }
 
-struct IndexOptimizer {
+struct FollowerIndexOptimizer {
     time_range: (i64, i64),
     index_fields: HashSet<String>,
     index_condition: IndexCondition,
     index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
 }
 
-impl IndexOptimizer {
+impl FollowerIndexOptimizer {
     pub fn new(
         time_range: (i64, i64),
         index_fields: HashSet<String>,
@@ -116,7 +118,100 @@ impl IndexOptimizer {
     }
 }
 
-impl TreeNodeRewriter for IndexOptimizer {
+impl TreeNodeRewriter for FollowerIndexOptimizer {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, plan: Self::Node) -> Result<Transformed<Self::Node>> {
+        if plan
+            .as_any()
+            .downcast_ref::<SortPreservingMergeExec>()
+            .is_some()
+        {
+            // Check for SimpleSelect
+            if let Some(index_optimize_mode) = is_simple_select(Arc::clone(&plan)) {
+                *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
+                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+            }
+            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
+        } else if plan.as_any().downcast_ref::<AggregateExec>().is_some() {
+            // Check for SimpleCount
+            if let Some(index_optimize_mode) = is_simple_count(Arc::clone(&plan)) {
+                *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
+                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+            }
+            // Check for SimpleHistogram
+            if let Some(index_optimize_mode) =
+                is_simple_histogram(Arc::clone(&plan), self.time_range)
+            {
+                *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
+                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+            }
+            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
+        }
+        Ok(Transformed::no(plan))
+    }
+}
+
+/// this use in query leader to generate [`IndexOptimizeMode`]
+/// this is used for optimizer that need global information
+/// like order and limit
+#[derive(Default, Debug)]
+pub struct LeaderIndexOptimizerule {
+    index_fields: HashSet<String>,
+    index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
+}
+
+impl LeaderIndexOptimizerule {
+    pub fn new(
+        index_fields: HashSet<String>,
+        index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
+    ) -> Self {
+        Self {
+            index_fields,
+            index_optimizer_mode,
+        }
+    }
+}
+
+impl PhysicalOptimizerRule for LeaderIndexOptimizerule {
+    fn optimize(
+        &self,
+        plan: Arc<dyn ExecutionPlan>,
+        _config: &ConfigOptions,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
+        let mut rewriter =
+            LeaderIndexOptimizer::new(self.index_fields.clone(), self.index_optimizer_mode.clone());
+        let plan = plan.rewrite(&mut rewriter)?.data;
+        Ok(plan)
+    }
+
+    fn name(&self) -> &str {
+        "index_optimizer"
+    }
+
+    fn schema_check(&self) -> bool {
+        true
+    }
+}
+
+struct LeaderIndexOptimizer {
+    index_fields: HashSet<String>,
+    index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
+}
+
+impl LeaderIndexOptimizer {
+    pub fn new(
+        index_fields: HashSet<String>,
+        index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
+    ) -> Self {
+        Self {
+            index_fields,
+            index_optimizer_mode,
+        }
+    }
+}
+
+impl TreeNodeRewriter for LeaderIndexOptimizer {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, plan: Self::Node) -> Result<Transformed<Self::Node>> {
@@ -133,29 +228,8 @@ impl TreeNodeRewriter for IndexOptimizer {
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
             }
             // Check for SimpleDistinct
-            if let Some(index_optimize_mode) = is_simple_distinct(
-                Arc::clone(&plan),
-                self.index_fields.clone(),
-                self.index_condition.clone(),
-            ) {
-                *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
-                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
-            }
-            // Check for SimpleSelect
-            if let Some(index_optimize_mode) = is_simple_select(Arc::clone(&plan)) {
-                *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
-                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
-            }
-            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
-        } else if plan.as_any().downcast_ref::<AggregateExec>().is_some() {
-            // Check for SimpleCount
-            if let Some(index_optimize_mode) = is_simple_count(Arc::clone(&plan)) {
-                *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
-                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
-            }
-            // Check for SimpleHistogram
             if let Some(index_optimize_mode) =
-                is_simple_histogram(Arc::clone(&plan), self.time_range)
+                is_simple_distinct(Arc::clone(&plan), self.index_fields.clone())
             {
                 *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));

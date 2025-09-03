@@ -21,15 +21,15 @@ use datafusion::{
         Result,
         tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
     },
+    physical_expr::{ScalarFunctionExpr, split_conjunction},
     physical_plan::{
-        ExecutionPlan, aggregates::AggregateExec, projection::ProjectionExec,
-        sorts::sort_preserving_merge::SortPreservingMergeExec,
+        ExecutionPlan, PhysicalExpr, aggregates::AggregateExec, filter::FilterExec,
+        projection::ProjectionExec, sorts::sort_preserving_merge::SortPreservingMergeExec,
     },
 };
 
-use crate::service::search::{
-    datafusion::optimizer::physical_optimizer::utils::{get_column_name, is_column},
-    index::IndexCondition,
+use crate::service::search::datafusion::optimizer::physical_optimizer::utils::{
+    get_column_name, is_column, is_only_timestamp_filter,
 };
 
 #[rustfmt::skip]
@@ -46,11 +46,10 @@ use crate::service::search::{
 ///                 FilterExec: _timestamp@0 >= 17296550822151 AND _timestamp@0 < 172965508891538700, projection=[kubernetes_namespace_name@1]
 ///                   CooperativeExec
 ///                     NewEmptyExec: name="default", projection=["_timestamp", "kubernetes_namespace_name"]
-pub(crate) fn is_simple_distinct(plan: Arc<dyn ExecutionPlan>, index_fields: HashSet<String>, index_condition: IndexCondition) -> Option<IndexOptimizeMode> {
+pub(crate) fn is_simple_distinct(plan: Arc<dyn ExecutionPlan>, index_fields: HashSet<String>) -> Option<IndexOptimizeMode> {
     let mut visitor = SimpleDistinctVisitor::new(index_fields);
     let _ = plan.visit(&mut visitor);
-    if let Some((field, fetch, ascend)) = visitor.simple_distinct 
-        && index_condition.is_simple_str_match(&field) {
+    if let Some((field, fetch, ascend)) = visitor.simple_distinct {
             Some(IndexOptimizeMode::SimpleDistinct(
                     field,
                     fetch,
@@ -129,6 +128,19 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
             // If projection doesn't have exactly 2 expressions, stop visiting
             self.simple_distinct = None;
             return Ok(TreeNodeRecursion::Stop);
+        } else if let Some(filter) = node.as_any().downcast_ref::<FilterExec>() {
+            let predicate = filter.predicate();
+            let exprs = split_conjunction(predicate);
+            if exprs.len() == 3
+                && is_only_timestamp_filter(&exprs[1..])
+                && let Some(column_name) = is_simple_str_match(exprs[0])
+                && self.index_fields.contains(&column_name)
+            {
+                return Ok(TreeNodeRecursion::Continue);
+            }
+            // If projection doesn't have exactly 2 expressions, stop visiting
+            self.simple_distinct = None;
+            return Ok(TreeNodeRecursion::Stop);
         } else if node.name() == "HashJoinExec"
             || node.name() == "RecursiveQueryExec"
             || node.name() == "UnionExec"
@@ -147,5 +159,16 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
             return Ok(TreeNodeRecursion::Stop);
         }
         Ok(TreeNodeRecursion::Continue)
+    }
+}
+
+fn is_simple_str_match(expr: &Arc<dyn PhysicalExpr>) -> Option<String> {
+    if let Some(func) = expr.as_any().downcast_ref::<ScalarFunctionExpr>()
+        && func.fun().name().to_lowercase() == "str_match"
+        && func.args().len() == 2
+    {
+        Some(get_column_name(&func.args()[0]).to_string())
+    } else {
+        None
     }
 }
