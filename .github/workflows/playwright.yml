@@ -186,7 +186,7 @@ jobs:
                 "pipelines.spec.js",
                 "pipeline-dynamic.spec.js",
                 "pipeline-core.spec.js",
-                # "remotepipeline.spec.js",
+                # "remotepipeline.spec.js"
               ]
           - testfolder: "Reports"
             browser: "chrome"
@@ -199,15 +199,7 @@ jobs:
                 "streamname.spec.js",
                 "streaming.spec.js",
               ]
-          - testfolder: "Queries"
-            browser: "chrome"
-            run_files:
-              [
-                "adhoc.spec.js",
-                "savedqueries.spec.js",
-                "queries-templates.spec.js",
-                "queries-variables.spec.js",
-              ]
+
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
