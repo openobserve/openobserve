@@ -38,13 +38,15 @@ mod topn;
 
 use crate::service::search::{
     datafusion::optimizer::physical_optimizer::index_optimizer::{
-        count::is_simple_count, distinct::is_simple_distinct, topn::is_simple_topn,
+        count::is_simple_count, distinct::is_simple_distinct, histogram::is_simple_histogram,
+        topn::is_simple_topn,
     },
     index::IndexCondition,
 };
 
 #[derive(Default, Debug)]
 pub struct IndexOptimizeRule {
+    time_range: (i64, i64),
     index_fields: HashSet<String>,
     index_condition: IndexCondition,
     index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
@@ -52,11 +54,13 @@ pub struct IndexOptimizeRule {
 
 impl IndexOptimizeRule {
     pub fn new(
+        time_range: (i64, i64),
         index_fields: HashSet<String>,
         index_condition: IndexCondition,
         index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
     ) -> Self {
         Self {
+            time_range,
             index_fields,
             index_condition,
             index_optimizer_mode,
@@ -71,6 +75,7 @@ impl PhysicalOptimizerRule for IndexOptimizeRule {
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let mut rewriter = IndexOptimizer::new(
+            self.time_range,
             self.index_fields.clone(),
             self.index_condition.clone(),
             self.index_optimizer_mode.clone(),
@@ -89,6 +94,7 @@ impl PhysicalOptimizerRule for IndexOptimizeRule {
 }
 
 struct IndexOptimizer {
+    time_range: (i64, i64),
     index_fields: HashSet<String>,
     index_condition: IndexCondition,
     index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
@@ -96,11 +102,13 @@ struct IndexOptimizer {
 
 impl IndexOptimizer {
     pub fn new(
+        time_range: (i64, i64),
         index_fields: HashSet<String>,
         index_condition: IndexCondition,
         index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
     ) -> Self {
         Self {
+            time_range,
             index_fields,
             index_condition,
             index_optimizer_mode,
@@ -133,7 +141,15 @@ impl TreeNodeRewriter for IndexOptimizer {
             }
             return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
         } else if plan.as_any().downcast_ref::<AggregateExec>().is_some() {
+            // Check for SimpleCount
             if let Some(index_optimize_mode) = is_simple_count(Arc::clone(&plan)) {
+                *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
+                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+            }
+            // Check for SimpleHistogram
+            if let Some(index_optimize_mode) =
+                is_simple_histogram(Arc::clone(&plan), self.time_range)
+            {
                 *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
             }

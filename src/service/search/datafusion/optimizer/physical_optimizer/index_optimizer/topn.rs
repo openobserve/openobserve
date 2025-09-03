@@ -53,6 +53,9 @@ pub(crate) fn is_simple_topn(plan: Arc<dyn ExecutionPlan>, index_fields: HashSet
     let mut visitor = SimpleTopnVisitor::new(index_fields);
     let _ = plan.visit(&mut visitor);
     if let Some((field, fetch, ascend)) = visitor.simple_topn {
+        if field.is_empty() {
+            return None;
+        }
         Some(IndexOptimizeMode::SimpleTopN(
             field,
             fetch,
@@ -87,9 +90,14 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
                 && fetch > 0
                 && sort_merge.expr().len() == 1
             {
-                // For SimpleTopN, the sort should be on the count(*) result, not directly on an
-                // index field We'll check this in the ProjectionExec and
-                // AggregateExec
+                // the sort should be on the count(*) result, not directly on an index field
+                // should not sort by index field
+                let sort_expr = sort_merge.expr().first();
+                let column_name = get_column_name(&sort_expr.expr);
+                if is_column(&sort_expr.expr) && self.index_fields.contains(column_name) {
+                    self.simple_topn = None;
+                    return Ok(TreeNodeRecursion::Stop);
+                }
                 self.simple_topn = Some((
                     "".to_string(), // Will be set when we find the group by field
                     fetch,

@@ -22,7 +22,7 @@ use datafusion::{
         tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
     },
     physical_plan::{
-        ExecutionPlan, aggregates::AggregateExec,
+        ExecutionPlan, aggregates::AggregateExec, projection::ProjectionExec,
         sorts::sort_preserving_merge::SortPreservingMergeExec,
     },
 };
@@ -114,6 +114,17 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
                 }
             }
             // if not simple distinct, stop visiting
+            self.simple_distinct = None;
+            return Ok(TreeNodeRecursion::Stop);
+        } else if let Some(projection) = node.as_any().downcast_ref::<ProjectionExec>() {
+            // Check ProjectionExec for the structure: [index_field]
+            let exprs = projection.expr();
+            if exprs.len() == 1 {
+                // First expression should be the index field
+                // We'll validate this in the AggregateExec
+                return Ok(TreeNodeRecursion::Continue);
+            }
+            // If projection doesn't have exactly 2 expressions, stop visiting
             self.simple_distinct = None;
             return Ok(TreeNodeRecursion::Stop);
         } else if node.name() == "HashJoinExec"

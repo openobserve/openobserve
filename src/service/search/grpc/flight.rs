@@ -177,6 +177,7 @@ pub async fn search(
         physical_plan,
         &ctx,
         &latest_schema,
+        (req.search_info.start_time, req.search_info.end_time),
         fst_fields.clone(),
         index_fields,
         index_condition_ref.clone(),
@@ -388,10 +389,12 @@ pub async fn search(
     Ok((ctx, physical_plan, scan_stats))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn optimizer_physical_plan(
     plan: Arc<dyn ExecutionPlan>,
     ctx: &SessionContext,
     schema: &Schema,
+    time_range: (i64, i64),
     fst_fields: Vec<String>,
     index_fields: Vec<String>,
     index_condition_ref: Arc<Mutex<Option<IndexCondition>>>,
@@ -404,6 +407,7 @@ fn optimizer_physical_plan(
     let index_condition = index_condition_ref.lock().clone();
     if let Some(index_condition) = index_condition {
         let index_optimizer_rule = IndexOptimizeRule::new(
+            time_range,
             index_fields,
             index_condition,
             index_optimizer_rule_ref.clone(),
