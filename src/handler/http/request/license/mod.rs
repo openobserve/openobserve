@@ -4,6 +4,8 @@ use o2_enterprise::enterprise::license::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::service::db::license;
+
 #[derive(Serialize, Deserialize)]
 struct LicenseResponse {
     key: Option<String>,
@@ -43,7 +45,7 @@ pub async fn store_license(body: web::Bytes) -> HttpResponse {
     db.put(LICENSE_DB_KEY, req.key.into(), false, None)
         .await
         .unwrap();
-    match o2_enterprise::enterprise::license::update_license().await {
+    match license::update().await {
         Ok(_) => HttpResponse::Created().finish(),
         Err(e) => {
             HttpResponse::InternalServerError().json(serde_json::json!({"message":e.to_string()}))

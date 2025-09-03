@@ -207,6 +207,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role(),
         )
         .await;
+        tokio::task::spawn(async move { db::license::watch().await });
     }
 
     // Router doesn't need to initialize job
