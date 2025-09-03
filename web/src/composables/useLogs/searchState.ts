@@ -16,13 +16,13 @@
 import { reactive, ref, type Ref, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+// import { useI18n } from "vue-i18n";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 import {
   DEFAULT_LOGS_CONFIG,
   DEFAULT_SEARCH_DEBUG_DATA,
   DEFAULT_SEARCH_AGG_DATA,
 } from "@/utils/logs/constants";
-import { constant } from "lodash-es";
 
 interface HistogramData {
   xData: any[];
@@ -91,6 +91,7 @@ interface SearchObject {
 export const searchState = () => {
   const store = useStore();
   const router = useRouter();
+  // const { t } = useI18n();
 
   // Main search object containing all search state
   const searchObj = reactive(
@@ -387,6 +388,8 @@ export const searchState = () => {
 
   return {
     // Reactive state
+    store,
+    router,
     searchObj,
     searchObjDebug,
     searchAggData,
