@@ -208,7 +208,7 @@ class SchemaPage {
     async waitForAllFieldAndAddQuery() {
         testLogger.debug('Waiting for _all field and adding query');
         await this.page.waitForSelector(this.schemaLocators.logExpandDetailAllKey, { state: 'visible' });
-        await this.page.locator(this.schemaLocators.logsSearchBarQueryEditor).locator('.cm-content').click();
+        await this.page.locator(this.schemaLocators.logsSearchBarQueryEditor).locator('.monaco-editor').click();
         await this.page.keyboard.type("str_match(_all, \'test\')");
         await this.page.waitForLoadState('domcontentloaded');
     }
@@ -283,7 +283,7 @@ class SchemaPage {
             }
         }
         
-        await this.page.locator(this.schemaLocators.fnEditor).getByRole('textbox').click();
+        await this.page.locator(this.schemaLocators.fnEditor).locator('.inputarea').click();
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).click();
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).fill(fromStream);
         await this.page.getByText(fromStream).click();
