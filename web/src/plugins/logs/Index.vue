@@ -402,6 +402,12 @@ import {
   isLimitQuery,
 } from "@/composables/useLogs/logsUtils";
 import searchState from "@/composables/useLogs/searchState";
+import {searchStream} from "@/composables/useLogs/searchStream";
+import { 
+  getVisualizationConfig,
+  encodeVisualizationConfig,
+  decodeVisualizationConfig, 
+} from "@/composables/useLogs/logsVisualization";
 
 export default defineComponent({
   name: "PageSearch",
@@ -576,7 +582,6 @@ export default defineComponent({
       extractFields,
       resetHistogramWithError,
       enableRefreshInterval,
-      buildWebSocketPayload,
       initializeSearchConnection,
       addTraceId,
       sendCancelSearchMessage,
@@ -587,10 +592,8 @@ export default defineComponent({
       processHttpHistogramResults,
       buildSearch,
       loadVisualizeData,
-      getVisualizationConfig,
-      encodeVisualizationConfig,
-      decodeVisualizationConfig,
     } = useLogs();
+    const { buildWebSocketPayload } = searchStream();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const showSearchHistory = ref(false);
