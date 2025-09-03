@@ -169,6 +169,7 @@ const defaultObject = {
     toggleFunction: false, // DEPRECATED use showTransformEditor instead
     isActionsEnabled: false,
     resetPlotChart: false,
+    refreshCache: false,
   },
   data: {
     query: <any>"",
@@ -2494,6 +2495,7 @@ const useLogs = () => {
               query: queryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
+              is_refresh_cache: searchObj.meta.refreshCache ?? false, 
             },
             "ui",
           )
@@ -2712,6 +2714,7 @@ const useLogs = () => {
             jobId: searchObj.meta.jobId ? searchObj.meta.jobId : "",
             page_type: searchObj.data.stream.streamType,
             traceparent,
+            is_refresh_cache: searchObj.meta.refreshCache ?? false,
           },
           "ui",
         )
@@ -3182,6 +3185,7 @@ const useLogs = () => {
               page_type: searchObj.data.stream.streamType,
               traceparent,
               is_ui_histogram: true,
+              is_refresh_cache: searchObj.meta.refreshCache ?? false,
             },
             "ui",
             searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false ? true : false,
@@ -4740,12 +4744,13 @@ const useLogs = () => {
   };
   const saveColumnSizes = () => {};
 
-  const handleRunQuery = async () => {
+  const handleRunQuery = async (refresh_cache = false) => {
     try {
       searchObj.loading = true;
       searchObj.meta.refreshHistogram = true;
       initialQueryPayload.value = null;
       searchObj.data.queryResults.aggs = null;
+      searchObj.meta.refreshCache = refresh_cache;
       if (
         Object.hasOwn(router.currentRoute.value.query, "type") &&
         router.currentRoute.value.query.type == "search_history_re_apply"
@@ -4758,6 +4763,9 @@ const useLogs = () => {
       //   }
       // }, 120000);
       await getQueryData();
+      if(searchObj.meta.refreshInterval){
+        searchObj.meta.refreshCache = false;
+      }
       // clearTimeout(queryTimeout);
     } catch (e: any) {
       console.log("Error while loading logs data");
@@ -5832,6 +5840,7 @@ const useLogs = () => {
       traceId: string;
       org_id: string;
       meta?: any;
+      is_refresh_cache?: boolean;
     } = {
       queryReq,
       type,
@@ -5839,6 +5848,7 @@ const useLogs = () => {
       traceId,
       org_id: searchObj.organizationIdentifier,
       meta,
+      is_refresh_cache: searchObj.meta.refreshCache ?? false,
     };
 
     return payload;
@@ -5857,6 +5867,7 @@ const useLogs = () => {
     } else if (searchObj.communicationMethod === "streaming") {
       payload.searchType = "ui";
       payload.pageType = searchObj.data.stream.streamType;
+      payload.is_refresh_cache = searchObj.meta.refreshCache ?? false;
       return fetchQueryDataWithHttpStream(payload, {
         data: handleSearchResponse,
         error: handleSearchError,
@@ -6751,6 +6762,7 @@ const useLogs = () => {
           isHistogramOnly: searchObj.meta.histogramDirtyFlag,
           is_ui_histogram: true,
         }
+        payload.is_refresh_cache = searchObj.meta.refreshCache ?? false;
 
         const requestId = initializeSearchConnection(payload);
 
