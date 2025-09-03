@@ -858,7 +858,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="handleRunQueryFn"
                 :disable="disable"
                 >{{ t("search.runQuery") }}</q-btn
+                >
+                <!-- <q-separator  class="tw-h-[29px] tw-w-[1px]" /> -->
+              <q-btn-dropdown
+                flat
+                class="tw-h-[29px] search-button-dropdown"
+                :class="
+                  config.isEnterprise == 'true' &&
+                  visualizeSearchRequestTraceIds.length
+                    ? 'tw-bg-[#ec1414]'
+                    : 'tw-bg-[#5ca380]'
+                "
+                unelevated
+                dense
               >
+                <q-btn
+                  data-test="logs-search-bar-refresh-btn"
+                  data-cy="search-bar-visuzlie-hard-refresh-button"
+                  dense
+                  flat
+                  no-caps
+                  :title="'Refresh Cache and Run Query'"
+                  class="q-pa-sm search-button tw-rounded-r-none tw-text-[12px]"
+                  @click="handleRunQueryFn(true)"
+                  :disable="
+                    config.isEnterprise == 'true' &&
+                    visualizeSearchRequestTraceIds.length
+                  "
+                >
+                  <q-icon name="refresh" class="q-mr-xs" />
+                  Refresh Cache and Run Query</q-btn
+                >
+              </q-btn-dropdown>
             </div>
             <div v-else class="tw-flex tw-items-center">
               <q-btn
@@ -3500,7 +3531,7 @@ export default defineComponent({
 
     const handleRunQueryFn = (refresh_cache = false) => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
-        emit("handleRunQueryFn");
+        emit("handleRunQueryFn", typeof refresh_cache === 'boolean' ? refresh_cache : false);
       } else {
         handleRunQuery(typeof refresh_cache === 'boolean' ? refresh_cache : false);
       }
