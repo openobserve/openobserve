@@ -23,7 +23,6 @@ import {
   DEFAULT_SEARCH_DEBUG_DATA,
   DEFAULT_SEARCH_AGG_DATA,
 } from "@/utils/logs/constants";
-import { constant } from "lodash-es";
 
 interface HistogramData {
   xData: any[];
