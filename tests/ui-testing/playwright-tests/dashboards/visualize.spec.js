@@ -138,7 +138,7 @@ test.describe("logs testcases", () => {
     // Reload the page
     await page.reload();
     // Verify the field is empty
-    await expect(page.locator(".cm-line").first()).toBeEmpty();
+    await expect(page.locator(".view-line").first()).toBeEmpty();
   });
 
   test.skip("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({

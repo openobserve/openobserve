@@ -14,8 +14,7 @@ export default class LogsVisualise {
     );
     this.queryEditor = page
       .locator("#fnEditor")
-      .getByRole("textbox")
-      .locator("div");
+      .getByRole("textbox");
 
     // Dashboard locators
     this.addToDashboardBtn = page.getByRole("button", {
@@ -208,15 +207,15 @@ export default class LogsVisualise {
 
   //open query editor
   async openQueryEditor() {
-    await this.page.locator(".cm-line").first().click();
+    await this.page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox').click();
   }
 
   //fill query editor
   async fillQueryEditor(sqlQuery) {
-    const queryEditor = this.page.locator(".cm-line").first();
+    const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox');
     await queryEditor.waitFor({ state: "visible", timeout: 5000 });
     await queryEditor.click();
-    await queryEditor.type(sqlQuery);
+    await queryEditor.fill(sqlQuery);
   }
 
   //fill logs query editor with SQL query
