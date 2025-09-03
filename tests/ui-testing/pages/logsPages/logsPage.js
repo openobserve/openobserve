@@ -109,8 +109,8 @@ export class LogsPage {
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
         this.qNotifyWarning = '#q-notify div';
         this.qPageContainer = '.q-page-container';
-        this.cmContent = '.cm-content';
-        this.cmLine = '.cm-line';
+        this.cmContent = '.view-lines';
+        this.cmLine = '.view-line';
         this.searchFunctionInput = { placeholder: 'Search Function' };
         this.timestampFieldTable = '[data-test="log-search-index-list-fields-table"]';
     }
@@ -396,7 +396,7 @@ export class LogsPage {
     async typeQuery(query) {
         await this.page.locator(this.queryEditor).click();
         await this.page.locator(this.queryEditor).press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
+        await this.page.locator(this.queryEditor).getByRole('textbox').fill(query);
     }
 
     async executeQueryWithKeyboardShortcut() {
@@ -1623,7 +1623,7 @@ export class LogsPage {
     }
 
     async expectFnEditorNotVisible() {
-        return await expect(this.page.locator('#fnEditor').getByRole('textbox').locator('div')).not.toBeVisible();
+        return await expect(this.page.locator('#fnEditor').getByRole('textbox')).not.toBeVisible();
     }
 
     async clickPast6DaysButton() {
@@ -1871,8 +1871,8 @@ export class LogsPage {
 
     async expectQueryEditorContainsSelectFrom() {
         return await this.page.locator(this.queryEditor)
-            .locator(this.cmContent)
-            .locator(this.cmLine)
+            .locator('.view-lines')
+            .locator('.view-line')
             .filter({ hasText: 'SELECT * FROM "e2e_automate"' })
             .nth(0);
     }
