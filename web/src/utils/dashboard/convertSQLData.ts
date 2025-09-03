@@ -34,6 +34,8 @@ import {
   getUnitValue,
   isTimeSeries,
   isTimeStamp,
+  calculateBottomLegendHeight,
+  calculateRightLegendWidth,
 } from "./convertDataIntoUnitValue";
 import {
   calculateGridPositions,
@@ -597,7 +599,7 @@ export const convertSQLData = async (
 
   const legendConfig: any = {
     show: panelSchema.config?.show_legends,
-    type: panelSchema.config?.legends_scrollable,
+    type: panelSchema.config?.legends_type === "plain" ? "plain" : "scroll", // Auto (null) and Scroll both use "scroll" type
     orient: legendPosition,
     padding: [10, 20, 10, 10],
     tooltip: {
@@ -2767,15 +2769,16 @@ export const convertSQLData = async (
     panelSchema.type != "gauge" &&
     panelSchema.type != "metric" &&
     panelSchema?.config?.legends_position == "right" &&
-    (panelSchema?.config?.legends_scrollable == null ||
-      panelSchema?.config?.legends_scrollable === "scroll")
+    (panelSchema?.config?.legends_type == null ||
+      panelSchema?.config?.legends_type === "plain" ||
+      panelSchema?.config?.legends_type === "scroll")
   ) {
     // Prefer explicit legend width if provided in config
     let legendWidth;
     if (
       panelSchema.config.legend_width &&
       !isNaN(parseFloat(panelSchema.config.legend_width.value))
-       // ["px", "%"].includes(panelSchema.config.legend_width.unit)
+      // ["px", "%"].includes(panelSchema.config.legend_width.unit)
     ) {
       legendWidth =
         panelSchema.config.legend_width.unit === "%"
@@ -2789,7 +2792,8 @@ export const convertSQLData = async (
         chartPanelRef.value?.offsetWidth || 800,
         chartPanelRef.value?.offsetHeight || 400,
         options.series || [],
-        panelSchema?.config?.legends_scrollable === "scroll",
+        panelSchema?.config?.legends_type === "scroll" ||
+          panelSchema?.config?.legends_type == null,
       );
     }
 
@@ -2808,6 +2812,11 @@ export const convertSQLData = async (
   // for metric, gauge we does not have data field
   if (!["metric", "gauge"].includes(panelSchema.type)) {
     options.series = options.series.filter((it: any) => it.data?.length);
+    if (panelSchema.type == "h-bar" || panelSchema.type == "h-stacked") {
+      options.xAxis = options.xAxis;
+    } else if (!["pie", "donut"].includes(panelSchema.type)) {
+      options.yAxis = options.yAxis;
+    }
   }
 
   // Apply dynamic legend height for bottom legends if conditions are met
@@ -2817,6 +2826,48 @@ export const convertSQLData = async (
     panelSchema?.config?.legends_position !== "right"
   ) {
     console.log("Dynamic legend height calculation triggered", panelSchema);
+
+    // Get chart width from chartPanelRef
+    const chartWidth = chartPanelRef.value?.offsetWidth || 800;
+    // Count legend items from series data
+    const legendCount = options.series?.length || 0;
+    // Calculate dynamic height for bottom legends
+    const dynamicHeight = calculateBottomLegendHeight(
+      legendCount,
+      chartWidth,
+      options.series || [],
+    );
+    options.grid.bottom = dynamicHeight;
+  }
+
+  // Apply dynamic legend height for bottom legends if conditions are met
+  if (
+    panelSchema?.config?.show_legends &&
+    panelSchema?.config?.legends_type === "plain" &&
+    panelSchema?.config?.legends_position !== "right"
+  ) {
+    // console.log("Dynamic legend height calculation triggered", panelSchema);
+
+    // Get chart width from chartPanelRef
+    const chartWidth = chartPanelRef.value?.offsetWidth || 800;
+    // Count legend items from series data
+    const legendCount = options.series?.length || 0;
+    // Calculate dynamic height for bottom legends
+    const dynamicHeight = calculateBottomLegendHeight(
+      legendCount,
+      chartWidth,
+      options.series || [],
+    );
+    options.grid.bottom = dynamicHeight;
+  }
+
+  // Apply dynamic legend height for bottom legends if conditions are met
+  if (
+    panelSchema?.config?.show_legends &&
+    panelSchema?.config?.legends_type === "plain" &&
+    panelSchema?.config?.legends_position !== "right"
+  ) {
+    // console.log("Dynamic legend height calculation triggered", panelSchema);
 
     // Get chart width from chartPanelRef
     const chartWidth = chartPanelRef.value?.offsetWidth || 800;

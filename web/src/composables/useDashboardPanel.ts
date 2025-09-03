@@ -60,7 +60,7 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
       show_gridlines: true,
       show_legends: true,
       legends_position: null,
-      legends_scrollable: null,
+      legends_type: null,
       unit: null,
       unit_custom: null,
       decimals: 2,

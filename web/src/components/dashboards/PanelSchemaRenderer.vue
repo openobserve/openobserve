@@ -807,7 +807,7 @@ export default defineComponent({
           // Re-trigger conversion to recalculate legend sizing with fresh dimensions
           await convertPanelDataCommon();
         }
-      }, 100); // Small delay to ensure layout has stabilized
+      }, 50); // Small delay to ensure layout has stabilized
     };
 
     // Listen for resize events (dispatched when config panel opens/closes)

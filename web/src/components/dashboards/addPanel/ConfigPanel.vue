@@ -328,15 +328,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type != 'maps'
         "
         outlined
-        v-model="dashboardPanelData.data.config.legends_scrollable"
-        :options="legendsScrollableOptions"
+        v-model="dashboardPanelData.data.config.legends_type"
+        :options="legendsTypeOptions"
         dense
-        label="Legends Scrollable"
+        label="Legends Type"
         class="showLabelOnTop"
         stack-label
         emit-value
         :display-value="`${
-          dashboardPanelData.data.config.legends_scrollable ?? 'Plain'
+          dashboardPanelData.data.config.legends_type ?? 'Auto'
         }`"
         data-test="dashboard-config-legends-scrollable"
       >
@@ -1299,8 +1299,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
-      <div class="space"></div>
-
       <q-toggle
         v-model="dashboardPanelData.data.config.show_gridlines"
         label="Show Gridlines"
@@ -1590,7 +1588,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount, onMounted, ref } from "vue";
+import {
+  computed,
+  defineComponent,
+  inject,
+  onBeforeMount,
+  onMounted,
+  ref,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
@@ -1849,10 +1854,14 @@ export default defineComponent({
       },
     ];
 
-    const legendsScrollableOptions = [
+    const legendsTypeOptions = [
+      {
+        label: "Auto",
+        value: null,
+      },
       {
         label: "Plain",
-        value: null,
+        value: "plain",
       },
       {
         label: "Scroll",
@@ -2174,7 +2183,7 @@ export default defineComponent({
       layerTypeOptions,
       symbolOptions,
       legendsPositionOptions,
-      legendsScrollableOptions,
+      legendsTypeOptions,
       unitOptions,
       labelPositionOptions,
       showSymbol,

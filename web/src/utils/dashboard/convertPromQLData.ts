@@ -20,6 +20,8 @@ import {
   getContrastColor,
   applySeriesColorMappings,
   getUnitValue,
+  calculateBottomLegendHeight,
+  calculateRightLegendWidth,
 } from "./convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
@@ -157,7 +159,7 @@ export const convertPromQLData = async (
 
   const legendConfig: any = {
     show: panelSchema.config?.show_legends,
-    type: panelSchema.config?.legends_scrollable,
+    type: panelSchema.config?.legends_type === "plain" ? "plain" : "scroll",
     orient: legendPosition,
     padding: [10, 20, 10, 10],
     tooltip: {
@@ -837,8 +839,9 @@ export const convertPromQLData = async (
     panelSchema.type != "gauge" &&
     panelSchema.type != "metric" &&
     panelSchema?.config?.legends_position == "right" &&
-    (panelSchema?.config?.legends_scrollable == null ||
-      panelSchema?.config?.legends_scrollable === "scroll")
+    (panelSchema?.config?.legends_type == null ||
+      panelSchema?.config?.legends_type === "plain" ||
+      panelSchema?.config?.legends_type === "scroll")
   ) {
     let legendWidth;
 
@@ -846,7 +849,7 @@ export const convertPromQLData = async (
       panelSchema.config.legend_width &&
       !isNaN(parseFloat(panelSchema.config.legend_width.value))
       // ["px", "%"].includes(panelSchema.config.legend_width.unit)
-    ) {
+       ) {
       legendWidth =
         panelSchema.config.legend_width.unit === "%"
           ? (chartPanelRef.value?.offsetWidth || 0) *
@@ -859,7 +862,8 @@ export const convertPromQLData = async (
         chartPanelRef.value?.offsetWidth || 800,
         chartPanelRef.value?.offsetHeight || 400,
         options.series || [],
-        panelSchema?.config?.legends_scrollable === "scroll",
+        panelSchema?.config?.legends_type === "scroll" ||
+          panelSchema?.config?.legends_type == null,
       );
     }
 
@@ -892,13 +896,10 @@ export const convertPromQLData = async (
   // Apply dynamic legend height for bottom legends if conditions are met
   if (
     panelSchema?.config?.show_legends &&
-    panelSchema?.config?.legends_scrollable !== "scroll" &&
+    panelSchema?.config?.legends_type === "plain" &&
     panelSchema?.config?.legends_position !== "right"
   ) {
-    console.log(
-      "Promql-Dynamic legend height calculation triggered",
-      panelSchema,
-    );
+    //  console.log("Promql-Dynamic legend height calculation triggered", panelSchema);
     // Get chart width from chartPanelRef
     const chartWidth = chartPanelRef.value?.offsetWidth || 800;
     // Count legend items from series data
