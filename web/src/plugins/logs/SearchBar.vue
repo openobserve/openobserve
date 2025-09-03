@@ -1508,6 +1508,11 @@ import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { fnParsedSQL, fnUnparsedSQL } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
+import { 
+  getVisualizationConfig,
+  encodeVisualizationConfig,
+  decodeVisualizationConfig, 
+} from "@/composables/useLogs/logsVisualization";
 
 const defaultValue: any = () => {
   return {
@@ -1682,8 +1687,6 @@ export default defineComponent({
       getJobData,
       routeToSearchSchedule,
       isActionsEnabled,
-      getVisualizationConfig,
-      encodeVisualizationConfig,
     } = useLogs();
 
     const { isStreamExists, isStreamFetched } = useStreams();

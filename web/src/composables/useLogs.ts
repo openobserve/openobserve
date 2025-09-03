@@ -73,10 +73,7 @@ import useSearchWebSocket from "./useSearchWebSocket";
 import useActions from "./useActions";
 import useStreamingSearch from "./useStreamingSearch";
 
-import {
-  searchState,
-  notificationMsg,
-} from "@/composables/useLogs/searchState";
+import { searchState } from "@/composables/useLogs/searchState";
 import { INTERVAL_MAP, DEFAULT_LOGS_CONFIG } from "@/utils/logs/constants";
 import {
   fnParsedSQL,
@@ -88,15 +85,24 @@ import {
   isWithQuery,
   addTraceId,
   removeTraceId,
+  addTransformToQuery,
+  isActionsEnabled,
+  showCancelSearchNotification,
+  updateUrlQueryParams,
+  isNonAggregatedSQLMode,
+  generateURLQuery,
 } from "@/composables/useLogs/logsUtils";
+
+import { updateFieldValues, extractFields, updateGridColumns, filterHitsColumns, getStreamList, extractFTSFields, loadStreamLists } from "@/composables/useLogs/streamFieldUtils";
+import { getHistogramTitle, resetHistogramWithError, generateHistogramData, generateHistogramSkeleton, setMultiStreamHistogramQuery, isHistogramEnabled } from "@/composables/useLogs/histogramUtils";
 
 // TODO OK:
 // useStreamManagement for stream-related functions
 // useQueryProcessing for query-related functions
 // useDataVisualization for histogram and data display functions
 
-let histogramResults: any = [];
-let histogramMappedData: any = [];
+// let histogramResults: any = [];
+// let histogramMappedData: any = [];
 
 const {
   fetchQueryDataWithWebSocket,
@@ -220,234 +226,234 @@ const useLogs = () => {
     }
   };
 
-  async function loadStreamLists(selectStream: boolean = true) {
-    try {
-      if (searchObj.data.streamResults.list.length > 0) {
-        let lastUpdatedStreamTime = 0;
+  // async function loadStreamLists(selectStream: boolean = true) {
+  //   try {
+  //     if (searchObj.data.streamResults.list.length > 0) {
+  //       let lastUpdatedStreamTime = 0;
 
-        let selectedStream: any[] = [];
+  //       let selectedStream: any[] = [];
 
-        searchObj.data.stream.streamLists = [];
-        let itemObj: {
-          label: string;
-          value: string;
-        };
+  //       searchObj.data.stream.streamLists = [];
+  //       let itemObj: {
+  //         label: string;
+  //         value: string;
+  //       };
         
 
-        for (const item of searchObj.data.streamResults.list) {
-          itemObj = {
-            label: item.name,
-            value: item.name,
-          };
+  //       for (const item of searchObj.data.streamResults.list) {
+  //         itemObj = {
+  //           label: item.name,
+  //           value: item.name,
+  //         };
 
-          searchObj.data.stream.streamLists.push(itemObj);
+  //         searchObj.data.stream.streamLists.push(itemObj);
 
-          // If isFirstLoad is true, then select the stream from query params
-          if (router.currentRoute.value?.query?.stream == item.name) {
-            selectedStream.push(itemObj.value);
-          }
-          if (
-            !router.currentRoute.value?.query?.stream &&
-            item.stats.doc_time_max >= lastUpdatedStreamTime
-          ) {
-            selectedStream = [];
-            lastUpdatedStreamTime = item.stats.doc_time_max;
-            selectedStream.push(itemObj.value);
-          }
-        }
-        if (
-          (store.state.zoConfig.query_on_stream_selection == false ||
-          router.currentRoute.value.query?.type == "stream_explorer") && selectStream
-        ) {
-          searchObj.data.stream.selectedStream = selectedStream;
-        }
-      } else {
-        searchObj.data.errorMsg = "No stream found in selected organization!";
-      }
-      return;
-    } catch (e: any) {
-      console.log("Error while loading stream list");
-    }
-  }
+  //         // If isFirstLoad is true, then select the stream from query params
+  //         if (router.currentRoute.value?.query?.stream == item.name) {
+  //           selectedStream.push(itemObj.value);
+  //         }
+  //         if (
+  //           !router.currentRoute.value?.query?.stream &&
+  //           item.stats.doc_time_max >= lastUpdatedStreamTime
+  //         ) {
+  //           selectedStream = [];
+  //           lastUpdatedStreamTime = item.stats.doc_time_max;
+  //           selectedStream.push(itemObj.value);
+  //         }
+  //       }
+  //       if (
+  //         (store.state.zoConfig.query_on_stream_selection == false ||
+  //         router.currentRoute.value.query?.type == "stream_explorer") && selectStream
+  //       ) {
+  //         searchObj.data.stream.selectedStream = selectedStream;
+  //       }
+  //     } else {
+  //       searchObj.data.errorMsg = "No stream found in selected organization!";
+  //     }
+  //     return;
+  //   } catch (e: any) {
+  //     console.log("Error while loading stream list");
+  //   }
+  // }
 
-  async function loadStreamFields(streamName: string) {
-    try {
-      if (streamName != "") {
-        searchObj.loadingStream = true;
-        return await getStream(
-          streamName,
-          searchObj.data.stream.streamType || "logs",
-          true,
-        ).then((res) => {
-          searchObj.loadingStream = false;
-          return res;
-        });
-      } else {
-        searchObj.data.errorMsg = "No stream found in selected organization!";
-      }
-      return;
-    } catch (e: any) {
-      searchObj.loadingStream = false;
-      console.log("Error while loading stream fields");
-    }
-  }
+  // async function loadStreamFields(streamName: string) {
+  //   try {
+  //     if (streamName != "") {
+  //       searchObj.loadingStream = true;
+  //       return await getStream(
+  //         streamName,
+  //         searchObj.data.stream.streamType || "logs",
+  //         true,
+  //       ).then((res) => {
+  //         searchObj.loadingStream = false;
+  //         return res;
+  //       });
+  //     } else {
+  //       searchObj.data.errorMsg = "No stream found in selected organization!";
+  //     }
+  //     return;
+  //   } catch (e: any) {
+  //     searchObj.loadingStream = false;
+  //     console.log("Error while loading stream fields");
+  //   }
+  // }
 
-  const getStreamList = async (selectStream: boolean = true) => {
-    try {
-      // commented below function as we are doing resetStreamData from all the places where getStreamList is called
-      // resetStreamData();
-      const streamType = searchObj.data.stream.streamType || "logs";
-      const streamData: any = await getStreams(streamType, false);
-      searchObj.data.streamResults = {
-        ...streamData,
-      };
-      await nextTick();
-      await loadStreamLists(selectStream);
-      return;
-    } catch (e: any) {
-      console.error("Error while getting stream list", e);
-    }
-  };
+  // const getStreamList = async (selectStream: boolean = true) => {
+  //   try {
+  //     // commented below function as we are doing resetStreamData from all the places where getStreamList is called
+  //     // resetStreamData();
+  //     const streamType = searchObj.data.stream.streamType || "logs";
+  //     const streamData: any = await getStreams(streamType, false);
+  //     searchObj.data.streamResults = {
+  //       ...streamData,
+  //     };
+  //     await nextTick();
+  //     await loadStreamLists(selectStream);
+  //     return;
+  //   } catch (e: any) {
+  //     console.error("Error while getting stream list", e);
+  //   }
+  // };
 
   // Helper functions for visualization config sync
-  const getVisualizationConfig = (dashboardPanelData: any) => {
-    if (!dashboardPanelData?.data) {
-      return null;
-    }
+  // const getVisualizationConfig = (dashboardPanelData: any) => {
+  //   if (!dashboardPanelData?.data) {
+  //     return null;
+  //   }
     
-    // Only store config object and chart type, not the entire dashboardPanelData
-    return {
-      config: dashboardPanelData.data.config || {},
-      type: dashboardPanelData.data.type || 'bar',
-    };
-  };
+  //   // Only store config object and chart type, not the entire dashboardPanelData
+  //   return {
+  //     config: dashboardPanelData.data.config || {},
+  //     type: dashboardPanelData.data.type || 'bar',
+  //   };
+  // };
 
-  const encodeVisualizationConfig = (config: any) => {
-    try {
-      return b64EncodeUnicode(JSON.stringify(config));
-    } catch (error) {
-      console.error("Failed to encode visualization config:", error);
-      return null;
-    }
-  };
+  // const encodeVisualizationConfig = (config: any) => {
+  //   try {
+  //     return b64EncodeUnicode(JSON.stringify(config));
+  //   } catch (error) {
+  //     console.error("Failed to encode visualization config:", error);
+  //     return null;
+  //   }
+  // };
 
-  const decodeVisualizationConfig = (encodedConfig: string) => {
-    try {
-      return JSON.parse(b64DecodeUnicode(encodedConfig) ?? "{}");
-    } catch (error) {
-      console.error("Failed to decode visualization config:", error);
-      return null;
-    }
-  };
+  // const decodeVisualizationConfig = (encodedConfig: string) => {
+  //   try {
+  //     return JSON.parse(b64DecodeUnicode(encodedConfig) ?? "{}");
+  //   } catch (error) {
+  //     console.error("Failed to decode visualization config:", error);
+  //     return null;
+  //   }
+  // };
 
-  const generateURLQuery = (isShareLink: boolean = false, dashboardPanelData: any = null) => {
-    const date = searchObj.data.datetime;
+  // const generateURLQuery = (isShareLink: boolean = false, dashboardPanelData: any = null) => {
+  //   const date = searchObj.data.datetime;
 
-    const query: any = {};
+  //   const query: any = {};
 
-    if (searchObj.data.stream.streamType) {
-      query["stream_type"] = searchObj.data.stream.streamType;
-    }
+  //   if (searchObj.data.stream.streamType) {
+  //     query["stream_type"] = searchObj.data.stream.streamType;
+  //   }
 
-    if (
-      searchObj.data.stream.selectedStream.length > 0 &&
-      typeof searchObj.data.stream.selectedStream != "object"
-    ) {
-      query["stream"] = searchObj.data.stream.selectedStream.join(",");
-    } else if (
-      typeof searchObj.data.stream.selectedStream == "object" &&
-      searchObj.data.stream.selectedStream.hasOwnProperty("value")
-    ) {
-      query["stream"] = searchObj.data.stream.selectedStream.value;
-    } else {
-      query["stream"] = searchObj.data.stream.selectedStream.join(",");
-    }
+  //   if (
+  //     searchObj.data.stream.selectedStream.length > 0 &&
+  //     typeof searchObj.data.stream.selectedStream != "object"
+  //   ) {
+  //     query["stream"] = searchObj.data.stream.selectedStream.join(",");
+  //   } else if (
+  //     typeof searchObj.data.stream.selectedStream == "object" &&
+  //     searchObj.data.stream.selectedStream.hasOwnProperty("value")
+  //   ) {
+  //     query["stream"] = searchObj.data.stream.selectedStream.value;
+  //   } else {
+  //     query["stream"] = searchObj.data.stream.selectedStream.join(",");
+  //   }
 
-    if (date.type == "relative") {
-      if (isShareLink) {
-        query["from"] = date.startTime;
-        query["to"] = date.endTime;
-      } else {
-        query["period"] = date.relativeTimePeriod;
-      }
-    } else if (date.type == "absolute") {
-      query["from"] = date.startTime;
-      query["to"] = date.endTime;
-    }
+  //   if (date.type == "relative") {
+  //     if (isShareLink) {
+  //       query["from"] = date.startTime;
+  //       query["to"] = date.endTime;
+  //     } else {
+  //       query["period"] = date.relativeTimePeriod;
+  //     }
+  //   } else if (date.type == "absolute") {
+  //     query["from"] = date.startTime;
+  //     query["to"] = date.endTime;
+  //   }
 
-    query["refresh"] = searchObj.meta.refreshInterval;
+  //   query["refresh"] = searchObj.meta.refreshInterval;
 
-    if (searchObj.data.query) {
-      query["sql_mode"] = searchObj.meta.sqlMode;
-      query["query"] = b64EncodeUnicode(searchObj.data.query.trim());
-    }
+  //   if (searchObj.data.query) {
+  //     query["sql_mode"] = searchObj.meta.sqlMode;
+  //     query["query"] = b64EncodeUnicode(searchObj.data.query.trim());
+  //   }
 
-    //add the function editor toggle is true or false
-    //it will help to retain the function editor state when we refresh the page
-    query["fn_editor"] = searchObj.meta.showTransformEditor;
-    if (
-      searchObj.data.transformType === "function" &&
-      searchObj.data.tempFunctionContent != ""
-    ) {
-      query["functionContent"] = b64EncodeUnicode(
-        searchObj.data.tempFunctionContent.trim(),
-      );
-    }
+  //   //add the function editor toggle is true or false
+  //   //it will help to retain the function editor state when we refresh the page
+  //   query["fn_editor"] = searchObj.meta.showTransformEditor;
+  //   if (
+  //     searchObj.data.transformType === "function" &&
+  //     searchObj.data.tempFunctionContent != ""
+  //   ) {
+  //     query["functionContent"] = b64EncodeUnicode(
+  //       searchObj.data.tempFunctionContent.trim(),
+  //     );
+  //   }
 
-    // TODO : Add type in query params for all types
-    if (searchObj.meta.pageType !== "logs") {
-      query["type"] = searchObj.meta.pageType;
-    }
+  //   // TODO : Add type in query params for all types
+  //   if (searchObj.meta.pageType !== "logs") {
+  //     query["type"] = searchObj.meta.pageType;
+  //   }
 
-    query["defined_schemas"] = searchObj.meta.useUserDefinedSchemas;
-    query["org_identifier"] = store.state.selectedOrganization.identifier;
-    query["quick_mode"] = searchObj.meta.quickMode;
-    query["show_histogram"] = searchObj.meta.showHistogram;
+  //   query["defined_schemas"] = searchObj.meta.useUserDefinedSchemas;
+  //   query["org_identifier"] = store.state.selectedOrganization.identifier;
+  //   query["quick_mode"] = searchObj.meta.quickMode;
+  //   query["show_histogram"] = searchObj.meta.showHistogram;
 
-    if(store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.regions?.length) {
-      query["regions"] = searchObj.meta.regions.join(",");
-    }
+  //   if(store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.regions?.length) {
+  //     query["regions"] = searchObj.meta.regions.join(",");
+  //   }
 
-    if(store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.clusters?.length) {
-      query["clusters"] = searchObj.meta.clusters.join(",");
-    }
+  //   if(store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.clusters?.length) {
+  //     query["clusters"] = searchObj.meta.clusters.join(",");
+  //   }
 
-    if(searchObj.meta.logsVisualizeToggle) {
-      query["logs_visualize_toggle"] = searchObj.meta.logsVisualizeToggle;
-    }
+  //   if(searchObj.meta.logsVisualizeToggle) {
+  //     query["logs_visualize_toggle"] = searchObj.meta.logsVisualizeToggle;
+  //   }
 
-    // Preserve visualization data in URL
-    // - If in visualize mode and panel data is provided, encode the dashboardPanelData
-    if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
-      const visualizationData = getVisualizationConfig(dashboardPanelData);
-      if (visualizationData) {
-        const encoded = encodeVisualizationConfig(visualizationData);
-        if (encoded) {
-          query["visualization_data"] = encoded;
-        }
-      }
-    } else {
-      // else preserve existing visualization data from the current URL
-      const existingEncodedConfig = router.currentRoute.value?.query?.visualization_data as string | undefined;
-      if (existingEncodedConfig) {
-        query["visualization_data"] = existingEncodedConfig;
-      }
-    }
+  //   // Preserve visualization data in URL
+  //   // - If in visualize mode and panel data is provided, encode the dashboardPanelData
+  //   if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
+  //     const visualizationData = getVisualizationConfig(dashboardPanelData);
+  //     if (visualizationData) {
+  //       const encoded = encodeVisualizationConfig(visualizationData);
+  //       if (encoded) {
+  //         query["visualization_data"] = encoded;
+  //       }
+  //     }
+  //   } else {
+  //     // else preserve existing visualization data from the current URL
+  //     const existingEncodedConfig = router.currentRoute.value?.query?.visualization_data as string | undefined;
+  //     if (existingEncodedConfig) {
+  //       query["visualization_data"] = existingEncodedConfig;
+  //     }
+  //   }
 
-    return query;
-  };
+  //   return query;
+  // };
 
-  const updateUrlQueryParams = (dashboardPanelData: any = null) => {
-    const query = generateURLQuery(false, dashboardPanelData);
-    if (
-      (Object.hasOwn(query, "type") &&
-        query.type == "search_history_re_apply") ||
-      query.type == "search_scheduler"
-    ) {
-      delete query.type;
-    }
-    router.push({ query });
-  };
+  // const updateUrlQueryParams = (dashboardPanelData: any = null) => {
+  //   const query = generateURLQuery(false, dashboardPanelData);
+  //   if (
+  //     (Object.hasOwn(query, "type") &&
+  //       query.type == "search_history_re_apply") ||
+  //     query.type == "search_scheduler"
+  //   ) {
+  //     delete query.type;
+  //   }
+  //   router.push({ query });
+  // };
 
   function extractFilterColumns(expression: any) {
     const columns: any[] = [];
@@ -1431,28 +1437,28 @@ const useLogs = () => {
     }
   }
 
-  const setMultiStreamHistogramQuery = (queryReq: any) => {
-    let histogramQuery = `select histogram(${store.state.zoConfig.timestamp_column}, '${searchObj.meta.resultGrid.chartInterval}') AS zo_sql_key, count(*) AS zo_sql_num from "[INDEX_NAME]" [WHERE_CLAUSE] GROUP BY zo_sql_key`;
-    let multiSql = [];
+  // const setMultiStreamHistogramQuery = (queryReq: any) => {
+  //   let histogramQuery = `select histogram(${store.state.zoConfig.timestamp_column}, '${searchObj.meta.resultGrid.chartInterval}') AS zo_sql_key, count(*) AS zo_sql_num from "[INDEX_NAME]" [WHERE_CLAUSE] GROUP BY zo_sql_key`;
+  //   let multiSql = [];
 
-    for (const stream of searchObj.data.stream.selectedStream) {
-      // one or more filter fields are missing in this stream so no need to include in histogram query
-      // this is to avoid the issue of missing fields in multi stream histogram query
-      if(searchObj.data.stream.missingStreamMultiStreamFilter.includes(stream)) {
-        continue;
-      }
-      // Replace the index name and where clause in the histogram query for each stream
-      multiSql.push(histogramQuery.replace(
-        "[INDEX_NAME]",
-        stream
-      ).replace(
-        "[WHERE_CLAUSE]",
-        searchObj.data.query ? 'WHERE ' + searchObj.data.query : ''
-      ));
-    }
+  //   for (const stream of searchObj.data.stream.selectedStream) {
+  //     // one or more filter fields are missing in this stream so no need to include in histogram query
+  //     // this is to avoid the issue of missing fields in multi stream histogram query
+  //     if(searchObj.data.stream.missingStreamMultiStreamFilter.includes(stream)) {
+  //       continue;
+  //     }
+  //     // Replace the index name and where clause in the histogram query for each stream
+  //     multiSql.push(histogramQuery.replace(
+  //       "[INDEX_NAME]",
+  //       stream
+  //     ).replace(
+  //       "[WHERE_CLAUSE]",
+  //       searchObj.data.query ? 'WHERE ' + searchObj.data.query : ''
+  //     ));
+  //   }
 
-    return multiSql.join(" UNION ALL ");
-  }
+  //   return multiSql.join(" UNION ALL ");
+  // }
 
   const getQueryData = async (isPagination = false) => {
     try {
@@ -1973,38 +1979,38 @@ const useLogs = () => {
     }
   };
 
-  function shouldAddFunctionToSearch() {
-    if (!isActionsEnabled.value) return searchObj.data.tempFunctionContent != "" && searchObj.meta.showTransformEditor;
+  // function shouldAddFunctionToSearch() {
+  //   if (!isActionsEnabled.value) return searchObj.data.tempFunctionContent != "" && searchObj.meta.showTransformEditor;
 
-    return searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent != "";
-  }
+  //   return searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent != "";
+  // }
 
-  const addTransformToQuery = (queryReq: any) => {
-    if (shouldAddFunctionToSearch()) {
-      queryReq.query["query_fn"] =
-        b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
-    }
+  // const addTransformToQuery = (queryReq: any) => {
+  //   if (shouldAddFunctionToSearch()) {
+  //     queryReq.query["query_fn"] =
+  //       b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
+  //   }
 
-    // Add action ID if it exists
-    if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
-      queryReq.query["action_id"] = searchObj.data.selectedTransform.id;
-    }
-  }
+  //   // Add action ID if it exists
+  //   if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
+  //     queryReq.query["action_id"] = searchObj.data.selectedTransform.id;
+  //   }
+  // }
 
-  function resetHistogramWithError(errorMsg: string, errorCode: number = 0) {
-    searchObj.data.histogram = {
-      xData: [],
-      yData: [],
-      chartParams: {
-        title: getHistogramTitle(),
-        unparsed_x_data: [],
-        timezone: "",
-      },
-      errorCode,
-      errorMsg,
-      errorDetail: "",
-    };
-  }
+  // function resetHistogramWithError(errorMsg: string, errorCode: number = 0) {
+  //   searchObj.data.histogram = {
+  //     xData: [],
+  //     yData: [],
+  //     chartParams: {
+  //       title: getHistogramTitle(),
+  //       unparsed_x_data: [],
+  //       timezone: "",
+  //     },
+  //     errorCode,
+  //     errorMsg,
+  //     errorDetail: "",
+  //   };
+  // }
 
   function isTimestampASC(orderby: any) {
     if (orderby) {
@@ -2022,48 +2028,48 @@ const useLogs = () => {
     return false;
   }
 
-  function generateHistogramSkeleton() {
-    if (
-      searchObj.data.queryResults.hasOwnProperty("aggs") &&
-      searchObj.data.queryResults.aggs
-    ) {
-      histogramResults = [];
-      histogramMappedData = [];
-      const intervalMs: any =
-        INTERVAL_MAP[searchObj.meta.resultGrid.chartInterval];
-      if (!intervalMs) {
-        throw new Error("Invalid interval");
-      }
-      searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval ? searchObj.data.queryResults.histogram_interval * 1000000 : intervalMs;
-      const date = new Date();
-      const startTimeDate = new Date(
-        searchObj.data.customDownloadQueryObj.query.start_time / 1000,
-      ); // Convert microseconds to milliseconds
-      if (searchObj.meta.resultGrid.chartInterval.includes("second")) {
-        startTimeDate.setSeconds(startTimeDate.getSeconds() > 30 ? 30 : 0, 0); // Round to the nearest whole minute
-      } else if (searchObj.meta.resultGrid.chartInterval.includes("1 minute")) {
-        startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
-        // startTimeDate.setMinutes(0, 0); // Round to the nearest whole minute
-      } else if (searchObj.meta.resultGrid.chartInterval.includes("minute")) {
-        // startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
-        startTimeDate.setMinutes(
-          parseInt(
-            searchObj.meta.resultGrid.chartInterval.replace(" minute", ""),
-          ),
-          0,
-        ); // Round to the nearest whole minute
-      } else if (searchObj.meta.resultGrid.chartInterval.includes("hour")) {
-        startTimeDate.setHours(startTimeDate.getHours() + 1);
-        startTimeDate.setUTCMinutes(0, 0); // Round to the nearest whole minute
-      } else {
-        startTimeDate.setMinutes(0, 0); // Round to the nearest whole minute
-        startTimeDate.setUTCHours(0, 0, 0); // Round to the nearest whole minute
-        startTimeDate.setDate(startTimeDate.getDate() + 1);
-      }
+  // function generateHistogramSkeleton() {
+  //   if (
+  //     searchObj.data.queryResults.hasOwnProperty("aggs") &&
+  //     searchObj.data.queryResults.aggs
+  //   ) {
+  //     histogramResults = [];
+  //     histogramMappedData = [];
+  //     const intervalMs: any =
+  //       INTERVAL_MAP[searchObj.meta.resultGrid.chartInterval];
+  //     if (!intervalMs) {
+  //       throw new Error("Invalid interval");
+  //     }
+  //     searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval ? searchObj.data.queryResults.histogram_interval * 1000000 : intervalMs;
+  //     const date = new Date();
+  //     const startTimeDate = new Date(
+  //       searchObj.data.customDownloadQueryObj.query.start_time / 1000,
+  //     ); // Convert microseconds to milliseconds
+  //     if (searchObj.meta.resultGrid.chartInterval.includes("second")) {
+  //       startTimeDate.setSeconds(startTimeDate.getSeconds() > 30 ? 30 : 0, 0); // Round to the nearest whole minute
+  //     } else if (searchObj.meta.resultGrid.chartInterval.includes("1 minute")) {
+  //       startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
+  //       // startTimeDate.setMinutes(0, 0); // Round to the nearest whole minute
+  //     } else if (searchObj.meta.resultGrid.chartInterval.includes("minute")) {
+  //       // startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
+  //       startTimeDate.setMinutes(
+  //         parseInt(
+  //           searchObj.meta.resultGrid.chartInterval.replace(" minute", ""),
+  //         ),
+  //         0,
+  //       ); // Round to the nearest whole minute
+  //     } else if (searchObj.meta.resultGrid.chartInterval.includes("hour")) {
+  //       startTimeDate.setHours(startTimeDate.getHours() + 1);
+  //       startTimeDate.setUTCMinutes(0, 0); // Round to the nearest whole minute
+  //     } else {
+  //       startTimeDate.setMinutes(0, 0); // Round to the nearest whole minute
+  //       startTimeDate.setUTCHours(0, 0, 0); // Round to the nearest whole minute
+  //       startTimeDate.setDate(startTimeDate.getDate() + 1);
+  //     }
 
-      const startTime = startTimeDate.getTime() * 1000;
-    }
-  }
+  //     const startTime = startTimeDate.getTime() * 1000;
+  //   }
+  // }
 
   // function hasAggregation(columns: any) {
   //   if (columns) {
@@ -2706,27 +2712,27 @@ const useLogs = () => {
     });
   }
 
-  const filterHitsColumns = () => {
-    searchObj.data.queryResults.filteredHit = [];
-    let itemHits: any = {};
-    if (searchObj.data.stream.selectedFields.length > 0) {
-      searchObj.data.queryResults.hits.map((hit: any) => {
-        itemHits = {};
-        // searchObj.data.stream.selectedFields.forEach((field) => {
-        for (const field of searchObj.data.stream.selectedFields) {
-          if (hit.hasOwnProperty(field)) {
-            itemHits[field] = hit[field];
-          }
-        }
-        itemHits[store.state.zoConfig.timestamp_column] =
-          hit[store.state.zoConfig.timestamp_column];
-        searchObj.data.queryResults.filteredHit.push(itemHits);
-      });
-    } else {
-      searchObj.data.queryResults.filteredHit =
-        searchObj.data.queryResults.hits;
-    }
-  };
+  // const filterHitsColumns = () => {
+  //   searchObj.data.queryResults.filteredHit = [];
+  //   let itemHits: any = {};
+  //   if (searchObj.data.stream.selectedFields.length > 0) {
+  //     searchObj.data.queryResults.hits.map((hit: any) => {
+  //       itemHits = {};
+  //       // searchObj.data.stream.selectedFields.forEach((field) => {
+  //       for (const field of searchObj.data.stream.selectedFields) {
+  //         if (hit.hasOwnProperty(field)) {
+  //           itemHits[field] = hit[field];
+  //         }
+  //       }
+  //       itemHits[store.state.zoConfig.timestamp_column] =
+  //         hit[store.state.zoConfig.timestamp_column];
+  //       searchObj.data.queryResults.filteredHit.push(itemHits);
+  //     });
+  //   } else {
+  //     searchObj.data.queryResults.filteredHit =
+  //       searchObj.data.queryResults.hits;
+  //   }
+  // };
 
   const routeToSearchSchedule = () => {
     router.push({
@@ -3003,1030 +3009,1030 @@ const useLogs = () => {
     });
   };
 
-  const updateFieldValues = () => {
-    try {
-      const excludedFields = [
-        store.state.zoConfig.timestamp_column,
-        "log",
-        "msg",
-      ];
-      // searchObj.data.queryResults.hits.forEach((item: { [x: string]: any }) => {
-      for (const item of searchObj.data.queryResults.hits) {
-        // Create set for each field values and add values to corresponding set
-        // Object.keys(item).forEach((key) => {
-        for (const key of Object.keys(item)) {
-          if (excludedFields.includes(key)) {
-            return;
-          }
+  // const updateFieldValues = () => {
+  //   try {
+  //     const excludedFields = [
+  //       store.state.zoConfig.timestamp_column,
+  //       "log",
+  //       "msg",
+  //     ];
+  //     // searchObj.data.queryResults.hits.forEach((item: { [x: string]: any }) => {
+  //     for (const item of searchObj.data.queryResults.hits) {
+  //       // Create set for each field values and add values to corresponding set
+  //       // Object.keys(item).forEach((key) => {
+  //       for (const key of Object.keys(item)) {
+  //         if (excludedFields.includes(key)) {
+  //           return;
+  //         }
 
-          if(fieldValues.value === undefined) {
-            fieldValues.value = {}
-          }
+  //         if(fieldValues.value === undefined) {
+  //           fieldValues.value = {}
+  //         }
 
-          if (fieldValues.value[key] == undefined) {
-            fieldValues.value[key] = new Set();
-          }
+  //         if (fieldValues.value[key] == undefined) {
+  //           fieldValues.value[key] = new Set();
+  //         }
 
-          if (!fieldValues.value[key].has(item[key])) {
-            fieldValues.value[key].add(item[key]);
-          }
-        }
-      }
-    } catch (e: any) {
-      console.log("Error while updating field values", e);
-    }
-  };
+  //         if (!fieldValues.value[key].has(item[key])) {
+  //           fieldValues.value[key].add(item[key]);
+  //         }
+  //       }
+  //     }
+  //   } catch (e: any) {
+  //     console.log("Error while updating field values", e);
+  //   }
+  // };
 
-  const resetFieldValues = () => {
-    fieldValues.value = {};
-  };
+  // const resetFieldValues = () => {
+  //   fieldValues.value = {};
+  // };
 
-  const hasInterestingFieldsInLocal = function(streamName: string) {
-    const localInterestingFields: any = useLocalInterestingFields();
-    return localInterestingFields.value != null &&
-    localInterestingFields.value[
-      searchObj.organizationIdentifier + "_" + streamName
-    ] !== undefined &&
-    localInterestingFields.value[
-      searchObj.organizationIdentifier + "_" + streamName
-    ].length > 0;
-  };
+  // const hasInterestingFieldsInLocal = function(streamName: string) {
+  //   const localInterestingFields: any = useLocalInterestingFields();
+  //   return localInterestingFields.value != null &&
+  //   localInterestingFields.value[
+  //     searchObj.organizationIdentifier + "_" + streamName
+  //   ] !== undefined &&
+  //   localInterestingFields.value[
+  //     searchObj.organizationIdentifier + "_" + streamName
+  //   ].length > 0;
+  // };
 
-  async function extractFields() {
-    try {
-      searchObjDebug["extractFieldsStartTime"] = performance.now();
-      searchObjDebug["extractFieldsWithAPI"] = "";
-      searchObj.data.errorMsg = "";
-      searchObj.data.errorDetail = "";
-      searchObj.data.countErrorMsg = "";
-      searchObj.data.stream.selectedStreamFields = [];
-      searchObj.data.stream.interestingFieldList = [];
-      const schemaFields: any = [];
-      const commonSchemaFields: any = [];
-      if (searchObj.data.streamResults.list.length > 0) {
-        const timestampField = store.state.zoConfig.timestamp_column;
-        const allField = store.state.zoConfig?.all_fields_name;
-        const schemaInterestingFields: string[] = [];
-        let userDefineSchemaSettings: any = [];
-        const schemaMaps: any = [];
-        const commonSchemaMaps: any = [];
-        const interestingSchemaMaps: any = [];
-        const interestingCommonSchemaMaps: any = [];
+  // async function extractFields() {
+  //   try {
+  //     searchObjDebug["extractFieldsStartTime"] = performance.now();
+  //     searchObjDebug["extractFieldsWithAPI"] = "";
+  //     searchObj.data.errorMsg = "";
+  //     searchObj.data.errorDetail = "";
+  //     searchObj.data.countErrorMsg = "";
+  //     searchObj.data.stream.selectedStreamFields = [];
+  //     searchObj.data.stream.interestingFieldList = [];
+  //     const schemaFields: any = [];
+  //     const commonSchemaFields: any = [];
+  //     if (searchObj.data.streamResults.list.length > 0) {
+  //       const timestampField = store.state.zoConfig.timestamp_column;
+  //       const allField = store.state.zoConfig?.all_fields_name;
+  //       const schemaInterestingFields: string[] = [];
+  //       let userDefineSchemaSettings: any = [];
+  //       const schemaMaps: any = [];
+  //       const commonSchemaMaps: any = [];
+  //       const interestingSchemaMaps: any = [];
+  //       const interestingCommonSchemaMaps: any = [];
 
-        let schemaFieldsIndex: number = -1;
-        let commonSchemaFieldsIndex: number = -1;
-        let fieldObj: any = {};
-        const localInterestingFields: any = useLocalInterestingFields();
-        const streamInterestingFields: any = [];
-        let streamInterestingFieldsLocal: any = [];
+  //       let schemaFieldsIndex: number = -1;
+  //       let commonSchemaFieldsIndex: number = -1;
+  //       let fieldObj: any = {};
+  //       const localInterestingFields: any = useLocalInterestingFields();
+  //       const streamInterestingFields: any = [];
+  //       let streamInterestingFieldsLocal: any = [];
 
-        const selectedStreamValues = searchObj.data.stream.selectedStream
-          .join(",")
-          .split(",");
+  //       const selectedStreamValues = searchObj.data.stream.selectedStream
+  //         .join(",")
+  //         .split(",");
 
-        searchObj.data.stream.expandGroupRows = {
-          common: true,
-          ...Object.fromEntries(
-            selectedStreamValues
-              .sort()
-              .map((stream: any) => [
-                stream,
-                searchObj.data.stream.expandGroupRows[stream] &&
-                selectedStreamValues.length > 1
-                  ? searchObj.data.stream.expandGroupRows[stream]
-                  : selectedStreamValues.length > 1
-                    ? false
-                    : true,
-              ]),
-          ),
-        };
-        searchObj.data.stream.expandGroupRowsFieldCount = {
-          common: 0,
-          ...Object.fromEntries(
-            selectedStreamValues.sort().map((stream: any) => [stream, 0]),
-          ),
-        };
+  //       searchObj.data.stream.expandGroupRows = {
+  //         common: true,
+  //         ...Object.fromEntries(
+  //           selectedStreamValues
+  //             .sort()
+  //             .map((stream: any) => [
+  //               stream,
+  //               searchObj.data.stream.expandGroupRows[stream] &&
+  //               selectedStreamValues.length > 1
+  //                 ? searchObj.data.stream.expandGroupRows[stream]
+  //                 : selectedStreamValues.length > 1
+  //                   ? false
+  //                   : true,
+  //             ]),
+  //         ),
+  //       };
+  //       searchObj.data.stream.expandGroupRowsFieldCount = {
+  //         common: 0,
+  //         ...Object.fromEntries(
+  //           selectedStreamValues.sort().map((stream: any) => [stream, 0]),
+  //         ),
+  //       };
 
-        searchObj.data.stream.interestingExpandedGroupRows = deepCopy(searchObj.data.stream.expandGroupRows);
-        searchObj.data.stream.interestingExpandedGroupRowsFieldCount = deepCopy(searchObj.data.stream.expandGroupRowsFieldCount);
+  //       searchObj.data.stream.interestingExpandedGroupRows = deepCopy(searchObj.data.stream.expandGroupRows);
+  //       searchObj.data.stream.interestingExpandedGroupRowsFieldCount = deepCopy(searchObj.data.stream.expandGroupRowsFieldCount);
 
-        searchObj.data.datetime.queryRangeRestrictionMsg = "";
-        searchObj.data.datetime.queryRangeRestrictionInHour = -1;
+  //       searchObj.data.datetime.queryRangeRestrictionMsg = "";
+  //       searchObj.data.datetime.queryRangeRestrictionInHour = -1;
 
-        const interestingFieldsMapping: {[key: string]: string[]} = {
-          "common": [],
-          ...Object.fromEntries(
-            selectedStreamValues.sort().map((stream: any) => [stream, []]),
-          ),
-        }
+  //       const interestingFieldsMapping: {[key: string]: string[]} = {
+  //         "common": [],
+  //         ...Object.fromEntries(
+  //           selectedStreamValues.sort().map((stream: any) => [stream, []]),
+  //         ),
+  //       }
 
-        const interestingFieldsMap: {[key: string]: boolean} = {}
+  //       const interestingFieldsMap: {[key: string]: boolean} = {}
 
-        for (const stream of searchObj.data.streamResults.list) {
-          if (searchObj.data.stream.selectedStream.includes(stream.name)) {
-            if (searchObj.data.stream.selectedStream.length > 1) {
-              schemaMaps.push({
-                name: convertToCamelCase(stream.name),
-                label: true,
-                ftsKey: false,
-                isSchemaField: false,
-                showValues: false,
-                group: stream.name,
-                isExpanded: false,
-                streams: [stream.name],
-                isInterestingField: false,
-              });
+  //       for (const stream of searchObj.data.streamResults.list) {
+  //         if (searchObj.data.stream.selectedStream.includes(stream.name)) {
+  //           if (searchObj.data.stream.selectedStream.length > 1) {
+  //             schemaMaps.push({
+  //               name: convertToCamelCase(stream.name),
+  //               label: true,
+  //               ftsKey: false,
+  //               isSchemaField: false,
+  //               showValues: false,
+  //               group: stream.name,
+  //               isExpanded: false,
+  //               streams: [stream.name],
+  //               isInterestingField: false,
+  //             });
 
-              interestingSchemaMaps.push(schemaMaps[schemaMaps.length - 1]);
+  //             interestingSchemaMaps.push(schemaMaps[schemaMaps.length - 1]);
 
-              schemaFields.push("dummylabel");
-              // searchObj.data.stream.expandGroupRowsFieldCount[stream.name] = searchObj.data.stream.expandGroupRowsFieldCount[stream.name] + 1;
-            }
+  //             schemaFields.push("dummylabel");
+  //             // searchObj.data.stream.expandGroupRowsFieldCount[stream.name] = searchObj.data.stream.expandGroupRowsFieldCount[stream.name] + 1;
+  //           }
 
-            // check for schema exist in the object or not
-            // if not pull the schema from server.
-            const streamData = await loadStreamFields(stream.name);
-            if (streamData.schema === undefined) {
-              searchObj.loadingStream = false;
-              searchObj.data.errorMsg = t("search.noFieldFound");
-              throw new Error(searchObj.data.errorMsg);
-              return;
-            }
+  //           // check for schema exist in the object or not
+  //           // if not pull the schema from server.
+  //           const streamData = await loadStreamFields(stream.name);
+  //           if (streamData.schema === undefined) {
+  //             searchObj.loadingStream = false;
+  //             searchObj.data.errorMsg = t("search.noFieldFound");
+  //             throw new Error(searchObj.data.errorMsg);
+  //             return;
+  //           }
 
-            stream.settings =  { ...streamData.settings };
-            stream.schema = [ ...streamData.schema ];
+  //           stream.settings =  { ...streamData.settings };
+  //           stream.schema = [ ...streamData.schema ];
 
-            userDefineSchemaSettings =
-              stream.settings?.defined_schema_fields?.slice() || [];
+  //           userDefineSchemaSettings =
+  //             stream.settings?.defined_schema_fields?.slice() || [];
               
-            if (
-              (stream.settings.max_query_range > 0 || store.state.zoConfig.max_query_range > 0) &&
-              (searchObj.data.datetime.queryRangeRestrictionInHour >
-                stream.settings.max_query_range ||
-                stream.settings.max_query_range == 0 ||
-                searchObj.data.datetime.queryRangeRestrictionInHour == -1) &&
-              searchObj.data.datetime.queryRangeRestrictionInHour != 0
-            ) {
-              //if stream has max_query_range, then use that, otherwise use the default max_query_range from the config
-              searchObj.data.datetime.queryRangeRestrictionInHour = stream.settings.max_query_range > 0 ? stream.settings.max_query_range : store.state.zoConfig.max_query_range;
+  //           if (
+  //             (stream.settings.max_query_range > 0 || store.state.zoConfig.max_query_range > 0) &&
+  //             (searchObj.data.datetime.queryRangeRestrictionInHour >
+  //               stream.settings.max_query_range ||
+  //               stream.settings.max_query_range == 0 ||
+  //               searchObj.data.datetime.queryRangeRestrictionInHour == -1) &&
+  //             searchObj.data.datetime.queryRangeRestrictionInHour != 0
+  //           ) {
+  //             //if stream has max_query_range, then use that, otherwise use the default max_query_range from the config
+  //             searchObj.data.datetime.queryRangeRestrictionInHour = stream.settings.max_query_range > 0 ? stream.settings.max_query_range : store.state.zoConfig.max_query_range;
 
-              searchObj.data.datetime.queryRangeRestrictionMsg = t(
-                "search.queryRangeRestrictionMsg",
-                {
-                  range:
-                    searchObj.data.datetime.queryRangeRestrictionInHour > 1
-                      ? searchObj.data.datetime.queryRangeRestrictionInHour +
-                        " hours"
-                      : searchObj.data.datetime.queryRangeRestrictionInHour +
-                        " hour",
-                },
-              );
-            }
+  //             searchObj.data.datetime.queryRangeRestrictionMsg = t(
+  //               "search.queryRangeRestrictionMsg",
+  //               {
+  //                 range:
+  //                   searchObj.data.datetime.queryRangeRestrictionInHour > 1
+  //                     ? searchObj.data.datetime.queryRangeRestrictionInHour +
+  //                       " hours"
+  //                     : searchObj.data.datetime.queryRangeRestrictionInHour +
+  //                       " hour",
+  //               },
+  //             );
+  //           }
 
-            let environmentInterestingFields = new Set();
-            if (
-              store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")
-            ) {
-              environmentInterestingFields =
-                 new Set(store.state?.zoConfig?.default_quick_mode_fields);
-            }
+  //           let environmentInterestingFields = new Set();
+  //           if (
+  //             store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")
+  //           ) {
+  //             environmentInterestingFields =
+  //                new Set(store.state?.zoConfig?.default_quick_mode_fields);
+  //           }
 
-            if (
-              stream.settings.hasOwnProperty("defined_schema_fields") &&
-              userDefineSchemaSettings.length > 0
-            ) {
-              searchObj.meta.hasUserDefinedSchemas = true;
-              if (store.state.zoConfig.hasOwnProperty("timestamp_column")) {
-                userDefineSchemaSettings.push(
-                  store.state.zoConfig?.timestamp_column,
-                );
-              }
+  //           if (
+  //             stream.settings.hasOwnProperty("defined_schema_fields") &&
+  //             userDefineSchemaSettings.length > 0
+  //           ) {
+  //             searchObj.meta.hasUserDefinedSchemas = true;
+  //             if (store.state.zoConfig.hasOwnProperty("timestamp_column")) {
+  //               userDefineSchemaSettings.push(
+  //                 store.state.zoConfig?.timestamp_column,
+  //               );
+  //             }
 
-              if (store.state.zoConfig.hasOwnProperty("all_fields_name")) {
-                userDefineSchemaSettings.push(
-                  store.state.zoConfig?.all_fields_name,
-                );
-              }
-            } else {
-              searchObj.meta.hasUserDefinedSchemas =
-                searchObj.meta.hasUserDefinedSchemas &&
-                searchObj.data.stream.selectedStream.length > 1;
-            }
+  //             if (store.state.zoConfig.hasOwnProperty("all_fields_name")) {
+  //               userDefineSchemaSettings.push(
+  //                 store.state.zoConfig?.all_fields_name,
+  //               );
+  //             }
+  //           } else {
+  //             searchObj.meta.hasUserDefinedSchemas =
+  //               searchObj.meta.hasUserDefinedSchemas &&
+  //               searchObj.data.stream.selectedStream.length > 1;
+  //           }
 
-            // remove timestamp field from the local interesting fields and update the local interesting fields. As timestamp field is default interesting field, we don't need to add it to the local storage
-            if(hasInterestingFieldsInLocal(stream.name)) {
-             const hasTimestampField = localInterestingFields.value[
-                searchObj.organizationIdentifier + "_" + stream.name
-              ].some((field: any) => field === store.state.zoConfig?.timestamp_column);
+  //           // remove timestamp field from the local interesting fields and update the local interesting fields. As timestamp field is default interesting field, we don't need to add it to the local storage
+  //           if(hasInterestingFieldsInLocal(stream.name)) {
+  //            const hasTimestampField = localInterestingFields.value[
+  //               searchObj.organizationIdentifier + "_" + stream.name
+  //             ].some((field: any) => field === store.state.zoConfig?.timestamp_column);
 
-              // remove timestamp field from the local interesting fields and update the local interesting fields
-              if(hasTimestampField) {
-                localInterestingFields.value[
-                  searchObj.organizationIdentifier + "_" + stream.name
-                ] = localInterestingFields.value[
-                  searchObj.organizationIdentifier + "_" + stream.name
-                ].filter((field: any) => field !== store.state.zoConfig?.timestamp_column);
-              }
+  //             // remove timestamp field from the local interesting fields and update the local interesting fields
+  //             if(hasTimestampField) {
+  //               localInterestingFields.value[
+  //                 searchObj.organizationIdentifier + "_" + stream.name
+  //               ] = localInterestingFields.value[
+  //                 searchObj.organizationIdentifier + "_" + stream.name
+  //               ].filter((field: any) => field !== store.state.zoConfig?.timestamp_column);
+  //             }
 
-              useLocalInterestingFields(localInterestingFields.value);
-            }            
+  //             useLocalInterestingFields(localInterestingFields.value);
+  //           }            
 
-            const deselectedFields = localInterestingFields.value?.[
-              "deselect" +
-                "_" +
-                searchObj.organizationIdentifier +
-                "_" +
-                stream.name
-            ];
+  //           const deselectedFields = localInterestingFields.value?.[
+  //             "deselect" +
+  //               "_" +
+  //               searchObj.organizationIdentifier +
+  //               "_" +
+  //               stream.name
+  //           ];
 
 
-            // Check if all deselected fields are present in the environment interesting fields
-            if(deselectedFields && deselectedFields.length > 0) {
-              localInterestingFields.value[
-                "deselect" +
-                  "_" +
-                  searchObj.organizationIdentifier +
-                  "_" +
-                  stream.name
-              ] = Array.from(deselectedFields).filter((field: any) => environmentInterestingFields.has(field));
-            }
+  //           // Check if all deselected fields are present in the environment interesting fields
+  //           if(deselectedFields && deselectedFields.length > 0) {
+  //             localInterestingFields.value[
+  //               "deselect" +
+  //                 "_" +
+  //                 searchObj.organizationIdentifier +
+  //                 "_" +
+  //                 stream.name
+  //             ] = Array.from(deselectedFields).filter((field: any) => environmentInterestingFields.has(field));
+  //           }
 
-            const filteredDeselectedFields =
-              new Set(localInterestingFields.value?.[
-              "deselect" +
-                "_" +
-                searchObj.organizationIdentifier +
-                "_" +
-                stream.name
-            ] || []);
+  //           const filteredDeselectedFields =
+  //             new Set(localInterestingFields.value?.[
+  //             "deselect" +
+  //               "_" +
+  //               searchObj.organizationIdentifier +
+  //               "_" +
+  //               stream.name
+  //           ] || []);
 
-            const filteredEnvironmentInterestingFields = Array.from(environmentInterestingFields).filter((field: any) => !filteredDeselectedFields.has(field));
+  //           const filteredEnvironmentInterestingFields = Array.from(environmentInterestingFields).filter((field: any) => !filteredDeselectedFields.has(field));
 
-            streamInterestingFieldsLocal = hasInterestingFieldsInLocal(stream.name)
-                ? [...localInterestingFields.value?.[
-                    searchObj.organizationIdentifier + "_" + stream.name
-                  ], ...filteredEnvironmentInterestingFields]
-                : [...filteredEnvironmentInterestingFields]
+  //           streamInterestingFieldsLocal = hasInterestingFieldsInLocal(stream.name)
+  //               ? [...localInterestingFields.value?.[
+  //                   searchObj.organizationIdentifier + "_" + stream.name
+  //                 ], ...filteredEnvironmentInterestingFields]
+  //               : [...filteredEnvironmentInterestingFields]
 
             
 
-            // Add timestamp column to the interesting field list if it is not present in the interesting field list
-            const intField = new Set(
-              [...searchObj.data.stream.interestingFieldList, ...streamInterestingFieldsLocal, store.state.zoConfig?.timestamp_column],
-            );
+  //           // Add timestamp column to the interesting field list if it is not present in the interesting field list
+  //           const intField = new Set(
+  //             [...searchObj.data.stream.interestingFieldList, ...streamInterestingFieldsLocal, store.state.zoConfig?.timestamp_column],
+  //           );
 
-            searchObj.data.stream.interestingFieldList = Array.from(intField);
+  //           searchObj.data.stream.interestingFieldList = Array.from(intField);
 
-            searchObj.data.stream.interestingFieldList.forEach((field: any) => {
-              if(interestingFieldsMap[field] === undefined) {
-                interestingFieldsMap[field] = false;
-              }
-            });
-
-
-            // create a schema field mapping based on field name to avoid iteration over object.
-            // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
-            let UDSFieldCount = 0;
-            const fields: [string] =
-              stream.settings?.defined_schema_fields &&
-              searchObj.meta.useUserDefinedSchemas === "user_defined_schema"
-                ? [
-                    store.state.zoConfig?.timestamp_column,
-                    ...stream.settings?.defined_schema_fields,
-                    store.state.zoConfig?.all_fields_name,
-                  ]
-                : stream.schema.map((obj: any) => obj.name);
-            for (const field of fields) {
-              fieldObj = {
-                name: field,
-                ftsKey:
-                  stream.settings.full_text_search_keys.indexOf(field) > -1
-                    ? true
-                    : false,
-                isSchemaField: true,
-                group: stream.name,
-                streams: [stream.name],
-                showValues: field !== timestampField && field !== allField,
-                isInterestingField:
-                  searchObj.data.stream.interestingFieldList.includes(field)
-                    ? true
-                    : false,
-              };
-
-              if (
-                store.state.zoConfig.user_defined_schemas_enabled &&
-                searchObj.meta.useUserDefinedSchemas == "user_defined_schema" &&
-                stream.settings.hasOwnProperty("defined_schema_fields") &&
-                userDefineSchemaSettings.length > 0
-              ) {
-                if (userDefineSchemaSettings.includes(field)) {
-                  schemaFieldsIndex = schemaFields.indexOf(field);
-                  commonSchemaFieldsIndex = commonSchemaFields.indexOf(field);
-                  if (schemaFieldsIndex > -1) {
-                    fieldObj.group = "common";
-
-                    if (
-                      schemaMaps[schemaFieldsIndex].hasOwnProperty("streams") &&
-                      schemaMaps[schemaFieldsIndex].streams.length > 0
-                    ) {
-                      fieldObj.streams.push(
-                        ...schemaMaps[schemaFieldsIndex].streams,
-                      );
-                      searchObj.data.stream.expandGroupRowsFieldCount[
-                        schemaMaps[schemaFieldsIndex].streams[0]
-                      ] =
-                        searchObj.data.stream.expandGroupRowsFieldCount[
-                          schemaMaps[schemaFieldsIndex].streams[0]
-                        ] - 1;
-                    }
-
-                    commonSchemaMaps.push(fieldObj);
-
-                    if(fieldObj.isInterestingField) {
-                      interestingCommonSchemaMaps.push(fieldObj);
-                      interestingFieldsMapping["common"].push(fieldObj.name);
-                      interestingFieldsMap[fieldObj.name] = true;
-                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
-                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
-
-                      if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0 && interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].includes(fieldObj.name)) {
-                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] =
-                          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] - 1;
-                      }
-                    }
-
-                    commonSchemaFields.push(field);
-                    searchObj.data.stream.expandGroupRowsFieldCount["common"] =
-                      searchObj.data.stream.expandGroupRowsFieldCount[
-                        "common"
-                      ] + 1;
-
-                    //remove the element from the index
-                    schemaFields.splice(schemaFieldsIndex, 1);
-                    schemaMaps.splice(schemaFieldsIndex, 1);
-                    const index = interestingSchemaMaps.findIndex((item: any) => item.name == field);
-                    if(index > -1) {
-                      interestingSchemaMaps.splice(index, 1);
-                    }
-                  } else if (commonSchemaFieldsIndex > -1) {
-                    commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
-                      stream.name,
-                    );
-                    // searchObj.data.stream.expandGroupRowsFieldCount["common"] =
-                    //   searchObj.data.stream.expandGroupRowsFieldCount[
-                    //     "common"
-                    //   ] + 1;
-                  } else {
-                    schemaMaps.push(fieldObj);
-                    if(fieldObj.isInterestingField) {
-                      interestingSchemaMaps.push(fieldObj);
-                      interestingFieldsMapping[stream.name].push(fieldObj.name);
-                      interestingFieldsMap[fieldObj.name] = true;
-                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] =
-                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] + 1;
-                    }
-                    schemaFields.push(field);
-                    searchObj.data.stream.expandGroupRowsFieldCount[
-                      stream.name
-                    ] =
-                      searchObj.data.stream.expandGroupRowsFieldCount[
-                        stream.name
-                      ] + 1;
-                  }
-
-                  if (UDSFieldCount < userDefineSchemaSettings.length) {
-                    UDSFieldCount++;
-                  } else {
-                    break;
-                  }
-                }
-
-                // if (schemaMaps.length == userDefineSchemaSettings.length) {
-                //   break;
-                // }
-              } else {
-                schemaFieldsIndex = schemaFields.indexOf(field);
-                commonSchemaFieldsIndex = commonSchemaFields.indexOf(field);
-                if (schemaFieldsIndex > -1) {
-                  fieldObj.group = "common";
-                  if (
-                    schemaMaps[schemaFieldsIndex].hasOwnProperty("streams") &&
-                    schemaMaps[schemaFieldsIndex].streams.length > 0
-                  ) {
-                    fieldObj.streams.push(
-                      ...schemaMaps[schemaFieldsIndex].streams,
-                    );
-
-                    searchObj.data.stream.expandGroupRowsFieldCount[
-                      schemaMaps[schemaFieldsIndex].streams[0]
-                    ] =
-                      searchObj.data.stream.expandGroupRowsFieldCount[
-                        schemaMaps[schemaFieldsIndex].streams[0]
-                      ] - 1;
+  //           searchObj.data.stream.interestingFieldList.forEach((field: any) => {
+  //             if(interestingFieldsMap[field] === undefined) {
+  //               interestingFieldsMap[field] = false;
+  //             }
+  //           });
 
 
-                    if(fieldObj.isInterestingField) {
-                      if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0 && interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].includes(fieldObj.name)) {
-                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-                          schemaMaps[schemaFieldsIndex].streams[0]
-                        ] =
-                          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-                            schemaMaps[schemaFieldsIndex].streams[0]
-                          ] - 1;
-                      }
-                    }
-                  }
+  //           // create a schema field mapping based on field name to avoid iteration over object.
+  //           // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
+  //           let UDSFieldCount = 0;
+  //           const fields: [string] =
+  //             stream.settings?.defined_schema_fields &&
+  //             searchObj.meta.useUserDefinedSchemas === "user_defined_schema"
+  //               ? [
+  //                   store.state.zoConfig?.timestamp_column,
+  //                   ...stream.settings?.defined_schema_fields,
+  //                   store.state.zoConfig?.all_fields_name,
+  //                 ]
+  //               : stream.schema.map((obj: any) => obj.name);
+  //           for (const field of fields) {
+  //             fieldObj = {
+  //               name: field,
+  //               ftsKey:
+  //                 stream.settings.full_text_search_keys.indexOf(field) > -1
+  //                   ? true
+  //                   : false,
+  //               isSchemaField: true,
+  //               group: stream.name,
+  //               streams: [stream.name],
+  //               showValues: field !== timestampField && field !== allField,
+  //               isInterestingField:
+  //                 searchObj.data.stream.interestingFieldList.includes(field)
+  //                   ? true
+  //                   : false,
+  //             };
 
-                  commonSchemaMaps.push(fieldObj);
+  //             if (
+  //               store.state.zoConfig.user_defined_schemas_enabled &&
+  //               searchObj.meta.useUserDefinedSchemas == "user_defined_schema" &&
+  //               stream.settings.hasOwnProperty("defined_schema_fields") &&
+  //               userDefineSchemaSettings.length > 0
+  //             ) {
+  //               if (userDefineSchemaSettings.includes(field)) {
+  //                 schemaFieldsIndex = schemaFields.indexOf(field);
+  //                 commonSchemaFieldsIndex = commonSchemaFields.indexOf(field);
+  //                 if (schemaFieldsIndex > -1) {
+  //                   fieldObj.group = "common";
 
-                  if(fieldObj.isInterestingField) {
-                    interestingCommonSchemaMaps.push(fieldObj);
-                    interestingFieldsMapping["common"].push(fieldObj.name);
-                    interestingFieldsMap[fieldObj.name] = true;
-                    searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
-                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
-                  }
-                  commonSchemaFields.push(field);
-                  searchObj.data.stream.expandGroupRowsFieldCount["common"] =
-                    searchObj.data.stream.expandGroupRowsFieldCount["common"] +
-                    1;
+  //                   if (
+  //                     schemaMaps[schemaFieldsIndex].hasOwnProperty("streams") &&
+  //                     schemaMaps[schemaFieldsIndex].streams.length > 0
+  //                   ) {
+  //                     fieldObj.streams.push(
+  //                       ...schemaMaps[schemaFieldsIndex].streams,
+  //                     );
+  //                     searchObj.data.stream.expandGroupRowsFieldCount[
+  //                       schemaMaps[schemaFieldsIndex].streams[0]
+  //                     ] =
+  //                       searchObj.data.stream.expandGroupRowsFieldCount[
+  //                         schemaMaps[schemaFieldsIndex].streams[0]
+  //                       ] - 1;
+  //                   }
 
-                  //remove the element from the index
-                  schemaFields.splice(schemaFieldsIndex, 1);
-                  schemaMaps.splice(schemaFieldsIndex, 1);
-                  const index = interestingSchemaMaps.findIndex((item: any) => item.name == field);
-                  if(index > -1) {                      
-                    interestingSchemaMaps.splice(index, 1);
-                  }
-                } else if (commonSchemaFieldsIndex > -1) {
-                  commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
-                    stream.name,
-                  );
-                  // searchObj.data.stream.expandGroupRowsFieldCount["common"] =
-                  //   searchObj.data.stream.expandGroupRowsFieldCount["common"] +
-                  //   1;
-                } else {
-                  schemaMaps.push(fieldObj);
+  //                   commonSchemaMaps.push(fieldObj);
 
-                  if(fieldObj.isInterestingField) {
-                    interestingSchemaMaps.push(fieldObj);
-                    interestingFieldsMapping[stream.name].push(fieldObj.name);
-                    interestingFieldsMap[fieldObj.name] = true;
-                    searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] =
-                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] + 1;
-                  }
-                  schemaFields.push(field);
-                  searchObj.data.stream.expandGroupRowsFieldCount[stream.name] =
-                    searchObj.data.stream.expandGroupRowsFieldCount[
-                      stream.name
-                    ] + 1;
-                }
-              }
-            }
+  //                   if(fieldObj.isInterestingField) {
+  //                     interestingCommonSchemaMaps.push(fieldObj);
+  //                     interestingFieldsMapping["common"].push(fieldObj.name);
+  //                     interestingFieldsMap[fieldObj.name] = true;
+  //                     searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
+  //                     searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
 
-            if (
-              searchObj.data.stream.selectedStream.length > 1 &&
-              commonSchemaFields.length == 0
-            ) {
-              commonSchemaMaps.unshift({
-                name: "Common Group Fields",
-                label: true,
-                ftsKey: false,
-                isSchemaField: false,
-                showValues: false,
-                group: "common",
-                isExpanded: false,
-                streams: [stream.name],
-                isInterestingField: false,
-              });
+  //                     if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0 && interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].includes(fieldObj.name)) {
+  //                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] =
+  //                         searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] - 1;
+  //                     }
+  //                   }
 
-              interestingCommonSchemaMaps.unshift(commonSchemaMaps[0]);
-              interestingFieldsMapping["common"].unshift(commonSchemaMaps[0]);
+  //                   commonSchemaFields.push(field);
+  //                   searchObj.data.stream.expandGroupRowsFieldCount["common"] =
+  //                     searchObj.data.stream.expandGroupRowsFieldCount[
+  //                       "common"
+  //                     ] + 1;
 
-              commonSchemaFields.unshift("dummylabel");
-              // searchObj.data.stream.expandGroupRowsFieldCount["common"] = searchObj.data.stream.expandGroupRowsFieldCount["common"] + 1;
-            }
-            //here we check whether timestamp field is present or not
-            //as we append timestamp dynamically for userDefined schema we need to check this
-            if (
-              userDefineSchemaSettings.includes(
-                store.state.zoConfig?.timestamp_column,
-              )
-            ) {
-              searchObj.data.hasSearchDataTimestampField = true;
-            } else {
-              searchObj.data.hasSearchDataTimestampField = false;
-            }
+  //                   //remove the element from the index
+  //                   schemaFields.splice(schemaFieldsIndex, 1);
+  //                   schemaMaps.splice(schemaFieldsIndex, 1);
+  //                   const index = interestingSchemaMaps.findIndex((item: any) => item.name == field);
+  //                   if(index > -1) {
+  //                     interestingSchemaMaps.splice(index, 1);
+  //                   }
+  //                 } else if (commonSchemaFieldsIndex > -1) {
+  //                   commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
+  //                     stream.name,
+  //                   );
+  //                   // searchObj.data.stream.expandGroupRowsFieldCount["common"] =
+  //                   //   searchObj.data.stream.expandGroupRowsFieldCount[
+  //                   //     "common"
+  //                   //   ] + 1;
+  //                 } else {
+  //                   schemaMaps.push(fieldObj);
+  //                   if(fieldObj.isInterestingField) {
+  //                     interestingSchemaMaps.push(fieldObj);
+  //                     interestingFieldsMapping[stream.name].push(fieldObj.name);
+  //                     interestingFieldsMap[fieldObj.name] = true;
+  //                     searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] =
+  //                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] + 1;
+  //                   }
+  //                   schemaFields.push(field);
+  //                   searchObj.data.stream.expandGroupRowsFieldCount[
+  //                     stream.name
+  //                   ] =
+  //                     searchObj.data.stream.expandGroupRowsFieldCount[
+  //                       stream.name
+  //                     ] + 1;
+  //                 }
 
-            // check for user defined schema is false then only consider checking new fields from result set
-            if (
-              searchObj.data.queryResults.hasOwnProperty("hits") &&
-              searchObj.data.queryResults?.hits.length > 0 &&
-              searchObj.data.stream.selectedStream.length == 1 &&
-              (!store.state.zoConfig.user_defined_schemas_enabled ||
-                !searchObj.meta.hasUserDefinedSchemas)
-            ) {
-              // Find the index of the record with max attributes
-              const maxAttributesIndex =
-                searchObj.data.queryResults.hits.reduce(
-                  (
-                    maxIndex: string | number,
-                    obj: {},
-                    currentIndex: any,
-                    array: { [x: string]: {} },
-                  ) => {
-                    const numAttributes = Object.keys(obj).length;
-                    const maxNumAttributes = Object.keys(
-                      array[maxIndex],
-                    ).length;
-                    return numAttributes > maxNumAttributes
-                      ? currentIndex
-                      : maxIndex;
-                  },
-                  0,
-                );
+  //                 if (UDSFieldCount < userDefineSchemaSettings.length) {
+  //                   UDSFieldCount++;
+  //                 } else {
+  //                   break;
+  //                 }
+  //               }
 
-              const recordwithMaxAttribute =
-                searchObj.data.queryResults.hits[maxAttributesIndex];
+  //               // if (schemaMaps.length == userDefineSchemaSettings.length) {
+  //               //   break;
+  //               // }
+  //             } else {
+  //               schemaFieldsIndex = schemaFields.indexOf(field);
+  //               commonSchemaFieldsIndex = commonSchemaFields.indexOf(field);
+  //               if (schemaFieldsIndex > -1) {
+  //                 fieldObj.group = "common";
+  //                 if (
+  //                   schemaMaps[schemaFieldsIndex].hasOwnProperty("streams") &&
+  //                   schemaMaps[schemaFieldsIndex].streams.length > 0
+  //                 ) {
+  //                   fieldObj.streams.push(
+  //                     ...schemaMaps[schemaFieldsIndex].streams,
+  //                   );
 
-              // Object.keys(recordwithMaxAttribute).forEach((key) => {
-              for (const key of Object.keys(recordwithMaxAttribute)) {
-                if (key == "_o2_id" || key == "_original" || key == "_all_values") {
-                  continue;
-                }
-                if (key == store.state.zoConfig.timestamp_column) {
-                  searchObj.data.hasSearchDataTimestampField = true;
-                }
-                if (
-                  !schemaFields.includes(key) &&
-                  !commonSchemaFields.includes(key) &&
-                  key != "_stream_name"
-                ) {
-                  fieldObj = {
-                    name: key,
-                    type: "Utf8",
-                    ftsKey: false,
-                    group: stream.name,
-                    isSchemaField: false,
-                    showValues: false,
-                    isInterestingField:
-                      searchObj.data.stream.interestingFieldList.includes(key)
-                        ? true
-                        : false,
-                    streams: [],
-                  };
-                  schemaMaps.push(fieldObj);
-
-                  if(fieldObj.isInterestingField) {
-                    interestingSchemaMaps.push(fieldObj);
-                    interestingFieldsMapping[stream.name].push(fieldObj);
-                    interestingFieldsMap[fieldObj.name] = true;
-                  }
-                  schemaFields.push(key);
-                }
-              }
-            }
-            searchObj.data.stream.userDefinedSchema =
-              userDefineSchemaSettings || [];
-          }
-        }
-        searchObj.data.stream.interestingFieldList = Object.keys(interestingFieldsMap).filter((field: any) => interestingFieldsMap[field]);
+  //                   searchObj.data.stream.expandGroupRowsFieldCount[
+  //                     schemaMaps[schemaFieldsIndex].streams[0]
+  //                   ] =
+  //                     searchObj.data.stream.expandGroupRowsFieldCount[
+  //                       schemaMaps[schemaFieldsIndex].streams[0]
+  //                     ] - 1;
 
 
-        // searchObj.data.stream.selectedStreamFields = schemaMaps;
-        searchObj.data.stream.selectedStreamFields = [
-          ...commonSchemaMaps,
-          ...schemaMaps,
-        ];
+  //                   if(fieldObj.isInterestingField) {
+  //                     if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0 && interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].includes(fieldObj.name)) {
+  //                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+  //                         schemaMaps[schemaFieldsIndex].streams[0]
+  //                       ] =
+  //                         searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+  //                           schemaMaps[schemaFieldsIndex].streams[0]
+  //                         ] - 1;
+  //                     }
+  //                   }
+  //                 }
+
+  //                 commonSchemaMaps.push(fieldObj);
+
+  //                 if(fieldObj.isInterestingField) {
+  //                   interestingCommonSchemaMaps.push(fieldObj);
+  //                   interestingFieldsMapping["common"].push(fieldObj.name);
+  //                   interestingFieldsMap[fieldObj.name] = true;
+  //                   searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
+  //                     searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
+  //                 }
+  //                 commonSchemaFields.push(field);
+  //                 searchObj.data.stream.expandGroupRowsFieldCount["common"] =
+  //                   searchObj.data.stream.expandGroupRowsFieldCount["common"] +
+  //                   1;
+
+  //                 //remove the element from the index
+  //                 schemaFields.splice(schemaFieldsIndex, 1);
+  //                 schemaMaps.splice(schemaFieldsIndex, 1);
+  //                 const index = interestingSchemaMaps.findIndex((item: any) => item.name == field);
+  //                 if(index > -1) {                      
+  //                   interestingSchemaMaps.splice(index, 1);
+  //                 }
+  //               } else if (commonSchemaFieldsIndex > -1) {
+  //                 commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
+  //                   stream.name,
+  //                 );
+  //                 // searchObj.data.stream.expandGroupRowsFieldCount["common"] =
+  //                 //   searchObj.data.stream.expandGroupRowsFieldCount["common"] +
+  //                 //   1;
+  //               } else {
+  //                 schemaMaps.push(fieldObj);
+
+  //                 if(fieldObj.isInterestingField) {
+  //                   interestingSchemaMaps.push(fieldObj);
+  //                   interestingFieldsMapping[stream.name].push(fieldObj.name);
+  //                   interestingFieldsMap[fieldObj.name] = true;
+  //                   searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] =
+  //                     searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] + 1;
+  //                 }
+  //                 schemaFields.push(field);
+  //                 searchObj.data.stream.expandGroupRowsFieldCount[stream.name] =
+  //                   searchObj.data.stream.expandGroupRowsFieldCount[
+  //                     stream.name
+  //                   ] + 1;
+  //               }
+  //             }
+  //           }
+
+  //           if (
+  //             searchObj.data.stream.selectedStream.length > 1 &&
+  //             commonSchemaFields.length == 0
+  //           ) {
+  //             commonSchemaMaps.unshift({
+  //               name: "Common Group Fields",
+  //               label: true,
+  //               ftsKey: false,
+  //               isSchemaField: false,
+  //               showValues: false,
+  //               group: "common",
+  //               isExpanded: false,
+  //               streams: [stream.name],
+  //               isInterestingField: false,
+  //             });
+
+  //             interestingCommonSchemaMaps.unshift(commonSchemaMaps[0]);
+  //             interestingFieldsMapping["common"].unshift(commonSchemaMaps[0]);
+
+  //             commonSchemaFields.unshift("dummylabel");
+  //             // searchObj.data.stream.expandGroupRowsFieldCount["common"] = searchObj.data.stream.expandGroupRowsFieldCount["common"] + 1;
+  //           }
+  //           //here we check whether timestamp field is present or not
+  //           //as we append timestamp dynamically for userDefined schema we need to check this
+  //           if (
+  //             userDefineSchemaSettings.includes(
+  //               store.state.zoConfig?.timestamp_column,
+  //             )
+  //           ) {
+  //             searchObj.data.hasSearchDataTimestampField = true;
+  //           } else {
+  //             searchObj.data.hasSearchDataTimestampField = false;
+  //           }
+
+  //           // check for user defined schema is false then only consider checking new fields from result set
+  //           if (
+  //             searchObj.data.queryResults.hasOwnProperty("hits") &&
+  //             searchObj.data.queryResults?.hits.length > 0 &&
+  //             searchObj.data.stream.selectedStream.length == 1 &&
+  //             (!store.state.zoConfig.user_defined_schemas_enabled ||
+  //               !searchObj.meta.hasUserDefinedSchemas)
+  //           ) {
+  //             // Find the index of the record with max attributes
+  //             const maxAttributesIndex =
+  //               searchObj.data.queryResults.hits.reduce(
+  //                 (
+  //                   maxIndex: string | number,
+  //                   obj: {},
+  //                   currentIndex: any,
+  //                   array: { [x: string]: {} },
+  //                 ) => {
+  //                   const numAttributes = Object.keys(obj).length;
+  //                   const maxNumAttributes = Object.keys(
+  //                     array[maxIndex],
+  //                   ).length;
+  //                   return numAttributes > maxNumAttributes
+  //                     ? currentIndex
+  //                     : maxIndex;
+  //                 },
+  //                 0,
+  //               );
+
+  //             const recordwithMaxAttribute =
+  //               searchObj.data.queryResults.hits[maxAttributesIndex];
+
+  //             // Object.keys(recordwithMaxAttribute).forEach((key) => {
+  //             for (const key of Object.keys(recordwithMaxAttribute)) {
+  //               if (key == "_o2_id" || key == "_original" || key == "_all_values") {
+  //                 continue;
+  //               }
+  //               if (key == store.state.zoConfig.timestamp_column) {
+  //                 searchObj.data.hasSearchDataTimestampField = true;
+  //               }
+  //               if (
+  //                 !schemaFields.includes(key) &&
+  //                 !commonSchemaFields.includes(key) &&
+  //                 key != "_stream_name"
+  //               ) {
+  //                 fieldObj = {
+  //                   name: key,
+  //                   type: "Utf8",
+  //                   ftsKey: false,
+  //                   group: stream.name,
+  //                   isSchemaField: false,
+  //                   showValues: false,
+  //                   isInterestingField:
+  //                     searchObj.data.stream.interestingFieldList.includes(key)
+  //                       ? true
+  //                       : false,
+  //                   streams: [],
+  //                 };
+  //                 schemaMaps.push(fieldObj);
+
+  //                 if(fieldObj.isInterestingField) {
+  //                   interestingSchemaMaps.push(fieldObj);
+  //                   interestingFieldsMapping[stream.name].push(fieldObj);
+  //                   interestingFieldsMap[fieldObj.name] = true;
+  //                 }
+  //                 schemaFields.push(key);
+  //               }
+  //             }
+  //           }
+  //           searchObj.data.stream.userDefinedSchema =
+  //             userDefineSchemaSettings || [];
+  //         }
+  //       }
+  //       searchObj.data.stream.interestingFieldList = Object.keys(interestingFieldsMap).filter((field: any) => interestingFieldsMap[field]);
+
+
+  //       // searchObj.data.stream.selectedStreamFields = schemaMaps;
+  //       searchObj.data.stream.selectedStreamFields = [
+  //         ...commonSchemaMaps,
+  //         ...schemaMaps,
+  //       ];
         
 
-        searchObj.data.stream.selectedInterestingStreamFields = [
-          ...interestingCommonSchemaMaps,
-          ...interestingSchemaMaps,
-        ];
+  //       searchObj.data.stream.selectedInterestingStreamFields = [
+  //         ...interestingCommonSchemaMaps,
+  //         ...interestingSchemaMaps,
+  //       ];
 
-        if (
-          searchObj.data.stream.selectedStreamFields != undefined &&
-          searchObj.data.stream.selectedStreamFields.length
-        )
-          updateFieldKeywords(searchObj.data.stream.selectedStreamFields);
+  //       if (
+  //         searchObj.data.stream.selectedStreamFields != undefined &&
+  //         searchObj.data.stream.selectedStreamFields.length
+  //       )
+  //         updateFieldKeywords(searchObj.data.stream.selectedStreamFields);
 
 
-        createFieldIndexMapping();
-      }
-      searchObjDebug["extractFieldsEndTime"] = performance.now();
-    } catch (e: any) {
-      searchObj.loadingStream = false;
-      console.log("Error while extracting fields.", e);
-      notificationMsg.value = "Error while extracting stream fields.";
-    }
-  }
+  //       createFieldIndexMapping();
+  //     }
+  //     searchObjDebug["extractFieldsEndTime"] = performance.now();
+  //   } catch (e: any) {
+  //     searchObj.loadingStream = false;
+  //     console.log("Error while extracting fields.", e);
+  //     notificationMsg.value = "Error while extracting stream fields.";
+  //   }
+  // }
 
-  const createFieldIndexMapping = async () => {
-    Promise.resolve().then(() => {
-      streamSchemaFieldsIndexMapping.value = {};
-      for (let i = 0; i < searchObj.data.stream.selectedStreamFields.length; i++) {
-        streamSchemaFieldsIndexMapping.value[searchObj.data.stream.selectedStreamFields[i].name] = i;
-      }
-    });
-  }
+  // const createFieldIndexMapping = async () => {
+  //   Promise.resolve().then(() => {
+  //     streamSchemaFieldsIndexMapping.value = {};
+  //     for (let i = 0; i < searchObj.data.stream.selectedStreamFields.length; i++) {
+  //       streamSchemaFieldsIndexMapping.value[searchObj.data.stream.selectedStreamFields[i].name] = i;
+  //     }
+  //   });
+  // }
 
-  const updateGridColumns = () => {
-    try {
-      searchObj.data.resultGrid.columns = [];
+  // const updateGridColumns = () => {
+  //   try {
+  //     searchObj.data.resultGrid.columns = [];
 
-      const logFilterField: any =
-        useLocalLogFilterField()?.value != null
-          ? useLocalLogFilterField()?.value
-          : {};
-      const logFieldSelectedValue: any = [];
-      const stream = searchObj.data.stream.selectedStream.sort().join("_");
-      // Check if logFilterField has keys (since it's an object, not an array)
-      if (
-        Object.keys(logFilterField).length > 0 &&
-        logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`] != undefined &&
-        Array.isArray(logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`])
-      ) {
-        logFieldSelectedValue.push(
-          ...logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`]
-        );
-      }
-      let selectedFields = (logFilterField && logFieldSelectedValue) || [];
+  //     const logFilterField: any =
+  //       useLocalLogFilterField()?.value != null
+  //         ? useLocalLogFilterField()?.value
+  //         : {};
+  //     const logFieldSelectedValue: any = [];
+  //     const stream = searchObj.data.stream.selectedStream.sort().join("_");
+  //     // Check if logFilterField has keys (since it's an object, not an array)
+  //     if (
+  //       Object.keys(logFilterField).length > 0 &&
+  //       logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`] != undefined &&
+  //       Array.isArray(logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`])
+  //     ) {
+  //       logFieldSelectedValue.push(
+  //         ...logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`]
+  //       );
+  //     }
+  //     let selectedFields = (logFilterField && logFieldSelectedValue) || [];
 
-      if (
-        searchObj.data.stream.selectedFields.length == 0 &&
-        selectedFields.length > 0
-      ) {
-        return (searchObj.data.stream.selectedFields = selectedFields);
-      }
+  //     if (
+  //       searchObj.data.stream.selectedFields.length == 0 &&
+  //       selectedFields.length > 0
+  //     ) {
+  //       return (searchObj.data.stream.selectedFields = selectedFields);
+  //     }
 
-      // As in saved view, we observed field getting duplicated in selectedFields
-      // So, we are removing duplicates before applying saved view
-      if (searchObj.data.stream.selectedFields?.length) {
-        selectedFields = [...new Set(searchObj.data.stream.selectedFields)];
-      }
+  //     // As in saved view, we observed field getting duplicated in selectedFields
+  //     // So, we are removing duplicates before applying saved view
+  //     if (searchObj.data.stream.selectedFields?.length) {
+  //       selectedFields = [...new Set(searchObj.data.stream.selectedFields)];
+  //     }
 
-      const parsedSQL: any = fnParsedSQL();
+  //     const parsedSQL: any = fnParsedSQL();
 
-      // By default when no fields are selected. Timestamp and Source will be visible. If user selects field, then only selected fields will be visible in table
-      // In SQL and Quick mode.
-      // If user adds timestamp manually then only we get it in response.
-      // If we don’t add timestamp and add timestamp to table it should show invalid date.
+  //     // By default when no fields are selected. Timestamp and Source will be visible. If user selects field, then only selected fields will be visible in table
+  //     // In SQL and Quick mode.
+  //     // If user adds timestamp manually then only we get it in response.
+  //     // If we don’t add timestamp and add timestamp to table it should show invalid date.
 
-      if (
-        selectedFields.length == 0 ||
-        !searchObj.data.queryResults?.hits?.length
-      ) {
-        searchObj.meta.resultGrid.manualRemoveFields = false;
-        if (
-          (searchObj.meta.sqlMode == true &&
-            parsedSQL.hasOwnProperty("columns") &&
-            searchObj.data.queryResults?.hits[0].hasOwnProperty(
-              store.state.zoConfig.timestamp_column,
-            )) ||
-          searchObj.meta.sqlMode == false ||
-          selectedFields.includes(store.state.zoConfig.timestamp_column)
-        ) {
-          searchObj.data.resultGrid.columns.push({
-            name: store.state.zoConfig.timestamp_column,
-            id: store.state.zoConfig.timestamp_column,
-            accessorFn: (row: any) =>
-              timestampToTimezoneDate(
-                row[store.state.zoConfig.timestamp_column] / 1000,
-                store.state.timezone,
-                "yyyy-MM-dd HH:mm:ss.SSS",
-              ),
-            prop: (row: any) =>
-              timestampToTimezoneDate(
-                row[store.state.zoConfig.timestamp_column] / 1000,
-                store.state.timezone,
-                "yyyy-MM-dd HH:mm:ss.SSS",
-              ),
-            label: t("search.timestamp") + ` (${store.state.timezone})`,
-            header: t("search.timestamp") + ` (${store.state.timezone})`,
-            align: "left",
-            sortable: true,
-            enableResizing: false,
-            meta: {
-              closable: false,
-              showWrap: false,
-              wrapContent: false,
-            },
-            size: 260,
-          });
-        }
+  //     if (
+  //       selectedFields.length == 0 ||
+  //       !searchObj.data.queryResults?.hits?.length
+  //     ) {
+  //       searchObj.meta.resultGrid.manualRemoveFields = false;
+  //       if (
+  //         (searchObj.meta.sqlMode == true &&
+  //           parsedSQL.hasOwnProperty("columns") &&
+  //           searchObj.data.queryResults?.hits[0].hasOwnProperty(
+  //             store.state.zoConfig.timestamp_column,
+  //           )) ||
+  //         searchObj.meta.sqlMode == false ||
+  //         selectedFields.includes(store.state.zoConfig.timestamp_column)
+  //       ) {
+  //         searchObj.data.resultGrid.columns.push({
+  //           name: store.state.zoConfig.timestamp_column,
+  //           id: store.state.zoConfig.timestamp_column,
+  //           accessorFn: (row: any) =>
+  //             timestampToTimezoneDate(
+  //               row[store.state.zoConfig.timestamp_column] / 1000,
+  //               store.state.timezone,
+  //               "yyyy-MM-dd HH:mm:ss.SSS",
+  //             ),
+  //           prop: (row: any) =>
+  //             timestampToTimezoneDate(
+  //               row[store.state.zoConfig.timestamp_column] / 1000,
+  //               store.state.timezone,
+  //               "yyyy-MM-dd HH:mm:ss.SSS",
+  //             ),
+  //           label: t("search.timestamp") + ` (${store.state.timezone})`,
+  //           header: t("search.timestamp") + ` (${store.state.timezone})`,
+  //           align: "left",
+  //           sortable: true,
+  //           enableResizing: false,
+  //           meta: {
+  //             closable: false,
+  //             showWrap: false,
+  //             wrapContent: false,
+  //           },
+  //           size: 260,
+  //         });
+  //       }
 
-        if (selectedFields.length == 0) {
-          searchObj.data.resultGrid.columns.push({
-            name: "source",
-            id: "source",
-            accessorFn: (row: any) => JSON.stringify(row),
-            cell: (info: any) => info.getValue(),
-            header: "source",
-            sortable: true,
-            enableResizing: false,
-            meta: {
-              closable: false,
-              showWrap: false,
-              wrapContent: false,
-            },
-          });
-        }
-      } else {
-        if (
-          searchObj.data.hasSearchDataTimestampField ||
-          selectedFields.includes(store.state.zoConfig.timestamp_column)
-        ) {
-          searchObj.data.resultGrid.columns.unshift({
-            name: store.state.zoConfig.timestamp_column,
-            id: store.state.zoConfig.timestamp_column,
-            accessorFn: (row: any) =>
-              timestampToTimezoneDate(
-                row[store.state.zoConfig.timestamp_column] / 1000,
-                store.state.timezone,
-                "yyyy-MM-dd HH:mm:ss.SSS",
-              ),
-            prop: (row: any) =>
-              timestampToTimezoneDate(
-                row[store.state.zoConfig.timestamp_column] / 1000,
-                store.state.timezone,
-                "yyyy-MM-dd HH:mm:ss.SSS",
-              ),
-            label: t("search.timestamp") + ` (${store.state.timezone})`,
-            header: t("search.timestamp") + ` (${store.state.timezone})`,
-            align: "left",
-            sortable: true,
-            enableResizing: false,
-            meta: {
-              closable: false,
-              showWrap: false,
-              wrapContent: false,
-            },
-            size: 260,
-          });
-        }
+  //       if (selectedFields.length == 0) {
+  //         searchObj.data.resultGrid.columns.push({
+  //           name: "source",
+  //           id: "source",
+  //           accessorFn: (row: any) => JSON.stringify(row),
+  //           cell: (info: any) => info.getValue(),
+  //           header: "source",
+  //           sortable: true,
+  //           enableResizing: false,
+  //           meta: {
+  //             closable: false,
+  //             showWrap: false,
+  //             wrapContent: false,
+  //           },
+  //         });
+  //       }
+  //     } else {
+  //       if (
+  //         searchObj.data.hasSearchDataTimestampField ||
+  //         selectedFields.includes(store.state.zoConfig.timestamp_column)
+  //       ) {
+  //         searchObj.data.resultGrid.columns.unshift({
+  //           name: store.state.zoConfig.timestamp_column,
+  //           id: store.state.zoConfig.timestamp_column,
+  //           accessorFn: (row: any) =>
+  //             timestampToTimezoneDate(
+  //               row[store.state.zoConfig.timestamp_column] / 1000,
+  //               store.state.timezone,
+  //               "yyyy-MM-dd HH:mm:ss.SSS",
+  //             ),
+  //           prop: (row: any) =>
+  //             timestampToTimezoneDate(
+  //               row[store.state.zoConfig.timestamp_column] / 1000,
+  //               store.state.timezone,
+  //               "yyyy-MM-dd HH:mm:ss.SSS",
+  //             ),
+  //           label: t("search.timestamp") + ` (${store.state.timezone})`,
+  //           header: t("search.timestamp") + ` (${store.state.timezone})`,
+  //           align: "left",
+  //           sortable: true,
+  //           enableResizing: false,
+  //           meta: {
+  //             closable: false,
+  //             showWrap: false,
+  //             wrapContent: false,
+  //           },
+  //           size: 260,
+  //         });
+  //       }
 
-        let sizes: any;
-        if (
-          searchObj.data.resultGrid.colSizes &&
-          searchObj.data.resultGrid.colSizes.hasOwnProperty(
-            searchObj.data.stream.selectedStream,
-          )
-        ) {
-          sizes =
-            searchObj.data.resultGrid.colSizes[
-              searchObj.data.stream.selectedStream
-            ];
-        }
+  //       let sizes: any;
+  //       if (
+  //         searchObj.data.resultGrid.colSizes &&
+  //         searchObj.data.resultGrid.colSizes.hasOwnProperty(
+  //           searchObj.data.stream.selectedStream,
+  //         )
+  //       ) {
+  //         sizes =
+  //           searchObj.data.resultGrid.colSizes[
+  //             searchObj.data.stream.selectedStream
+  //           ];
+  //       }
 
-        const canvas = document.createElement("canvas");
-        const context = canvas.getContext("2d");
+  //       const canvas = document.createElement("canvas");
+  //       const context = canvas.getContext("2d");
 
-        for (const field of selectedFields) {
-          if (field != store.state.zoConfig.timestamp_column) {
-            let foundKey, foundValue;
+  //       for (const field of selectedFields) {
+  //         if (field != store.state.zoConfig.timestamp_column) {
+  //           let foundKey, foundValue;
 
-            if (sizes?.length > 0) {
-              Object.keys(sizes[0]).forEach((key) => {
-                const trimmedKey = key
-                  .replace(/^--(header|col)-/, "")
-                  .replace(/-size$/, "");
-                if (trimmedKey === field) {
-                  foundKey = key;
-                  foundValue = sizes[0][key];
-                }
-              });
-            }
+  //           if (sizes?.length > 0) {
+  //             Object.keys(sizes[0]).forEach((key) => {
+  //               const trimmedKey = key
+  //                 .replace(/^--(header|col)-/, "")
+  //                 .replace(/-size$/, "");
+  //               if (trimmedKey === field) {
+  //                 foundKey = key;
+  //                 foundValue = sizes[0][key];
+  //               }
+  //             });
+  //           }
 
-            searchObj.data.resultGrid.columns.push({
-              name: field,
-              id: field,
-              accessorFn: (row: { [x: string]: any; source: any }) => {
-                return byString(row, field);
-              },
-              header: field,
-              sortable: true,
-              enableResizing: true,
-              meta: {
-                closable: true,
-                showWrap: true,
-                wrapContent: false,
-              },
-              size: foundValue ? foundValue : getColumnWidth(context, field),
-              maxSize: window.innerWidth,
-            });
-          }
-        }
-      }
+  //           searchObj.data.resultGrid.columns.push({
+  //             name: field,
+  //             id: field,
+  //             accessorFn: (row: { [x: string]: any; source: any }) => {
+  //               return byString(row, field);
+  //             },
+  //             header: field,
+  //             sortable: true,
+  //             enableResizing: true,
+  //             meta: {
+  //               closable: true,
+  //               showWrap: true,
+  //               wrapContent: false,
+  //             },
+  //             size: foundValue ? foundValue : getColumnWidth(context, field),
+  //             maxSize: window.innerWidth,
+  //           });
+  //         }
+  //       }
+  //     }
 
-      extractFTSFields();
-    } catch (e: any) {
-      searchObj.loadingStream = false;
-      notificationMsg.value = "Error while updating table columns.";
-    }
-  };
+  //     extractFTSFields();
+  //   } catch (e: any) {
+  //     searchObj.loadingStream = false;
+  //     notificationMsg.value = "Error while updating table columns.";
+  //   }
+  // };
 
-  /**
-   * Helper function to calculate width of the column based on its content(from first 5 rows)
-   * @param context - Canvas Context to calculate width of column using its content
-   * @param field - Field name for which width needs to be calculated
-   * @returns - Width of the column
-   */
-  const getColumnWidth = (context: any, field: string) => {
-    // Font of table header
-    context.font = "bold 14px sans-serif";
-    let max = context.measureText(field).width + 16;
+  // /**
+  //  * Helper function to calculate width of the column based on its content(from first 5 rows)
+  //  * @param context - Canvas Context to calculate width of column using its content
+  //  * @param field - Field name for which width needs to be calculated
+  //  * @returns - Width of the column
+  //  */
+  // const getColumnWidth = (context: any, field: string) => {
+  //   // Font of table header
+  //   context.font = "bold 14px sans-serif";
+  //   let max = context.measureText(field).width + 16;
 
-    // Font of the table content
-    context.font = "12px monospace";
-    let width = 0;
-    try {
-      for (let i = 0; i < 5; i++) {
-        if (searchObj.data.queryResults.hits?.[i]?.[field]) {
-          width = context.measureText(
-            searchObj.data.queryResults.hits[i][field],
-          ).width;
+  //   // Font of the table content
+  //   context.font = "12px monospace";
+  //   let width = 0;
+  //   try {
+  //     for (let i = 0; i < 5; i++) {
+  //       if (searchObj.data.queryResults.hits?.[i]?.[field]) {
+  //         width = context.measureText(
+  //           searchObj.data.queryResults.hits[i][field],
+  //         ).width;
 
-          if (width > max) max = width;
-        }
-      }
-    } catch (err) {
-      console.log("Error while calculation column width");
-    }
+  //         if (width > max) max = width;
+  //       }
+  //     }
+  //   } catch (err) {
+  //     console.log("Error while calculation column width");
+  //   }
 
-    max += 24; // 24px padding
+  //   max += 24; // 24px padding
 
-    if (max > 800) return 800;
+  //   if (max > 800) return 800;
 
-    if (max < 150) return 150;
+  //   if (max < 150) return 150;
 
-    return max;
-  };
+  //   return max;
+  // };
 
-  function getHistogramTitle() {
-    try {
-      const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
-      const startCount =
-        currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
-      let endCount;
+  // function getHistogramTitle() {
+  //   try {
+  //     const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
+  //     const startCount =
+  //       currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
+  //     let endCount;
 
-      let totalCount = Math.max(
-        searchObj.data.queryResults.hits?.length,
-        searchObj.data.queryResults.total,
-      );
+  //     let totalCount = Math.max(
+  //       searchObj.data.queryResults.hits?.length,
+  //       searchObj.data.queryResults.total,
+  //     );
 
-      if (!searchObj.meta.resultGrid.showPagination) {
-        endCount = searchObj.data.queryResults.hits?.length;
-        totalCount = searchObj.data.queryResults.hits?.length;
-      } else {
-        endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
-        if (
-          currentPage >=
-          (searchObj.communicationMethod === "ws" || searchObj.communicationMethod === "streaming" || searchObj.meta.jobId != ""
-            ? searchObj.data.queryResults?.pagination?.length
-            : searchObj.data.queryResults.partitionDetail?.paginations
-                ?.length || 0) -
-            1
-        ) {
-          endCount = Math.min(
-            startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
-            totalCount,
-          );
-        } else {
-          endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
-        }
-      }
+  //     if (!searchObj.meta.resultGrid.showPagination) {
+  //       endCount = searchObj.data.queryResults.hits?.length;
+  //       totalCount = searchObj.data.queryResults.hits?.length;
+  //     } else {
+  //       endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
+  //       if (
+  //         currentPage >=
+  //         (searchObj.communicationMethod === "ws" || searchObj.communicationMethod === "streaming" || searchObj.meta.jobId != ""
+  //           ? searchObj.data.queryResults?.pagination?.length
+  //           : searchObj.data.queryResults.partitionDetail?.paginations
+  //               ?.length || 0) -
+  //           1
+  //       ) {
+  //         endCount = Math.min(
+  //           startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
+  //           totalCount,
+  //         );
+  //       } else {
+  //         endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
+  //       }
+  //     }
 
-      if (searchObj.meta.sqlMode && searchAggData.hasAggregation) {
-        totalCount = searchAggData.total;
-      }
+  //     if (searchObj.meta.sqlMode && searchAggData.hasAggregation) {
+  //       totalCount = searchAggData.total;
+  //     }
 
-      if (isNaN(totalCount)) {
-        totalCount = 0;
-      }
+  //     if (isNaN(totalCount)) {
+  //       totalCount = 0;
+  //     }
 
-      if (isNaN(endCount)) {
-        endCount = 0;
-      }
+  //     if (isNaN(endCount)) {
+  //       endCount = 0;
+  //     }
 
-      let plusSign: string = "";
-      if (
-        searchObj.data.queryResults?.partitionDetail?.partitions?.length > 1 &&
-        endCount < totalCount &&
-        searchObj.meta.showHistogram == false
-      ) {
-        plusSign = "+";
-      }
+  //     let plusSign: string = "";
+  //     if (
+  //       searchObj.data.queryResults?.partitionDetail?.partitions?.length > 1 &&
+  //       endCount < totalCount &&
+  //       searchObj.meta.showHistogram == false
+  //     ) {
+  //       plusSign = "+";
+  //     }
 
-      if (
-        (searchObj.communicationMethod === "ws" || searchObj.communicationMethod === "streaming") &&
-        endCount < totalCount &&
-        !searchObj.meta.showHistogram
-      ) {
-        plusSign = "+";
-      }
+  //     if (
+  //       (searchObj.communicationMethod === "ws" || searchObj.communicationMethod === "streaming") &&
+  //       endCount < totalCount &&
+  //       !searchObj.meta.showHistogram
+  //     ) {
+  //       plusSign = "+";
+  //     }
 
-      const scanSizeLabel =
-        searchObj.data.queryResults.result_cache_ratio !== undefined &&
-        searchObj.data.queryResults.result_cache_ratio > 0
-          ? "Delta Scan Size"
-          : "Scan Size";
+  //     const scanSizeLabel =
+  //       searchObj.data.queryResults.result_cache_ratio !== undefined &&
+  //       searchObj.data.queryResults.result_cache_ratio > 0
+  //         ? "Delta Scan Size"
+  //         : "Scan Size";
 
-      const title =
-        "Showing " +
-        startCount +
-        " to " +
-        endCount +
-        " out of " +
-        totalCount.toLocaleString() +
-        plusSign +
-        " events in " +
-        searchObj.data.queryResults.took +
-        " ms. (" +
-        scanSizeLabel +
-        ": " +
-        formatSizeFromMB(searchObj.data.queryResults.scan_size) +
-        plusSign +
-        ")";
-      return title;
-    } catch (e: any) {
-      console.log("Error while generating histogram title", e);
-      notificationMsg.value = "Error while generating histogram title.";
-      return "";
-    }
-  }
+  //     const title =
+  //       "Showing " +
+  //       startCount +
+  //       " to " +
+  //       endCount +
+  //       " out of " +
+  //       totalCount.toLocaleString() +
+  //       plusSign +
+  //       " events in " +
+  //       searchObj.data.queryResults.took +
+  //       " ms. (" +
+  //       scanSizeLabel +
+  //       ": " +
+  //       formatSizeFromMB(searchObj.data.queryResults.scan_size) +
+  //       plusSign +
+  //       ")";
+  //     return title;
+  //   } catch (e: any) {
+  //     console.log("Error while generating histogram title", e);
+  //     notificationMsg.value = "Error while generating histogram title.";
+  //     return "";
+  //   }
+  // }
 
-  function generateHistogramData() {
-    try {
-      // searchObj.data.histogram.chartParams.title = ""
-      let num_records: number = 0;
-      const unparsed_x_data: any[] = [];
-      const xData: number[] = [];
-      const yData: number[] = [];
-      let hasAggregationFlag = false;
+  // function generateHistogramData() {
+  //   try {
+  //     // searchObj.data.histogram.chartParams.title = ""
+  //     let num_records: number = 0;
+  //     const unparsed_x_data: any[] = [];
+  //     const xData: number[] = [];
+  //     const yData: number[] = [];
+  //     let hasAggregationFlag = false;
 
-      const parsedSQL: any = fnParsedSQL();
-      if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
-        hasAggregationFlag = hasAggregation(parsedSQL.columns);
-      }
+  //     const parsedSQL: any = fnParsedSQL();
+  //     if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
+  //       hasAggregationFlag = hasAggregation(parsedSQL.columns);
+  //     }
 
-      if (
-        searchObj.data.queryResults.hasOwnProperty("aggs") &&
-        searchObj.data.queryResults.aggs
-      ) {
-        histogramMappedData = new Map(
-          histogramResults.map((item: any) => [
-            item.zo_sql_key,
-            JSON.parse(JSON.stringify(item)),
-          ]),
-        );
+  //     if (
+  //       searchObj.data.queryResults.hasOwnProperty("aggs") &&
+  //       searchObj.data.queryResults.aggs
+  //     ) {
+  //       histogramMappedData = new Map(
+  //         histogramResults.map((item: any) => [
+  //           item.zo_sql_key,
+  //           JSON.parse(JSON.stringify(item)),
+  //         ]),
+  //       );
 
-        searchObj.data.queryResults.aggs.forEach((item: any) => {
-          if (histogramMappedData.has(item.zo_sql_key)) {
-            histogramMappedData.get(item.zo_sql_key).zo_sql_num +=
-              item.zo_sql_num;
-          } else {
-            histogramMappedData.set(item.zo_sql_key, item);
-          }
-        });
+  //       searchObj.data.queryResults.aggs.forEach((item: any) => {
+  //         if (histogramMappedData.has(item.zo_sql_key)) {
+  //           histogramMappedData.get(item.zo_sql_key).zo_sql_num +=
+  //             item.zo_sql_num;
+  //         } else {
+  //           histogramMappedData.set(item.zo_sql_key, item);
+  //         }
+  //       });
 
-        const mergedData: any = Array.from(histogramMappedData.values());
-        mergedData.map(
-          (bucket: {
-            zo_sql_key: string | number | Date;
-            zo_sql_num: string;
-          }) => {
-            num_records = num_records + parseInt(bucket.zo_sql_num, 10);
-            unparsed_x_data.push(bucket.zo_sql_key);
-            // const histDate = new Date(bucket.zo_sql_key);
-            xData.push(
-              histogramDateTimezone(bucket.zo_sql_key, store.state.timezone),
-            );
-            // xData.push(Math.floor(histDate.getTime()))
-            yData.push(parseInt(bucket.zo_sql_num, 10));
-          },
-        );
+  //       const mergedData: any = Array.from(histogramMappedData.values());
+  //       mergedData.map(
+  //         (bucket: {
+  //           zo_sql_key: string | number | Date;
+  //           zo_sql_num: string;
+  //         }) => {
+  //           num_records = num_records + parseInt(bucket.zo_sql_num, 10);
+  //           unparsed_x_data.push(bucket.zo_sql_key);
+  //           // const histDate = new Date(bucket.zo_sql_key);
+  //           xData.push(
+  //             histogramDateTimezone(bucket.zo_sql_key, store.state.timezone),
+  //           );
+  //           // xData.push(Math.floor(histDate.getTime()))
+  //           yData.push(parseInt(bucket.zo_sql_num, 10));
+  //         },
+  //       );
 
-        searchObj.data.queryResults.total = num_records;
-      }
-      const chartParams = {
-        title: getHistogramTitle(),
-        unparsed_x_data: unparsed_x_data,
-        timezone: store.state.timezone,
-      };
-      searchObj.data.histogram = {
-        xData,
-        yData,
-        chartParams,
-        errorCode: 0,
-        errorMsg: "",
-        errorDetail: "",
-      };
-    } catch (e: any) {
-      console.log("Error while generating histogram data", e);
-      notificationMsg.value = "Error while generating histogram data.";
-    }
-  }
+  //       searchObj.data.queryResults.total = num_records;
+  //     }
+  //     const chartParams = {
+  //       title: getHistogramTitle(),
+  //       unparsed_x_data: unparsed_x_data,
+  //       timezone: store.state.timezone,
+  //     };
+  //     searchObj.data.histogram = {
+  //       xData,
+  //       yData,
+  //       chartParams,
+  //       errorCode: 0,
+  //       errorMsg: "",
+  //       errorDetail: "",
+  //     };
+  //   } catch (e: any) {
+  //     console.log("Error while generating histogram data", e);
+  //     notificationMsg.value = "Error while generating histogram data.";
+  //   }
+  // }
 
   const refreshData = () => {
     try {
@@ -4302,22 +4308,22 @@ const useLogs = () => {
     }
   };
 
-  const ftsFields: any = ref([]);
-  const extractFTSFields = () => {
-    if (
-      searchObj.data.stream.selectedStreamFields != undefined &&
-      searchObj.data.stream.selectedStreamFields.length > 0
-    ) {
-      ftsFields.value = searchObj.data.stream.selectedStreamFields
-        .filter((item: any) => item.ftsKey === true)
-        .map((item: any) => item.name);
-    }
+  // const ftsFields: any = ref([]);
+  // const extractFTSFields = () => {
+  //   if (
+  //     searchObj.data.stream.selectedStreamFields != undefined &&
+  //     searchObj.data.stream.selectedStreamFields.length > 0
+  //   ) {
+  //     ftsFields.value = searchObj.data.stream.selectedStreamFields
+  //       .filter((item: any) => item.ftsKey === true)
+  //       .map((item: any) => item.name);
+  //   }
 
-    // if there is no FTS fields set by user then use default FTS fields
-    if (ftsFields.value.length == 0) {
-      ftsFields.value = store.state.zoConfig.default_fts_keys;
-    }
-  };
+  //   // if there is no FTS fields set by user then use default FTS fields
+  //   if (ftsFields.value.length == 0) {
+  //     ftsFields.value = store.state.zoConfig.default_fts_keys;
+  //   }
+  // };
 
   const getSavedViews = async () => {
     try {
@@ -6094,22 +6100,22 @@ const useLogs = () => {
     }
   };
 
-  const showCancelSearchNotification = () => {
-    $q.notify({
-      message: "Running query cancelled successfully",
-      color: "positive",
-      position: "bottom",
-      timeout: 4000,
-    });
-  };
+  // const showCancelSearchNotification = () => {
+  //   $q.notify({
+  //     message: "Running query cancelled successfully",
+  //     color: "positive",
+  //     position: "bottom",
+  //     timeout: 4000,
+  //   });
+  // };
 
 
 
 
 
-  const isActionsEnabled = computed(() => {
-    return (config.isEnterprise == "true" || config.isCloud == "true") && store.state.zoConfig.actions_enabled;
-  });
+  // const isActionsEnabled = computed(() => {
+  //   return (config.isEnterprise == "true" || config.isCloud == "true") && store.state.zoConfig.actions_enabled;
+  // });
   
   return {
     searchObj,
@@ -6151,12 +6157,9 @@ const useLogs = () => {
     setSelectedStreams,
     extractValueQuery,
     initialQueryPayload,
-    refreshPagination,
     loadJobData,
     refreshJobPagination,
     enableRefreshInterval,
-    buildWebSocketPayload,
-    initializeSearchConnection,
     routeToSearchSchedule,
     isActionsEnabled,
     sendCancelSearchMessage,
@@ -6174,14 +6177,9 @@ const useLogs = () => {
     setCommunicationMethod,
     loadVisualizeData,
     processHttpHistogramResults,
-    getVisualizationConfig,
-    encodeVisualizationConfig,
-    decodeVisualizationConfig,
     streamSchemaFieldsIndexMapping,
-    shouldAddFunctionToSearch,
     notificationMsg,
     showErrorNotification,
-    addTransformToQuery,
     setDateTime,
   };
 };
