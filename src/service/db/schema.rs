@@ -390,6 +390,7 @@ async fn handle_update(key: &str, start_dt: Option<i64>) -> Result<(), anyhow::E
             ));
         }
     }
+    log::debug!("[Schema:watch] Stream settings: {}", item_key);
     let mut w = STREAM_SETTINGS.write().await;
     w.insert(item_key.to_string(), settings);
     infra::schema::set_stream_settings_atomic(w.clone());
@@ -425,6 +426,7 @@ async fn handle_update(key: &str, start_dt: Option<i64>) -> Result<(), anyhow::E
         })
         .or_insert(schema_versions);
     drop(w);
+    log::debug!("[Schema:watch] Schema updated: {}", item_key);
     Ok(())
 }
 
@@ -445,6 +447,10 @@ async fn handle_delete(item_key: &str) -> Result<(), anyhow::Error> {
     w.remove(item_key);
     w.shrink_to_fit();
     drop(w);
+    log::debug!(
+        "[Schema:watch] Schema removed from stream_scheamas: {}",
+        item_key
+    );
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
     w.remove(item_key);
     w.shrink_to_fit();
@@ -463,6 +469,10 @@ async fn handle_delete(item_key: &str) -> Result<(), anyhow::Error> {
         log::error!("[Schema:watch] del_offset: {}", e);
     }
 
+    log::debug!(
+        "[Schema:watch] Schema removed from stream_scheamas_latest: {}",
+        item_key
+    );
     if stream_type.eq(&StreamType::EnrichmentTables) && is_local_disk_storage() {
         let data_dir = format!(
             "{}files/{org_id}/{stream_type}/{stream_name}",
@@ -480,6 +490,7 @@ async fn handle_delete(item_key: &str) -> Result<(), anyhow::Error> {
             log::error!("[Schema:watch] delete local enrichment file error: {}", e);
         }
     }
+    log::debug!("[Schema:watch] Schema removed: {}", item_key);
     Ok(())
 }
 

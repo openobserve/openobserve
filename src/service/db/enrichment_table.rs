@@ -442,5 +442,9 @@ async fn handle_update(org_id: &str, stream_name: &str) -> Result<(), anyhow::Er
 async fn handle_delete(org_id: &str, stream_name: &str) -> Result<(), anyhow::Error> {
     let item_key = format!("{org_id}/{}/{stream_name}", StreamType::EnrichmentTables);
     ENRICHMENT_TABLES.remove(&item_key);
+    log::debug!(
+        "[ENRICHMENT::TABLE watch] Enrichment table deleted: {}",
+        item_key
+    );
     Ok(())
 }
