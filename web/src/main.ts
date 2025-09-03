@@ -49,7 +49,7 @@ app
 // const router = createRouter(store);
 app.use(store).use(router);
 
-const { reoInit, setupPageTitles } = useReo();
+const { reoInit } = useReo();
 
 reoInit();
 
