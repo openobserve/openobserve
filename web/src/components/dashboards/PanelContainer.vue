@@ -314,6 +314,7 @@ self="top right" max-width="220px">
               </q-item-section>
             </q-item>
             <q-item
+              v-if="config.isEnterprise === 'true'"
               clickable
               v-close-popup="true"
               @click="onPanelModifyClick('Refresh')"
@@ -327,6 +328,7 @@ self="top right" max-width="220px">
               </q-item-section>
             </q-item>
             <q-item
+              v-if="config.isEnterprise === 'true'"
               clickable
               v-close-popup="true"
               @click="onPanelModifyClick('Refresh')"
@@ -463,6 +465,7 @@ import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
+import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
 
 const QueryInspector = defineAsyncComponent(() => {
@@ -949,6 +952,7 @@ export default defineComponent({
       handleLimitNumberOfSeriesWarningMessageUpdate,
       isPartialData,
       handleIsPartialDataUpdate,
+      config,
       t,
     };
   },
