@@ -802,7 +802,7 @@ export default defineComponent({
             store,
             route.query.dashboard,
             route.query.folder ?? "default",
-          ),
+          ) ?? {},
         ),
       );
       // console.timeEnd("AddPanel:loadDashboard");

@@ -36,12 +36,15 @@ impl From<DestinationError> for HttpResponse {
 }
 
 /// CreateDestination
-///
-/// #{"ratelimit_module":"Destinations", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "CreateDestination",
+    summary = "Create alert destination",
+    description = "Creates a new alert destination configuration for an organization. Destinations define where alert \
+                   notifications are sent when alert conditions are met, including webhooks, email addresses, Slack \
+                   channels, PagerDuty integrations, and other notification services. The destination can be used by \
+                   multiple alerts within the organization.",
     security(
         ("Authorization"= [])
     ),
@@ -50,8 +53,11 @@ impl From<DestinationError> for HttpResponse {
       ),
     request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/alerts/destinations")]
@@ -76,12 +82,14 @@ pub async fn save_destination(
 }
 
 /// UpdateDestination
-///
-/// #{"ratelimit_module":"Destinations", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "UpdateDestination",
+    summary = "Update alert destination",
+    description = "Updates an existing alert destination configuration. Allows modification of destination settings such as \
+                   webhook URLs, authentication credentials, notification channels, and other delivery parameters. The \
+                   updated configuration will apply to all future alert notifications using this destination.",
     security(
         ("Authorization"= [])
     ),
@@ -91,8 +99,11 @@ pub async fn save_destination(
       ),
     request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/alerts/destinations/{destination_name}")]
@@ -112,12 +123,14 @@ pub async fn update_destination(
 }
 
 /// GetDestination
-///
-/// #{"ratelimit_module":"Destinations", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetDestination",
+    summary = "Get alert destination",
+    description = "Retrieves the configuration details for a specific alert destination. Returns the complete destination \
+                   setup including delivery method, authentication credentials, notification settings, and other \
+                   configuration parameters. Used for reviewing and managing existing destination configurations.",
     security(
         ("Authorization"= [])
     ),
@@ -127,7 +140,10 @@ pub async fn update_destination(
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = Destination),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse), 
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()), 
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/alerts/destinations/{destination_name}")]
@@ -140,12 +156,15 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
 }
 
 /// ListDestinations
-///
-/// #{"ratelimit_module":"Destinations", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "ListDestinations",
+    summary = "List alert destinations",
+    description = "Retrieves a list of all alert destinations configured for an organization. Optionally filter by module \
+                   type (alert or pipeline) to get specific destination categories. Returns destination names, types, and \
+                   basic configuration details to help administrators manage notification routing and review available \
+                   delivery options.",
     security(
         ("Authorization"= [])
     ),
@@ -155,7 +174,10 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<Destination>),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/alerts/destinations")]
@@ -201,12 +223,14 @@ async fn list_destinations(
 }
 
 /// DeleteDestination
-///
-/// #{"ratelimit_module":"Destinations", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "DeleteAlertDestination",
+    summary = "Delete alert destination",
+    description = "Removes an alert destination configuration from the organization. The destination must not be in use by \
+                   any active alerts or pipelines before deletion. Once deleted, any alerts previously configured to use \
+                   this destination will need to be updated with alternative notification methods to continue functioning.",
     security(
         ("Authorization"= [])
     ),
@@ -215,10 +239,13 @@ async fn list_destinations(
         ("destination_name" = String, Path, description = "Destination name"),
     ),
     responses(
-        (status = 200, description = "Success",   content_type = "application/json", body = HttpResponse),
-        (status = 409, description = "Conflict", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 409, description = "Conflict", content_type = "application/json", body = ()),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/alerts/destinations/{destination_name}")]

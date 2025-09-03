@@ -15,9 +15,11 @@
 
 use o2_enterprise::enterprise::ai::meta::AiMessage;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct PromptRequest {
+    #[schema(value_type = Vec<Object>)]
     pub messages: Vec<AiMessage>,
     #[serde(default)]
     pub model: String,
@@ -25,7 +27,7 @@ pub struct PromptRequest {
     pub provider: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct PromptResponse {
     pub role: String,
     pub content: String,

@@ -1939,4 +1939,29 @@ export class LogsPage {
     async expectTimestampFieldVisible() {
         return await expect(this.page.locator(this.timestampFieldTable).getByTitle('_timestamp')).toBeVisible();
     }
+
+    // Field management methods for add/remove fields to table
+    async hoverOnFieldExpandButton(fieldName) {
+        await this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`).hover();
+        await this.page.waitForTimeout(300);
+    }
+
+    async clickAddFieldToTableButton(fieldName) {
+        await this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`).click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async clickRemoveFieldFromTableButton(fieldName) {
+        await this.page.locator(`[data-test="log-search-index-list-remove-${fieldName}-field-btn"]`).click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async expectFieldInTableHeader(fieldName) {
+        return await expect(this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`)).toBeVisible();
+    }
+
+    async expectFieldNotInTableHeader(fieldName) {
+        // When field is removed, the source column should be visible again
+        return await expect(this.page.locator('[data-test="log-search-result-table-th-source"]').getByText('source')).toBeVisible();
+    }
 } 

@@ -169,7 +169,7 @@ jobs:
   release:
     name: Release artifacts
     needs: [build]
-    runs-on: ubuntu-latest
+    runs-on: repo-openobserve-standard-4
     permissions:
       id-token: write
       contents: write
@@ -221,3 +221,62 @@ jobs:
           name: "Release ${{ github.ref_name }}"
           generate_release_notes: true
           body: ${{ steps.generate-body.outputs.body }}
+
+      - name: Send release notification to Strapi
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Get release info from workflow dispatch inputs
+            const tag = context.ref.replace("refs/tags/", "");
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: tag
+            });      
+            function cleanChangelog(changelog) {
+              if (!changelog) return '';
+              return changelog
+                .split(/\r?\n/)
+                .map(line => {
+                  if (line.toLowerCase().includes('full changelog')) return '';
+                  line = line.replace(/by\s+@[\w-]+.*$/i, '');
+                  line = line.replace(/@\w+/g, '');
+                  line = line.replace(/\bhttps?:\/\/\Spull\S/gi, '');
+                  return line.trim();
+                })
+                .filter(line => line.length > 0)
+                .join('\n');
+            }
+
+            const cleanedBody = cleanChangelog(release.body);
+            const payload = {
+              version: release.tag_name,
+              release_name: release.name,
+              release_url: release.html_url,
+              changelog: cleanedBody || 'No release notes provided',
+              type: 'PUBLIC',
+              date: release.published_at
+            };
+            try {
+              const response = await fetch(`${process.env.STRAPI_WEBHOOK_URL}/api/github-releases?status=draft`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${process.env.STRAPI_API_TOKEN}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({data: payload})
+              });
+
+              if (!response.ok) {
+                throw new Error(`Webhook request failed: ${response.status} ${response.statusText}`);
+              }
+
+              console.log('Response status:', response.status);
+            } catch (error) {
+              console.error('Failed to send webhook notification:', error);
+              core.setFailed(error.message);
+            }
+        env:
+          STRAPI_WEBHOOK_URL: ${{ secrets.STRAPI_WEBHOOK_URL }}
+          STRAPI_API_TOKEN: ${{ secrets.STRAPI_API_TOKEN }}
+  

@@ -37,22 +37,26 @@ impl From<PipelineError> for HttpResponse {
 }
 
 /// CreatePipeline
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipeline",
     operation_id = "createPipeline",
+    summary = "Create new pipeline",
+    description = "Creates a new data processing pipeline with specified transformations and routing rules. Pipelines define how incoming data is processed before storage",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Pipeline, description = "Pipeline data", content_type = "application/json"),
+    request_body(content = Object, description = "Pipeline data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/pipelines")]
@@ -83,12 +87,13 @@ pub async fn save_pipeline(
 }
 
 /// ListPipelines
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "listPipelines",
+    summary = "List organization pipelines",
+    description = "Retrieves all data processing pipelines configured for the organization, including their status and associated triggers",
     security(
         ("Authorization"= [])
     ),
@@ -97,6 +102,9 @@ pub async fn save_pipeline(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = PipelineList),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/pipelines")]
@@ -148,12 +156,13 @@ async fn list_pipelines(
 }
 
 /// GetStreamsWithPipeline
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "getStreamsWithPipeline",
+    summary = "Get streams with pipelines",
+    description = "Retrieves a list of streams that have associated data processing pipelines, showing the relationship between streams and their transformation rules",
     security(
         ("Authorization"= [])
     ),
@@ -162,6 +171,9 @@ async fn list_pipelines(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = PipelineList),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/pipelines/streams")]
@@ -174,12 +186,13 @@ async fn list_streams_with_pipeline(path: web::Path<String>) -> Result<HttpRespo
 }
 
 /// DeletePipeline
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "deletePipeline",
+    summary = "Delete pipeline",
+    description = "Permanently deletes a data processing pipeline. This will stop any ongoing data transformations using this pipeline",
     security(
         ("Authorization"= [])
     ),
@@ -188,8 +201,11 @@ async fn list_streams_with_pipeline(path: web::Path<String>) -> Result<HttpRespo
         ("pipeline_id" = String, Path, description = "Pipeline ID"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/pipelines/{pipeline_id}")]
@@ -205,22 +221,26 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
 }
 
 /// UpdatePipeline
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "updatePipeline",
+    summary = "Update pipeline",
+    description = "Updates an existing data processing pipeline with new transformation rules, routing configurations, or other settings",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Pipeline, description = "Pipeline data", content_type = "application/json"),
+    request_body(content = Object, description = "Pipeline data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/pipelines")]
@@ -236,12 +256,13 @@ pub async fn update_pipeline(pipeline: web::Json<Pipeline>) -> Result<HttpRespon
 }
 
 /// EnablePipeline
-///
-/// #{"ratelimit_module":"Pipeline", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "enablePipeline",
+    summary = "Enable or disable pipeline",
+    description = "Enables or disables a data processing pipeline. Disabled pipelines will not process incoming data until re-enabled",
     security(
         ("Authorization"= [])
     ),
@@ -251,9 +272,12 @@ pub async fn update_pipeline(pipeline: web::Json<Pipeline>) -> Result<HttpRespon
         ("value" = bool, Query, description = "Enable or disable pipeline"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/pipelines/{pipeline_id}/enable")]
