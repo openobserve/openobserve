@@ -335,7 +335,7 @@ self="top right" max-width="220px">
                 <q-item-label
                   data-test="dashboard-refresh-without-cache"
                   class="q-pa-sm"
-                  >Refresh Without Using Cache</q-item-label
+                  >Refresh without using cache</q-item-label
                 >
               </q-item-section>
             </q-item>

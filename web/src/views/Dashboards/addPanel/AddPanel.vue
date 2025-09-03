@@ -110,9 +110,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
         >
-          <q-btn-group v-if="config.isEnterprise == 'true'" class="q-ml-md">
+          <q-btn
+            v-if="!config.isEnterprise"
+            class="q-ml-md text-bold"
+            data-test="dashboard-apply"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            :label="t('panel.apply')"
+            @click="() => runQuery(false)"
+          />
+          <q-btn-group v-if="config.isEnterprise" class="q-ml-md">
             <q-btn
-              :flat="searchRequestTraceIds.length > 0"
               class="o2-primary-button tw-h-[36px] q-ml-md"
               :class="
                 store.state.theme === 'dark'
@@ -142,25 +151,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('panel.apply')
               "
               @click="onApplyBtnClick"
+              style="width: 92px;"
             />
 
             <q-btn-dropdown
-              v-if="searchRequestTraceIds.length === 0"
               class="text-bold no-border"
               padding="xs"
-              color="secondary"
+              :color="searchRequestTraceIds.length > 0 ? 'negative' : 'secondary'"
               text-color="white"
               no-caps
               auto-close
               dropdown-icon="keyboard_arrow_down"
+              :disable="searchRequestTraceIds.length > 0"
             >
               <q-list>
-                <q-item clickable @click="runQuery(true)">
+                <q-item clickable @click="runQuery(true)" :disable="searchRequestTraceIds.length > 0">
                   <q-item-section avatar>
                     <q-icon size="xs" name="refresh" style="align-items: baseline; padding: 0px;" />
                   </q-item-section>
                   <q-item-section>
-                    <q-item-label style="font-size: 12px; align-items: baseline; padding: 0px;">Apply Without Using Cache</q-item-label>
+                    <q-item-label style="font-size: 12px; align-items: baseline; padding: 0px;">Apply without using cache</q-item-label>
                   </q-item-section>
                 </q-item>
               </q-list>
