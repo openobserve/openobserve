@@ -1151,25 +1151,21 @@ async fn send_to_children(
     node_type: &str,
     usage_sender: &Sender<super::usage_tracker::PipelineUsageEvent>,
 ) {
-    // Report usage if item has not been reported yet
-    if !item.reported && child_senders.len() > 1 {
-        // At this point we are creating a new branch in the pipeline, which means data
-        // multiplication This needs to be tracked for usage and priced accordingly as
-        // separate pipeline processing
-        let data_size = item.record.to_string().len() as f64;
-        let usage_event = super::usage_tracker::PipelineUsageEvent {
-            idx: item.idx,
-            data_size,
-        };
-
-        if let Err(e) = usage_sender.send(usage_event).await {
-            log::error!("[Pipeline]: {node_type} failed to report usage: {e}");
-        } else {
-            item.reported = true;
-        }
-    }
-
     if child_senders.len() == 1 {
+        // Report usage if item has not been reported yet
+        if !item.reported {
+            let data_size = item.record.to_string().len() as f64;
+            let usage_event = super::usage_tracker::PipelineUsageEvent {
+                data_size,
+            };
+
+            if let Err(e) = usage_sender.send(usage_event).await {
+                log::error!("[Pipeline]: {node_type} failed to report usage: {e}");
+            } else {
+                item.reported = true;
+            }
+        }
+
         // HACK to avoid cloning
         if let Err(send_err) = child_senders[0].send(item).await {
             log::error!(
@@ -1177,8 +1173,47 @@ async fn send_to_children(
             );
         }
     } else {
-        for child_sender in child_senders.iter_mut() {
-            if let Err(send_err) = child_sender.send(item.clone()).await {
+        // At this point we are creating a new branch in the pipeline, which means data
+        // multiplication. This needs to be tracked for usage and priced accordingly as
+        // separate pipeline processing.
+        let data_size = item.record.to_string().len() as f64;
+        
+        // Report usage for original item if not already reported
+        if !item.reported {
+            let usage_event = super::usage_tracker::PipelineUsageEvent {
+                data_size,
+            };
+            
+            if let Err(e) = usage_sender.send(usage_event).await {
+                log::error!("[Pipeline]: {node_type} failed to report usage: {e}");
+            }
+            
+            item.reported = true
+        }
+        
+        // Send original item to first child (preserves reported flag)
+        if let Err(send_err) = child_senders[0].send(item.clone()).await {
+            log::error!(
+                "[Pipeline]: {node_type} errors sending record to its children caused by: {send_err}"
+            );
+            return;
+        }
+        
+        // For remaining children, send clones with reported: false and report each
+        for child_sender in child_senders[1..].iter_mut() {
+            // Report usage for each additional clone (data multiplication)
+            let usage_event = super::usage_tracker::PipelineUsageEvent {
+                data_size,
+            };
+            
+            if let Err(e) = usage_sender.send(usage_event).await {
+                log::error!("[Pipeline]: {node_type} failed to report usage: {e}");
+            }
+            
+            // Create clone with reported: false
+            let cloned_item = item.clone();
+            
+            if let Err(send_err) = child_sender.send(cloned_item).await {
                 log::error!(
                     "[Pipeline]: {node_type} errors sending record to its children caused by: {send_err}"
                 );
