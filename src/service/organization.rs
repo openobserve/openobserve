@@ -35,7 +35,7 @@ use {
     chrono::{Duration, Utc},
     config::{SMTP_CLIENT, get_config},
     lettre::{AsyncTransport, Message, message::SinglePart},
-    o2_enterprise::enterprise::cloud::{OrgInviteStatus, org_invites},
+    o2_enterprise::enterprise::cloud::{InvitationRecord, OrgInviteStatus, org_invites},
 };
 
 #[cfg(feature = "cloud")]
@@ -599,7 +599,10 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
 }
 
 #[cfg(feature = "cloud")]
-pub async fn decline_invitation(user_email: &str, token: &str) -> Result<(), anyhow::Error> {
+pub async fn decline_invitation(
+    user_email: &str,
+    token: &str,
+) -> Result<Vec<InvitationRecord>, anyhow::Error> {
     let invite = org_invites::get_by_token_user(token, user_email)
         .await
         .map_err(|e| {
@@ -620,7 +623,19 @@ pub async fn decline_invitation(user_email: &str, token: &str) -> Result<(), any
         return Err(anyhow::anyhow!("Error updating status"));
     }
 
-    Ok(())
+    let invites = match db::user::list_user_invites(user_email).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error in listing invites for {user_email} : {e}");
+            vec![]
+        }
+    };
+    let pending = invites
+        .into_iter()
+        .filter(|invite| invite.status == OrgInviteStatus::Pending && invite.expires_at > now)
+        .collect();
+
+    Ok(pending)
 }
 
 pub async fn get_org(org: &str) -> Option<Organization> {
