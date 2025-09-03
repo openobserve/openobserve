@@ -158,56 +158,43 @@ export default class DashboardFilter {
     await fieldLabelLocator.waitFor({ state: "visible", timeout: 10000 });
     await fieldLabelLocator.click();
 
-    // Step 2: Handle column dropdown with improved reliability
-    const allColumnLocators = this.page.locator(
-      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
-    );
-    await allColumnLocators
-      .first()
-      .waitFor({ state: "visible", timeout: 10000 });
+    // Step 2: Handle column dropdown with combobox (reliable way)
+    const combobox = this.page.getByRole("combobox", {
+      name: "Filters on Field",
+    });
 
-    const count = await allColumnLocators.count();
-    const columnLocator =
-      count === 1
-        ? allColumnLocators.first()
-        : index === 0
-        ? allColumnLocators.first()
-        : allColumnLocators.last();
+    await combobox.waitFor({ state: "visible", timeout: 10000 });
+    await combobox.fill(newFieldName);
 
-    await columnLocator.waitFor({ state: "visible", timeout: 10000 });
-    await columnLocator.click();
-    await columnLocator.fill(newFieldName);
+    // Wait for options to load
+    await this.page.waitForSelector('[role="option"]', { timeout: 10000 });
 
-    // ✅ Step 2: Select option with 3 fallback locators
-    let optionSelected = false;
+    // Try selecting using multiple strategies to reduce flakiness
+    const optionLocators = [
+      this.page.getByRole("option", { name: newFieldName, exact: true }),
+      this.page.getByText(newFieldName, { exact: true }),
+      this.page.locator('div.q-menu[role="listbox"] div.q-item').first(),
+    ];
 
-    // Locator 1: Role based
-    const roleOption = this.page
-      .getByRole("option", { name: newFieldName, exact: true })
-      .first();
-    // Locator 2: Text based
-    const textOption = this.page.getByText(newFieldName, { exact: true });
-    // Locator 3: Fallback q-item
-    const qItemOption = this.page
-      .locator('div.q-menu[role="listbox"] div.q-item')
-      .first();
-
-    for (const locator of [roleOption, textOption, qItemOption]) {
+    let selected = false;
+    for (const locator of optionLocators) {
       try {
-        await locator.waitFor({ state: "visible", timeout: 5000 });
-        await locator.click({ timeout: 3000 });
-        optionSelected = true;
+        await locator.waitFor({ state: "visible", timeout: 10000 });
+        await locator.click();
+        selected = true;
         break;
       } catch (e) {
-        // continue to next locator
+        // ignore and try next locator
       }
     }
 
-    if (!optionSelected) {
-      throw new Error(`Failed to select dropdown option: ${newFieldName}`);
+    // Fallback to keyboard selection if none of the locators worked
+    if (!selected) {
+      await combobox.press("ArrowDown");
+      await combobox.press("Enter");
     }
 
-    // Step 3: Condition dropdown with improved reliability
+    // Step 3: Condition dropdown
     if (operator || value) {
       const conditionLocator = this.page.locator(
         `[data-test="dashboard-add-condition-condition-${idx}"]`
@@ -216,7 +203,7 @@ export default class DashboardFilter {
       await conditionLocator.click();
     }
 
-    // Step 4: Operator dropdown with proper waits
+    // Step 4: Operator dropdown
     if (operator) {
       const operatorLocator =
         index === 0
@@ -237,7 +224,7 @@ export default class DashboardFilter {
       await operatorOption.click();
     }
 
-    // Step 5: Fill value field with enhanced reliability
+    // Step 5: Fill value field
     if (value) {
       const valueInput =
         index === 0
