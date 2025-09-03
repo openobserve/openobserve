@@ -304,6 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item-section>
             </q-item>
             <q-item
+              v-if="config.isEnterprise === 'true'"
               clickable
               v-close-popup="true"
               @click="onPanelModifyClick('Refresh')"
@@ -421,6 +422,7 @@ import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
+import config from "@/aws-exports";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -915,6 +917,7 @@ export default defineComponent({
       handleLimitNumberOfSeriesWarningMessageUpdate,
       isPartialData,
       handleIsPartialDataUpdate,
+      config,
     };
   },
   methods: {
