@@ -41,13 +41,7 @@ import {
   WebSocketErrorResponse,
 } from "@/ts/interfaces/query";
 
-import {
-  updateFieldValues,
-  extractFields,
-  updateGridColumns,
-  filterHitsColumns,
-  resetFieldValues,
-} from "@/composables/useLogs/streamFieldUtils";
+import useStreamFieldUtils from "@/composables/useLogs/useStreamFieldUtils";
 import {
   getHistogramTitle,
   generateHistogramData,
@@ -82,7 +76,7 @@ import {
   isWebSocketEnabled,
   isStreamingEnabled,
   addSpacesToOperators,
-  deepCopy
+  deepCopy,
 } from "@/utils/zincutils";
 
 export const searchStream = () => {
@@ -101,6 +95,14 @@ export const searchStream = () => {
     searchPartitionMap,
     resetHistogramError,
   } = searchState();
+
+  let {
+    updateFieldValues,
+    extractFields,
+    updateGridColumns,
+    filterHitsColumns,
+    resetFieldValues,
+  } = useStreamFieldUtils();
 
   const {
     fetchQueryDataWithWebSocket,
