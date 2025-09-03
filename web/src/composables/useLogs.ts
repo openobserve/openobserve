@@ -93,7 +93,7 @@ import {
   generateURLQuery,
 } from "@/composables/useLogs/logsUtils";
 
-import { updateFieldValues, extractFields, updateGridColumns, filterHitsColumns, getStreamList, extractFTSFields, loadStreamLists } from "@/composables/useLogs/streamFieldUtils";
+import useStreamFieldUtils from "@/composables/useLogs/useStreamFieldUtils";
 import { getHistogramTitle, resetHistogramWithError, generateHistogramData, generateHistogramSkeleton, setMultiStreamHistogramQuery, isHistogramEnabled } from "@/composables/useLogs/histogramUtils";
 
 // TODO OK:
@@ -121,6 +121,8 @@ type SearchPartition = {
 };
 
 const searchPartitionMap = reactive<Record<string, SearchPartition>>({});
+
+let { updateFieldValues, extractFields, updateGridColumns, filterHitsColumns, getStreamList, extractFTSFields, loadStreamLists } = useStreamFieldUtils();
 
 const useLogs = () => {
   const store = useStore();
