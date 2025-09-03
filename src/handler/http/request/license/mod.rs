@@ -41,5 +41,10 @@ pub async fn store_license(body: web::Bytes) -> HttpResponse {
     db.put(LICENSE_DB_KEY, req.key.into(), false, None)
         .await
         .unwrap();
-    HttpResponse::Created().finish()
+    match o2_enterprise::enterprise::license::update_license().await {
+        Ok(_) => HttpResponse::Created().finish(),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"message":e.to_string()}))
+        }
+    }
 }
