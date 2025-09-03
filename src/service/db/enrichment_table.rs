@@ -361,6 +361,8 @@ async fn publish_event(event: EnrichmentTableEvent) -> Result<(), infra::errors:
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
+    // For non-local mode, we use the nats queue to watch the enrichment table events.
+    // Hence no need to watch the enrichment table events here.
     if !get_config().common.local_mode {
         return Ok(());
     }

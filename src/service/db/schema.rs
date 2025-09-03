@@ -276,6 +276,11 @@ pub async fn list(
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
+    // For non-local mode, we use the nats queue to watch the schema events.
+    // Hence no need to watch the schema events here.
+    if !get_config().common.local_mode {
+        return Ok(());
+    }
     let key = SCHEMA_KEY;
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
