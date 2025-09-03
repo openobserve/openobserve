@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
         >
           <q-btn
-            v-if="!config.isEnterprise"
+            v-if="config.isEnterprise === 'false'"
             class="q-ml-md text-bold"
             data-test="dashboard-apply"
             padding="sm lg"
@@ -120,7 +120,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('panel.apply')"
             @click="() => runQuery(false)"
           />
-          <q-btn-group v-if="config.isEnterprise" class="q-ml-md">
+          <q-btn-group
+            v-if="config.isEnterprise === 'true'"
+            class="q-ml-md"
+          >
             <q-btn
               class="o2-primary-button tw-h-[36px] q-ml-md"
               :class="
