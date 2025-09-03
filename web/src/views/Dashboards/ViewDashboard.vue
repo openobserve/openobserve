@@ -181,8 +181,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disable="arePanelsLoading"
                 :color="arePanelsLoading ? 'negative' : (isVariablesChanged ? 'warning' : '')"
                 :text-color="arePanelsLoading ? 'negative' : (store.state.theme == 'dark' ? 'white' : 'dark')"
-                menu-anchor="bottom middle"
-                menu-self="top left"
               >
                 <q-list>
                   <q-item clickable @click="refreshData(true)" :disable="arePanelsLoading">
@@ -190,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-icon size="xs" name="refresh" style="align-items: baseline; padding: 0px;" />
                     </q-item-section>
                     <q-item-section>
-                      <q-item-label style="font-size: 12px; align-items: baseline; padding: 0px;">Refresh Without Using Cache</q-item-label>
+                      <q-item-label style="font-size: 12px; align-items: baseline; padding: 0px;">Refresh without using cache</q-item-label>
                     </q-item-section>
                   </q-item>
                 </q-list>
