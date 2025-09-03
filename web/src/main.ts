@@ -53,8 +53,6 @@ const { reoInit, setupPageTitles } = useReo();
 
 reoInit();
 
-// Setup dynamic page titles for better analytics tracking
-setupPageTitles(router);
 
 
 // app.use(SearchPlugin);
