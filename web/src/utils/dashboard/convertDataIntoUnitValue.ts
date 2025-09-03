@@ -1,5 +1,6 @@
 import { date } from "quasar";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
+import functionValidation from "../../components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { getColorPalette } from "./colorPalette";
 
 const units: any = {
@@ -1357,6 +1358,236 @@ export const validateDashboardJson = (dashboardJson: any): string[] => {
 
   return errors;
 };
+
+/**
+ * Adds missing arguments to a field based on its function definition
+ * @param fields The field object to process
+ * @returns The updated field object with missing arguments added
+ */
+export function addMissingArgs(fields: any): any {
+  if (!fields || !fields.functionName) {
+    return fields;
+  }
+
+  // Find the function definition based on the functionName
+  const functionDef = functionValidation.find(
+    (fn: any) => fn.functionName === fields.functionName,
+  );
+
+  if (!functionDef) {
+    return fields;
+  }
+
+  const args = fields.args || [];
+  const updatedArgs = [...args]; // Clone the existing args array
+
+  // Iterate through the function definition's arguments
+  functionDef.args.forEach((argDef: any, index: number) => {
+    const isArgProvided = updatedArgs?.[index]?.type
+      ? argDef.type.map((t: any) => t.value).includes(updatedArgs[index]?.type)
+      : false;
+
+    if (!isArgProvided) {
+      // If the argument is missing, add it
+      const argType = argDef.type[0]; // Always take the first type
+      const defaultValue =
+        argDef.defaultValue !== undefined
+          ? argDef.defaultValue
+          : argType.value === "field"
+            ? {}
+            : "";
+
+      updatedArgs.push({
+        type: argType.value,
+        value: defaultValue,
+      });
+    }
+  });
+
+  // Return the updated fields object
+  return {
+    ...fields,
+    args: updatedArgs,
+  };
+}
+
+/**
+ * Builds SQL query string from input field configuration
+ * @param fields The field configuration object
+ * @param defaultStream The default stream name
+ * @returns The SQL query string
+ */
+export function buildSQLQueryFromInput(
+  fields: any,
+  defaultStream: any,
+): string {
+  // Handle undefined or null fields
+  if (!fields) {
+    return "";
+  }
+
+  // if fields type is raw, return rawQuery
+  if (fields.type === "raw") {
+    return `${fields?.rawQuery ?? ""}`;
+  }
+
+  // Extract functionName and args from the input with fallbacks
+  const functionName = fields.functionName;
+  const args = Array.isArray(fields.args) ? fields.args : [];
+
+  // If no functionName is provided, return empty string
+  if (!functionName && functionName !== null) {
+    return "";
+  }
+
+  // Find the function definition based on the functionName
+  const selectedFunction = functionValidation.find(
+    (fn: any) => fn.functionName === functionName,
+  );
+
+  // If the function is not found, return empty string instead of throwing
+  if (!selectedFunction) {
+    return "";
+  }
+
+  // Validate the provided args against the function's argument definitions
+  const argsDefinition = selectedFunction.args;
+
+  if (!argsDefinition || !Array.isArray(argsDefinition)) {
+    return "";
+  }
+
+  const sqlArgs = [];
+  for (let i = 0; i < args.length; i++) {
+    // Skip if arg is undefined or null
+    if (!args[i]) {
+      continue;
+    }
+
+    const argValue = args[i]?.value;
+    const argType = args[i]?.type;
+
+    if (!argType) {
+      continue;
+    }
+
+    // Add the argument to the SQL query
+    if (argType === "field") {
+      // Handle case where field object might be incomplete
+      if (!argValue.field) {
+        continue;
+      }
+      // If the argument type is "field", do not wrap with quotes
+      sqlArgs.push(
+        argValue.streamAlias
+          ? `${argValue.streamAlias}.${argValue.field}`
+          : `${defaultStream}.${argValue.field}`,
+      );
+    } else if (argType === "string") {
+      // If the argument type is "string", wrap with single quotes
+      sqlArgs.push(`'${argValue}'`);
+    } else if (
+      argType === "number" ||
+      argType === "histogramInterval" ||
+      argType === "interval"
+    ) {
+      // If the argument type is "number", "histogramInterval", or "interval", do not wrap with quotes
+      sqlArgs.push(argValue);
+    } else if (argType === "function") {
+      // Recursively build the SQL query for the nested function
+      try {
+        const nestedFunctionQuery = buildSQLQueryFromInput(
+          argValue,
+          defaultStream,
+        );
+        if (nestedFunctionQuery) {
+          sqlArgs.push(nestedFunctionQuery);
+        }
+      } catch (error) {
+        // If nested function fails, just skip this argument
+        continue;
+      }
+    } else {
+      // Skip unsupported argument types instead of throwing
+      continue;
+    }
+  }
+
+  // If no valid arguments were found, return minimal query
+  if (sqlArgs.length === 0 && argsDefinition.length > 0) {
+    return "";
+  }
+
+  // Special handling for specific functions
+  switch (functionName) {
+    case "count-distinct":
+      return `COUNT(DISTINCT ${sqlArgs[0]})`;
+    default:
+      return selectedFunction.template
+        ? selectedFunction.template.replace(/\$(\d+)/g, (match: any, index: any) =>
+            sqlArgs[index - 1] || match,
+          )
+        : `${sqlArgs[0]}`;
+  }
+}
+
+/**
+ * Builds SQL JOIN clauses from join configuration
+ * @param joins Array of join configurations
+ * @param defaultStream The default stream name
+ * @returns The SQL JOIN clause string
+ */
+export function buildSQLJoinsFromInput(
+  joins: any[],
+  defaultStream: any,
+): string {
+  if (!joins || joins.length === 0) {
+    return ""; // No joins, return empty string
+  }
+
+  const joinClauses = [];
+
+  for (const join of joins) {
+    const { stream, streamAlias, joinType, conditions } = join;
+
+    if (!stream || !joinType || !conditions || conditions.length === 0) {
+      // Invalid join, return empty string
+      return "";
+    }
+
+    const joinConditionStrings = [];
+    for (const condition of conditions) {
+      const { leftField, rightField, operation, logicalOperator } = condition;
+
+      if (!leftField?.field || !rightField?.field || !operation) {
+        // Invalid condition, return empty string
+        return "";
+      }
+
+      const leftFieldStr = leftField.streamAlias
+        ? `${leftField.streamAlias}.${leftField.field}`
+        : `${defaultStream}.${leftField.field}`;
+
+      const rightFieldStr = rightField.streamAlias
+        ? `${rightField.streamAlias}.${rightField.field}`
+        : `${defaultStream}.${rightField.field}`;
+
+      joinConditionStrings.push(
+        `${leftFieldStr} ${operation} ${rightFieldStr}`,
+      );
+    }
+
+    // Join all conditions with AND/OR
+    const joinConditionsSQL = joinConditionStrings.join(" AND ");
+
+    // Construct the JOIN SQL statement
+    joinClauses.push(
+      `${joinType.toUpperCase()} JOIN "${stream}" AS ${streamAlias ?? defaultStream} ON ${joinConditionsSQL}`,
+    );
+  }
+
+  return joinClauses.join(" ");
+}
 
 // Modify the getContrastColor function to consider theme
 export const getContrastColor = (

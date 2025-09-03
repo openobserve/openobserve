@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               $event,
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields?.source.column,
+              ].fields?.source,
               'source',
             )
           "
@@ -73,54 +73,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
               dense
               size="sm"
-              :label="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.source?.column
-              "
+              :label="sourceLabel"
               class="q-pl-sm"
-              :data-test="`dashboard-source-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.source?.column
-              }`"
+              :data-test="`dashboard-source-item-${sourceLabel}`"
             >
               <q-menu
-                class="q-pa-md"
-                :data-test="`dashboard-source-item-${
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
-                  ].fields?.source?.column
-                }-menu`"
+                class="field-function-menu-popup"
+                :data-test="`dashboard-source-item-${sourceLabel}-menu`"
               >
-                <div>
-                  <q-input
-                    dense
-                    filled
-                    data-test="dashboard-source-item-input"
-                    :label="t('common.label')"
+                <div style="padding: 3px 16px 16px 16px">
+                  <DynamicFunctionPopUp
                     v-model="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
-                      ].fields.source.label
+                      ].fields.source
+                    "
+                    :allowAggregation="false"
+                    :customQuery="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery
                     "
                   />
-                  <div
-                    v-if="
-                      !dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery &&
-                      dashboardPanelData.data.queryType == 'sql'
-                    "
-                  >
-                    <SortByBtnGrp
-                      :fieldObj="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.source
-                      "
-                    />
-                  </div>
                 </div>
               </q-menu>
             </q-btn>
@@ -128,11 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-source-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.source?.column
-              }-remove`"
+              :data-test="`dashboard-source-item-${sourceLabel}-remove`"
               @click="removeSource()"
               icon="close"
             />
@@ -189,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               $event,
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields?.target.column,
+              ].fields?.target,
               'target',
             )
           "
@@ -208,54 +178,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               color="primary"
               size="sm"
-              :label="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.target?.column
-              "
-              :data-test="`dashboard-target-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.target?.column
-              }`"
+              :label="targetLabel"
+              :data-test="`dashboard-target-item-${targetLabel}`"
               class="q-pl-sm"
             >
               <q-menu
-                class="q-pa-md"
-                :data-test="`dashboard-target-item-${
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
-                  ].fields?.target?.column
-                }-menu`"
+                class="field-function-menu-popup"
+                :data-test="`dashboard-target-item-${targetLabel}-menu`"
               >
-                <div>
-                  <q-input
-                    dense
-                    filled
-                    label="Label"
-                    data-test="dashboard-target-item-input"
+                <div style="padding: 3px 16px 16px 16px">
+                  <DynamicFunctionPopUp
                     v-model="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
-                      ].fields.target.label
+                      ].fields.target
+                    "
+                    :allowAggregation="false"
+                    :customQuery="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery
                     "
                   />
-                  <div
-                    v-if="
-                      !dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery &&
-                      dashboardPanelData.data.queryType == 'sql'
-                    "
-                  >
-                    <SortByBtnGrp
-                      :fieldObj="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.target
-                      "
-                    />
-                  </div>
                 </div>
               </q-menu>
             </q-btn>
@@ -263,11 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-target-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.target?.column
-              }-remove`"
+              :data-test="`dashboard-target-item-${targetLabel}-remove`"
               @click="removeTarget()"
               icon="close"
             />
@@ -324,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               $event,
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields?.value.column,
+              ].fields?.value,
               'value',
             )
           "
@@ -344,61 +284,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
               size="sm"
               :label="valueLabel"
-              :data-test="`dashboard-value-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.value?.column
-              }`"
+              :data-test="`dashboard-value-item-${valueLabel}`"
               class="q-pl-sm"
             >
               <q-menu
-                class="q-pa-md"
-                :data-test="`dashboard-value-item-${
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
-                  ].fields?.value?.column
-                }-menu`"
+                class="field-function-menu-popup"
+                :data-test="`dashboard-value-item-${valueLabel}-menu`"
               >
                 <div>
-                  <div class="row q-mb-sm" style="align-items: center">
-                    <div
-                      v-if="
-                        !dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery
-                      "
-                      class="q-mr-xs"
-                      style="width: 160px"
-                    >
-                      <q-select
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.value.aggregationFunction
-                        "
-                        :options="triggerOperators"
-                        dense
-                        filled
-                        emit-value
-                        map-options
-                        :label="t('common.aggregation')"
-                        data-test="dashboard-value-item-dropdown"
-                      >
-                        <template v-slot:append>
-                          <q-icon
-                            name="close"
-                            size="small"
-                            @click.stop.prevent="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.value.aggregationFunction = null
-                            "
-                            class="cursor-pointer"
-                          />
-                        </template>
-                      </q-select>
-                    </div>
-                  </div>
+                  <DynamicFunctionPopUp
+                    v-model="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.value
+                    "
+                    :allowAggregation="true"
+                    :customQuery="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery
+                    "
+                  />
                   <q-input
                     dense
                     filled
@@ -476,11 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-value-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.value?.column
-              }-remove`"
+              :data-test="`dashboard-value-item-${valueLabel}-remove`"
               @click="removeValue()"
               icon="close"
             />
@@ -524,6 +426,9 @@ import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoCompl
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
+import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
+import { buildSQLQueryFromInput } from "@/utils/dashboard/convertDataIntoUnitValue";
+import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 
 export default defineComponent({
   name: "DashboardSankeyChartBuilder",
@@ -532,6 +437,8 @@ export default defineComponent({
     CommonAutoComplete,
     SanitizedHtmlRenderer,
     DashboardFiltersOption,
+    DynamicFunctionPopUp,
+    DashboardJoinsOption,
   },
   props: ["dashboardData"],
   setup(props) {
@@ -600,6 +507,7 @@ export default defineComponent({
     );
 
     const onDrop = (e: any, targetAxis: string) => {
+      e.stopPropagation();
       // move the items  between axis or from the field list
       // check if the source is from axis or field list
       if (dashboardPanelData.meta.dragAndDrop.dragSource === "fieldList") {
@@ -620,7 +528,7 @@ export default defineComponent({
             addValue(dragElement);
             break;
           case "f":
-            addFilteredItem(dragElement?.name);
+            addFilteredItem(dragElement);
             break;
         }
       } else {
@@ -731,14 +639,18 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
       ) {
-        return field.column;
+        return field.alias;
       }
-      if (field.aggregationFunction) {
-        const aggregation = field.aggregationFunction.toUpperCase();
-        return `${aggregation}(${field.column})`;
-      } else {
-        return field.column;
-      }
+      return buildSQLQueryFromInput(
+        field,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.joins?.length
+          ? dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields?.stream
+          : "",
+      );
     };
 
     const valueLabel = computed(() => {
@@ -747,6 +659,22 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].fields.value;
       return commonBtnLabel(valueField);
+    });
+
+    const sourceLabel = computed(() => {
+      const sourceField =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.source;
+      return commonBtnLabel(sourceField);
+    });
+
+    const targetLabel = computed(() => {
+      const targetField =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.target;
+      return commonBtnLabel(targetField);
     });
 
     const operators = ["=", "<>", ">=", "<=", ">", "<"];
@@ -818,6 +746,8 @@ export default defineComponent({
       Hint,
       promqlMode,
       valueLabel,
+      sourceLabel,
+      targetLabel,
       onFieldDragStart,
       operators,
       isHavingFilterVisible,

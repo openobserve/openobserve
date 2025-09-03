@@ -24,12 +24,10 @@
         class="q-pl-sm"
         :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
       >
-        <q-menu
-          class="q-pa-md"
-          @show="(e: any) => loadFilterItem(condition.column)"
-        >
+        <!-- @show="(e: any) => loadFilterItem(condition.column)" -->
+        <q-menu class="q-pa-md">
           <div style="display: flex">
-            <q-select
+            <!-- <q-select
               v-model="condition.column"
               :options="filteredSchemaOptions"
               label="Filters on Field"
@@ -45,6 +43,12 @@
               emit-value
               @filter="filterStreamFn"
               @update:model-value="handleFieldChange"
+              :data-test="`dashboard-add-condition-column-${conditionIndex}}`"
+              /> -->
+            <StreamFieldSelect
+              class="tw-w-full"
+              :streams="getAllSelectedStreams()"
+              v-model="condition.column"
               :data-test="`dashboard-add-condition-column-${conditionIndex}}`"
             />
             <q-btn
@@ -177,17 +181,20 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, toRef, watch } from "vue";
+import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
+import useDashboardPanelData from "@/composables/useDashboardPanel";
+import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 
 export default defineComponent({
   name: "AddCondition",
   components: {
     CommonAutoComplete,
     SanitizedHtmlRenderer,
+    StreamFieldSelect,
   },
   props: [
     "condition",
@@ -199,6 +206,13 @@ export default defineComponent({
     "conditionIndex",
   ],
   setup(props, { emit }) {
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard",
+    );
+    const { getAllSelectedStreams, buildCondition } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+    );
     const { t } = useI18n();
     const searchTerm = ref("");
     const { filterFn: filterStreamFn, filteredOptions: filteredSchemaOptions } =
@@ -206,9 +220,13 @@ export default defineComponent({
 
     const filteredListOptions = computed(() => {
       const options = props.dashboardPanelData.meta.filterValue
-        .find((it: any) => it.column == props.condition.column)
-        ?.value.filter((option: any) =>
-          option.toLowerCase().includes(searchTerm.value.toLowerCase()),
+        .find(
+          (it: any) =>
+            it.filterItem.field == props?.condition?.column?.field &&
+            it.filterItem.streamAlias == props?.condition?.column?.streamAlias,
+        )
+        ?.value?.filter((option: any) =>
+          option?.toLowerCase().includes(searchTerm.value.toLowerCase()),
         );
 
       // Sort options alphabetically
@@ -323,6 +341,7 @@ export default defineComponent({
       removeColumnName,
       filteredSchemaOptions,
       sortedFilteredListOptions: filteredListOptions,
+      getAllSelectedStreams,
     };
   },
 });

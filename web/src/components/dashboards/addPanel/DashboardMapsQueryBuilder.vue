@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               $event,
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields?.name.column,
+              ].fields?.name,
               'name',
             )
           "
@@ -73,54 +73,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
               dense
               size="sm"
-              :label="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.name?.column
-              "
+              :label="nameLabel"
               class="q-pl-sm"
-              :data-test="`dashboard-name-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.name?.column
-              }`"
+              :data-test="`dashboard-name-item-${nameLabel}`"
             >
               <q-menu
-                class="q-pa-md"
-                :data-test="`dashboard-name-item-${
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
-                  ].fields?.name?.column
-                }-menu`"
+                class="field-function-menu-popup"
+                :data-test="`dashboard-name-item-${nameLabel}-menu`"
               >
-                <div>
-                  <q-input
-                    dense
-                    filled
-                    data-test="dashboard-name-item-input"
-                    :label="t('common.label')"
+                <div style="padding: 3px 16px 16px 16px">
+                  <DynamicFunctionPopUp
                     v-model="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
-                      ].fields.name.label
+                      ].fields.name
+                    "
+                    :allowAggregation="false"
+                    :customQuery="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery
                     "
                   />
-                  <div
-                    v-if="
-                      !dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery &&
-                      dashboardPanelData.data.queryType == 'sql'
-                    "
-                  >
-                    <SortByBtnGrp
-                      :fieldObj="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.name
-                      "
-                    />
-                  </div>
                 </div>
               </q-menu>
             </q-btn>
@@ -128,11 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-name-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.name?.column
-              }-remove`"
+              :data-test="`dashboard-name-item-${nameLabel}-remove`"
               @click="removeMapName()"
               icon="close"
             />
@@ -190,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               $event,
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields?.value_for_maps.column,
+              ].fields?.value_for_maps,
               'value_for_maps',
             )
           "
@@ -210,61 +180,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
               size="sm"
               :label="valueLabel"
-              :data-test="`dashboard-value_for_maps-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.value_for_maps?.column
-              }`"
+              :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
               class="q-pl-sm"
             >
               <q-menu
-                class="q-pa-md"
-                :data-test="`dashboard-value_for_maps-item-${
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
-                  ].fields?.value_for_maps?.column
-                }-menu`"
+                class="field-function-menu-popup"
+                :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
               >
                 <div>
-                  <div class="row q-mb-sm" style="align-items: center">
-                    <div
-                      v-if="
-                        !dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery
-                      "
-                      class="q-mr-xs"
-                      style="width: 160px"
-                    >
-                      <q-select
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.value_for_maps.aggregationFunction
-                        "
-                        :options="triggerOperators"
-                        dense
-                        filled
-                        emit-value
-                        map-options
-                        :label="t('common.aggregation')"
-                        data-test="dashboard-value_for_maps-item-dropdown"
-                      >
-                        <template v-slot:append>
-                          <q-icon
-                            name="close"
-                            size="small"
-                            @click.stop.prevent="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.value_for_maps.aggregationFunction = null
-                            "
-                            class="cursor-pointer"
-                          />
-                        </template>
-                      </q-select>
-                    </div>
-                  </div>
+                  <DynamicFunctionPopUp
+                    v-model="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.value_for_maps
+                    "
+                    :allowAggregation="true"
+                    :customQuery="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery
+                    "
+                  />
                   <q-input
                     dense
                     filled
@@ -342,11 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-value_for_maps-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.value_for_maps?.column
-              }-remove`"
+              :data-test="`dashboard-value_for_maps-item-${valueLabel}-remove`"
               @click="removeMapValue()"
               icon="close"
             />
@@ -390,6 +322,9 @@ import { useQuasar } from "quasar";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
+import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
+import { buildSQLQueryFromInput } from "@/utils/dashboard/convertDataIntoUnitValue";
+import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 
 export default defineComponent({
   name: "DashboardMapsQueryBuilder",
@@ -398,6 +333,8 @@ export default defineComponent({
     CommonAutoComplete,
     SanitizedHtmlRenderer,
     DashboardFiltersOption,
+    DynamicFunctionPopUp,
+    DashboardJoinsOption,
   },
   props: ["dashboardData"],
   setup(props) {
@@ -462,6 +399,7 @@ export default defineComponent({
     );
 
     const onDrop = (e: any, targetAxis: string) => {
+      e.stopPropagation();
       // move the items  between axis or from the field list
       // check if the source is from axis or field list
       if (dashboardPanelData.meta.dragAndDrop.dragSource === "fieldList") {
@@ -479,7 +417,7 @@ export default defineComponent({
             addMapValue(dragElement);
             break;
           case "f":
-            addFilteredItem(dragElement?.name);
+            addFilteredItem(dragElement);
             break;
         }
       } else {
@@ -590,14 +528,18 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
       ) {
-        return field.column;
+        return field?.alias;
       }
-      if (field.aggregationFunction) {
-        const aggregation = field.aggregationFunction.toUpperCase();
-        return `${aggregation}(${field.column})`;
-      } else {
-        return field.column;
-      }
+      return buildSQLQueryFromInput(
+        field,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.joins?.length
+          ? dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields?.stream
+          : "",
+      );
     };
 
     const valueLabel = computed(() => {
@@ -606,6 +548,14 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].fields.value_for_maps;
       return commonBtnLabel(valueField);
+    });
+
+    const nameLabel = computed(() => {
+      const nameField =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.name;
+      return commonBtnLabel(nameField);
     });
 
     const operators = ["=", "<>", ">=", "<=", ">", "<"];
@@ -665,6 +615,7 @@ export default defineComponent({
       removeMapName,
       removeMapValue,
       valueLabel,
+      nameLabel,
       triggerOperators,
       pagination: ref({
         rowsPerPage: 0,

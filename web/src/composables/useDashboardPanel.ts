@@ -24,7 +24,12 @@ import {
   isStreamingEnabled,
 } from "@/utils/zincutils";
 import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
-import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
+import {
+  buildSQLQueryFromInput,
+  buildSQLJoinsFromInput,
+  validatePanel,
+} from "@/utils/dashboard/convertDataIntoUnitValue";
+import useStreams from "./useStreams";
 import useValuesWebSocket from "./dashboard/useValuesWebSocket";
 import queryService from "@/services/search";
 
@@ -128,6 +133,7 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
         query: "",
         vrlFunctionQuery: "",
         customQuery: false,
+        joins: [],
         fields: {
           stream: "",
           stream_type: "logs",
@@ -200,6 +206,9 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
       streamResultsType: "",
       filterField: "",
     },
+    streamFields: {
+      groupedFields: [],
+    },
   },
 });
 
@@ -213,6 +222,7 @@ const getDefaultCustomChartText = () => {
 const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const store = useStore();
   const { showErrorNotification } = useNotifications();
+  const { getStreams, getStream } = useStreams();
   const valuesWebSocket = useValuesWebSocket();
 
   // Initialize the state for this page key if it doesn't already exist
@@ -244,6 +254,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       query: "",
       vrlFunctionQuery: "",
       customQuery: queryType === "promql",
+      joins: [],
       fields: {
         stream:
           dashboardPanelData.data.queries[
@@ -3479,6 +3490,132 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     processExtractedFields(extractedFields, autoSelectChartType);
   };
 
+  const getAllSelectedStreams = () => {
+    // get all streams
+    // mainStream + all join streams
+
+    return [
+      {
+        stream:
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream,
+      },
+      ...((
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.joins ?? []
+      )?.map((join: any) => ({
+        stream: join.stream,
+        streamAlias: join.streamAlias,
+      })) ?? []),
+    ];
+  };
+
+  /**
+   * Builds a condition string from a condition object for use in SQL queries.
+   * @param {object} condition - The condition object to build.
+   * @returns {string} - the condition as a string.
+   */
+  const buildCondition = (condition: any) => {
+    const streamAlias =
+      condition.column.streamAlias ??
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.stream;
+
+    if (condition.filterType === "group") {
+      const groupConditions = condition.conditions
+        .map(buildCondition)
+        .filter((cond: any) => cond);
+
+      if (groupConditions.length === 0) return "";
+
+      const groupQuery = groupConditions.join(
+        ` ${condition.logicalOperator || "AND"} `,
+      );
+
+      return groupConditions.length ? `(${groupQuery})` : "";
+    } else if (condition.type === "list" && condition.values?.length > 0) {
+      return `${streamAlias}.${condition.column.field} IN (${condition.values
+        .map((value: any) => formatValue(value, condition.column))
+        .join(", ")})`;
+    } else if (condition.type === "condition" && condition.operator != null) {
+      let selectFilter = "";
+      if (["Is Null", "Is Not Null"].includes(condition.operator)) {
+        selectFilter += `${streamAlias}.${condition.column.field} `;
+        switch (condition.operator) {
+          case "Is Null":
+            selectFilter += `IS NULL`;
+            break;
+          case "Is Not Null":
+            selectFilter += `IS NOT NULL`;
+            break;
+        }
+      } else if (condition.operator === "IN") {
+        selectFilter += `${streamAlias}.${condition.column.field} IN (${formatINValue(
+          condition.value,
+        )})`;
+      } else if (condition.operator === "NOT IN") {
+        selectFilter += `${streamAlias}.${condition.column.field} NOT IN (${formatINValue(
+          condition.value,
+        )})`;
+      } else if (condition.operator === "match_all") {
+        selectFilter += `match_all(${formatValue(condition.value, condition.column)})`;
+      } else if (condition.operator === "str_match") {
+        selectFilter += `str_match(${streamAlias}.${condition.column.field}, ${formatValue(
+          condition.value,
+          condition.column,
+        )})`;
+      } else if (condition.operator === "str_match_ignore_case") {
+        selectFilter += `str_match_ignore_case(${streamAlias}.${condition.column.field}, ${formatValue(
+          condition.value,
+          condition.column,
+        )})`;
+      } else if (condition.operator === "re_match") {
+        selectFilter += `re_match(${streamAlias}.${condition.column.field}, ${formatValue(
+          condition.value,
+          condition.column,
+        )})`;
+      } else if (condition.operator === "re_not_match") {
+        selectFilter += `re_not_match(${streamAlias}.${condition.column.field}, ${formatValue(
+          condition.value,
+          condition.column,
+        )})`;
+      } else {
+        selectFilter += `${streamAlias}.${condition.column.field} ${condition.operator} ${formatValue(
+          condition.value,
+          condition.column,
+        )}`;
+      }
+      return selectFilter;
+    }
+
+    return "";
+  };
+
+  const formatINValue = (value: any) => {
+    if (Array.isArray(value)) {
+      return value
+        .map((it: any) => `'${escapeSingleQuotes(it)}'`)
+        .join(", ");
+    } else if (typeof value === "string") {
+      // Split by comma and trim spaces
+      return value
+        .split(",")
+        .map((it: any) => `'${escapeSingleQuotes(it.trim())}'`)
+        .join(", ");
+    }
+    return `'${escapeSingleQuotes(value)}'`;
+  };
+
+  const formatValue = (value: any, column: any) => {
+    if (column?.type === "Utf8" || column?.type === "text") {
+      return `'${escapeSingleQuotes(value)}'`;
+    }
+    return value;
+  };
+
   return {
     dashboardPanelData,
     resetDashboardPanelData,
@@ -3535,6 +3672,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     convertSchemaToFields,
     setFieldsBasedOnChartTypeValidation,
     getDefaultDashboardPanelData,
+    getAllSelectedStreams,
+    buildCondition,
   };
 };
 export default useDashboardPanelData;

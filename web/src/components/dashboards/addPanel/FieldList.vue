@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             sortable: true,
           },
         ]"
-        :rows="data.currentFieldsList"
+        :rows="flattenGroupedFields"
         v-model:pagination="pagination"
         row-key="column"
         :filter="dashboardPanelData.meta.stream.filterField"
@@ -176,6 +176,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <div
+                v-if="props?.row?.isGroup"
+                class="tw-pl-2 tw-py-1 tw-font-semibold tw-bg-gray-200"
+              >
+                {{ props?.row?.groupName }}
+              </div>
+              <div
+                v-else
                 class="field_overlay"
                 :title="props.row.name"
                 :data-test="`field-list-item-${
@@ -549,9 +556,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="8px"
               color="white"
               text-color="primary"
-              @update:model-value="toggleSchema"
               :options="userDefinedSchemaBtnGroupOption"
-            >
+              >
+              <!-- @update:model-value="toggleSchema" -->
               <template v-slot:user_defined_slot>
                 <q-icon name="person"></q-icon>
                 <q-icon name="schema"></q-icon>
@@ -714,7 +721,7 @@ export default defineComponent({
       // schemaList: [],
       // indexOptions: [],
       streamType: ["logs", "metrics", "traces"],
-      currentFieldsList: [],
+      // currentFieldsList: [],
     });
     const filteredStreams = ref([]);
     const {
@@ -765,6 +772,34 @@ export default defineComponent({
 
     // computed property to set default value as false
     const hideAllFieldsSelection = computed(() => props.hideAllFieldsSelection ?? false);
+
+    // Flatten grouped fields for display in the table
+    const flattenGroupedFields = computed(() => {
+      const currentFieldsList = [];
+
+      // if user defined schema is enabled, use user defined schema
+      // else use selectedStreamFields
+      if (
+        store.state.zoConfig.user_defined_schemas_enabled &&
+        dashboardPanelData.meta.stream.userDefinedSchema.length > 0 &&
+        dashboardPanelData.meta.stream.useUserDefinedSchemas ==
+          "user_defined_schema"
+      ) {
+        currentFieldsList.push(
+          ...dashboardPanelData.meta.stream.customQueryFields,
+          ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+          ...dashboardPanelData.meta.stream.userDefinedSchema,
+        );
+      } else {
+        currentFieldsList.push(
+          ...dashboardPanelData.meta.stream.customQueryFields,
+          ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+          ...dashboardPanelData.meta.stream.selectedStreamFields,
+        );
+      }
+
+      return currentFieldsList;
+    });
 
     // get stream list
     const streamDataLoading = useLoading(async (stream_type: any) => {
@@ -1230,6 +1265,7 @@ export default defineComponent({
       userDefinedSchemaBtnGroupOption,
       pagination,
       hideAllFieldsSelection,
+      flattenGroupedFields,
       pagesNumber: computed(() => {
         return Math.ceil(
           dashboardPanelData.meta.stream.selectedStreamFields.length /
