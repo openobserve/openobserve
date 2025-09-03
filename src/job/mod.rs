@@ -146,10 +146,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move {
             // create the internal coordinator stream if not exists
             if let Err(e) = infra::cluster_coordinator::create_stream().await {
-                log::error!(
-                    "[INTERNAL_COORDINATOR::CREATE_STREAM] Failed to create internal coordinator stream: {}",
-                    e
-                );
                 panic!(
                     "[INTERNAL_COORDINATOR::CREATE_STREAM] Failed to create internal coordinator stream: {}",
                     e
