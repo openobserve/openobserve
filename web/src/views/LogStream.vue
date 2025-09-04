@@ -380,7 +380,7 @@ import { cloneDeep } from "lodash-es";
 import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
-
+import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "PageLogStream",
   components: { QTablePagination, SchemaIndex, NoData, AddStream },
@@ -407,6 +407,7 @@ export default defineComponent({
     const loadingState = ref(true);
     const searchKeyword = ref("");
     const deleteAssociatedAlertsPipelines = ref(true);
+    const { track } = useReo();
 
     const perPageOptions: any = [20, 50, 100, 250, 500];
     const maxRecordToReturn = ref<number>(100);
@@ -913,6 +914,13 @@ export default defineComponent({
 
     const addStream = () => {
       addStreamDialog.value.show = true;
+      track("Button Click", {
+        button: "Add Stream",
+        pageTitle: "Stream Explorer",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Streams",
+      });
       // router.push({
       //   name: "addStream",
       //   query: {

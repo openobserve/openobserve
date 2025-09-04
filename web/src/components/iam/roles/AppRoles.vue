@@ -119,8 +119,11 @@ import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const { t } = useI18n();
+
+const { track } = useReo();
 
 const showAddGroup = ref(false);
 
@@ -184,6 +187,10 @@ const updateTable = () => {
 };
 
 const addRole = () => {
+  track("Button Click", {
+    button: "Add Role",
+    page: "Roles"
+  });
   showAddGroup.value = true;
 };
 

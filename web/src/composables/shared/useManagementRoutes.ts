@@ -13,6 +13,7 @@ const useManagementRoutes = () => {
       component: Settings,
       meta: {
         keepAlive: true,
+        title: "Settings",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -21,6 +22,9 @@ const useManagementRoutes = () => {
         {
           path: "general",
           name: "general",
+          meta: {
+            title: "General",
+          },
           component: () => import("@/components/settings/General.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -29,6 +33,9 @@ const useManagementRoutes = () => {
         {
           path: "organization",
           name: "organizationSettings",
+          meta:{
+            title: "Organization Settings",
+          },
           component: () =>
             import("@/components/settings/OrganizationSettings.vue"),
           beforeEnter(to: any, from: any, next: any) {
@@ -38,6 +45,9 @@ const useManagementRoutes = () => {
         {
           path: "alert_destinations",
           name: "alertDestinations",
+          meta:{
+            title: "Alert Destinations",
+          },
           component: AlertsDestinationList,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -46,6 +56,9 @@ const useManagementRoutes = () => {
         {
           path: "templates",
           name: "alertTemplates",
+          meta:{
+            title: "Alert Templates",
+          },
           component: TemplateList,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -63,6 +76,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/queries/RunningQueries.vue"),
           meta: {
             keepAlive: true,
+            title: "Query Management",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -74,6 +88,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/CipherKeys.vue"),
           meta: {
             keepAlive: true,
+            title: "Cipher Keys",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -82,6 +97,9 @@ const useManagementRoutes = () => {
         {
           path: "pipeline_destinations",
           name: "pipelineDestinations",
+          meta:{
+            title: "Pipeline Destinations",
+          },
           component: () =>
             import("@/components/alerts/PipelinesDestinationList.vue"),
           beforeEnter(to: any, from: any, next: any) {
@@ -94,6 +112,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/Nodes.vue"),
           meta: {
             keepAlive: true,
+            title: "Nodes",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -105,6 +124,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/DomainManagement.vue"),
           meta: {
             keepAlive: true,
+            title: "Domain Management",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -116,6 +136,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/RegexPatternList.vue"),
           meta: {
             keepAlive: true,
+            title: "Regex Patterns",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -134,6 +155,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/OrganizationManagement.vue"),
           meta: {
             keepAlive: true,
+            title: "Organization Management",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);

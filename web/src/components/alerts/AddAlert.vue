@@ -486,6 +486,7 @@ import cronParser from "cron-parser";
 import AlertsContainer from "./AlertsContainer.vue";
 import JsonEditor from "../common/JsonEditor.vue";
 import { validateAlert } from "@/utils/validateAlerts";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const defaultValue: any = () => {
   return {
@@ -648,6 +649,8 @@ export default defineComponent({
     
     const showJsonEditorDialog = ref(false);
     const validationErrors = ref([]);
+
+    const { track } = useReo();
 
     const activeFolderId = ref(router.currentRoute.value.query.folder || "default");
 
@@ -1739,7 +1742,8 @@ export default defineComponent({
       validationErrors,
       originalStreamFields,
       generateSqlQuery,
-      generateWhereClause
+      generateWhereClause,
+      track,
     };
   },
 
@@ -1972,6 +1976,10 @@ export default defineComponent({
               dismiss();
               this.handleAlertError(err);
             });
+          this.track("Button Click", {
+            button: "Update Alert",
+            page: "Alerts"
+          });
           segment.track("Button Click", {
             button: "Update Alert",
             user_org: this.store.state.selectedOrganization.identifier,
@@ -2004,6 +2012,10 @@ export default defineComponent({
               dismiss();
               this.handleAlertError(err);
             });
+          this.track("Button Click", {
+            button: "Create Alert",
+            page: "Alerts"
+          });
           segment.track("Button Click", {
             button: "Save Alert",
             user_org: this.store.state.selectedOrganization.identifier,

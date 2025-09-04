@@ -237,6 +237,7 @@ pub async fn search(
             )
         );
 
+        let tantivy_optimize_start = std::time::Instant::now();
         let mut storage_idx_optimize_rule = idx_optimize_rule.clone();
         (tantivy_file_list, file_list) = handle_tantivy_optimize(
             &trace_id,
@@ -246,12 +247,38 @@ pub async fn search(
             index_updated_at,
         )
         .await?;
+        log::info!(
+            "{}",
+            search_inspector_fields(
+                format!("[trace_id {trace_id}] flight->search: handle tantivy optimize"),
+                SearchInspectorFieldsBuilder::new()
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("flight:do_get::search handle tantivy optimize".to_string())
+                    .search_role("follower".to_string())
+                    .duration(tantivy_optimize_start.elapsed().as_millis() as usize)
+                    .build()
+            )
+        );
 
         // sort by max_ts, the latest file should be at the top
+        let sort_start = std::time::Instant::now();
         if empty_exec.sorted_by_time() {
             file_list.par_sort_unstable_by(|a, b| b.meta.max_ts.cmp(&a.meta.max_ts));
         }
+        log::info!(
+            "{}",
+            search_inspector_fields(
+                format!("[trace_id {trace_id}] flight->search: sort file list"),
+                SearchInspectorFieldsBuilder::new()
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("flight:do_get::search sort file list".to_string())
+                    .search_role("follower".to_string())
+                    .duration(sort_start.elapsed().as_millis() as usize)
+                    .build()
+            )
+        );
 
+        let storage_search_start = std::time::Instant::now();
         let (tbls, stats) = match super::storage::search(
             query_params.clone(),
             latest_schema.clone(),
@@ -274,6 +301,21 @@ pub async fn search(
                 return Err(e);
             }
         };
+        log::info!(
+            "{}",
+            search_inspector_fields(
+                format!(
+                    "[trace_id {trace_id}] flight->search: storage search completed, {} files",
+                    file_list.len()
+                ),
+                SearchInspectorFieldsBuilder::new()
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("flight:do_get::search storage search".to_string())
+                    .search_role("follower".to_string())
+                    .duration(storage_search_start.elapsed().as_millis() as usize)
+                    .build()
+            )
+        );
         tables.extend(tbls);
         scan_stats.add(&stats);
     }
@@ -348,7 +390,20 @@ pub async fn search(
     // create a Union Plan to merge all tables
     let start = std::time::Instant::now();
     let union_table = Arc::new(NewUnionTable::new(empty_exec.schema().clone(), tables));
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] flight->search: created union table"),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight:do_get::search union table creation".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
 
+    let scan_start = std::time::Instant::now();
     let union_exec = union_table
         .scan(
             &ctx.state(),
@@ -357,10 +412,37 @@ pub async fn search(
             empty_exec.limit(),
         )
         .await?;
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] flight->search: union table scan"),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight:do_get::search union table scan".to_string())
+                .search_role("follower".to_string())
+                .duration(scan_start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
+
+    let rewrite_start = std::time::Instant::now();
     let mut rewriter = ReplaceTableScanExec::new(union_exec);
     physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] flight->search: physical plan rewrite"),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight:do_get::search physical plan rewrite".to_string())
+                .search_role("follower".to_string())
+                .duration(rewrite_start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
 
     if !tantivy_file_list.is_empty() {
+        let tantivy_start = std::time::Instant::now();
         scan_stats.add(&collect_stats(&tantivy_file_list));
         physical_plan = tantivy_optimize_rewrite(
             query_params.clone(),
@@ -369,6 +451,18 @@ pub async fn search(
             idx_optimize_rule.unwrap(), // guaranteed Some, if tantivy_file_list is not empty
             physical_plan,
         )?;
+        log::info!(
+            "{}",
+            search_inspector_fields(
+                format!("[trace_id {trace_id}] flight->search: tantivy optimize rewrite"),
+                SearchInspectorFieldsBuilder::new()
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("flight:do_get::search tantivy optimize rewrite".to_string())
+                    .search_role("follower".to_string())
+                    .duration(tantivy_start.elapsed().as_millis() as usize)
+                    .build()
+            )
+        );
     }
 
     log::info!(
