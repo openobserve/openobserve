@@ -28,7 +28,9 @@ import {
   findFirstValidMappedValue,
   validatePanel,
   validateDashboardJson,
-  validateSQLPanelFields
+  validateSQLPanelFields,
+  calculateBottomLegendHeight,
+  calculateRightLegendWidth
 } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 vi.mock("quasar", () => ({
@@ -2323,6 +2325,470 @@ describe("Dashboard Data Conversion Utils", () => {
       const errors = [];
       validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true, "logs");
       expect(errors).toContain("Unable to extract value field from the query.");
+    });
+  });
+
+  describe("calculateBottomLegendHeight", () => {
+    it("should return 0 for no legend items", () => {
+      const result = calculateBottomLegendHeight(0, 800);
+      expect(result).toBe(0);
+    });
+
+    it("should calculate height for single row of legends", () => {
+      const result = calculateBottomLegendHeight(3, 800);
+      expect(result).toBeGreaterThan(0);
+      expect(typeof result).toBe("number");
+    });
+
+    it("should calculate height for multiple rows of legends", () => {
+      const result = calculateBottomLegendHeight(20, 400); // Many legends, narrow width
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should use series data for better text width estimation", () => {
+      const seriesData = [
+        { name: "Very Long Legend Name That Takes Space" },
+        { name: "Short" },
+        { name: "Medium Length Name" }
+      ];
+      
+      const result = calculateBottomLegendHeight(3, 800, seriesData);
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should respect maximum height constraint (80% rule)", () => {
+      const maxHeight = 500;
+      const result = calculateBottomLegendHeight(50, 400, [], maxHeight); // Many legends
+      expect(result).toBeLessThanOrEqual(maxHeight * 0.8);
+    });
+
+    it("should enforce minimum height", () => {
+      const result = calculateBottomLegendHeight(1, 2000); // Single legend, wide chart
+      expect(result).toBeGreaterThanOrEqual(50); // Minimum 50px (3.125rem)
+    });
+
+    it("should handle series with seriesName instead of name", () => {
+      const seriesData = [
+        { seriesName: "Series with seriesName property" },
+        { name: "Series with name property" },
+        {} // Empty series
+      ];
+      
+      const result = calculateBottomLegendHeight(3, 800, seriesData);
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should configure legend and grid positioning when config objects provided", () => {
+      const legendConfig = {};
+      const gridConfig = {};
+      const chartHeight = 400;
+      
+      const result = calculateBottomLegendHeight(
+        5, 
+        800, 
+        [], 
+        undefined, 
+        legendConfig, 
+        gridConfig, 
+        chartHeight
+      );
+      
+      expect(result).toBeGreaterThan(0);
+      expect(gridConfig).toHaveProperty("bottom");
+      expect(legendConfig).toHaveProperty("top");
+      expect(legendConfig).toHaveProperty("height");
+    });
+
+    it("should handle very long legend names", () => {
+      const seriesData = [
+        { name: "Extremely Long Legend Name That Would Normally Exceed Maximum Width Constraints And Test Text Width Calculation" }
+      ];
+      
+      const result = calculateBottomLegendHeight(1, 800, seriesData);
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should calculate correctly for different chart widths", () => {
+      const narrowResult = calculateBottomLegendHeight(10, 300);
+      const wideResult = calculateBottomLegendHeight(10, 1200);
+      
+      // Narrow charts should need more rows (taller height)
+      expect(narrowResult).toBeGreaterThanOrEqual(wideResult);
+    });
+
+    it("should handle edge case with zero chart width", () => {
+      const result = calculateBottomLegendHeight(5, 0);
+      expect(result).toBeGreaterThan(0); // Should still return valid height
+    });
+
+    it("should handle negative chart width gracefully", () => {
+      const result = calculateBottomLegendHeight(5, -100);
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should handle series with numeric names", () => {
+      const seriesData = [
+        { name: 123 },
+        { name: 456.78 },
+        { name: "string_name" }
+      ];
+      
+      const result = calculateBottomLegendHeight(3, 800, seriesData);
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should calculate positioning parameters correctly", () => {
+      const legendConfig = {};
+      const gridConfig = {};
+      const chartHeight = 600;
+      
+      calculateBottomLegendHeight(5, 800, [], 500, legendConfig, gridConfig, chartHeight);
+      
+      expect(gridConfig.bottom).toBeGreaterThan(0);
+      expect(legendConfig.top).toBeGreaterThan(0);
+      expect(legendConfig.height).toBeGreaterThan(0);
+      expect(legendConfig.top).toBeLessThan(chartHeight);
+    });
+  });
+
+  describe("calculateRightLegendWidth", () => {
+    it("should return 0 for no legend items", () => {
+      const result = calculateRightLegendWidth(0, 800, 400);
+      expect(result).toBe(0);
+    });
+
+    it("should calculate width for legends positioned on right", () => {
+      const result = calculateRightLegendWidth(5, 800, 400);
+      expect(result).toBeGreaterThan(0);
+      expect(typeof result).toBe("number");
+    });
+
+    it("should use series data for text width calculation", () => {
+      const seriesData = [
+        { name: "Very Long Legend Name" },
+        { name: "Short" },
+        { name: "Medium Name" }
+      ];
+      
+      const result = calculateRightLegendWidth(3, 800, 400, seriesData);
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should handle scrollable legends", () => {
+      const scrollableResult = calculateRightLegendWidth(20, 800, 400, [], true);
+      const nonScrollableResult = calculateRightLegendWidth(20, 800, 400, [], false);
+      
+      expect(scrollableResult).toBeGreaterThan(0);
+      expect(nonScrollableResult).toBeGreaterThan(0);
+      // Scrollable should typically be narrower as it uses single column
+      expect(scrollableResult).toBeLessThanOrEqual(nonScrollableResult);
+    });
+
+    it("should respect 80% maximum width constraint", () => {
+      const chartWidth = 800;
+      const result = calculateRightLegendWidth(50, chartWidth, 400); // Many legends
+      expect(result).toBeLessThanOrEqual(chartWidth * 0.8);
+    });
+
+    it("should handle series with seriesName property", () => {
+      const seriesData = [
+        { seriesName: "Series Name Property" },
+        { name: "Regular Name Property" }
+      ];
+      
+      const result = calculateRightLegendWidth(2, 800, 400, seriesData);
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should calculate multiple columns for non-scrollable legends", () => {
+      const result = calculateRightLegendWidth(30, 800, 200); // Many legends, short height
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should handle very tall charts", () => {
+      const result = calculateRightLegendWidth(10, 800, 2000); // Very tall chart
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should handle very short charts", () => {
+      const result = calculateRightLegendWidth(10, 800, 100); // Very short chart
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should handle very narrow charts", () => {
+      const result = calculateRightLegendWidth(5, 200, 400); // Narrow chart
+      expect(result).toBeLessThanOrEqual(200 * 0.8); // Should respect 80% constraint
+    });
+
+    it("should handle series with empty/null names", () => {
+      const seriesData = [
+        { name: "" },
+        { name: null },
+        { name: undefined },
+        { seriesName: "Valid Name" }
+      ];
+      
+      const result = calculateRightLegendWidth(4, 800, 400, seriesData);
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should enforce minimum text width constraints", () => {
+      const seriesData = [{ name: "A" }]; // Very short name
+      
+      const result = calculateRightLegendWidth(1, 800, 400, seriesData);
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should enforce maximum text width constraints", () => {
+      const seriesData = [
+        { name: "Extremely Long Legend Name That Exceeds Normal Width Expectations And Should Be Constrained By Maximum Width Limits To Prevent UI Issues" }
+      ];
+      
+      const result = calculateRightLegendWidth(1, 800, 400, seriesData);
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should handle zero chart dimensions", () => {
+      const result1 = calculateRightLegendWidth(5, 0, 400);
+      expect(result1).toBe(0); // Should return 0 for zero width
+
+      const result2 = calculateRightLegendWidth(5, 800, 0);
+      expect(result2).toBeGreaterThan(0); // Should still calculate width
+    });
+
+    it("should calculate different widths for scrollable vs non-scrollable", () => {
+      const scrollable = calculateRightLegendWidth(15, 800, 300, [], true);
+      const nonScrollable = calculateRightLegendWidth(15, 800, 300, [], false);
+      
+      expect(scrollable).toBeGreaterThan(0);
+      expect(nonScrollable).toBeGreaterThan(0);
+    });
+
+    it("should handle numeric legend names", () => {
+      const seriesData = [
+        { name: 123 },
+        { name: 456.789 },
+        { name: 0 }
+      ];
+      
+      const result = calculateRightLegendWidth(3, 800, 400, seriesData);
+      expect(result).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Legend Calculation Edge Cases", () => {
+    it("should handle calculateBottomLegendHeight with very wide chart", () => {
+      const result = calculateBottomLegendHeight(5, 5000); // Very wide chart
+      expect(result).toBeGreaterThan(0);
+      // With very wide chart, legends should fit in fewer rows
+    });
+
+    it("should handle calculateBottomLegendHeight with configuration objects null", () => {
+      const result = calculateBottomLegendHeight(5, 800, [], undefined, null, null, 400);
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should handle calculateRightLegendWidth with very many legends", () => {
+      const result = calculateRightLegendWidth(100, 800, 400); // 100 legends
+      expect(result).toBeLessThanOrEqual(800 * 0.8);
+    });
+
+    it("should handle mixed series data types in bottom legend calculation", () => {
+      const seriesData = [
+        { name: "String Name" },
+        { seriesName: "Series Name" },
+        { name: 123 },
+        { name: null },
+        { name: "" },
+        { unknown_prop: "value" } // Missing both name properties
+      ];
+      
+      const result = calculateBottomLegendHeight(6, 600, seriesData);
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should handle mixed series data types in right legend calculation", () => {
+      const seriesData = [
+        { name: "String Name" },
+        { seriesName: "Series Name" },
+        { name: 123 },
+        { name: null },
+        { name: "" },
+        { unknown_prop: "value" } // Missing both name properties
+      ];
+      
+      const result = calculateRightLegendWidth(6, 800, 400, seriesData);
+      expect(result).toBeGreaterThan(0);
+    });
+
+    it("should handle calculateBottomLegendHeight minimum height enforcement", () => {
+      const result = calculateBottomLegendHeight(1, 10000, []); // Single legend, very wide
+      expect(result).toBeGreaterThanOrEqual(50); // Should enforce 50px minimum
+    });
+
+    it("should handle calculateRightLegendWidth with extreme aspect ratios", () => {
+      const tallNarrowResult = calculateRightLegendWidth(10, 200, 2000);
+      const wideShortResult = calculateRightLegendWidth(10, 2000, 200);
+      
+      expect(tallNarrowResult).toBeGreaterThan(0);
+      expect(wideShortResult).toBeGreaterThan(0);
+    });
+
+    it("should validate legend configuration object updates in calculateBottomLegendHeight", () => {
+      const legendConfig = { existing: "value" };
+      const gridConfig = { existing: "value" };
+      const chartHeight = 500;
+      
+      calculateBottomLegendHeight(8, 600, [], 400, legendConfig, gridConfig, chartHeight);
+      
+      // Should have updated the configuration objects
+      expect(legendConfig).toHaveProperty("top");
+      expect(legendConfig).toHaveProperty("height");
+      expect(gridConfig).toHaveProperty("bottom");
+      expect(legendConfig.existing).toBe("value"); // Should preserve existing properties
+      expect(gridConfig.existing).toBe("value");
+    });
+
+    it("should handle calculateBottomLegendHeight with no maxHeight constraint", () => {
+      const result1 = calculateBottomLegendHeight(20, 400); // No maxHeight
+      const result2 = calculateBottomLegendHeight(20, 400, [], 500); // With maxHeight
+      
+      expect(result1).toBeGreaterThan(0);
+      expect(result2).toBeGreaterThan(0);
+    });
+
+    it("should handle calculateRightLegendWidth with minimal chart height", () => {
+      const result = calculateRightLegendWidth(5, 800, 50); // Very short chart
+      expect(result).toBeGreaterThan(0);
+      // Should still calculate reasonable width even with minimal height
+    });
+
+    it("should calculate correct positioning in calculateBottomLegendHeight", () => {
+      const legendConfig = {};
+      const gridConfig = {};
+      const chartHeight = 400;
+      
+      const calculatedHeight = calculateBottomLegendHeight(
+        5, 600, [], 300, legendConfig, gridConfig, chartHeight
+      );
+      
+      // Legend top should be positioned correctly relative to chart height
+      expect(legendConfig.top).toBeGreaterThan(0);
+      expect(legendConfig.top).toBeLessThan(chartHeight);
+      expect(legendConfig.top).toBe(chartHeight - calculatedHeight + 10);
+      expect(legendConfig.height).toBe(calculatedHeight - 20);
+    });
+  });
+
+  describe("Legend Calculation Integration Scenarios", () => {
+    it("should handle realistic dashboard scenario with bottom legends", () => {
+      const seriesData = [
+        { name: "CPU Usage (%)" },
+        { name: "Memory Usage (GB)" },
+        { name: "Disk I/O (MB/s)" },
+        { name: "Network In (Mbps)" },
+        { name: "Network Out (Mbps)" }
+      ];
+      
+      const legendConfig = {};
+      const gridConfig = {};
+      
+      const height = calculateBottomLegendHeight(
+        5, 1000, seriesData, 600, legendConfig, gridConfig, 400
+      );
+      
+      expect(height).toBeGreaterThan(0);
+      expect(height).toBeLessThanOrEqual(600 * 0.8);
+      expect(gridConfig.bottom).toBe(height);
+    });
+
+    it("should handle realistic dashboard scenario with right legends", () => {
+      const seriesData = [
+        { name: "Application Server" },
+        { name: "Database Server" },
+        { name: "Load Balancer" },
+        { name: "Cache Server" },
+        { name: "Message Queue" }
+      ];
+      
+      const width = calculateRightLegendWidth(5, 1200, 600, seriesData, false);
+      
+      expect(width).toBeGreaterThan(0);
+      expect(width).toBeLessThanOrEqual(1200 * 0.8);
+    });
+
+    it("should handle time series with many data points", () => {
+      const seriesData = Array.from({ length: 50 }, (_, i) => ({
+        name: `Metric_${i}_${Date.now()}`
+      }));
+      
+      const bottomHeight = calculateBottomLegendHeight(50, 800, seriesData);
+      const rightWidth = calculateRightLegendWidth(50, 800, 400, seriesData);
+      
+      expect(bottomHeight).toBeGreaterThan(0);
+      expect(rightWidth).toBeGreaterThan(0);
+    });
+
+    it("should handle mixed English and Unicode legend names", () => {
+      const seriesData = [
+        { name: "English Name" },
+        { name: "中文名称" },
+        { name: "日本語名前" },
+        { name: "العربية" },
+        { name: "Русский" },
+        { name: "🚀 Emoji Name 📊" }
+      ];
+      
+      const bottomHeight = calculateBottomLegendHeight(6, 800, seriesData);
+      const rightWidth = calculateRightLegendWidth(6, 800, 400, seriesData);
+      
+      expect(bottomHeight).toBeGreaterThan(0);
+      expect(rightWidth).toBeGreaterThan(0);
+    });
+
+    it("should optimize for different legend display strategies", () => {
+      const manyShortNames = Array.from({ length: 20 }, (_, i) => ({ name: `S${i}` }));
+      const fewLongNames = [
+        { name: "Very Long Descriptive Legend Name 1" },
+        { name: "Very Long Descriptive Legend Name 2" },
+        { name: "Very Long Descriptive Legend Name 3" }
+      ];
+      
+      const manyShortHeight = calculateBottomLegendHeight(20, 800, manyShortNames);
+      const fewLongHeight = calculateBottomLegendHeight(3, 800, fewLongNames);
+      const manyShortWidth = calculateRightLegendWidth(20, 800, 400, manyShortNames);
+      const fewLongWidth = calculateRightLegendWidth(3, 800, 400, fewLongNames);
+      
+      expect(manyShortHeight).toBeGreaterThan(0);
+      expect(fewLongHeight).toBeGreaterThan(0);
+      expect(manyShortWidth).toBeGreaterThan(0);
+      expect(fewLongWidth).toBeGreaterThan(0);
+    });
+
+    it("should handle extreme legend counts", () => {
+      // Test with 1 legend
+      expect(calculateBottomLegendHeight(1, 800)).toBeGreaterThan(0);
+      expect(calculateRightLegendWidth(1, 800, 400)).toBeGreaterThan(0);
+      
+      // Test with 1000 legends
+      expect(calculateBottomLegendHeight(1000, 800)).toBeGreaterThan(0);
+      expect(calculateRightLegendWidth(1000, 800, 400)).toBeLessThanOrEqual(800 * 0.8);
+    });
+
+    it("should handle chart configurations with partial config objects", () => {
+      const partialLegendConfig = { existingProperty: true };
+      const partialGridConfig = { existingGridProp: "value" };
+      
+      calculateBottomLegendHeight(
+        3, 600, [], undefined, partialLegendConfig, partialGridConfig, 400
+      );
+      
+      // Should preserve existing properties while adding new ones
+      expect(partialLegendConfig.existingProperty).toBe(true);
+      expect(partialLegendConfig).toHaveProperty("top");
+      expect(partialLegendConfig).toHaveProperty("height");
+      expect(partialGridConfig.existingGridProp).toBe("value");
+      expect(partialGridConfig).toHaveProperty("bottom");
     });
   });
 });
