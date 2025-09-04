@@ -1183,7 +1183,8 @@
     "domainNeedsEmails": "Domain '{domain}' must have at least one email address when not allowing all users",
     "domainSettingsSaved": "Domain settings saved successfully",
     "errorSavingDomainSettings": "Error saving domain settings",
-    "noDomainMessage": "No domains configured. Add domains above to restrict access."
+    "noDomainMessage": "No domains configured. Add domains above to restrict access.",
+    "license": "License"
   },
   "reports": {
     "header": "Reports",
