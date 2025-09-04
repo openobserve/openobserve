@@ -351,12 +351,10 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), infra::errors::Error
 }
 
 async fn publish_event(event: EnrichmentTableEvent) -> Result<(), infra::errors::Error> {
+    let name = event.name.clone();
     let event = InternalCoordinatorEvent::EnrichmentTable(event);
-    let payload = json::to_vec(&event).map_err(|e| {
-        infra::errors::Error::Message(format!("Failed to serialize enrichment table event: {}", e))
-    })?;
-    publish(payload).await?;
-    log::debug!("Published enrichment table event: {:?}", event);
+    publish(event).await?;
+    log::debug!("Published enrichment table event: {:?}", name);
     Ok(())
 }
 

@@ -322,6 +322,7 @@ pub async fn handle_schema_event(event: SchemaEvent) -> Result<(), anyhow::Error
 }
 
 async fn handle_update(key: &str, start_dt: Option<i64>) -> Result<(), anyhow::Error> {
+    log::debug!("[Schema:watch] internal coordinator handle update event: {key}");
     // The key should be like org_id/stream_type/stream_name/start_dt
     let key_columns = key.split('/').collect::<Vec<&str>>();
     let (item_key, ev_start_dt) = if key_columns.len() > 3 {
@@ -436,6 +437,7 @@ async fn handle_update(key: &str, start_dt: Option<i64>) -> Result<(), anyhow::E
 }
 
 async fn handle_delete(item_key: &str) -> Result<(), anyhow::Error> {
+    log::debug!("[Schema:watch] internal coordinator handle delete event: {item_key}");
     let columns = item_key.split('/').collect::<Vec<&str>>();
     let org_id = columns[0];
     let stream_type = StreamType::from(columns[1]);

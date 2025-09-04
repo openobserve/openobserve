@@ -38,6 +38,10 @@ pub async fn handle_internal_coordinator_event(payload: Vec<u8>) -> Result<(), a
         }
         InternalCoordinatorEvent::Schema(event) => {
             if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() {
+                log::debug!(
+                    "[INTERNAL_COORDINATOR::HANDLE_SCHEMA_EVENT] handling schema event: {:?}",
+                    event
+                );
                 super::schema::handle_schema_event(event).await
             } else {
                 Ok(())

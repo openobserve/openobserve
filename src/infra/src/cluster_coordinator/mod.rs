@@ -21,10 +21,11 @@ pub mod pipelines;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use config::get_config;
+use config::{get_config, utils::json};
 use tokio::sync::mpsc;
 
 use crate::{
+    cluster_coordinator::events::InternalCoordinatorEvent,
     db::Db,
     errors::Error,
     queue::{self, RetentionPolicy},
@@ -48,10 +49,16 @@ pub async fn create_stream() -> Result<(), Error> {
 
 /// `event` should be a json string. The message will be published to the internal coordinator
 /// stream.
-pub async fn publish(payload: Vec<u8>) -> Result<(), Error> {
+pub async fn publish(event: InternalCoordinatorEvent) -> Result<(), Error> {
     if get_config().common.local_mode {
         return Ok(());
     }
+    let payload = json::to_vec(&event).map_err(|e| {
+        Error::Message(format!(
+            "Failed to serialize internal coordinator event: {}",
+            e
+        ))
+    })?;
     let queue = queue::get_queue().await;
     queue
         .publish(INTERNAL_COORDINATOR_STREAM, Bytes::from(payload))

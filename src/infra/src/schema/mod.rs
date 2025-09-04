@@ -780,10 +780,12 @@ pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
 
 /// Publish a schema event to the cluster coordinator queue
 pub async fn publish_event(event: SchemaEvent) -> Result<()> {
+    log::debug!(
+        "[INTERNAL_COORDINATOR::PUBLISH_EVENT] publish schema event: {:?}",
+        event
+    );
     let event = InternalCoordinatorEvent::Schema(event);
-    let payload = json::to_vec(&event)
-        .map_err(|e| Error::Message(format!("Failed to serialize schema event: {}", e)))?;
-    publish(payload).await?;
+    publish(event).await?;
     Ok(())
 }
 

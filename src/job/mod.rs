@@ -153,9 +153,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 );
             }
             let _ = infra::cluster_coordinator::subscribe(async move |payload| {
-                log::debug!(
-                    "[INTERNAL_COORDINATOR::SUBSCRIBE] Received internal coordinator event"
-                );
                 db::internal_coordinator_stream::handle_internal_coordinator_event(payload).await
             })
             .await;

@@ -203,6 +203,7 @@ impl super::Db for PostgresDb {
 
         // event watch
         if need_watch {
+            log::debug!("[POSTGRES] event watch for key: {}", key);
             // Check for local mode only if key starts with SCHEMA_KEY
             // this is because only schema is broadcasted through the coordinator queue.
             let local_mode = if key.starts_with(SCHEMA_KEY) {
@@ -211,6 +212,7 @@ impl super::Db for PostgresDb {
                 false
             };
             if !local_mode && key.starts_with(SCHEMA_KEY) {
+                log::debug!("[POSTGRES] publish schema update event for key: {}", key);
                 if let Err(e) =
                     crate::schema::publish_event(schema_update_event(key, start_dt)).await
                 {
