@@ -408,6 +408,12 @@ export default defineComponent({
       emit("shareLink");
     };
 
+    /**
+     * Update the date time in the date time component
+     * @param value - object containing start time and end time
+     * @param value.startTime - start time in microseconds
+     * @param value.endTime - end time in microseconds
+     */
     const updateNewDateTime = (value: object) => {
       if (!value.startTime || !value.endTime) return;
       dateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
