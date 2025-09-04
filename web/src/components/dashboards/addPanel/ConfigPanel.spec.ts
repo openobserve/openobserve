@@ -66,7 +66,6 @@ const mockDashboardPanelData = {
         unit: "px"
       },
       axis_border_show: false,
-      show_gridlines: true,
       connect_nulls: false,
       no_value_replacement: "",
       wrap_table_cells: false,
@@ -624,10 +623,10 @@ describe("ConfigPanel", () => {
       expect(gridlinesToggle.exists()).toBe(true);
     });
 
-    it("should initialize gridlines as true by default", () => {
+    it("should not initialize gridlines by default", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.dashboardPanelData.data.config.show_gridlines).toBe(true);
+      expect(wrapper.vm.dashboardPanelData.data.config.show_gridlines).toBeUndefined();
     });
 
     it("should bind gridlines value to toggle", async () => {
@@ -947,7 +946,7 @@ describe("ConfigPanel", () => {
       const config = wrapper.vm.dashboardPanelData.data.config;
       
       // Check that all expected default values are set by the component's onBeforeMount
-      expect(config.show_gridlines).toBe(true);
+      expect(config.show_gridlines).toBeUndefined();
       expect(config.connect_nulls).toBe(false);
       expect(config.wrap_table_cells).toBe(false);
       expect(config.table_transpose).toBe(false);
@@ -994,7 +993,7 @@ describe("ConfigPanel", () => {
 
       // Should still initialize missing properties
       const config = wrapper.vm.dashboardPanelData.data.config;
-      expect(config.show_gridlines).toBe(true);
+      expect(config.show_gridlines).toBeUndefined();
       expect(config.trellis).toBeDefined();
       expect(config.legend_width).toBeDefined();
     });
