@@ -65,6 +65,49 @@ export class ManagementPage {
     await expect(this.page).toHaveURL(/settings/);
   }
 
+  async checkAndEnableWebSocket() {
+    // Selector for the WebSocket toggle
+    const toggleSelector = '[data-test="general-settings-enable-websocket"]';
+
+    // Wait for the toggle element to be visible
+    await this.page.waitForSelector(toggleSelector);
+
+    // Get the current state of the toggle
+    const isChecked = await this.page.$eval(toggleSelector, (toggle) => {
+      return toggle.getAttribute("aria-checked") === "true";
+    });
+
+    // Log the current state
+    console.log(
+      `WebSocket is currently ${isChecked ? "enabled" : "disabled"}.`
+    );
+
+    // If the WebSocket is not enabled, click to enable it
+    if (!isChecked) {
+      console.log("Enabling WebSocket...");
+      await this.page.click(toggleSelector);
+
+      // Optionally, wait for a brief moment to ensure the toggle action is completed
+      await this.page.waitForTimeout(500); // Adjust the timeout as needed
+
+      // Verify if the toggle is now enabled
+      const newCheckedState = await this.page.$eval(
+        toggleSelector,
+        (toggle) => {
+          return toggle.getAttribute("aria-checked") === "true";
+        }
+      );
+
+      if (newCheckedState) {
+        console.log("WebSocket has been successfully enabled.");
+      } else {
+        console.log("Failed to enable WebSocket.");
+      }
+    } else {
+      console.log("WebSocket is already enabled.");
+    }
+  }
+
   async checkStreaming() {
     await this.page.goto(
       process.env["ZO_BASE_URL"] + "/web/logs?org_identifier=default"
@@ -86,8 +129,15 @@ export class ManagementPage {
     const isChecked = await this.page.$eval(toggleSelector, (toggle) => {
       return toggle.getAttribute("aria-checked") === "true";
     });
+
+    // Log the current state
+    console.log(
+      `Streaming is currently ${isChecked ? "enabled" : "disabled"}.`
+    );
+
     // If the Streaming is not enabled, click to enable it
     if (!isChecked) {
+      console.log("Enabling Streaming...");
       await this.page.click(toggleSelector);
 
       // Optionally, wait for a brief moment to ensure the toggle action is completed
