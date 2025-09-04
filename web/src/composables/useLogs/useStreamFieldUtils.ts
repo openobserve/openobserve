@@ -61,7 +61,6 @@ import {
   getColumnWidth,
 } from "@/composables/useLogs/logsUtils";
 
-const { updateFieldKeywords } = useSqlSuggestions();
 let {
   searchObj,
   searchObjDebug,
@@ -71,15 +70,11 @@ let {
   histogramMappedData,
   histogramResults,
 } = searchState();
-const {
-  getStreams,
-  getStream,
-  getMultiStreams,
-  isStreamExists,
-  isStreamFetched,
-} = useStreams();
 
 export const useStreamFieldUtils = () => {
+  const { getStreams, getStream } = useStreams();
+  const { updateFieldKeywords } = useSqlSuggestions();
+
   const store = useStore();
   const router = useRouter();
   const { t } = useI18n();
@@ -293,7 +288,8 @@ export const useStreamFieldUtils = () => {
               const hasTimestampField = localInterestingFields.value[
                 searchObj.organizationIdentifier + "_" + stream.name
               ].some(
-                (field: any) => field === store.state.zoConfig?.timestamp_column,
+                (field: any) =>
+                  field === store.state.zoConfig?.timestamp_column,
               );
 
               // remove timestamp field from the local interesting fields and update the local interesting fields
@@ -462,8 +458,9 @@ export const useStreamFieldUtils = () => {
 
                     commonSchemaFields.push(field);
                     searchObj.data.stream.expandGroupRowsFieldCount["common"] =
-                      searchObj.data.stream.expandGroupRowsFieldCount["common"] +
-                      1;
+                      searchObj.data.stream.expandGroupRowsFieldCount[
+                        "common"
+                      ] + 1;
 
                     //remove the element from the index
                     schemaFields.splice(schemaFieldsIndex, 1);
@@ -496,7 +493,9 @@ export const useStreamFieldUtils = () => {
                         1;
                     }
                     schemaFields.push(field);
-                    searchObj.data.stream.expandGroupRowsFieldCount[stream.name] =
+                    searchObj.data.stream.expandGroupRowsFieldCount[
+                      stream.name
+                    ] =
                       searchObj.data.stream.expandGroupRowsFieldCount[
                         stream.name
                       ] + 1;
@@ -567,7 +566,8 @@ export const useStreamFieldUtils = () => {
                   }
                   commonSchemaFields.push(field);
                   searchObj.data.stream.expandGroupRowsFieldCount["common"] =
-                    searchObj.data.stream.expandGroupRowsFieldCount["common"] + 1;
+                    searchObj.data.stream.expandGroupRowsFieldCount["common"] +
+                    1;
 
                   //remove the element from the index
                   schemaFields.splice(schemaFieldsIndex, 1);
@@ -596,12 +596,14 @@ export const useStreamFieldUtils = () => {
                       stream.name
                     ] =
                       searchObj.data.stream
-                        .interestingExpandedGroupRowsFieldCount[stream.name] + 1;
+                        .interestingExpandedGroupRowsFieldCount[stream.name] +
+                      1;
                   }
                   schemaFields.push(field);
                   searchObj.data.stream.expandGroupRowsFieldCount[stream.name] =
-                    searchObj.data.stream.expandGroupRowsFieldCount[stream.name] +
-                    1;
+                    searchObj.data.stream.expandGroupRowsFieldCount[
+                      stream.name
+                    ] + 1;
                 }
               }
             }
@@ -649,21 +651,24 @@ export const useStreamFieldUtils = () => {
                 !searchObj.meta.hasUserDefinedSchemas)
             ) {
               // Find the index of the record with max attributes
-              const maxAttributesIndex = searchObj.data.queryResults.hits.reduce(
-                (
-                  maxIndex: string | number,
-                  obj: {},
-                  currentIndex: any,
-                  array: { [x: string]: {} },
-                ) => {
-                  const numAttributes = Object.keys(obj).length;
-                  const maxNumAttributes = Object.keys(array[maxIndex]).length;
-                  return numAttributes > maxNumAttributes
-                    ? currentIndex
-                    : maxIndex;
-                },
-                0,
-              );
+              const maxAttributesIndex =
+                searchObj.data.queryResults.hits.reduce(
+                  (
+                    maxIndex: string | number,
+                    obj: {},
+                    currentIndex: any,
+                    array: { [x: string]: {} },
+                  ) => {
+                    const numAttributes = Object.keys(obj).length;
+                    const maxNumAttributes = Object.keys(
+                      array[maxIndex],
+                    ).length;
+                    return numAttributes > maxNumAttributes
+                      ? currentIndex
+                      : maxIndex;
+                  },
+                  0,
+                );
 
               const recordwithMaxAttribute =
                 searchObj.data.queryResults.hits[maxAttributesIndex];
@@ -1102,7 +1107,8 @@ export const useStreamFieldUtils = () => {
         searchObj.data.queryResults.filteredHit.push(itemHits);
       });
     } else {
-      searchObj.data.queryResults.filteredHit = searchObj.data.queryResults.hits;
+      searchObj.data.queryResults.filteredHit =
+        searchObj.data.queryResults.hits;
     }
   };
 
