@@ -32,8 +32,8 @@ pub async fn get_license_info() -> HttpResponse {
         license,
         installation_id: config::get_instance_id(),
         expired: license_expired().await,
-        search_used: search_used(),
-        ingestion_used: ingestion_used(),
+        search_used: search_used() * 100.0, // convert to percentage
+        ingestion_used: ingestion_used() * 100.0, // convert tot percentage
     };
     HttpResponse::Ok().json(res)
 }
