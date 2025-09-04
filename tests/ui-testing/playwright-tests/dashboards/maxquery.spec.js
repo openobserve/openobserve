@@ -69,7 +69,7 @@ test.describe("dashboard max query testcases", () => {
 
     await pm.dashboardPanelActions.savePanel();
 
-    await page.waitForTimeout(2000);
+    // await page.waitForTimeout(2000);
 
     await pm.dateTimeHelper.setRelativeTimeRange("6-w");
 
@@ -98,7 +98,7 @@ test.describe("dashboard max query testcases", () => {
 
     await deleteDashboard(page, randomDashboardName);
 
-    await page.waitForTimeout(1000);
+    // await page.waitForTimeout(1000);
 
     await pm.dashboardList.menuItem("streams-item");
 

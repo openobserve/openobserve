@@ -1,3 +1,4 @@
+import { expect } from "../../playwright-tests/baseFixtures";
 export default class StreamSettingsPage {
   constructor(page) {
     this.page = page;
@@ -14,7 +15,7 @@ export default class StreamSettingsPage {
     this.saveButton = page.locator(
       '[data-test="schema-update-settings-button"]'
     );
-    this.closeButton = page.locator("button", { hasText: "close" });
+    this.closeButton = page.locator('[data-test="schema-cancel-button"]');
   }
 
   async updateStreamMaxQueryRange(streamName, newValue) {
@@ -22,17 +23,15 @@ export default class StreamSettingsPage {
     // Search for the stream
     await this.searchInput.click();
     await this.searchInput.fill(streamName);
-    await this.page.waitForTimeout(3000);
+    // await this.page.waitForTimeout(2000);
 
-    // Wait for the expected response
-    // await this.page.waitForResponse(
-    //   (response) =>
-    //     response
-    //       .url()
-    //       .includes(
-    //         "/api/default/streams?type=logs&offset=0&limit=20&keyword=e2e_automate"
-    //       ) && response.status() === 200
-    // );
+    // Click on the Stream Detail button for the specific stream
+    await this.page
+      .getByRole("cell", { name: streamName })
+      .first()
+      .locator("..")
+      .getByRole("button", { name: "Stream Detail" })
+      .click();
 
     // Wait for stream details to appear and click
 
@@ -48,7 +47,11 @@ export default class StreamSettingsPage {
     await this.saveButton.waitFor({ state: "visible", timeout: 15000 });
     await this.saveButton.click();
 
-    await this.page.waitForTimeout(3000);
+    // await this.page.waitForTimeout(3000);
+
+    // Wait for the text and assert it's visible
+    const successMessage = this.page.getByText("Stream settings updated");
+    await expect(successMessage).toBeVisible({ timeout: 10000 });
 
     // Close the modal
     // await this.closeButton.waitFor({ state: "visible", timeout: 15000 });
