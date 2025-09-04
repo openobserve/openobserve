@@ -1327,9 +1327,9 @@ export const convertSQLData = async (
 
     // Extract unique values for the second x-axis key
     // NOTE: while filter, we can't compare type as well because set will have string values
-    const uniqueValues = Array.from(
-      new Set(missingValueData.map((obj: any) => obj[breakDownKey])),
-    ).filter((value: any) => value != null || value != undefined);
+    const uniqueValues = [
+      ...new Set(missingValueData.map((obj: any) => obj[breakDownKey])),
+    ].filter((value: any) => value != null || value != undefined);
 
     return uniqueValues;
   }
@@ -1907,16 +1907,16 @@ export const convertSQLData = async (
       // get first x axis key
       const key0 = xAxisKeys[0];
       // get the unique value of the first xAxis's key
-      let xAxisZerothPositionUniqueValue = Array.from(
-        new Set(searchQueryData[0].map((obj: any) => obj[key0])),
-      ).filter((it) => it);
+      let xAxisZerothPositionUniqueValue = [
+        ...new Set(searchQueryData[0].map((obj: any) => obj[key0])),
+      ].filter((it) => it);
 
       // get second x axis key
       const key1 = yAxisKeys[0];
       // get the unique value of the second xAxis's key
-      const xAxisFirstPositionUniqueValue = Array.from(
-        new Set(searchQueryData[0].map((obj: any) => obj[key1])),
-      ).filter((it) => it);
+      const xAxisFirstPositionUniqueValue = [
+        ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
+      ].filter((it) => it);
 
       const yAxisKey0 = zAxisKeys[0];
       const zValues: any = xAxisFirstPositionUniqueValue.map((first: any) => {
