@@ -1457,7 +1457,7 @@ export const calculateBottomLegendHeight = (
 
   // Constants for legend sizing in rem units (converted to pixels)
   const LEGEND_ITEM_HEIGHT = remToPx(1.25); // 1.25rem = 20px (Height per legend item row)
-  const LEGEND_PADDING = remToPx(2.5); // 2.5rem = 40px (Top and bottom padding)
+  const LEGEND_PADDING = remToPx(1.5); // 1.5rem = 24px (Top and bottom padding)
   const LEGEND_ICON_WIDTH = remToPx(0.875); // 0.875rem = 14px (Width of legend icon/symbol)
   const LEGEND_ICON_MARGIN = remToPx(0.5); // 0.5rem = 8px (Margin between icon and text)
   const LEGEND_ITEM_MARGIN = remToPx(1.25); // 1.25rem = 20px (Horizontal margin between legend items)
@@ -1467,14 +1467,16 @@ export const calculateBottomLegendHeight = (
   // Calculate average text width based on actual series names
   let avgTextWidth = MIN_TEXT_WIDTH;
   if (seriesData.length > 0) {
-    const totalTextLength = seriesData.reduce((sum, series) => {
-      const name = series.name || series.seriesName || "";
-      return sum + name.toString().length;
+    const totalTextWidth = seriesData.reduce((sum, series) => {
+      const name = (series.name || series.seriesName || "").toString();
+      // Use calculateWidthText for accurate font-based measurements
+      const textWidth = calculateWidthText(name, "12px");
+      return sum + textWidth;
     }, 0);
-    const avgTextLength = totalTextLength / seriesData.length;
-    // Estimate width: roughly 7 pixels per character, constrained by min/max
+    const avgTextLength = totalTextWidth / seriesData.length;
+    // Use actual calculated width, constrained by min/max
     avgTextWidth = Math.min(
-      Math.max(avgTextLength * 7, MIN_TEXT_WIDTH),
+      Math.max(avgTextLength, MIN_TEXT_WIDTH),
       MAX_TEXT_WIDTH,
     );
   }
