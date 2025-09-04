@@ -666,7 +666,8 @@ async function getQueryData() {
         searchObj.loading = false;
 
         if (
-          filter.replace(/ /g, "").includes("trace_id=") &&
+          filter &&
+          filter.includes("trace_id=") &&
           res.data.hits.length === 1 &&
           res.data.hits[0].start_time &&
           res.data.hits[0].end_time
