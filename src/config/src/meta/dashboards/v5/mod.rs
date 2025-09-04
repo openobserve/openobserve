@@ -252,6 +252,8 @@ pub struct PanelConfig {
     show_legends: bool,
     legends_position: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    legends_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     unit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     unit_custom: Option<String>,
@@ -317,6 +319,8 @@ pub struct PanelConfig {
     background: Option<Background>,
     #[serde(skip_serializing_if = "Option::is_none")]
     trellis: Option<Trellis>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    show_gridlines: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]

@@ -34,6 +34,8 @@ import {
   getUnitValue,
   isTimeSeries,
   isTimeStamp,
+  calculateBottomLegendHeight,
+  calculateRightLegendWidth,
 } from "./convertDataIntoUnitValue";
 import {
   calculateGridPositions,
@@ -127,6 +129,11 @@ export const convertSQLData = async (
   chartPanelStyle: any,
   annotations: any,
 ) => {
+  // Set gridlines visibility based on config.show_gridlines (default: true)
+  const showGridlines =
+    panelSchema?.config?.show_gridlines !== undefined
+      ? panelSchema.config.show_gridlines
+      : true;
   const extras: any = {};
 
   // if no data than return it
@@ -596,7 +603,7 @@ export const convertSQLData = async (
 
   const legendConfig: any = {
     show: panelSchema.config?.show_legends,
-    type: "scroll",
+    type: panelSchema.config?.legends_type === "plain" ? "plain" : "scroll", // Auto (null) and Scroll both use "scroll" type
     orient: legendPosition,
     padding: [10, 20, 10, 10],
     tooltip: {
@@ -1177,7 +1184,7 @@ export const convertSQLData = async (
           margin: 10,
         },
         splitLine: {
-          show: true,
+          show: showGridlines,
         },
         axisLine: {
           show: searchQueryData?.every((it: any) => it.length == 0)
@@ -1242,7 +1249,7 @@ export const convertSQLData = async (
         },
       },
       splitLine: {
-        show: true,
+        show: showGridlines,
       },
       axisLine: {
         show: searchQueryData?.every((it: any) => it.length == 0)
@@ -1271,6 +1278,24 @@ export const convertSQLData = async (
     },
     series: [],
   };
+
+  // Ensure gridlines visibility is set for all xAxis and yAxis (handles both array and object cases)
+  if (options.xAxis) {
+    (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
+      (axis) => {
+        // if (!axis.splitLine) axis.splitLine = {};
+        axis.splitLine.show = showGridlines;
+      },
+    );
+  }
+  if (options.yAxis) {
+    (Array.isArray(options.yAxis) ? options.yAxis : [options.yAxis]).forEach(
+      (axis) => {
+        // if (!axis.splitLine) axis.splitLine = {};
+        axis.splitLine.show = showGridlines;
+      },
+    );
+  }
 
   const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema);
 
@@ -2758,50 +2783,50 @@ export const convertSQLData = async (
   }
 
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
-  //only check for vertical side only
+  //only check for vertical side only (right legends) and when legends are not scrollable
   if (
     legendConfig.orient == "vertical" &&
     panelSchema.config?.show_legends &&
     panelSchema.type != "gauge" &&
-    panelSchema.type != "metric"
+    panelSchema.type != "metric" &&
+    panelSchema?.config?.legends_position == "right" &&
+    (panelSchema?.config?.legends_type == null ||
+      panelSchema?.config?.legends_type === "plain" ||
+      panelSchema?.config?.legends_type === "scroll")
   ) {
+    // Prefer explicit legend width if provided in config
     let legendWidth;
-
     if (
       panelSchema.config.legend_width &&
       !isNaN(parseFloat(panelSchema.config.legend_width.value))
       // ["px", "%"].includes(panelSchema.config.legend_width.unit)
     ) {
-      if (panelSchema.config.legend_width.unit === "%") {
-        // If in percentage, calculate percentage of the chartPanelRef width
-        const percentage = panelSchema.config.legend_width.value / 100;
-        legendWidth = chartPanelRef.value?.offsetWidth * percentage;
-      } else {
-        // If in pixels, use the provided value
-        legendWidth = panelSchema.config.legend_width.value;
-      }
-    } else {
-      let maxValue: string;
-      if (panelSchema.type === "pie" || panelSchema.type === "donut") {
-        maxValue = options.series[0].data.reduce((max: any, it: any) => {
-          return max.length < it?.name?.length ? it?.name : max;
-        }, "");
-      } else {
-        maxValue = options.series.reduce((max: any, it: any) => {
-          return max.length < it?.name?.length ? it?.name : max;
-        }, "");
-      }
-
-      // If legend_width is not provided or has invalid format, calculate it based on other criteria
       legendWidth =
-        Math.min(
-          chartPanelRef.value?.offsetWidth / 3,
-          calculateWidthText(maxValue) + 60,
-        ) ?? 20;
+        panelSchema.config.legend_width.unit === "%"
+          ? (chartPanelRef.value?.offsetWidth || 0) *
+            (panelSchema.config.legend_width.value / 100)
+          : panelSchema.config.legend_width.value;
+    } else {
+      // Dynamically compute width to ensure legends do not overlap the chart
+      legendWidth = calculateRightLegendWidth(
+        options.series?.length || 0,
+        chartPanelRef.value?.offsetWidth || 800,
+        chartPanelRef.value?.offsetHeight || 400,
+        options.series || [],
+        panelSchema?.config?.legends_type === "scroll" ||
+          panelSchema?.config?.legends_type == null,
+      );
     }
 
+    // Reserve space on the right so that the plot shrinks horizontally
     options.grid.right = legendWidth;
-    options.legend.textStyle.width = legendWidth - 55;
+    // Constrain legend text to the reserved space to avoid overflow
+    options.legend.textStyle.width = Math.max(legendWidth - 55, 60);
+    // Explicitly bound the legend area to the reserved right-side width
+    const containerWidth = chartPanelRef.value?.offsetWidth || 0;
+    const legendLeftPx = Math.max(containerWidth - legendWidth, 0);
+    options.legend.left = legendLeftPx;
+    options.legend.right = 0;
   }
 
   //check if is there any data else filter out axis or series data
@@ -2815,6 +2840,37 @@ export const convertSQLData = async (
     }
   }
 
+  // Apply dynamic legend height for bottom legends if conditions are met
+  if (
+    panelSchema?.config?.show_legends &&
+    panelSchema?.config?.legends_type === "plain" &&
+    (panelSchema?.config?.legends_position === "bottom" ||
+      panelSchema?.config?.legends_position === null) // Handle null/undefined as auto
+  ) {
+    // Get chart dimensions from chartPanelRef
+    const chartWidth = chartPanelRef.value?.offsetWidth || 800;
+    const chartHeight = chartPanelRef.value?.offsetHeight || 400;
+    // Count legend items from series data
+    const legendCount = options.series?.length || 0;
+
+    // Apply 80% height constraint for plain legends with bottom or auto position
+    const maxHeight =
+      panelSchema?.config?.legends_position === "bottom" ||
+      panelSchema?.config?.legends_position === null
+        ? chartHeight
+        : undefined;
+
+    // Calculate and configure bottom legend positioning to prevent overflow to top
+    calculateBottomLegendHeight(
+      legendCount,
+      chartWidth,
+      options.series || [],
+      maxHeight,
+      options.legend,
+      options.grid,
+      chartHeight,
+    );
+  }
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 
