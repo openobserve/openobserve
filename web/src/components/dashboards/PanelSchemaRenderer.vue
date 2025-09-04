@@ -749,7 +749,7 @@ export default defineComponent({
 
     // Watch for layout changes (config panel open/close) and re-trigger conversion
     // This ensures legend calculations use fresh dimensions after layout changes
-    let resizeTimeout: NodeJS.Timeout | null = null;
+    let resizeTimeout: any = null;
     const handleResizeEvent = async () => {
       // Clear any existing timeout to debounce resize events
       if (resizeTimeout) {
