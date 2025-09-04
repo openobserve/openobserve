@@ -3,6 +3,7 @@ import PageManager from "../../pages/page-manager";
 import { ingestion } from "./utils/dashIngestion.js";
 import { login } from "./utils/dashLogin.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+const testLogger = require('../utils/test-logger.js');
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).slice(2, 11);

@@ -2,6 +2,7 @@ const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
 const { getHeaders, getIngestionUrl, sendRequest } = require('../../utils/apiUtils.js');
+const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
 
@@ -33,7 +34,7 @@ test.describe("Stream multiselect testcases", () => {
         e2e: "1",
       };
       const response = await sendRequest(page, ingestionUrl, payload, headers);
-      console.log(`Response from ${streamName}:`, response);
+      testLogger.debug('API response received', { streamName, response });
     }
 
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);

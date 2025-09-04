@@ -2,6 +2,7 @@ import { test, expect } from "../baseFixtures.js";
 import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
+const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
 
@@ -62,7 +63,7 @@ async function ingestion(page) {
       streamName: streamName,
       logsdata: logsdata
     });
-    console.log(response);
+    testLogger.debug('API response received', { response });
   }
 }
 
