@@ -401,9 +401,7 @@ export default defineComponent({
                       }
                     });
                 }
-                setTimeout(() => {
                   redirectUser(redirectURI);
-                }, 800);
               } else {
                 //if user is not authorized, show error message and reset form.
                 submitting.value = false;
