@@ -355,6 +355,7 @@ import {
   invalidateLoginData,
 } from "@/utils/zincutils";
 import config from "@/aws-exports";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const defaultValue: any = () => {
   return {
@@ -405,6 +406,7 @@ export default defineComponent({
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
+    const { track } = useReo();
     const $q = useQuasar();
     const formData: any = ref(defaultValue());
     const existingUser = ref(true);
@@ -477,12 +479,11 @@ export default defineComponent({
           return;
         }
         update(() => {
-          const needle = val.toLowerCase();
-          filterdOption.value = props.customRoles.filter(
-            (v: any) => v.toLowerCase().indexOf(needle) > -1,
-          );
-        });
+          const needle = val.toLowerCase()
+          filterdOption.value = props.customRoles.filter((v:any) => v.toLowerCase().indexOf(needle) > -1)
+        })
       },
+      track,
     };
   },
   created() {
@@ -559,6 +560,10 @@ export default defineComponent({
             dismiss();
             this.formData.email = userEmail;
           });
+          this.track("Button Click", {
+            button: "Update User",
+            page: "Add User"
+          });
       } else {
         if (this.existingUser) {
           const userEmail = this.formData.email;
@@ -598,6 +603,10 @@ export default defineComponent({
                 this.formData.email = userEmail;
               }
             });
+            this.track("Button Click", {
+              button: "Update User",
+              page: "Add User"
+            });
         } else {
           userServiece
             .create(this.formData, selectedOrg)
@@ -612,6 +621,10 @@ export default defineComponent({
                 timeout: 2000,
               });
               dismiss();
+            });
+            this.track("Button Click", {
+              button: "Create User",
+              page: "Add User"
             });
         }
       }

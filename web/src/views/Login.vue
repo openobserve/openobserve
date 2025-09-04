@@ -59,6 +59,7 @@ import {
   getImageURL,
 } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
+import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
   name: "LoginPage",
@@ -73,6 +74,7 @@ export default defineComponent({
     const q = useQuasar();
     const router: any = useRouter();
     const showInvitations = ref(false);
+    const { identify } = useReo();
     const invitedOrg = ref<{ identifier: string; name: string }>({
       identifier: "",
       name: "",
@@ -174,9 +176,16 @@ export default defineComponent({
           ) {
             localStorage.setItem("isFirstTimeLogin", "true");
           }
-
+          //this will identify the user for reo.dev
+          identify({
+            username: store.state.userInfo.email,
+            type: "email"
+          });
           // Check for pending invites
-          redirectUser();
+          setTimeout(() => {
+            redirectUser();
+          }, 800);
+
         })
         .catch((e: any) => {
           console.log("Error while fetching organizations", e);
