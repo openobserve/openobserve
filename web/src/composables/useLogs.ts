@@ -37,8 +37,6 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 
-let { updateFieldValues, extractFields, updateGridColumns, filterHitsColumns, getStreamList, extractFTSFields, loadStreamLists } = useStreamFieldUtils();
-
 const useLogs = () => {
   const store = useStore();
   const { t } = useI18n();
