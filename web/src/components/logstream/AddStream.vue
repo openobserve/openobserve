@@ -133,8 +133,10 @@ import { useStore } from "vuex";
 import { computed } from "vue";
 import { useQuasar } from "quasar";
 import useStreams from "@/composables/useStreams";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const { t } = useI18n();
+
 
 const streamTypes = [
   { label: "Logs", value: "logs" },
@@ -155,6 +157,8 @@ const fields: Ref<any[]> = ref([]);
 const store = useStore();
 
 const q = useQuasar();
+
+const { track } = useReo();
 
 const streamInputs = ref({
   name: "",
@@ -245,6 +249,10 @@ const saveStream = async () => {
         timeout: 4000,
       });
       }
+    });
+    track("Button Click", {
+      button: "Save Stream",
+      page: "Add Stream"
     });
 
 };

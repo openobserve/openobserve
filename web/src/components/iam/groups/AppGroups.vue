@@ -119,10 +119,13 @@ import { getGroups, deleteGroup } from "@/services/iam";
 import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const showAddGroup = ref(false);
 
 const { t } = useI18n();
+
+const { track } = useReo();
 
 const rows: any = ref([]);
 
@@ -185,6 +188,10 @@ const updateTable = () => {
 };
 
 const addGroup = () => {
+  track("Button Click", {
+    button: "Add Group",
+    page: "Groups"
+  });
   showAddGroup.value = true;
 };
 
