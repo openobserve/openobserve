@@ -47,7 +47,7 @@ test.describe("Custom Charts Tests", () => {
     // await page.locator('[data-test="dashboard-panel-error-bar-icon"]').click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
-      .getByRole("textbox")
+      .locator(".inputarea")
       .fill('select * from "e2e_automate"');
     await page.waitForTimeout(2000);
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -75,7 +75,7 @@ test.describe("Custom Charts Tests", () => {
     await page.waitForTimeout(1000);
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
-      .getByRole("textbox")
+      .locator(".inputarea")
       .fill('select * from "e2e_automate"');
     await page.waitForTimeout(3000);
     await pm.dashboardPanelActions.applyDashboardBtn();

@@ -306,7 +306,7 @@ test.describe("visualization VRL testcases", () => {
       .nth(3)
       .click();
 
-    await page.locator("#fnEditor").getByRole("textbox").press("Control+a");
+    await page.locator("#fnEditor").locator(".inputarea").press("Control+a");
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   });
 
