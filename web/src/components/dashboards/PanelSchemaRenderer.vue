@@ -865,6 +865,31 @@ export default defineComponent({
       { deep: true },
     );
 
+    // Watch specifically for legend configuration changes that require immediate re-calculation
+    // watch(
+    //   () => [
+    //     panelSchema.value?.config?.show_legends,
+    //     panelSchema.value?.config?.legends_position,
+    //     panelSchema.value?.config?.legends_type,
+    //     panelSchema.value?.config?.legend_width,
+    //   ],
+    //   async () => {
+    //     if (
+    //       !errorDetail?.value?.message &&
+    //       validatePanelData?.value?.length === 0 &&
+    //       data.value?.length &&
+    //       chartPanelRef.value
+    //     ) {
+    //       // For legend changes, add a small delay to ensure any layout changes have completed
+    //       setTimeout(async () => {
+    //         await nextTick();
+    //         await convertPanelDataCommon();
+    //       }, 50);
+    //     }
+    //   },
+    //   { deep: true },
+    // );
+
     watch(
       [data, store?.state, annotations],
       async () => {
@@ -1416,7 +1441,11 @@ export default defineComponent({
           variableValue =
             variable.value === null
               ? ""
-              : `${variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value}`;
+              : `${
+                  variable.escapeSingleQuotes
+                    ? escapeSingleQuotes(variable.value)
+                    : variable.value
+                }`;
           // if (query.includes(variableName)) {
           //   metadata.push({
           //     type: "variable",
