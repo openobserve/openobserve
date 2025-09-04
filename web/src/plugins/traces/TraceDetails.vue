@@ -706,11 +706,27 @@ export default defineComponent({
               return;
             }
             searchObj.data.traceDetails.selectedTrace = trace;
+
+            let startTime = Number(router.currentRoute.value.query.from);
+            let endTime = Number(router.currentRoute.value.query.to);
+            if (
+              res.data.hits.length === 1 &&
+              res.data.hits[0].start_time &&
+              res.data.hits[0].end_time
+            ) {
+              startTime = Math.floor(res.data.hits[0].start_time / 1000);
+              endTime = Math.ceil(res.data.hits[0].end_time / 1000);
+              updateQuery({
+                from: startTime,
+                to: endTime,
+              });
+            }
+
             getTraceDetails({
               stream: streamName,
               trace_id: trace.trace_id,
-              from: Number(router.currentRoute.value.query.from),
-              to: Number(router.currentRoute.value.query.to),
+              from: startTime,
+              to: endTime,
             });
           })
           .catch(() => {
@@ -724,6 +740,15 @@ export default defineComponent({
         searchObj.data.traceDetails.isLoadingTraceMeta = false;
         showTraceDetailsError();
       }
+    };
+
+    const updateQuery = (newParams: any) => {
+      router.replace({
+        query: {
+          ...router.currentRoute.value.query, // keep existing params
+          ...newParams, // overwrite with new ones
+        },
+      });
     };
 
     const getDefaultRequest = () => {

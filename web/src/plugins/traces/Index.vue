@@ -671,7 +671,10 @@ async function getQueryData() {
           res.data.hits[0].start_time &&
           res.data.hits[0].end_time
         ) {
-          updateNewDateTime(res.data.start_time, res.data.end_time);
+          updateNewDateTime(
+            Math.floor(res.data.hits[0].start_time / 1000),
+            Math.ceil(res.data.hits[0].end_time / 1000),
+          );
         }
 
         const formattedHits = getTracesMetaData(res.data.hits);
@@ -740,6 +743,11 @@ async function getQueryData() {
   }
 }
 
+/**
+ *
+ * @param startTime - start time in microseconds
+ * @param endTime - end time in microseconds
+ */
 const updateNewDateTime = (startTime: number, endTime: number) => {
   searchBarRef.value.updateNewDateTime({
     startTime: startTime,
