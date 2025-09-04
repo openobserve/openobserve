@@ -105,8 +105,8 @@ test.describe("Schema testcases", () => {
     await page.locator('button').filter({ hasText: 'close' }).click();
     await page.getByRole('button', { name: 'Explore' }).first().click();
     await page.waitForTimeout(1000);
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-tab"]').click();
+    // await page.locator('[data-test="date-time-btn"]').click();
+    // await page.locator('[data-test="date-time-relative-tab"]').click();
     // await page.locator('[data-test="date-time-relative-15-m-btn"]').click();
     await page.waitForTimeout(2000);
     // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
@@ -114,7 +114,7 @@ test.describe("Schema testcases", () => {
     await page.waitForTimeout(1000);
 
     await page.locator('[data-test="logs-user-defined-fields-btn"]').click();
-    await page.locator('[data-test="log-search-index-list-interesting-_all-field-btn"]').last().click({force: true});
+    // await page.locator('[data-test="log-search-index-list-interesting-_all-field-btn"]').last().click({force: true});
 
     await applyQueryButton(page);
      await page.getByText(/^arrow_drop_down_all:.*$/).click();
@@ -149,16 +149,14 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]').click();
     await page.locator('[data-test="schema-add-field-button"]').click();
     await page.locator('[data-test="schema-update-settings-button"]').click();
-    await page.locator('button').filter({ hasText: 'close' }).click();
+    await page.waitForTimeout(3000);
+    await page.keyboard.press('Escape');
     await page.waitForTimeout(1000);
     await ingestion(page);
     await page.waitForTimeout(2000);
     await page.getByRole('button', { name: 'Explore' }).first().click();
-    await page.waitForTimeout(3000);
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-tab"]').click();
-    // await page.locator('[data-test="date-time-relative-15-m-btn"]').click();
-    // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.waitForTimeout(2000);
     await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
     await page.getByText('arrow_drop_down_timestamp:').click();
