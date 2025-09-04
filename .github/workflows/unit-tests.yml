@@ -1,27 +1,56 @@
 name: Unit tests
+permissions:
+  contents: read
 
 on:
   push:
     branches:
       - "main"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+    paths:
+      - "src/**"
+      - "web/**"
+      - ".github/workflows/unit-tests.yml"
   pull_request:
     branches:
       - "*"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+    paths:
+      - "src/**"
+      - "web/**"
+      - ".github/workflows/unit-tests.yml"
 
 env:
   COLUMNS: 150
   ZO_RESULT_CACHE_ENABLED: true
 
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.run_id }}
+#   cancel-in-progress: true
+
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api-changed: ${{ steps.changes.outputs.api }}
+      web-changed: ${{ steps.changes.outputs.web }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+      
+      - name: Detect changes
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            api:
+              - 'src/**'
+            web:
+              - 'web/**'
+
   unit_tests:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.api-changed == 'true'
     runs-on:
       labels: ubicloud-standard-8
 
@@ -45,19 +74,21 @@ jobs:
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
-
-      - name: Check if API code has changes and skip if none
-        run: |
-          if [[ -n "${{ github.event.before }}" ]] && ! git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^src/"; then
-            echo "API code hasn't changed, skipping unit tests"
-            exit 0
-          fi
+        with:
+          fetch-depth: 1
 
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2025-05-20
           targets: x86_64-unknown-linux-gnu
+
+      - name: Check code formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy lints
+        run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
+
       - uses: taiki-e/install-action@v2
         with:
           tool: nextest
@@ -74,12 +105,6 @@ jobs:
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
-
-      - name: Check code formatting
-        run: cargo fmt --all -- --check
-
-      - name: Setup cargo config
-        run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
 
       - name: Run unit tests
         run: |
@@ -119,18 +144,15 @@ jobs:
           ./coverage.sh check
 
   ui_unit_tests:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.web-changed == 'true'
     runs-on: ubuntu-latest
     
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
-
-      - name: Check if frontend code has changes and skip if none
-        run: |
-          if [[ -n "${{ github.event.before }}" ]] && ! git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^web/"; then
-            echo "Frontend code hasn't changed, skipping frontend tests"
-            exit 0
-          fi
+        with:
+          fetch-depth: 1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
