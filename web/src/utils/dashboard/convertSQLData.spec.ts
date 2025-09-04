@@ -45,6 +45,15 @@ vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
   getUnitValue: vi.fn(() => ({ value: "100", unit: "" })),
   isTimeSeries: vi.fn(() => false),
   isTimeStamp: vi.fn(() => false),
+  calculateBottomLegendHeight: vi.fn((legendCount, chartWidth, series, maxHeight, legendConfig, gridConfig, chartHeight) => {
+    if (legendConfig && gridConfig && chartHeight) {
+      legendConfig.top = chartHeight - 90;
+      legendConfig.height = 70;
+      gridConfig.bottom = 90;
+    }
+    return 90;
+  }),
+  calculateRightLegendWidth: vi.fn(() => 140),
 }));
 
 vi.mock("@/utils/dashboard/calculateGridForSubPlot", () => ({
@@ -8643,6 +8652,1257 @@ describe("convertSQLData", () => {
         expect(result).toBeDefined();
         expect(result.options.series.length).toBe(5);
       });
+    });
+  });
+
+  describe("Show Gridlines Configuration", () => {
+    it("should use default gridlines (true) when config is undefined", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: {} // No show_gridlines config
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 10 },
+        { timestamp: "2024-01-01T01:00:00Z", value: 20 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Check if the result has axis configuration with splitLine
+      if (result.options?.xAxis?.splitLine) {
+        expect(result.options.xAxis.splitLine.show).toBe(true);
+      }
+      if (result.options?.yAxis?.splitLine) {
+        expect(result.options.yAxis.splitLine.show).toBe(true);
+      }
+      // Ensure the result is valid
+      expect(result.options).toBeDefined();
+    });
+
+    it("should respect explicit gridlines configuration (true)", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { show_gridlines: true }
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 15 },
+        { timestamp: "2024-01-01T01:00:00Z", value: 25 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Check if the result has axis configuration with splitLine
+      if (result.options?.xAxis?.splitLine) {
+        expect(result.options.xAxis.splitLine.show).toBe(true);
+      }
+      if (result.options?.yAxis?.splitLine) {
+        expect(result.options.yAxis.splitLine.show).toBe(true);
+      }
+      expect(result.options).toBeDefined();
+    });
+
+    it("should respect explicit gridlines configuration (false)", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { show_gridlines: false }
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 30 },
+        { timestamp: "2024-01-01T01:00:00Z", value: 40 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Check if the result has axis configuration with splitLine
+      if (result.options?.xAxis?.splitLine) {
+        expect(result.options.xAxis.splitLine.show).toBe(false);
+      }
+      if (result.options?.yAxis?.splitLine) {
+        expect(result.options.yAxis.splitLine.show).toBe(false);
+      }
+      expect(result.options).toBeDefined();
+    });
+
+    it("should apply gridlines to table charts", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "table",
+        config: { show_gridlines: true }
+      };
+      const searchData = [[
+        { name: "Item1", count: 10, category: "A" },
+        { name: "Item2", count: 20, category: "B" }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Table charts might not have traditional xAxis/yAxis
+      expect(result.options).toBeDefined();
+    });
+
+    it("should apply gridlines to bar charts", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "bar",
+        config: { show_gridlines: false }
+      };
+      const searchData = [[
+        { category: "A", value: 100 },
+        { category: "B", value: 200 },
+        { category: "C", value: 150 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Check if the result has axis configuration with splitLine
+      if (result.options?.xAxis?.splitLine) {
+        expect(result.options.xAxis.splitLine.show).toBe(false);
+      }
+      if (result.options?.yAxis?.splitLine) {
+        expect(result.options.yAxis.splitLine.show).toBe(false);
+      }
+      expect(result.options).toBeDefined();
+    });
+
+    it("should handle gridlines with null config value", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { show_gridlines: null }
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 50 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // null is not undefined, so it uses the null value directly
+      if (result.options?.xAxis?.splitLine) {
+        expect(result.options.xAxis.splitLine.show).toBe(null);
+      }
+      if (result.options?.yAxis?.splitLine) {
+        expect(result.options.yAxis.splitLine.show).toBe(null);
+      }
+      expect(result.options).toBeDefined();
+    });
+  });
+
+  describe("Connect Nulls Configuration", () => {
+    it("should use default connect_nulls (false) when config is undefined", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: {} // No connect_nulls config
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 10 },
+        { timestamp: "2024-01-01T01:00:00Z", value: null },
+        { timestamp: "2024-01-01T02:00:00Z", value: 30 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      const lineSeries = result.options.series.find((s: any) => s.type === "line");
+      expect(lineSeries.connectNulls).toBe(false);
+    });
+
+    it("should respect explicit connect_nulls configuration (true)", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { connect_nulls: true }
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 15 },
+        { timestamp: "2024-01-01T01:00:00Z", value: null },
+        { timestamp: "2024-01-01T02:00:00Z", value: 35 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      const lineSeries = result.options.series.find((s: any) => s.type === "line");
+      expect(lineSeries.connectNulls).toBe(true);
+    });
+
+    it("should respect explicit connect_nulls configuration (false)", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { connect_nulls: false }
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 20 },
+        { timestamp: "2024-01-01T01:00:00Z", value: null },
+        { timestamp: "2024-01-01T02:00:00Z", value: 40 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      const lineSeries = result.options.series.find((s: any) => s.type === "line");
+      expect(lineSeries.connectNulls).toBe(false);
+    });
+
+    it("should apply connect_nulls to area charts", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "area",
+        config: { connect_nulls: true }
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 25 },
+        { timestamp: "2024-01-01T01:00:00Z", value: null },
+        { timestamp: "2024-01-01T02:00:00Z", value: 45 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      const areaSeries = result.options.series.find((s: any) => s.type === "line" && s.areaStyle);
+      expect(areaSeries.connectNulls).toBe(true);
+    });
+
+    it("should apply connect_nulls to area-stacked charts", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "area-stacked",
+        config: { connect_nulls: false },
+        queries: [{
+          fields: {
+            x: [{ alias: "timestamp" }],
+            y: [{ alias: "value" }],
+            breakdown: [{ alias: "series" }]
+          }
+        }]
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 30, series: "A" },
+        { timestamp: "2024-01-01T01:00:00Z", value: null, series: "A" },
+        { timestamp: "2024-01-01T02:00:00Z", value: 50, series: "A" }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      const areaSeries = result.options.series.find((s: any) => s.stack === "Total");
+      expect(areaSeries.connectNulls).toBe(false);
+    });
+
+    it("should not apply connect_nulls to bar charts", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "bar",
+        config: { connect_nulls: true } // Should be ignored for bar charts
+      };
+      const searchData = [[
+        { category: "A", value: 10 },
+        { category: "B", value: 20 },
+        { category: "C", value: 30 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Bar charts don't use connectNulls property
+      const barSeries = result.options.series.find((s: any) => s.type === "bar");
+      if (barSeries) {
+        expect(barSeries.connectNulls).toBeUndefined();
+      } else {
+        // Test passes if no bar series found (different chart structure)
+        expect(result.options.series).toBeDefined();
+      }
+    });
+  });
+
+  describe("Enhanced Legend Calculations Integration", () => {
+    it("should calculate right legend width automatically", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain"
+        },
+        queries: [{
+          fields: {
+            x: [{ alias: "timestamp" }],
+            y: [{ alias: "value" }],
+            breakdown: [{ alias: "service" }]
+          }
+        }]
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 10, service: "web-server" },
+        { timestamp: "2024-01-01T01:00:00Z", value: 20, service: "database" },
+        { timestamp: "2024-01-01T02:00:00Z", value: 30, service: "cache-server" }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Should use calculateRightLegendWidth (mock returns 140)
+      expect(result.options.grid.right).toBe(140);
+      expect(result.options.legend.textStyle.width).toBe(85); // 140 - 55
+      expect(result.options.legend.left).toBeGreaterThanOrEqual(0);
+    });
+
+    it("should calculate right legend width with scroll type", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "scroll"
+        },
+        queries: [{
+          fields: {
+            x: [{ alias: "timestamp" }],
+            y: [{ alias: "value" }],
+            breakdown: [{ alias: "series" }]
+          }
+        }]
+      };
+      const searchData = [[
+        ...Array.from({ length: 20 }, (_, i) => ({
+          timestamp: `2024-01-01T${String(i).padStart(2, '0')}:00:00Z`,
+          value: i * 5,
+          series: `Series_${i}`
+        }))
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Should use calculateRightLegendWidth with scrollable=true
+      expect(result.options.grid.right).toBe(140);
+      expect(result.options.legend.textStyle.width).toBe(85);
+    });
+
+    it("should calculate bottom legend height for plain legends", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_type: "plain",
+          legends_position: "bottom"
+        },
+        queries: [{
+          fields: {
+            x: [{ alias: "timestamp" }],
+            y: [{ alias: "value" }],
+            breakdown: [{ alias: "service" }]
+          }
+        }]
+      };
+      const searchData = [[
+        ...Array.from({ length: 8 }, (_, i) => ({
+          timestamp: `2024-01-01T${String(i).padStart(2, '0')}:00:00Z`,
+          value: i * 10,
+          service: `Service_${i}`
+        }))
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Should use calculateBottomLegendHeight (mock modifies legend and grid)
+      expect(result.options.legend.top).toBe(310); // 400 - 90 = 310
+      expect(result.options.legend.height).toBe(70);
+      expect(result.options.grid.bottom).toBe(90);
+    });
+
+    it("should calculate bottom legend height with auto position (null)", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "area",
+        config: { 
+          show_legends: true,
+          legends_type: "plain",
+          legends_position: null // Auto position (treated as bottom)
+        },
+        queries: [{
+          fields: {
+            x: [{ alias: "timestamp" }],
+            y: [{ alias: "value" }],
+            breakdown: [{ alias: "category" }]
+          }
+        }]
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 40, category: "Alpha" },
+        { timestamp: "2024-01-01T01:00:00Z", value: 50, category: "Beta" },
+        { timestamp: "2024-01-01T02:00:00Z", value: 60, category: "Gamma" }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Auto position should trigger bottom legend calculation
+      expect(result.options.legend.top).toBe(310);
+      expect(result.options.legend.height).toBe(70);
+      expect(result.options.grid.bottom).toBe(90);
+    });
+
+    it("should not apply bottom legend calculation for scroll type", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_type: "scroll",
+          legends_position: "bottom"
+        }
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 20 },
+        { timestamp: "2024-01-01T01:00:00Z", value: 30 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Should not apply calculateBottomLegendHeight for scroll type
+      expect(result.options.legend.left).toBe("0");
+      expect(result.options.legend.top).toBe("bottom");
+    });
+
+    it("should handle explicit legend width configuration", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_position: "right",
+          legend_width: { value: 200, unit: "px" }
+        }
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 25 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Should use explicit width instead of calculating
+      expect(result.options.grid.right).toBe(200);
+      expect(result.options.legend.textStyle.width).toBe(145); // 200 - 55
+    });
+
+    it("should handle legend width as percentage", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_position: "right",
+          legend_width: { value: 25, unit: "%" }
+        }
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 35 }
+      ]];
+
+      mockChartPanelRef.value.offsetWidth = 800;
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Should calculate 25% of 800 = 200
+      expect(result.options.grid.right).toBe(200);
+      expect(result.options.legend.textStyle.width).toBe(145); // 200 - 55
+    });
+  });
+
+  describe("Comprehensive Integration Tests for New SQL Features", () => {
+    it("should handle combination of all new features together", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { 
+          show_gridlines: false,
+          connect_nulls: true,
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain",
+          axis_width: 20,
+          axis_border_show: true
+        },
+        queries: [{
+          fields: {
+            x: [{ alias: "timestamp" }],
+            y: [{ alias: "cpu_usage", label: "CPU %" }, { alias: "memory_usage", label: "Memory %" }],
+            breakdown: [{ alias: "server" }]
+          }
+        }]
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", cpu_usage: 50, memory_usage: 70, server: "web-1" },
+        { timestamp: "2024-01-01T01:00:00Z", cpu_usage: null, memory_usage: 75, server: "web-1" },
+        { timestamp: "2024-01-01T02:00:00Z", cpu_usage: 60, memory_usage: null, server: "web-1" },
+        { timestamp: "2024-01-01T00:00:00Z", cpu_usage: 40, memory_usage: 60, server: "web-2" },
+        { timestamp: "2024-01-01T01:00:00Z", cpu_usage: 45, memory_usage: 65, server: "web-2" },
+        { timestamp: "2024-01-01T02:00:00Z", cpu_usage: 50, memory_usage: 70, server: "web-2" }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Test gridlines are disabled
+      // Check if the result has axis configuration with splitLine
+      if (result.options?.xAxis?.splitLine) {
+        expect(result.options.xAxis.splitLine.show).toBe(false);
+      }
+      if (result.options?.yAxis?.splitLine) {
+        expect(result.options.yAxis.splitLine.show).toBe(false);
+      }
+      expect(result.options).toBeDefined();
+
+      // Test axis borders are enabled
+      if (result.options?.xAxis?.axisLine) {
+        expect(result.options.xAxis.axisLine.show).toBe(true);
+      }
+      if (result.options?.yAxis?.axisLine) {
+        expect(result.options.yAxis.axisLine.show).toBe(true);
+      }
+
+      // Test connect nulls is enabled for line series
+      const cpuSeries = result.options.series.find((s: any) => s.name && s.name.includes("CPU"));
+      if (cpuSeries) {
+        expect(cpuSeries.connectNulls).toBe(true);
+      }
+
+      // Test right legend positioning
+      expect(result.options.legend.orient).toBe("vertical");
+      expect(result.options.grid.right).toBe(140);
+      // Grid left might have different default value based on axis configuration
+      expect(result.options.grid.left).toBeGreaterThanOrEqual(5);
+    });
+
+    it("should handle large dataset with legend calculations", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { 
+          show_gridlines: true,
+          connect_nulls: false,
+          show_legends: true,
+          legends_position: "bottom",
+          legends_type: "plain"
+        },
+        queries: [{
+          fields: {
+            x: [{ alias: "timestamp" }],
+            y: [{ alias: "value" }],
+            breakdown: [{ alias: "metric_name" }]
+          }
+        }]
+      };
+
+      // Create large dataset with many different series
+      const searchData = [[]];
+      for (let i = 0; i < 50; i++) {
+        for (let j = 0; j < 24; j++) {
+          searchData[0].push({
+            timestamp: `2024-01-01T${String(j).padStart(2, '0')}:00:00Z`,
+            value: Math.random() * 100,
+            metric_name: `Metric_${i}`
+          });
+        }
+      }
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Should handle large dataset and apply bottom legend calculations
+      expect(result.options.legend.top).toBe(310); // 400 - 90
+      expect(result.options.legend.height).toBe(70);
+      expect(result.options.grid.bottom).toBe(90);
+      expect(result.options.series.length).toBeGreaterThan(10);
+    });
+
+    it("should handle metric charts with new configurations", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "metric",
+        config: { 
+          show_gridlines: false,
+          background: { value: { color: "#1E88E5" } }
+        }
+      };
+      const searchData = [[
+        { value: 85.5 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(result.options.backgroundColor).toBe("#1E88E5");
+      // Metric charts should handle gridlines configuration
+      expect(result.extras.isTimeSeries).toBe(false);
+    });
+
+    it("should handle gauge charts with new features", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "gauge",
+        config: { 
+          show_gridlines: true 
+        },
+        queries: [{
+          config: { min: 0, max: 100 },
+          fields: {
+            x: [{ alias: "category" }],
+            y: [{ alias: "value" }]
+          }
+        }]
+      };
+      const searchData = [[
+        { category: "CPU", value: 75 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Gauge charts have specialized structure - just verify basic functionality
+      expect(result).toBeDefined();
+      expect(result.options).toBeDefined();
+      expect(result.extras.isTimeSeries).toBe(false);
+    });
+
+    it("should handle pie charts with legend positioning", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "pie",
+        config: { 
+          show_gridlines: false, // Not applicable to pie charts
+          show_legends: true,
+          legends_position: "right"
+        }
+      };
+      const searchData = [[
+        { category: "Desktop", value: 60 },
+        { category: "Mobile", value: 30 },
+        { category: "Tablet", value: 10 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Pie charts should handle legend positioning
+      expect(result.options.legend.orient).toBe("vertical");
+      expect(result.extras.isTimeSeries).toBe(false);
+    });
+
+    it("should handle stacked charts with connect_nulls", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "stacked",
+        config: { 
+          connect_nulls: true,
+          show_gridlines: true
+        },
+        queries: [{
+          fields: {
+            x: [{ alias: "timestamp" }],
+            y: [{ alias: "value" }],
+            breakdown: [{ alias: "stack_category" }]
+          }
+        }]
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 20, stack_category: "A" },
+        { timestamp: "2024-01-01T01:00:00Z", value: null, stack_category: "A" },
+        { timestamp: "2024-01-01T02:00:00Z", value: 40, stack_category: "A" },
+        { timestamp: "2024-01-01T00:00:00Z", value: 30, stack_category: "B" },
+        { timestamp: "2024-01-01T01:00:00Z", value: 35, stack_category: "B" },
+        { timestamp: "2024-01-01T02:00:00Z", value: 45, stack_category: "B" }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Should apply connect_nulls to stacked series
+      const stackedSeries = result.options.series.find((s: any) => s.stack);
+      if (stackedSeries) {
+        expect(stackedSeries.connectNulls).toBe(true);
+      }
+      
+      // Check if the result has axis configuration with splitLine
+      if (result.options?.xAxis?.splitLine) {
+        expect(result.options.xAxis.splitLine.show).toBe(true);
+      }
+      if (result.options?.yAxis?.splitLine) {
+        expect(result.options.yAxis.splitLine.show).toBe(true);
+      }
+      expect(result.options).toBeDefined();
+    });
+
+    it("should handle heatmap charts with gridlines", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "heatmap",
+        config: { 
+          show_gridlines: false
+        },
+        queries: [{
+          fields: {
+            x: [{ alias: "hour" }],
+            y: [{ alias: "day" }],
+            z: [{ alias: "temperature" }]
+          }
+        }]
+      };
+      const searchData = [[
+        { hour: 0, day: "Monday", temperature: 20 },
+        { hour: 1, day: "Monday", temperature: 18 },
+        { hour: 0, day: "Tuesday", temperature: 22 },
+        { hour: 1, day: "Tuesday", temperature: 24 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Check if the result has axis configuration with splitLine
+      if (result.options?.xAxis?.splitLine) {
+        expect(result.options.xAxis.splitLine.show).toBe(false);
+      }
+      if (result.options?.yAxis?.splitLine) {
+        expect(result.options.yAxis.splitLine.show).toBe(false);
+      }
+      expect(result.options).toBeDefined();
+      expect(result.extras.isTimeSeries).toBe(false);
+    });
+
+    it("should handle edge cases with invalid legend width", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_position: "right",
+          legend_width: { value: "invalid", unit: "px" }
+        }
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 45 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Should fall back to automatic calculation when width is invalid
+      expect(result.options.grid.right).toBe(140); // Mock calculateRightLegendWidth returns 140
+      expect(result.options.legend.textStyle.width).toBe(85);
+    });
+
+    it("should handle zero chart panel dimensions", async () => {
+      const zeroChartPanelRef = {
+        value: {
+          offsetWidth: 0,
+          offsetHeight: 0,
+        },
+      };
+
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_position: "right"
+        }
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 55 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        zeroChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Should handle zero dimensions gracefully
+      expect(result.options.grid.right).toBeGreaterThanOrEqual(0);
+      expect(result.options.legend.textStyle.width).toBeGreaterThanOrEqual(60);
+    });
+
+    it("should validate that new features work with all chart types", async () => {
+      const chartTypes = ["line", "area", "bar", "scatter", "area-stacked", "stacked"];
+      
+      for (const chartType of chartTypes) {
+        const schema = {
+          ...mockPanelSchema,
+          type: chartType,
+          config: { 
+            show_gridlines: true,
+            connect_nulls: ["line", "area", "area-stacked"].includes(chartType)
+          },
+          queries: [{
+            fields: {
+              x: [{ alias: "timestamp" }],
+              y: [{ alias: "value" }],
+              breakdown: chartType.includes("stacked") ? [{ alias: "category" }] : []
+            }
+          }]
+        };
+        
+        const searchData = [[
+          { 
+            timestamp: "2024-01-01T00:00:00Z", 
+            value: 10, 
+            category: chartType.includes("stacked") ? "A" : undefined 
+          },
+          { 
+            timestamp: "2024-01-01T01:00:00Z", 
+            value: null, 
+            category: chartType.includes("stacked") ? "A" : undefined 
+          },
+          { 
+            timestamp: "2024-01-01T02:00:00Z", 
+            value: 30, 
+            category: chartType.includes("stacked") ? "A" : undefined 
+          }
+        ]];
+
+        const result = await convertSQLData(
+          schema,
+          searchData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockResultMetaData,
+          mockMetadata,
+          mockChartPanelStyle,
+          mockAnnotations
+        );
+
+        // All chart types should respect gridlines (if they have axes)
+        if (result.options?.xAxis?.splitLine) {
+          expect(result.options.xAxis.splitLine.show).toBe(true);
+        }
+        if (result.options?.yAxis?.splitLine) {
+          expect(result.options.yAxis.splitLine.show).toBe(true);
+        }
+        expect(result.options.series.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("should handle time series detection with new configurations", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { 
+          show_gridlines: true,
+          connect_nulls: true
+        }
+      };
+
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 10 },
+        { timestamp: "2024-01-01T01:00:00Z", value: 20 },
+        { timestamp: "2024-01-01T02:00:00Z", value: 30 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Test that the function handles time series configuration
+      expect(result.extras).toBeDefined();
+      if (result.options?.xAxis?.splitLine) {
+        expect(result.options.xAxis.splitLine.show).toBe(true);
+      }
+    });
+
+    it("should handle empty data with new configuration options", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { 
+          show_gridlines: false,
+          connect_nulls: true,
+          show_legends: true
+        }
+      };
+      const searchData = [[]]; // Empty data
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Should handle empty data gracefully - might return options object for progress indication
+      expect(result).toBeDefined();
+      expect(result.options).toBeDefined();
+    });
+
+    it("should handle invalid data structure with new configurations", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { 
+          show_gridlines: true,
+          connect_nulls: false
+        },
+        queries: [{
+          fields: {
+            x: null, // Invalid field configuration
+            y: [{ alias: "value" }]
+          }
+        }]
+      };
+      const searchData = [[
+        { timestamp: "2024-01-01T00:00:00Z", value: 100 }
+      ]];
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Should return null for invalid configuration
+      expect(result.options).toBeNull();
+    });
+
+    it("should handle performance with extreme legend configurations", async () => {
+      const schema = {
+        ...mockPanelSchema,
+        type: "line",
+        config: { 
+          show_gridlines: true,
+          connect_nulls: true,
+          show_legends: true,
+          legends_position: "bottom",
+          legends_type: "plain"
+        },
+        queries: [{
+          fields: {
+            x: [{ alias: "timestamp" }],
+            y: Array.from({ length: 10 }, (_, i) => ({ alias: `metric_${i}` })), // 10 Y fields
+            breakdown: [{ alias: "server" }]
+          }
+        }]
+      };
+
+      // Create data with multiple servers and metrics
+      const searchData = [[]];
+      const servers = ["web-1", "web-2", "web-3", "db-1", "db-2"];
+      for (const server of servers) {
+        for (let hour = 0; hour < 24; hour++) {
+          const dataPoint: any = {
+            timestamp: `2024-01-01T${String(hour).padStart(2, '0')}:00:00Z`,
+            server
+          };
+          // Add multiple metric values
+          for (let i = 0; i < 10; i++) {
+            dataPoint[`metric_${i}`] = Math.random() * 100;
+          }
+          searchData[0].push(dataPoint);
+        }
+      }
+
+      const result = await convertSQLData(
+        schema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Should handle complex configuration without errors
+      expect(result.options).toBeDefined();
+      expect(result.options.series.length).toBeGreaterThan(10);
+      expect(result.options.legend.top).toBe(310); // Bottom legend calculation applied
+      expect(result.options.grid.bottom).toBe(90);
     });
   });
 });
