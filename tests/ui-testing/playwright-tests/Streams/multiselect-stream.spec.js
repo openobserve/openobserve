@@ -58,7 +58,7 @@ async function multistreamselect(page) {
 
     //before we click on fn editor we need to turn on the function editor if is toggled off
     await page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
-    await page.locator('#fnEditor').locator('.inputarea').click()
+    await page.locator('#fnEditor').locator('.monaco-editor').click()
 //   await page.locator('[data-test="log-search-index-list-stream-toggle-e2e_stream1"] div').nth(2).click({force:true});
     const cell = await page.getByRole('cell', { name: /Common Group Fields/ });
 

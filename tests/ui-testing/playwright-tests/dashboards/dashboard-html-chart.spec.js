@@ -82,7 +82,7 @@ test.describe("HTML chart dashboard", () => {
 
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .locator(".inputarea")
+      .locator(".monaco-editor")
       .click();
 
     await page
@@ -138,7 +138,7 @@ test.describe("HTML chart dashboard", () => {
 
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .locator(".inputarea")
+      .locator(".monaco-editor")
       .click();
 
     await page
@@ -182,7 +182,7 @@ test.describe("HTML chart dashboard", () => {
 
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .locator(".inputarea")
+      .locator(".monaco-editor")
       .click();
     await page
       .locator('[data-test="dashboard-html-editor"]')
@@ -216,7 +216,7 @@ test.describe("HTML chart dashboard", () => {
 
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .locator(".inputarea")
+      .locator(".monaco-editor")
       .click();
     await page
       .locator('[data-test="dashboard-html-editor"]')

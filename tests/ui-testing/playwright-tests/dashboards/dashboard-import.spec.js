@@ -128,7 +128,7 @@ test.describe("dashboard Import testcases", () => {
       );
 
     await expect(
-      page.locator(".view-lines").filter({ hasText: '"dashboardId": "' })
+      page.locator(".view-lines").locator(".view-line").filter({ hasText: '"dashboardId": "' })
     ).toBeVisible();
 
     await pm.dashboardImport.clickImportButton();

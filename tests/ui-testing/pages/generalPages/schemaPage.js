@@ -283,7 +283,7 @@ class SchemaPage {
             }
         }
         
-        await this.page.locator(this.schemaLocators.fnEditor).locator('.inputarea').click();
+        await this.page.locator(this.schemaLocators.fnEditor).locator('.monaco-editor').click();
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).click();
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).fill(fromStream);
         await this.page.getByText(fromStream).click();

@@ -195,7 +195,7 @@ test.describe("Core Pipeline Tests", () => {
     await page.getByRole("img", { name: "Function", exact: true }).click();
     await pageManager.pipelinesPage.toggleCreateFunction();
     await pageManager.pipelinesPage.enterFunctionName(randomFunctionName);
-    await page.locator('[data-test="logs-vrl-function-editor"]').locator('.inputarea').click();
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator('.monaco-editor').click();
     await page.keyboard.type(".a=41", { delay: 100 });
     await page.keyboard.press("Enter");
     await page.keyboard.type(".", { delay: 100 });

@@ -197,7 +197,7 @@ test.describe("logs testcases", () => {
 
     const queryEditor = page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole("textbox");
+      .locator(".monaco-editor");
     await expect(queryEditor).toBeVisible();
 
     // Step 2: Fill and apply the initial query

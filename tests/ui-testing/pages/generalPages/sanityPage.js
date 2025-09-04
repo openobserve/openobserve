@@ -256,11 +256,11 @@ export class SanityPage {
         
         await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).locator('div').nth(2).click();
         
-        const queryEditor = this.page.locator(this.queryEditorContent).locator('.inputarea');
+        const queryEditor = this.page.locator(this.queryEditorContent);
         await expect(queryEditor).toBeVisible({ timeout: 10000 });
         
-        await queryEditor.click();
-        await queryEditor.fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+        await queryEditor.locator('.monaco-editor').click();
+        await queryEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
         
         await this.page.waitForLoadState('domcontentloaded');
         await this.page.locator(this.refreshButton).click({ force: true });
@@ -290,7 +290,7 @@ export class SanityPage {
             }
         }
         
-        const fnEditorTextbox = this.page.locator(this.fnEditor).locator('.inputarea');
+        const fnEditorTextbox = this.page.locator(this.fnEditor).locator('.monaco-editor');
         
         try {
             await expect(fnEditorTextbox).toBeVisible({ timeout: 15000 });
@@ -809,12 +809,12 @@ export class SanityPage {
         }
         
         // Wait for SQL editor to be ready
-        const sqlEditor = this.page.locator('#fnEditor').locator('.inputarea');
+        const sqlEditor = this.page.locator('#fnEditor');
         await expect(sqlEditor).toBeVisible({ timeout: 15000 });
         
-        await expect(sqlEditor).toBeEditable({ timeout: 10000 });
+        await expect(sqlEditor).locator('.inputarea').toBeEditable({ timeout: 10000 });
         
-        await sqlEditor.click();
+        await sqlEditor.locator('.monaco-editor').click();
         
         // Enable SQL mode with error handling
         const sqlModeSwitch = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2);
@@ -830,7 +830,7 @@ export class SanityPage {
         }
         
         // Fill SQL query into the editor
-        await sqlEditor.fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+        await sqlEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
         await this.page.waitForLoadState('domcontentloaded');
         
         // Click refresh button with robust waits
