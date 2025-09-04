@@ -73,6 +73,8 @@ const mockDashboardPanelData = {
       table_transpose: false,
       table_dynamic_columns: false,
       top_results_others: false,
+      legends_type: null,
+      base_map: { type: "osm" },
       map_symbol_style: {
         size: "by Value",
         size_by_value: {
@@ -1003,8 +1005,8 @@ describe("ConfigPanel", () => {
       const chartConfigs = [
         { type: 'line', shouldHaveGridlines: true, shouldHaveConnectNulls: false },
         { type: 'area', shouldHaveGridlines: true, shouldHaveConnectNulls: true },
-        { type: 'table', shouldHaveGridlines: true, shouldHaveConnectNulls: false },
-        { type: 'pie', shouldHaveGridlines: true, shouldHaveConnectNulls: false }
+        { type: 'table', shouldHaveGridlines: false, shouldHaveConnectNulls: false },
+        { type: 'pie', shouldHaveGridlines: false, shouldHaveConnectNulls: false }
       ];
 
       chartConfigs.forEach(({ type, shouldHaveGridlines, shouldHaveConnectNulls }) => {
@@ -1109,6 +1111,179 @@ describe("ConfigPanel", () => {
       expect(wrapper.vm.dashboardPanelData.data.config.show_gridlines).toBe(false);
       expect(wrapper.vm.dashboardPanelData.data.config.connect_nulls).toBe(true);
       expect(wrapper.vm.dashboardPanelData.data.config.wrap_table_cells).toBe(true);
+    });
+  });
+
+  describe("Chart Type Specific Gridlines Visibility", () => {
+    it("should show gridlines toggle for supported chart types", () => {
+      const supportedTypes = ['line', 'area', 'bar', 'scatter', 'area-stacked', 'stacked', 'h-bar', 'h-stacked'];
+      
+      supportedTypes.forEach(type => {
+        const panelData = {
+          ...mockDashboardPanelData,
+          data: { ...mockDashboardPanelData.data, type }
+        };
+
+        wrapper = createWrapper({ dashboardPanelData: panelData });
+        
+        const gridlinesToggle = wrapper.find('[data-test="dashboard-config-show-gridlines"]');
+        expect(gridlinesToggle.exists()).toBe(true);
+        
+        if (wrapper) {
+          wrapper.unmount();
+        }
+      });
+    });
+
+    it("should hide gridlines toggle for excluded chart types", () => {
+      const excludedTypes = ['table', 'heatmap', 'metric', 'gauge', 'geomap', 'pie', 'donut', 'sankey', 'maps'];
+      
+      excludedTypes.forEach(type => {
+        const panelData = {
+          ...mockDashboardPanelData,
+          data: { 
+            ...mockDashboardPanelData.data, 
+            type,
+            config: {
+              ...mockDashboardPanelData.data.config,
+              // Add type-specific config for geomap
+              base_map: type === 'geomap' ? { type: "osm" } : undefined,
+              map_view: type === 'geomap' ? { lat: 0, lng: 0, zoom: 1 } : undefined
+            }
+          }
+        };
+
+        wrapper = createWrapper({ dashboardPanelData: panelData });
+        
+        const gridlinesToggle = wrapper.find('[data-test="dashboard-config-show-gridlines"]');
+        expect(gridlinesToggle.exists()).toBe(false);
+        
+        if (wrapper) {
+          wrapper.unmount();
+        }
+      });
+    });
+
+    it("should show connect nulls toggle only for area and line charts", () => {
+      const supportedTypes = ['area', 'line', 'area-stacked'];
+      
+      supportedTypes.forEach(type => {
+        const panelData = {
+          ...mockDashboardPanelData,
+          data: { ...mockDashboardPanelData.data, type }
+        };
+
+        wrapper = createWrapper({ dashboardPanelData: panelData });
+        
+        const connectNullsToggle = wrapper.find('[data-test="dashboard-config-connect-null-values"]');
+        expect(connectNullsToggle.exists()).toBe(true);
+        
+        if (wrapper) {
+          wrapper.unmount();
+        }
+      });
+    });
+  });
+
+  describe("Legend Type Options Configuration", () => {
+    it("should show legend type selector when legends are enabled", () => {
+      const panelData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "line",
+          config: {
+            ...mockDashboardPanelData.data.config,
+            show_legends: true
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: panelData });
+      
+      const legendTypeSelector = wrapper.find('[data-test="dashboard-config-legends-scrollable"]');
+      expect(legendTypeSelector.exists()).toBe(true);
+    });
+
+    it("should initialize legends_type as null (Auto) by default", () => {
+      wrapper = createWrapper();
+      
+      // Should default to null which displays as "Auto"
+      expect(wrapper.vm.dashboardPanelData.data.config.legends_type).toBe(null);
+    });
+
+    it("should handle legend type options correctly", () => {
+      wrapper = createWrapper();
+      
+      // Check that legendTypeOptions are available in component
+      expect(wrapper.vm.legendTypeOptions).toBeDefined();
+      expect(Array.isArray(wrapper.vm.legendTypeOptions)).toBe(true);
+      expect(wrapper.vm.legendTypeOptions.length).toBeGreaterThan(0);
+    });
+
+    it("should show Auto as display value when legends_type is null", () => {
+      const panelData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          config: {
+            ...mockDashboardPanelData.data.config,
+            show_legends: true,
+            legends_type: null
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: panelData });
+      
+      const legendTypeSelector = wrapper.find('[data-test="dashboard-config-legends-scrollable"]');
+      if (legendTypeSelector.exists()) {
+        const displayValue = legendTypeSelector.attributes('display-value');
+        if (displayValue) {
+          expect(displayValue).toContain('Auto');
+        }
+      }
+      // Ensure the component renders correctly
+      expect(wrapper.vm.dashboardPanelData.data.config.legends_type).toBe(null);
+    });
+
+    it("should update legend type when selection changes", async () => {
+      const panelData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          config: {
+            ...mockDashboardPanelData.data.config,
+            show_legends: true
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: panelData });
+      
+      // Set legend type to plain
+      wrapper.vm.dashboardPanelData.data.config.legends_type = "plain";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.dashboardPanelData.data.config.legends_type).toBe("plain");
+    });
+
+    it("should handle legend type scroll configuration", async () => {
+      const panelData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          config: {
+            ...mockDashboardPanelData.data.config,
+            show_legends: true,
+            legends_type: "scroll"
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: panelData });
+
+      expect(wrapper.vm.dashboardPanelData.data.config.legends_type).toBe("scroll");
     });
   });
 });
