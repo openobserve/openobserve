@@ -47,18 +47,7 @@ import {
 } from "@/utils/zincutils";
 
 import {
-  fnParsedSQL,
-  fnUnparsedSQL,
-  extractTimestamps,
-  hasAggregation,
-  isLimitQuery,
-  isDistinctQuery,
-  isWithQuery,
-  addTraceId,
-  removeTraceId,
-  addTransformToQuery,
-  isActionsEnabled,
-  getColumnWidth,
+  logsUtils
 } from "@/composables/useLogs/logsUtils";
 
 let {
@@ -78,6 +67,19 @@ export const useStreamFieldUtils = () => {
   const store = useStore();
   const router = useRouter();
   const { t } = useI18n();
+
+  const {fnParsedSQL,
+  fnUnparsedSQL,
+  extractTimestamps,
+  hasAggregation,
+  isLimitQuery,
+  isDistinctQuery,
+  isWithQuery,
+  addTraceId,
+  removeTraceId,
+  addTransformToQuery,
+  isActionsEnabled,
+  getColumnWidth,} = logsUtils();
 
   const updateFieldValues = () => {
     try {

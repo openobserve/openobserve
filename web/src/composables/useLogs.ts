@@ -74,33 +74,13 @@ import useActions from "./useActions";
 import useStreamingSearch from "./useStreamingSearch";
 
 import { searchState } from "@/composables/useLogs/searchState";
+import { searchStream } from "@/composables/useLogs/searchStream";
 import { INTERVAL_MAP, DEFAULT_LOGS_CONFIG } from "@/utils/logs/constants";
-import {
-  fnParsedSQL,
-  fnUnparsedSQL,
-  extractTimestamps,
-  hasAggregation,
-  isLimitQuery,
-  isDistinctQuery,
-  isWithQuery,
-  addTraceId,
-  removeTraceId,
-  addTransformToQuery,
-  isActionsEnabled,
-  showCancelSearchNotification,
-  updateUrlQueryParams,
-  isNonAggregatedSQLMode,
-  generateURLQuery,
-} from "@/composables/useLogs/logsUtils";
+import {logsUtils} from "@/composables/useLogs/logsUtils";
 
 import useStreamFieldUtils from "@/composables/useLogs/useStreamFieldUtils";
 import {
-  getHistogramTitle,
-  resetHistogramWithError,
-  generateHistogramData,
-  generateHistogramSkeleton,
-  setMultiStreamHistogramQuery,
-  isHistogramEnabled,
+  histogramUtils
 } from "@/composables/useLogs/histogramUtils";
 
 // TODO OK:
@@ -142,6 +122,63 @@ const useLogs = () => {
   const { getAllFunctions } = useFunctions();
   const { getAllActions } = useActions();
 
+  const {getHistogramTitle,
+  resetHistogramWithError,
+  generateHistogramData,
+  generateHistogramSkeleton,
+  setMultiStreamHistogramQuery,
+  isHistogramEnabled,} = histogramUtils();
+
+  const { getQueryReq,
+getDataThroughStream,
+buildWebSocketPayload,
+initializeSearchConnection,
+sendSearchMessage,
+handleStreamingHits,
+handleStreamingMetadata,
+updatePageCountTotal,
+trimPageCountExtraHit,
+handleHistogramStreamingHits,
+handleHistogramStreamingMetadata,
+handlePageCountStreamingHits,
+handlePageCountStreamingMetadata,
+handleSearchResponse,
+handleFunctionError,
+handleAggregation,
+updateResult,
+handleLogsResponse,
+chunkedAppend,
+handlePageCountResponse,
+handleHistogramResponse,
+shouldShowHistogram,
+processHistogramRequest,
+isHistogramDataMissing,
+handleSearchClose,
+handleSearchError,
+constructErrorMessage,
+getAggsTotal,
+refreshPagination,
+shouldGetPageCount,
+getPageCountThroughSocket,
+setCancelSearchError,
+handleSearchReset} = searchStream();
+
+  const {fnParsedSQL,
+  fnUnparsedSQL,
+  extractTimestamps,
+  hasAggregation,
+  isLimitQuery,
+  isDistinctQuery,
+  isWithQuery,
+  addTraceId,
+  removeTraceId,
+  addTransformToQuery,
+  isActionsEnabled,
+  showCancelSearchNotification,
+  updateUrlQueryParams,
+  isNonAggregatedSQLMode,
+  generateURLQuery,} = logsUtils();
+
   const {
     updateFieldValues,
     extractFields,
@@ -150,6 +187,7 @@ const useLogs = () => {
     getStreamList,
     extractFTSFields,
     loadStreamLists,
+    resetFieldValues,
   } = useStreamFieldUtils();
 
   let parser: null | Parser = new Parser();
@@ -906,7 +944,7 @@ const useLogs = () => {
         req.query.sql = b64EncodeUnicode(req.query.sql);
       }
 
-      updateUrlQueryParams();
+      // updateUrlQueryParams();
 
       return req;
     } catch (e: any) {

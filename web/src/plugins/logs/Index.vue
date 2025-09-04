@@ -397,11 +397,7 @@ import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import useAiChat from "@/composables/useAiChat";
 import queryService from "@/services/search";
 import {
-  fnParsedSQL,
-  fnUnparsedSQL,
-  isDistinctQuery,
-  isWithQuery,
-  isLimitQuery,
+  logsUtils
 } from "@/composables/useLogs/logsUtils";
 import searchState from "@/composables/useLogs/searchState";
 import {searchStream} from "@/composables/useLogs/searchStream";
@@ -595,6 +591,12 @@ export default defineComponent({
       buildSearch,
       loadVisualizeData,
     } = useLogs();
+
+    const {fnParsedSQL,
+  fnUnparsedSQL,
+  isDistinctQuery,
+  isWithQuery,
+  isLimitQuery,} = logsUtils();
     const { buildWebSocketPayload } = searchStream();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
