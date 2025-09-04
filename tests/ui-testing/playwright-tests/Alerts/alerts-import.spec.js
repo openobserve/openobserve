@@ -1,6 +1,6 @@
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const logData = require("../../fixtures/log.json");
-const PageManager = require('../../pages/page-manager.js');
+import { PageManager } from '../../pages/page-manager.js';
 
 test.describe("Alerts Import/Export", () => {
   // Shared test variables

@@ -1,5 +1,5 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const PageManager = require('../../pages/page-manager.js');
+import { PageManager } from '../../pages/page-manager.js';
 const testLogger = require('../utils/test-logger.js');
 const logData = require("../../fixtures/log.json");
 const matchAllLogsData = require("../../../test-data/match_all.json");
