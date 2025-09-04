@@ -1,4 +1,8 @@
-import { test, expect } from "../baseFixtures.js";
+const {
+  test,
+  expect,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
 import logData from "../../fixtures/log.json";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
@@ -14,15 +18,13 @@ test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard max query testcases", () => {
   test.beforeEach(async ({ page }) => {
-    console.log("running before each");
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestion(page);
-    await page.waitForTimeout(2000);
-    // Navigate to the logs page to ensure correct org context
-    await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    );
+
+    // Navigate to logs page
+    const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
+
+    await page.goto(logsUrl);
   });
   test("should correctly display max query range error message when max query range is exceeded.", async ({
     page,
