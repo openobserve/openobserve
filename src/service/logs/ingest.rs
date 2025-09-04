@@ -228,14 +228,16 @@ pub async fn ingest(
             None // `item` won't be flattened, no need to store original
         };
 
+        // we report stream size before pushing data to pipeline
+        // this is to capture the actual size of stream at the time of ingestion
+        let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
+        *_size += estimate_json_bytes(&item);
+
         if executable_pipeline.is_some() {
             // buffer the records, timestamp, and originals for pipeline batch processing
             pipeline_inputs.push(item);
             original_options.push(original_data);
         } else {
-            let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
-            *_size += estimate_json_bytes(&item);
-
             // JSON Flattening
             let mut res = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
 
@@ -454,10 +456,14 @@ pub async fn ingest(
                         ts_data.push((timestamp, local_val));
                         *fn_num = need_usage_report.then_some(function_no);
 
-                        let _size = size_by_stream
-                            .entry(destination_stream.clone())
-                            .or_insert(0);
-                        *_size += original_size;
+                        // since we report the size for the original stream before the pipeline execution
+                        // we need to skip the actual size. 
+                        if destination_stream.ne(&stream_name) {
+                            let _size = size_by_stream
+                                .entry(destination_stream.clone())
+                                .or_insert(0);
+                            *_size += original_size;
+                        }
 
                         tokio::task::coop::consume_budget().await;
                     }

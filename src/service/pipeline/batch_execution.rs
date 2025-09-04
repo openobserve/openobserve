@@ -257,10 +257,12 @@ impl ExecutablePipeline {
 
         // Report pipeline ingestion
         let source_stream_params = self.get_source_stream_params();
-        let source_size: f64 = records.iter()
+        let source_size: f64 = records
+            .iter()
             .map(|record| record.to_string().len() as f64)
-            .sum::<f64>() / config::SIZE_IN_MB;
-        
+            .sum::<f64>()
+            / config::SIZE_IN_MB;
+
         if source_size > 0.0 {
             let req_stats = config::meta::self_reporting::usage::RequestStats {
                 size: source_size,
@@ -288,7 +290,6 @@ impl ExecutablePipeline {
         // error_channel
         let (error_sender, mut error_receiver) =
             channel::<(String, String, String, Option<String>)>(batch_size);
-
 
         let mut node_senders = HashMap::new();
         let mut node_receivers = HashMap::new();
@@ -397,7 +398,6 @@ impl ExecutablePipeline {
         if let Err(e) = try_join_all(node_tasks).await {
             log::error!("[Pipeline] node processing jobs failed: {e}");
         }
-
 
         // Publish errors if received any
         if let Some(pipeline_errors) = error_task.await.map_err(|e| {
@@ -680,42 +680,9 @@ async fn process_node(
             } else {
                 log::debug!("[Pipeline]: source node {node_idx} starts processing");
                 // source stream node: send received record to all its children
-                let mut total_pipeline_size: f64 = 0.0;
                 while let Some(item) = receiver.recv().await {
-                    // Track pipeline processing usage (data flowing from source stream)
-                    total_pipeline_size += item.record.to_string().len() as f64;
-                    
                     send_to_children(&mut child_senders, item, "StreamNode").await;
                     count += 1;
-                }
-                
-                // Report pipeline processing usage after processing all records
-                if total_pipeline_size > 0.0 {
-                    let pipeline_size_mb = total_pipeline_size / config::SIZE_IN_MB;
-                    let req_stats = config::meta::self_reporting::usage::RequestStats {
-                        size: pipeline_size_mb,
-                        records: count as i64,
-                        response_time: 0.0,
-                        ..config::meta::self_reporting::usage::RequestStats::default()
-                    };
-                    
-                    // Use stream_name with pipeline_id for pipeline processing
-                    let stream_with_pipeline = if let Some(stream_name) = &stream_name {
-                        format!("{}-{}", stream_name, pipeline_id)
-                    } else {
-                        format!("pipeline-{}", pipeline_id)
-                    };
-                    
-                    crate::service::self_reporting::report_request_usage_stats(
-                        req_stats,
-                        &org_id,
-                        &stream_with_pipeline,
-                        config::meta::stream::StreamType::Logs, // Default to Logs
-                        config::meta::self_reporting::usage::UsageType::Pipeline,
-                        0, // No additional functions for pipeline processing
-                        chrono::Utc::now().timestamp_micros(),
-                    )
-                    .await;
                 }
                 log::debug!(
                     "[Pipeline] {pipeline_name} : source node {node_idx} done processing {count} records"
