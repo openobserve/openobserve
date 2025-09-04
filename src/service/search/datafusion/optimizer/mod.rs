@@ -37,6 +37,7 @@ use datafusion::{
     physical_plan::ExecutionPlan,
     prelude::SessionContext,
 };
+use infra::schema::get_stream_setting_index_fields;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::search::datafusion::optimizer::context::generate_streaming_agg_rules,
@@ -56,7 +57,8 @@ use crate::service::search::{
             limit_join_right_side::LimitJoinRightSide, rewrite_histogram::RewriteHistogram,
         },
         physical_optimizer::{
-            distribute_analyze::optimize_distribute_analyze, join_reorder::JoinReorderRule,
+            distribute_analyze::optimize_distribute_analyze,
+            index_optimizer::LeaderIndexOptimizerule, join_reorder::JoinReorderRule,
             remote_scan::generate_remote_scan_rules,
         },
     },
@@ -167,6 +169,7 @@ pub fn generate_physical_optimizer_rules(
     contexts: Vec<PhysicalOptimizerContext>,
 ) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
     let mut rules = vec![Arc::new(JoinReorderRule::new()) as _];
+
     for context in contexts.into_iter() {
         match context {
             PhysicalOptimizerContext::RemoteScan(context) => {
@@ -190,6 +193,26 @@ pub fn generate_physical_optimizer_rules(
             }
         }
     }
+
+    // should after remote scan
+    if sql.stream_names.len() == 1 {
+        let stream_name = &sql.stream_names[0];
+        let schema = sql.schemas.get(stream_name).unwrap();
+        let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
+        let index_fields = get_stream_setting_index_fields(&stream_settings);
+        let index_fields = index_fields
+            .into_iter()
+            .filter_map(|index_field| {
+                if schema.contains_field(&index_field) {
+                    Some(index_field)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        rules.push(Arc::new(LeaderIndexOptimizerule::new(index_fields)) as _);
+    }
+
     rules
 }
 

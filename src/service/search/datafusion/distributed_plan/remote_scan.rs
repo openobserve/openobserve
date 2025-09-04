@@ -17,7 +17,10 @@ use std::{any::Any, sync::Arc};
 
 use arrow_schema::SchemaRef;
 use config::{
-    meta::search::{ScanStats, SearchEventType},
+    meta::{
+        inverted_index::IndexOptimizeMode,
+        search::{ScanStats, SearchEventType},
+    },
     utils::rand::generate_random_string,
 };
 use datafusion::{
@@ -132,6 +135,11 @@ impl RemoteScanExec {
 
     pub fn set_analyze(mut self) -> Self {
         self.remote_scan_node.search_infos.is_analyze = true;
+        self
+    }
+
+    pub fn set_index_optimize_mode(mut self, index_optimize_mode: IndexOptimizeMode) -> Self {
+        self.remote_scan_node.index_info.index_optimize_mode = Some(index_optimize_mode.into());
         self
     }
 }

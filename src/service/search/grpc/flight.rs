@@ -171,8 +171,9 @@ pub async fn search(
     let file_stats_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
 
     // optimize physical plan, current for tantivy index optimize
+    let index_optimize_mode = req.index_info.index_optimize_mode.clone();
     let index_condition_ref = Arc::new(Mutex::new(None));
-    let index_optimizer_rule_ref = Arc::new(Mutex::new(None));
+    let index_optimizer_rule_ref = Arc::new(Mutex::new(index_optimize_mode.map(Into::into)));
     let mut physical_plan = optimizer_physical_plan(
         physical_plan,
         &ctx,
@@ -405,7 +406,10 @@ fn optimizer_physical_plan(
     let mut plan = index_rule.optimize(plan, ctx.state().config_options())?;
 
     let index_condition = index_condition_ref.lock().clone();
-    if let Some(index_condition) = index_condition {
+    if let Some(index_condition) = index_condition
+        // if index_condition is not None, we need to use index optimizer rule(TopN, Distinct)
+        && index_optimizer_rule_ref.lock().is_none() // if
+    {
         let index_optimizer_rule = FollowerIndexOptimizerule::new(
             time_range,
             index_fields,

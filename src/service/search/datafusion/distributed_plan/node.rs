@@ -79,6 +79,7 @@ impl RemoteScanNodes {
 
         let index_info = IndexInfo {
             equal_keys: self.equal_keys.get(table_name).unwrap_or(&vec![]).clone(),
+            index_optimize_mode: None, // set in LeaderIndexOptimizerule
         };
 
         let super_cluster_info = SuperClusterInfo {
