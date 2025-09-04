@@ -112,14 +112,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     :label="xLabel[index]"
                     class="q-pl-sm"
-                    :data-test="`dashboard-x-item-${itemX?.column}`"
+                    :data-test="`dashboard-x-item-${itemX?.alias}`"
                   >
                     <q-menu
-                      class="q-pa-md"
-                      :data-test="`dashboard-x-item-${itemX?.column}-menu`"
+                      class="field-function-menu-popup"
+                      :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
                     >
-                      <div>
-                        <div class="">
+                      <div style="padding: 3px 16px 16px 16px; width: 771px">
+                        <div>
                           <div
                             v-if="
                               !dashboardPanelData.data.queries[
@@ -131,33 +131,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             class="q-mr-xs q-mb-sm"
                           >
-                            <q-select
+                            <DynamicFunctionPopUp
                               v-model="
                                 dashboardPanelData.data.queries[
                                   dashboardPanelData.layout.currentQueryIndex
-                                ].fields.x[index].aggregationFunction
+                                ].fields.x[index]
                               "
-                              :options="triggerOperatorsWithHistogram"
-                              dense
-                              filled
-                              emit-value
-                              map-options
-                              :label="t('common.aggregation')"
-                              data-test="dashboard-x-item-dropdown"
-                            >
-                              <template v-slot:append>
-                                <q-icon
-                                  name="close"
-                                  size="small"
-                                  @click.stop.prevent="
-                                    dashboardPanelData.data.queries[
-                                      dashboardPanelData.layout.currentQueryIndex
-                                    ].fields.x[index].aggregationFunction = null
-                                  "
-                                  class="cursor-pointer"
-                                />
-                              </template>
-                            </q-select>
+                              :allowAggregation="false"
+                              :isUpdate="
+                                !dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].customQuery
+                              "
+                            />
                           </div>
                         </div>
                         <!-- histogram interval if auto sql and aggregation function is histogram-->
@@ -248,8 +234,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="height: 100%"
                     size="xs"
                     dense
-                    :data-test="`dashboard-x-item-${itemX?.column}-remove`"
-                    @click="removeXAxisItem(itemX?.column)"
+                    :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
+                    @click="removeXAxisItemByIndex(index)"
                     icon="close"
                   />
                 </div>
@@ -378,14 +364,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     :label="bLabel[index]"
                     class="q-pl-sm"
-                    :data-test="`dashboard-b-item-${itemB?.column}`"
+                    :data-test="`dashboard-b-item-${itemB?.alias}`"
                   >
                     <q-menu
-                      class="q-pa-md"
-                      :data-test="`dashboard-b-item-${itemB?.column}-menu`"
+                      class="field-function-menu-popup"
+                      :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
                     >
-                      <div>
-                        <div class="">
+                      <div style="padding: 3px 16px 16px 16px; width: 771px">
+                        <div>
                           <div
                             v-if="
                               !dashboardPanelData.data.queries[
@@ -501,7 +487,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="height: 100%"
                     size="xs"
                     dense
-                    :data-test="`dashboard-b-item-${itemB?.column}-remove`"
+                    :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
                     @click="removeBreakdownItem(itemB?.column)"
                     icon="close"
                   />
@@ -1344,7 +1330,7 @@ export default defineComponent({
               addBreakDownAxisItem(dragElement);
               break;
             case "f":
-              addFilteredItem(dragElement?.name);
+              addFilteredItem(dragElement);
               break;
           }
           reorderItems(

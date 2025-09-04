@@ -1,6 +1,6 @@
 import { date } from "quasar";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
-import functionValidation from "../../components/dashboards/addPanel/dynamicFunction/functionValidation.json";
+import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { getColorPalette } from "./colorPalette";
 
 const units: any = {
@@ -605,6 +605,10 @@ const validateChartFieldsConfiguration = (
   yAxisLabel: string = "Y-Axis",
   pageKey: string = "dashboard",
 ) => {
+  if (!chartType || !fields) {
+    return;
+  }
+
   switch (chartType) {
     case "donut":
     case "pie": {
@@ -816,6 +820,89 @@ const validateChartFieldsConfiguration = (
       break;
   }
 
+  // need to validate all the fields based on the selected aggregation function
+  // get all the fields that are not derived and type is build
+  const aggregationFunctionError = [
+    ...(fields?.y || []),
+    ...(fields?.x || []),
+    ...(fields?.breakdown || []),
+    ...(fields?.z || []),
+  ]
+    .filter(
+      (field: any) =>
+        field?.aggregationFunction &&
+        !field?.isDerived &&
+        field?.type === "build",
+    )
+    .map((field: any) => {
+      // get the function definition
+      const functionDef = functionValidation.aggregator.find(
+        (f: any) => f.name === field.aggregationFunction,
+      );
+
+      if (!functionDef) {
+        return `Function ${field.aggregationFunction} is not valid.`;
+      }
+
+      // validate the arguments
+      const args = field?.args ?? [];
+
+      // Initialize result array for non-variable argument functions
+      const result: string[] = [];
+
+      // Check if the field has args defined and if it's a variable argument function
+      const hasVariableArgs = functionDef.args?.some((arg: any) => arg.variable);
+
+      if (!hasVariableArgs) {
+        functionDef.args?.forEach((argDef: any, index: any) => {
+          // For functions with fixed arguments (not variable)
+          let argDefIndex = index;
+
+          // If the function has a variable argument, we need to handle the argument index differently
+          const variableArgPosition = functionDef.args?.findIndex(
+            (arg: any) => arg.variable,
+          );
+
+          if (variableArgPosition !== -1 && index >= variableArgPosition) {
+            // For arguments after the variable position, use the last fixed argument definition
+            argDefIndex = variableArgPosition;
+          }
+
+          const allowedTypes = functionDef.args[argDefIndex].type.map(
+            (t: any) => t.value,
+          );
+
+          const arg = args[index];
+          if (!arg) return;
+
+          // Check if the argument type matches any of the allowed types
+          const isValidType = allowedTypes.some((allowedType: any) => {
+            if (allowedType === "field") {
+              return arg.field !== undefined && arg.field !== null;
+            } else if (allowedType === "value") {
+              return arg.value !== undefined && arg.value !== null;
+            }
+            return false;
+          });
+
+          if (!isValidType) {
+            result.push(
+              `Argument ${index + 1} for function ${
+                field.aggregationFunction
+              } should be of type ${allowedTypes.join(" or ")}.`,
+            );
+          }
+        });
+      }
+
+      return result.join(" ");
+    })
+    .filter((error: any) => error);
+
+  if (aggregationFunctionError.length > 0) {
+    errors.push(...aggregationFunctionError);
+  }
+
   // Check filter conditions validity
   if (fields?.filter?.conditions?.length) {
     // Validate the conditions
@@ -832,7 +919,7 @@ const validateChartFieldsConfiguration = (
  * @param {array} errors - Array to collect errors
  * @param {boolean} isFieldsValidationRequired - Whether field validation is required
  */
-export const validateSQLPanelFields = (
+export const validatePanel = (
   panelData: any,
   queryIndex: number,
   currentXLabel: string,
@@ -1226,6 +1313,43 @@ const validateStreamFields = (
   }
 };
 
+const validateJoinField = (join: any, errors: string[], joinIndex: number) => {
+  // validate stream
+  if (!join?.stream) {
+    errors.push(`Join ${joinIndex + 1}: Stream is required`);
+  }
+
+  // validate join type
+  if (!join?.joinType) {
+    errors.push(`Join ${joinIndex + 1}: Join type is required`);
+  }
+
+  // validate conditions
+  if (!join?.conditions || join?.conditions.length === 0) {
+    errors.push(`Join ${joinIndex + 1}: At least one condition is required`);
+  } else {
+    join.conditions.forEach((condition: any, conditionIndex: number) => {
+      if (!condition?.leftField) {
+        errors.push(
+          `Join ${joinIndex + 1}, Condition ${conditionIndex + 1}: Left field is required`,
+        );
+      }
+
+      if (!condition?.rightField) {
+        errors.push(
+          `Join ${joinIndex + 1}, Condition ${conditionIndex + 1}: Right field is required`,
+        );
+      }
+
+      if (!condition?.operation) {
+        errors.push(
+          `Join ${joinIndex + 1}, Condition ${conditionIndex + 1}: Operation is required`,
+        );
+      }
+    });
+  }
+};
+
 /**
  * Validates the dashboard JSON structure
  *
@@ -1480,8 +1604,10 @@ export function buildSQLQueryFromInput(
       // If the argument type is "field", do not wrap with quotes
       sqlArgs.push(
         argValue.streamAlias
-          ? `${argValue.streamAlias}.${argValue.field}`
-          : `${defaultStream}.${argValue.field}`,
+          ? argValue.streamAlias + "." + argValue.field
+          : defaultStream
+            ? defaultStream + "." + argValue.field
+            : argValue.field,
       );
     } else if (argType === "string") {
       // If the argument type is "string", wrap with single quotes
@@ -1551,8 +1677,8 @@ export function buildSQLJoinsFromInput(
     const { stream, streamAlias, joinType, conditions } = join;
 
     if (!stream || !joinType || !conditions || conditions.length === 0) {
-      // Invalid join, return empty string
-      return "";
+      // Invalid join, skip it and continue to the next one
+      continue;
     }
 
     const joinConditionStrings = [];

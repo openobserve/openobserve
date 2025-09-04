@@ -334,6 +334,52 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     return dashboardPanelData.meta.stream.selectedStreamFields ?? [];
   });
 
+  async function loadStreamFields(streamName: string) {
+    try {
+      if (!streamName) return;
+
+      // Create a new request and store it in the cache
+      return await getStream(
+        streamName,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type ?? "logs",
+        true,
+      );
+    } catch (e: any) {
+      console.error("Error while loading stream fields", e);
+    }
+  }
+
+  // Helper function to update grouped fields
+  const updateGroupedFields = async () => {
+    const currentStream =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.stream;
+    if (!currentStream) return;
+
+    // Collect streams (main + joins)
+    const joinsStreams = [
+      { stream: currentStream },
+      ...(dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].joins?.filter((stream: any) => stream?.stream) ?? []),
+    ];
+
+    // Fetch stream fields
+    const groupedFields = await Promise.all(
+      joinsStreams.map(async (stream: any) => {
+        return {
+          ...(await loadStreamFields(stream?.stream)),
+          stream_alias: stream?.streamAlias,
+        };
+      }),
+    );
+
+    dashboardPanelData.meta.streamFields.groupedFields = groupedFields;
+  };
+
   const isAddXAxisNotAllowed = computed((e: any) => {
     switch (dashboardPanelData.data.type) {
       case "pie":
@@ -436,7 +482,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     );
   };
 
-  const addXAxisItem = (row: { name: string }) => {
+  const addXAxisItem = (row: { name: string; streamAlias?: string }) => {
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -453,53 +499,79 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
-    // check for existing field
-    if (
-      !dashboardPanelData.data.queries[
+    // check for existing field (commented out in patch - allowing duplicates)
+    // if (
+    //   !dashboardPanelData.data.queries[
+    //     dashboardPanelData.layout.currentQueryIndex
+    //   ].fields.x.find((it: any) => it.column == row.name)
+    // ) {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.x.push({
+      label: !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.x.find((it: any) => it.column == row.name)
-    ) {
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.x.push({
-        label: !dashboardPanelData.data.queries[
+      ].customQuery
+        ? generateLabelFromName(row.name)
+        : row.name,
+      alias:
+        !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? generateLabelFromName(row.name)
+        ].customQuery && !isDerived
+          ? "x_axis_" +
+            (dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.x.length +
+              1)
           : row.name,
-        alias:
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery && !isDerived
-            ? "x_axis_" +
-              (dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.x.length +
-                1)
-            : row.name,
-        column: row.name,
-        color: null,
-        aggregationFunction:
-          row.name == store.state.zoConfig.timestamp_column && !isDerived
-            ? "histogram"
-            : null,
-        sortBy:
-          row.name == store.state.zoConfig.timestamp_column
-            ? dashboardPanelData.data.type == "table"
-              ? "DESC"
-              : "ASC"
-            : null,
-        isDerived,
-        havingConditions: [],
-        treatAsNonTimestamp:
-          row.name === store.state.zoConfig.timestamp_column ? false : true,
-      });
-    }
+      // column: row.name,
+      color: null,
+      type: "build",
+      functionName:
+        row.name == store.state.zoConfig.timestamp_column && !isDerived
+          ? "histogram"
+          : null,
+      args:
+        row.name == store.state.zoConfig.timestamp_column && !isDerived
+          ? [
+              {
+                type: "field",
+                value: {
+                  field: row.name,
+                  streamAlias: row.streamAlias,
+                },
+              },
+              {
+                type: "histogramInterval",
+                value: null,
+              },
+            ]
+          : [
+              {
+                type: "field",
+                value: {
+                  field: row.name,
+                  streamAlias: row.streamAlias,
+                },
+              },
+            ],
+      sortBy:
+        row.name == store.state.zoConfig.timestamp_column
+          ? dashboardPanelData.data.type == "table"
+            ? "DESC"
+            : "ASC"
+          : null,
+      isDerived,
+      havingConditions: [],
+      treatAsNonTimestamp:
+        row.name === store.state.zoConfig.timestamp_column ? false : true,
+    });
+
+    // }
 
     updateArrayAlias();
   };
 
-  const addBreakDownAxisItem = (row: any) => {
+  const addBreakDownAxisItem = (row: { name: string; streamAlias?: string }) => {
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -516,51 +588,76 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
-    // check for existing field
-    if (
-      !dashboardPanelData.data.queries[
+    // check for existing field (commented out in patch - allowing duplicates)
+    // if (
+    //   !dashboardPanelData.data.queries[
+    //     dashboardPanelData.layout.currentQueryIndex
+    //   ].fields.breakdown.find((it: any) => it.column == row.name)
+    // ) {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.breakdown.push({
+      label: !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.breakdown.find((it: any) => it.column == row.name)
-    ) {
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.breakdown.push({
-        label: !dashboardPanelData.data.queries[
+      ].customQuery
+        ? generateLabelFromName(row.name)
+        : row.name,
+      alias:
+        !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? generateLabelFromName(row.name)
+        ].customQuery && !isDerived
+          ? "breakdown_" +
+            (dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.breakdown.length +
+              1)
           : row.name,
-        alias:
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery && !isDerived
-            ? "breakdown_" +
-              (dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.breakdown.length +
-                1)
-            : row.name,
-        column: row.name,
-        color: null,
-        aggregationFunction:
-          row.name == store.state.zoConfig.timestamp_column && !isDerived
-            ? "histogram"
-            : null,
-        sortBy:
-          row.name == store.state.zoConfig.timestamp_column
-            ? dashboardPanelData.data.type == "table"
-              ? "DESC"
-              : "ASC"
-            : null,
-        isDerived,
-        havingConditions: [],
-      });
-    }
+      // column: row.name,
+      color: null,
+      type: "build",
+      functionName:
+        row.name == store.state.zoConfig.timestamp_column && !isDerived
+          ? "histogram"
+          : null,
+      args:
+        row.name == store.state.zoConfig.timestamp_column && !isDerived
+          ? [
+              {
+                type: "field",
+                value: {
+                  field: row.name,
+                  streamAlias: row.streamAlias,
+                },
+              },
+              {
+                type: "histogramInterval",
+                value: null,
+              },
+            ]
+          : [
+              {
+                type: "field",
+                value: {
+                  field: row.name,
+                  streamAlias: row.streamAlias,
+                },
+              },
+            ],
+      sortBy:
+        row.name == store.state.zoConfig.timestamp_column
+          ? dashboardPanelData.data.type == "table"
+            ? "DESC"
+            : "ASC"
+          : null,
+      isDerived,
+      havingConditions: [],
+    });
+    // }
 
     updateArrayAlias();
   };
 
-  const addYAxisItem = (row: any) => {
+  const addYAxisItem = (row: { name: string; streamAlias?: string }) => {
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -577,45 +674,54 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
-    if (
-      !dashboardPanelData.data.queries[
+    // check for existing field (commented out in patch - allowing duplicates)
+    // if (
+    //   !dashboardPanelData.data.queries[
+    //     dashboardPanelData.layout.currentQueryIndex
+    //   ].fields.y.find((it: any) => it?.column == row.name)
+    // ) {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.y.push({
+      label: !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.y.find((it: any) => it?.column == row.name)
-    ) {
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.y.push({
-        label: !dashboardPanelData.data.queries[
+      ].customQuery
+        ? generateLabelFromName(row.name)
+        : row.name,
+      alias:
+        !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? generateLabelFromName(row.name)
+        ].customQuery && !isDerived
+          ? "y_axis_" +
+            (dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.y.length +
+              1)
           : row.name,
-        alias:
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery && !isDerived
-            ? "y_axis_" +
-              (dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.y.length +
-                1)
-            : row.name,
-        column: row.name,
-        color: getNewColorValue(),
-        aggregationFunction:
-          dashboardPanelData.data.type == "heatmap" || isDerived
-            ? null
-            : "count",
-        isDerived,
-        havingConditions: [],
-        treatAsNonTimestamp:
-          row.name === store.state.zoConfig.timestamp_column ? false : true,
-      });
-    }
+      // column: row.name,
+      color: getNewColorValue(),
+      type: "build",
+      functionName:
+        dashboardPanelData.data.type == "heatmap" || isDerived ? null : "count",
+      args: [
+        {
+          type: "field",
+          value: {
+            field: row.name,
+            streamAlias: row.streamAlias,
+          },
+        },
+      ],
+      isDerived,
+      havingConditions: [],
+      treatAsNonTimestamp:
+        row.name === store.state.zoConfig.timestamp_column ? false : true,
+    });
+    // }
     updateArrayAlias();
   };
 
-  const addZAxisItem = (row: any) => {
+  const addZAxisItem = (row: { name: string; streamAlias?: string }) => {
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -632,58 +738,80 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
-    if (
-      !dashboardPanelData.data.queries[
+    // check for existing field (commented out in patch - allowing duplicates)
+    // if (
+    //   !dashboardPanelData.data.queries[
+    //     dashboardPanelData.layout.currentQueryIndex
+    //   ].fields.z.find((it: any) => it.column == row.name)
+    // ) {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.z.push({
+      label: !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.z.find((it: any) => it.column == row.name)
-    ) {
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.z.push({
-        label: !dashboardPanelData.data.queries[
+      ].customQuery
+        ? generateLabelFromName(row.name)
+        : row.name,
+      alias:
+        !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-          ? generateLabelFromName(row.name)
+        ].customQuery && !isDerived
+          ? "z_axis_" +
+            (dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.z.length +
+              1)
           : row.name,
-        alias:
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery && !isDerived
-            ? "z_axis_" +
-              (dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.z.length +
-                1)
-            : row.name,
-        column: row.name,
-        color: getNewColorValue(),
-        aggregationFunction: isDerived ? null : "count",
-        isDerived,
-        havingConditions: [],
-      });
-    }
+      // column: row.name,
+      color: getNewColorValue(),
+      type: "build",
+      functionName: isDerived ? null : "count",
+      args: [
+        {
+          type: "field",
+          value: {
+            field: row.name,
+            streamAlias: row.streamAlias,
+          },
+        },
+      ],
+      isDerived,
+      havingConditions: [],
+    });
+    // }
     updateArrayAlias();
   };
 
-  const addLatitude = (row: any) => {
+  const addLatitude = (row: { name: string; streamAlias?: string }) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
-    if (
-      !dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.latitude
-    ) {
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.latitude = {
-        label: generateLabelFromName(row.name),
-        alias: isDerived ? row.name : "latitude",
-        column: row.name,
-        color: getNewColorValue(),
-        aggregationFunction: null, // You can set the appropriate aggregation function here
-        isDerived,
-        havingConditions: [],
-      };
-    }
+    // check for existing field (commented out in patch - allowing duplicates)
+    // if (
+    //   !dashboardPanelData.data.queries[
+    //     dashboardPanelData.layout.currentQueryIndex
+    //   ].fields.latitude
+    // ) {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.latitude = {
+      label: generateLabelFromName(row.name),
+      alias: isDerived ? row.name : "latitude",
+      // column: row.name,
+      color: getNewColorValue(),
+      type: "build",
+      functionName: null, // You can set the appropriate aggregation function here
+      args: [
+        {
+          type: "field",
+          value: {
+            field: row.name,
+            streamAlias: row.streamAlias,
+          },
+        },
+      ],
+      isDerived,
+      havingConditions: [],
+    };
+    // }
   };
 
   const addLongitude = (row: any) => {
@@ -1217,7 +1345,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery && !it.isDerived
             ? "x_axis_" + (index + 1)
-            : it?.column),
+            : it?.alias),
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
@@ -1228,7 +1356,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery && !it.isDerived
             ? "y_axis_" + (index + 1)
-            : it?.column),
+            : it?.alias),
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
@@ -1239,7 +1367,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery && !it.isDerived
             ? "z_axis_" + (index + 1)
-            : it?.column),
+            : it?.alias),
     );
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
@@ -1250,14 +1378,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery && !it.isDerived
             ? "breakdown_" + (index + 1)
-            : it?.column),
+            : it?.alias),
     );
   };
 
-  const removeXAxisItem = (name: string) => {
-    const index = dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.x.findIndex((it: any) => it.column == name);
+  const removeXAxisItemByIndex = (index: number) => {
     if (index >= 0) {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1357,7 +1482,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     ].fields.value = null;
   };
 
-  const addFilteredItem = async (name: string) => {
+  const addFilteredItem = async (filterItem: {
+    streamAlias: string;
+    name: string;
+  }) => {
     const currentQuery =
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1376,7 +1504,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     currentQuery.fields.filter.conditions.push({
       type: "list",
       values: [],
-      column: name,
+      column: filterItem.name,
       operator: null,
       value: null,
       logicalOperator: "AND",
@@ -1398,7 +1526,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         end_time: new Date(
           dashboardPanelData.meta.dateTime["end_time"].toISOString(),
         ).getTime(),
-        fields: [name],
+        fields: [filterItem.name],
         size: 100,
         type: currentQuery.fields.stream_type,
         no_count: true,
@@ -1407,8 +1535,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       const res = await valuesWebSocket.fetchFieldValues(
         queryReq,
         dashboardPanelData,
-        name,
+        filterItem.name,
       );
+
+      dashboardPanelData.meta.filterValue.push({
+        filterItem: {
+          field: filterItem.name,
+          streamAlias: filterItem.streamAlias,
+        },
+        value: [],
+        isLoading: false,
+      });
     } catch (error: any) {
       const errorDetailValue =
         error.response?.data.error_detail ||
@@ -2121,6 +2258,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
      * @returns {string} - the condition as a string.
      */
     const buildCondition = (condition: any) => {
+      const streamAlias =
+        condition.column.streamAlias ??
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream;
+
       const columnType =
         dashboardPanelData.meta.stream.selectedStreamFields.find(
           (it: any) => it.name == condition.column,
@@ -2367,6 +2510,19 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].fields?.stream
     }" `;
+
+    // Add joins if they exist
+    const joinsClause = buildSQLJoinsFromInput(
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].joins,
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields?.stream,
+    );
+    if (joinsClause) {
+      query += ` ${joinsClause} `;
+    }
 
     // Add the AND/OR condition logic
     const filterData =
