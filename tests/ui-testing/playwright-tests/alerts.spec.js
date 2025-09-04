@@ -15,7 +15,7 @@ const uuid = uuidv4();
 // Remove non-alphabetic characters from UUID
 const alphaUuid = uuid.replace(/[^a-zA-Z]/g, "");
 
-// Construct function name
+// Construct function name 
 const functionName = `automate${alphaUuid}`;
 
 async function login(page) {
