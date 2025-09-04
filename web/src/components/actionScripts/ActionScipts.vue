@@ -303,6 +303,7 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import actions from "@/services/action_scripts";
 import useActions from "@/composables/useActions";
+import { useReo } from "@/services/reodotdev_analytics";
 
 interface ActionScriptList {
   "#": string | number; // If this represents a serial number or row index
@@ -356,6 +357,7 @@ export default defineComponent({
     const isFetchingStreams = ref(false);
     const isSubmitting = ref(false);
     const { getAllActions } = useActions();
+    const { track } = useReo();
 
     const { getStreams } = useStreams();
 
@@ -589,6 +591,10 @@ export default defineComponent({
     };
 
     const addAlert = () => {
+      track("Button Click", {
+        button: "Add Action Scripts",
+        page: "Action Scripts"
+      });
       showAddActionScriptDialog.value = true;
     };
 

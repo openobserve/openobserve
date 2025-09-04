@@ -236,6 +236,7 @@ import {
   outlinedAccountTree,
 } from "@quasar/extras/material-icons-outlined";
 import useLogs from "@/composables/useLogs";
+import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
   name: "functionList",
@@ -267,6 +268,7 @@ export default defineComponent({
     const { searchObj } = useLogs();
     const pipelineList = ref([]);
     const selectedPipeline = ref("");
+    const { track } = useReo();
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -420,6 +422,10 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
+        track("Button Click", {
+          button: "Add Function",
+          page: "Functions"
+        });
       } else {
         isUpdated.value = true;
         action = "Update Function";
@@ -430,6 +436,10 @@ export default defineComponent({
             name: props.row.name,
             org_identifier: store.state.selectedOrganization.identifier,
           },
+        });
+        track("Button Click", {
+          button: "Update Function",
+          page: "Functions"
         });
       }
       addTransform();

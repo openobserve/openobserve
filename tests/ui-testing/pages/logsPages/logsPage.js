@@ -112,6 +112,7 @@ export class LogsPage {
         this.cmContent = '.cm-content';
         this.cmLine = '.cm-line';
         this.searchFunctionInput = { placeholder: 'Search Function' };
+        this.timestampFieldTable = '[data-test="log-search-index-list-fields-table"]';
     }
 
 
@@ -1917,5 +1918,50 @@ export class LogsPage {
                 await toggleButton.click();
             }
         }
+    }
+
+    async clickTimestampField() {
+        return await this.page.locator(this.timestampFieldTable).getByTitle('_timestamp').click();
+    }
+
+    async clickSchemaButton() {
+        return await this.page.getByRole('button').filter({ hasText: /^schema$/ }).click();
+    }
+
+    async clickInfoSchemaButton() {
+        return await this.page.getByRole('button').filter({ hasText: 'infoschema' }).click();
+    }
+
+    async clickClearButton() {
+        return await this.page.getByRole('button', { name: 'Clear' }).click();
+    }
+
+    async expectTimestampFieldVisible() {
+        return await expect(this.page.locator(this.timestampFieldTable).getByTitle('_timestamp')).toBeVisible();
+    }
+
+    // Field management methods for add/remove fields to table
+    async hoverOnFieldExpandButton(fieldName) {
+        await this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`).hover();
+        await this.page.waitForTimeout(300);
+    }
+
+    async clickAddFieldToTableButton(fieldName) {
+        await this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`).click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async clickRemoveFieldFromTableButton(fieldName) {
+        await this.page.locator(`[data-test="log-search-index-list-remove-${fieldName}-field-btn"]`).click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async expectFieldInTableHeader(fieldName) {
+        return await expect(this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`)).toBeVisible();
+    }
+
+    async expectFieldNotInTableHeader(fieldName) {
+        // When field is removed, the source column should be visible again
+        return await expect(this.page.locator('[data-test="log-search-result-table-th-source"]').getByText('source')).toBeVisible();
     }
 } 

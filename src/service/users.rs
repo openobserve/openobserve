@@ -545,7 +545,7 @@ pub async fn update_user(
                 }
 
                 #[cfg(not(feature = "enterprise"))]
-                log::debug!("Role changed from {:?} to {:?}", old_role, new_role);
+                log::debug!("Role changed from {old_role:?} to {new_role:?}");
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                     http::StatusCode::OK,
                     "User updated successfully",
@@ -931,6 +931,33 @@ pub async fn remove_user_from_org(
                     )));
                 }
 
+                if initiating_user.email == email_id {
+                    return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                        http::StatusCode::FORBIDDEN,
+                        "Not Allowed",
+                    )));
+                }
+
+                #[cfg(feature = "cloud")]
+                {
+                    use o2_enterprise::enterprise::cloud::org_invites;
+
+                    match org_invites::delete_invites_for_user(org_id, &email_id).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            log::error!(
+                                "error deleting invites when deleting user {email_id} from org {org_id} : {e}"
+                            );
+                            return Ok(HttpResponse::InternalServerError().json(
+                                MetaHttpResponse::error(
+                                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                                    "error deleting user invites",
+                                ),
+                            ));
+                        }
+                    }
+                }
+
                 if !user.organizations.is_empty() {
                     let orgs = &mut user.organizations;
                     if orgs.len() == 1 {
@@ -1075,20 +1102,37 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
 }
 
 #[cfg(feature = "cloud")]
-pub async fn list_user_invites(user_id: &str) -> Result<HttpResponse, Error> {
+pub async fn list_user_invites(user_id: &str, only_pending: bool) -> Result<HttpResponse, Error> {
     let result = db::user::list_user_invites(user_id).await;
     match result {
         Ok(res) => {
-            let result = res
-                .into_iter()
-                .map(|invite| UserInvite {
+            let mut result: Vec<UserInvite> = Vec::with_capacity(res.len());
+
+            for invite in res {
+                result.push(UserInvite {
+                    org_name: db::organization::get_org(&invite.org_id)
+                        .await
+                        .map(|org| org.name)
+                        .unwrap_or("default".to_string()),
                     role: invite.role,
                     org_id: invite.org_id,
                     token: invite.token,
+                    inviter_id: invite.inviter_id,
                     status: InviteStatus::from(&invite.status),
                     expires_at: invite.expires_at,
-                })
-                .collect();
+                });
+            }
+
+            if only_pending {
+                let now = chrono::Utc::now().timestamp_micros();
+
+                result = result
+                    .into_iter()
+                    .filter(|invite| {
+                        invite.status == InviteStatus::Pending && invite.expires_at > now
+                    })
+                    .collect();
+            }
             Ok(HttpResponse::Ok().json(UserInviteList { data: result }))
         }
         Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(

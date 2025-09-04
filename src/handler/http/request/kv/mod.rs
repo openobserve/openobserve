@@ -21,12 +21,15 @@ use hashbrown::HashMap;
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
 
 /// GetValue
-///
-/// #{"ratelimit_module":"Key Values", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
     operation_id = "GetKVValue",
+    summary = "Get value from key-value store",
+    description = "Retrieves the stored value for a specific key from the organization's key-value store. Returns the raw text \
+                   value if the key exists, or a 404 error if the key is not found. Useful for storing and retrieving \
+                   configuration settings, application state, or other simple data.",
     security(
         ("Authorization"= [])
     ),
@@ -37,6 +40,9 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
     responses(
         (status = 200, description = "Success",  content_type = "text/plain", body = String),
         (status = 404, description = "NotFound", content_type = "text/plain", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/kv/{key}")]
@@ -53,12 +59,15 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
 }
 
 /// SetValue
-///
-/// #{"ratelimit_module":"Key Values", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
     operation_id = "SetKVValue",
+    summary = "Store value in key-value store",
+    description = "Stores a text value under the specified key in the organization's key-value store. Creates a new key if it \
+                   doesn't exist, or updates the existing value. The key-value store is perfect for configuration settings, \
+                   feature flags, application state, and other simple data that needs to persist across sessions.",
     security(
         ("Authorization"= [])
     ),
@@ -70,6 +79,9 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
     responses(
         (status = 200, description = "Success", content_type = "text/plain", body = String),
         (status = 500, description = "Failure", content_type = "text/plain", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/kv/{key}")]
@@ -93,12 +105,15 @@ pub async fn set(
 }
 
 /// RemoveValue
-///
-/// #{"ratelimit_module":"Key Values", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
     operation_id = "RemoveKVValue",
+    summary = "Delete key from key-value store",
+    description = "Permanently removes a key and its associated value from the organization's key-value store. Returns a success \
+                   response if the key was deleted, or a 404 error if the key doesn't exist. This operation cannot be undone, \
+                   so use carefully when cleaning up unused configuration or application data.",
     security(
         ("Authorization"= [])
     ),
@@ -109,6 +124,9 @@ pub async fn set(
     responses(
         (status = 200, description = "Success",  content_type = "text/plain", body = String),
         (status = 404, description = "NotFound", content_type = "text/plain", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/kv/{key}")]
@@ -125,12 +143,15 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 }
 
 /// ListKeys
-///
-/// #{"ratelimit_module":"Key Values", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
     operation_id = "ListKVKeys",
+    summary = "List keys from key-value store",
+    description = "Retrieves a list of all keys stored in the organization's key-value store. You can optionally filter keys by \
+                   providing a prefix to only return keys that start with specific characters. This is useful for organizing \
+                   related configuration settings or browsing available stored data.",
     security(
         ("Authorization"= [])
     ),
@@ -140,6 +161,9 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/kv")]

@@ -77,7 +77,7 @@ pub async fn search(
     file_list: &[FileKey],
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
-    index_condition: Option<IndexCondition>,
+    mut index_condition: Option<IndexCondition>,
     mut fst_fields: Vec<String>,
     idx_optimize_rule: Option<IndexOptimizeMode>,
 ) -> super::SearchTable {
@@ -129,14 +129,13 @@ pub async fn search(
         files.len(),
     );
 
-    let (use_inverted_index, tantivy_condition, datafusion_condition) =
-        check_inverted_index(query.clone(), index_condition);
+    let use_inverted_index = query.use_inverted_index
+        && index_condition.is_some()
+        && !index_condition.as_ref().unwrap().is_condition_all();
     log::info!(
-        "[trace_id {}] flight->search: use_inverted_index {}, tantivy_condition {:?}, datafusion_condition {:?}",
+        "[trace_id {}] flight->search: use_inverted_index {use_inverted_index}, index_condition {:?}",
         query.trace_id,
-        use_inverted_index,
-        tantivy_condition,
-        datafusion_condition
+        index_condition,
     );
 
     let mut idx_took = 0;
@@ -145,7 +144,7 @@ pub async fn search(
         (idx_took, is_add_filter_back, ..) = tantivy_search(
             query.clone(),
             &mut files,
-            tantivy_condition.clone(),
+            index_condition.clone(),
             idx_optimize_rule,
         )
         .await?;
@@ -168,34 +167,19 @@ pub async fn search(
                     .search_role("follower".to_string())
                     .duration(idx_took)
                     .desc(format!(
-                        "inverted index reduced file_list from {} to {} in {} ms",
-                        original_files_len,
+                        "inverted index reduced file_list from {original_files_len} to {} in {idx_took} ms",
                         files.len(),
-                        idx_took
                     ))
                     .build()
             )
         );
     }
 
-    let mut index_condition = generate_add_filter_back_condition(
-        tantivy_condition,
-        datafusion_condition,
-        &mut is_add_filter_back, // pass by reference to modify the value
-    );
-
     // set index_condition to None, means we do not need to add filter back
     if !is_add_filter_back {
         index_condition = None;
         fst_fields = vec![];
     }
-
-    log::info!(
-        "[trace_id {}] search->storage: add filter back index_condition {:?}, is_add_filter_back {}",
-        query.trace_id,
-        index_condition,
-        is_add_filter_back
-    );
 
     let cfg = get_config();
     let mut files_group: HashMap<usize, Vec<FileKey>> =
@@ -405,87 +389,6 @@ pub async fn search(
         )
     );
     Ok((tables, scan_stats))
-}
-
-// if Condition::All() -> disable inverted index
-// if negated condition
-//    1. split the negated condition into two parts (negative_conditions, positive_conditions)
-//    2. if negative_conditions is empty or enable not filter env, use inverted index
-//    3. if negative_conditions is not empty and positive_conditions is empty, do not use inverted
-//       index
-//    4. if negative_conditions is not empty and positive_conditions is not empty, use
-//       positive_conditions search tantivy, and if search error add filter back, always add
-//       negative_conditions to filter back
-// return
-//     1. use_inverted_index,
-//     2. index_condition(positive conditions used for tantivy search, if search tantivy error, also
-//        need add filter back)
-//     3. index_condition(negative conditions used for add filter back),
-fn check_inverted_index(
-    query: Arc<super::QueryParams>,
-    index_condition: Option<IndexCondition>,
-) -> (bool, Option<IndexCondition>, Option<IndexCondition>) {
-    if !query.use_inverted_index || index_condition.is_none() {
-        return (false, None, None);
-    }
-
-    // Condition:All() means search tantivy without filter,
-    // so we should not use inverted index in datafusion search
-    // Condition:All() is used for TantivyOptimizeExec
-    let index_condition = index_condition.unwrap();
-    if index_condition.is_condition_all() {
-        return (false, None, None);
-    }
-
-    // negative conditions with TantivyOptimizeExec is fast,
-    // but for row_ids it only fast when row_ids is small
-    // only positive conditions or enable not filter env, use inverted index
-    if get_config().common.feature_query_not_filter_with_index
-        || !index_condition.is_negated_condition()
-    {
-        return (true, Some(index_condition), None);
-    }
-
-    // only negative conditions, do not use inverted index
-    let (positive_conditions, negative_conditions) = index_condition.split_condition_by_negated();
-    if positive_conditions.is_empty() {
-        return (false, None, Some(negative_conditions));
-    }
-
-    // positive and negative conditions, use inverted index
-    (true, Some(positive_conditions), Some(negative_conditions))
-}
-
-fn generate_add_filter_back_condition(
-    tantivy_condition: Option<IndexCondition>,
-    datafusion_condition: Option<IndexCondition>,
-    is_add_filter_back: &mut bool,
-) -> Option<IndexCondition> {
-    // early return if tantivy_condition or datafusion_condition is None
-    if tantivy_condition.is_none() && datafusion_condition.is_none() {
-        return None;
-    }
-
-    // if have datafusion_condition, always add filter back
-    if datafusion_condition.is_some() {
-        let mut index_condition = datafusion_condition.clone();
-        if let Some(tantivy_cond) = tantivy_condition.as_ref()
-            && *is_add_filter_back
-        {
-            index_condition
-                .as_mut()
-                .unwrap()
-                .add_index_condition(tantivy_cond.clone());
-        }
-        *is_add_filter_back = true;
-        return index_condition;
-    }
-
-    if *is_add_filter_back {
-        return tantivy_condition;
-    }
-
-    None
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
@@ -1309,7 +1212,6 @@ mod tests {
     use config::meta::stream::FileMeta;
 
     use super::*;
-    use crate::service::search::grpc::QueryParams;
 
     fn create_file_key(min_ts: i64, max_ts: i64) -> FileKey {
         FileKey {
@@ -1516,172 +1418,6 @@ mod tests {
     }
 
     #[test]
-    fn test_check_inverted_index_disabled_by_config() {
-        let query = Arc::new(QueryParams {
-            trace_id: "test".to_string(),
-            org_id: "org1".to_string(),
-            stream_type: config::meta::stream::StreamType::Logs,
-            stream_name: "stream1".to_string(),
-            time_range: Some((0, 1000)),
-            work_group: None,
-            use_inverted_index: false,
-        });
-        let index_condition = Some(crate::service::search::index::IndexCondition::default());
-
-        let result = check_inverted_index(query, index_condition);
-        assert!(!result.0);
-        assert!(result.1.is_none());
-        assert!(result.2.is_none());
-    }
-
-    #[test]
-    fn test_check_inverted_index_no_condition() {
-        let query = Arc::new(QueryParams {
-            trace_id: "test".to_string(),
-            org_id: "org1".to_string(),
-            stream_type: config::meta::stream::StreamType::Logs,
-            stream_name: "stream1".to_string(),
-            time_range: Some((0, 1000)),
-            work_group: None,
-            use_inverted_index: true,
-        });
-
-        let result = check_inverted_index(query, None);
-        assert!(!result.0);
-        assert!(result.1.is_none());
-        assert!(result.2.is_none());
-    }
-
-    #[test]
-    fn test_check_inverted_index_condition_all() {
-        use crate::service::search::index::{Condition, IndexCondition};
-
-        let query = Arc::new(QueryParams {
-            trace_id: "test".to_string(),
-            org_id: "org1".to_string(),
-            stream_type: config::meta::stream::StreamType::Logs,
-            stream_name: "stream1".to_string(),
-            time_range: Some((0, 1000)),
-            work_group: None,
-            use_inverted_index: true,
-        });
-        let mut index_condition = IndexCondition::new();
-        index_condition.add_condition(Condition::All());
-
-        let result = check_inverted_index(query, Some(index_condition));
-        assert!(!result.0);
-        assert!(result.1.is_none());
-        assert!(result.2.is_none());
-    }
-
-    #[test]
-    fn test_check_inverted_index_positive_condition() {
-        use crate::service::search::index::{Condition, IndexCondition};
-
-        let query = Arc::new(QueryParams {
-            trace_id: "test".to_string(),
-            org_id: "org1".to_string(),
-            stream_type: config::meta::stream::StreamType::Logs,
-            stream_name: "stream1".to_string(),
-            time_range: Some((0, 1000)),
-            work_group: None,
-            use_inverted_index: true,
-        });
-        let mut index_condition = IndexCondition::new();
-        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-
-        let result = check_inverted_index(query, Some(index_condition));
-        assert!(result.0);
-        assert!(result.1.is_some());
-        assert!(result.2.is_none());
-    }
-
-    #[test]
-    fn test_generate_add_filter_back_condition_both_none() {
-        let mut is_add_filter_back = false;
-        let result = generate_add_filter_back_condition(None, None, &mut is_add_filter_back);
-        assert!(result.is_none());
-        assert!(!is_add_filter_back);
-    }
-
-    #[test]
-    fn test_generate_add_filter_back_condition_only_datafusion() {
-        use crate::service::search::index::{Condition, IndexCondition};
-
-        let mut datafusion_condition = IndexCondition::new();
-        datafusion_condition
-            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-        let mut is_add_filter_back = false;
-
-        let result = generate_add_filter_back_condition(
-            None,
-            Some(datafusion_condition),
-            &mut is_add_filter_back,
-        );
-        assert!(result.is_some());
-        assert!(is_add_filter_back);
-    }
-
-    #[test]
-    fn test_generate_add_filter_back_condition_with_both() {
-        use crate::service::search::index::{Condition, IndexCondition};
-
-        let mut tantivy_condition = IndexCondition::new();
-        tantivy_condition
-            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-
-        let mut datafusion_condition = IndexCondition::new();
-        datafusion_condition
-            .add_condition(Condition::Equal("field2".to_string(), "value2".to_string()));
-
-        let mut is_add_filter_back = true;
-
-        let result = generate_add_filter_back_condition(
-            Some(tantivy_condition),
-            Some(datafusion_condition),
-            &mut is_add_filter_back,
-        );
-        assert!(result.is_some());
-        assert!(is_add_filter_back);
-    }
-
-    #[test]
-    fn test_generate_add_filter_back_condition_only_tantivy_no_filter_back() {
-        use crate::service::search::index::{Condition, IndexCondition};
-
-        let mut tantivy_condition = IndexCondition::new();
-        tantivy_condition
-            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-        let mut is_add_filter_back = false;
-
-        let result = generate_add_filter_back_condition(
-            Some(tantivy_condition),
-            None,
-            &mut is_add_filter_back,
-        );
-        assert!(result.is_none());
-        assert!(!is_add_filter_back);
-    }
-
-    #[test]
-    fn test_generate_add_filter_back_condition_only_tantivy_with_filter_back() {
-        use crate::service::search::index::{Condition, IndexCondition};
-
-        let mut tantivy_condition = IndexCondition::new();
-        tantivy_condition
-            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-        let mut is_add_filter_back = true;
-
-        let result = generate_add_filter_back_condition(
-            Some(tantivy_condition),
-            None,
-            &mut is_add_filter_back,
-        );
-        assert!(result.is_some());
-        assert!(is_add_filter_back);
-    }
-
-    #[test]
     fn test_get_simple_distinct_field_none() {
         let idx_optimize_rule = None;
         let result = get_simple_distinct_field(&idx_optimize_rule);
@@ -1791,5 +1527,205 @@ mod tests {
         let result = generate_cache_key(&Some(index_condition), &idx_optimize_rule, parquet_file);
         assert!(!result.is_empty());
         assert!(result.contains("file_1_10"));
+    }
+
+    #[test]
+    fn test_get_cache_entry_row_ids_bitvec_small_percent() {
+        use config::meta::bitvec::BitVec;
+
+        use crate::service::search::grpc::utils::TantivyResult;
+
+        let mut bitvec = BitVec::repeat(false, 4);
+        bitvec.set(0, true);
+        bitvec.set(2, true);
+        let result = TantivyResult::RowIdsBitVec(2, bitvec);
+        let percent = 0.5; // Less than 1.0, should use roaring bitmap
+        let parquet_rows = 4;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            tantivy_result_cache::CacheEntry::RowIdsRoaring(num_rows, roaring, rows) => {
+                assert_eq!(num_rows, 2);
+                assert_eq!(rows, 4);
+                assert_eq!(roaring.len(), 2); // Should contain positions 0 and 2
+                assert!(roaring.contains(0));
+                assert!(roaring.contains(2));
+            }
+            _ => panic!("Expected RowIdsRoaring cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_row_ids_bitvec_large_percent() {
+        use config::meta::bitvec::BitVec;
+
+        use crate::service::search::grpc::utils::TantivyResult;
+
+        let mut bitvec = BitVec::repeat(false, 4);
+        bitvec.set(0, true);
+        bitvec.set(1, true);
+        bitvec.set(3, true);
+        let result = TantivyResult::RowIdsBitVec(3, bitvec);
+        let percent = 2.0; // Greater than 1.0, should use bitvec
+        let parquet_rows = 4;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            tantivy_result_cache::CacheEntry::RowIdsBitVec(num_rows, returned_bitvec) => {
+                assert_eq!(num_rows, 3);
+                assert_eq!(returned_bitvec.len(), 4);
+                assert_eq!(returned_bitvec.get(0).unwrap(), true);
+                assert_eq!(returned_bitvec.get(1).unwrap(), true);
+                assert_eq!(returned_bitvec.get(2).unwrap(), false);
+                assert_eq!(returned_bitvec.get(3).unwrap(), true);
+            }
+            _ => panic!("Expected RowIdsBitVec cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_count() {
+        use crate::service::search::grpc::utils::TantivyResult;
+
+        let result = TantivyResult::Count(42);
+        let percent = 1.0;
+        let parquet_rows = 100;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            tantivy_result_cache::CacheEntry::Count(count) => {
+                assert_eq!(count, 42);
+            }
+            _ => panic!("Expected Count cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_histogram() {
+        use crate::service::search::grpc::utils::TantivyResult;
+
+        let histogram_data = vec![1, 2, 3, 4];
+        let result = TantivyResult::Histogram(histogram_data.clone());
+        let percent = 1.0;
+        let parquet_rows = 100;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            tantivy_result_cache::CacheEntry::Histogram(histogram) => {
+                assert_eq!(histogram, histogram_data);
+            }
+            _ => panic!("Expected Histogram cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_distinct() {
+        use std::collections::HashSet;
+
+        use crate::service::search::grpc::utils::TantivyResult;
+
+        let mut distinct_values = HashSet::new();
+        distinct_values.insert("value1".to_string());
+        distinct_values.insert("value2".to_string());
+        let result = TantivyResult::Distinct(distinct_values.clone());
+        let percent = 1.0;
+        let parquet_rows = 100;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            tantivy_result_cache::CacheEntry::Distinct(distinct) => {
+                assert_eq!(distinct, distinct_values);
+            }
+            _ => panic!("Expected Distinct cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_into_chunks_exact_divisible() {
+        let v = vec![1, 2, 3, 4, 5, 6];
+        let chunks = into_chunks(v, 2);
+
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], vec![1, 2]);
+        assert_eq!(chunks[1], vec![3, 4]);
+        assert_eq!(chunks[2], vec![5, 6]);
+    }
+
+    #[test]
+    fn test_into_chunks_empty_vector() {
+        let v: Vec<i32> = vec![];
+        let chunks = into_chunks(v, 3);
+
+        assert_eq!(chunks.len(), 0);
+    }
+
+    #[test]
+    fn test_into_chunks_chunk_size_larger_than_vector() {
+        let v = vec![1, 2];
+        let chunks = into_chunks(v, 5);
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], vec![1, 2]);
+    }
+
+    #[test]
+    fn test_repartition_sorted_groups_empty() {
+        let groups: Vec<Vec<FileKey>> = vec![];
+        let result = repartition_sorted_groups(groups, 2);
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_repartition_sorted_groups_no_split_needed() {
+        let groups = vec![vec![create_file_key(1, 10)], vec![create_file_key(11, 20)]];
+        let expect_group_elements = 2;
+        let result = repartition_sorted_groups(groups.clone(), expect_group_elements);
+
+        // Should remain unchanged since groups are already small enough
+        assert_eq!(result, groups);
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_single_file() {
+        let files = vec![create_file_key(1, 10)];
+        let partition_num = 3;
+        let groups = group_files_by_time_range(files, partition_num);
+
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].len(), 1);
+        assert_eq!(groups[0][0].key, "file_1_10");
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_no_overlap_many_partitions() {
+        let files = vec![
+            create_file_key(1, 10),
+            create_file_key(11, 20),
+            create_file_key(21, 30),
+        ];
+        let partition_num = 10; // More partitions than files
+        let groups = group_files_by_time_range(files, partition_num);
+
+        // Should create separate groups for non-overlapping files
+        assert_eq!(groups.len(), 3);
+        for group in &groups {
+            assert_eq!(group.len(), 1); // Each file should be in its own group
+        }
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_many_single_element_groups() {
+        let file_groups = vec![
+            vec![create_file_key(1, 10)],
+            vec![create_file_key(11, 20)],
+            vec![create_file_key(21, 30)],
+        ];
+        let result = regroup_tantivy_files(file_groups);
+
+        assert_eq!(result.len(), 1); // Max group length is 1
+        assert_eq!(result[0].len(), 3); // Should contain all files
+        assert_eq!(result[0][0].key, "file_1_10");
+        assert_eq!(result[0][1].key, "file_11_20");
+        assert_eq!(result[0][2].key, "file_21_30");
     }
 }

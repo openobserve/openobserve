@@ -100,11 +100,7 @@ impl PartitionGenerator {
         let mini_partition_size = self.calculate_mini_partition_size(step);
 
         log::debug!(
-            "mini_partition_size_microseconds: {}, step: {}, end_time: {}, start_time: {}",
-            mini_partition_size,
-            step,
-            end_time,
-            start_time
+            "mini_partition_size_microseconds: {mini_partition_size}, step: {step}, end_time: {end_time}, start_time: {start_time}"
         );
 
         // Add mini partition if possible

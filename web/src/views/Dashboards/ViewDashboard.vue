@@ -686,6 +686,8 @@ export default defineComponent({
       ) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
+        refreshedVariablesData.isVariablesLoading = false;
+        refreshedVariablesData.values = [];
       }
 
       // check if route has time related query params

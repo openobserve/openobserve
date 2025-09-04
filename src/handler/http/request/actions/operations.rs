@@ -26,6 +26,7 @@ use {
     },
     actix_http::header::HeaderMap,
     actix_web::post,
+    config::meta::destinations::Template,
     itertools::Itertools,
     o2_enterprise::enterprise::actions::{action_manager::trigger_action, meta::TriggerSource},
     tracing::{Level, span},
@@ -37,6 +38,8 @@ use {
     context_path = "/api",
     tag = "Actions",
     operation_id = "InvokeAction",
+    summary = "Test action execution with sample data",
+    description = "Executes an action with test data to validate its configuration and behavior",
     security(
         ("Authorization"= [])
     ),
@@ -44,11 +47,11 @@ use {
         ("org_id" = String, Path, description = "Organization name"),
         ("action_id" = String, Path, description = "Action ID"),
     ),
-    request_body(content = Template, description = "Template data", content_type =
-"application/json"),     responses(
-        (status = 200, description = "Success", content_type = "application/json", body =
-HttpResponse),         (status = 400, description = "Error",   content_type = "application/json",
-body = HttpResponse),     )
+    request_body(content = Template, description = "Template data", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    )
 )]
 #[post("/{org_id}/actions/test/{action_id}")]
 pub async fn test_action(
@@ -93,6 +96,8 @@ pub async fn test_action(
     context_path = "/api",
     tag = "Actions",
     operation_id = "PauseAction",
+    summary = "Pause action execution",
+    description = "Temporarily pauses the execution of an automated action",
     security(
         ("Authorization"= [])
     ),
@@ -102,8 +107,8 @@ pub async fn test_action(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body =
-HttpResponse),         (status = 400, description = "Error",   content_type = "application/json",
-body = HttpResponse),     )
+Object),         (status = 400, description = "Error",   content_type = "application/json",
+body = ()),     )
 )]
 #[get("/{org_id}/actions/pause/{action_id}")]
 pub async fn pause_action(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
@@ -115,6 +120,8 @@ pub async fn pause_action(_path: web::Path<(String, String)>) -> Result<HttpResp
     context_path = "/api",
     tag = "Actions",
     operation_id = "ResumeAction",
+    summary = "Resume action execution",
+    description = "Resumes a previously paused action to continue its execution",
     security(
         ("Authorization"= [])
     ),
@@ -124,8 +131,8 @@ pub async fn pause_action(_path: web::Path<(String, String)>) -> Result<HttpResp
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body =
-HttpResponse),         (status = 400, description = "Error",   content_type = "application/json",
-body = HttpResponse),     )
+Object),         (status = 400, description = "Error",   content_type = "application/json",
+body = ()),     )
 )]
 #[get("/{org_id}/actions/resume/{action_id}")]
 pub async fn resume_action(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {

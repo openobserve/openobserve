@@ -112,13 +112,23 @@ pub async fn handle_otlp_request(
 ) -> Result<HttpResponse, anyhow::Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
-        log::error!("[METRICS:OTLP] ingestion error: {e}");
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE,
-                e,
-            )),
-        );
+        // we do not want to log trial period expired errors
+        if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    e,
+                )),
+            );
+        } else {
+            log::error!("[METRICS:OTLP] ingestion error: {e}");
+            return Ok(
+                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                    http::StatusCode::SERVICE_UNAVAILABLE,
+                    e,
+                )),
+            );
+        }
     }
 
     let start = std::time::Instant::now();

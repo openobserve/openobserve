@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <q-separator vertical />
-              <div class="col-auto" style="height: 100%;">
+              <div class="col-auto">
                 <PanelSidebar
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
@@ -457,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <q-separator vertical />
-              <div class="col-auto" style="height: 100%;">
+              <div class="col-auto">
                 <PanelSidebar
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
@@ -802,7 +802,7 @@ export default defineComponent({
             store,
             route.query.dashboard,
             route.query.folder ?? "default",
-          ),
+          ) ?? {},
         ),
       );
       // console.timeEnd("AddPanel:loadDashboard");
