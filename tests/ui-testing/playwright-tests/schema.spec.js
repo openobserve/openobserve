@@ -220,6 +220,7 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="schema-stream-delete-newtest-field-fts-key-checkbox"]').click();
     await page.locator('[data-test="schema-add-field-button"]').click();
     await page.locator('[data-test="schema-update-settings-button"]').click();
+    await page.waitForTimeout(3000);
     await page.getByRole('cell', { name: 'newtest' }).first().click();
     await page.locator('[data-test="schema-stream-delete-newtest-field-fts-key-checkbox"]').first().click();
     await page.locator('[data-test="schema-delete-button"]').click();
