@@ -1651,6 +1651,8 @@ export default defineComponent({
     const { resetStreamData, searchObj } = searchState();
     const { buildSearch } = useSearchStream();
 
+    const {fnParsedSQL, fnUnparsedSQL} = logsUtils();
+
     const {
       fnParsedSQL,
       fnUnparsedSQL,
