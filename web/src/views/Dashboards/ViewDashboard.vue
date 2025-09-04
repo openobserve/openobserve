@@ -837,7 +837,7 @@ export default defineComponent({
       });
     };
 
-    const refreshData = (withoutCache = false) => {
+    const refreshData = () => {
       if (!arePanelsLoading.value) {
         // Generate new run ID for whole dashboard refresh
         generateNewDashboardRunId();
@@ -848,7 +848,7 @@ export default defineComponent({
         currentDashboardData.data.tabs?.forEach((tab: any) => {
           tab.panels?.forEach((panel: any) => {
             allPanelIds.push(panel.id);
-            shouldRefreshWithoutCachePerPanel.value[panel.id] = withoutCache;
+            shouldRefreshWithoutCachePerPanel.value[panel.id] = false;
           });
         });
 
