@@ -121,8 +121,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="dashboard-icons hideOnPrintMode"
               size="sm"
             />
-             <q-btn
-             v-if="config.isEnterprise === 'false'"
+            <q-btn
+              v-if="config.isEnterprise == 'true' && arePanelsLoading"
+              outline
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              size="sm"
+              no-caps
+              icon="cancel"
+              @click="cancelQuery"
+              data-test="dashboard-cancel-btn"
+              color="negative"
+            >
+              <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
+            </q-btn>
+            <q-btn
+              v-else
               :outline="isVariablesChanged ? false : true"
               class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
@@ -142,58 +155,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}
               </q-tooltip>
             </q-btn>
-            <q-btn-group
-              v-if="config.isEnterprise === 'true'"
-              class="dashboard-icons q-ml-sm hideOnPrintMode no-border refresh-btn-group"
-            >
-            <q-btn
-                :outline="!arePanelsLoading && (isVariablesChanged ? false : true)"
-                :flat="arePanelsLoading"
-                class="dashboard-icons q-px-sm hideOnPrintMode apply-btn-refresh"
-                size="sm"
-                no-caps
-                :icon="arePanelsLoading ? 'cancel' : 'refresh'"
-                @click="onRefreshBtnClick"
-                :data-test="arePanelsLoading ? 'dashboard-cancel-btn' : 'dashboard-refresh-btn'"
-                :color="arePanelsLoading ? 'negative' : (isVariablesChanged ? 'warning' : '')"
-                :text-color="arePanelsLoading ? 'negative' : (store.state.theme == 'dark' ? 'white' : 'dark')"
-                :disable="arePanelsLoading && config.isEnterprise === 'false'"
-              >
-                <q-tooltip>
-                  {{
-                    arePanelsLoading
-                      ? t("panel.cancel")
-                      : (isVariablesChanged
-                          ? "Refresh to apply latest variable changes"
-                          : "Refresh")
-                  }}
-                </q-tooltip>
-              </q-btn>
-              
-              <q-btn-dropdown
-                :outline="!arePanelsLoading && (isVariablesChanged ? false : true)"
-                class="apply-btn-dropdown"
-                :flat="arePanelsLoading"
-                padding="0px"
-                size="sm"
-                no-caps
-                auto-close
-                :disable="arePanelsLoading"
-                :color="arePanelsLoading ? 'negative' : (isVariablesChanged ? 'warning' : '')"
-                :text-color="arePanelsLoading ? 'negative' : (store.state.theme == 'dark' ? 'white' : 'dark')"
-              >
-                <q-list>
-                  <q-item clickable @click="refreshData(true)" :disable="arePanelsLoading">
-                    <q-item-section avatar>
-                      <q-icon size="xs" name="refresh" style="align-items: baseline; padding: 0px;" />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label style="font-size: 12px; align-items: baseline; padding: 0px;">Refresh without using cache</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </q-btn-dropdown>
-            </q-btn-group>
 
             <ExportDashboard
               v-if="!isFullscreen"
@@ -1241,15 +1202,6 @@ export default defineComponent({
       }
     });
 
-    const onRefreshBtnClick = () => {
-      if (config.isEnterprise == 'true' && arePanelsLoading.value) {
-        cancelQuery()
-      } else {
-        refreshData();
-      }
-
-    };
-
     return {
       currentDashboardData,
       toggleFullscreen,
@@ -1316,7 +1268,6 @@ export default defineComponent({
       saveJsonDashboard,
       setTimeForVariables,
       runId,
-      onRefreshBtnClick,
     };
   },
 });
@@ -1374,55 +1325,5 @@ export default defineComponent({
 
 .folder-name:hover {
   background-color: $accent !important;
-}
-
-/* Outline state borders */
-.refresh-btn-group .apply-btn-refresh.q-btn--outline::before {
-  border-right: none !important;
-}
-
-.refresh-btn-group .apply-btn-dropdown.q-btn--outline::before {
-  border-left: 1px solid $border-color !important;
-}
-
-/* Flat state borders (when loading/cancel) - using pseudo-elements to avoid layout shifts */
-.refresh-btn-group .apply-btn-refresh.q-btn--flat::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border: 1px solid $border-color !important;
-  border-right: none !important;
-  border-radius: inherit;
-  pointer-events: none;
-}
-
-.refresh-btn-group .apply-btn-dropdown.q-btn--flat::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border: 1px solid $border-color !important;
-  border-left: 1px solid $border-color !important;
-  border-radius: inherit;
-  pointer-events: none;
-}
-
-.apply-btn-refresh{
-  border-top-left-radius: 4px !important;
-  border-bottom-left-radius: 4px !important;
-  border-top-right-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
-}
-
-.apply-btn-dropdown{
-  border-top-left-radius: 0 !important;
-  border-bottom-left-radius: 0 !important;
-  border-top-right-radius: 4px !important;
-  border-bottom-right-radius: 4px !important;
 }
 </style>
