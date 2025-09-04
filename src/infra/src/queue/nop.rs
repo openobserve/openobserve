@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use tokio::sync::mpsc;
 
-use crate::errors::*;
+use crate::{errors::*, queue::RetentionPolicy};
 
 pub async fn init() -> Result<()> {
     Ok(())
@@ -46,6 +46,14 @@ impl Default for NopQueue {
 #[async_trait]
 impl super::Queue for NopQueue {
     async fn create(&self, _topic: &str) -> Result<()> {
+        todo!()
+    }
+
+    async fn create_with_retention_policy(
+        &self,
+        _topic: &str,
+        _retention_policy: RetentionPolicy,
+    ) -> Result<()> {
         todo!()
     }
 
