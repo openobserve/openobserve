@@ -1111,6 +1111,7 @@ export const useStreamFieldUtils = () => {
     extractFields,
     loadStreamFields,
     getStreamList,
+    loadStreamLists,
     resetFieldValues,
     hasInterestingFieldsInLocal,
     createFieldIndexMapping,
@@ -1118,7 +1119,6 @@ export const useStreamFieldUtils = () => {
     extractFTSFields,
     filterHitsColumns,
   };
-
 };
 
 export default useStreamFieldUtils;
