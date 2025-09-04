@@ -227,6 +227,7 @@ import type { TemplateData, Template } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const props = defineProps<{ template: TemplateData | null }>();
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
@@ -246,6 +247,7 @@ const store = useStore();
 const q = useQuasar();
 const editorRef: any = ref(null);
 const isUpdatingTemplate = ref(false);
+const { track } = useReo();
 const sampleTemplates = [
   {
     name: "Slack",
@@ -390,6 +392,10 @@ const saveTemplate = () => {
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
+    track("Button Click", {
+      button: "Update Template",
+      page: "Add Template"
+    });
   } else {
     {
       templateService
@@ -422,6 +428,10 @@ const saveTemplate = () => {
             message: err.response?.data?.error || err.response?.data?.message,
           });
         });
+      track("Button Click", {
+        button: "Create Template",
+        page: "Add Template"
+      });
     }
   }
 };
