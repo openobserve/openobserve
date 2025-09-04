@@ -39,6 +39,7 @@ pub async fn create_stream() -> Result<(), Error> {
     if get_config().common.local_mode {
         return Ok(());
     }
+    log::info!("[INTERNAL_COORDINATOR::CREATE_STREAM] creating internal coordinator stream");
     let queue = queue::get_queue().await;
     queue
         .create_with_retention_policy(INTERNAL_COORDINATOR_STREAM, RetentionPolicy::Interest)
@@ -65,6 +66,7 @@ where
     if get_config().common.local_mode {
         return Ok(());
     }
+    log::info!("[INTERNAL_COORDINATOR::SUBSCRIBE] subscribing to internal coordinator stream");
     let queue = queue::get_queue().await;
     let mut receiver: Arc<mpsc::Receiver<super::queue::Message>> = queue
         .consume(INTERNAL_COORDINATOR_STREAM)
