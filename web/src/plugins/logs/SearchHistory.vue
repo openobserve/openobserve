@@ -253,7 +253,7 @@ import type { Ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 
-import { extractTimestamps } from "@/composables/useLogs/logsUtils";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -302,6 +302,8 @@ export default defineComponent({
     const isLoading = ref(false);
     const isDateTimeChanged = ref(false);
     const moreDetailsToDisplay = ref("");
+
+    const {extractTimestamps} = logsUtils();
 
     const activeTab = ref("query");
     const tabs = ref([
