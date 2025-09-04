@@ -1506,7 +1506,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
-import { fnParsedSQL, fnUnparsedSQL } from "@/composables/useLogs/logsUtils";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import { 
   getVisualizationConfig,
@@ -1666,6 +1666,8 @@ export default defineComponent({
     const regionFilter = ref();
     const regionFilterRef = ref(null);
     const { resetStreamData } = searchState();
+
+    const {fnParsedSQL, fnUnparsedSQL} = logsUtils();
 
     const {
       searchObj,
