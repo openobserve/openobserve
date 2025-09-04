@@ -184,6 +184,8 @@ test.describe("Schema testcases", () => {
     // await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
     await page.getByText('e2e_automate').click();
     await page.waitForTimeout(4000);
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.waitForTimeout(2000);
     await page.waitForSelector('text=Loading...', { state: 'hidden' });
     await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click()
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
