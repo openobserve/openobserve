@@ -15,10 +15,7 @@
 
 import { searchState } from "@/composables/useLogs/searchState";
 import {
-  fnParsedSQL,
-  fnUnparsedSQL,
-  addTraceId,
-  removeTraceId,
+  logsUtils
 } from "@/composables/useLogs/logsUtils";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { logsErrorMessage } from "@/utils/common";
@@ -46,6 +43,11 @@ export const useSearchAround = () => {
     notificationMsg,
     showErrorNotification,
   } = useLogs();
+
+  const { fnParsedSQL,
+  fnUnparsedSQL,
+  addTraceId,
+  removeTraceId, } = logsUtils();
 
   /**
    * Performs a search around operation to fetch logs data around a specific timestamp or log entry.
