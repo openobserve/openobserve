@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-separator spaced />
 
-    <div class="q-px-md q-pt-sm" style="margin-bottom: 30px;">
+    <div class="q-px-md q-pt-sm" style="margin-bottom: 58px;">
       <div class="o2-page-subtitle1">{{ t("billing.features") }}</div>
       <div class="o2-page-subtitle2 q-mb-md q-mt-xs">{{ t("billing.included") }}</div>
 
