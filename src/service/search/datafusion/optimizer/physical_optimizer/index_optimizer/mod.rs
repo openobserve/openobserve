@@ -36,15 +36,12 @@ mod histogram;
 mod select;
 mod topn;
 
-use crate::service::search::{
-    datafusion::{
-        distributed_plan::remote_scan::RemoteScanExec,
-        optimizer::physical_optimizer::index_optimizer::{
-            count::is_simple_count, distinct::is_simple_distinct, histogram::is_simple_histogram,
-            select::is_simple_select, topn::is_simple_topn,
-        },
+use crate::service::search::datafusion::{
+    distributed_plan::remote_scan::RemoteScanExec,
+    optimizer::physical_optimizer::index_optimizer::{
+        count::is_simple_count, distinct::is_simple_distinct, histogram::is_simple_histogram,
+        select::is_simple_select, topn::is_simple_topn,
     },
-    index::IndexCondition,
 };
 
 /// this use in query follower to generate [`IndexOptimizeMode`]
@@ -52,22 +49,16 @@ use crate::service::search::{
 #[derive(Default, Debug)]
 pub struct FollowerIndexOptimizerule {
     time_range: (i64, i64),
-    index_fields: HashSet<String>,
-    index_condition: IndexCondition,
     index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
 }
 
 impl FollowerIndexOptimizerule {
     pub fn new(
         time_range: (i64, i64),
-        index_fields: HashSet<String>,
-        index_condition: IndexCondition,
         index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
     ) -> Self {
         Self {
             time_range,
-            index_fields,
-            index_condition,
             index_optimizer_mode,
         }
     }
@@ -79,12 +70,8 @@ impl PhysicalOptimizerRule for FollowerIndexOptimizerule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        let mut rewriter = FollowerIndexOptimizer::new(
-            self.time_range,
-            self.index_fields.clone(),
-            self.index_condition.clone(),
-            self.index_optimizer_mode.clone(),
-        );
+        let mut rewriter =
+            FollowerIndexOptimizer::new(self.time_range, self.index_optimizer_mode.clone());
         let plan = plan.rewrite(&mut rewriter)?.data;
         Ok(plan)
     }
@@ -100,22 +87,16 @@ impl PhysicalOptimizerRule for FollowerIndexOptimizerule {
 
 struct FollowerIndexOptimizer {
     time_range: (i64, i64),
-    index_fields: HashSet<String>,
-    index_condition: IndexCondition,
     index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
 }
 
 impl FollowerIndexOptimizer {
     pub fn new(
         time_range: (i64, i64),
-        index_fields: HashSet<String>,
-        index_condition: IndexCondition,
         index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
     ) -> Self {
         Self {
             time_range,
-            index_fields,
-            index_condition,
             index_optimizer_mode,
         }
     }

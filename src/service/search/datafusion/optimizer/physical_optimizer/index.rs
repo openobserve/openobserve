@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::HashSet,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use datafusion::{
     common::{
@@ -53,6 +59,9 @@ use crate::service::search::{
 pub struct IndexRule {
     index_fields: HashSet<String>,
     index_condition: Arc<Mutex<Option<IndexCondition>>>,
+    // this set to true when all filter can be extract to
+    // index condition(except _timestamp filter)
+    pub can_optimize: Arc<AtomicBool>,
 }
 
 impl IndexRule {
@@ -63,7 +72,12 @@ impl IndexRule {
         Self {
             index_fields,
             index_condition,
+            can_optimize: Arc::new(AtomicBool::new(false)),
         }
+    }
+
+    pub fn can_optimize(&self) -> bool {
+        self.can_optimize.load(Ordering::Relaxed)
     }
 }
 
@@ -88,6 +102,11 @@ impl PhysicalOptimizerRule for IndexRule {
                 conditions: vec![Condition::All()],
             });
         }
+
+        // set can_optimize to the index_rule
+        self.can_optimize
+            .store(rewriter.can_optimize, Ordering::Relaxed);
+
         Ok(plan)
     }
 
