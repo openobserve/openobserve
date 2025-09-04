@@ -92,22 +92,6 @@ export class ManagementPage {
 
       // Optionally, wait for a brief moment to ensure the toggle action is completed
       await this.page.waitForTimeout(500); // Adjust the timeout as needed
-
-      // Verify if the toggle is now enabled
-      const newCheckedState = await this.page.$eval(
-        toggleSelector,
-        (toggle) => {
-          return toggle.getAttribute("aria-checked") === "true";
-        }
-      );
-
-      if (newCheckedState) {
-        console.log("Streaming has been successfully enabled.");
-      } else {
-        console.log("Failed to enable Streaming.");
-      }
-    } else {
-      console.log("Streaming is already enabled.");
     }
   }
 
@@ -142,24 +126,8 @@ export class ManagementPage {
       await this.page.waitForTimeout(500); // allow UI to update
 
       // Verify toggle is now disabled
-      const newCheckedState = await this.page.$eval(
-        toggleSelector,
-        (toggle) => {
-          return toggle.getAttribute("aria-checked") === "true";
-        }
-      );
 
       await this.page.locator('[data-test="dashboard-add-submit"]').click();
-
-      await this.page.waitForTimeout(5000);
-
-      if (!newCheckedState) {
-        console.log("Streaming has been successfully disabled.");
-      } else {
-        console.log("Failed to disable Streaming.");
-      }
-    } else {
-      console.log("Streaming is already disabled.");
     }
   }
 }
