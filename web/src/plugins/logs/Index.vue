@@ -378,6 +378,7 @@ import {
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
+import useStreamFieldUtils from "@/composables/useLogs/useStreamFieldUtils";
 import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
@@ -560,6 +561,7 @@ export default defineComponent({
     const disableMoreErrorDetails: boolean = ref(false);
     const searchHistoryRef = ref(null);
     const { resetSearchObj, initialLogsState, resetStreamData } = searchState();
+    const { getStreamList } = useStreamFieldUtils();
     let {
       searchObj,
       getQueryData,
@@ -577,7 +579,6 @@ export default defineComponent({
       getHistogramQueryData,
       generateHistogramSkeleton,
       getRegionInfo,
-      getStreamList,
       getFunctions,
       extractFields,
       resetHistogramWithError,
