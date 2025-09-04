@@ -1277,7 +1277,6 @@ export const convertSQLData = async (
   if (options.xAxis) {
     (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
       (axis) => {
-        // if (!axis.splitLine) axis.splitLine = {};
         axis.splitLine.show = showGridlines;
       },
     );
