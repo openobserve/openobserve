@@ -118,4 +118,32 @@ export default class ChartTypeSelector {
     await removeButton.waitFor({ state: "visible", timeout: 5000 });
     await removeButton.click();
   }
+
+  // Helper function to wait for table data to load completely
+  async waitForTableDataLoad() {
+    // Wait for table to be visible
+    await this.page.waitForSelector('[data-test="dashboard-panel-table"]', {
+      timeout: 10000,
+    });
+
+    // Wait for table to have data (non-empty tbody)
+    await this.page.waitForFunction(
+      () => {
+        const table = document.querySelector(
+          '[data-test="dashboard-panel-table"]'
+        );
+        const rows = table?.querySelectorAll("tbody tr");
+        return (
+          rows &&
+          rows.length > 0 &&
+          Array.from(rows).some((row) =>
+            Array.from(row.querySelectorAll("td")).some(
+              (cell) => cell.textContent.trim() !== ""
+            )
+          )
+        );
+      },
+      { timeout: 15000 }
+    );
+  }
 }
