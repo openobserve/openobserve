@@ -4,9 +4,9 @@ const {
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
 import logData from "../../fixtures/log.json";
-import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
 
 import StreamSettingsPage from "../../pages/dashboardPages/streams.js";
 import PageManager from "../../pages/page-manager";
@@ -25,6 +25,7 @@ test.describe("dashboard max query testcases", () => {
     const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
 
     await page.goto(logsUrl);
+    await page.waitForLoadState('networkidle');
   });
   test("should correctly display max query range error message when max query range is exceeded.", async ({
     page,
@@ -61,6 +62,8 @@ test.describe("dashboard max query testcases", () => {
 
     await pm.chartTypeSelector.searchAndAddField("kubernetes_labels_name", "b");
 
+    // Wait for date-time controls to be ready before setting time range
+    await waitForDateTimeButtonToBeEnabled(page);
     await pm.dateTimeHelper.setRelativeTimeRange("6-w");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -73,6 +76,8 @@ test.describe("dashboard max query testcases", () => {
 
     // await page.waitForTimeout(2000);
 
+    // Wait for date-time controls to be ready before setting time range
+    await waitForDateTimeButtonToBeEnabled(page);
     await pm.dateTimeHelper.setRelativeTimeRange("6-w");
 
     const response = await page.waitForResponse(
@@ -90,6 +95,8 @@ test.describe("dashboard max query testcases", () => {
       page.locator('[data-test="dashboard-panel-max-duration-warning"]')
     ).toBeVisible({ timeout: 15000 });
 
+    // Wait for date-time controls to be ready before setting time range
+    await waitForDateTimeButtonToBeEnabled(page);
     await pm.dateTimeHelper.setRelativeTimeRange("2-h");
 
     await expect(
