@@ -172,7 +172,7 @@ pub struct AlertSummary {
     pub num_scheduled: i64,
     pub trigger_status: TriggerStatus,
 }
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct TriggerStatus {
     pub healthy: i64,
     pub failed: i64,
