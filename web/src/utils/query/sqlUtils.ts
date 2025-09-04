@@ -775,6 +775,7 @@ export const convertQueryIntoSingleLine = async (query: any) => {
   }
 };
 
+<<<<<<< ours
 
 export const getStreamNameFromQuery = async (query: any) => {
   let streamName = null;
@@ -854,6 +855,8 @@ export const getStreamNameFromQuery = async (query: any) => {
 // Export internal functions for testing
 export { formatValue, parseCondition, convertWhereToFilter, extractFilters, extractTableName };
 
+=======
+>>>>>>> theirs
 // // List of known aggregation functions
 // const aggregationFunctions = new Set([
 //   "count",
@@ -1231,14 +1234,11 @@ export async function buildSQLQueryWithParser(
     });
   }
 
-  console.log(
-    "Abhay: ast",
-    parser.astify(
-      `SELECT histogram(default._timestamp) as "x_axis_1", count(stream_0.kubernetes_host) as "y_axis_1"  FROM "default" join e2e_automate as stream_0 on default.k8s_namespace_name = stream_0.k8s_namespace_name AND default.abc != stream_0.bcd  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`,
-    ),
-  );
-
   // Convert AST to SQL
   const sql = parser.sqlify(ast);
   return sql.replace(/`/g, '"'); // Replace backticks with double quotes for consistency
+<<<<<<< ours
 }
+=======
+}
+>>>>>>> theirs

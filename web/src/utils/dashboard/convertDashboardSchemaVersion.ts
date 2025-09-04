@@ -63,13 +63,21 @@ const migrateV5FieldsToV6 = (
   if (!fieldItem) return;
   // mirgrate old args
   // previously, args was only used for histogram interval
+<<<<<<< ours
   // so, add arg type as histogramInterval
+=======
+  // so, add arg type as histogramInverval
+>>>>>>> theirs
   if (!fieldItem.args) {
     fieldItem.args = [];
   } else {
     fieldItem.args.forEach((arg: any) => {
       if (!arg.type) {
+<<<<<<< ours
         arg.type = "histogramInterval";
+=======
+        arg.type = "histogramInverval";
+>>>>>>> theirs
       }
     });
   }
@@ -116,6 +124,10 @@ function migrateFields(
   }
 }
 
+<<<<<<< ours
+<<<<<<< ours
+=======
+>>>>>>> theirs
 /**
  * Migrates filter conditions by recursively processing nested structures
  * Converts string column fields to objects with streamAlias and field properties
@@ -148,6 +160,11 @@ function migrateFilterConditions(filter: any): any {
   return filter;
 }
 
+<<<<<<< ours
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
 export function convertDashboardSchemaVersion(data: any) {
   if (!data) {
     return;
@@ -310,6 +327,10 @@ export function convertDashboardSchemaVersion(data: any) {
                 migrateV5FieldsToV6,
               );
             });
+<<<<<<< ours
+<<<<<<< ours
+=======
+>>>>>>> theirs
 
             // Migrate the filters
             // all column which is currently string will be converted to object with streamAlias and field
@@ -317,6 +338,11 @@ export function convertDashboardSchemaVersion(data: any) {
             queryItem.fields.filter = migrateFilterConditions(
               queryItem.fields.filter,
             );
+<<<<<<< ours
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
           });
         });
       });

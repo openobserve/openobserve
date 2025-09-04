@@ -81,8 +81,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="field-function-menu-popup"
                 :data-test="`dashboard-latitude-item-${latitudeLabel}-menu`"
               >
-                <div style="padding: 3px 16px 16px 16px">
-                  <DynamicFunctionPopUp
+                <div style="padding: 3px 16px 16px 16px; width: 771px">
+                  <div>
+                    <div class="q-mr-xs q-mb-sm">
+                      <DynamicFunctionPopUp
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.latitude
+                        "
+                        :allowAggregation="false"
+                        :customQuery="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery
+                    "
+                  />
+<<<<<<< ours
+                  <q-input
+                    dense
+                    filled
+                    data-test="dashboard-latitude-item-input"
+                    :label="t('common.label')"
+>>>>>>> theirs
                     v-model="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -95,6 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery
                     "
                   />
+=======
+>>>>>>> theirs
                 </div>
               </q-menu>
             </q-btn>
@@ -183,10 +206,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-pl-sm"
             >
               <q-menu
+<<<<<<< ours
                 class="field-function-menu-popup"
                 :data-test="`dashboard-longitude-item-${longitudeLabel}-menu`"
               >
                 <div style="padding: 3px 16px 16px 16px">
+                  <DynamicFunctionPopUp
+=======
+                class="q-pa-md"
+                :data-test="`dashboard-longitude-item-${longitudeLabel}-menu`"
+              >
+                <div>
                   <DynamicFunctionPopUp
                     v-model="
                       dashboardPanelData.data.queries[
@@ -200,6 +230,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery
                     "
                   />
+<<<<<<< ours
+                  <q-input
+                    dense
+                    filled
+                    label="Label"
+                    data-test="dashboard-longitude-item-input"
+>>>>>>> theirs
+                    v-model="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.longitude
+                    "
+                    :allowAggregation="false"
+                    :customQuery="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery
+                    "
+                  />
+=======
+>>>>>>> theirs
                 </div>
               </q-menu>
             </q-btn>
@@ -284,22 +335,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
               size="sm"
               :label="weightLabel"
-              :data-test="`dashboard-weight-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.weight?.column
-              }`"
+              :data-test="`dashboard-weight-item-${weightLabel}`"
               class="q-pl-sm"
             >
               <q-menu
                 class="q-pa-md"
-                :data-test="`dashboard-weight-item-${
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
-                  ].fields?.weight?.column
-                }-menu`"
+                :data-test="`dashboard-weight-item-${weightLabel}-menu`"
               >
                 <div>
+<<<<<<< ours
+<<<<<<< ours
                   <DynamicFunctionPopUp
                     v-model="
                       dashboardPanelData.data.queries[
@@ -313,76 +358,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery
                     "
                   />
+=======
+                  <div class="row q-mb-sm" style="align-items: center">
+                    <div
+                      v-if="
+                        !dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery
+                      "
+                      class="q-mr-xs"
+                      style="width: 160px"
+                    >
+                      <DynamicFunctionPopUp
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.weight
+                        "
+                        :allowAggregation="true"
+                      />
+                      <!-- <q-select
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.weight.aggregationFunction
+                        "
+                        :options="triggerOperators"
+                        dense
+                        filled
+                        emit-value
+                        map-options
+                        :label="t('common.aggregation')"
+                        data-test="dashboard-weight-item-dropdown"
+                      >
+                        <template v-slot:append>
+                          <q-icon
+                            name="close"
+                            size="small"
+                            @click.stop.prevent="
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields.weight.aggregationFunction = null
+                            "
+                            class="cursor-pointer"
+                          />
+                        </template>
+                      </q-select> -->
+                    </div>
+                  </div>
+>>>>>>> theirs
                   <q-input
                     dense
                     filled
                     :label="t('common.label')"
                     data-test="dashboard-weight-item-input"
+=======
+                  <DynamicFunctionPopUp
+>>>>>>> theirs
                     v-model="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
-                      ].fields.weight.label
+                      ].fields.weight
                     "
-                  />
-                  <div style="width: 100%" class="tw-mb-2">
-                    <span class="tw-block tw-mb-1 tw-font-bold">Having</span>
-
-                    <q-btn
-                      dense
-                      outline
-                      color="primary"
-                      icon="add"
-                      label="Add"
-                      @click="toggleHavingFilter"
-                      v-if="!isHavingFilterVisible()"
-                    />
-
-                    <div
-                      class="tw-flex tw-space-x-2 tw-mt-2 tw-items-center"
-                      v-if="isHavingFilterVisible()"
-                    >
-                      <q-select
-                        dense
-                        filled
-                        v-model="getHavingCondition().operator"
-                        :options="operators"
-                        style="width: 30%"
-                      >
-                      </q-select>
-
-                      <q-input
-                        dense
-                        filled
-                        v-model.number="getHavingCondition().value"
-                        style="width: 50%"
-                        type="number"
-                        placeholder="Value"
-                      />
-
-                      <q-btn
-                        dense
-                        flat
-                        icon="close"
-                        @click="cancelHavingFilter"
-                      />
-                    </div>
-                  </div>
-                  <div
-                    v-if="
-                      !dashboardPanelData.data.queries[
+<<<<<<< ours
+=======
+                    :allowAggregation="true"
+<<<<<<< ours
+>>>>>>> theirs
+=======
+                    :customQuery="
+                      dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery &&
-                      dashboardPanelData.data.queryType == 'sql'
+                      ].customQuery
                     "
-                  >
-                    <SortByBtnGrp
-                      :fieldObj="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.weight
-                      "
-                    />
-                  </div>
+>>>>>>> theirs
+                  />
                 </div>
               </q-menu>
             </q-btn>
@@ -390,11 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-weight-item-${
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields?.weight?.column
-              }-remove`"
+              :data-test="`dashboard-weight-item-${weightLabel}-remove`"
               @click="removeWeight()"
               icon="close"
             />
@@ -413,6 +459,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-separator />
+    <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
+    <q-separator />
     <!-- filters container -->
     <DashboardFiltersOption
       :dashboardData="dashboardData"
@@ -425,25 +473,37 @@ import { defineComponent, ref, reactive, watch, computed, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
-import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
-import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/convertDataIntoUnitValue";
+<<<<<<< ours
+<<<<<<< ours
+import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
+=======
+>>>>>>> theirs
+=======
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 
+<<<<<<< ours
+>>>>>>> theirs
+
+=======
+>>>>>>> theirs
 export default defineComponent({
   name: "DashboardGeoMapsQueryBuilder",
   components: {
-    SortByBtnGrp,
-    CommonAutoComplete,
-    SanitizedHtmlRenderer,
     DashboardFiltersOption,
     DynamicFunctionPopUp,
+<<<<<<< ours
+<<<<<<< ours
     DashboardJoinsOption,
+=======
+>>>>>>> theirs
+=======
+    DashboardJoinsOption,
+>>>>>>> theirs
   },
   props: ["dashboardData"],
   setup(props) {
@@ -539,57 +599,62 @@ export default defineComponent({
         // move the item from field list to axis
         const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
-        const dragName =
-          selectedStreamFieldsBasedOnUserDefinedSchema.value.find(
-            (item: any) => item?.name === dragElement,
-          );
-        const customDragName =
-          dashboardPanelData.meta.stream.customQueryFields.find(
-            (item: any) => item?.name === dragElement,
-          );
+        const currentQueryField =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields;
+        if (targetAxis !== "f") {
+          if (
+            (targetAxis === "latitude" && currentQueryField.latitude) ||
+            (targetAxis === "longitude" && currentQueryField.longitude) ||
+            (targetAxis === "weight" && currentQueryField.weight)
+          ) {
+            const maxAllowedAxisFields = 1;
 
-        if (dragName || customDragName) {
-          const currentQueryField =
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields;
-          if (targetAxis !== "f") {
-            if (
-              (targetAxis === "latitude" && currentQueryField.latitude) ||
-              (targetAxis === "longitude" && currentQueryField.longitude) ||
-              (targetAxis === "weight" && currentQueryField.weight)
-            ) {
-              const maxAllowedAxisFields = 1;
+            const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
 
-              const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
+            showErrorNotification(errorMessage);
+            cleanupDraggingFields();
+            return;
+          }
 
-              showErrorNotification(errorMessage);
-              cleanupDraggingFields();
-              return;
-            }
-
-            // Remove from the original axis
-            const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
-            if (dragSource === "latitude") {
-              removeLatitude();
-            } else if (dragSource === "longitude") {
-              removeLongitude();
-            } else if (dragSource === "weight") {
-              removeWeight();
-            }
+          // Remove from the original axis
+          const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
+          if (dragSource === "latitude") {
+            removeLatitude();
+          } else if (dragSource === "longitude") {
+            removeLongitude();
+          } else if (dragSource === "weight") {
+            removeWeight();
           }
         }
         if (targetAxis === "f") {
           return;
         }
 
+        // find first arg which is of type field
+        const firstFieldTypeArg = dragElement?.args?.find(
+          (arg: any) => arg?.type === "field",
+        )?.value;
+
+        if (!firstFieldTypeArg) {
+          showErrorNotification("Without field, not able to drag");
+          cleanupDraggingFields();
+          return;
+        }
+
+        const fieldObj = {
+          name: firstFieldTypeArg.field,
+          streamAlias: firstFieldTypeArg.streamAlias,
+        };
+
         // Add to the new axis
         if (targetAxis === "latitude") {
-          addLatitude(dragName || customDragName);
+          addLatitude(fieldObj);
         } else if (targetAxis === "longitude") {
-          addLongitude(dragName || customDragName);
+          addLongitude(fieldObj);
         } else if (targetAxis === "weight") {
-          addWeight(dragName || customDragName);
+          addWeight(fieldObj);
         }
       }
 
@@ -652,19 +717,54 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
       ) {
+<<<<<<< ours
+<<<<<<< ours
         return field.alias;
+=======
+        // HERE NEED CHANGES
+        return field.column;
+>>>>>>> theirs
+=======
+        return field.alias;
+>>>>>>> theirs
       }
       return buildSQLQueryFromInput(
         field,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
+<<<<<<< ours
+<<<<<<< ours
+=======
+>>>>>>> theirs
         ]?.joins?.length
           ? dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.stream
           : "",
+<<<<<<< ours
+=======
+        ].fields?.stream,
+>>>>>>> theirs
+=======
+>>>>>>> theirs
       );
     };
+
+    const latitudeLabel = computed(() => {
+      const latitudeField =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.latitude;
+      return commonBtnLabel(latitudeField);
+    });
+
+    const longitudeLabel = computed(() => {
+      const longitudeField =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.longitude;
+      return commonBtnLabel(longitudeField);
+    });
 
     const weightLabel = computed(() => {
       const weightField =
@@ -759,6 +859,8 @@ export default defineComponent({
       Hint,
       WeightHint,
       promqlMode,
+      latitudeLabel,
+      longitudeLabel,
       weightLabel,
       latitudeLabel,
       longitudeLabel,

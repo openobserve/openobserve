@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="padding: 3px 16px 16px 16px display: flex; gap: 16px;">
+  <div style="padding: 3px 16px 16px 16px; display: flex; gap: 16px;">
     <div>
       <q-input
         dense
@@ -42,8 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, inject, defineProps, defineEmits } from "vue";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import { defineComponent, inject } from "vue";
+
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { useI18n } from "vue-i18n";
@@ -85,4 +85,8 @@ export default defineComponent({
   box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.05);
   padding: 16px;
 }
+<<<<<<< ours
 </style>
+=======
+</style>
+>>>>>>> theirs

@@ -37,10 +37,11 @@
                 no-caps
                 dense
                 color="primary"
+                icon-right="arrow_drop_down"
                 square
                 :no-wrap="true"
                 size="sm"
-                :label="index"
+                :label="joinObj?.stream"
                 :data-test="`dashboard-join-item-${index}`"
                 class="q-pl-sm"
               >
@@ -219,4 +220,8 @@ export default defineComponent({
 .axis-container {
   margin: 5px;
 }
+<<<<<<< ours
 </style>
+=======
+</style>
+>>>>>>> theirs

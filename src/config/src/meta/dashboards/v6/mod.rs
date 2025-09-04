@@ -625,3 +625,8 @@ pub enum LineInterpolation {
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum LabelPosition {
+    Top,
+    Inside,
+    InsideTop,
+    InsideBottom,
+}

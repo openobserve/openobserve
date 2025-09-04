@@ -78,11 +78,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-source-item-${sourceLabel}`"
             >
               <q-menu
+<<<<<<< ours
+<<<<<<< ours
                 class="field-function-menu-popup"
                 :data-test="`dashboard-source-item-${sourceLabel}-menu`"
+<<<<<<< ours
               >
                 <div style="padding: 3px 16px 16px 16px">
                   <DynamicFunctionPopUp
+=======
+                class="q-pa-md"
+=======
+                class="field-function-menu-popup"
+>>>>>>> theirs
+                :data-test="`dashboard-source-item-${sourceLabel}-menu`"
+                style="width: 771px !important"
+=======
+>>>>>>> theirs
+              >
+<<<<<<< ours
+                <div>
+                  <DynamicFunctionPopUp
+                    v-model="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.source
+                    "
+                    :allowAggregation="false"
+                  />
+<<<<<<< ours
+                  <q-input
+                    dense
+                    filled
+                    data-test="dashboard-source-item-input"
+                    :label="t('common.label')"
+>>>>>>> theirs
                     v-model="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -95,6 +125,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery
                     "
                   />
+=======
+>>>>>>> theirs
+=======
+                <div style="padding: 3px 16px 16px 16px">
+                  <div>
+                    <div class="q-mr-xs q-mb-sm">
+                      <DynamicFunctionPopUp
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.source
+                        "
+                        :allowAggregation="false"
+                        :customQuery="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].customQuery
+                        "
+                      />
+                    </div>
+                  </div>
+>>>>>>> theirs
                 </div>
               </q-menu>
             </q-btn>
@@ -183,11 +235,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-pl-sm"
             >
               <q-menu
+<<<<<<< ours
+<<<<<<< ours
                 class="field-function-menu-popup"
                 :data-test="`dashboard-target-item-${targetLabel}-menu`"
               >
                 <div style="padding: 3px 16px 16px 16px">
                   <DynamicFunctionPopUp
+=======
+                class="q-pa-md"
+=======
+                class="field-function-menu-popup"
+>>>>>>> theirs
+                :data-test="`dashboard-target-item-${targetLabel}-menu`"
+              >
+<<<<<<< ours
+                <div>
+                  <DynamicFunctionPopUp
+                    v-model="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.target
+                    "
+                    :allowAggregation="false"
+                  />
+<<<<<<< ours
+                  <q-input
+                    dense
+                    filled
+                    label="Label"
+                    data-test="dashboard-target-item-input"
+>>>>>>> theirs
                     v-model="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -200,6 +278,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery
                     "
                   />
+=======
+>>>>>>> theirs
+=======
+                <div style="padding: 3px 16px 16px 16px">
+                  <div>
+                    <div class="q-mr-xs q-mb-sm">
+                      <DynamicFunctionPopUp
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.target
+                        "
+                        :allowAggregation="false"
+                        :customQuery="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].customQuery
+                        "
+                      />
+                    </div>
+                  </div>
+>>>>>>> theirs
                 </div>
               </q-menu>
             </q-btn>
@@ -288,6 +388,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-pl-sm"
             >
               <q-menu
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
                 class="field-function-menu-popup"
                 :data-test="`dashboard-value-item-${valueLabel}-menu`"
               >
@@ -305,6 +408,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery
                     "
                   />
+=======
+                class="q-pa-md"
+=======
+>>>>>>> theirs
+                :data-test="`dashboard-value-item-${valueLabel}-menu`"
+=======
+>>>>>>> theirs
+                class="field-function-menu-popup"
+                :data-test="`dashboard-value-item-${valueLabel}-menu`"
+              >
+                <div style="padding: 3px 16px 16px 16px">
+                  <div>
+                    <div class="q-mr-xs q-mb-sm">
+                      <DynamicFunctionPopUp
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.value
+                        "
+                        :allowAggregation="true"
+                        :customQuery="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].customQuery
+                        "
+                      />
+                    </div>
+                  </div>
+<<<<<<< ours
+>>>>>>> theirs
                   <q-input
                     dense
                     filled
@@ -375,6 +508,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     />
                   </div>
+=======
+>>>>>>> theirs
                 </div>
               </q-menu>
             </q-btn>
@@ -400,6 +535,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    <q-separator />
+    <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
     <q-separator />
     <!-- filters container -->
     <DashboardFiltersOption
@@ -428,7 +565,14 @@ import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/convertDataIntoUnitValue";
+<<<<<<< ours
+<<<<<<< ours
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
+=======
+>>>>>>> theirs
+=======
+import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
+>>>>>>> theirs
 
 export default defineComponent({
   name: "DashboardSankeyChartBuilder",
@@ -438,7 +582,14 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     DashboardFiltersOption,
     DynamicFunctionPopUp,
+<<<<<<< ours
+<<<<<<< ours
     DashboardJoinsOption,
+=======
+>>>>>>> theirs
+=======
+    DashboardJoinsOption,
+>>>>>>> theirs
   },
   props: ["dashboardData"],
   setup(props) {
@@ -535,57 +686,62 @@ export default defineComponent({
         // move the item from field list to axis
         const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
-        const dragName =
-          selectedStreamFieldsBasedOnUserDefinedSchema.value.find(
-            (item: any) => item?.name === dragElement,
-          );
-        const customDragName =
-          dashboardPanelData.meta.stream.customQueryFields.find(
-            (item: any) => item?.name === dragElement,
-          );
+        const currentQueryField =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields;
+        if (targetAxis !== "f") {
+          if (
+            (targetAxis === "source" && currentQueryField.source) ||
+            (targetAxis === "target" && currentQueryField.target) ||
+            (targetAxis === "value" && currentQueryField.value)
+          ) {
+            const maxAllowedAxisFields = 1;
 
-        if (dragName || customDragName) {
-          const currentQueryField =
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields;
-          if (targetAxis !== "f") {
-            if (
-              (targetAxis === "source" && currentQueryField.source) ||
-              (targetAxis === "target" && currentQueryField.target) ||
-              (targetAxis === "value" && currentQueryField.value)
-            ) {
-              const maxAllowedAxisFields = 1;
+            const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
 
-              const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
+            showErrorNotification(errorMessage);
+            cleanupDraggingFields();
+            return;
+          }
 
-              showErrorNotification(errorMessage);
-              cleanupDraggingFields();
-              return;
-            }
-
-            // Remove from the original axis
-            const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
-            if (dragSource === "source") {
-              removeSource();
-            } else if (dragSource === "target") {
-              removeTarget();
-            } else if (dragSource === "value") {
-              removeValue();
-            }
+          // Remove from the original axis
+          const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
+          if (dragSource === "source") {
+            removeSource();
+          } else if (dragSource === "target") {
+            removeTarget();
+          } else if (dragSource === "value") {
+            removeValue();
           }
         }
         if (targetAxis === "f") {
           return;
         }
 
+        // find first arg which is of type field
+        const firstFieldTypeArg = dragElement?.args?.find(
+          (arg: any) => arg?.type === "field",
+        )?.value;
+
+        if (!firstFieldTypeArg) {
+          showErrorNotification("Without field, not able to drag");
+          cleanupDraggingFields();
+          return;
+        }
+
+        const fieldObj = {
+          name: firstFieldTypeArg.field,
+          streamAlias: firstFieldTypeArg.streamAlias,
+        };
+
         // Add to the new axis
         if (targetAxis === "source") {
-          addSource(dragName || customDragName);
+          addSource(fieldObj);
         } else if (targetAxis === "target") {
-          addTarget(dragName || customDragName);
+          addTarget(fieldObj);
         } else if (targetAxis === "value") {
-          addValue(dragName || customDragName);
+          addValue(fieldObj);
         }
       }
 
@@ -639,19 +795,54 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
       ) {
+<<<<<<< ours
+<<<<<<< ours
         return field.alias;
+=======
+        // HERE NEED CHANGES
+        return field.column;
+>>>>>>> theirs
+=======
+        return field.alias;
+>>>>>>> theirs
       }
       return buildSQLQueryFromInput(
         field,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
+<<<<<<< ours
+<<<<<<< ours
+=======
+>>>>>>> theirs
         ]?.joins?.length
           ? dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.stream
           : "",
+<<<<<<< ours
+=======
+        ].fields?.stream,
+>>>>>>> theirs
+=======
+>>>>>>> theirs
       );
     };
+
+    const sourceLabel = computed(() => {
+      const sourceField =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.source;
+      return commonBtnLabel(sourceField);
+    });
+
+    const targetLabel = computed(() => {
+      const targetField =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.target;
+      return commonBtnLabel(targetField);
+    });
 
     const valueLabel = computed(() => {
       const valueField =
@@ -745,6 +936,8 @@ export default defineComponent({
       expansionItems,
       Hint,
       promqlMode,
+      sourceLabel,
+      targetLabel,
       valueLabel,
       sourceLabel,
       targetLabel,
@@ -1044,5 +1237,15 @@ export default defineComponent({
 .q-field--dense .q-field__control,
 .q-field--dense .q-field__marginal {
   height: 34px;
+}
+
+.field-function-menu-popup {
+  width: 771px !important;
+  height: 323px;
+  border-radius: 4px;
+  border: 1px solid #d5d5d5;
+  background: #fff;
+  box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.05);
+  padding: 16px;
 }
 </style>

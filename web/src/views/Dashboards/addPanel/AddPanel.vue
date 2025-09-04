@@ -210,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <div v-if="isOutDated" class="tw-p-2">
                     <div
+<<<<<<< ours
                       :style="{
                         borderColor: '#c3920d',
                         borderWidth: '1px',
@@ -219,6 +220,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         padding: '1%',
                         borderRadius: '5px',
                       }"
+=======
+                      class="layout-panel-container col"
+                      style="height: 100%; width: 100%"
+>>>>>>> theirs
                     >
                       <div style="font-weight: 700">
                         Your chart is not up to date
@@ -399,6 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="layout-panel-container tw-h-[calc(100vh-200px)] col"
                 >
+<<<<<<< ours
                   <q-splitter
                     class="query-editor-splitter"
                     v-model="splitterModel"
@@ -409,6 +415,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <CustomChartEditor
                         v-model="dashboardPanelData.data.customChartContent"
                         style="width: 100%; height: 100%"
+=======
+                  <template #before>
+                    <div
+                      class="layout-panel-container col"
+                      style="height: 100%"
+                    >
+                      <q-splitter
+                        class="query-editor-splitter"
+                        v-model="splitterModel"
+                        style="height: 100%"
+                        @update:model-value="layoutSplitterUpdated"
+                      >
+                        <template #before>
+                          <CustomChartEditor
+                            v-model="dashboardPanelData.data.customChartContent"
+                            style="width: 100%; height: 100%"
+                          />
+                        </template>
+                        <template #separator>
+                          <div class="splitter-vertical splitter-enabled"></div>
+                          <q-avatar
+                            color="primary"
+                            text-color="white"
+                            size="20px"
+                            icon="drag_indicator"
+                            style="top: 10px; left: 3.5px"
+                            data-test="dashboard-markdown-editor-drag-indicator"
+                          />
+                        </template>
+                        <template #after>
+                          <PanelSchemaRenderer
+                            v-if="chartData"
+                            @metadata-update="metaDataValue"
+                            :key="dashboardPanelData.data.type"
+                            :panelSchema="chartData"
+                            :dashboard-id="queryParams?.dashboard"
+                            :folder-id="queryParams?.folder"
+                            :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                            :variablesData="updatedVariablesData"
+                            :width="6"
+                            @error="handleChartApiError"
+                            @updated:data-zoom="onDataZoom"
+                            @updated:vrlFunctionFieldList="
+                              updateVrlFunctionFieldList
+                            "
+                            @last-triggered-at-update="
+                              handleLastTriggeredAtUpdate
+                            "
+                            searchType="dashboards"
+                          />
+                        </template>
+                      </q-splitter>
+
+                      <DashboardErrorsComponent
+                        :errors="errorData"
+                        class="col-auto"
+                        style="flex-shrink: 0"
+>>>>>>> theirs
                       />
                     </template>
                     <template #separator>
@@ -766,10 +830,19 @@ export default defineComponent({
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
       // console.time("add panel loadDashboard");
-      loadDashboard();
+      await loadDashboard();
 
       registerAiContextHandler();
       // console.timeEnd("add panel loadDashboard");
+      
+      // Call makeAutoSQLQuery after dashboard data is loaded
+      // Only generate SQL if we're in auto query mode
+      if (!editMode.value && 
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery) {
+        await makeAutoSQLQuery();
+      }
     });
 
     let list = computed(function () {
@@ -975,6 +1048,75 @@ export default defineComponent({
         }
         // console.timeEnd("watch:dashboardPanelData.layout.showQueryBar");
       },
+    );
+
+    // Generate the query when the fields are updated
+    watch(
+      () => [
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.filter,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.latitude,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.longitude,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.weight,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.source,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.target,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.name,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value_for_maps,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].joins,
+      ],
+      () => {
+        // only continue if current mode is auto query generation
+        if (
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery
+        ) {
+          // makeAutoSQLQuery is async function
+          makeAutoSQLQuery();
+        }
+      },
+      { deep: true },
     );
 
     const runQuery = () => {

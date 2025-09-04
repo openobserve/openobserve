@@ -1,15 +1,19 @@
 <template>
-  <div class="q-pa-md">
-    <div class="q-gutter-md">
+  <div>
+    <div>
       <q-select
+        ref="streamFieldSelect"
         filled
         v-model="internalModel"
-        :options="options"
-        label="Select a Field"
-        option-label="name"
-        option-value="name"
-        :display-value="internalModel?.field"
-        map-options
+        :options="filteredOptions"
+        dense
+        use-input
+        input-debounce="0"
+        behavior="menu"
+        hide-selected
+        @filter="filterFields"
+        @blur="updateInputValue(internalModel.value?.field)"
+        data-test="stream-field-select"
       >
         <template v-slot:option="scope">
           <q-expansion-item
@@ -76,13 +80,15 @@ export default defineComponent({
     );
 
     const internalModel = ref(props.modelValue);
-
     const options = ref<Option[]>([]);
+    const filteredOptions = ref<Option[]>([]);
 
     const { getStream } = useStreams();
     const { dashboardPanelData } = useDashboardPanelData(
       dashboardPanelDataPageKey,
     );
+
+    const streamFieldSelect = ref<any>(null);
 
     async function loadStreamFields(streamName: string) {
       try {
@@ -104,9 +110,15 @@ export default defineComponent({
       }
     }
 
+    function updateInputValue(val: string) {
+      streamFieldSelect?.value?.updateInputValue?.(val);
+    }
+
     async function fetchFieldsForStreams() {
       if (!props.streams || props.streams.length === 0) {
         options.value = [];
+        filteredOptions.value = [];
+        updateInputValue(internalModel.value?.field);
         return;
       }
 
@@ -126,6 +138,61 @@ export default defineComponent({
           };
         }),
       );
+
+      // Initialize filtered options with all options
+      filteredOptions.value = [...options?.value];
+
+      updateInputValue(internalModel.value?.field);
+    }
+
+    function filterFields(val: string | object, update: any) {
+      // Handle both string and object values for val
+      let searchText = "";
+
+      if (val === "" || val === internalModel.value?.field) {
+        update(() => {
+          filteredOptions.value = [...options?.value];
+        });
+        return;
+      }
+
+      // Check if val is string or object
+      if (typeof val === "string" && val !== "") {
+        searchText = val.toLowerCase();
+      } else {
+        // If we can't determine the search text, just show all options
+        update(() => {
+          filteredOptions.value = [...options?.value];
+        });
+        return;
+      }
+
+      update(() => {
+        const needle = searchText;
+        // Filter options where either stream name (label) or field name contains the search term
+        filteredOptions.value = options?.value
+          ?.map((stream) => {
+            // First check if stream name matches
+            const streamMatches = stream?.label?.toLowerCase().includes(needle);
+
+            // Then filter child fields that match
+            const matchingFields = stream?.children?.filter((field: any) =>
+              field?.name?.toLowerCase()?.includes(needle),
+            );
+
+            // If stream name matches or has matching fields, include in results
+            if (streamMatches || matchingFields.length > 0) {
+              return {
+                ...stream,
+                // If stream matches directly, include all fields
+                // Otherwise only include matching fields
+                children: streamMatches ? stream?.children : matchingFields,
+              };
+            }
+            return null;
+          })
+          .filter(Boolean) as Option[];
+      });
     }
 
     function selectField(field: any) {
@@ -133,6 +200,7 @@ export default defineComponent({
         streamAlias: field?.stream?.streamAlias,
         field: field.name,
       };
+      updateInputValue(field.name);
     }
 
     // Watch for v-model changes
@@ -146,8 +214,16 @@ export default defineComponent({
     return {
       internalModel,
       options,
+      filteredOptions,
       selectField,
+      filterFields,
+      streamFieldSelect,
+      updateInputValue,
     };
   },
 });
+<<<<<<< ours
 </script>
+=======
+</script>
+>>>>>>> theirs

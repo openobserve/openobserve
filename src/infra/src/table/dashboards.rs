@@ -485,6 +485,11 @@ fn inner_data_as_json(dashboard: Dashboard) -> Result<JsonValue, errors::Error> 
             v5: Some(inner),
             ..
         } => serde_json::to_value(inner).map_err(errors::Error::SerdeJsonError),
+        Dashboard {
+            version: 6,
+            v6: Some(inner),
+            ..
+        } => serde_json::to_value(inner).map_err(errors::Error::SerdeJsonError),
         Dashboard { version: v, .. } => Err(errors::PutDashboardError::MissingInnerData(v).into()),
     }?;
 

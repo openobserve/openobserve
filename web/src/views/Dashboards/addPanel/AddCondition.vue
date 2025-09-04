@@ -43,6 +43,11 @@
               emit-value
               @filter="filterStreamFn"
               @update:model-value="handleFieldChange"
+              /> -->
+            <StreamFieldSelect
+              class="tw-w-full"
+              :streams="getAllSelectedStreams()"
+              v-model="condition.column"
               :data-test="`dashboard-add-condition-column-${conditionIndex}}`"
               /> -->
             <StreamFieldSelect
@@ -210,7 +215,15 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
+<<<<<<< ours
+<<<<<<< ours
     const { getAllSelectedStreams, buildCondition } = useDashboardPanelData(
+=======
+    const { getAllSelectedStreams } = useDashboardPanelData(
+>>>>>>> theirs
+=======
+    const { getAllSelectedStreams, buildCondition } = useDashboardPanelData(
+>>>>>>> theirs
       dashboardPanelDataPageKey,
     );
     const { t } = useI18n();
@@ -219,11 +232,25 @@ export default defineComponent({
       useSelectAutoComplete(toRef(props, "schemaOptions"), "label");
 
     const filteredListOptions = computed(() => {
+      // get stream name from streamAlias
+      const streamName =
+        getAllSelectedStreams().find(
+          (it: any) => it.streamAlias == props?.condition?.column?.streamAlias,
+        )?.stream ??
+        props.dashboardPanelData.data.queries[
+          props.dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream;
+
       const options = props.dashboardPanelData.meta.filterValue
         .find(
           (it: any) =>
+<<<<<<< ours
             it.filterItem.field == props?.condition?.column?.field &&
             it.filterItem.streamAlias == props?.condition?.column?.streamAlias,
+=======
+            it.column == props?.condition?.column?.field &&
+            it?.streamName == streamName,
+>>>>>>> theirs
         )
         ?.value?.filter((option: any) =>
           option?.toLowerCase().includes(searchTerm.value.toLowerCase()),
@@ -265,47 +292,49 @@ export default defineComponent({
     const filterOptions = ["AND", "OR"];
 
     const computedLabel = (condition: any) => {
-      if (condition.operator === "match_all") {
-        return condition.operator + "(" + condition.value + ")";
-      } else if (condition.operator === "str_match") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else if (condition.operator === "str_match_ignore_case") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else if (condition.operator === "re_match") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else if (condition.operator === "re_not_match") {
-        return (
-          condition.operator +
-          "(" +
-          condition.column +
-          ", " +
-          condition.value +
-          ")"
-        );
-      } else {
-        return props.condition.column;
-      }
+      // if (condition.operator === "match_all") {
+      //   return condition.operator + "(" + condition.value + ")";
+      // } else if (condition.operator === "str_match") {
+      //   return (
+      //     condition.operator +
+      //     "(" +
+      //     condition.column +
+      //     ", " +
+      //     condition.value +
+      //     ")"
+      //   );
+      // } else if (condition.operator === "str_match_ignore_case") {
+      //   return (
+      //     condition.operator +
+      //     "(" +
+      //     condition.column +
+      //     ", " +
+      //     condition.value +
+      //     ")"
+      //   );
+      // } else if (condition.operator === "re_match") {
+      //   return (
+      //     condition.operator +
+      //     "(" +
+      //     condition.column +
+      //     ", " +
+      //     condition.value +
+      //     ")"
+      //   );
+      // } else if (condition.operator === "re_not_match") {
+      //   return (
+      //     condition.operator +
+      //     "(" +
+      //     condition.column +
+      //     ", " +
+      //     condition.value +
+      //     ")"
+      //   );
+      // } else {
+      //   return props.condition.column;
+      // }
+      const builtCondition = buildCondition(condition);
+      return builtCondition === "" ? condition.column.field : builtCondition;
     };
 
     const emitLogicalOperatorChange = (newOperator: string) => {
@@ -317,7 +346,7 @@ export default defineComponent({
     };
 
     const removeColumnName = () => {
-      props.condition.column = "";
+      props.condition.column = {};
     };
 
     watch(
@@ -326,6 +355,13 @@ export default defineComponent({
         if (newColumn !== oldColumn) {
           props.condition.values = [];
         }
+      },
+    );
+
+    watch(
+      () => props.condition.column,
+      () => {
+        props.loadFilterItem(props.condition.column);
       },
     );
 

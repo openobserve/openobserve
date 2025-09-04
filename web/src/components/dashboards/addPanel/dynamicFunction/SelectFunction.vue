@@ -8,7 +8,6 @@
       input-debounce="0"
       behavior="menu"
       use-input
-      filled
       borderless
       dense
       hide-selected
@@ -18,7 +17,7 @@
       option-value="value"
       emit-value
       map-options
-      class="tw-w-52"
+      class="tw-w-72 tw-h-10 tw-border tw-border-solid tw-border-gray-200 tw-pl-2"
     >
       <!-- <template v-slot:append>
           <q-icon
@@ -29,38 +28,83 @@
           />
         </template> -->
     </q-select>
+    <div class="tw-w-full tw-p-3 tw-flex tw-gap-2">
+      <!-- <SubTaskArrow /> -->
 
-    <!-- {{ JSON.stringify(fields.args) }} -->
-    <!-- Loop through the args for the first n-1 arguments -->
-    <div
-      v-for="(arg, argIndex) in fields.args"
-      :key="argIndex"
-      class="tw-w-full tw-flex tw-flex-col"
-    >
-      <div>
-        <div>
-          <label :for="'arg-' + argIndex">Parameters {{ argIndex + 1 }}</label>
-        </div>
-        <div class="tw-flex tw-gap-x-3">
-          <!-- type selector -->
-          <q-select
-            v-model="fields.args[argIndex].type"
-            @update:model-value="onArgTypeChange(fields.args[argIndex])"
-            :options="
-              getSupportedTypeBasedOnFunctionNameAndIndex(
-                fields.functionName,
-                argIndex,
-              )
-            "
-            dense
-            filled
-            label="Select Type"
-            data-test="dashboard-y-item-dropdown"
-            class="tw-w-40 tw-min-w-40"
-          />
+      <!-- {{ JSON.stringify(fields.args) }} -->
+      <!-- Loop through the args for the first n-1 arguments -->
+      <div class="tw-w-full">
+        <div
+          v-for="(arg, argIndex) in fields.args"
+          :key="argIndex + '-' + arg.type"
+          class="tw-w-full tw-flex tw-flex-col"
+        >
+          <div class="tw-flex">
+            <!-- <div class="tw-mr-2 tw-relative">
+              <SubTaskArrow class="tw-absolute" />
+              <div
+                v-if="argIndex !== fields.args.length - 1"
+                class="tw-border-l-[1px] tw-border-[#001495] tw-opacity-50 tw-relative tw-h-full"
+              ></div>
+            </div> -->
+            <div class="tw-mr-2 tw-relative" style="min-height: 50px">
+              <!-- Vertical Line using top & bottom instead of height -->
+              <div
+                class="tw-absolute tw-top-0 tw-w-[1px] tw-bg-[#001495] tw-opacity-50"
+                :style="{
+                  bottom:
+                    argIndex === fields.args.length - 1
+                      ? 'calc(100% - 32px)'
+                      : '0',
+                  left: '0.5px',
+                }"
+              ></div>
 
-          <!-- Render different input types based on validation -->
-          <!-- <q-select
+              <!-- SubTask Arrow -->
+              <div class="tw-absolute" :style="{ top: '28px', right: '-11px' }">
+                <SubTaskArrow />
+              </div>
+            </div>
+
+            <div>
+              <div class="tw-flex tw-items-center tw-gap-x-2">
+                <label :for="'arg-' + argIndex"
+                  >Parameter {{ argIndex + 1 }}</label
+                >
+              </div>
+              <div class="tw-flex">
+                <!-- type selector -->
+                <q-select
+                  v-model="fields.args[argIndex].type"
+                  @update:model-value="onArgTypeChange(fields.args[argIndex])"
+                  :options="
+                    getSupportedTypeBasedOnFunctionNameAndIndex(
+                      fields.functionName,
+                      argIndex,
+                    )
+                  "
+                  option-label="label"
+                  option-value="value"
+                  behavior="menu"
+                  map-options
+                  emit-value
+                  dense
+                  filled
+                  :display-value="''"
+                  class="tw-w-22 tw-min-w-22 tw-h-10 text-sm bg-primary text-white q-field--dark"
+                  :required="isRequired(fields.functionName, argIndex)"
+                  :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
+                >
+                  <template v-slot:prepend>
+                    <q-icon
+                      :name="getIconBasedOnArgType(fields.args[argIndex].type)"
+                      padding="sm"
+                    />
+                  </template>
+                </q-select>
+
+                <!-- Render different input types based on validation -->
+                <!-- <q-select
             v-model="fields.args[argIndex].value"
             :options="filteredSchemaOptions"
             label="Select Field"
@@ -76,66 +120,80 @@
             @filter="filterStreamFn"
             :required="isRequired(fields.functionName, argIndex)"
             class="tw-w-52"
-          /> -->
+             /> -->
 
-          <!-- Left field selector using StreamFieldSelect -->
-          <div class="tw-w-52" v-if="fields.args[argIndex]?.type === 'field'">
-            <StreamFieldSelect
-              :streams="getAllSelectedStreams()"
-              v-model="fields.args[argIndex].value"
-            />
+                <!-- Left field selector using StreamFieldSelect -->
+                <div
+                  class="tw-w-52"
+                  v-if="fields.args[argIndex]?.type === 'field'"
+                >
+                  <StreamFieldSelect
+                    :streams="getAllSelectedStreams()"
+                    v-model="fields.args[argIndex].value"
+                    :data-test="`dashboard-function-dropdown-arg-field-selector-${argIndex}`"
+                  />
+                </div>
+
+                <q-input
+                  v-if="fields.args[argIndex]?.type === 'string'"
+                  type="text"
+                  v-model="fields.args[argIndex].value"
+                  placeholder="Enter string"
+                  :required="isRequired(fields.functionName, argIndex)"
+                  class="tw-w-52"
+                  dense
+                  :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
+                />
+
+                <q-input
+                  v-if="fields.args[argIndex]?.type === 'number'"
+                  type="number"
+                  v-model="fields.args[argIndex].value"
+                  placeholder="Enter number"
+                  :required="isRequired(fields.functionName, argIndex)"
+                  class="tw-w-52"
+                  dense
+                  :data-test="`dashboard-function-dropdown-arg-number-input-${argIndex}`"
+                />
+
+                <SelectFunction
+                  v-if="fields.args[argIndex]?.type === 'function'"
+                  v-model="fields.args[argIndex].value"
+                  :allowAggregation="allowAggregation"
+                  :data-test="`dashboard-function-dropdown-arg-function-input-${argIndex}`"
+                />
+
+                <!-- histogram interval for sql queries -->
+                <HistogramIntervalDropDown
+                  v-if="fields.args[argIndex]?.type === 'histogramInterval'"
+                  :model-value="fields.args[argIndex].value"
+                  @update:modelValue="
+                    (newValue: any) => {
+                      fields.args[argIndex].value = newValue.value;
+                    }
+                  "
+                  class="tw-w-52"
+                  :data-test="`dashboard-function-dropdown-arg-histogram-interval-input-${argIndex}`"
+                />
+
+                <!-- Remove argument button -->
+                <q-btn
+                  v-if="canRemoveArgument(fields.functionName, argIndex)"
+                  icon="close"
+                  dense
+                  flat
+                  round
+                  @click="removeArgument(argIndex)"
+                  class="tw-h-10 tw-w-10"
+                  :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
+                />
+              </div>
+            </div>
           </div>
-
-          <q-input
-            v-if="fields.args[argIndex]?.type === 'string'"
-            type="text"
-            v-model="fields.args[argIndex].value"
-            placeholder="Enter string"
-            :required="isRequired(fields.functionName, argIndex)"
-            class="tw-w-52"
-          />
-
-          <q-input
-            v-if="fields.args[argIndex]?.type === 'number'"
-            type="number"
-            v-model="fields.args[argIndex].value"
-            placeholder="Enter number"
-            :required="isRequired(fields.functionName, argIndex)"
-            class="tw-w-52"
-          />
-
-          <SelectFunction
-            v-if="fields.args[argIndex]?.type === 'function'"
-            class="tw-ml-4"
-            v-model="fields.args[argIndex].value"
-          />
-
-          <!-- histogram interval for sql queries -->
-          <HistogramIntervalDropDown
-            v-if="fields.args[argIndex]?.type === 'histogramInterval'"
-            :model-value="fields.args[argIndex].value"
-            @update:modelValue="
-              (newValue: any) => {
-                fields.args[argIndex].value = newValue.value;
-              }
-            "
-            class="tw-w-52"
-          />
-
-          <!-- Remove argument button -->
-          <q-btn
-            v-if="canRemoveArgument(fields.functionName, argIndex)"
-            icon="close"
-            dense
-            flat
-            round
-            @click="removeArgument(argIndex)"
-            class="tw-h-10 tw-w-10"
-          />
         </div>
-      </div>
 
-      <!-- Add more arguments if allowed -->
+        <!-- Add more arguments if allowed -->
+      </div>
     </div>
     <q-btn
       v-if="canAddArgument(fields.functionName)"
@@ -146,26 +204,39 @@
       class="tw-mt-3"
       no-caps
       dense
+      :data-test="`dashboard-function-dropdown-add-argument-button`"
     />
   </div>
 </template>
 
 <script lang="ts">
 import { ref, watch, toRef, computed, inject } from "vue";
-import functionValidation from "./functionValidation.json";
+import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { useSelectAutoComplete } from "@/composables/useSelectAutocomplete";
 import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
 import { addMissingArgs } from "@/utils/dashboard/convertDataIntoUnitValue";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
+import SubTaskArrow from "@/components/icons/SubTaskArrow.vue";
+import {
+  symOutlinedFunction,
+  symOutlinedTitle,
+  symOutlined123,
+  symOutlinedList,
+} from "@quasar/extras/material-symbols-outlined";
 
 export default {
   name: "SelectFunction",
-  components: { HistogramIntervalDropDown, StreamFieldSelect },
+  components: { HistogramIntervalDropDown, StreamFieldSelect, SubTaskArrow },
   props: {
     modelValue: {
       type: Object,
       required: true,
+    },
+    allowAggregation: {
+      type: Boolean,
+      required: false,
+      default: false,
     },
   },
   emits: ["update:modelValue"],
@@ -174,17 +245,9 @@ export default {
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const { dashboardPanelData, selectedStreamFieldsBasedOnUserDefinedSchema } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
-
-    // const schemaOptions = computed(() =>
-    //   selectedStreamFieldsBasedOnUserDefinedSchema?.value?.map(
-    //     (field: any) => ({
-    //       label: field.name,
-    //       value: field.name,
-    //     }),
-    //   ),
-    // );
+    const { getAllSelectedStreams } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+    );
 
     const fields = ref(addMissingArgs(props.modelValue));
 
@@ -205,7 +268,15 @@ export default {
 
     const filterFunctionsOptions = (val: string, update: any) => {
       update(() => {
-        filteredFunctions.value = functionValidation
+        let filteredFunctionsValidation = functionValidation;
+        // if allowAggregation is true, then filter the functions based on isAggregation
+        if (props.allowAggregation === false) {
+          filteredFunctionsValidation = filteredFunctionsValidation.filter(
+            (v) => !v.isAggregation,
+          );
+        }
+
+        filteredFunctions.value = filteredFunctionsValidation
           .map((v) => ({
             label: v.functionLabel,
             value: v.functionName,
@@ -218,7 +289,7 @@ export default {
 
     const getValidationForFunction = (functionName: string) => {
       return (
-        functionValidation.find((v) => v.functionName === functionName) ?? {}
+        functionValidation.find((v) => v.functionName === (functionName ?? null)) ?? {}
       );
     };
 
@@ -264,13 +335,13 @@ export default {
       if (canAddArgument(fields.value.functionName)) {
         if (funcValidation.allowAddArgAt === "n") {
           fields.value.args.push({
-            type: funcValidation?.args?.[adjustedIndex]?.type?.[0],
+            type: funcValidation?.args?.[adjustedIndex]?.type?.[0]?.value,
             value: "",
           });
         } else if (funcValidation.allowAddArgAt === "n-1") {
           // Add an argument before the separator
           fields.value.args.splice(fields.value.args.length - 1, 0, {
-            type: funcValidation?.args?.[adjustedIndex]?.type?.[0], // Add default type (e.g., field, string, etc.)
+            type: funcValidation?.args?.[adjustedIndex]?.type?.[0]?.value, // Add default type (e.g., field, string, etc.)
             value: "",
           });
         }
@@ -356,7 +427,9 @@ export default {
     watch(
       () => fields.value.functionName,
       (newVal) => {
-        // Reset the args array
+        // Save the old args
+        const oldArgs = [...fields.value.args];
+
         // get the validation for the selected function
         const funcValidation: any = getValidationForFunction(
           fields.value.functionName,
@@ -364,14 +437,23 @@ export default {
 
         // rebuild fields.value.args based on funcValidation.args
         if (funcValidation) {
-          // need to add args based on funcValidation.args
-          fields.value.args = (funcValidation?.args ?? []).flatMap((arg: any) =>
+          // Create new args array based on validation
+          const newArgs = (funcValidation?.args ?? []).flatMap((arg: any) =>
             // need to consider `min` config for each arg
             Array.from({ length: arg.min ?? 1 }).map(() => ({
-              type: arg.type[0],
-              value: arg?.defaultValue,
+              type: arg.type[0]?.value,
+              value: arg.type[0]?.value === "field" ? {} : arg?.defaultValue,
             })),
           );
+
+          // Preserve field values where both old and new types are "field"
+          for (let i = 0; i < newArgs.length && i < oldArgs.length; i++) {
+            if (newArgs[i].type === "field" && oldArgs[i].type === "field") {
+              newArgs[i].value = oldArgs[i].value;
+            }
+          }
+
+          fields.value.args = newArgs;
         }
       },
     );
@@ -396,31 +478,23 @@ export default {
       }
     };
 
-    const getAllSelectedStreams = () => {
-      // get all streams
-      // mainStream + all join streams
-
-      return [
-        {
-          stream:
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream,
-        },
-        ...((
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.joins ?? []
-        )?.map((join: any) => ({
-          stream: join.stream,
-          streamAlias: join.streamAlias,
-        })) ?? []),
-      ];
+    const getIconBasedOnArgType = (type: string) => {
+      switch (type) {
+        case "field":
+          return symOutlinedList;
+        case "function":
+          return symOutlinedFunction;
+        case "string":
+          return symOutlinedTitle;
+        case "number":
+          return symOutlined123;
+        case "histogramInterval":
+          return "bar_chart";
+      }
     };
 
     return {
       fields,
-      functionValidation,
       // availableFunctions,
       getValidationForFunction,
       canAddArgument,
@@ -437,7 +511,12 @@ export default {
       filterFunctionsOptions,
       onArgTypeChange,
       getAllSelectedStreams,
+      getIconBasedOnArgType,
     };
   },
 };
+<<<<<<< ours
 </script>
+=======
+</script>
+>>>>>>> theirs
