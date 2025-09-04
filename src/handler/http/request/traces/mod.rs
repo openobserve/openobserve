@@ -77,11 +77,15 @@ async fn handle_req(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
+    let content_type = req
+        .headers()
+        .get("Content-Type")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("application/json");
     let in_stream_name = req
         .headers()
         .get(&get_config().grpc.stream_header_key)
-        .map(|header| header.to_str().unwrap());
+        .and_then(|header| header.to_str().ok());
     if content_type.eq(CONTENT_TYPE_PROTO) {
         traces::otlp_proto(&org_id, body, in_stream_name).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
@@ -97,6 +101,8 @@ async fn handle_req(
 }
 
 /// GetLatestTraces
+///
+/// #{"ratelimit_module":"Traces", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Traces",
@@ -133,9 +139,6 @@ async fn handle_req(
         })),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
-    ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/{stream_name}/traces/latest")]
@@ -147,16 +150,20 @@ pub async fn get_latest_traces(
     let cfg = get_config();
 
     let (org_id, stream_name) = path.into_inner();
-    let http_span = if cfg.common.tracing_search_enabled {
-        tracing::info_span!(
+    let (http_span, trace_id) = if cfg.common.tracing_search_enabled {
+        let uuid_v7_trace_id = config::ider::generate_trace_id();
+        let span = tracing::info_span!(
             "/api/{org_id}/{stream_name}/traces/latest",
             org_id = org_id.clone(),
-            stream_name = stream_name.clone()
-        )
+            stream_name = stream_name.clone(),
+            trace_id = uuid_v7_trace_id.clone()
+        );
+
+        (span, uuid_v7_trace_id)
     } else {
-        Span::none()
+        let trace_id = get_or_create_trace_id(in_req.headers(), &Span::none());
+        (Span::none(), trace_id)
     };
-    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
     let user_id = in_req
         .headers()
         .get("user_id")
@@ -213,6 +220,7 @@ pub async fn get_latest_traces(
         Some(v) => v.to_string(),
         None => "".to_string(),
     };
+
     let from = query
         .get("from")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
@@ -230,6 +238,36 @@ pub async fn get_latest_traces(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
     if end_time == 0 {
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
+    }
+    // default/traces/latest?filter=trace_id=%2701990a31c98e72cbb5e38df024e7adef%27&
+    // start_time=1756811970952000&end_time=1756812870952000&from=0&size=25
+    // filter=trace_id=%2701990a31c98e72cbb5e38df024e7adef%27%20and%20service_name%20=%27all%27
+
+    let search_trace_id = query.get("trace_id").map(|v| v.to_string());
+    let start_time_from_trace_id = if let Some(trace_id) = search_trace_id {
+        config::ider::get_start_time_from_trace_id(&trace_id).unwrap_or(0)
+    } else if filter.contains("trace_id=") {
+        // Safely extract trace_id from filter string
+        let trace_id = filter
+            .split("trace_id=")
+            .nth(1)
+            .and_then(|s| s.split("&").next())
+            .and_then(|s| s.split(" ").next())
+            .map(|s| s.replace("'", "").replace("\"", ""))
+            .filter(|s| !s.is_empty());
+
+        if let Some(trace_id) = trace_id {
+            config::ider::get_start_time_from_trace_id(&trace_id).unwrap_or(0)
+        } else {
+            0
+        }
+    } else {
+        0
+    };
+
+    if start_time_from_trace_id > 0 {
+        start_time = start_time_from_trace_id - 60 * 1_000_000; //60 seconds earlier
+        end_time = start_time_from_trace_id + 3600 * 1_000_000; //1 hour later
     }
 
     let max_query_range = crate::common::utils::stream::get_max_query_range(
