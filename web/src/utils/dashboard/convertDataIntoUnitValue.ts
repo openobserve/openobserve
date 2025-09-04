@@ -1422,3 +1422,157 @@ export const getContrastColor = (
     return luminance > 0.5 ? "#000000" : "#FFFFFF";
   }
 };
+
+/**
+ * Converts rem units to pixels based on the root font size (typically 16px)
+ * @param {number} rem - The rem value to convert
+ * @param {number} rootFontSize - The root font size in pixels (default: 16)
+ * @returns {number} The value in pixels
+ */
+const remToPx = (rem: number, rootFontSize: number = 16): number => {
+  return rem * rootFontSize;
+};
+
+/**
+ * Calculates and configures the height needed for legends when positioned at the bottom
+ * @param {number} legendCount - Number of legend items
+ * @param {number} chartWidth - Width of the chart container
+ * @param {any[]} seriesData - Series data to get actual legend names
+ * @param {number} maxHeight - Maximum available height for chart container (optional)
+ * @param {any} legendConfig - Legend configuration object to modify (optional)
+ * @param {any} gridConfig - Grid configuration object to modify (optional)
+ * @param {number} chartHeight - Height of the chart container (required if configuring position)
+ * @returns {number} Height in pixels to reserve at the bottom
+ */
+export const calculateBottomLegendHeight = (
+  legendCount: number,
+  chartWidth: number,
+  seriesData: any[] = [],
+  maxHeight?: number,
+  legendConfig?: any,
+  gridConfig?: any,
+  chartHeight?: number,
+): number => {
+  if (legendCount === 0) return 0;
+
+  // Constants for legend sizing in rem units (converted to pixels)
+  const LEGEND_ITEM_HEIGHT = remToPx(1.25); // 1.25rem = 20px (Height per legend item row)
+  const LEGEND_PADDING = remToPx(2.5); // 2.5rem = 40px (Top and bottom padding)
+  const LEGEND_ICON_WIDTH = remToPx(0.875); // 0.875rem = 14px (Width of legend icon/symbol)
+  const LEGEND_ICON_MARGIN = remToPx(0.5); // 0.5rem = 8px (Margin between icon and text)
+  const LEGEND_ITEM_MARGIN = remToPx(1.25); // 1.25rem = 20px (Horizontal margin between legend items)
+  const MIN_TEXT_WIDTH = remToPx(3.125); // 3.125rem = 50px (Minimum text width per legend item)
+  const MAX_TEXT_WIDTH = remToPx(9.375); // 9.375rem = 150px (Maximum text width per legend item)
+
+  // Calculate average text width based on actual series names
+  let avgTextWidth = MIN_TEXT_WIDTH;
+  if (seriesData.length > 0) {
+    const totalTextLength = seriesData.reduce((sum, series) => {
+      const name = series.name || series.seriesName || "";
+      return sum + name.toString().length;
+    }, 0);
+    const avgTextLength = totalTextLength / seriesData.length;
+    // Estimate width: roughly 7 pixels per character, constrained by min/max
+    avgTextWidth = Math.min(
+      Math.max(avgTextLength * 7, MIN_TEXT_WIDTH),
+      MAX_TEXT_WIDTH,
+    );
+  }
+
+  // Calculate total width needed per legend item
+  const itemWidth =
+    LEGEND_ICON_WIDTH + LEGEND_ICON_MARGIN + avgTextWidth + LEGEND_ITEM_MARGIN;
+
+  // Calculate how many items can fit per row
+  const availableWidth = chartWidth - LEGEND_PADDING * 2;
+  const itemsPerRow = Math.max(1, Math.floor(availableWidth / itemWidth));
+
+  // Calculate number of rows needed
+  const numRows = Math.ceil(legendCount / itemsPerRow);
+
+  // Calculate total height
+  const totalHeight = numRows * LEGEND_ITEM_HEIGHT + LEGEND_PADDING;
+
+  // Apply 80% maximum height constraint if maxHeight is provided
+  // This ensures 20% of space is reserved for the chart and 80% maximum for legends
+  let finalHeight = Math.max(totalHeight, remToPx(3.125)); // Minimum height of 3.125rem = 50px
+
+  if (maxHeight && maxHeight > 0) {
+    const maxAllowedHeight = maxHeight * 0.8; // 80% maximum for legends, 20% for chart
+    finalHeight = Math.min(finalHeight, maxAllowedHeight);
+  }
+
+  // If configuration objects are provided, also configure positioning
+  if (legendConfig && gridConfig && chartHeight) {
+    // Set grid bottom margin
+    gridConfig.bottom = finalHeight;
+
+    // Position legend at exact location to prevent overflow to top
+    const legendTopPosition = chartHeight - finalHeight + 10; // 10px padding from bottom
+    legendConfig.top = legendTopPosition;
+    legendConfig.height = finalHeight - 20; // Constrain height within allocated space
+  }
+
+  return finalHeight;
+};
+
+/**
+ * Calculates the width needed for legends when positioned on the right
+ * Keeps chart height unchanged and ensures legends do not overlap the plot
+ * @param {number} legendCount - Number of legend items
+ * @param {number} chartWidth - Width of the chart container
+ * @param {number} chartHeight - Height of the chart container
+ * @param {any[]} seriesData - Series data to get actual legend names
+ * @param {boolean} isScrollable - Whether the legend is scrollable
+ * @returns {number} Width in pixels to reserve on the right
+ */
+export const calculateRightLegendWidth = (
+  legendCount: number,
+  chartWidth: number,
+  chartHeight: number,
+  seriesData: any[] = [],
+  isScrollable: boolean = false,
+): number => {
+  if (legendCount === 0) return 0;
+
+  // Sizing constants in rem units (converted to pixels)
+  const LEGEND_ROW_HEIGHT = remToPx(1.125); // 1.125rem = 18px (per line height)
+  const LEGEND_ICON_WIDTH = remToPx(0.875); // 0.875rem = 14px
+  const LEGEND_ICON_MARGIN = remToPx(0.625); // 0.625rem = 10px
+  const HORIZONTAL_PADDING = remToPx(1.5); // 1.5rem = 24px (left+right padding for legend area)
+  const VERTICAL_PADDING = remToPx(1); // 1rem = 16px
+  const MIN_TEXT_WIDTH = remToPx(5); // 5rem = 80px
+  const MAX_TEXT_WIDTH = remToPx(11.25); // 11.25rem = 180px (allow wider names)
+
+  // Longest text width to avoid truncation
+  let longestTextWidth = MIN_TEXT_WIDTH;
+  if (seriesData.length > 0) {
+    longestTextWidth = seriesData.reduce((max, series) => {
+      const name = (series.name || series.seriesName || "").toString();
+      const width = calculateWidthText(name);
+      return Math.max(max, width);
+    }, MIN_TEXT_WIDTH);
+    longestTextWidth = Math.min(
+      Math.max(longestTextWidth, MIN_TEXT_WIDTH),
+      MAX_TEXT_WIDTH,
+    );
+  }
+
+  // Width per legend column (icon + gap + text)
+  const perColumnWidth =
+    LEGEND_ICON_WIDTH + LEGEND_ICON_MARGIN + longestTextWidth;
+
+  // Determine rows that fit vertically and required columns
+  const availableHeight = Math.max(
+    chartHeight - VERTICAL_PADDING * 2,
+    LEGEND_ROW_HEIGHT,
+  );
+  const rows = Math.max(1, Math.floor(availableHeight / LEGEND_ROW_HEIGHT));
+  const cols = isScrollable ? 1 : Math.ceil(legendCount / rows);
+
+  // Total width reserved for legends
+  const totalLegendWidth = cols * perColumnWidth + HORIZONTAL_PADDING * 2;
+
+  // Allow using up to 80% of chart width to fully show legends
+  return Math.min(totalLegendWidth, Math.floor(chartWidth * 0.8));
+};
