@@ -1605,7 +1605,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount, onMounted, ref } from "vue";
+import {
+  computed,
+  defineComponent,
+  inject,
+  onBeforeMount,
+  onMounted,
+  ref,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
@@ -1767,10 +1774,6 @@ export default defineComponent({
 
       if (!dashboardPanelData?.data?.config?.trellis?.group_by_y_axis) {
         dashboardPanelData.data.config.trellis.group_by_y_axis = false;
-      }
-
-      if (!dashboardPanelData.data.config.show_gridlines) {
-        dashboardPanelData.data.config.show_gridlines = true;
       }
     });
 
