@@ -12,6 +12,15 @@ vi.mock("./convertDataIntoUnitValue", () => ({
   getContrastColor: vi.fn(() => "#FFFFFF"),
   applySeriesColorMappings: vi.fn(),
   getUnitValue: vi.fn((value) => ({ value: value?.toString() || "0", unit: "" })),
+  calculateRightLegendWidth: vi.fn(() => 120),
+  calculateBottomLegendHeight: vi.fn((legendCount, chartWidth, series, maxHeight, legendConfig, gridConfig, chartHeight) => {
+    if (legendConfig && gridConfig && chartHeight) {
+      legendConfig.top = chartHeight - 80;
+      legendConfig.height = 60;
+      gridConfig.bottom = 80;
+    }
+    return 80;
+  }),
 }));
 
 vi.mock("date-fns-tz", () => ({
@@ -2082,5 +2091,1285 @@ describe("Convert PromQL Data Utils", () => {
       expect(expectedTrace.coordinateSystem).toBe("polar");
     });
 
+  });
+
+  describe("Show Gridlines Configuration", () => {
+    it("should use default gridlines (true) when config is undefined", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: {}, // No show_gridlines config
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "test_metric" },
+              values: [[1640435200, "10"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.yAxis.splitLine.show).toBe(true);
+    });
+
+    it("should respect explicit gridlines configuration (true)", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_gridlines: true 
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "test_metric" },
+              values: [[1640435200, "10"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.yAxis.splitLine.show).toBe(true);
+    });
+
+    it("should respect explicit gridlines configuration (false)", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_gridlines: false 
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "test_metric" },
+              values: [[1640435200, "10"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      expect(result.options.xAxis.splitLine.show).toBe(false);
+      expect(result.options.yAxis.splitLine.show).toBe(false);
+    });
+
+    it("should apply gridlines to gauge chart axes", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "gauge",
+        config: { 
+          show_gridlines: false 
+        },
+        queries: [{ config: { promql_legend: "", min: 0, max: 100 } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "gauge_metric" },
+              values: [[1640435200, "75"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Gauge charts have array-based xAxis and yAxis
+      expect(result.options.xAxis).toEqual([{ type: "value", show: false }]);
+      expect(result.options.yAxis).toEqual([{ type: "value", show: false }]);
+    });
+
+    it("should apply gridlines to metric chart axes", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "metric",
+        config: { 
+          show_gridlines: true 
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "metric_value" },
+              values: [[1640435200, "50"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Metric charts have empty array axes
+      expect(result.options.xAxis).toEqual([]);
+      expect(result.options.yAxis).toEqual([]);
+    });
+
+    it("should handle gridlines with null config value", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_gridlines: null 
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "test_metric" },
+              values: [[1640435200, "10"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Based on the ternary logic: panelSchema?.config?.show_gridlines !== undefined ? panelSchema.config.show_gridlines : true
+      // When show_gridlines is null, it's not undefined, so it uses the null value
+      // The splitLine.show gets set to null, not the default true
+      expect(result.options.xAxis.splitLine.show).toBe(null);
+      expect(result.options.yAxis.splitLine.show).toBe(null);
+    });
+  });
+
+  describe("Connect Nulls Configuration", () => {
+    it("should use default connect_nulls (false) when config is undefined", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: {}, // No connect_nulls config
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "test_metric" },
+              values: [[1640435200, "10"], [1640435260, null], [1640435320, "20"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const lineSeries = result.options.series.find((s: any) => s.name === '{"__name__":"test_metric"}');
+      expect(lineSeries.connectNulls).toBe(false);
+    });
+
+    it("should respect explicit connect_nulls configuration (true)", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          connect_nulls: true 
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "test_metric" },
+              values: [[1640435200, "10"], [1640435260, null], [1640435320, "20"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const lineSeries = result.options.series.find((s: any) => s.name === '{"__name__":"test_metric"}');
+      expect(lineSeries.connectNulls).toBe(true);
+    });
+
+    it("should respect explicit connect_nulls configuration (false)", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          connect_nulls: false 
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "test_metric" },
+              values: [[1640435200, "15"], [1640435260, null], [1640435320, "25"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const lineSeries = result.options.series.find((s: any) => s.name === '{"__name__":"test_metric"}');
+      expect(lineSeries.connectNulls).toBe(false);
+    });
+
+    it("should apply connect_nulls to all chart types that support it", async () => {
+      const supportedTypes = ["line", "area", "area-stacked"];
+      
+      for (const chartType of supportedTypes) {
+        const panelSchema = {
+          id: "panel1",
+          type: chartType,
+          config: { 
+            connect_nulls: true 
+          },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: `${chartType}_metric` },
+                values: [[1640435200, "10"], [1640435260, null], [1640435320, "20"]],
+              },
+            ],
+          },
+        ];
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        const series = result.options.series.find((s: any) => s.name === `{"__name__":"${chartType}_metric"}`);
+        expect(series.connectNulls).toBe(true);
+      }
+    });
+  });
+
+  describe("Enhanced Legend Width Calculation", () => {
+    it("should calculate legend width automatically when no explicit width is set", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain"
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "very_long_metric_name_for_width_testing" },
+              values: [[1640435200, "10"]],
+            },
+            {
+              metric: { __name__: "short" },
+              values: [[1640435200, "20"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Should automatically calculate legend width
+      expect(result.options.grid.right).toBeGreaterThan(0);
+      expect(result.options.legend.textStyle.width).toBeGreaterThan(60);
+      expect(result.options.legend.left).toBeGreaterThanOrEqual(0);
+    });
+
+    it("should respect scroll legends type in width calculation", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "scroll"
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: Array.from({ length: 15 }, (_, i) => ({
+            metric: { __name__: `metric_${i}`, instance: `server_${i}` },
+            values: [[1640435200, (i * 10).toString()]],
+          })),
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Scroll legends should use calculateRightLegendWidth with scrollable=true
+      expect(result.options.grid.right).toBeGreaterThan(0);
+      expect(result.options.legend.textStyle.width).toBeGreaterThan(60);
+    });
+
+    it("should handle invalid legend width values gracefully", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_position: "right",
+          legend_width: { value: "invalid", unit: "px" }
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "test_metric" },
+              values: [[1640435200, "10"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Should fall back to automatic calculation when width is invalid
+      expect(result.options.grid.right).toBeGreaterThan(0);
+      expect(result.options.legend.textStyle.width).toBeGreaterThan(60);
+    });
+
+    it("should handle zero chart panel dimensions in legend width calculation", async () => {
+      const zeroChartPanelRef = {
+        value: {
+          offsetWidth: 0,
+          offsetHeight: 0,
+        },
+      };
+
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_position: "right"
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "test_metric" },
+              values: [[1640435200, "10"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        zeroChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Should handle zero dimensions gracefully
+      expect(result.options.grid.right).toBeGreaterThanOrEqual(0);
+      expect(result.options.legend.textStyle.width).toBeGreaterThanOrEqual(60);
+    });
+  });
+
+  describe("Bottom Legend Height Integration", () => {
+    it("should calculate bottom legend height for plain legends", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_type: "plain",
+          legends_position: "bottom"
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: Array.from({ length: 8 }, (_, i) => ({
+            metric: { __name__: `metric_${i}`, service: `service_${i}` },
+            values: [[1640435200, (i * 5).toString()]],
+          })),
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Should configure legend and grid positioning
+      expect(result.options.legend.top).toBeGreaterThan(0);
+      expect(result.options.legend.height).toBeGreaterThan(0);
+      expect(result.options.grid.bottom).toBeGreaterThan(0);
+    });
+
+    it("should calculate bottom legend height with auto position (null)", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_type: "plain",
+          legends_position: null // Auto position
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: Array.from({ length: 5 }, (_, i) => ({
+            metric: { __name__: `auto_metric_${i}` },
+            values: [[1640435200, (i * 10).toString()]],
+          })),
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Auto position should be treated as bottom
+      expect(result.options.legend.top).toBeGreaterThan(0);
+      expect(result.options.legend.height).toBeGreaterThan(0);
+      expect(result.options.grid.bottom).toBeGreaterThan(0);
+    });
+
+    it("should not apply bottom legend calculation for scroll type", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_type: "scroll",
+          legends_position: "bottom"
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "scroll_metric" },
+              values: [[1640435200, "10"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Should not apply calculateBottomLegendHeight for scroll type
+      expect(result.options.legend.left).toBe("0");
+      expect(result.options.legend.top).toBe("bottom");
+      // Grid bottom should use default calculation, not dynamic
+    });
+
+    it("should not apply bottom legend calculation when legends are disabled", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_legends: false,
+          legends_type: "plain",
+          legends_position: "bottom"
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "disabled_legend_metric" },
+              values: [[1640435200, "10"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Should not apply dynamic legend height calculation
+      expect(result.options.legend.show).toBe(false);
+    });
+  });
+
+  describe("Integration Tests for New Features", () => {
+    it("should handle combination of gridlines, connect_nulls, and legend positioning", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_gridlines: false,
+          connect_nulls: true,
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain"
+        },
+        queries: [{ config: { promql_legend: "Service: {service}" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "cpu_usage", service: "web-server" },
+              values: [[1640435200, "50"], [1640435260, null], [1640435320, "75"]],
+            },
+            {
+              metric: { __name__: "memory_usage", service: "database" },
+              values: [[1640435200, "80"], [1640435260, "85"], [1640435320, "90"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Test gridlines are disabled
+      expect(result.options.xAxis.splitLine.show).toBe(false);
+      expect(result.options.yAxis.splitLine.show).toBe(false);
+
+      // Test connect nulls is enabled
+      const cpuSeries = result.options.series.find((s: any) => s.name === "Service: web-server");
+      expect(cpuSeries.connectNulls).toBe(true);
+
+      // Test legend positioning is calculated
+      expect(result.options.legend.orient).toBe("vertical");
+      expect(result.options.grid.right).toBeGreaterThan(0);
+    });
+
+    it("should handle bottom legend with many series and custom legend names", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "area",
+        config: { 
+          show_legends: true,
+          legends_type: "plain",
+          legends_position: "bottom",
+          show_gridlines: true,
+          connect_nulls: false
+        },
+        queries: [{ config: { promql_legend: "{__name__} on {instance}" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: Array.from({ length: 12 }, (_, i) => ({
+            metric: { 
+              __name__: `metric_${i}`, 
+              instance: `server-${i}.example.com`,
+              job: `job-${i}`
+            },
+            values: [[1640435200, (i * 15).toString()], [1640435260, ((i * 15) + 5).toString()]],
+          })),
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Should apply bottom legend height calculation
+      expect(result.options.legend.top).toBeGreaterThan(0);
+      expect(result.options.legend.height).toBeGreaterThan(0);
+      expect(result.options.grid.bottom).toBeGreaterThan(0);
+
+      // Verify series names are properly formatted
+      expect(result.options.series.some((s: any) => 
+        s.name && s.name.includes("metric_0 on server-0.example.com")
+      )).toBe(true);
+    });
+
+    it("should handle edge case with very large number of series and legend calculations", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "bar",
+        config: { 
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "scroll"
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      
+      // Create 200 series (exceeds default limit of 100)
+      const largeSeries = Array.from({ length: 200 }, (_, i) => ({
+        metric: { 
+          __name__: `large_metric_${i}`, 
+          instance: `instance_${i}`,
+          datacenter: i < 100 ? "us-east" : "us-west"
+        },
+        values: [[1640435200, (i * 2).toString()]],
+      }));
+
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: largeSeries,
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Should limit series and show warning
+      expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
+        "Limiting the displayed series to ensure optimal performance"
+      );
+
+      // Should still calculate legend width for limited series
+      expect(result.options.grid.right).toBeGreaterThan(0);
+      expect(result.options.legend.textStyle.width).toBeGreaterThan(60);
+    });
+
+    it("should handle matrix result types with new configurations", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_gridlines: true,
+          connect_nulls: false,
+          show_legends: false
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "matrix_metric" },
+              values: [[1640435200, "30"], [1640435260, "35"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.legend.show).toBe(false);
+      expect(result.extras.isTimeSeries).toBe(true);
+    });
+
+    it("should handle error scenarios in legend width calculations gracefully", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_position: "right",
+          legend_width: { value: 150, unit: "px" }
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "test_metric" },
+              values: [[1640435200, "10"]],
+            },
+          ],
+        },
+      ];
+
+      // Mock undefined chartPanelRef to test fallback
+      const undefinedChartPanelRef = { value: null };
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        undefinedChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Should use explicit width despite undefined chartPanelRef
+      expect(result.options.grid.right).toBe(150);
+      expect(result.options.legend.textStyle.width).toBe(95); // 150 - 55
+    });
+
+    it("should handle complex PromQL legend template with multiple placeholders", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "area",
+        config: { 
+          show_gridlines: false,
+          connect_nulls: true,
+          show_legends: true,
+          legends_position: "bottom",
+          legends_type: "plain"
+        },
+        queries: [{ config: { promql_legend: "{__name__}[{instance}] - {job} ({mode})" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { 
+                __name__: "http_requests_total",
+                instance: "web-1:8080",
+                job: "web-server",
+                mode: "production"
+              },
+              values: [[1640435200, "100"], [1640435260, null], [1640435320, "150"]],
+            },
+            {
+              metric: { 
+                __name__: "http_requests_total",
+                instance: "web-2:8080", 
+                job: "web-server",
+                mode: "staging"
+              },
+              values: [[1640435200, "50"], [1640435260, "60"], [1640435320, "70"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Test complex legend name formatting
+      expect(result.options.series.some((s: any) => 
+        s.name === "http_requests_total[web-1:8080] - web-server (production)"
+      )).toBe(true);
+      expect(result.options.series.some((s: any) => 
+        s.name === "http_requests_total[web-2:8080] - web-server (staging)"
+      )).toBe(true);
+
+      // Test connect nulls
+      const series1 = result.options.series.find((s: any) => 
+        s.name === "http_requests_total[web-1:8080] - web-server (production)"
+      );
+      expect(series1.connectNulls).toBe(true);
+
+      // Test bottom legend calculation with long names
+      expect(result.options.legend.top).toBeGreaterThan(0);
+      expect(result.options.grid.bottom).toBeGreaterThan(0);
+    });
+
+    it("should handle performance with extreme configurations", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_gridlines: true,
+          connect_nulls: false,
+          show_legends: true,
+          legends_position: "right",
+          legends_type: null, // Should default to scroll behavior
+          axis_width: 15,
+          y_axis_min: 0,
+          y_axis_max: 1000
+        },
+        queries: [{ config: { promql_legend: "{__name__}_{instance}_{job}" } }],
+      };
+
+      // Create maximum allowed series (100)
+      const maxSeries = Array.from({ length: 100 }, (_, i) => ({
+        metric: { 
+          __name__: `performance_metric_${i}`,
+          instance: `performance_instance_${i}`,
+          job: `performance_job_${i}`
+        },
+        values: Array.from({ length: 100 }, (_, j) => [
+          1640435200 + (j * 60), 
+          (Math.random() * 1000).toString()
+        ]),
+      }));
+
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: maxSeries,
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Should handle maximum load without errors
+      expect(result.options).toBeDefined();
+      expect(result.options.series.length).toBeGreaterThan(95); // At least most series + annotation series
+      expect(result.options.grid.left).toBe(15);
+      expect(result.options.yAxis.min).toBe(0);
+      expect(result.options.yAxis.max).toBe(1000);
+      expect(result.options.grid.right).toBeGreaterThan(0);
+      expect(result.extras.isTimeSeries).toBe(true);
+    });
+
+    it("should properly integrate calculateRightLegendWidth function call", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line", 
+        config: { 
+          show_legends: true,
+          legends_position: "right",
+          legends_type: "plain"
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "integration_metric" },
+              values: [[1640435200, "25"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Should have called calculateRightLegendWidth (using default mock return value 120)
+      expect(result.options.grid.right).toBe(120);
+      expect(result.options.legend.textStyle.width).toBe(65); // 120 - 55
+    });
+
+    it("should properly integrate calculateBottomLegendHeight function call", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_legends: true,
+          legends_type: "plain",
+          legends_position: "bottom"
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "bottom_integration_metric" },
+              values: [[1640435200, "15"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Should have applied the mock function's modifications (using default mock values)
+      expect(result.options.legend.top).toBe(220); // 300 - 80 = 220
+      expect(result.options.legend.height).toBe(60);
+      expect(result.options.grid.bottom).toBe(80);
+    });
+
+    it("should handle axis border configuration with new gridlines", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_gridlines: true,
+          axis_border_show: true
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "border_test_metric" },
+              values: [[1640435200, "10"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Should show both axis borders and gridlines
+      expect(result.options.xAxis.axisLine.show).toBe(true);
+      expect(result.options.yAxis.axisLine.show).toBe(true);
+      expect(result.options.xAxis.splitLine.show).toBe(true);
+      expect(result.options.yAxis.splitLine.show).toBe(true);
+    });
+
+    it("should handle empty result but valid structure", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          show_gridlines: false,
+          connect_nulls: true
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [], // Empty result
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      // Should handle empty result gracefully
+      expect(result.options.xAxis.splitLine.show).toBe(false);
+      expect(result.options.yAxis.splitLine.show).toBe(false);
+      expect(result.options.series).toHaveLength(1); // Annotation series only
+      expect(result.extras.isTimeSeries).toBe(true);
+    });
+
+    it("should validate all chart types work with new gridlines configuration", async () => {
+      const chartTypes = ["line", "bar", "area", "scatter", "area-stacked"];
+      
+      for (const chartType of chartTypes) {
+        const panelSchema = {
+          id: "panel1",
+          type: chartType,
+          config: { 
+            show_gridlines: false,
+            connect_nulls: chartType.includes("area") || chartType === "line"
+          },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: `${chartType}_test_metric` },
+                values: [[1640435200, "20"]],
+              },
+            ],
+          },
+        ];
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        // All chart types should respect gridlines configuration
+        expect(result.options.xAxis.splitLine.show).toBe(false);
+        expect(result.options.yAxis.splitLine.show).toBe(false);
+        
+        // Verify chart-specific properties are preserved
+        expect(result.options.series.length).toBeGreaterThan(0);
+        expect(result.extras.isTimeSeries).toBe(true);
+      }
+    });
+
+    it("should handle tooltip formatting with new unit configurations", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          unit: "bytes",
+          unit_custom: "MB",
+          decimals: 3,
+          show_gridlines: true
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "byte_metric" },
+              values: [[1640435200, "1048576"], [1640435260, "2097152"]],
+            },
+          ],
+        },
+      ];
+
+      // Mock hoveredSeriesState to test tooltip behavior
+      const testHoveredState = {
+        value: {
+          setHoveredSeriesName: vi.fn(),
+          hoveredSeriesName: '{"__name__":"byte_metric"}',
+          panelId: "panel1",
+        },
+      };
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        testHoveredState,
+        mockAnnotations,
+      );
+
+      // Verify tooltip configuration
+      expect(result.options.tooltip.formatter).toBeDefined();
+      expect(result.options.tooltip.axisPointer.label.formatter).toBeDefined();
+      expect(result.options.tooltip.axisPointer.label.precision).toBe(3);
+    });
+
+    it("should handle step interpolation configuration with connect_nulls", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { 
+          line_interpolation: "step-start",
+          connect_nulls: false,
+          show_gridlines: true
+        },
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "step_metric" },
+              values: [[1640435200, "10"], [1640435260, null], [1640435320, "20"]],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const series = result.options.series.find((s: any) => s.name === '{"__name__":"step_metric"}');
+      expect(series.step).toBe("start"); // step-start becomes "start"
+      expect(series.smooth).toBe(false); // Should not be smooth with step
+      expect(series.connectNulls).toBe(false);
+    });
   });
 });
