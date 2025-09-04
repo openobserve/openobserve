@@ -36,7 +36,9 @@ use {
     chrono::{Duration, Utc},
     config::{SMTP_CLIENT, get_config},
     lettre::{AsyncTransport, Message, message::SinglePart},
-    o2_enterprise::enterprise::cloud::{InvitationRecord, OrgInviteStatus, org_invites},
+    o2_enterprise::enterprise::cloud::{
+        InvitationRecord, OrgInviteStatus, billings::get_billing_by_org_id, org_invites,
+    },
 };
 
 #[cfg(feature = "cloud")]
@@ -280,6 +282,20 @@ pub async fn create_org(
     if !is_allowed && !is_root_user(user_email) {
         return Err(anyhow::anyhow!("Only root user can create organization"));
     }
+
+    #[cfg(feature = "cloud")]
+    {
+        let orgs = list_orgs_by_user(user_email).await?;
+        for org in orgs {
+            let billing = get_billing_by_org_id(&org.identifier).await?;
+            if billing.is_none() {
+                return Err(anyhow::anyhow!(
+                    "A user cannot be part of multiple free accounts"
+                ));
+            }
+        }
+    }
+
     org.name = org.name.trim().to_owned();
 
     let has_valid_chars = org
@@ -521,6 +537,21 @@ pub async fn generate_invitation(
                 ));
             }
         }
+
+        if get_billing_by_org_id(org_id).await?.is_none() {
+            // If the org we are inviting to is paid, its fine to send invitations
+            // irrespective of what other orgs invitees are part of.
+            // if it is a free org, we must check that the orgs invitee is already part
+            // of are all paid, as one user cannot be part of more than one free org.
+            let invitee_orgs = list_orgs_by_user(invitee).await?;
+            for org in invitee_orgs {
+                if get_billing_by_org_id(&org.identifier).await?.is_none() {
+                    return Err(anyhow::anyhow!(
+                        "Invitee {invitee} is already part of another free org, cannot be invited in this org"
+                    ));
+                }
+            }
+        }
     }
     if let Some(org) = get_org(org_id).await {
         let invite_token = config::ider::generate();
@@ -603,6 +634,20 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
         Some(org) => org,
         None => return Err(anyhow::anyhow!("Organization doesn't exist")),
     };
+
+    if get_billing_by_org_id(&org_id).await?.is_none() {
+        // if the org user is joining is paid, no issues, we can just let them join
+        // if it is a free org, we must check that the orgs the joining user is already part
+        // of are all paid, as one user cannot be part of more than one free org.
+        let user_orgs = list_orgs_by_user(user_email).await?;
+        for org in user_orgs {
+            if get_billing_by_org_id(&org.identifier).await?.is_none() {
+                return Err(anyhow::anyhow!(
+                    "User is already a part of a free organization. A user cannot join multiple free orgs."
+                ));
+            }
+        }
+    }
 
     // Check if user is already part of the org
     if get_cached_user_org(&org_id, user_email).is_some() {
