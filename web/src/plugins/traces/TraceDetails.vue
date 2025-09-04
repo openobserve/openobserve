@@ -716,7 +716,7 @@ export default defineComponent({
             ) {
               startTime = Math.floor(res.data.hits[0].start_time / 1000);
               endTime = Math.ceil(res.data.hits[0].end_time / 1000);
-              updateQuery({
+              updateUrlQueryParams({
                 from: startTime,
                 to: endTime,
               });
@@ -742,7 +742,11 @@ export default defineComponent({
       }
     };
 
-    const updateQuery = (newParams: any) => {
+    /**
+     * Update the query parameters in the URL
+     * @param newParams - object containing new parameters
+     */
+    const updateUrlQueryParams = (newParams: any) => {
       router.replace({
         query: {
           ...router.currentRoute.value.query, // keep existing params
