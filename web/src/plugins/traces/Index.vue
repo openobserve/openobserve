@@ -664,6 +664,16 @@ async function getQueryData() {
       })
       .then(async (res) => {
         searchObj.loading = false;
+
+        if (
+          filter.replace(/ /g, "").includes("trace_id=") &&
+          res.data.hits.length === 1 &&
+          res.data.hits[0].start_time &&
+          res.data.hits[0].end_time
+        ) {
+          updateNewDateTime(res.data.start_time, res.data.end_time);
+        }
+
         const formattedHits = getTracesMetaData(res.data.hits);
         if (res.data.from > 0) {
           searchObj.data.queryResults.from = res.data.from;
@@ -729,6 +739,13 @@ async function getQueryData() {
     showErrorNotification("Search request failed");
   }
 }
+
+const updateNewDateTime = (startTime: number, endTime: number) => {
+  searchBarRef.value.updateNewDateTime({
+    startTime: startTime,
+    endTime: endTime,
+  });
+};
 
 const getTracesMetaData = (traces) => {
   if (!traces.length) return [];
@@ -1158,7 +1175,6 @@ const searchData = () => {
   }
 
   runQueryFn();
-  indexListRef.value.filterExpandedFieldValues();
 
   if (config.isCloud == "true") {
     segment.track("Button Click", {
