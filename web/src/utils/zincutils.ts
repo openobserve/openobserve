@@ -16,7 +16,7 @@
 import config from "../aws-exports";
 import { ref } from "vue";
 import { DateTime } from "luxon";
-import { v4 as uuidv4 } from "uuid";
+import { v4 as uuidv4, v7 as uuidv7 } from "uuid";
 import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
@@ -777,6 +777,10 @@ export function getUUID() {
   return uuidv4();
 }
 
+export function getUUIDv7() {
+  return uuidv7();
+}
+
 export const maskText = (text: string) => {
   // Disabled masking as it was not great usefully
   // const visibleChars = 4; // Number of characters to keep visible at the beginning and end
@@ -850,7 +854,9 @@ export const getFunctionErrorMessage = (
 };
 
 export const generateTraceContext = () => {
-  const traceId = getUUID().replace(/-/g, "");
+  // Use UUID v7 for trace ID (time-ordered)
+  const traceId = getUUIDv7().replace(/-/g, "");
+  // Use UUID v4 for span ID (random)
   const spanId = getUUID().replace(/-/g, "").slice(0, 16);
 
   return {

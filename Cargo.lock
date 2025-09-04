@@ -2556,6 +2556,7 @@ dependencies = [
  "tracing-subscriber",
  "urlencoding",
  "utoipa",
+ "uuid",
  "vrl",
 ]
 
