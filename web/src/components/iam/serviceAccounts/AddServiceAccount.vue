@@ -110,6 +110,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 import service_accounts from "@/services/service_accounts";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const defaultValue: any = () => {
   return {
@@ -138,6 +139,7 @@ export default defineComponent({
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
+    const { track } = useReo();
     const $q = useQuasar();
     const formData: any = ref(defaultValue());
     const existingUser = ref(false);
@@ -167,6 +169,7 @@ export default defineComponent({
       loadingOrganizations,
       logout_confirm,
       firstName,
+      track,
     };
   },
   created() {
@@ -220,25 +223,33 @@ export default defineComponent({
             dismiss();
             this.formData.email = userEmail;
           });
+          this.track("Button Click", {
+            button: "Update Service Account",
+            page: "Add Service Account"
+          });
       } else {
-        service_accounts
-          .create(this.formData, selectedOrg)
-          .then((res: any) => {
-            dismiss();
-            this.$emit("updated", res.data, this.formData, "created");
-          })
-          .catch((err: any) => {
-            if (err.response?.status != 403) {
-              if (err?.response?.data?.message) {
-                this.$q.notify({
-                  color: "negative",
-                  message: err?.response?.data?.message,
-                  timeout: 2000,
-                });
+          service_accounts
+            .create(this.formData, selectedOrg)
+            .then((res: any) => {
+              dismiss();
+              this.$emit("updated", res.data, this.formData, "created");
+            })
+            .catch((err: any) => {
+              if(err.response?.status != 403){
+                if(err?.response?.data?.message ) {
+                  this.$q.notify({
+                    color: "negative",
+                    message: err?.response?.data?.message,
+                    timeout: 2000,
+                  });
+                }
               }
-            }
-
-            dismiss();
+              
+              dismiss();
+            });
+          this.track("Button Click", {
+            button: "Create Service Account",
+            page: "Add Service Account"
           });
       }
     },

@@ -10,7 +10,7 @@ git-fetch-with-cli = true
 
 exceptions = [
     # We should probably NOT bundle CA certs but use the OS ones.
-    { name = "webpki-roots", allow = ["MPL-2.0"] },
+    { name = "webpki-roots", allow = ["MPL-2.0","CDLA-Permissive-2.0"] },
     { name = "openobserve", allow = ["AGPL-3.0"] },
     { name = "config", allow = ["AGPL-3.0"] },
     { name = "infra", allow = ["AGPL-3.0"] },

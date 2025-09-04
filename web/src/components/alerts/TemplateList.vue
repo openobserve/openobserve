@@ -183,6 +183,7 @@ import { useRouter } from "vue-router";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ImportTemplate from "./ImportTemplate.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const AddTemplate = defineAsyncComponent(
   () => import("@/components/alerts/AddTemplate.vue"),
@@ -192,6 +193,7 @@ const store = useStore();
 const { t } = useI18n();
 const router = useRouter();
 const q = useQuasar();
+const { track } = useReo();
 const templates: Ref<Template[]> = ref([]);
 const columns: any = ref<QTableProps["columns"]>([
   {
@@ -308,6 +310,12 @@ const getTemplateByName = (name: string) => {
   return templates.value.find((template) => template.name === name);
 };
 const editTemplate = (template: any = null) => {
+  if (!template) {
+    track("Button Click", {
+      button: "Add Template",
+      page: "Alert Templates"
+    });
+  }
   resetEditingTemplate();
   toggleTemplateEditor();
 

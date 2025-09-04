@@ -106,6 +106,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import segment from "../../services/segment_analytics";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const defaultValue: any = () => {
   return {
@@ -139,6 +140,7 @@ export default defineComponent({
     const editorRef: any = ref(null);
     let editorobj: any = null;
     const isFetchingStreams = ref(false);
+    const { track } = useReo();
 
     let compilationErr = ref("");
 
@@ -191,6 +193,10 @@ export default defineComponent({
         user_id: store.state.userInfo.email,
         function_name: formData.value.name,
         page: "Add/Update Enrichment Table",
+      });
+      track("Button Click", {
+        button: "Save Enrichment Table",
+        page: "Add Enrichment Table"
       });
     };
 

@@ -215,12 +215,15 @@ import { useI18n } from "vue-i18n";
 import reports from "@/services/reports";
 import { cloneDeep } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const reportsTableRows: Ref<any[]> = ref([]);
 
 const { t } = useI18n();
 
 const router = useRouter();
+
+const { track } = useReo();
 
 const confirmDelete = ref(false);
 
@@ -498,6 +501,10 @@ const deleteReport = (report: any) => {
 };
 
 const createNewReport = () => {
+  track("Button Click", {
+    button: "Add Report",
+    page: "Reports"
+  });
   router.push({ name: "createReport" });
 };
 
