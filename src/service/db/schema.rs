@@ -28,7 +28,10 @@ use config::{
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache,
-    cluster_coordinator::events::{SchemaAction, SchemaEvent},
+    cluster_coordinator::{
+        events::{SchemaAction, SchemaEvent},
+        should_watch_through_queue,
+    },
     schema::{
         SCHEMA_KEY, STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST,
         STREAM_SETTINGS, SchemaCache, unwrap_stream_settings,
@@ -278,7 +281,7 @@ pub async fn list(
 pub async fn watch() -> Result<(), anyhow::Error> {
     // For non-local mode, we use the nats queue to watch the schema events.
     // Hence no need to watch the schema events here.
-    if !get_config().common.local_mode {
+    if should_watch_through_queue() {
         return Ok(());
     }
     let cluster_coordinator = db::get_coordinator().await;

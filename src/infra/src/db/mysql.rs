@@ -18,7 +18,6 @@ use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{
-    get_config,
     metrics::{DB_QUERY_NUMS, DB_QUERY_TIME},
     utils::{hash::Sum64, util::zero_or},
 };
@@ -32,6 +31,7 @@ use tokio::sync::{OnceCell, mpsc};
 
 use super::{DBIndex, IndexStatement};
 use crate::{
+    cluster_coordinator::should_watch_through_queue,
     errors::*,
     schema::{SCHEMA_KEY, schema_delete_event, schema_update_event},
 };
@@ -213,12 +213,12 @@ impl super::Db for MysqlDb {
         let time = start.elapsed().as_secs_f64();
         // event watch
         if need_watch {
-            let local_mode = if key.starts_with(SCHEMA_KEY) {
-                get_config().common.local_mode
+            let should_use_queue = if key.starts_with(SCHEMA_KEY) {
+                should_watch_through_queue()
             } else {
                 false
             };
-            if !local_mode && key.starts_with(SCHEMA_KEY) {
+            if should_use_queue && key.starts_with(SCHEMA_KEY) {
                 if let Err(e) =
                     crate::schema::publish_event(schema_update_event(key, start_dt)).await
                 {
@@ -471,8 +471,8 @@ impl super::Db for MysqlDb {
 
         // event watch
         if need_watch {
-            let local_mode = if key.starts_with(SCHEMA_KEY) {
-                get_config().common.local_mode
+            let should_use_queue = if key.starts_with(SCHEMA_KEY) {
+                should_watch_through_queue()
             } else {
                 // we can ignore for the modules other than schema
                 // because only schema is broadcasted through the coordinator queue.
@@ -483,7 +483,7 @@ impl super::Db for MysqlDb {
             } else {
                 start_dt
             };
-            if !local_mode && key.starts_with(SCHEMA_KEY) {
+            if should_use_queue && key.starts_with(SCHEMA_KEY) {
                 if let Err(e) =
                     crate::schema::publish_event(schema_update_event(key, start_dt)).await
                 {
@@ -509,8 +509,8 @@ impl super::Db for MysqlDb {
     ) -> Result<()> {
         // event watch
         if need_watch {
-            let local_mode = if key.starts_with(SCHEMA_KEY) {
-                get_config().common.local_mode
+            let should_use_queue = if key.starts_with(SCHEMA_KEY) {
+                should_watch_through_queue()
             } else {
                 false
             };
@@ -523,7 +523,7 @@ impl super::Db for MysqlDb {
             let cluster_coordinator = super::get_coordinator().await;
             tokio::task::spawn(async move {
                 for key in items {
-                    if !local_mode && key.starts_with(SCHEMA_KEY) {
+                    if should_use_queue && key.starts_with(SCHEMA_KEY) {
                         if let Err(e) =
                             crate::schema::publish_event(schema_delete_event(&key, start_dt)).await
                         {

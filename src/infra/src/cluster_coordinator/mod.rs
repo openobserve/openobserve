@@ -21,7 +21,7 @@ pub mod pipelines;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use config::{get_config, utils::json};
+use config::{get_config, meta::meta_store::MetaStore, utils::json};
 use tokio::sync::mpsc;
 
 use crate::{
@@ -37,7 +37,7 @@ pub async fn get_coordinator() -> &'static Box<dyn Db> {
 }
 
 pub async fn create_stream() -> Result<(), Error> {
-    if get_config().common.local_mode {
+    if !should_watch_through_queue() {
         return Ok(());
     }
     log::info!("[INTERNAL_COORDINATOR::CREATE_STREAM] creating internal coordinator stream");
@@ -50,7 +50,7 @@ pub async fn create_stream() -> Result<(), Error> {
 /// `event` should be a json string. The message will be published to the internal coordinator
 /// stream.
 pub async fn publish(event: InternalCoordinatorEvent) -> Result<(), Error> {
-    if get_config().common.local_mode {
+    if !should_watch_through_queue() {
         return Ok(());
     }
     let payload = json::to_vec(&event).map_err(|e| {
@@ -70,7 +70,7 @@ where
     F: Fn(Vec<u8>) -> Fut,
     Fut: Future<Output = Result<(), anyhow::Error>>,
 {
-    if get_config().common.local_mode {
+    if !should_watch_through_queue() {
         return Ok(());
     }
     log::info!("[INTERNAL_COORDINATOR::SUBSCRIBE] subscribing to internal coordinator stream");
@@ -93,4 +93,10 @@ where
         }
     }
     Ok(())
+}
+
+pub fn should_watch_through_queue() -> bool {
+    let cfg = get_config();
+    let cluster_coordinator: MetaStore = cfg.common.cluster_coordinator.as_str().into();
+    !cfg.common.local_mode && cluster_coordinator == MetaStore::Nats
 }
