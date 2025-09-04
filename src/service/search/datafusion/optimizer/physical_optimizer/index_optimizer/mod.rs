@@ -180,7 +180,6 @@ impl PhysicalOptimizerRule for LeaderIndexOptimizerule {
 
         // set index_optimizer_mode to the remotescan
         if let Some(index_optimizer_mode) = rewriter.index_optimizer_mode {
-            println!("\nindex_optimizer_mode: {:?}\n", index_optimizer_mode);
             let mut rewriter = IndexOptimizerRewrite::new(index_optimizer_mode);
             plan = plan.rewrite(&mut rewriter)?.data;
         }

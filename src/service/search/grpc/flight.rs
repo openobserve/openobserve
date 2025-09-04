@@ -500,9 +500,9 @@ fn optimizer_physical_plan(
     let mut plan = index_rule.optimize(plan, ctx.state().config_options())?;
 
     let index_condition = index_condition_ref.lock().clone();
+    // if index_condition is not None, we need to use index optimizer rule(TopN, Distinct)
     if let Some(index_condition) = index_condition
-        // if index_condition is not None, we need to use index optimizer rule(TopN, Distinct)
-        && index_optimizer_rule_ref.lock().is_none() // if
+        && index_optimizer_rule_ref.lock().is_none()
     {
         let index_optimizer_rule = FollowerIndexOptimizerule::new(
             time_range,
