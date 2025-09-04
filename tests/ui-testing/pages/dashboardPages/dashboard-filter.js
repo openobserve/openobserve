@@ -180,11 +180,12 @@ export default class DashboardFilter {
     //   .first()
     //   .click();
 
-    // Wait for the dropdown menu to appear and select first suggestion
-    const menu = this.page.locator('div.q-menu[role="listbox"]');
-    await menu.waitFor({ state: "visible", timeout: 10000 });
-
-    const firstSuggestion = menu.locator('div.q-item').first();
+    // Wait for the suggestion list to appear and select the first suggestion
+    const suggestion = await this.page.locator(
+      'div.q-menu[role="listbox"] div.q-item'
+    );
+    await suggestion.waitFor({ state: "visible", timeout: 10000 });
+    const firstSuggestion = suggestion.first();
     await firstSuggestion.waitFor({ state: "visible", timeout: 10000 });
     await firstSuggestion.click();
 
