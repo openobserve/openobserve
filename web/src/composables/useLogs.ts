@@ -122,14 +122,14 @@ type SearchPartition = {
 
 const searchPartitionMap = reactive<Record<string, SearchPartition>>({});
 
-let { updateFieldValues, extractFields, updateGridColumns, filterHitsColumns, getStreamList, extractFTSFields, loadStreamLists } = useStreamFieldUtils();
-
 const useLogs = () => {
   const store = useStore();
   const { t } = useI18n();
   const $q = useQuasar();
   const { getAllFunctions } = useFunctions();
   const { getAllActions } = useActions();
+
+  const { updateFieldValues, extractFields, updateGridColumns, filterHitsColumns, getStreamList, extractFTSFields, loadStreamLists } = useStreamFieldUtils();
 
   let parser: null | Parser = new Parser();
 
@@ -6125,7 +6125,6 @@ const useLogs = () => {
     getStreams,
     updatedLocalLogFilterField,
     getFunctions,
-    getStreamList,
     fieldValues,
     extractFields,
     getQueryData,
