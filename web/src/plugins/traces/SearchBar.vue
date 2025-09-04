@@ -416,8 +416,8 @@ export default defineComponent({
      */
     const updateNewDateTime = (value: object) => {
       if (!value.startTime || !value.endTime) return;
-      dateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
-      dateTimeRef.value.setDateType("absolute");
+      dateTimeRef.value?.setAbsoluteTime(value.startTime, value.endTime);
+      dateTimeRef.value?.setDateType("absolute");
     };
 
     return {

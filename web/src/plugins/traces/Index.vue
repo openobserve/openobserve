@@ -750,7 +750,7 @@ async function getQueryData() {
  * @param endTime - end time in microseconds
  */
 const updateNewDateTime = (startTime: number, endTime: number) => {
-  searchBarRef.value.updateNewDateTime({
+  searchBarRef.value?.updateNewDateTime({
     startTime: startTime,
     endTime: endTime,
   });
