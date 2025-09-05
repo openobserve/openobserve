@@ -1,7 +1,10 @@
-import { test, expect } from "../baseFixtures";
+const {
+  test,
+  expect,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
 import path from "path";
 import fs from "fs";
-import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 const testLogger = require('../utils/test-logger.js');
@@ -25,8 +28,7 @@ test.describe("Custom Charts Tests", () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestion(page);
   });
 
