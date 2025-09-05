@@ -271,8 +271,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-              <div class="data-to-display row items-end">
+              <div class="data-to-display row items-end tw-flex tw-justify-between">
                 {{ summary.function_count }}
+                <div>
+                      <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                    >View
+                      <router-link
+                        exact
+                        :to="{ name: 'functionList' }"
+                        class="absolute full-width full-height"
+                      ></router-link>
+                  </q-btn>
+                </div>
               </div>
             </div>
           </div>
@@ -290,8 +300,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-              <div class="data-to-display row items-end">
+              <div class="data-to-display row items-end tw-flex tw-justify-between">
                 {{ summary.dashboard_count }}
+                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                    >View
+                      <router-link
+                        exact
+                        :to="{ name: 'dashboards' }"
+                        class="absolute full-width full-height"
+                      ></router-link>
+                  </q-btn>
               </div>
             </div>
           </div>
