@@ -52,6 +52,13 @@ pub fn uuid() -> String {
     Ksuid::new(None, None).to_string()
 }
 
+/// Generate a unique id like uuid for file name.
+pub fn generate_file_name() -> String {
+    let id = generate();
+    let rand_str = format!("{:04x}", rand::random::<u16>());
+    id + rand_str.as_str()
+}
+
 /// Generate a new trace_id.
 pub fn generate_trace_id() -> String {
     let trace_id = crate::utils::rand::get_rand_u128()
