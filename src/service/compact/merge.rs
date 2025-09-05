@@ -846,7 +846,7 @@ pub async fn merge_files(
 
     // generate datafusion tables
     let mut tables = Vec::new();
-    let trace_id = ider::generate();
+    let trace_id = ider::generate_file_name();
     for (schema_key, files) in file_groups {
         if files.is_empty() {
             continue;
