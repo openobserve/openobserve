@@ -2019,7 +2019,8 @@ export class LogsPage {
     }
 
     async clickDownloadResults() {
-        return await this.page.getByText('Download results', { exact: true }).click();
+        await this.page.getByText('keyboard_arrow_right').click();
+        return await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
     }
 
     async clickDownloadResultsForCustom() {

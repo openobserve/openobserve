@@ -1,45 +1,40 @@
-import { test, expect } from "../baseFixtures";
-import PageManager from "../../pages/page-manager.js";
-import logData from "../../cypress/fixtures/log.json";
-import logsdata from "../../../test-data/logs_data.json";
-// (duplicate import removed)
-import * as fs from 'fs';
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const testLogger = require('../utils/test-logger.js');
+const PageManager = require('../../pages/page-manager.js');
+const logData = require("../../fixtures/log.json");
+const logsdata = require("../../../test-data/logs_data.json");
+const fs = require('fs');
 
 test.describe("Logs Downloads testcases", () => {
   let pageManager;
   let downloadDir;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    // Initialize test setup
+    testLogger.testStart(testInfo.title, testInfo.file);
+    
+    // Navigate to base URL with authentication
+    await navigateToBase(page);
     pageManager = new PageManager(page);
     
-    // Navigate to login page first
-    await page.goto(process.env["ZO_BASE_URL"]);
-    
-    // Click "Login as internal user" if visible
-    if (await page.getByText('Login as internal user').isVisible()) {
-      await page.getByText('Login as internal user').click();
-    }
-    
-    // Use existing login function from logs page
-    await pageManager.logsPage.login();
-    await page.waitForTimeout(1000);
+    // Post-authentication stabilization wait
+    await page.waitForLoadState('networkidle');
     
     // Use existing ingestion function from logs page - ingest multiple times to ensure enough data
-    console.log('📊 Ingesting data to ensure sufficient records for testing...');
+    testLogger.info('Ingesting data to ensure sufficient records for testing');
     await pageManager.logsPage.ingestLogs(process.env["ORGNAME"], "e2e_automate", logsdata);
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
     
     // Ingest additional data to ensure we have at least 10000 records
     for (let i = 0; i < 5; i++) {
       await pageManager.logsPage.ingestLogs(process.env["ORGNAME"], "e2e_automate", logsdata);
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('domcontentloaded');
     }
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
     await pageManager.logsPage.selectStream("e2e_automate");
     await pageManager.logsPage.clickRefreshButton();
     await expect(page.locator('[data-test="log-table-column-0-source"]').getByText('{"_timestamp":')).toBeVisible();
@@ -61,12 +56,23 @@ test.describe("Logs Downloads testcases", () => {
   test("should download normal results and verify CSV content", {
     tag: ['@downloadNormal', '@all', '@logs', '@logsDownloads']
   }, async ({ page }) => {
-    console.log('🧪 Starting test: Normal download (no custom range)');
+    testLogger.info('Starting test: Normal download (no custom range)');
     
     await pageManager.logsPage.clickMoreOptionsButton();
     await pageManager.logsPage.clickDownloadResults();
     const downloadPromise = pageManager.logsPage.waitForDownload();
-    await page.getByText('CSV', { exact: true }).click();
+    
+    // Try to find CSV button with fallback mechanism
+    const csvButton = page.getByText('CSV', { exact: true });
+    try {
+      await csvButton.waitFor({ state: 'visible', timeout: 3000 });
+      await csvButton.click();
+    } catch (error) {
+      testLogger.debug('CSV button not visible, reopening more options menu');
+      await pageManager.logsPage.clickMoreOptionsButton();
+      await csvButton.click();
+    }
+    
     const download = await downloadPromise;
     
     // Verify download started
@@ -74,7 +80,7 @@ test.describe("Logs Downloads testcases", () => {
     expect(download.suggestedFilename()).toBeTruthy();
     
     await pageManager.logsPage.verifyDownload(download, 'download_results.csv', downloadDir);
-    console.log('✅ Test completed: Normal download verification finished');
+    testLogger.info('Test completed: Normal download verification finished');
   });
 
   test("should download custom range 100 results and verify CSV content", {
