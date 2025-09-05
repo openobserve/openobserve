@@ -135,6 +135,7 @@ jobs:
             browser: "chrome"
             run_files:
               [
+                "logsDownloads.spec.js",
                 "logsqueries.spec.js",
                 "secondsPrecisionAdded.spec.js",
                 "logsqueries.cte.spec.js",
@@ -178,7 +179,7 @@ jobs:
                 "dashboard-maps.spec.js",
                 "dashboard-multi-y-axis.spec.js",
                 "dashboard-html-chart.spec.js",
-                # "visualize.spec.js",
+                "visualize.spec.js",
                 # "visualization-vrl.spec.js"
               ]
           - testfolder: "Pipelines"
