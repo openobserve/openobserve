@@ -812,7 +812,7 @@ export class SanityPage {
         const sqlEditor = this.page.locator('#fnEditor');
         await expect(sqlEditor).toBeVisible({ timeout: 15000 });
         
-        await expect(sqlEditor).locator('.inputarea').toBeEditable({ timeout: 10000 });
+        await expect(sqlEditor).locator('.monaco-editor').toBeEditable({ timeout: 10000 });
         
         await sqlEditor.locator('.monaco-editor').click();
         
