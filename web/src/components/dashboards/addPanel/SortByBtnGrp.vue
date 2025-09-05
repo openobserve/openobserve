@@ -1,21 +1,21 @@
 <template>
   Sort By:
-  <q-btn-group class="q-mr-sm">
+  <q-btn-group class="tw-border-none">
     <q-btn
-      :class="!fieldObj.sortBy ? 'selected' : ''"
+      :class="[!fieldObj.sortBy ? 'selected' : '', 'tw-px-2.5']"
       @click="updateSortOption(null)"
       icon="block"
       size="sm"
       data-test="dashboard-sort-by-item-clear"
     />
     <q-btn
-      :class="fieldObj.sortBy === 'ASC' ? 'selected' : ''"
+      :class="[fieldObj.sortBy === 'ASC' ? 'selected' : 'custom-border no-border', 'tw-px-2.5']"
       @click="updateSortOption('ASC')"
       data-test="dashboard-sort-by-item-asc"
       ><AscSort
     /></q-btn>
     <q-btn
-      :class="fieldObj.sortBy === 'DESC' ? 'selected' : ''"
+      :class="[fieldObj.sortBy === 'DESC' ? 'selected' : '', 'tw-px-2.5']"
       @click="updateSortOption('DESC')"
       data-test="dashboard-sort-by-item-desc"
       ><DescSort
@@ -42,10 +42,10 @@ export default defineComponent({
   setup(props) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey
+      dashboardPanelDataPageKey,
     );
 
     const updateSortOption = (value: any) => {
@@ -64,5 +64,18 @@ export default defineComponent({
   background-color: var(--q-primary) !important;
   font-weight: bold;
   color: white;
+}
+
+.no-border {
+  border: none !important;
+}
+.custom-border {
+  border-top: 2px solid #d5d5d5 !important;
+  border-bottom: 2px solid #d5d5d5 !important;
+  border-left: 0px solid !important;
+  border-right: 0px solid !important;
+}
+.q-btn {
+  border: none;
 }
 </style>
