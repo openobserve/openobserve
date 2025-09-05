@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-icon size="xs" name="refresh" style="align-items: baseline; padding: 0px;" />
                   </q-item-section>
                   <q-item-section>
-                    <q-item-label style="font-size: 12px; align-items: baseline; padding: 0px;">Apply without using cache</q-item-label>
+                    <q-item-label style="font-size: 12px; align-items: baseline; padding: 0px;">Refresh Cache & Apply</q-item-label>
                   </q-item-section>
                 </q-item>
               </q-list>
