@@ -19,7 +19,7 @@ impl RemoveShortFilter {
 
 impl<T> RemoveShortFilterStream<T> {
     fn predicate(&self, token: &Token) -> bool {
-        token.text.len() > self.token_length_limit
+        token.text.len() >= self.token_length_limit
     }
 }
 
@@ -110,10 +110,11 @@ mod tests {
     #[test]
     fn test_remove_short() {
         let tokens = token_stream_helper("i am a hello tantivy, happy searching!");
-        assert_eq!(tokens.len(), 4);
-        assert_token(&tokens[0], 3, "hello", 7, 12);
-        assert_token(&tokens[1], 4, "tantivy", 13, 20);
-        assert_token(&tokens[2],5, "happy", 22, 27);
-        assert_token(&tokens[3], 6, "searching", 28, 37);
+        assert_eq!(tokens.len(), 5);
+        assert_token(&tokens[0], 1, "am", 2, 4);
+        assert_token(&tokens[1], 3, "hello", 7, 12);
+        assert_token(&tokens[2], 4, "tantivy", 13, 20);
+        assert_token(&tokens[3], 5, "happy", 22, 27);
+        assert_token(&tokens[4], 6, "searching", 28, 37);
     }
 }

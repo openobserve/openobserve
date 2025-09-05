@@ -22,7 +22,7 @@ use tantivy::tokenizer::{SimpleTokenizer, TextAnalyzer, Token};
 use crate::{get_config, utils::tantivy::tokenizer::remove_short::RemoveShortFilter};
 
 pub const O2_TOKENIZER: &str = "o2";
-const MIN_TOKEN_LENGTH: usize = 1;
+const MIN_TOKEN_LENGTH: usize = 2;
 const MAX_TOKEN_LENGTH: usize = 64;
 
 pub fn o2_tokenizer_build() -> TextAnalyzer {

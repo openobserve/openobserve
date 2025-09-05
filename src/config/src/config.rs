@@ -1420,7 +1420,7 @@ pub struct Limit {
     pub inverted_index_skip_threshold: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_MIN_TOKEN_LENGTH",
-        default = 1,
+        default = 2,
         help = "Minimum length of a token in the inverted index."
     )]
     pub inverted_index_min_token_length: usize,
@@ -2824,7 +2824,7 @@ fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.inverted_index_cache_max_entries = 100000;
     }
     if cfg.limit.inverted_index_min_token_length == 0 {
-        cfg.limit.inverted_index_min_token_length = 1;
+        cfg.limit.inverted_index_min_token_length = 2;
     }
     if cfg.limit.inverted_index_max_token_length == 0 {
         cfg.limit.inverted_index_max_token_length = 64;
