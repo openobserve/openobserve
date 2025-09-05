@@ -316,12 +316,28 @@ export default class LogsVisualise {
         // Double-check visibility after waiting
         const isVisible = await chartRenderer.first().isVisible();
         if (!isVisible) {
-          // Wait a bit more and try again before failing
-          await page.waitForTimeout(2000);
+          // Wait for chart content to be rendered intelligently
+          const chartContentReady = await this.waitForChartContent(page, 3000);
+
+          if (!chartContentReady) {
+            // Fallback: try waiting for chart renderer to be stable
+            try {
+              await chartRenderer.first().waitFor({
+                state: "visible",
+                timeout: 2000,
+              });
+            } catch (fallbackError) {
+              throw new Error(
+                `Chart renderer present but content failed to load after intelligent waiting. Error: ${fallbackError.message}`
+              );
+            }
+          }
+
+          // Final visibility check after intelligent waiting
           const isVisibleRetry = await chartRenderer.first().isVisible();
           if (!isVisibleRetry) {
             throw new Error(
-              "Chart renderer is present but not visible after retry"
+              "Chart renderer is present but not visible after intelligent retry"
             );
           }
         }
@@ -341,6 +357,54 @@ export default class LogsVisualise {
           `No chart renderer found. Original error: ${error.message}`
         );
       }
+    }
+  }
+
+  // Helper method to wait for chart content intelligently
+  async waitForChartContent(page, timeout = 5000) {
+    try {
+      await Promise.race([
+        // Wait for chart canvas to be visible (for chart types)
+        page
+          .locator('[data-test="chart-renderer"] canvas')
+          .first()
+          .waitFor({
+            state: "visible",
+            timeout,
+          })
+          .catch(() => {}),
+        // Wait for table content to be visible (for table chart)
+        page
+          .locator('[data-test="dashboard-panel-table"] tbody tr')
+          .first()
+          .waitFor({
+            state: "visible",
+            timeout,
+          })
+          .catch(() => {}),
+        // Wait for any loading indicators to disappear
+        page
+          .locator('[data-test="chart-loading"], .q-spinner')
+          .waitFor({
+            state: "hidden",
+            timeout,
+          })
+          .catch(() => {}),
+        // Wait for data to be rendered (generic data elements)
+        page
+          .locator(
+            '[data-test="chart-renderer"] [data-value], [data-test="dashboard-panel-table"] td'
+          )
+          .first()
+          .waitFor({
+            state: "visible",
+            timeout,
+          })
+          .catch(() => {}),
+      ]);
+      return true;
+    } catch (error) {
+      return false;
     }
   }
 
