@@ -3,7 +3,7 @@ import logData from "../../ui-testing/cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
 import { LogsPage } from '../pages/logsPage.js';
 
-test.describe.configure({ mode: 'serial' });
+test.describe.configure({ mode: 'parallel' });
 const streamName = `stream${Date.now()}`;
 
 async function login(page) {
@@ -230,6 +230,29 @@ test.describe("Schema testcases", () => {
     await page.getByPlaceholder('Name *').click();
     await page.getByPlaceholder('Name *').fill(fieldName);
     console.log(`Filled field name: ${fieldName}`);
+    
+    // Check if data type field exists
+    const dataTypeField = page.getByPlaceholder('Data Type *');
+    const hasDataType = await dataTypeField.isVisible({ timeout: 2000 }).catch(() => false);
+    
+    if (hasDataType) {
+        await dataTypeField.click();
+        await page.waitForTimeout(500);
+        
+        // Try to select Utf8 or first available option
+        const utf8Option = page.getByRole('option', { name: 'Utf8' });
+        if (await utf8Option.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await utf8Option.click();
+            console.log('Selected Utf8 data type');
+        } else {
+            const firstOption = page.getByRole('option').first();
+            if (await firstOption.isVisible({ timeout: 2000 })) {
+                await firstOption.click();
+                console.log('Selected first available data type');
+            }
+        }
+    }
+    
     await page.locator('[data-test="schema-update-settings-button"]').click();
     console.log('Clicked schema-update-settings-button');
     await page.locator('[data-test="schema-field-search-input"]').fill(fieldName)
@@ -269,9 +292,6 @@ test.describe("Schema testcases", () => {
     }
     
     console.log(`Looking for field: ${fieldName}`);
-    
-    // Wait for the page to load and try to find the newtest cell
-    await page.waitForLoadState('networkidle');
     
     // Check if the cell exists, if not try refreshing or navigating back
     const fieldCell = page.getByRole('cell', { name: fieldName }).first();
@@ -329,12 +349,19 @@ test.describe("Schema testcases", () => {
             console.log(`Found field ${fieldName} after alternative navigation`);
             await fieldCell.click();
         } else {
-            console.log(`Field ${fieldName} still not found, skipping deletion test`);
-            return; // Exit the test as field wasn't created properly
+            throw new Error(`TEST FAILED: Field "${fieldName}" was not created successfully. Field is not visible in schema table after all navigation attempts.`);
         }
     }
+    
+    // Take screenshot before deletion
+    await page.screenshot({ path: `test-results/before-deletion-${fieldName}.png`, fullPage: true });
+    
     await page.locator(`[data-test="schema-stream-delete-${fieldName}-field-fts-key-checkbox"]`).first().click();
     await page.locator('[data-test="schema-delete-button"]').click();
+    
+    // Take screenshot of delete confirmation dialog
+    await page.screenshot({ path: `test-results/delete-confirmation-${fieldName}.png`, fullPage: true });
+    
     await page.locator('[data-test="confirm-button"]').click();
     await page.waitForTimeout(2000);
     console.log(`Attempted to delete field: ${fieldName}`);
@@ -346,16 +373,23 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="tab-schemaFields"]').click();
     await page.waitForTimeout(2000);
     
+    // Take screenshot of schema table after deletion
+    await page.screenshot({ path: `test-results/schema-after-deletion-${fieldName}.png`, fullPage: true });
+    
     // Check if field still exists
     const deletedFieldExists = await page.getByRole('cell', { name: fieldName }).first().isVisible({ timeout: 3000 }).catch(() => false);
     console.log(`Field ${fieldName} still exists after deletion: ${deletedFieldExists}`);
     
     if (!deletedFieldExists) {
       console.log(`✅ Field ${fieldName} successfully deleted`);
+      console.log('✅ Add and delete field test completed successfully');
     } else {
       console.log(`❌ Field ${fieldName} still exists after deletion attempt`);
+      
+      // Take final failure screenshot
+      await page.screenshot({ path: `test-results/DELETION-FAILED-${fieldName}.png`, fullPage: true });
+      
+      throw new Error(`TEST FAILED: Field "${fieldName}" still exists after deletion attempt. Deletion process failed.`);
     }
-    
-    console.log('✅ Add and delete field test completed successfully');
   });
 })
