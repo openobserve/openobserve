@@ -1,6 +1,6 @@
 use tantivy::tokenizer::{Token, TokenFilter, TokenStream, Tokenizer};
 
-/// `RemoveLongFilter` removes tokens that are longer
+/// `RemoveShortFilter` removes tokens that are shorter
 /// than a given number of bytes (in UTF-8 representation).
 ///
 /// It is especially useful when indexing unconstrained content.
@@ -11,7 +11,7 @@ pub struct RemoveShortFilter {
 }
 
 impl RemoveShortFilter {
-    /// Creates a `RemoveLongFilter` given a limit in bytes of the UTF-8 representation.
+    /// Creates a `RemoveShortFilter` given a limit in bytes of the UTF-8 representation.
     pub fn limit(length_limit: usize) -> RemoveShortFilter {
         RemoveShortFilter { length_limit }
     }
