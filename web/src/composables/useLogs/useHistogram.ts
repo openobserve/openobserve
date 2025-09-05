@@ -50,7 +50,7 @@ import {
   logsUtils
 } from "@/composables/useLogs/logsUtils";
 
-export const histogramUtils = () => {
+export const useHistogram = () => {
   const store = useStore();
   const router = useRouter();
   let {
@@ -359,4 +359,4 @@ export const histogramUtils = () => {
 
 };
 
-export default histogramUtils;
+export default useHistogram;
