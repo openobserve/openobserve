@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-md " style="overflow-y: auto; ">
-    <div v-if="!no_data_ingest && !isLoadingSummary" class="column " style="height: auto; overflow-y: auto; ">
+  <q-page class="q-px-md" style="overflow-y: auto; ">
+    <div v-if="!no_data_ingest && !isLoadingSummary" class="column q-pt-md" style="height: auto; overflow-y: auto; ">
         <!-- 1st section -->
         <TrialPeriod></TrialPeriod>
-        <div class="streams-container q-pa-lg "
+        <div class="streams-container q-px-lg q-py-md "
         :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
          >
           <div class="row justify-between items-center q-mb-md">
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- 2nd section -->
         <div class="charts-main-container row tw-gap-4 q-mt-md xl:tw-min-h-[330px] " style="display: flex; gap: 16px; height: calc(100% - 22px);  ">
           <!-- Chart 1 --> 
-          <div class=" first-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[35%]  tw-p-4 " style= " display: flex; flex-direction: column;"
+          <div class=" first-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[35%]  tw-p-4" style= " display: flex; flex-direction: column;"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
           >
             <div class="details-container" style="margin-bottom: 16px;">
