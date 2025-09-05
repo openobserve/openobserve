@@ -1700,6 +1700,24 @@ export default defineComponent({
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
+          let logsPageQuery = "";
+          
+          // handle sql mode
+          if(!searchObj.meta.sqlMode){
+            const queryBuild = buildSearch();
+            logsPageQuery = queryBuild?.query?.sql ?? "";
+          } else {
+            logsPageQuery = searchObj.data.query;
+          }
+          
+          // Check if query is SELECT * which is not supported for visualization
+          if (isSimpleSelectAllQuery(logsPageQuery)) {
+            showErrorNotification(
+              "Select * query is not supported for visualization",
+            );
+            return;
+          }
+
           const success = await updateVisualization(false);
           if (!success) {
             return;
