@@ -360,52 +360,19 @@ export default class LogsVisualise {
     }
   }
 
-  // Helper method to wait for chart content intelligently
+  // RECOMMENDED: Native browser function (fastest & most reliable)
   async waitForChartContent(page, timeout = 5000) {
-    try {
-      await Promise.race([
-        // Wait for chart canvas to be visible (for chart types)
-        page
-          .locator('[data-test="chart-renderer"] canvas')
-          .first()
-          .waitFor({
-            state: "visible",
-            timeout,
-          })
-          .catch(() => {}),
-        // Wait for table content to be visible (for table chart)
-        page
-          .locator('[data-test="dashboard-panel-table"] tbody tr')
-          .first()
-          .waitFor({
-            state: "visible",
-            timeout,
-          })
-          .catch(() => {}),
-        // Wait for any loading indicators to disappear
-        page
-          .locator('[data-test="chart-loading"], .q-spinner')
-          .waitFor({
-            state: "hidden",
-            timeout,
-          })
-          .catch(() => {}),
-        // Wait for data to be rendered (generic data elements)
-        page
-          .locator(
-            '[data-test="chart-renderer"] [data-value], [data-test="dashboard-panel-table"] td'
-          )
-          .first()
-          .waitFor({
-            state: "visible",
-            timeout,
-          })
-          .catch(() => {}),
-      ]);
-      return true;
-    } catch (error) {
-      return false;
-    }
+    return page
+      .waitForFunction(
+        () =>
+          document.querySelector(
+            '[data-test="chart-renderer"], [data-test="dashboard-panel-table"]'
+          )?.offsetParent !== null,
+        {},
+        { timeout }
+      )
+      .then(() => true)
+      .catch(() => false);
   }
 
   // Verify quick mode toggle state
@@ -469,5 +436,11 @@ export default class LogsVisualise {
     // Submit panel settings
     await this.updateSettingsBtn.waitFor({ state: "visible", timeout: 5000 });
     await this.updateSettingsBtn.click();
+  }
+
+  //wait for query inspector to be visible
+  async waitForQueryInspector(page) {
+    const queryInspector = page.getByText("Query Inspectorclose");
+    await expect(queryInspector).toBeVisible({ timeout: 10000 });
   }
 }

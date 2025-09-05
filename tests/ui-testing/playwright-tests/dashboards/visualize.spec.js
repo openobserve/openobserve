@@ -452,14 +452,18 @@ test.describe("logs testcases", () => {
       randomDashboardName,
       panelName
     );
-    await page.waitForTimeout(2000);
+
+    // Wait for and assert the success message
+    const successMessage = page.getByText("Panel added to dashboard");
+    await expect(successMessage).toBeVisible({ timeout: 10000 });
 
     await page
       .locator('[data-test="dashboard-edit-panel-' + panelName + '-dropdown"]')
       .click();
     await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
 
-    await page.waitForTimeout(2000);
+    await pm.logsVisualise.waitForQueryInspector(page);
+
     await expect(
       page
         .getByRole("cell", {
@@ -495,13 +499,17 @@ test.describe("logs testcases", () => {
       panelName
     );
 
-    await page.waitForTimeout(2000);
+    // Wait for and assert the success message
+    const successMessage = page.getByText("Panel added to dashboard");
+    await expect(successMessage).toBeVisible({ timeout: 10000 });
+
     await page
       .locator('[data-test="dashboard-edit-panel-' + panelName + '-dropdown"]')
       .click();
     await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
 
-    await page.waitForTimeout(2000);
+    await pm.logsVisualise.waitForQueryInspector(page);
+
     await expect(
       page
         .getByRole("cell", {
