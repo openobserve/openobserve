@@ -378,6 +378,7 @@
     "serviceAccounts": "Service Accounts",
     "serviceAccountsName": "Service Accounts Name",
     "basicUsers": "Users",
+    "invitations": "Invitations",
     "quota": "Quotas"
   },
   "ticket": {

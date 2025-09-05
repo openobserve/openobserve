@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
+      </div>
     </div>
     <q-table
       ref="qTable"
@@ -76,9 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:header="props">
         <q-tr :props="props">
-          <q-th v-for="col in props.cols"
-          :class="col.classes"
-          :key="col.name" :props="props">
+          <q-th
+            v-for="col in props.cols"
+            :class="col.classes"
+            :key="col.name"
+            :props="props"
+          >
             <span>{{ col.label }}</span>
           </q-th>
         </q-tr>
@@ -100,7 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`delete-basic-user-${props.row.email}`"
           />
           <q-btn
-            v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
+            v-if="
+              props.row.enableEdit &&
+              props.row.status != 'pending' &&
+              config.isCloud == 'false'
+            "
             icon="edit"
             :title="t('user.update')"
             class="q-ml-xs"
@@ -111,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             @click="addRoutePush(props)"
             style="cursor: pointer !important"
-             :data-test="`edit-basic-user-${props.row.email}`"
+            :data-test="`edit-basic-user-${props.row.email}`"
           />
         </q-td>
       </template>
@@ -170,8 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated
-            no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
@@ -266,15 +273,16 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
+      updateUserActions();
       await getRoles();
 
       // if (config.isCloud == "true") {
-        // columns.value.push({
-        //   name: "status",
-        //   field: "status",
-        //   label: t("user.status"),
-        //   align: "left",
-        // });
+      // columns.value.push({
+      //   name: "status",
+      //   field: "status",
+      //   label: t("user.status"),
+      //   align: "left",
+      // });
       // }
 
       // if (
@@ -288,8 +296,6 @@ export default defineComponent({
       //     align: "left",
       //   });
       // }
-
-      updateUserActions();
     });
 
     const columns: any = ref<QTableProps["columns"]>([
@@ -336,7 +342,7 @@ export default defineComponent({
         field: "actions",
         label: t("user.actions"),
         align: "left",
-        classes: 'actions-column'
+        classes: "actions-column",
       },
     ]);
     const userEmail: any = ref("");
@@ -376,7 +382,7 @@ export default defineComponent({
         usersService
           .invitedUsers(store.state.selectedOrganization.identifier)
           .then((res) => {
-            if(res.status == 200) {
+            if (res.status == 200) {
               dismiss();
               resolve(res.data);
             } else {
@@ -389,7 +395,7 @@ export default defineComponent({
             reject([]);
           });
       });
-    }
+    };
 
     const getOrgMembers = () => {
       const dismiss = $q.notify({
@@ -409,7 +415,7 @@ export default defineComponent({
               resultTotal.value += invitedMembers.length;
               users = [...res.data.data, ...invitedMembers];
             }
-            
+
             let counter = 1;
             currentUserRole.value = "";
             usersState.users = users.map((data: any) => {
@@ -427,8 +433,12 @@ export default defineComponent({
                 email: maskText(data.email),
                 first_name: data.first_name,
                 last_name: data.last_name,
-                role: data?.status == "pending" ? data.role + " (Invited)": data.role,
-                enableEdit: store.state.userInfo.email == data.email ? true : false,
+                role:
+                  data?.status == "pending"
+                    ? data.role + " (Invited)"
+                    : data.role,
+                enableEdit:
+                  store.state.userInfo.email == data.email ? true : false,
                 enableChangeRole: false,
                 enableDelete: config.isCloud == "true" ? true : false,
                 status: data?.status,
@@ -535,18 +545,16 @@ export default defineComponent({
     };
 
     const shouldAllowDelete = (user: any) => {
-
       if (isEnterprise.value) {
-      //for cloud
-      //should allow delete for all users when it is root and also when the row user is not root 
-      //should allow delete for all users when it is admin and also when the row user is not logged in user / not root
-        if(config.isCloud == 'true'){
+        //for cloud
+        //should allow delete for all users when it is root and also when the row user is not root
+        //should allow delete for all users when it is admin and also when the row user is not logged in user / not root
+        if (config.isCloud == "true") {
           return (
             user.role !== "root" &&
             (currentUserRole.value == "root" ||
               currentUserRole.value == "admin") &&
-              store.state.userInfo.email !== user.email
-
+            store.state.userInfo.email !== user.email
           );
         }
         return (
@@ -923,7 +931,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-
 .iconHoverBtn {
   cursor: pointer !important;
 }
