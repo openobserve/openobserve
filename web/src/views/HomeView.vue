@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-px-md" style="overflow-y: auto; ">
+  <q-page class="q-px-md" style="overflow-y: auto;" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view' : ''">
     <div v-if="!no_data_ingest && !isLoadingSummary" class="column q-pt-md" style="height: auto; overflow-y: auto; ">
         <!-- 1st section -->
         <TrialPeriod></TrialPeriod>
@@ -788,4 +788,8 @@ export default defineComponent({
 // .second-chart-container{
 //   width: calc(65% - 16px);
 // }
+
+.ai-enabled-home-view{
+  height: calc(100vh - 120px);
+}
 </style>
