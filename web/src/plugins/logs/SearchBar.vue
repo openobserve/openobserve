@@ -1001,7 +1001,7 @@ class="q-pr-sm q-pt-xs" />
                   dense
                   flat
                   no-caps
-                  :title="'Refresh Cache and Run Query'"
+                  :title="'Refresh Cache & Run Query'"
                   class="q-pa-sm search-button tw-rounded-r-none tw-text-[12px]"
                   @click="handleRunQueryFn(true)"
                   :disable="
@@ -1010,7 +1010,7 @@ class="q-pr-sm q-pt-xs" />
                   "
                 >
                   <q-icon name="refresh" class="q-mr-xs" />
-                  Refresh Cache and Run Query</q-btn
+                  Refresh Cache & Run Query</q-btn
                 >
               </q-btn-dropdown>
             </div>
@@ -1054,6 +1054,32 @@ class="q-pr-sm q-pt-xs" />
                 "
                 >{{ t("search.runQuery") }}</q-btn
               >
+              <q-separator  class="tw-h-[29px] tw-w-[1px]" />
+              <q-btn-dropdown flat class="tw-h-[29px] search-button-dropdown" 
+              :class="
+              config.isEnterprise == 'true' &&
+                  (!!searchObj.data.searchRequestTraceIds.length ||
+                    !!searchObj.data.searchWebSocketTraceIds.length) &&
+                  (searchObj.loading == true ||
+                    searchObj.loadingHistogram == true) ? 'tw-bg-[#ec1414]' : 'tw-bg-[#5ca380]'"
+               unelevated dense >
+                    <q-btn
+                      data-test="logs-search-bar-refresh-btn"
+                      data-cy="search-bar-refresh-button"
+                      dense
+                      flat
+                      no-caps
+                      :title="'Refresh Cache & Run Query'"
+                      class="q-pa-sm search-button tw-rounded-r-none tw-text-[12px] "
+                      @click="handleRunQueryFn(true)"
+                      :disable="
+                        searchObj.loading == true ||
+                        searchObj.loadingHistogram == true
+                      "
+                      >
+                      <q-icon name="refresh" class="q-mr-xs" />
+                      Refresh Cache & Run Query</q-btn>
+              </q-btn-dropdown>
             </div>
           </div>
         </div>
