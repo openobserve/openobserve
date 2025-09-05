@@ -31,10 +31,10 @@ import {
   WebSocketErrorResponse,
 } from "@/ts/interfaces/query";
 
-import useStreamFieldUtils from "@/composables/useLogs/useStreamFieldUtils";
+import useStreamFields from "@/composables/useLogs/useStreamFields";
 import {
-  histogramUtils
-} from "@/composables/useLogs/histogramUtils";
+  useHistogram
+} from "@/composables/useLogs/useHistogram";
 
 import {
   convertDateToTimestamp,
@@ -87,7 +87,7 @@ export const searchStream = () => {
   resetHistogramWithError,
   generateHistogramSkeleton,
   setMultiStreamHistogramQuery,
-  isHistogramEnabled,} = histogramUtils();
+  isHistogramEnabled,} = useHistogram();
 
   const store = useStore();
   const router = useRouter();
@@ -108,7 +108,7 @@ export const searchStream = () => {
     updateGridColumns,
     filterHitsColumns,
     resetFieldValues,
-  } = useStreamFieldUtils();
+  } = useStreamFields();
 
   const {
     fetchQueryDataWithWebSocket,
