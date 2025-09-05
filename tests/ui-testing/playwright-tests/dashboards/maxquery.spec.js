@@ -74,8 +74,6 @@ test.describe("dashboard max query testcases", () => {
 
     await pm.dashboardPanelActions.savePanel();
 
-    // await page.waitForTimeout(2000);
-
     // Wait for date-time controls to be ready before setting time range
     await waitForDateTimeButtonToBeEnabled(page);
     await pm.dateTimeHelper.setRelativeTimeRange("6-w");
