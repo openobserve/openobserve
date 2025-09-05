@@ -3,6 +3,7 @@ import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import logData from "../../fixtures/log.json";
 import PageManager from "../../pages/page-manager";
+import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
 
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 
@@ -542,5 +543,37 @@ test.describe("logs testcases", () => {
 
     // Verify the error message is displayed
     await expect(errorMessage.first()).toBeVisible();
+  });
+  test("should show quick mode as true when toggling to visualize tab", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+
+    await pm.logsVisualise.logsSelectStream("e2e_automate");
+
+    await waitForDateTimeButtonToBeEnabled(page);
+
+    await pm.logsVisualise.setRelative("6", "w");
+
+    // Step 4: Apply the query
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // Step 5: Open the visualize tab
+    await pm.logsVisualise.openVisualiseTab();
+
+    // Step 6: Wait for the tab to load properly
+    // await page.waitForTimeout(2000);
+
+    // Step 7: Verify quick mode toggle is true
+    const quickModeState = await pm.logsVisualise.verifyQuickModeToggle(true);
+    expect(quickModeState).toBe(true);
+
+    // Additional assertion using Playwright's expect for the toggle state
+    const quickModeToggle = page.locator(
+      '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
+    );
+    await expect(quickModeToggle).toHaveAttribute("aria-checked", "true");
   });
 });

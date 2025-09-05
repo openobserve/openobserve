@@ -314,6 +314,43 @@ export default class LogsVisualise {
     return chartExists > 0;
   }
 
+  // Verify quick mode toggle state
+  async verifyQuickModeToggle(expectedState = true) {
+    const quickModeToggle = this.page.locator(
+      '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
+    );
+
+    // Wait for the toggle to be present
+    await quickModeToggle.waitFor({ state: "visible", timeout: 10000 });
+
+    // Check aria-checked attribute
+    const ariaChecked = await quickModeToggle.getAttribute("aria-checked");
+    const isChecked = ariaChecked === "true";
+
+    // Also check the CSS class for additional verification
+    const toggleInner = this.page.locator(
+      '[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner'
+    );
+    const hasCheckmark =
+      (await toggleInner.locator(".q-toggle__inner--truthy").count()) > 0;
+
+    if (expectedState) {
+      if (!isChecked) {
+        throw new Error(
+          `Expected quick mode to be true but aria-checked="${ariaChecked}"`
+        );
+      }
+    } else {
+      if (isChecked) {
+        throw new Error(
+          `Expected quick mode to be false but aria-checked="${ariaChecked}"`
+        );
+      }
+    }
+
+    return isChecked;
+  }
+
   // Helper function to verify chart type selection
   async verifyChartTypeSelected(page, chartType, shouldBeSelected = true) {
     const selector = `[data-test="selected-chart-${chartType}-item"]`;
