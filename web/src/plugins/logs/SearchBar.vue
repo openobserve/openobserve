@@ -878,13 +878,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   flat
                   no-caps
-                  :title="'Refresh Cache and Run Query'"
+                  :title="'Refresh Cache & Run Query'"
                   class="q-pa-sm search-button tw-rounded-r-none tw-text-[12px]"
                   @click="handleRunQueryFn(true)"
                   :disable="disable"
                 >
                   <q-icon name="refresh" class="q-mr-xs" />
-                  Refresh Cache and Run Query</q-btn
+                  Refresh Cache & Run Query</q-btn
                 >
               </q-btn-dropdown>
             </div>
@@ -936,7 +936,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       flat
                       no-caps
-                      :title="'Refresh Cache and Run Query'"
+                      :title="'Refresh Cache & Run Query'"
                       class="q-pa-sm search-button tw-rounded-r-none tw-text-[12px] "
                       @click="handleRunQueryFn(true)"
                       :disable="
@@ -945,7 +945,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       >
                       <q-icon name="refresh" class="q-mr-xs" />
-                      Refresh Cache and Run Query</q-btn>
+                      Refresh Cache & Run Query</q-btn>
               </q-btn-dropdown>
             </div>
           </div>
