@@ -54,6 +54,100 @@ const convertPanelSchemaVersion = (data: any) => {
   };
 };
 
+const migrateV5FieldsToV6 = (
+  fieldItem: any,
+  isCustomQuery: boolean,
+  stream: string,
+) => {
+  // if fieldItem is undefined, do nothing
+  if (!fieldItem) return;
+  // mirgrate old args
+  // previously, args was only used for histogram interval
+  // so, add arg type as histogramInterval
+  if (!fieldItem.args) {
+    fieldItem.args = [];
+  } else {
+    fieldItem.args.forEach((arg: any) => {
+      if (!arg.type) {
+        arg.type = "histogramInterval";
+      }
+    });
+  }
+
+  // if customQuery then do nothing
+  // else need to shift column name to as first arg
+  if (isCustomQuery) {
+    fieldItem.type = "custom";
+  } else {
+    fieldItem.type = "build";
+    // prepend column in args
+    fieldItem.args.unshift({
+      type: "field",
+      value: {
+        field: fieldItem.column,
+        streamAlias: stream,
+      },
+    });
+    delete fieldItem.column;
+  }
+
+  // rename aggregationFunction to functionName
+  if (fieldItem.aggregationFunction) {
+    fieldItem.functionName = fieldItem.aggregationFunction;
+    delete fieldItem.aggregationFunction;
+  } else {
+    // if no aggregationFunction then set functionName to null
+    fieldItem.functionName = null;
+  }
+};
+
+function migrateFields(
+  fields: any | any[],
+  isCustomQuery: boolean,
+  stream: string,
+  migrateFunction: (field: any, isCustomQuery: boolean, stream: string) => void,
+) {
+  if (Array.isArray(fields)) {
+    fields.forEach((field: any) =>
+      migrateFunction(field, isCustomQuery, stream),
+    );
+  } else {
+    migrateFunction(fields, isCustomQuery, stream);
+  }
+}
+
+/**
+ * Migrates filter conditions by recursively processing nested structures
+ * Converts string column fields to objects with streamAlias and field properties
+ * @param filter The filter object to migrate
+ * @returns The migrated filter object
+ */
+function migrateFilterConditions(filter: any): any {
+  if (!filter) return filter;
+
+  if (filter.conditions && Array.isArray(filter.conditions)) {
+    // Process each condition recursively
+    filter.conditions = filter.conditions.map((condition: any) => {
+      // If it's a group, recursively process it
+      if (condition.filterType === "group") {
+        return migrateFilterConditions(condition);
+      }
+
+      // For regular conditions, convert string column to object with streamAlias and field
+      if (typeof condition.column === "string") {
+        condition.column = {
+          streamAlias: undefined,
+          field: condition.column,
+        };
+      }
+
+      return condition;
+    });
+  }
+
+  return filter;
+}
+
 export function convertDashboardSchemaVersion(data: any) {
   if (!data) {
     return;

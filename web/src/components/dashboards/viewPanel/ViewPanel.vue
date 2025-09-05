@@ -27,6 +27,11 @@
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
+          @update:modelValue="
+            (newValue: any) => {
+              histogramInterval = newValue.value;
+            }
+          "
           class="q-ml-sm"
           style="width: 150px"
           data-test="dashboard-viewpanel-histogram-interval-dropdown"
@@ -357,10 +362,7 @@ export default defineComponent({
     const refreshInterval = ref(0);
 
     // histogram interval
-    const histogramInterval: any = ref({
-      value: null,
-      label: "Auto",
-    });
+    const histogramInterval: any = ref(null);
 
     // array of histogram fields
     let histogramFields: any = ref([]);
@@ -410,7 +412,7 @@ export default defineComponent({
                 histogramExpr.args.type === "expr_list"
               ) {
                 // if selected histogramInterval is null then remove interval argument
-                if (!histogramInterval.value.value) {
+                if (!histogramInterval.value) {
                   histogramExpr.args.value = histogramExpr.args.value.slice(
                     0,
                     1,
@@ -426,13 +428,13 @@ export default defineComponent({
                     // Update existing interval value
                     histogramExpr.args.value[1] = {
                       type: "single_quote_string",
-                      value: `${histogramInterval.value.value}`,
+                      value: `${histogramInterval.value}`,
                     };
                   } else {
                     // create new arg for interval
                     histogramExpr.args.value.push({
                       type: "single_quote_string",
-                      value: `${histogramInterval.value.value}`,
+                      value: `${histogramInterval.value}`,
                     });
                   }
                 }
@@ -501,7 +503,7 @@ export default defineComponent({
           : dashboardPanelData.data.queries
               .map((q: any) =>
                 [...q.fields.x, ...q.fields.y, ...q.fields.z].find(
-                  (f: any) => f.aggregationFunction == "histogram",
+                  (f: any) => f.functionName == "histogram",
                 ),
               )
               .filter((field: any) => field != undefined);
@@ -514,10 +516,7 @@ export default defineComponent({
             histogramFields.value[i]?.args &&
             histogramFields.value[i]?.args[0]?.value
           ) {
-            histogramInterval.value = {
-              value: histogramFields.value[i]?.args[0]?.value,
-              label: histogramFields.value[i]?.args[0]?.value,
-            };
+            histogramInterval.value = histogramFields.value[i]?.args[0]?.value;
             break;
           }
         }
