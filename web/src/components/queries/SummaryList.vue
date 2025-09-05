@@ -59,6 +59,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </q-td>
       </template>
+      <template #body-cell-duration="props">
+        <q-td :props="props">
+          {{ durationFormatter(props.row.duration) }}
+        </q-td>
+      </template>
+      <template #body-cell-queryRange="props">
+        <q-td :props="props">
+          {{ durationFormatter(props.row.queryRange) }}
+        </q-td>
+      </template>
 
       <template #bottom="scope">
         <q-btn
@@ -97,6 +107,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useI18n } from "vue-i18n";
 import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
+import { durationFormatter } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "RunningQueriesList",
@@ -238,6 +249,7 @@ export default defineComponent({
       handleMultiQueryCancel,
       pagination,
       getAllUserQueries,
+      durationFormatter,
     };
   },
 });
