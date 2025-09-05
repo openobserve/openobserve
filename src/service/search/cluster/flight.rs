@@ -60,7 +60,10 @@ use crate::{
                     rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
                 },
                 exec::{prepare_datafusion_context, register_udf},
-                optimizer::{generate_analyzer_rules, generate_optimizer_rules},
+                optimizer::{
+                    generate_analyzer_rules, generate_optimizer_rules,
+                    utils::is_place_holder_or_empty,
+                },
                 table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
             },
             generate_filter_from_equal_items,
@@ -457,6 +460,13 @@ pub async fn run_datafusion(
             )
         })
         .collect::<HashMap<_, _>>();
+
+    if is_place_holder_or_empty(&physical_plan) {
+        let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
+        return ret
+            .map(|data| (data, ScanStats::default(), "".to_string()))
+            .map_err(|e| e.into());
+    };
 
     // check inverted index prefix search
     #[allow(deprecated)]

@@ -25,6 +25,7 @@ use datafusion::{
     },
     datasource::DefaultTableSource,
     logical_expr::{Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan, TableSource, col},
+    physical_plan::ExecutionPlan,
     prelude::Expr,
     scalar::ScalarValue,
 };
@@ -299,5 +300,10 @@ fn generate_table_source_with_sorted_by_time(
 
 pub fn is_contain_deduplication_plan(plan: &LogicalPlan) -> bool {
     plan.exists(|plan| Ok(matches!(plan, LogicalPlan::Extension(_))))
+        .unwrap()
+}
+
+pub fn is_place_holder_or_empty(plan: &Arc<dyn ExecutionPlan>) -> bool {
+    plan.exists(|plan| Ok(plan.name() == "PlaceholderRowExec" || plan.name() == "EmptyExec"))
         .unwrap()
 }
