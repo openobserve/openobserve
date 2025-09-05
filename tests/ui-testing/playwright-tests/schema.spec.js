@@ -200,6 +200,9 @@ test.describe("Schema testcases", () => {
   });
 
   test('should add a new field and delete it from schema', async ({ page }) => {
+    // Generate random field name
+    const randomPrefix = Math.random().toString(36).substring(2, 7);
+    const fieldName = `${randomPrefix}_newtest`;
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e_automate');
@@ -213,11 +216,11 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="schema-add-fields-title"]').click();
     
     await page.getByPlaceholder('Name *').click();
-    await page.getByPlaceholder('Name *').fill('newtest');
+    await page.getByPlaceholder('Name *').fill(fieldName);
     await page.locator('[data-test="schema-update-settings-button"]').click();
-    await page.locator('[data-test="schema-field-search-input"]').fill('newtest')
+    await page.locator('[data-test="schema-field-search-input"]').fill(fieldName)
     await page.waitForTimeout(1000);
-    await page.locator('[data-test="schema-stream-delete-newtest-field-fts-key-checkbox"]').click();
+    await page.locator(`[data-test="schema-stream-delete-${fieldName}-field-fts-key-checkbox"]`).click();
     await page.locator('[data-test="schema-add-field-button"]').click();
     await page.locator('[data-test="schema-update-settings-button"]').click();
     
@@ -237,21 +240,21 @@ test.describe("Schema testcases", () => {
     await page.waitForLoadState('networkidle');
     
     // Check if the cell exists, if not try refreshing or navigating back
-    const newtestCell = page.getByRole('cell', { name: 'newtest' }).first();
+    const fieldCell = page.getByRole('cell', { name: fieldName }).first();
     try {
-        await newtestCell.waitFor({ state: 'visible', timeout: 10000 });
-        await newtestCell.click();
+        await fieldCell.waitFor({ state: 'visible', timeout: 10000 });
+        await fieldCell.click();
     } catch (error) {
         // If cell not found, try refreshing the page or navigating back to schema
-        console.log('newtest cell not found, trying to refresh schema view');
+        console.log(`${fieldName} cell not found, trying to refresh schema view`);
         await page.keyboard.press('Escape');
         await page.waitForTimeout(1000);
         await page.getByRole('button', { name: 'Stream Detail' }).first().click();
         await page.locator('[data-test="tab-schemaFields"]').click();
         await page.waitForTimeout(2000);
-        await page.getByRole('cell', { name: 'newtest' }).first().click();
+        await page.getByRole('cell', { name: fieldName }).first().click();
     }
-    await page.locator('[data-test="schema-stream-delete-newtest-field-fts-key-checkbox"]').first().click();
+    await page.locator(`[data-test="schema-stream-delete-${fieldName}-field-fts-key-checkbox"]`).first().click();
     await page.locator('[data-test="schema-delete-button"]').click();
     await page.locator('[data-test="confirm-button"]').click();
     await page.waitForTimeout(2000);
