@@ -444,6 +444,8 @@ test.describe("logs testcases", () => {
 
     await pm.logsVisualise.openVisualiseTab();
 
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+
     await pm.logsVisualise.verifyChartRenders(page);
 
     await pm.logsVisualise.addPanelToNewDashboard(
@@ -486,7 +488,7 @@ test.describe("logs testcases", () => {
 
     await pm.logsVisualise.openVisualiseTab();
 
-    await page.waitForTimeout(2000);
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     await pm.logsVisualise.addPanelToNewDashboard(
       randomDashboardName,

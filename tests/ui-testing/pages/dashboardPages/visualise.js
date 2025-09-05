@@ -301,17 +301,47 @@ export default class LogsVisualise {
     const chartRenderer = page.locator(
       '[data-test="chart-renderer"], [data-test="dashboard-panel-table"]'
     );
-    const chartExists = await chartRenderer.count();
 
-    if (chartExists > 0) {
-      // Check if the chart is visible without using expect in page object
-      const isVisible = await chartRenderer.first().isVisible();
-      if (!isVisible) {
-        throw new Error("Chart renderer is present but not visible");
+    try {
+      // Wait for chart renderer to be present and visible
+      await chartRenderer.first().waitFor({
+        state: "visible",
+        timeout: 15000,
+      });
+
+      // Additional check to ensure the chart is actually rendered
+      const chartExists = await chartRenderer.count();
+
+      if (chartExists > 0) {
+        // Double-check visibility after waiting
+        const isVisible = await chartRenderer.first().isVisible();
+        if (!isVisible) {
+          // Wait a bit more and try again before failing
+          await page.waitForTimeout(2000);
+          const isVisibleRetry = await chartRenderer.first().isVisible();
+          if (!isVisibleRetry) {
+            throw new Error(
+              "Chart renderer is present but not visible after retry"
+            );
+          }
+        }
+      }
+
+      return chartExists > 0;
+    } catch (error) {
+      // If waiting times out, check if element exists but is not visible
+      const chartExists = await chartRenderer.count();
+      if (chartExists > 0) {
+        const isVisible = await chartRenderer.first().isVisible();
+        throw new Error(
+          `Chart renderer found (${chartExists} elements) but visibility check failed. Is visible: ${isVisible}. Original error: ${error.message}`
+        );
+      } else {
+        throw new Error(
+          `No chart renderer found. Original error: ${error.message}`
+        );
       }
     }
-
-    return chartExists > 0;
   }
 
   // Verify quick mode toggle state
