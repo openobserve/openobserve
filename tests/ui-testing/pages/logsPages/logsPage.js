@@ -2032,7 +2032,7 @@ export class LogsPage {
     }
 
     async selectCustomDownloadRange(range) {
-        return await this.page.getByText(range, { exact: true }).click();
+        return await this.page.getByRole('option', { name: range, exact: true }).click();
     }
 
     async clickConfirmDialogOkButton() {
