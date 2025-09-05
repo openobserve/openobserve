@@ -152,7 +152,7 @@ fn looks_like_base64(s: &str) -> bool {
     // Base64 characteristics:
     // 1. Only contains [A-Za-z0-9], the tokenizer will remove all non-alphanumeric characters
     // 2. Should be reasonably long (to avoid false positives)
-    const MIN_BASE64_LENGTH: usize = 1024; // Adjust this threshold as needed
+    const MIN_BASE64_LENGTH: usize = super::MAX_TOKEN_LENGTH + 1; // Adjust this threshold as needed
 
     if s.len() < MIN_BASE64_LENGTH {
         return false;
@@ -230,9 +230,9 @@ mod tests {
 
     #[test]
     fn test_o2_tokenizer_camel_case_with_base64() {
-        let body = "2025-03-13 INFO Current Users : Ly8gQWRkIHRoaXMgaGVscGVyIGZ1bmN0aW9uIHRvIGRldGVjdCBiYXNlNjQtbGlrZSBzdHJpbmdzCmZuIGxvb2tzX2xpa2VfYmFzZTY0KHM6ICZzdHIpIC0xIGJvb2wgewogICAgLy8gQmFzZTY0IGNoYXJhY3RlcmlzdGljczoKICAgIC8vIDEuIExlbmd0aCBzaG91bGQgYmUgbXVsdGlwbGUgb2YgNCAoZXhjZXB0IGZvciBwYWRkZWQgc3RyaW5ncykKICAgIC8vIDIuIE9ubHkgY29udGFpbnMgW0EtWmEtejAtOSsvPV0KICAgIC8vIDMuIFNob3VsZCBiZSByZWFzb25hYmx5IGxvbmcgKHRvIGF2b2lkIGZhbHNlIHBvc2l0aXZlcykKICAgIGNvbnN0IE1JTl9CQVNFNjRfTEVOR1RIOiB1c2l6ZSA9IDE2OyAvLyBBZGp1c3QgdGhpcyB0aHJlc2hvbGQgYXMgbmVlZGVkCiAgICAKICAgIGlmIHMubGVuKCkgPCBNSU5fQkFTRTY0X0xFTkdUSCB7c3NzCiAgICAgICAgcmV0dXJuIGZhbHNlO3gKICAgIH0KICAgIC8vIEFkZCB0aGlzIGhlbHBlciBmdW5jdGlvbiB0byBkZXRlY3QgYmFzZTY0LWxpa2Ugc3RyaW5ncwpmbiBsb29rc19saWtlX2Jhc2U2NChzOiAmc3RyKSAtPiBib29sIHsKICAgIC8vIEJhc2U2NCBjaGFyYWN0ZXJpc3RpY3M6CiAgICAvLyAxLiBMZW5ndGggc2hvdWxkIGJlIG11bHRpcGxlIG9mIDQgKGV4Y2VwdCBmb3IgcGFkZGVkIHN0cmluZ3MpCiAgICAvLyAyLiBPbmx5IGNvbnRhaW5zIFtBLVphLXowLTkrLz1dCiAgICAvLyAzLiBTaG91bGQgYmUgcmVhc29uYWJseSBsb25nICh0byBhdm9pZCBmYWxzZSBwb3NpdGl2ZXMpCiAgICBjb25zdCBNSU5fQkFTRTY0X0xFTkdUSDogdXNpemUgPSAxNjsgLy8gQWRqdXN0IHRoaXMgdGhyZXNob2xkIGFzIG5lZWRlZAogICAgCiAgICBpZiBzLmxlbigpIDwgTUlOX0JBU0U2NF9MRU5HVEggewogICAgICAgIHJldHVybiBmYWxzZTsKICAgIH0KICAgIA==";
+        let body = "2025-03-13 INFO Current Users : Ly8gQWRkIHRoaXMgaGVscGVyIGZ1bmN0aW9uIHRvIGRldGVjd+O2gQWRkIHRoaXMgaGVscGVyIGZ1bmN0aW9uIHRvIGRldGVjdCBiYXNlNjQtbGlrZSBzdHJpbmdzCmZuIGxvb2tzX2xpa2VfYmFzZTY0KHM6ICZzdHIpIC0xIGJvb2wgewogICAgLy8gQmFzZTY0IGNoYXJhY3RlcmlzdGljczoKICAgIC8vIDEuIExlbmd0aCBzaG91bGQgYmUgbXVsdGlwbGUgb2YgNCAoZXhjZXB0IGZvciBwYWRkZWQgc3RyaW5ncykKICAgIC8vIDIuIE9ubHkgY29udGFpbnMgW0EtWmEtejAtOSsvPV0KICAgIC8vIDMuIFNob3VsZCBiZSByZWFzb25hYmx5IGxvbmcgKHRvIGF2b2lkIGZhbHNlIHBvc2l0aXZlcykKICAgIGNvbnN0IE1JTl9CQVNFNjRfTEVOR1RIOiB1c2l6ZSA9IgPCBNSU5fQkFTRTY0X0xF==";
         let tokens = token_stream_helper(body);
-        assert_eq!(tokens.len(), 7);
+        assert_eq!(tokens.len(), 27);
         assert_token(&tokens[0], 0, "2025", 0, 4);
         assert_token(&tokens[1], 1, "03", 5, 7);
         assert_token(&tokens[2], 2, "13", 8, 10);
