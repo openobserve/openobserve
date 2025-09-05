@@ -13,10 +13,10 @@ on:
   pull_request:
     branches:
       - "*"
-    paths:
-      - "src/**"
-      - "web/**"
-      - ".github/workflows/unit-tests.yml"
+    # paths:
+    #   - "src/**"
+    #   - "web/**"
+    #   - ".github/workflows/unit-tests.yml"
 
 env:
   COLUMNS: 150
