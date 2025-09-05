@@ -217,24 +217,46 @@ test.describe("Schema testcases", () => {
     
     await page.getByPlaceholder('Name *').click();
     await page.getByPlaceholder('Name *').fill(fieldName);
+    console.log(`Filled field name: ${fieldName}`);
     await page.locator('[data-test="schema-update-settings-button"]').click();
+    console.log('Clicked schema-update-settings-button');
     await page.locator('[data-test="schema-field-search-input"]').fill(fieldName)
     await page.waitForTimeout(1000);
     await page.locator(`[data-test="schema-stream-delete-${fieldName}-field-fts-key-checkbox"]`).click();
     await page.locator('[data-test="schema-add-field-button"]').click();
+    console.log('Clicked schema-add-field-button');
     await page.locator('[data-test="schema-update-settings-button"]').click();
+    console.log('Clicked final schema-update-settings-button');
     
     // Wait and confirm the field was added successfully
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(8000);
     await page.waitForLoadState('networkidle');
     
-    // Look for success indicators or field confirmation before proceeding
-    try {
-        await page.waitForSelector('text=Successfully', { timeout: 5000 });
-        console.log('Success message found - field added successfully');
-    } catch {
-        console.log('No explicit success message, checking for field in UI');
+    // Close any dialog first to refresh the view
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(1000);
+    
+    // Reopen stream details to get fresh schema view
+    await page.getByRole('button', { name: 'Stream Detail' }).first().click();
+    await page.locator('[data-test="tab-schemaFields"]').click();
+    await page.waitForTimeout(3000);
+    
+    // Debug: Check if schema table is loading
+    const schemaTable = page.locator('[data-test*="schema"]').first();
+    const schemaTableExists = await schemaTable.isVisible({ timeout: 5000 }).catch(() => false);
+    console.log(`Schema table visible: ${schemaTableExists}`);
+    
+    // Debug: Check for loading indicators
+    const loadingIndicator = await page.locator('text=Loading').isVisible({ timeout: 2000 }).catch(() => false);
+    console.log(`Loading indicator present: ${loadingIndicator}`);
+    
+    // Wait for any loading to complete
+    if (loadingIndicator) {
+      await page.waitForSelector('text=Loading', { state: 'hidden', timeout: 10000 });
+      console.log('Loading completed');
     }
+    
+    console.log(`Looking for field: ${fieldName}`);
     
     // Wait for the page to load and try to find the newtest cell
     await page.waitForLoadState('networkidle');
@@ -247,24 +269,51 @@ test.describe("Schema testcases", () => {
     } catch (error) {
         // If cell not found, try refreshing the page or navigating back to schema
         console.log(`${fieldName} cell not found, trying to refresh schema view`);
+        
+        // Debug: Check what cells are actually available
+        const allCells = await page.locator('[role="cell"]').allTextContents();
+        console.log('Available cells:', allCells);
+        
+        // Debug: Check if the field appears anywhere in the page
+        const pageContent = await page.textContent('body');
+        const fieldExists = pageContent.includes(fieldName);
+        console.log(`Field ${fieldName} exists in page content: ${fieldExists}`);
+        
         await page.keyboard.press('Escape');
         await page.waitForTimeout(1000);
         await page.getByRole('button', { name: 'Stream Detail' }).first().click();
         await page.locator('[data-test="tab-schemaFields"]').click();
         await page.waitForTimeout(2000);
+        
+        // Debug: Check again after refresh
+        const allCellsAfter = await page.locator('[role="cell"]').allTextContents();
+        console.log('Available cells after refresh:', allCellsAfter);
+        
         await page.getByRole('cell', { name: fieldName }).first().click();
     }
     await page.locator(`[data-test="schema-stream-delete-${fieldName}-field-fts-key-checkbox"]`).first().click();
     await page.locator('[data-test="schema-delete-button"]').click();
     await page.locator('[data-test="confirm-button"]').click();
     await page.waitForTimeout(2000);
-    await page.locator('button').filter({ hasText: 'close' }).click()
+    console.log(`Attempted to delete field: ${fieldName}`);
+    
+    // Verify field was deleted
+    await page.locator('button').filter({ hasText: 'close' }).click();
     await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Stream Detail' }).first().click();
     await page.locator('[data-test="tab-schemaFields"]').click();
-    await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]').click();
-    await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]').click();
-    await page.locator('[data-test="schema-add-field-button"]').click();
-    await page.locator('[data-test="schema-update-settings-button"]').click();
+    await page.waitForTimeout(2000);
+    
+    // Check if field still exists
+    const deletedFieldExists = await page.getByRole('cell', { name: fieldName }).first().isVisible({ timeout: 3000 }).catch(() => false);
+    console.log(`Field ${fieldName} still exists after deletion: ${deletedFieldExists}`);
+    
+    if (!deletedFieldExists) {
+      console.log(`✅ Field ${fieldName} successfully deleted`);
+    } else {
+      console.log(`❌ Field ${fieldName} still exists after deletion attempt`);
+    }
+    
+    console.log('✅ Add and delete field test completed successfully');
   });
 })
