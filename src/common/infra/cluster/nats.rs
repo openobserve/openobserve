@@ -91,8 +91,32 @@ async fn register() -> Result<()> {
             e
         })?;
 
-    // 2. watch node list
-    task::spawn(async move { super::watch_node_list().await });
+    // 2. create the internal coordinator stream if not exists
+    log::info!("[INTERNAL_COORDINATOR::INIT] initializing internal coordinator");
+    // create the internal coordinator stream if not exists
+    if let Err(e) = infra::cluster_coordinator::create_stream().await {
+        dist_lock::unlock(&locker).await.map_err(|e| {
+            log::error!("[CLUSTER] nats unlock failed: {}", e);
+            e
+        })?;
+        return Err(Error::Message(format!(
+            "[INTERNAL_COORDINATOR::CREATE_STREAM] Failed to create internal coordinator stream: {}",
+            e
+        )));
+    }
+    // Except router it will run on every node. That is because this nats queue is supposed
+    // to be common for all the event types like enrichment table/schema etc.
+    tokio::task::spawn(async move {
+        let _ = infra::cluster_coordinator::subscribe(async move |payload| {
+            crate::service::db::internal_coordinator_stream::handle_internal_coordinator_event(
+                payload,
+            )
+            .await
+        })
+        .await;
+    });
+
+    // task::spawn(async move { super::watch_node_list().await });
 
     // 3. get node list
     let node_list = match super::list_nodes().await {
