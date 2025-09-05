@@ -18,7 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page class="q-px-md" style="overflow-y: auto;" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view' : ''">
     <div v-if="!no_data_ingest && !isLoadingSummary" class="column q-pt-md" style="height: auto; overflow-y: auto; ">
         <!-- 1st section -->
-        <TrialPeriod></TrialPeriod>
+         <div>
+          <TrialPeriod></TrialPeriod>
+         </div>
         <div class="streams-container q-px-lg q-py-md "
         :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
          >
