@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page class="q-pa-md " style="overflow-y: auto; ">
     <div v-if="!no_data_ingest && !isLoadingSummary" class="column " style="height: auto; overflow-y: auto; ">
         <!-- 1st section -->
+        <TrialPeriod></TrialPeriod>
         <div class="streams-container q-pa-lg "
         :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
          >
@@ -301,6 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="q-pa-md row items-start q-gutter-md"
       style="margin: 0 auto; justify-content: center"
     >
+    <TrialPeriod></TrialPeriod>
       <div class="my-card card-container">
         <div align="center" flat
 bordered class="my-card q-py-md">
@@ -340,6 +342,7 @@ import { formatSizeFromMB, addCommasToNumber, getImageURL } from "@/utils/zincut
 import useStreams from "@/composables/useStreams";
 import pipelines from "@/services/pipelines";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
+import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 
 export default defineComponent({
   name: "PageHome",
@@ -643,6 +646,7 @@ export default defineComponent({
   },
   components: {
     CustomChartRenderer,
+    TrialPeriod,
   },
 });
 </script>
