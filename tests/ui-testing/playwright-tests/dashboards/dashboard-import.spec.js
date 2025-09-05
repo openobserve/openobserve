@@ -1,18 +1,20 @@
-import { test, expect } from "../baseFixtures";
+const {
+  test,
+  expect,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
 import logData from "../../fixtures/log.json";
-import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage } from "./utils/dashCreation.js";
 import PageManager from "../../pages/page-manager";
+const testLogger = require('../utils/test-logger.js');
 test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard Import testcases", () => {
   test.beforeEach(async ({ page }) => {
     console.log("running before each");
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestion(page);
-    await page.waitForTimeout(2000);
 
     const orgNavigation = page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
