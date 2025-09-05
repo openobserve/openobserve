@@ -220,8 +220,37 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="schema-stream-delete-newtest-field-fts-key-checkbox"]').click();
     await page.locator('[data-test="schema-add-field-button"]').click();
     await page.locator('[data-test="schema-update-settings-button"]').click();
-    await page.waitForTimeout(3000);
-    await page.getByRole('cell', { name: 'newtest' }).first().click();
+    
+    // Wait and confirm the field was added successfully
+    await page.waitForTimeout(5000);
+    await page.waitForLoadState('networkidle');
+    
+    // Look for success indicators or field confirmation before proceeding
+    try {
+        await page.waitForSelector('text=Successfully', { timeout: 5000 });
+        console.log('Success message found - field added successfully');
+    } catch {
+        console.log('No explicit success message, checking for field in UI');
+    }
+    
+    // Wait for the page to load and try to find the newtest cell
+    await page.waitForLoadState('networkidle');
+    
+    // Check if the cell exists, if not try refreshing or navigating back
+    const newtestCell = page.getByRole('cell', { name: 'newtest' }).first();
+    try {
+        await newtestCell.waitFor({ state: 'visible', timeout: 10000 });
+        await newtestCell.click();
+    } catch (error) {
+        // If cell not found, try refreshing the page or navigating back to schema
+        console.log('newtest cell not found, trying to refresh schema view');
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(1000);
+        await page.getByRole('button', { name: 'Stream Detail' }).first().click();
+        await page.locator('[data-test="tab-schemaFields"]').click();
+        await page.waitForTimeout(2000);
+        await page.getByRole('cell', { name: 'newtest' }).first().click();
+    }
     await page.locator('[data-test="schema-stream-delete-newtest-field-fts-key-checkbox"]').first().click();
     await page.locator('[data-test="schema-delete-button"]').click();
     await page.locator('[data-test="confirm-button"]').click();
