@@ -51,7 +51,7 @@ async function ingestion(page) {
   console.log(response);
 }
 
-test.describe("Schema testcases", () => {
+test.describe.serial("Schema testcases", () => {
   let logsPage;
   // let logData;
   function removeUTFCharacters(text) {
@@ -84,131 +84,6 @@ test.describe("Schema testcases", () => {
     const allsearch = page.waitForResponse("**/api/default/_search**");
     await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
     await applyQueryButton(page);
-  });
-
-  test('stream schema settings updated to be displayed under logs', async ({ page }) => {
-    await page.locator('[data-test="menu-link-\\/streams-item"]').click();
-    await page.getByPlaceholder('Search Stream').click();
-    await page.getByPlaceholder('Search Stream').fill('e2e_automate');
-    await page.waitForTimeout(1000);
-    await page.getByRole('button', { name: 'Stream Detail' }).first().click();
-    await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]').click();
-    await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]').click();
-    await page.locator('[data-test="schema-add-field-button"]').click();
-    await page.locator('[data-test="schema-update-settings-button"]').click();
-    
-    // Handle schema fields tab visibility issues in CI/CD
-    const schemaFieldsTab = page.locator('[data-test="tab-schemaFields"]');
-    const allFieldsTab = page.locator('[data-test="tab-allFields"]');
-    
-    if (await schemaFieldsTab.isVisible({ timeout: 3000 }) && await schemaFieldsTab.isEnabled({ timeout: 1000 })) {
-        await schemaFieldsTab.click();
-    } else if (await allFieldsTab.isVisible({ timeout: 3000 })) {
-        console.log('Schema fields tab not available, using all fields tab');
-        await allFieldsTab.click();
-    } else {
-        console.log('Neither schema fields nor all fields tab available, proceeding without tab switch');
-    }
-    await page.getByRole('cell', { name: 'kubernetes_annotations_kubectl_kubernetes_io_default_container' }).click();
-    await page.getByRole('cell', { name: 'kubernetes_annotations_kubernetes_io_psp' }).click();
-    await page.waitForTimeout(1000);
-    await ingestion(page);
-    await page.waitForTimeout(2000);
-    await page.locator('button').filter({ hasText: 'close' }).first().click();
-    await page.getByRole('button', { name: 'Explore' }).first().click();
-    await page.waitForTimeout(1000);
-    // await page.locator('[data-test="date-time-btn"]').click();
-    // await page.locator('[data-test="date-time-relative-tab"]').click();
-    // await page.locator('[data-test="date-time-relative-15-m-btn"]').click();
-    await page.waitForTimeout(2000);
-    // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
-    await page.waitForTimeout(1000);
-
-    await page.locator('[data-test="logs-user-defined-fields-btn"]').click();
-    // await page.locator('[data-test="log-search-index-list-interesting-_all-field-btn"]').last().click({force: true});
-
-    await applyQueryButton(page);
-     await page.getByText(/^arrow_drop_down_all:.*$/).click();
-    await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
-    await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('_timestamp');
-    await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click();
-    await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
-    await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('_all');
-    await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_all')
-    await page.locator('[data-test="logs-all-fields-btn"]').click();
-    await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
-    await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_all')
-    await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
-    await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('_timestamp');
-    await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click();
-
-    await page.waitForSelector('[data-test="log-expand-detail-key-_all"]', { state: 'visible' });
-    await page.locator('[data-test="logs-search-bar-query-editor"]').locator('.monaco-editor').click();
-    await page.keyboard.type("str_match(_all, \'test\')");
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.waitForTimeout(2000);
-    const errorMessage = page.locator('[data-test="logs-search-error-message"]');
-    await expect(errorMessage).not.toBeVisible();
-    await page.locator('[data-test="menu-link-\\/streams-item"]').click();
-    await page.getByPlaceholder('Search Stream').click();
-    await page.getByPlaceholder('Search Stream').fill('e2e_automate');
-    await page.waitForTimeout(1000);
-    await page.getByRole('button', { name: 'Stream Detail' }).first().click();
-    await page.locator('[data-test="tab-schemaFields"]').click();
-    await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]').click();
-    await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]').click();
-    await page.locator('[data-test="schema-add-field-button"]').click();
-    await page.locator('[data-test="schema-update-settings-button"]').click();
-    await page.waitForTimeout(3000);
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(1000);
-    await ingestion(page);
-    await page.waitForTimeout(2000);
-    await page.getByRole('button', { name: 'Explore' }).first().click();
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
-    await page.getByText('arrow_drop_down_timestamp:').click();
-  });
-
-  test('should display stream details on navigating from blank stream to stream with details', async ({ page }) => {
-    await page.locator('[data-test="menu-link-\\/streams-item"]').click();
-    await page.locator('[data-test="log-stream-add-stream-btn"]').click();
-    await page.getByLabel('Name *').click();
-    await page.getByLabel('Name *').fill(streamName);
-    await page.locator('.q-form > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native').click();
-    await page.getByRole('option', { name: 'Logs' }).locator('div').nth(2).click();
-    await page.locator('[data-test="save-stream-btn"]').click();
-    await page.waitForTimeout(1000);
-    await page.locator('[data-test="menu-link-\\/-item"]').click();
-    await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-    await page.locator('#fnEditor').locator('.monaco-editor').click()
-    await page.locator('[data-test="log-search-index-list-select-stream"]').click();
-    await page.locator('[data-test="log-search-index-list-select-stream"]').fill(streamName);
-    await page.getByText(streamName).click();
-    // await page.getByRole('option', { name: streamName }).locator('div').nth(2).click();
-    await page.waitForTimeout(1000);
-    await page.locator('[data-test="log-search-index-list-select-stream"]').click();
-    await page.locator('[data-test="log-search-index-list-select-stream"]').fill('e2e_automate');
-    // await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
-    await page.getByText('e2e_automate').click();
-    await page.waitForTimeout(4000);
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.waitForTimeout(2000);
-    await page.waitForSelector('text=Loading...', { state: 'hidden' });
-    await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click()
-    await page.locator('[data-test="menu-link-\\/streams-item"]').click();
-    await page.getByPlaceholder('Search Stream').click();
-    await page.getByPlaceholder('Search Stream').fill(streamName);
-    await page.waitForTimeout(1000);
-    await page.locator('[data-test="log-stream-refresh-stats-btn"]').click();
-    await page.getByPlaceholder('Search Stream').click();
-    await page.getByPlaceholder('Search Stream').click();
-    await page.getByRole('button', { name: 'Delete' }).click();
-    await page.getByRole('button', { name: 'Ok' }).click();
   });
 
   test('should add a new field and delete it from schema', async ({ page }) => {
@@ -391,5 +266,130 @@ test.describe("Schema testcases", () => {
       
       throw new Error(`TEST FAILED: Field "${fieldName}" still exists after deletion attempt. Deletion process failed.`);
     }
+  });
+
+  test('stream schema settings updated to be displayed under logs', async ({ page }) => {
+    await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+    await page.getByPlaceholder('Search Stream').click();
+    await page.getByPlaceholder('Search Stream').fill('e2e_automate');
+    await page.waitForTimeout(1000);
+    await page.getByRole('button', { name: 'Stream Detail' }).first().click();
+    await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]').click();
+    await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]').click();
+    await page.locator('[data-test="schema-add-field-button"]').click();
+    await page.locator('[data-test="schema-update-settings-button"]').click();
+    
+    // Handle schema fields tab visibility issues in CI/CD
+    const schemaFieldsTab = page.locator('[data-test="tab-schemaFields"]');
+    const allFieldsTab = page.locator('[data-test="tab-allFields"]');
+    
+    if (await schemaFieldsTab.isVisible({ timeout: 3000 }) && await schemaFieldsTab.isEnabled({ timeout: 1000 })) {
+        await schemaFieldsTab.click();
+    } else if (await allFieldsTab.isVisible({ timeout: 3000 })) {
+        console.log('Schema fields tab not available, using all fields tab');
+        await allFieldsTab.click();
+    } else {
+        console.log('Neither schema fields nor all fields tab available, proceeding without tab switch');
+    }
+    await page.getByRole('cell', { name: 'kubernetes_annotations_kubectl_kubernetes_io_default_container' }).click();
+    await page.getByRole('cell', { name: 'kubernetes_annotations_kubernetes_io_psp' }).click();
+    await page.waitForTimeout(1000);
+    await ingestion(page);
+    await page.waitForTimeout(2000);
+    await page.locator('button').filter({ hasText: 'close' }).first().click();
+    await page.getByRole('button', { name: 'Explore' }).first().click();
+    await page.waitForTimeout(1000);
+    // await page.locator('[data-test="date-time-btn"]').click();
+    // await page.locator('[data-test="date-time-relative-tab"]').click();
+    // await page.locator('[data-test="date-time-relative-15-m-btn"]').click();
+    await page.waitForTimeout(2000);
+    // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
+    await page.waitForTimeout(1000);
+
+    await page.locator('[data-test="logs-user-defined-fields-btn"]').click();
+    // await page.locator('[data-test="log-search-index-list-interesting-_all-field-btn"]').last().click({force: true});
+
+    await applyQueryButton(page);
+     await page.getByText(/^arrow_drop_down_all:.*$/).click();
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('_timestamp');
+    await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click();
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('_all');
+    await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_all')
+    await page.locator('[data-test="logs-all-fields-btn"]').click();
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
+    await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_all')
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('_timestamp');
+    await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click();
+
+    await page.waitForSelector('[data-test="log-expand-detail-key-_all"]', { state: 'visible' });
+    await page.locator('[data-test="logs-search-bar-query-editor"]').locator('.monaco-editor').click();
+    await page.keyboard.type("str_match(_all, \'test\')");
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.waitForTimeout(2000);
+    const errorMessage = page.locator('[data-test="logs-search-error-message"]');
+    await expect(errorMessage).not.toBeVisible();
+    await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+    await page.getByPlaceholder('Search Stream').click();
+    await page.getByPlaceholder('Search Stream').fill('e2e_automate');
+    await page.waitForTimeout(1000);
+    await page.getByRole('button', { name: 'Stream Detail' }).first().click();
+    await page.locator('[data-test="tab-schemaFields"]').click();
+    await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]').click();
+    await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]').click();
+    await page.locator('[data-test="schema-add-field-button"]').click();
+    await page.locator('[data-test="schema-update-settings-button"]').click();
+    await page.waitForTimeout(3000);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(1000);
+    await ingestion(page);
+    await page.waitForTimeout(2000);
+    await page.getByRole('button', { name: 'Explore' }).first().click();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
+    await page.getByText('arrow_drop_down_timestamp:').click();
+  });
+
+  test('should display stream details on navigating from blank stream to stream with details', async ({ page }) => {
+    await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+    await page.locator('[data-test="log-stream-add-stream-btn"]').click();
+    await page.getByLabel('Name *').click();
+    await page.getByLabel('Name *').fill(streamName);
+    await page.locator('.q-form > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native').click();
+    await page.getByRole('option', { name: 'Logs' }).locator('div').nth(2).click();
+    await page.locator('[data-test="save-stream-btn"]').click();
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="menu-link-\\/-item"]').click();
+    await page.locator('[data-test="menu-link-\\/logs-item"]').click();
+    await page.locator('#fnEditor').locator('.monaco-editor').click()
+    await page.locator('[data-test="log-search-index-list-select-stream"]').click();
+    await page.locator('[data-test="log-search-index-list-select-stream"]').fill(streamName);
+    await page.getByText(streamName).click();
+    // await page.getByRole('option', { name: streamName }).locator('div').nth(2).click();
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="log-search-index-list-select-stream"]').click();
+    await page.locator('[data-test="log-search-index-list-select-stream"]').fill('e2e_automate');
+    // await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
+    await page.getByText('e2e_automate').click();
+    await page.waitForTimeout(4000);
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.waitForTimeout(2000);
+    await page.waitForSelector('text=Loading...', { state: 'hidden' });
+    await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click()
+    await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+    await page.getByPlaceholder('Search Stream').click();
+    await page.getByPlaceholder('Search Stream').fill(streamName);
+    await page.waitForTimeout(1000);
+    await page.locator('[data-test="log-stream-refresh-stats-btn"]').click();
+    await page.getByPlaceholder('Search Stream').click();
+    await page.getByPlaceholder('Search Stream').click();
+    await page.getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('button', { name: 'Ok' }).click();
   });
 })
