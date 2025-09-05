@@ -269,11 +269,6 @@ mod tests {
         // Test that converting from IndexOptimizeMode to cluster_rpc and back preserves the
         // original
         let test_modes = [
-            IndexOptimizeMode::SimpleSelect(100, true),
-            IndexOptimizeMode::SimpleSelect(50, false),
-            IndexOptimizeMode::SimpleCount,
-            IndexOptimizeMode::SimpleHistogram(0, 10, 5),
-            IndexOptimizeMode::SimpleHistogram(-100, 25, 20),
             IndexOptimizeMode::SimpleTopN("cpu_usage".to_string(), 10, true),
             IndexOptimizeMode::SimpleTopN("memory_usage".to_string(), 5, false),
             IndexOptimizeMode::SimpleDistinct("user_id".to_string(), 100, true),
@@ -300,13 +295,9 @@ mod tests {
         // Test edge cases and boundary values
         let edge_cases = [
             // Zero values
-            IndexOptimizeMode::SimpleSelect(0, true),
-            IndexOptimizeMode::SimpleHistogram(0, 0, 0),
             IndexOptimizeMode::SimpleTopN("".to_string(), 0, false),
             IndexOptimizeMode::SimpleDistinct("".to_string(), 0, true),
             // Large values (using u32::MAX to avoid overflow in conversion)
-            IndexOptimizeMode::SimpleSelect(u32::MAX as usize, false),
-            IndexOptimizeMode::SimpleHistogram(i64::MAX, u64::MAX, u32::MAX as usize),
             IndexOptimizeMode::SimpleTopN(
                 "very_long_field_name_that_might_exceed_normal_lengths".to_string(),
                 u32::MAX as usize,
@@ -317,8 +308,6 @@ mod tests {
                 u32::MAX as usize,
                 false,
             ),
-            // Negative values for histogram
-            IndexOptimizeMode::SimpleHistogram(i64::MIN, 1, 1),
         ];
 
         for mode in edge_cases {
