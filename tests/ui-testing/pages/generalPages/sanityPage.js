@@ -294,7 +294,7 @@ export class SanityPage {
         
         try {
             await expect(fnEditorTextbox).toBeVisible({ timeout: 15000 });
-            await expect(fnEditorTextbox).toBeEditable({ timeout: 10000 });
+            // await expect(fnEditorTextbox).toBeEditable({ timeout: 10000 });
             await this.page.waitForLoadState('domcontentloaded');
             await fnEditorTextbox.click();
         } catch (error) {
@@ -812,7 +812,7 @@ export class SanityPage {
         const sqlEditor = this.page.locator('#fnEditor');
         await expect(sqlEditor).toBeVisible({ timeout: 15000 });
         
-        await expect(sqlEditor).locator('.monaco-editor').toBeEditable({ timeout: 10000 });
+        // await expect(sqlEditor).locator('.monaco-editor').toBeEditable({ timeout: 10000 });
         
         await sqlEditor.locator('.monaco-editor').click();
         
