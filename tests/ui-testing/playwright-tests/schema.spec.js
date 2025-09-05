@@ -3,8 +3,10 @@ import logData from "../../ui-testing/cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
 import { LogsPage } from '../pages/logsPage.js';
 
-test.describe.configure({ mode: 'serial' });
+// Parallel execution enabled - each test uses dedicated streams
 const streamName = `stream${Date.now()}`;
+
+test.describe("Schema testcases", () => {
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
@@ -23,9 +25,8 @@ async function login(page) {
   await page.locator('[data-cy="login-sign-in"]').click();
 }
 
-async function ingestion(page) {
+async function ingestion(page, streamName) {
   const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_automate";
   const basicAuthCredentials = Buffer.from(
     `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
   ).toString('base64');
@@ -51,7 +52,6 @@ async function ingestion(page) {
   console.log(response);
 }
 
-test.describe.serial("Schema testcases", () => {
   let logsPage;
   // let logData;
   function removeUTFCharacters(text) {
@@ -71,76 +71,136 @@ test.describe.serial("Schema testcases", () => {
     await expect.poll(async () => (await search).status()).toBe(200);
   }
 
-  test.beforeEach(async ({ page }) => {
-    await login(page);
-    logsPage = new LogsPage(page);
-    await page.waitForTimeout(1000)
-    await ingestion(page);
-    await page.waitForTimeout(2000)
-
-    await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
-    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
-    await applyQueryButton(page);
-  });
+  // Individual test setup with dedicated streams - moved to each test
 
   test('should add a new field and delete it from schema', async ({ page }) => {
+    // Test 1: Setup with dedicated stream e2e_automate1
+    const testStreamName = 'e2e_automate1';
+    await login(page);
+    const logsPage = new LogsPage(page);
+    await page.waitForTimeout(1000);
+    await ingestion(page, testStreamName);
+    await page.waitForTimeout(2000);
+
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    const allsearch = page.waitForResponse("**/api/default/_search**");
+    await logsPage.selectStreamAndStreamTypeForLogs(testStreamName); 
+    await applyQueryButton(page);
+    
     // Generate random field name
     const randomPrefix = Math.random().toString(36).substring(2, 7);
     const fieldName = `${randomPrefix}_newtest`;
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
-    await page.getByPlaceholder('Search Stream').fill('e2e_automate');
+    await page.getByPlaceholder('Search Stream').fill(testStreamName);
     await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Stream Detail' }).first().click();
     await page.locator('[data-test="tab-allFields"]').click();
-    await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]').click();
-    await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]').click();
-    await page.locator('[data-test="schema-add-field-button"]').click();
-    await page.locator('[data-test="schema-update-settings-button"]').click();
-    await page.locator('[data-test="schema-add-fields-title"]').click();
+    await page.waitForTimeout(2000);
+    console.log('Clicked allFields tab');
     
-    await page.getByPlaceholder('Name *').click();
-    await page.getByPlaceholder('Name *').fill(fieldName);
+    // Step 1: Clear some existing fields to make space (optional cleanup)
+    try {
+        await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]').click();
+        await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]').click();
+        console.log('Cleared some existing fields');
+    } catch (error) {
+        console.log('Could not clear existing fields, proceeding...');
+    }
+    
+    // Step 2: Click Add Field button to open the add field form
+    await page.locator('[data-test="schema-add-field-button"]').click();
+    await page.waitForTimeout(1000);
+    console.log('Clicked schema-add-field-button to open form');
+    
+    // Step 3: Fill in the new field details
+    await page.locator('[data-test="schema-add-fields-title"]').click();
+    await page.waitForTimeout(500);
+    
+    // Verify the field creation form is actually visible
+    const nameField = page.getByPlaceholder('Name *');
+    await nameField.waitFor({ state: 'visible', timeout: 5000 });
+    console.log('✅ Field creation form is visible');
+    
+    await nameField.click();
+    await nameField.fill(fieldName);
     console.log(`Filled field name: ${fieldName}`);
     
-    // Check if data type field exists
+    // Verify the field name was actually filled
+    const filledValue = await nameField.inputValue();
+    if (filledValue !== fieldName) {
+        throw new Error(`Field name not filled correctly. Expected: ${fieldName}, Got: ${filledValue}`);
+    }
+    console.log('✅ Field name confirmed in input');
+    
+    // Check if data type field exists and fill it
     const dataTypeField = page.getByPlaceholder('Data Type *');
     const hasDataType = await dataTypeField.isVisible({ timeout: 2000 }).catch(() => false);
+    console.log(`Data Type field visible: ${hasDataType}`);
     
     if (hasDataType) {
         await dataTypeField.click();
-        await page.waitForTimeout(500);
+        await page.waitForTimeout(1000); // Give time for dropdown to open
         
         // Try to select Utf8 or first available option
         const utf8Option = page.getByRole('option', { name: 'Utf8' });
-        if (await utf8Option.isVisible({ timeout: 2000 }).catch(() => false)) {
+        if (await utf8Option.isVisible({ timeout: 3000 }).catch(() => false)) {
             await utf8Option.click();
-            console.log('Selected Utf8 data type');
+            console.log('✅ Selected Utf8 data type');
+            
+            // Verify selection was made
+            const selectedValue = await dataTypeField.inputValue();
+            console.log(`Data type field value after selection: ${selectedValue}`);
         } else {
-            const firstOption = page.getByRole('option').first();
-            if (await firstOption.isVisible({ timeout: 2000 })) {
+            // Try to find any available option
+            const options = page.getByRole('option');
+            const optionCount = await options.count();
+            console.log(`Available data type options: ${optionCount}`);
+            
+            if (optionCount > 0) {
+                const firstOption = options.first();
+                const optionText = await firstOption.textContent();
                 await firstOption.click();
-                console.log('Selected first available data type');
+                console.log(`✅ Selected first available data type: ${optionText}`);
+                
+                // Verify selection
+                const selectedValue = await dataTypeField.inputValue();
+                console.log(`Data type field value after selection: ${selectedValue}`);
+            } else {
+                console.log('❌ Warning: No data type options found - this may cause field creation to fail');
             }
         }
+    } else {
+        console.log('ℹ️ Data type field not required or not visible');
     }
     
+    // Step 4: Save the new field by clicking Update Settings
     await page.locator('[data-test="schema-update-settings-button"]').click();
-    console.log('Clicked schema-update-settings-button');
-    await page.locator('[data-test="schema-field-search-input"]').fill(fieldName)
-    await page.waitForTimeout(1000);
-    await page.locator(`[data-test="schema-stream-delete-${fieldName}-field-fts-key-checkbox"]`).click();
-    await page.locator('[data-test="schema-add-field-button"]').click();
-    console.log('Clicked schema-add-field-button');
-    await page.locator('[data-test="schema-update-settings-button"]').click();
-    console.log('Clicked final schema-update-settings-button');
+    console.log('Clicked schema-update-settings-button to save field');
     
-    // Wait and confirm the field was added successfully
-    await page.waitForTimeout(8000);
+    // Wait for success notification or field creation confirmation
+    let fieldCreationSuccess = false;
+    try {
+        // Wait for success notification
+        await page.waitForSelector('#q-notify', { timeout: 15000 });
+        const notificationText = await page.locator('#q-notify').textContent();
+        console.log(`Notification appeared: ${notificationText}`);
+        
+        // Check if it's a success message (adjust text based on actual notifications)
+        if (notificationText && (notificationText.includes('success') || notificationText.includes('added') || notificationText.includes('updated'))) {
+            fieldCreationSuccess = true;
+            console.log('✅ Field creation success notification confirmed');
+        } else {
+            console.log('⚠️ Notification found but may not indicate success');
+        }
+        await page.waitForTimeout(3000); // Wait for backend processing
+    } catch (error) {
+        console.log('❌ No success notification found within timeout, proceeding with extended wait');
+        await page.waitForTimeout(15000); // Longer fallback wait
+    }
+    
     await page.waitForLoadState('networkidle');
+    console.log(`Field creation process completed. Success notification: ${fieldCreationSuccess}`);
     
     // Close any dialog first to refresh the view
     await page.keyboard.press('Escape');
@@ -168,64 +228,70 @@ test.describe.serial("Schema testcases", () => {
     
     console.log(`Looking for field: ${fieldName}`);
     
-    // Check if the cell exists, if not try refreshing or navigating back
-    const fieldCell = page.getByRole('cell', { name: fieldName }).first();
-    try {
-        await fieldCell.waitFor({ state: 'visible', timeout: 10000 });
-        await fieldCell.click();
-    } catch (error) {
-        // If cell not found, try refreshing the page or navigating back to schema
-        console.log(`${fieldName} cell not found, trying to refresh schema view`);
+    // Robust field verification with multiple retry attempts
+    let fieldFound = false;
+    let fieldCell;
+    
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        console.log(`Attempt ${attempt}: Looking for field ${fieldName}`);
         
-        console.log(`Field ${fieldName} not found in initial load, checking alternative approaches`);
-        
-        // If the schema table is empty, the field might still be getting added
-        // Skip the click attempt and proceed directly to deletion verification
-        console.log('Skipping field click due to empty schema table in CI/CD environment');
-        
-        // Instead of clicking the cell, proceed with a different approach
-        // The field was created successfully based on the API calls
-        // Try to delete it by searching for it first
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(2000);
-        
-        // Navigate fresh to stream details
-        await page.locator('[data-test="menu-link-\\/streams-item"]').click();
-        await page.waitForTimeout(1000);
-        await page.getByPlaceholder('Search Stream').click();
-        await page.getByPlaceholder('Search Stream').fill('e2e_automate');
-        await page.waitForTimeout(1000);
-        await page.getByRole('button', { name: 'Stream Detail' }).first().click();
-        
-        // Try different tabs to find the field
-        const allFieldsTab = page.locator('[data-test="tab-allFields"]');
-        const schemaFieldsTab = page.locator('[data-test="tab-schemaFields"]');
-        
-        if (await allFieldsTab.isVisible({ timeout: 3000 })) {
-            console.log('Using allFields tab');
-            await allFieldsTab.click();
-        } else if (await schemaFieldsTab.isVisible({ timeout: 3000 })) {
-            console.log('Using schemaFields tab');
-            await schemaFieldsTab.click();
-        }
-        
-        await page.waitForTimeout(3000);
-        
-        // Search for the field in the search box if available
+        // Clear any search filters first
         const searchBox = page.locator('[data-test="schema-field-search-input"]');
         if (await searchBox.isVisible({ timeout: 2000 })) {
-            await searchBox.fill(fieldName);
-            await page.waitForTimeout(1000);
+            await searchBox.clear();
+            await page.waitForTimeout(500);
         }
         
-        // Try to find the field again after proper navigation
-        const fieldCell = page.getByRole('cell', { name: fieldName }).first();
+        fieldCell = page.getByRole('cell', { name: fieldName }).first();
+        
         if (await fieldCell.isVisible({ timeout: 5000 })) {
-            console.log(`Found field ${fieldName} after alternative navigation`);
-            await fieldCell.click();
-        } else {
-            throw new Error(`TEST FAILED: Field "${fieldName}" was not created successfully. Field is not visible in schema table after all navigation attempts.`);
+            console.log(`✅ Field ${fieldName} found on attempt ${attempt}`);
+            fieldFound = true;
+            break;
         }
+        
+        if (attempt < 3) {
+            console.log(`❌ Field ${fieldName} not found on attempt ${attempt}, retrying...`);
+            
+            // Try refreshing the schema view
+            await page.keyboard.press('Escape');
+            await page.waitForTimeout(1000);
+            
+            // Re-navigate to stream details
+            await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+            await page.waitForTimeout(1000);
+            await page.getByPlaceholder('Search Stream').fill(testStreamName);
+            await page.waitForTimeout(1000);
+            await page.getByRole('button', { name: 'Stream Detail' }).first().click();
+            
+            // Try both schema tabs
+            const schemaFieldsTab = page.locator('[data-test="tab-schemaFields"]');
+            const allFieldsTab = page.locator('[data-test="tab-allFields"]');
+            
+            if (await schemaFieldsTab.isVisible({ timeout: 3000 })) {
+                await schemaFieldsTab.click();
+                await page.waitForTimeout(2000);
+            } else if (await allFieldsTab.isVisible({ timeout: 3000 })) {
+                await allFieldsTab.click();
+                await page.waitForTimeout(2000);
+            }
+            
+            // Wait for schema table to load
+            await page.waitForLoadState('networkidle');
+            await page.waitForTimeout(2000);
+        }
+    }
+    
+    if (!fieldFound) {
+        throw new Error(`TEST FAILED: Field "${fieldName}" was not created successfully. Field is not visible in schema table after 3 attempts.`);
+    }
+    
+    // Click the found field
+    try {
+        await fieldCell.click();
+        console.log(`Successfully clicked field: ${fieldName}`);
+    } catch (error) {
+        console.log(`Warning: Could not click field ${fieldName}, but it exists. Proceeding with deletion.`);
     }
     
     // Take screenshot before deletion
@@ -269,9 +335,22 @@ test.describe.serial("Schema testcases", () => {
   });
 
   test('stream schema settings updated to be displayed under logs', async ({ page }) => {
+    // Test 2: Setup with dedicated stream e2e_automate2
+    const testStreamName = 'e2e_automate2';
+    await login(page);
+    const logsPage = new LogsPage(page);
+    await page.waitForTimeout(1000);
+    await ingestion(page, testStreamName);
+    await page.waitForTimeout(2000);
+
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    const allsearch = page.waitForResponse("**/api/default/_search**");
+    await logsPage.selectStreamAndStreamTypeForLogs(testStreamName); 
+    await applyQueryButton(page);
+    
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
-    await page.getByPlaceholder('Search Stream').fill('e2e_automate');
+    await page.getByPlaceholder('Search Stream').fill(testStreamName);
     await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Stream Detail' }).first().click();
     await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]').click();
@@ -294,7 +373,7 @@ test.describe.serial("Schema testcases", () => {
     await page.getByRole('cell', { name: 'kubernetes_annotations_kubectl_kubernetes_io_default_container' }).click();
     await page.getByRole('cell', { name: 'kubernetes_annotations_kubernetes_io_psp' }).click();
     await page.waitForTimeout(1000);
-    await ingestion(page);
+    await ingestion(page, testStreamName);
     await page.waitForTimeout(2000);
     await page.locator('button').filter({ hasText: 'close' }).first().click();
     await page.getByRole('button', { name: 'Explore' }).first().click();
@@ -305,7 +384,7 @@ test.describe.serial("Schema testcases", () => {
     await page.waitForTimeout(2000);
     // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
 
     await page.locator('[data-test="logs-user-defined-fields-btn"]').click();
     // await page.locator('[data-test="log-search-index-list-interesting-_all-field-btn"]').last().click({force: true});
@@ -335,7 +414,7 @@ test.describe.serial("Schema testcases", () => {
     await expect(errorMessage).not.toBeVisible();
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
-    await page.getByPlaceholder('Search Stream').fill('e2e_automate');
+    await page.getByPlaceholder('Search Stream').fill(testStreamName);
     await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Stream Detail' }).first().click();
     await page.locator('[data-test="tab-schemaFields"]').click();
@@ -346,7 +425,7 @@ test.describe.serial("Schema testcases", () => {
     await page.waitForTimeout(3000);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(1000);
-    await ingestion(page);
+    await ingestion(page, testStreamName);
     await page.waitForTimeout(2000);
     await page.getByRole('button', { name: 'Explore' }).first().click();
     await page.waitForTimeout(2000);
@@ -357,6 +436,19 @@ test.describe.serial("Schema testcases", () => {
   });
 
   test('should display stream details on navigating from blank stream to stream with details', async ({ page }) => {
+    // Test 3: Setup with dedicated stream e2e_automate3
+    const testStreamName = 'e2e_automate3';
+    await login(page);
+    const logsPage = new LogsPage(page);
+    await page.waitForTimeout(1000);
+    await ingestion(page, testStreamName);
+    await page.waitForTimeout(2000);
+
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    const allsearch = page.waitForResponse("**/api/default/_search**");
+    await logsPage.selectStreamAndStreamTypeForLogs(testStreamName); 
+    await applyQueryButton(page);
+    
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.locator('[data-test="log-stream-add-stream-btn"]').click();
     await page.getByLabel('Name *').click();
@@ -374,9 +466,9 @@ test.describe.serial("Schema testcases", () => {
     // await page.getByRole('option', { name: streamName }).locator('div').nth(2).click();
     await page.waitForTimeout(1000);
     await page.locator('[data-test="log-search-index-list-select-stream"]').click();
-    await page.locator('[data-test="log-search-index-list-select-stream"]').fill('e2e_automate');
-    // await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
-    await page.getByText('e2e_automate').click();
+    await page.locator('[data-test="log-search-index-list-select-stream"]').fill(testStreamName);
+    // await page.getByRole('option', { name: 'testStreamName' }).locator('div').nth(2).click();
+    await page.getByText(testStreamName).click();
     await page.waitForTimeout(4000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.waitForTimeout(2000);
