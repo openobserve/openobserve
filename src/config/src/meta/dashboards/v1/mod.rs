@@ -60,6 +60,7 @@ impl From<Dashboard> for super::Dashboard {
             v3: None,
             v4: None,
             v5: None,
+            v6: None,
             version,
             hash,
             updated_at,
