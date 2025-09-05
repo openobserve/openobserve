@@ -60,7 +60,7 @@ let {
   histogramResults,
 } = searchState();
 
-export const useStreamFieldUtils = () => {
+export const useStreamFields = () => {
   const { getStreams, getStream } = useStreams();
   const { updateFieldKeywords } = useSqlSuggestions();
 
@@ -1129,4 +1129,4 @@ export const useStreamFieldUtils = () => {
   };
 };
 
-export default useStreamFieldUtils;
+export default useStreamFields;
