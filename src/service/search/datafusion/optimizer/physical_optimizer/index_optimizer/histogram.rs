@@ -80,7 +80,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
             // Check if the AggregateExec matches SimpleHistogram pattern
             if aggregate.group_expr().expr().len() == 1
                 && aggregate.aggr_expr().len() == 1
-                && aggregate.aggr_expr()[0].fun().name().to_lowercase() == "count"
+                && aggregate.aggr_expr()[0].name() == "count(Int64(1))"
             {
                 // Check group by field
                 if let Some((group_expr, _)) = aggregate.group_expr().expr().first()

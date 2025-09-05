@@ -499,8 +499,14 @@ fn optimizer_physical_plan(
     let index_rule = IndexRule::new(index_fields.clone(), index_condition_ref.clone());
     let mut plan = index_rule.optimize(plan, ctx.state().config_options())?;
 
-    let index_condition = index_condition_ref.lock().clone();
-    if index_condition.is_some()
+    // if the index rule can't optimize, we should take the index optimizer rule
+    if !index_rule.can_optimize() {
+        index_optimizer_rule_ref.lock().take();
+    }
+
+    // if the index condition is some, and the index optimizer rule is none,
+    // and filter only have _timestamp filter, we can try to optimize the plan
+    if index_condition_ref.lock().is_some()
         && index_optimizer_rule_ref.lock().is_none()
         && index_rule.can_optimize()
     {

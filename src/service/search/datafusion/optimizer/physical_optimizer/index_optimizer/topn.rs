@@ -128,7 +128,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
                     if is_column(group_expr) && self.index_fields.contains(column_name) {
                         // Check aggregate function is count(*)
                         let aggr_expr = &aggregate.aggr_expr()[0];
-                        if aggr_expr.fun().name().to_lowercase() == "count" {
+                        if aggr_expr.name() == "count(Int64(1))" {
                             // Update the simple_topn with the correct field name
                             if let Some(simple_topn) = &mut self.simple_topn {
                                 self.simple_topn =

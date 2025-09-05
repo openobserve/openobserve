@@ -68,7 +68,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleCountVisitor {
         if let Some(aggregate) = node.as_any().downcast_ref::<AggregateExec>() {
             if aggregate.group_expr().is_empty()
                 && aggregate.aggr_expr().len() == 1
-                && aggregate.aggr_expr()[0].fun().name().to_lowercase() == "count"
+                && aggregate.aggr_expr()[0].name() == "count(Int64(1))"
             {
                 self.is_simple_count = true;
             } else {

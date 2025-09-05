@@ -122,7 +122,10 @@ impl PhysicalOptimizerRule for IndexRule {
 struct IndexOptimizer {
     index_fields: HashSet<String>,
     index_condition: Arc<Mutex<Option<IndexCondition>>>,
+    // set to true when the filter only have _timestamp filter
     can_optimize: bool,
+    is_remove_filter: bool,
+    optimizer_enabled: bool,
 }
 
 impl IndexOptimizer {
@@ -134,6 +137,12 @@ impl IndexOptimizer {
             index_fields,
             index_condition,
             can_optimize: false,
+            is_remove_filter: config::get_config()
+                .common
+                .feature_query_remove_filter_with_index,
+            optimizer_enabled: config::get_config()
+                .common
+                .inverted_index_count_optimizer_enabled,
         }
     }
 }
@@ -154,18 +163,27 @@ impl TreeNodeRewriter for IndexOptimizer {
                 }
             }
 
+            // check if we can remove the filter
+            let is_remove_filter = self.is_remove_filter || index_conditions.can_remove_filter();
+
+            // set the index condition
             if !index_conditions.is_empty() {
                 *self.index_condition.lock() = Some(index_conditions);
             }
 
-            // if all filter can be used in index, we can
-            // use index optimizer rule to optimize the query
-            if is_only_timestamp_filter(&other_conditions.iter().collect::<Vec<_>>()) {
-                self.can_optimize = true;
+            if is_remove_filter {
+                // if all filter can be used in index, we can
+                // use index optimizer rule to optimize the query
+                if self.optimizer_enabled
+                    && is_only_timestamp_filter(&other_conditions.iter().collect::<Vec<_>>())
+                {
+                    self.can_optimize = true;
+                }
+                let plan = construct_filter_exec(filter, other_conditions)?;
+                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+            } else {
+                return Ok(Transformed::new(node, false, TreeNodeRecursion::Stop));
             }
-
-            let plan = construct_filter_exec(filter, other_conditions)?;
-            return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
         }
         Ok(Transformed::no(node))
     }
