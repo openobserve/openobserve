@@ -1,5 +1,8 @@
-import { test, expect } from "@playwright/test";
-import { login } from "./utils/dashLogin.js";
+const {
+  test,
+  expect,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
 import { ingestion } from "./utils/dashIngestion.js";
 import logData from "../../fixtures/log.json";
 import PageManager from "../../pages/page-manager";
@@ -52,14 +55,14 @@ const queryWithoutAliases = `SELECT count(kubernetes_container_hash), count(kube
 
 test.describe("logs testcases", () => {
   test.beforeEach(async ({ page }) => {
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestion(page);
-    await page.waitForTimeout(2000);
 
-    await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    );
+    // Navigate to logs page
+    const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
+
+    await page.goto(logsUrl);
+    await page.waitForLoadState("networkidle");
 
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
@@ -562,9 +565,6 @@ test.describe("logs testcases", () => {
 
     // Step 5: Open the visualize tab
     await pm.logsVisualise.openVisualiseTab();
-
-    // Step 6: Wait for the tab to load properly
-    // await page.waitForTimeout(2000);
 
     // Step 7: Verify quick mode toggle is true
     const quickModeState = await pm.logsVisualise.verifyQuickModeToggle(true);

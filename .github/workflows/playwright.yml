@@ -182,25 +182,25 @@ jobs:
                 "visualize.spec.js",
                 # "visualization-vrl.spec.js"
               ]
-          # - testfolder: "Pipelines"
-          #   browser: "chrome"
-          #   run_files: [
-          #       "pipelines.spec.js",
-          #       "pipeline-dynamic.spec.js",
-          #       "pipeline-core.spec.js",
-          #       # "remotepipeline.spec.js"
-          #     ]
-          # - testfolder: "Reports"
-          #   browser: "chrome"
-          #   run_files: ["reportsUpdated.spec.js", "reportsUpdated2.spec.js"]
-          # - testfolder: "Streams"
-          #   browser: "chrome"
-          #   run_files:
-          #     [
-          #       "multiselect-stream.spec.js",
-          #       "streamname.spec.js",
-          #       "streaming.spec.js",
-          #     ]
+          - testfolder: "Pipelines"
+            browser: "chrome"
+            run_files: [
+                "pipelines.spec.js",
+                "pipeline-dynamic.spec.js",
+                "pipeline-core.spec.js",
+                # "remotepipeline.spec.js"
+              ]
+          - testfolder: "Reports"
+            browser: "chrome"
+            run_files: ["reportsUpdated.spec.js", "reportsUpdated2.spec.js"]
+          - testfolder: "Streams"
+            browser: "chrome"
+            run_files:
+              [
+                "multiselect-stream.spec.js",
+                "streamname.spec.js",
+                "streaming.spec.js",
+              ]
 
     steps:
       - name: Clone the current repo
