@@ -667,7 +667,7 @@ async function getQueryData() {
 
         if (
           filter &&
-          filter.includes("trace_id=") &&
+          filter.includes("trace_id") &&
           res.data.hits.length === 1 &&
           res.data.hits[0].start_time &&
           res.data.hits[0].end_time
@@ -753,6 +753,12 @@ const updateNewDateTime = (startTime: number, endTime: number) => {
   searchBarRef.value?.updateNewDateTime({
     startTime: startTime,
     endTime: endTime,
+  });
+  $q.notify({
+    type: "positive",
+    message:
+      "The selected time range did not include this trace. The time range has been updated to match the trace’s timestamp.",
+    timeout: 5000,
   });
 };
 
