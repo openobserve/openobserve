@@ -6,6 +6,9 @@ import { ManagementPage } from '../generalPages/managementPage.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Import testLogger for proper logging
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
+
 export class LogsPage {
     constructor(page) {
         this.page = page;
@@ -1234,7 +1237,7 @@ export class LogsPage {
             logData: logData
         });
         
-        console.log(response);
+        testLogger.debug('Ingestion API response received', { response });
         return response;
     }
 
@@ -1269,7 +1272,8 @@ export class LogsPage {
     }
 
     async clearQueryEditor() {
-        return await this.page.locator(this.queryEditor).getByRole('textbox').press('ControlOrMeta+a');
+        await this.page.locator(this.queryEditor).getByRole('textbox').press('ControlOrMeta+a');
+        return await this.page.locator(this.queryEditor).getByRole('textbox').press('Backspace');
     }
 
     async typeInQueryEditor(text) {
