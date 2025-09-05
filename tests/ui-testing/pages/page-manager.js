@@ -50,7 +50,7 @@ const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
 import UnflattenedPage from "./logsPages/unflattened.js";
 
-class PageManager {
+export default class PageManager {
   /**
    * @param {import('@playwright/test').Page} page - Playwright page instance
    */

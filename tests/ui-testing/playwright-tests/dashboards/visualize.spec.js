@@ -46,6 +46,9 @@ const largeDatasetSqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_i
 
 const histogramQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1"  FROM "${STREAM_NAME}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC `;
 
+// Query without aliases for testing error message
+const queryWithoutAliases = `SELECT count(kubernetes_container_hash), count(kubernetes_container_name), count(kubernetes_host) FROM "${STREAM_NAME}" WHERE kubernetes_namespace_name IS NOT NULL GROUP BY kubernetes_annotations_kubectl_kubernetes_io_default_container`;
+
 test.describe("logs testcases", () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
@@ -504,5 +507,40 @@ test.describe("logs testcases", () => {
 
     await page.locator('[data-test="dashboard-back-btn"]').click();
     await deleteDashboard(page, randomDashboardName);
+  });
+
+  test("should show error message when using aggregation functions without aliases in SQL query", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    // Step 1: Open logs page
+    await pm.logsVisualise.openLogs();
+
+    // Step 2: Fill the query editor with SQL query without aliases
+    await pm.logsVisualise.fillLogsQueryEditor(queryWithoutAliases);
+
+    // Step 3: Set relative time
+    await pm.logsVisualise.setRelative("6", "w");
+
+    // Step 4: Apply the query
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // Step 5: Open the visualize tab
+    await pm.logsVisualise.openVisualiseTab();
+
+    // Step 6: Wait for error message to appear
+    const errorMessage = page.getByText(
+      "Fields using aggregation functions must have aliases"
+    );
+
+    // Wait for the error message to appear on the page
+    await errorMessage.waitFor({ state: "visible", timeout: 10000 });
+
+    // Step 7: Check for the specific error message using getByText
+    await expect(errorMessage).toBeVisible();
+
+    // Verify the error message is displayed
+    await expect(errorMessage.first()).toBeVisible();
   });
 });
