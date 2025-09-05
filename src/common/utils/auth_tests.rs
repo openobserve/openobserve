@@ -3248,7 +3248,6 @@ mod tests {
                 datafusion_streaming_aggs_cache_max_entries: usize::default(),
                 datafusion_min_partition_num: usize::default(),
                 short_url_retention_days: i64::default(),
-                inverted_index_cache_max_entries: usize::default(),
                 inverted_index_skip_threshold: usize::default(),
                 max_query_range_for_sa: i64::default(),
                 db_text_data_type: String::default(),
