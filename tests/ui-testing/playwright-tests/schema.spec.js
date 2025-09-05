@@ -3,7 +3,7 @@ import logData from "../../ui-testing/cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
 import { LogsPage } from '../pages/logsPage.js';
 
-test.describe.configure({ mode: 'parallel' });
+test.describe.configure({ mode: 'serial' });
 const streamName = `stream${Date.now()}`;
 
 async function login(page) {
