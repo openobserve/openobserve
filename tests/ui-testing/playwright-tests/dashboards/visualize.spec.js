@@ -542,8 +542,6 @@ test.describe("logs testcases", () => {
     await errorMessage.waitFor({ state: "visible", timeout: 10000 });
 
     // Step 7: Check for the specific error message using getByText
-    await expect(errorMessage).toBeVisible();
-
     // Verify the error message is displayed
     await expect(errorMessage.first()).toBeVisible();
   });

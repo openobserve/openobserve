@@ -323,29 +323,15 @@ export default class LogsVisualise {
     // Wait for the toggle to be present
     await quickModeToggle.waitFor({ state: "visible", timeout: 10000 });
 
-    // Check aria-checked attribute
+    // Check aria-checked attribute - this is the most reliable indicator
     const ariaChecked = await quickModeToggle.getAttribute("aria-checked");
     const isChecked = ariaChecked === "true";
 
-    // Also check the CSS class for additional verification
-    const toggleInner = this.page.locator(
-      '[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner'
-    );
-    const hasCheckmark =
-      (await toggleInner.locator(".q-toggle__inner--truthy").count()) > 0;
-
-    if (expectedState) {
-      if (!isChecked) {
-        throw new Error(
-          `Expected quick mode to be true but aria-checked="${ariaChecked}"`
-        );
-      }
-    } else {
-      if (isChecked) {
-        throw new Error(
-          `Expected quick mode to be false but aria-checked="${ariaChecked}"`
-        );
-      }
+    // Validate the toggle state matches expectation
+    if (expectedState !== isChecked) {
+      throw new Error(
+        `Expected quick mode to be ${expectedState} but aria-checked="${ariaChecked}"`
+      );
     }
 
     return isChecked;
