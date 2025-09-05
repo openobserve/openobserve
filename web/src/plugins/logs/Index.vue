@@ -379,7 +379,7 @@ import {
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
-import useStreamFieldUtils from "@/composables/useLogs/useStreamFieldUtils";
+import useStreamFields from "@/composables/useLogs/useStreamFields";
 import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
@@ -406,6 +406,7 @@ import {
   encodeVisualizationConfig,
   decodeVisualizationConfig, 
 } from "@/composables/useLogs/logsVisualization";
+import useSearchBar from "@/composables/useLogs/useSearchBar";
 
 export default defineComponent({
   name: "PageSearch",
@@ -558,7 +559,8 @@ export default defineComponent({
     const disableMoreErrorDetails: boolean = ref(false);
     const searchHistoryRef = ref(null);
     const { resetSearchObj, initialLogsState, resetStreamData } = searchState();
-    const { getStreamList } = useStreamFieldUtils();
+    const { getStreamList } = useStreamFields();
+    const { getFunctions } = useSearchBar();
     let {
       searchObj,
       getQueryData,
@@ -576,7 +578,6 @@ export default defineComponent({
       getHistogramQueryData,
       generateHistogramSkeleton,
       getRegionInfo,
-      getFunctions,
       extractFields,
       resetHistogramWithError,
       enableRefreshInterval,
