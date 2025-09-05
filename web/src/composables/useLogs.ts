@@ -106,7 +106,7 @@ const useLogs = () => {
   generateHistogramData,
   generateHistogramSkeleton,
   setMultiStreamHistogramQuery,
-  isHistogramEnabled,} = histogramUtils();
+  isHistogramEnabled,} = useHistogram();
 
   const { getQueryReq,
 getDataThroughStream,
@@ -141,6 +141,8 @@ shouldGetPageCount,
 getPageCountThroughSocket,
 setCancelSearchError,
 handleSearchReset} = searchStream();
+
+const {getFunctions, getActions} = useSearchBar();
 
   const {fnParsedSQL,
   fnUnparsedSQL,
