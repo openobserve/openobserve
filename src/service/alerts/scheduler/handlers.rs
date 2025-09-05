@@ -1422,7 +1422,6 @@ async fn handle_derived_stream_triggers(
                                         .entry(stream_params.clone())
                                         .or_default()
                                         .extend(results);
-
                                 }
                             }
                         }
