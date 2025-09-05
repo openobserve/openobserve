@@ -8,7 +8,7 @@ import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
 
-import StreamSettingsPage from "../../pages/dashboardPages/streams.js";
+import StreamSettingsPage from "../../pages/generalPages/streams.js";
 import PageManager from "../../pages/page-manager";
 
 const randomDashboardName =

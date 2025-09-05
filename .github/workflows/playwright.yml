@@ -178,7 +178,7 @@ jobs:
                 "dashboard-maps.spec.js",
                 "dashboard-multi-y-axis.spec.js",
                 "dashboard-html-chart.spec.js",
-                # "visualize.spec.js",
+                "visualize.spec.js",
                 # "visualization-vrl.spec.js"
               ]
           - testfolder: "Pipelines"
