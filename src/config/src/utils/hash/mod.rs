@@ -121,4 +121,101 @@ mod tests {
             "Hash should not equal the original password"
         );
     }
+
+    #[test]
+    fn test_get_passcode_hash_very_long_inputs() {
+        let long_password = "a".repeat(100);
+        let long_salt = "b".repeat(16); // Use a reasonable salt length
+
+        let hash = get_passcode_hash(&long_password, &long_salt);
+        assert!(!hash.is_empty(), "Very long inputs should produce a hash");
+        assert_ne!(
+            hash, long_password,
+            "Hash should not equal the original password"
+        );
+        assert_ne!(hash, long_salt, "Hash should not equal the salt");
+    }
+
+    #[test]
+    fn test_get_passcode_hash_binary_like_inputs() {
+        let binary_password = "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F";
+        let binary_salt = "\x7F\x7E\x7D\x7C\x7B\x7A\x79\x78\x77\x76\x75\x74\x73\x72\x71\x70";
+
+        let hash = get_passcode_hash(binary_password, binary_salt);
+        assert!(!hash.is_empty(), "Binary-like inputs should produce a hash");
+        assert_ne!(
+            hash, binary_password,
+            "Hash should not equal the original password"
+        );
+        assert_ne!(hash, binary_salt, "Hash should not equal the salt");
+    }
+
+    #[test]
+    fn test_get_passcode_hash_whitespace_inputs() {
+        let whitespace_password = "   password with spaces   ";
+        let whitespace_salt = "\t\n\r salt with whitespace \t\n\r";
+
+        let hash = get_passcode_hash(whitespace_password, whitespace_salt);
+        assert!(!hash.is_empty(), "Whitespace inputs should produce a hash");
+        assert_ne!(
+            hash, whitespace_password,
+            "Hash should not equal the original password"
+        );
+        assert_ne!(hash, whitespace_salt, "Hash should not equal the salt");
+    }
+
+    #[test]
+    fn test_get_passcode_hash_consistency_across_runs() {
+        let password = "test_password_123";
+        let salt = "test_salt_456";
+
+        // Run multiple times to ensure consistency
+        let hashes = (0..10)
+            .map(|_| get_passcode_hash(password, salt))
+            .collect::<Vec<_>>();
+
+        // All hashes should be identical
+        let first_hash = &hashes[0];
+        for hash in &hashes[1..] {
+            assert_eq!(hash, first_hash, "Hashes should be consistent across runs");
+        }
+    }
+
+    #[test]
+    fn test_get_passcode_hash_format_validation() {
+        let password = "test";
+        let salt = "test_salt_123";
+
+        let hash = get_passcode_hash(password, salt);
+
+        // Argon2 hashes should start with "$argon2d$" and contain multiple "$" separators
+        assert!(
+            hash.starts_with("$argon2d$"),
+            "Hash should start with $argon2d$"
+        );
+        assert!(
+            hash.matches('$').count() >= 3,
+            "Hash should contain at least 3 $ separators"
+        );
+
+        // Hash should be reasonably long (Argon2 hashes are typically 95+ characters)
+        assert!(hash.len() >= 90, "Hash should be reasonably long");
+    }
+
+    #[test]
+    fn test_get_passcode_hash_null_byte_handling() {
+        let password_with_null = "pass\x00word";
+        let salt_with_null = "salt\x00value";
+
+        let hash = get_passcode_hash(password_with_null, salt_with_null);
+        assert!(
+            !hash.is_empty(),
+            "Inputs with null bytes should produce a hash"
+        );
+        assert_ne!(
+            hash, password_with_null,
+            "Hash should not equal the original password"
+        );
+        assert_ne!(hash, salt_with_null, "Hash should not equal the salt");
+    }
 }

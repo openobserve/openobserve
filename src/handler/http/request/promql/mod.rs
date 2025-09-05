@@ -32,6 +32,8 @@ use crate::{
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusRemoteWrite",
+    summary = "Ingest Prometheus metrics",
+    description = "Receives Prometheus metrics data via remote write protocol. Accepts protobuf-encoded WriteRequest payloads containing time series data and stores them for querying. Compatible with standard Prometheus remote write configuration.",
         security(
         ("Authorization"= [])
     ),
@@ -40,8 +42,8 @@ use crate::{
     ),
     request_body(content = String, description = "prometheus WriteRequest", content_type = "application/x-protobuf"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200})),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/prometheus/api/v1/write")]
@@ -67,13 +69,14 @@ pub async fn remote_write(
 }
 
 /// prometheus instant queries
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusQuery",
+    summary = "Execute Prometheus instant query",
+    description = "Executes a Prometheus instant query at a single point in time. Returns current values for metrics matching the query expression. Compatible with Prometheus instant query API for seamless integration with existing monitoring tools.",
     security(
         ("Authorization"= [])
     ),
@@ -84,7 +87,7 @@ pub async fn remote_write(
         ("timeout" = Option<String>, Query, description = "Evaluation timeout"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status" : "success",
             "data" : {
                "resultType" : "vector",
@@ -108,7 +111,10 @@ pub async fn remote_write(
                ]
             }
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query")]
@@ -224,13 +230,14 @@ async fn query(
 }
 
 /// prometheus range queries
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusRangeQuery",
+    summary = "Execute Prometheus range query",
+    description = "Executes a Prometheus range query over a specified time period. Returns time series data with multiple data points for metrics matching the query expression. Compatible with Prometheus range query API for time series analysis and visualization.",
     security(
         ("Authorization"= [])
     ),
@@ -243,7 +250,7 @@ async fn query(
         ("timeout" = Option<String>, Query, description = "Evaluation timeout"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status" : "success",
             "data" : {
                "resultType" : "matrix",
@@ -275,7 +282,10 @@ async fn query(
                ]
             }
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query_range")]
@@ -303,13 +313,14 @@ pub async fn query_range_post(
 }
 
 /// prometheus query exemplars
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-exemplars
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusQueryExemplars",
+    summary = "Query Prometheus exemplars",
+    description = "Queries exemplars for metrics within a specified time range. Exemplars are references to trace data that are associated with specific metric data points, enabling correlation between metrics and traces for observability workflows.",
     security(
         ("Authorization"= [])
     ),
@@ -320,7 +331,7 @@ pub async fn query_range_post(
         ("end" = String, Query, description = "<rfc3339 | unix_timestamp>: End timestamp, inclusive"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status": "success",
             "data": [
                 {
@@ -366,7 +377,10 @@ pub async fn query_range_post(
                 }
             ]
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query_exemplars")]
@@ -521,13 +535,14 @@ async fn query_range(
 }
 
 /// prometheus query metric metadata
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusMetadata",
+    summary = "Get metric metadata",
+    description = "Retrieves metadata information about metrics including their type, help text, and units. Provides essential information for understanding metric semantics and proper usage in queries and visualizations.",
     security(
         ("Authorization"= [])
     ),
@@ -537,7 +552,7 @@ async fn query_range(
         ("metric" = Option<String>, Query, description = "A metric name to filter metadata for. All metric metadata is retrieved if left empty"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status": "success",
             "data": {
               "cortex_ring_tokens": [
@@ -561,7 +576,10 @@ async fn query_range(
               ]
             }
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/metadata")]
@@ -583,13 +601,14 @@ pub async fn metadata(
 }
 
 /// prometheus finding series by label matchers
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusSeries",
+    summary = "Find metric series",
+    description = "Finds time series that match given label matchers. Returns the unique combinations of metric names and labels that exist in the specified time range. Useful for discovering available metrics and their label combinations.",
     security(
         ("Authorization"= [])
     ),
@@ -600,7 +619,7 @@ pub async fn metadata(
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status" : "success",
             "data" : [
                {
@@ -620,7 +639,10 @@ pub async fn metadata(
                }
             ]
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/series")]
@@ -727,13 +749,14 @@ async fn series(
 }
 
 /// prometheus getting label names
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#getting-label-names
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusLabels",
+    summary = "Get metric label names",
+    description = "Returns a list of label names available in the metric data within the specified time range. Optionally filter by series selector to get labels for specific metrics. Useful for building dynamic queries and understanding data structure.",
     security(
         ("Authorization"= [])
     ),
@@ -744,7 +767,7 @@ async fn series(
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status": "success",
             "data": [
                 "__name__",
@@ -770,7 +793,10 @@ async fn series(
                 "version"
             ]
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/labels")]
@@ -825,13 +851,14 @@ async fn labels(
 }
 
 /// prometheus query label values
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-label-values
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusLabelValues",
+    summary = "Get label values",
+    description = "Returns all possible values for a specific label name within the specified time range. Optionally filter by series selector to get values for specific metrics. Essential for building filters and understanding label cardinality.",
     security(
         ("Authorization"= [])
     ),
@@ -843,14 +870,17 @@ async fn labels(
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status" : "success",
             "data" : [
                "node",
                "prometheus"
             ]
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/label/{label_name}/values")]
@@ -939,13 +969,14 @@ fn validate_metadata_params(
 }
 
 /// prometheus formatting query expressions
-///
-/// #{"ratelimit_module":"Metrics", "ratelimit_module_operation":"get"}#
+
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#formatting-query-expressions
 #[utoipa::path(
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusFormatQuery",
+    summary = "Format Prometheus query",
+    description = "Formats and prettifies a Prometheus query expression. Returns the query in a standardized, readable format which helps with query validation, debugging, and ensuring consistent query formatting across applications.",
     security(
         ("Authorization"= [])
     ),
@@ -953,11 +984,14 @@ fn validate_metadata_params(
         ("query" = String, Query, description = "Prometheus expression query string."),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "status" : "success",
             "data" : "foo / bar"
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/format_query")]

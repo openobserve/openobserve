@@ -191,6 +191,166 @@ mod tests {
     }
 
     #[test]
+    fn test_quantile_comprehensive() {
+        // Test basic quartiles
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        assert_eq!(quantile(&data, 0.0), Some(1.0)); // Minimum
+        assert_eq!(quantile(&data, 0.25), Some(2.0)); // First quartile
+        assert_eq!(quantile(&data, 0.5), Some(3.0)); // Median
+        assert_eq!(quantile(&data, 0.75), Some(4.0)); // Third quartile
+        assert_eq!(quantile(&data, 1.0), Some(5.0)); // Maximum
+
+        // Test with unsorted data
+        let data = vec![5.0, 1.0, 3.0, 2.0, 4.0];
+        assert_eq!(quantile(&data, 0.5), Some(3.0));
+
+        // Test edge cases
+        let data: Vec<f64> = vec![];
+        assert_eq!(quantile(&data, 0.5), None); // Empty data
+
+        let data = vec![42.0];
+        assert_eq!(quantile(&data, 0.5), Some(42.0)); // Single element
+
+        // Test invalid quantiles
+        let data = vec![1.0, 2.0, 3.0];
+        assert_eq!(quantile(&data, -0.5), Some(f64::NEG_INFINITY));
+        assert_eq!(quantile(&data, 1.5), Some(f64::INFINITY));
+        assert!(quantile(&data, f64::NAN).unwrap().is_nan());
+
+        // Test with duplicates
+        let data = vec![1.0, 2.0, 2.0, 2.0, 3.0];
+        assert_eq!(quantile(&data, 0.5), Some(2.0));
+
+        // Test interpolation
+        let data = vec![10.0, 20.0];
+        assert_eq!(quantile(&data, 0.5), Some(15.0)); // Exact midpoint
+    }
+
+    #[test]
+    fn test_calculate_trend_comprehensive() {
+        // Test first index (should return previous trend)
+        assert_eq!(calculate_trend(0, 0.3, 100.0, 150.0, 5.0), 5.0);
+
+        // Test normal calculation
+        // trend_factor = 0.2, change = 120 - 100 = 20, previous_trend = 3.0
+        // Expected: 0.2 * 20 + 0.8 * 3.0 = 4.0 + 2.4 = 6.4
+        assert!((calculate_trend(1, 0.2, 100.0, 120.0, 3.0) - 6.4).abs() < 1e-10);
+
+        // Test extreme trend factors
+        assert_eq!(calculate_trend(1, 0.0, 100.0, 200.0, 5.0), 5.0); // Only previous trend
+        assert_eq!(calculate_trend(1, 1.0, 100.0, 200.0, 5.0), 100.0); // Only current change
+
+        // Test negative changes
+        let result = calculate_trend(1, 0.5, 100.0, 80.0, 2.0);
+        assert!((result - (-9.0)).abs() < 1e-10); // 0.5 * (-20) + 0.5 * 2 = -9
+
+        // Test zero change
+        let result = calculate_trend(1, 0.3, 100.0, 100.0, 5.0);
+        assert!((result - 3.5).abs() < 1e-10); // 0.3 * 0 + 0.7 * 5 = 3.5
+    }
+
+    #[test]
+    fn test_linear_regression_comprehensive() {
+        // Test perfect linear relationship y = 2x + 3
+        let samples = vec![
+            Sample::new(0, 3.0),
+            Sample::new(1000, 5.0),
+            Sample::new(2000, 7.0),
+            Sample::new(3000, 9.0),
+        ];
+        let result = linear_regression(&samples, 0);
+        assert!(result.is_some());
+        let (slope, intercept) = result.unwrap();
+        assert!((slope - 2000.0).abs() < 1e-6); // 2 per second = 2000 per 1000ms
+        assert!((intercept - 3.0).abs() < 1e-6);
+
+        // Test constant values
+        let samples = vec![
+            Sample::new(1000, 5.0),
+            Sample::new(2000, 5.0),
+            Sample::new(3000, 5.0),
+        ];
+        let result = linear_regression(&samples, 0);
+        assert!(result.is_some());
+        let (slope, intercept) = result.unwrap();
+        assert_eq!(slope, 0.0);
+        assert_eq!(intercept, 5.0);
+
+        // Test edge cases
+        let samples: Vec<Sample> = vec![];
+        assert!(linear_regression(&samples, 0).is_none()); // Empty
+
+        let samples = vec![Sample::new(1000, 42.0)];
+        let result = linear_regression(&samples, 0);
+        assert!(result.is_some());
+        let (slope, intercept) = result.unwrap();
+        assert_eq!(slope, 0.0);
+        assert_eq!(intercept, 42.0);
+
+        // Test infinite values
+        let samples = vec![
+            Sample::new(1000, f64::INFINITY),
+            Sample::new(2000, f64::INFINITY),
+        ];
+        assert!(linear_regression(&samples, 0).is_none());
+
+        // Test negative slope
+        let samples = vec![
+            Sample::new(1000, 100.0),
+            Sample::new(2000, 80.0),
+            Sample::new(3000, 60.0),
+        ];
+        let result = linear_regression(&samples, 0);
+        assert!(result.is_some());
+        let (slope, _) = result.unwrap();
+        assert!(slope < 0.0);
+        assert!((slope - (-20000.0)).abs() < 1e-6); // -20 per second
+    }
+
+    #[test]
+    fn test_kahan_sum_increment_comprehensive() {
+        // Test basic increment
+        let (sum, c) = kahan_sum_increment(1.0, 0.0, 0.0);
+        assert_eq!(sum, 1.0);
+        assert_eq!(c, 0.0);
+
+        // Test increment to existing sum
+        let (sum, c) = kahan_sum_increment(2.0, 1.0, 0.0);
+        assert_eq!(sum, 3.0);
+        assert_eq!(c, 0.0);
+
+        // Test with compensation
+        let (sum, c) = kahan_sum_increment(1.0, 1.0, 0.1);
+        assert_eq!(sum, 2.0);
+        assert_eq!(c, 0.1);
+
+        // Test precision preservation with very small increment
+        let (sum, c) = kahan_sum_increment(1e-15, 1.0, 0.0);
+        assert!(sum >= 1.0);
+        // The compensation term should capture precision loss
+        assert!(c != 0.0 || sum > 1.0);
+
+        // Test full Kahan summation
+        fn kahan_sum(values: &[f64]) -> f64 {
+            let mut sum = 0.0;
+            let mut c = 0.0;
+            for &value in values {
+                let (new_sum, new_c) = kahan_sum_increment(value, sum, c);
+                sum = new_sum;
+                c = new_c;
+            }
+            sum + c
+        }
+
+        let values = vec![1.0, 2.0, 3.0, 4.0];
+        assert_eq!(kahan_sum(&values), 10.0);
+
+        let values = vec![0.1, 0.2, 0.3];
+        let result = kahan_sum(&values);
+        assert!((result - 0.6).abs() < 1e-15);
+    }
+
+    #[test]
     fn test_mean() {
         // Test normal case
         let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];

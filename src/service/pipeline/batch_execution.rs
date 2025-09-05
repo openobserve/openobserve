@@ -260,7 +260,8 @@ impl ExecutablePipeline {
             channel::<(usize, StreamParams, Value)>(batch_size);
 
         // error_channel
-        let (error_sender, mut error_receiver) = channel::<(String, String, String)>(batch_size);
+        let (error_sender, mut error_receiver) =
+            channel::<(String, String, String, Option<String>)>(batch_size);
 
         let mut node_senders = HashMap::new();
         let mut node_receivers = HashMap::new();
@@ -285,7 +286,7 @@ impl ExecutablePipeline {
                 .collect();
             let result_sender_cp = node.children.is_empty().then_some(result_sender.clone());
             let error_sender_cp = error_sender.clone();
-            let vrl_runtime = self.vrl_map.get(node_id).cloned();
+            let vrl_runtime: Option<(VRLResultResolver, bool)> = self.vrl_map.get(node_id).cloned();
             let pipeline_name = pipeline_name.clone();
             let stream_name = stream_name.clone();
 
@@ -328,8 +329,8 @@ impl ExecutablePipeline {
         let error_task = tokio::spawn(async move {
             log::debug!("[Pipeline]: starts error collecting job");
             let mut count = 0;
-            while let Some((node_id, node_type, error)) = error_receiver.recv().await {
-                pipeline_error.add_node_error(node_id, node_type, error);
+            while let Some((node_id, node_type, error, fn_name)) = error_receiver.recv().await {
+                pipeline_error.add_node_error(node_id, node_type, error, fn_name);
                 count += 1;
             }
             log::debug!("[Pipeline]: collected {count} errors");
@@ -548,7 +549,7 @@ async fn process_node(
     mut child_senders: Vec<Sender<(usize, Value, bool)>>,
     vrl_runtime: Option<(VRLResultResolver, bool)>,
     result_sender: Option<Sender<(usize, StreamParams, Value)>>,
-    error_sender: Sender<(String, String, String)>,
+    error_sender: Sender<(String, String, String, Option<String>)>,
     pipeline_name: String,
     stream_name: Option<String>,
 ) -> Result<()> {
@@ -571,7 +572,7 @@ async fn process_node(
                             Err(e) => {
                                 let err_msg = format!("LeafNode error with flattening: {e}");
                                 if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .send((node.id.to_string(), node.node_type(), err_msg, None))
                                     .await
                                 {
                                     log::error!(
@@ -606,7 +607,7 @@ async fn process_node(
                                 };
                                 log::warn!("{err_msg}");
                                 if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .send((node.id.to_string(), node.node_type(), err_msg, None))
                                     .await
                                 {
                                     log::error!(
@@ -655,7 +656,7 @@ async fn process_node(
                         Err(e) => {
                             let err_msg = format!("ConditionNode error with flattening: {e}");
                             if let Err(send_err) = error_sender
-                                .send((node.id.to_string(), node.node_type(), err_msg))
+                                .send((node.id.to_string(), node.node_type(), err_msg, None))
                                 .await
                             {
                                 log::error!(
@@ -700,8 +701,14 @@ async fn process_node(
                             Ok(flattened) => flattened,
                             Err(e) => {
                                 let err_msg = format!("FunctionNode error with flattening: {e}");
+                                let err_msg = err_msg.get(0..500).unwrap_or(&err_msg);
                                 if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .send((
+                                        node.id.to_string(),
+                                        node.node_type(),
+                                        err_msg.to_owned(),
+                                        Some(func_params.name.to_owned()),
+                                    ))
                                     .await
                                 {
                                     log::error!(
@@ -723,9 +730,17 @@ async fn process_node(
                         ) {
                             (res, None) => res,
                             (res, Some(error)) => {
-                                let err_msg = format!("FunctionNode error: {error}");
+                                let err_msg = format!(
+                                    "FunctionNode error: {}",
+                                    error.get(0..500).unwrap_or(&error)
+                                );
                                 if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .send((
+                                        node.id.to_string(),
+                                        node.node_type(),
+                                        err_msg.to_owned(),
+                                        Some(func_params.name.to_owned()),
+                                    ))
                                     .await
                                 {
                                     log::error!(
@@ -761,9 +776,17 @@ async fn process_node(
                 ) {
                     (res, None) => res,
                     (res, Some(error)) => {
-                        let err_msg = format!("FunctionNode error: {error}");
+                        let err_msg = format!(
+                            "FunctionNode error: {}",
+                            error.get(0..500).unwrap_or(&error)
+                        );
                         if let Err(send_err) = error_sender
-                            .send((node.id.to_string(), node.node_type(), err_msg))
+                            .send((
+                                node.id.to_string(),
+                                node.node_type(),
+                                err_msg.to_owned(),
+                                Some(func_params.name.to_owned()),
+                            ))
                             .await
                         {
                             log::error!(
@@ -819,7 +842,7 @@ async fn process_node(
                         Err(e) => {
                             let err_msg = format!("DestinationNode error with flattening: {e}");
                             if let Err(send_err) = error_sender
-                                .send((node.id.to_string(), node.node_type(), err_msg))
+                                .send((node.id.to_string(), node.node_type(), err_msg, None))
                                 .await
                             {
                                 log::error!(
@@ -836,7 +859,7 @@ async fn process_node(
                 {
                     let err_msg = format!("DestinationNode error handling timestamp: {e}");
                     if let Err(send_err) = error_sender
-                        .send((node.id.to_string(), node.node_type(), err_msg))
+                        .send((node.id.to_string(), node.node_type(), err_msg, None))
                         .await
                     {
                         log::error!(
@@ -927,7 +950,7 @@ async fn process_node(
                                 "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
                             );
                             if let Err(send_err) = error_sender
-                                .send((node.id.to_string(), node.node_type(), err_msg))
+                                .send((node.id.to_string(), node.node_type(), err_msg, None))
                                 .await
                             {
                                 log::error!(
@@ -950,7 +973,7 @@ async fn process_node(
             let err_msg = "[Pipeline]: remote destination is not supported in open source version. Records dropped".to_string();
             log::error!("{err_msg}");
             if let Err(send_err) = error_sender
-                .send((node.id.to_string(), node.node_type(), err_msg))
+                .send((node.id.to_string(), node.node_type(), err_msg, None))
                 .await
             {
                 log::error!(
@@ -1130,6 +1153,8 @@ fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use config::utils::json;
 
     use super::*;
@@ -1158,5 +1183,396 @@ mod tests {
         assert!(err1.is_err());
         let err1 = resolve_stream_name("{{eulav}}", &record);
         assert!(err1.is_err());
+    }
+
+    // Test ExecutablePipelineBulkInputs
+    #[test]
+    fn test_executable_pipeline_bulk_inputs_new() {
+        let inputs = ExecutablePipelineBulkInputs::new();
+        assert!(inputs.records.is_empty());
+        assert!(inputs.doc_ids.is_empty());
+        assert!(inputs.originals.is_empty());
+    }
+
+    #[test]
+    fn test_executable_pipeline_bulk_inputs_default() {
+        let inputs = ExecutablePipelineBulkInputs::default();
+        assert!(inputs.records.is_empty());
+        assert!(inputs.doc_ids.is_empty());
+        assert!(inputs.originals.is_empty());
+    }
+
+    #[test]
+    fn test_executable_pipeline_bulk_inputs_add_input() {
+        let mut inputs = ExecutablePipelineBulkInputs::new();
+        let record = json::json!({"key": "value"});
+        let doc_id = Some("doc123".to_string());
+        let original = Some("original_data".to_string());
+
+        inputs.add_input(record.clone(), doc_id.clone(), original.clone());
+
+        assert_eq!(inputs.records.len(), 1);
+        assert_eq!(inputs.doc_ids.len(), 1);
+        assert_eq!(inputs.originals.len(), 1);
+        assert_eq!(inputs.records[0], record);
+        assert_eq!(inputs.doc_ids[0], doc_id);
+        assert_eq!(inputs.originals[0], original);
+    }
+
+    #[test]
+    fn test_executable_pipeline_bulk_inputs_add_multiple() {
+        let mut inputs = ExecutablePipelineBulkInputs::new();
+
+        // Add first input
+        let record1 = json::json!({"key1": "value1"});
+        inputs.add_input(record1.clone(), Some("doc1".to_string()), None);
+
+        // Add second input
+        let record2 = json::json!({"key2": "value2"});
+        inputs.add_input(record2.clone(), None, Some("original2".to_string()));
+
+        assert_eq!(inputs.records.len(), 2);
+        assert_eq!(inputs.doc_ids.len(), 2);
+        assert_eq!(inputs.originals.len(), 2);
+
+        assert_eq!(inputs.records[0], record1);
+        assert_eq!(inputs.records[1], record2);
+        assert_eq!(inputs.doc_ids[0], Some("doc1".to_string()));
+        assert_eq!(inputs.doc_ids[1], None);
+        assert_eq!(inputs.originals[0], None);
+        assert_eq!(inputs.originals[1], Some("original2".to_string()));
+    }
+
+    #[test]
+    fn test_executable_pipeline_bulk_inputs_into_parts() {
+        let mut inputs = ExecutablePipelineBulkInputs::new();
+        let record = json::json!({"test": "data"});
+        let doc_id = Some("test_doc".to_string());
+        let original = Some("test_original".to_string());
+
+        inputs.add_input(record.clone(), doc_id.clone(), original.clone());
+
+        let (records, doc_ids, originals) = inputs.into_parts();
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(doc_ids.len(), 1);
+        assert_eq!(originals.len(), 1);
+        assert_eq!(records[0], record);
+        assert_eq!(doc_ids[0], doc_id);
+        assert_eq!(originals[0], original);
+    }
+
+    // Test ExecutablePipelineTraceInputs
+    #[test]
+    fn test_executable_pipeline_trace_inputs_new() {
+        let inputs = ExecutablePipelineTraceInputs::new();
+        assert!(inputs.records.is_empty());
+        assert!(inputs.services.is_empty());
+        assert!(inputs.span_names.is_empty());
+        assert!(inputs.span_status_for_spanmetrics.is_empty());
+        assert!(inputs.span_kinds.is_empty());
+        assert!(inputs.span_durations.is_empty());
+    }
+
+    #[test]
+    fn test_executable_pipeline_trace_inputs_default() {
+        let inputs = ExecutablePipelineTraceInputs::default();
+        assert!(inputs.records.is_empty());
+        assert!(inputs.services.is_empty());
+        assert!(inputs.span_names.is_empty());
+        assert!(inputs.span_status_for_spanmetrics.is_empty());
+        assert!(inputs.span_kinds.is_empty());
+        assert!(inputs.span_durations.is_empty());
+    }
+
+    #[test]
+    fn test_executable_pipeline_trace_inputs_add_input() {
+        let mut inputs = ExecutablePipelineTraceInputs::new();
+        let record = json::json!({"trace": "data"});
+        let service = "test-service".to_string();
+        let span_name = "test-span".to_string();
+        let span_status = "OK".to_string();
+        let span_kind = "CLIENT".to_string();
+        let duration = 123.45;
+
+        inputs.add_input(
+            record.clone(),
+            service.clone(),
+            span_name.clone(),
+            span_status.clone(),
+            span_kind.clone(),
+            duration,
+        );
+
+        assert_eq!(inputs.records.len(), 1);
+        assert_eq!(inputs.services.len(), 1);
+        assert_eq!(inputs.span_names.len(), 1);
+        assert_eq!(inputs.span_status_for_spanmetrics.len(), 1);
+        assert_eq!(inputs.span_kinds.len(), 1);
+        assert_eq!(inputs.span_durations.len(), 1);
+
+        assert_eq!(inputs.records[0], record);
+        assert_eq!(inputs.services[0], service);
+        assert_eq!(inputs.span_names[0], span_name);
+        assert_eq!(inputs.span_status_for_spanmetrics[0], span_status);
+        assert_eq!(inputs.span_kinds[0], span_kind);
+        assert_eq!(inputs.span_durations[0], duration);
+    }
+
+    #[test]
+    fn test_executable_pipeline_trace_inputs_into_parts() {
+        let mut inputs = ExecutablePipelineTraceInputs::new();
+        let record = json::json!({"test": "trace"});
+        let service = "test-service".to_string();
+        let span_name = "test-span".to_string();
+        let span_status = "OK".to_string();
+        let span_kind = "INTERNAL".to_string();
+        let duration = 42.0;
+
+        inputs.add_input(
+            record.clone(),
+            service.clone(),
+            span_name.clone(),
+            span_status.clone(),
+            span_kind.clone(),
+            duration,
+        );
+
+        let (records, services, span_names, span_statuses, span_kinds, durations) =
+            inputs.into_parts();
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(services.len(), 1);
+        assert_eq!(span_names.len(), 1);
+        assert_eq!(span_statuses.len(), 1);
+        assert_eq!(span_kinds.len(), 1);
+        assert_eq!(durations.len(), 1);
+
+        assert_eq!(records[0], record);
+        assert_eq!(services[0], service);
+        assert_eq!(span_names[0], span_name);
+        assert_eq!(span_statuses[0], span_status);
+        assert_eq!(span_kinds[0], span_kind);
+        assert_eq!(durations[0], duration);
+    }
+
+    // Test ExecutableNode
+    #[test]
+    fn test_executable_node_display_stream() {
+        let node = ExecutableNode {
+            id: "test_id".to_string(),
+            node_data: NodeData::Stream(StreamParams::new("org1", "stream1", StreamType::Logs)),
+            children: vec![],
+        };
+        assert_eq!(node.to_string(), "stream");
+        assert_eq!(node.node_type(), "stream");
+    }
+
+    #[test]
+    fn test_executable_node_display_function() {
+        let node = ExecutableNode {
+            id: "test_id".to_string(),
+            node_data: NodeData::Function(config::meta::pipeline::components::FunctionParams {
+                name: "test_function".to_string(),
+                after_flatten: true,
+                num_args: 1,
+            }),
+            children: vec![],
+        };
+        assert_eq!(node.to_string(), "function");
+        assert_eq!(node.node_type(), "function");
+    }
+
+    // Test topological_sort function
+    #[test]
+    fn test_topological_sort_simple_chain() {
+        let mut node_map = HashMap::new();
+
+        // Create a simple chain: A -> B -> C
+        node_map.insert(
+            "A".to_string(),
+            ExecutableNode {
+                id: "A".to_string(),
+                node_data: NodeData::Stream(StreamParams::new("org1", "stream1", StreamType::Logs)),
+                children: vec!["B".to_string()],
+            },
+        );
+
+        node_map.insert(
+            "B".to_string(),
+            ExecutableNode {
+                id: "B".to_string(),
+                node_data: NodeData::Function(config::meta::pipeline::components::FunctionParams {
+                    name: "func1".to_string(),
+                    after_flatten: false,
+                    num_args: 0,
+                }),
+                children: vec!["C".to_string()],
+            },
+        );
+
+        node_map.insert(
+            "C".to_string(),
+            ExecutableNode {
+                id: "C".to_string(),
+                node_data: NodeData::Stream(StreamParams::new("org1", "stream2", StreamType::Logs)),
+                children: vec![],
+            },
+        );
+
+        let result = topological_sort(&node_map);
+        assert!(result.is_ok());
+        let sorted = result.unwrap();
+        assert_eq!(sorted.len(), 3);
+
+        // A should come before B, B should come before C
+        let a_pos = sorted.iter().position(|x| x == "A").unwrap();
+        let b_pos = sorted.iter().position(|x| x == "B").unwrap();
+        let c_pos = sorted.iter().position(|x| x == "C").unwrap();
+
+        assert!(a_pos < b_pos);
+        assert!(b_pos < c_pos);
+    }
+
+    #[test]
+    fn test_topological_sort_single_node() {
+        let mut node_map = HashMap::new();
+
+        node_map.insert(
+            "A".to_string(),
+            ExecutableNode {
+                id: "A".to_string(),
+                node_data: NodeData::Stream(StreamParams::new("org1", "stream1", StreamType::Logs)),
+                children: vec![],
+            },
+        );
+
+        let result = topological_sort(&node_map);
+        assert!(result.is_ok());
+        let sorted = result.unwrap();
+        assert_eq!(sorted.len(), 1);
+        assert_eq!(sorted[0], "A");
+    }
+
+    #[test]
+    fn test_topological_sort_empty() {
+        let node_map = HashMap::new();
+        let result = topological_sort(&node_map);
+        assert!(result.is_ok());
+        let sorted = result.unwrap();
+        assert!(sorted.is_empty());
+    }
+
+    // Test resolve_stream_name function
+    #[test]
+    fn test_resolve_stream_name_simple_field() {
+        let record = json::json!({
+            "stream": "test_stream",
+            "value": 42
+        });
+
+        let result = resolve_stream_name("{stream}", &record);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "test_stream");
+    }
+
+    #[test]
+    fn test_resolve_stream_name_complex_pattern() {
+        let record = json::json!({
+            "app": "myapp",
+            "env": "prod",
+            "version": "1.0"
+        });
+
+        let result = resolve_stream_name("logs-{app}-{env}-{version}", &record);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "logs-myapp-prod-1.0");
+    }
+
+    #[test]
+    fn test_resolve_stream_name_missing_field() {
+        let record = json::json!({
+            "existing": "value"
+        });
+
+        let result = resolve_stream_name("{missing_field}", &record);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Field name missing_field not found")
+        );
+    }
+
+    #[test]
+    fn test_resolve_stream_name_no_pattern() {
+        let record = json::json!({
+            "field": "value"
+        });
+
+        let result = resolve_stream_name("static_stream_name", &record);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "static_stream_name");
+    }
+
+    // Test BatchBuffer (enterprise feature)
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_batch_buffer_new() {
+        let buffer = BatchBuffer::new();
+        assert!(buffer.records.is_empty());
+        assert_eq!(buffer.total_bytes, 0);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_batch_buffer_add_records() {
+        let mut buffer = BatchBuffer::new();
+        let records = vec![
+            json::json!({"key1": "value1"}),
+            json::json!({"key2": "value2"}),
+        ];
+
+        buffer.add_records(records.clone());
+
+        assert_eq!(buffer.records.len(), 2);
+        assert!(buffer.total_bytes > 0);
+        assert_eq!(buffer.records[0], records[0]);
+        assert_eq!(buffer.records[1], records[1]);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_batch_buffer_should_flush_by_size() {
+        let mut buffer = BatchBuffer::new();
+
+        // Add records up to the limit
+        for i in 0..50 {
+            buffer.add_records(vec![json::json!({"id": i})]);
+        }
+
+        assert!(buffer.should_flush()); // Should flush due to record count
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_batch_buffer_take_records() {
+        let mut buffer = BatchBuffer::new();
+        let records = vec![
+            json::json!({"key1": "value1"}),
+            json::json!({"key2": "value2"}),
+        ];
+
+        buffer.add_records(records.clone());
+        let taken = buffer.take_records();
+
+        assert_eq!(taken.len(), 2);
+        assert_eq!(taken[0], records[0]);
+        assert_eq!(taken[1], records[1]);
+
+        // Buffer should be empty after taking
+        assert!(buffer.records.is_empty());
+        assert_eq!(buffer.total_bytes, 0);
     }
 }

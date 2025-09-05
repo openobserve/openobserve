@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref, onBeforeMount, onActivated, defineEmits, computed } from "vue";
+import { ref, onBeforeMount, onActivated, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";

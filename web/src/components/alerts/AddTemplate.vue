@@ -212,15 +212,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import {
   ref,
-  onMounted,
-  defineProps,
   onBeforeMount,
   onActivated,
-  defineEmits,
-  watch,
   computed,
   defineAsyncComponent,
-  defineComponent,
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -232,6 +227,7 @@ import type { TemplateData, Template } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const props = defineProps<{ template: TemplateData | null }>();
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
@@ -251,6 +247,7 @@ const store = useStore();
 const q = useQuasar();
 const editorRef: any = ref(null);
 const isUpdatingTemplate = ref(false);
+const { track } = useReo();
 const sampleTemplates = [
   {
     name: "Slack",
@@ -395,6 +392,10 @@ const saveTemplate = () => {
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
+    track("Button Click", {
+      button: "Update Template",
+      page: "Add Template"
+    });
   } else {
     {
       templateService
@@ -427,6 +428,10 @@ const saveTemplate = () => {
             message: err.response?.data?.error || err.response?.data?.message,
           });
         });
+      track("Button Click", {
+        button: "Create Template",
+        page: "Add Template"
+      });
     }
   }
 };

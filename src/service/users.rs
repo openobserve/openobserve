@@ -172,16 +172,16 @@ pub async fn post_user(
             #[cfg(feature = "enterprise")]
             {
                 use o2_openfga::authorizer::authz::{
-                    get_service_account_creation_tuple, get_user_crole_tuple, get_user_role_tuple,
-                    update_tuples,
+                    get_add_user_to_org_tuples, get_service_account_creation_tuple,
+                    get_user_crole_tuple, update_tuples,
                 };
                 if get_openfga_config().enabled {
                     let mut tuples = vec![];
                     let org_id = org_id.replace(' ', "_");
-                    get_user_role_tuple(
-                        &usr_req.role.base_role.to_string(),
-                        &usr_req.email,
+                    get_add_user_to_org_tuples(
                         &org_id,
+                        &usr_req.email,
+                        &usr_req.role.base_role.to_string(),
                         &mut tuples,
                     );
                     if usr_req.role.base_role.eq(&UserRole::ServiceAccount) {
@@ -545,7 +545,7 @@ pub async fn update_user(
                 }
 
                 #[cfg(not(feature = "enterprise"))]
-                log::debug!("Role changed from {:?} to {:?}", old_role, new_role);
+                log::debug!("Role changed from {old_role:?} to {new_role:?}");
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                     http::StatusCode::OK,
                     "User updated successfully",
@@ -580,13 +580,13 @@ pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyh
         // Update OFGA
         #[cfg(feature = "enterprise")]
         {
-            use o2_openfga::authorizer::authz::{get_user_role_tuple, update_tuples};
+            use o2_openfga::authorizer::authz::{get_add_user_to_org_tuples, update_tuples};
             if get_openfga_config().enabled {
                 let mut tuples = vec![];
-                get_user_role_tuple(
-                    &UserRole::Admin.to_string(),
-                    user_email,
+                get_add_user_to_org_tuples(
                     org_id,
+                    user_email,
+                    &UserRole::Admin.to_string(),
                     &mut tuples,
                 );
                 match update_tuples(tuples, vec![]).await {
@@ -674,11 +674,11 @@ pub async fn add_user_to_org(
             #[cfg(feature = "enterprise")]
             {
                 use o2_openfga::authorizer::authz::{
-                    get_user_crole_tuple, get_user_role_tuple, update_tuples,
+                    get_add_user_to_org_tuples, get_user_crole_tuple, update_tuples,
                 };
                 if get_openfga_config().enabled {
                     let mut tuples = vec![];
-                    get_user_role_tuple(&base_role.to_string(), &email, org_id, &mut tuples);
+                    get_add_user_to_org_tuples(org_id, &email, &base_role.to_string(), &mut tuples);
                     if role.custom_role.is_some() {
                         let custom_role = role.custom_role.unwrap();
                         custom_role.iter().for_each(|crole| {
@@ -931,6 +931,33 @@ pub async fn remove_user_from_org(
                     )));
                 }
 
+                if initiating_user.email == email_id {
+                    return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                        http::StatusCode::FORBIDDEN,
+                        "Not Allowed",
+                    )));
+                }
+
+                #[cfg(feature = "cloud")]
+                {
+                    use o2_enterprise::enterprise::cloud::org_invites;
+
+                    match org_invites::delete_invites_for_user(org_id, &email_id).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            log::error!(
+                                "error deleting invites when deleting user {email_id} from org {org_id} : {e}"
+                            );
+                            return Ok(HttpResponse::InternalServerError().json(
+                                MetaHttpResponse::error(
+                                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                                    "error deleting user invites",
+                                ),
+                            ));
+                        }
+                    }
+                }
+
                 if !user.organizations.is_empty() {
                     let orgs = &mut user.organizations;
                     if orgs.len() == 1 {
@@ -1075,20 +1102,37 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
 }
 
 #[cfg(feature = "cloud")]
-pub async fn list_user_invites(user_id: &str) -> Result<HttpResponse, Error> {
+pub async fn list_user_invites(user_id: &str, only_pending: bool) -> Result<HttpResponse, Error> {
     let result = db::user::list_user_invites(user_id).await;
     match result {
         Ok(res) => {
-            let result = res
-                .into_iter()
-                .map(|invite| UserInvite {
+            let mut result: Vec<UserInvite> = Vec::with_capacity(res.len());
+
+            for invite in res {
+                result.push(UserInvite {
+                    org_name: db::organization::get_org(&invite.org_id)
+                        .await
+                        .map(|org| org.name)
+                        .unwrap_or("default".to_string()),
                     role: invite.role,
                     org_id: invite.org_id,
                     token: invite.token,
+                    inviter_id: invite.inviter_id,
                     status: InviteStatus::from(&invite.status),
                     expires_at: invite.expires_at,
-                })
-                .collect();
+                });
+            }
+
+            if only_pending {
+                let now = chrono::Utc::now().timestamp_micros();
+
+                result = result
+                    .into_iter()
+                    .filter(|invite| {
+                        invite.status == InviteStatus::Pending && invite.expires_at > now
+                    })
+                    .collect();
+            }
             Ok(HttpResponse::Ok().json(UserInviteList { data: result }))
         }
         Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
@@ -1248,14 +1292,17 @@ mod tests {
     async fn set_up() {
         let _ = ORM_CLIENT.get_or_init(connect_to_orm).await;
         // clear the table here as previous tests could have written to it
-        infra::table::org_users::clear().await.unwrap();
-        infra::table::users::clear().await.unwrap();
-        infra::table::organizations::clear().await.unwrap();
-        infra_db::create_table().await.unwrap();
-        infra_table::create_user_tables().await.unwrap();
-        organization::check_and_create_org_without_ofga("dummy")
-            .await
-            .unwrap();
+        let _ = infra::table::org_users::clear().await;
+        let _ = infra::table::users::clear().await;
+        let _ = infra::table::organizations::clear().await;
+        let _ = infra_db::create_table().await;
+        let _ = infra_table::create_user_tables().await;
+        let _ = organization::check_and_create_org_without_ofga("dummy").await;
+
+        // Clear global caches to ensure test isolation
+        USERS.clear();
+        ORG_USERS.clear();
+
         USERS.insert(
             "admin@zo.dev".to_string(),
             infra::table::users::UserRecord {
@@ -1390,5 +1437,272 @@ mod tests {
         let resp = remove_user_from_org("dummy", "user2@example.com", "admin@zo.dev").await;
 
         assert!(resp.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_create_new_user() {
+        set_up().await;
+
+        let db_user = DBUser {
+            email: "newuser@example.com".to_string(),
+            password: "".to_string(),
+            salt: "".to_string(),
+            first_name: "New".to_string(),
+            last_name: "User".to_string(),
+            password_ext: None,
+            is_external: false,
+            organizations: vec![UserOrg {
+                name: "dummy".to_string(),
+                token: "".to_string(),
+                rum_token: None,
+                role: UserRole::User,
+            }],
+        };
+
+        let result = create_new_user(db_user).await;
+        if let Err(e) = &result {
+            println!("Error creating user: {e:?}");
+        }
+        assert!(result.is_ok());
+
+        // Test creating another user with pre-existing password and token
+        let db_user2 = DBUser {
+            email: "existinguser@example.com".to_string(),
+            password: "existing_password".to_string(),
+            salt: "existing_salt".to_string(),
+            first_name: "Existing".to_string(),
+            last_name: "User".to_string(),
+            password_ext: None,
+            is_external: false,
+            organizations: vec![UserOrg {
+                name: "dummy".to_string(),
+                token: "existing_token".to_string(),
+                rum_token: Some("existing_rum".to_string()),
+                role: UserRole::User,
+            }],
+        };
+
+        let result = create_new_user(db_user2).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_user() {
+        set_up().await;
+
+        let resp = delete_user("nonexistent@example.com").await;
+        assert!(resp.is_ok());
+
+        let resp = delete_user("admin@zo.dev").await;
+        assert!(resp.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_root_user_exists_edge_cases() {
+        set_up().await;
+
+        let exists = root_user_exists().await;
+        assert!(!exists);
+
+        crate::common::infra::config::ROOT_USER.insert(
+            "root".to_string(),
+            User {
+                email: "root@example.com".to_string(),
+                first_name: "Root".to_string(),
+                last_name: "User".to_string(),
+                password: "root_pass".to_string(),
+                salt: "root_salt".to_string(),
+                password_ext: Some("root_pass_ext".to_string()),
+                role: UserRole::Root,
+                token: "root_token".to_string(),
+                rum_token: Some("root_rum".to_string()),
+                org: "default".to_string(),
+                is_external: false,
+            },
+        );
+
+        let exists = root_user_exists().await;
+        assert!(!exists);
+    }
+
+    #[tokio::test]
+    async fn test_create_root_user_if_not_exists() {
+        set_up().await;
+
+        let user_req = UserRequest {
+            email: "root@example.com".to_string(),
+            password: "root_password".to_string(),
+            role: UserOrgRole {
+                base_role: UserRole::Root,
+                custom_role: None,
+            },
+            first_name: "Root".to_string(),
+            last_name: "User".to_string(),
+            is_external: false,
+            token: Some("root_token".to_string()),
+        };
+
+        let result = create_root_user_if_not_exists("default", user_req).await;
+        assert!(result.is_ok());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_get_user_roles_by_org_id() {
+        let roles = vec![
+            "org1/role1".to_string(),
+            "org1/role2".to_string(),
+            "org2/role3".to_string(),
+            "global_role".to_string(),
+        ];
+
+        let org1_roles = get_user_roles_by_org_id(roles.clone(), Some("org1"));
+        assert_eq!(org1_roles, vec!["role1".to_string(), "role2".to_string()]);
+
+        let org2_roles = get_user_roles_by_org_id(roles.clone(), Some("org2"));
+        assert_eq!(org2_roles, vec!["role3".to_string()]);
+
+        let all_roles = get_user_roles_by_org_id(roles.clone(), None);
+        assert_eq!(all_roles, roles);
+
+        let empty_roles = get_user_roles_by_org_id(vec![], Some("org1"));
+        assert_eq!(empty_roles, Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    async fn test_post_user_validation() {
+        set_up().await;
+
+        let invalid_email_req = UserRequest {
+            email: "invalid-email".to_string(),
+            password: "password123".to_string(),
+            role: UserOrgRole {
+                base_role: UserRole::User,
+                custom_role: None,
+            },
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+            is_external: false,
+            token: None,
+        };
+
+        let resp = post_user("dummy", invalid_email_req, "admin@zo.dev").await;
+        assert!(resp.is_ok());
+        let response = resp.unwrap();
+        assert_eq!(response.status(), 400);
+
+        let empty_password_req = UserRequest {
+            email: "test@example.com".to_string(),
+            password: "".to_string(),
+            role: UserOrgRole {
+                base_role: UserRole::User,
+                custom_role: None,
+            },
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+            is_external: false,
+            token: None,
+        };
+
+        let resp = post_user("dummy", empty_password_req, "admin@zo.dev").await;
+        assert!(resp.is_ok());
+        let response = resp.unwrap();
+        assert_eq!(response.status(), 400);
+
+        let existing_user_req = UserRequest {
+            email: "admin@zo.dev".to_string(),
+            password: "password123".to_string(),
+            role: UserOrgRole {
+                base_role: UserRole::User,
+                custom_role: None,
+            },
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+            is_external: false,
+            token: None,
+        };
+
+        let resp = post_user("dummy", existing_user_req, "admin@zo.dev").await;
+        assert!(resp.is_ok());
+        let response = resp.unwrap();
+        assert_eq!(response.status(), 400);
+    }
+
+    #[tokio::test]
+    async fn test_update_user_validation() {
+        set_up().await;
+
+        let resp = update_user(
+            "dummy",
+            "invalid-email",
+            false,
+            "admin@zo.dev",
+            UpdateUser {
+                token: None,
+                first_name: None,
+                last_name: None,
+                old_password: None,
+                new_password: None,
+                role: None,
+                change_password: false,
+            },
+        )
+        .await;
+        assert!(resp.is_ok());
+        let response = resp.unwrap();
+        assert_eq!(response.status(), 400);
+
+        let resp = update_user(
+            "dummy",
+            "nonexistent@example.com",
+            false,
+            "admin@zo.dev",
+            UpdateUser {
+                token: None,
+                first_name: Some("New Name".to_string()),
+                last_name: None,
+                old_password: None,
+                new_password: None,
+                role: None,
+                change_password: false,
+            },
+        )
+        .await;
+        assert!(resp.is_ok());
+        let response = resp.unwrap();
+        assert_eq!(response.status(), 404);
+    }
+
+    #[tokio::test]
+    async fn test_add_user_to_org_validation() {
+        set_up().await;
+
+        let resp = add_user_to_org(
+            "dummy",
+            "invalid-email",
+            UserOrgRole {
+                base_role: UserRole::User,
+                custom_role: None,
+            },
+            "admin@zo.dev",
+        )
+        .await;
+        assert!(resp.is_ok());
+        let response = resp.unwrap();
+        assert_eq!(response.status(), 400);
+
+        let resp = add_user_to_org(
+            "dummy",
+            "nonexistent@example.com",
+            UserOrgRole {
+                base_role: UserRole::User,
+                custom_role: None,
+            },
+            "admin@zo.dev",
+        )
+        .await;
+        assert!(resp.is_ok());
+        let response = resp.unwrap();
+        assert_eq!(response.status(), 422);
     }
 }

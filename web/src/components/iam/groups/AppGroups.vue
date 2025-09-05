@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("iam.groups") }}
     </div>
     <div class=" row items-center justify-end">
-        <div date-test="iam-groups-search-input">
+        <div data-test="iam-groups-search-input">
           <q-input
             v-model="filterQuery"
             filled
@@ -119,10 +119,13 @@ import { getGroups, deleteGroup } from "@/services/iam";
 import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const showAddGroup = ref(false);
 
 const { t } = useI18n();
+
+const { track } = useReo();
 
 const rows: any = ref([]);
 
@@ -185,6 +188,10 @@ const updateTable = () => {
 };
 
 const addGroup = () => {
+  track("Button Click", {
+    button: "Add Group",
+    page: "Groups"
+  });
   showAddGroup.value = true;
 };
 
@@ -229,7 +236,7 @@ const deleteUserGroup = (group: any) => {
   deleteGroup(group.group_name, store.state.selectedOrganization.identifier)
     .then(() => {
       q.notify({
-        message: "Role deleted successfully!",
+        message: "Group deleted successfully!",
         color: "positive",
         position: "bottom",
       });

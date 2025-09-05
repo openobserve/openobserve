@@ -931,7 +931,10 @@ pub async fn merge_files(
 
             // upload file to storage
             let buf = Bytes::from(buf);
-            if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node {
+            if cfg.cache_latest_files.enabled
+                && cfg.cache_latest_files.cache_parquet
+                && cfg.cache_latest_files.download_from_node
+            {
                 infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
                 log::debug!("merge_files {new_file_key} file_data::disk::set success");
             }
@@ -968,7 +971,9 @@ pub async fn merge_files(
 
                 // upload file to storage
                 let buf = Bytes::from(buf);
-                if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node
+                if cfg.cache_latest_files.enabled
+                    && cfg.cache_latest_files.cache_parquet
+                    && cfg.cache_latest_files.download_from_node
                 {
                     infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
                     log::debug!("merge_files {new_file_key} file_data::disk::set success");

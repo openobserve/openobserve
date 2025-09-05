@@ -272,12 +272,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   ref,
   computed,
-  defineProps,
   onBeforeMount,
   onActivated,
-  defineEmits,
   watch,
-  reactive,
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -521,6 +518,28 @@ const saveDestination = () => {
   addNode(destinationData);
   emit("cancel:hideform");
 };
+
+// Expose functions for testing
+defineExpose({
+  getUUID,
+  createDestination,
+  addApiHeader,
+  deleteApiHeader,
+  createEmailTemplate,
+  getDestinations,
+  saveDestination,
+  formData,
+  apiHeaders,
+  selectedDestination,
+  destinations,
+  isValidDestination,
+  getFormattedDestinations,
+  createNewDestination,
+  isUpdatingDestination,
+  retries,
+  apiMethods,
+  outputFormats
+});
 </script>
 <style lang="scss" scoped>
 .destination-method-select {

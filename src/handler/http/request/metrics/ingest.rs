@@ -28,6 +28,10 @@ use crate::{
     context_path = "/api",
     tag = "Metrics",
     operation_id = "MetricsIngestionJson",
+    summary = "Ingest metrics via JSON",
+    description = "Ingests metrics data using JSON format. Accepts an array of metric objects containing metric name, type \
+                   (counter, gauge, histogram, or summary), labels, timestamp, and value. This endpoint is ideal for custom \
+                   applications and systems that generate metrics in JSON format rather than protocol buffers.",
     security(
         ("Authorization"= [])
     ),
@@ -36,8 +40,8 @@ use crate::{
     ),
     request_body(content = String, description = "Ingest data (json array)", content_type = "application/json", example = json!([{"__name__":"metrics stream name","__type__":"counter / gauge / histogram / summary","label_name1":"label_value1","label_name2":"label_value2", "_timestamp":1687175143,"value":1.2}])),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200,"status": [{"name": "up","successful": 3,"failed": 0}]})),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "up","successful": 3,"failed": 0}]})),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/ingest/metrics/_json")]
@@ -59,10 +63,14 @@ pub async fn json(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpRes
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PostMetrics",
+    summary = "Ingest metrics via OTLP",
+    description = "Ingests metrics data using OpenTelemetry Protocol (OTLP) format. Supports both Protocol Buffers and JSON \
+                   content types for OTLP metrics ingestion. This is the standard endpoint for OpenTelemetry SDK and \
+                   collector integrations to send metrics data.",
     request_body(content = String, description = "ExportMetricsServiceRequest", content_type = "application/x-protobuf"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200})),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/v1/metrics")]

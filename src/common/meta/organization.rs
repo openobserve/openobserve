@@ -150,7 +150,7 @@ pub struct OrgSummary {
     pub total_dashboards: i64,
 }
 
-#[derive(Default, Serialize, Deserialize, ToSchema)]
+#[derive(Default, Clone, Serialize, Deserialize, ToSchema)]
 pub struct StreamSummary {
     pub num_streams: i64,
     pub total_records: i64,
@@ -159,7 +159,7 @@ pub struct StreamSummary {
     pub total_index_size: f64,
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct PipelineSummary {
     pub num_realtime: i64,
     pub num_scheduled: i64,
@@ -178,7 +178,7 @@ pub enum IngestionTokensContainer {
     RumToken(RumIngestionToken),
 }
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, ToSchema, Clone)]
 pub struct IngestionPasscode {
     pub passcode: String,
     pub user: String,
@@ -189,7 +189,7 @@ pub struct PasscodeResponse {
     pub data: IngestionPasscode,
 }
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, ToSchema, Clone)]
 pub struct RumIngestionToken {
     pub user: String,
     pub rum_token: Option<String>,
@@ -220,10 +220,10 @@ fn default_toggle_ingestion_logs() -> bool {
     false
 }
 
-fn default_enable_aggregation_cache() -> bool {
+fn default_enable_streaming_aggregation() -> bool {
     #[cfg(feature = "enterprise")]
     {
-        config::get_config().common.aggregation_cache_enabled
+        config::get_config().common.feature_query_streaming_aggs
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -248,7 +248,7 @@ pub struct OrganizationSettingPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub toggle_ingestion_logs: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub aggregation_cache_enabled: Option<bool>,
+    pub streaming_aggregation_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_streaming_search: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -267,8 +267,8 @@ pub struct OrganizationSetting {
     pub span_id_field_name: String,
     #[serde(default = "default_toggle_ingestion_logs")]
     pub toggle_ingestion_logs: bool,
-    #[serde(default = "default_enable_aggregation_cache")]
-    pub aggregation_cache_enabled: bool,
+    #[serde(default = "default_enable_streaming_aggregation")]
+    pub streaming_aggregation_enabled: bool,
     #[serde(default = "default_enable_streaming_search")]
     pub enable_streaming_search: bool,
     #[serde(default = "default_auto_refresh_interval")]
@@ -286,7 +286,7 @@ impl Default for OrganizationSetting {
             trace_id_field_name: default_trace_id_field_name(),
             span_id_field_name: default_span_id_field_name(),
             toggle_ingestion_logs: default_toggle_ingestion_logs(),
-            aggregation_cache_enabled: default_enable_aggregation_cache(),
+            streaming_aggregation_enabled: default_enable_streaming_aggregation(),
             enable_streaming_search: default_enable_streaming_search(),
             min_auto_refresh_interval: default_auto_refresh_interval(),
             free_trial_expiry: None,
@@ -320,9 +320,10 @@ pub struct RegionInfo<T> {
 /// 1. Regions at the top level as object keys
 /// 2. Clusters within each region as object keys
 /// 3. Nodes as arrays directly under each cluster
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, ToSchema)]
 pub struct NodeListResponse {
     #[serde(flatten)]
+    #[schema(value_type = Object)]
     pub regions: std::collections::HashMap<String, RegionInfo<Vec<Node>>>,
 }
 
@@ -360,7 +361,7 @@ impl NodeListResponse {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug, ToSchema)]
 pub struct ClusterInfo {
     pub pending_jobs: u64,
 }
@@ -370,8 +371,9 @@ pub struct ClusterInfo {
 /// Contains a three-level hierarchy with a flat format:
 /// 1. Regions at the top level as object keys
 /// 2. Clusters within each region as object keys
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, ToSchema)]
 pub struct ClusterInfoResponse {
+    #[schema(value_type = Object)]
     pub regions: std::collections::HashMap<String, RegionInfo<ClusterInfo>>,
 }
 
@@ -516,5 +518,266 @@ mod tests {
 
         assert_eq!(record.status, InviteStatus::Pending);
         assert!(record.is_external);
+    }
+
+    #[test]
+    fn test_organization_default_values() {
+        let org = Organization {
+            identifier: Default::default(),
+            name: "Test Org".to_string(),
+            org_type: Default::default(),
+        };
+
+        assert_eq!(org.identifier, "");
+        assert_eq!(org.name, "Test Org");
+        assert_eq!(org.org_type, "");
+    }
+
+    #[test]
+    fn test_all_org_list_details_default_plan() {
+        let details = AllOrgListDetails {
+            id: 123,
+            identifier: "org-123".to_string(),
+            name: "Test Org".to_string(),
+            created_at: 1640995200,
+            updated_at: 1640995260,
+            org_type: "standard".to_string(),
+            plan: Default::default(),
+            trial_expires_at: None,
+        };
+
+        assert_eq!(details.plan, 0);
+        assert_eq!(details.trial_expires_at, None);
+    }
+
+    #[test]
+    fn test_organization_response() {
+        let user = OrgUser {
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+            email: "test@example.com".to_string(),
+        };
+
+        let org_details = OrgDetails {
+            id: 1,
+            identifier: "org-1".to_string(),
+            name: "Org One".to_string(),
+            user_email: "admin1@example.com".to_string(),
+            ingest_threshold: THRESHOLD,
+            search_threshold: THRESHOLD,
+            org_type: "basic".to_string(),
+            user_obj: user,
+            plan: 0,
+        };
+
+        let response = OrganizationResponse {
+            data: vec![org_details],
+        };
+
+        assert_eq!(response.data.len(), 1);
+        assert_eq!(response.data[0].identifier, "org-1");
+        assert_eq!(response.data[0].ingest_threshold, THRESHOLD);
+    }
+
+    #[test]
+    fn test_all_organization_response() {
+        let details1 = AllOrgListDetails {
+            id: 1,
+            identifier: "org-1".to_string(),
+            name: "Org One".to_string(),
+            created_at: 1640995200,
+            updated_at: 1640995260,
+            org_type: "basic".to_string(),
+            plan: 0,
+            trial_expires_at: None,
+        };
+
+        let details2 = AllOrgListDetails {
+            id: 2,
+            identifier: "org-2".to_string(),
+            name: "Org Two".to_string(),
+            created_at: 1640995300,
+            updated_at: 1640995360,
+            org_type: "premium".to_string(),
+            plan: 1,
+            trial_expires_at: Some(1641081600),
+        };
+
+        let response = AllOrganizationResponse {
+            data: vec![details1, details2],
+        };
+
+        assert_eq!(response.data.len(), 2);
+        assert_eq!(response.data[0].name, "Org One");
+        assert_eq!(response.data[1].name, "Org Two");
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_extend_trial_period_request() {
+        let request = ExtendTrialPeriodRequest {
+            org_id: "org-trial".to_string(),
+            new_end_date: 1641081600,
+        };
+
+        assert_eq!(request.org_id, "org-trial");
+        assert_eq!(request.new_end_date, 1641081600);
+    }
+
+    #[test]
+    fn test_org_summary() {
+        let stream_summary = StreamSummary {
+            num_streams: 10,
+            total_records: 1000000,
+            total_storage_size: 1024.0 * 1024.0 * 100.0, // 100MB
+            total_compressed_size: 1024.0 * 1024.0 * 25.0, // 25MB
+            total_index_size: 1024.0 * 1024.0 * 5.0,     // 5MB
+        };
+
+        let pipeline_summary = PipelineSummary {
+            num_realtime: 5,
+            num_scheduled: 3,
+        };
+
+        let alert_summary = AlertSummary {
+            num_realtime: 12,
+            num_scheduled: 8,
+        };
+
+        let summary = OrgSummary {
+            streams: stream_summary,
+            pipelines: pipeline_summary,
+            alerts: alert_summary,
+            total_functions: 25,
+            total_dashboards: 15,
+        };
+
+        assert_eq!(summary.streams.num_streams, 10);
+        assert_eq!(summary.streams.total_records, 1000000);
+        assert_eq!(summary.pipelines.num_realtime, 5);
+        assert_eq!(summary.pipelines.num_scheduled, 3);
+        assert_eq!(summary.alerts.num_realtime, 12);
+        assert_eq!(summary.alerts.num_scheduled, 8);
+        assert_eq!(summary.total_functions, 25);
+        assert_eq!(summary.total_dashboards, 15);
+    }
+
+    #[test]
+    fn test_organization_setting_with_trial_expiry() {
+        let setting = OrganizationSetting {
+            free_trial_expiry: Some(1641081600),
+            ..Default::default()
+        };
+
+        assert_eq!(setting.free_trial_expiry, Some(1641081600));
+        assert_eq!(setting.trace_id_field_name, "trace_id");
+        assert_eq!(setting.span_id_field_name, "span_id");
+    }
+
+    #[test]
+    fn test_organization_setting_response() {
+        let setting = OrganizationSetting::default();
+        let response = OrganizationSettingResponse {
+            data: setting.clone(),
+        };
+
+        assert_eq!(
+            response.data.trace_id_field_name,
+            setting.trace_id_field_name
+        );
+        assert_eq!(response.data.span_id_field_name, setting.span_id_field_name);
+    }
+
+    #[test]
+    fn test_node_list_response_multiple_regions() {
+        let node1 = Node {
+            name: "node-1".to_string(),
+            ..Default::default()
+        };
+
+        let node2 = Node {
+            name: "node-2".to_string(),
+            ..Default::default()
+        };
+
+        let mut response = NodeListResponse::new();
+        response.add_node(
+            node1.clone(),
+            "us-east".to_string(),
+            "cluster-a".to_string(),
+        );
+        response.add_node(
+            node2.clone(),
+            "eu-west".to_string(),
+            "cluster-b".to_string(),
+        );
+
+        assert_eq!(response.regions.len(), 2);
+        assert!(response.regions.contains_key("us-east"));
+        assert!(response.regions.contains_key("eu-west"));
+
+        let us_nodes = &response
+            .regions
+            .get("us-east")
+            .unwrap()
+            .clusters
+            .get("cluster-a")
+            .unwrap();
+        assert_eq!(us_nodes.len(), 1);
+        assert_eq!(us_nodes[0].name, "node-1");
+
+        let eu_nodes = &response
+            .regions
+            .get("eu-west")
+            .unwrap()
+            .clusters
+            .get("cluster-b")
+            .unwrap();
+        assert_eq!(eu_nodes.len(), 1);
+        assert_eq!(eu_nodes[0].name, "node-2");
+    }
+
+    #[test]
+    fn test_cluster_info_response_multiple_clusters() {
+        let mut response = ClusterInfoResponse::default();
+
+        let info1 = ClusterInfo { pending_jobs: 5 };
+        let info2 = ClusterInfo { pending_jobs: 10 };
+
+        response.add_cluster_info(
+            info1.clone(),
+            "cluster-1".to_string(),
+            "us-east".to_string(),
+        );
+        response.add_cluster_info(
+            info2.clone(),
+            "cluster-2".to_string(),
+            "us-east".to_string(),
+        );
+
+        assert_eq!(response.regions.len(), 1);
+        let region = response.regions.get("us-east").unwrap();
+        assert_eq!(region.clusters.len(), 2);
+        assert_eq!(region.clusters.get("cluster-1").unwrap().pending_jobs, 5);
+        assert_eq!(region.clusters.get("cluster-2").unwrap().pending_jobs, 10);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_organization_invite_response() {
+        let data = OrganizationInviteResponseData {
+            valid_members: Some(vec!["user1@example.com".to_string()]),
+            existing_members: None,
+            invalid_email: None,
+        };
+
+        let response = OrganizationInviteResponse {
+            data,
+            message: "Invitation sent successfully".to_string(),
+        };
+
+        assert_eq!(response.message, "Invitation sent successfully");
+        assert!(response.data.valid_members.is_some());
+        assert_eq!(response.data.valid_members.as_ref().unwrap().len(), 1);
     }
 }

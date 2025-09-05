@@ -171,13 +171,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 <script lang="ts" setup>
-import { ref, type Ref, defineEmits, onMounted, watch, defineAsyncComponent, computed } from "vue";
+import { ref, type Ref, onMounted, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
-import pipelineService from "@/services/pipelines";
 import usePipelines from "@/composables/usePipelines";
 
 import AddStream from "@/components/logstream/AddStream.vue";
@@ -473,6 +472,39 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   });
   return filteredOptions;
 };
+
+// Expose methods for testing
+defineExpose({
+  sanitizeStreamName,
+  sanitizeStaticPart,
+  getStreamList,
+  updateStreams,
+  handleDynamicStreamName,
+  saveDynamicStream,
+  getLogStream,
+  openCancelDialog,
+  openDeleteDialog,
+  deleteNode,
+  saveStream,
+  filterStreams,
+  filterColumns,
+  // Expose reactive variables for testing
+  filteredStreams,
+  createNewStream,
+  isUpdating,
+  isFetchingStreams,
+  indexOptions,
+  schemaList,
+  streams,
+  usedStreams,
+  stream_name,
+  dynamic_stream_name,
+  appendData,
+  stream_type,
+  selectedNodeType,
+  filteredStreamTypes,
+  dialog
+});
 </script>
 
 <style >

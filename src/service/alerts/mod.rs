@@ -126,6 +126,7 @@ impl QueryConditionExt for QueryCondition {
                     // CustomQuery is only used by Alerts' triggers.
                     return Ok(eval_results);
                 };
+
                 build_sql(org_id, stream_name, stream_type, self, v).await?
             }
             QueryType::SQL => {
@@ -220,6 +221,15 @@ impl QueryConditionExt for QueryCondition {
         // SQL may contain multiple stream names, check for each stream
         // if the query period is greater than the max query range
         for stream in stream_names.iter() {
+            if infra::schema::get_stream_schema_from_cache(org_id, stream, stream_type)
+                .await
+                .is_none()
+            {
+                return Err(anyhow::anyhow!(
+                    "Stream \"{stream}\" not found in schema, skipping alert evaluation"
+                ));
+            };
+
             if let Some(settings) = infra::schema::get_settings(org_id, stream, stream_type).await {
                 let max_query_range = settings.max_query_range;
                 if max_query_range > 0 && trigger_condition.period > max_query_range * 60 {
@@ -686,13 +696,22 @@ async fn build_sql(
     conditions: &ConditionList,
 ) -> Result<String, anyhow::Error> {
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let where_sql = conditions
-        .to_sql(&schema)
-        .await
-        .map_err(|err| anyhow::anyhow!("Error building SQL on stream {stream_name}: {err}"))?;
+    let where_sql = if conditions.len().await == 0 {
+        "".to_string()
+    } else {
+        format!(
+            " WHERE {}",
+            conditions
+                .to_sql(&schema)
+                .await
+                .map_err(|err| anyhow::anyhow!(
+                    "Error building SQL on stream {stream_name}: {err}"
+                ))?
+        )
+    };
     if query_condition.aggregation.is_none() {
-        return Ok(format!("SELECT * FROM \"{stream_name}\" WHERE {where_sql}"));
-    }
+        return Ok(format!("SELECT * FROM \"{stream_name}\" {where_sql}"));
+    };
 
     // handle aggregation
     let mut sql = String::new();
@@ -743,20 +762,14 @@ async fn build_sql(
         && !group.is_empty()
     {
         sql = format!(
-            "SELECT {}, {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
+            "SELECT {}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {} HAVING {having_expr}",
             group.join(", "),
-            func_expr,
-            TIMESTAMP_COL_NAME,
-            TIMESTAMP_COL_NAME,
-            stream_name,
-            where_sql,
             group.join(", "),
-            having_expr
         );
     }
     if sql.is_empty() {
         sql = format!(
-            "SELECT {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\" {where_sql} HAVING {having_expr}"
+            "SELECT {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} HAVING {having_expr}"
         );
     }
     Ok(sql)
@@ -788,7 +801,7 @@ fn build_expr(
                 }
                 Operator::LessThan => format!("\"{field_alias}\" < '{val}'"),
                 Operator::LessThanEquals => format!("\"{field_alias}\" <= '{val}'"),
-                Operator::Contains => format!("str_match(\"{field_alias}\", '%{val}%')"),
+                Operator::Contains => format!("str_match(\"{field_alias}\", '{val}')"),
                 Operator::NotContains => {
                     format!("\"{field_alias}\" NOT LIKE '%{val}%'")
                 }

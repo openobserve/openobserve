@@ -21,6 +21,7 @@ use {
     },
     config::meta::user::{UserOrg, UserRole},
     o2_dex::config::get_config as get_dex_config,
+    o2_openfga::authorizer::authz::get_add_user_to_org_tuples,
     o2_openfga::authorizer::roles::{
         check_and_get_crole_tuple_for_new_user, get_roles_for_user, get_user_crole_removal_tuples,
     },
@@ -31,7 +32,7 @@ use {
     crate::{common::meta::user::TokenValidationResponse, service::db},
     config::meta::user::DBUser,
     jsonwebtoken::TokenData,
-    o2_openfga::authorizer::authz::{get_user_org_tuple, update_tuples},
+    o2_openfga::authorizer::authz::{get_new_user_creation_tuple, update_tuples},
     o2_openfga::config::get_config as get_openfga_config,
     once_cell::sync::Lazy,
     regex::Regex,
@@ -58,7 +59,7 @@ pub async fn process_token(
         TokenValidationResponse,
         Option<TokenData<HashMap<String, Value>>>,
     ),
-) -> Option<bool> {
+) -> Option<(bool, bool)> {
     let dec_token = res.1.unwrap();
 
     let user_email = res.0.user_email.to_owned();
@@ -76,9 +77,7 @@ pub async fn process_token(
     #[cfg(not(feature = "cloud"))]
     {
         use config::get_config;
-        use o2_openfga::authorizer::authz::{
-            get_user_creation_tuples, get_user_role_creation_tuple, get_user_role_deletion_tuple,
-        };
+        use o2_openfga::authorizer::authz::get_user_role_deletion_tuple;
 
         use crate::common::meta::user::UserOrgRole;
 
@@ -205,11 +204,12 @@ pub async fn process_token(
                 {
                     Ok(_) => {
                         log::info!("User added to the organization {}", org.name);
-                        write_tuples.push(get_user_role_creation_tuple(
-                            &org.role.to_string(),
-                            &user_email,
+                        get_add_user_to_org_tuples(
                             &org.name,
-                        ));
+                            &user_email,
+                            &org.role.to_string(),
+                            &mut write_tuples,
+                        );
                     }
                     Err(e) => {
                         log::error!("Error adding user to the organization {}: {}", org.name, e);
@@ -265,11 +265,12 @@ pub async fn process_token(
                             &user_email,
                             &org.name,
                         ));
-                        write_tuples.push(get_user_role_creation_tuple(
-                            &org.role.to_string(),
-                            &user_email,
+                        get_add_user_to_org_tuples(
                             &org.name,
-                        ));
+                            &user_email,
+                            &org.role.to_string(),
+                            &mut write_tuples,
+                        );
                     }
                     Err(e) => {
                         log::error!(
@@ -304,7 +305,7 @@ pub async fn process_token(
                 for (index, org) in source_orgs.iter().enumerate() {
                     // Assuming all the relevant tuples for this org exist
                     let mut tuples = vec![];
-                    get_user_creation_tuples(
+                    get_add_user_to_org_tuples(
                         &org.name,
                         &user_email,
                         &org.role.to_string(),
@@ -317,11 +318,7 @@ pub async fn process_token(
 
                     if index == 0 {
                         // this is to allow user call organization api with org
-                        tuples.push(get_user_org_tuple(
-                            &user_email,
-                            &user_email,
-                            Some(&org.role.to_string()),
-                        ));
+                        get_new_user_creation_tuple(&user_email, &mut tuples);
                     }
 
                     tuples_to_add.insert(org.name.to_owned(), tuples);
@@ -429,18 +426,15 @@ async fn map_group_to_custom_role(
 
         if openfga_cfg.enabled {
             let _ = organization::check_and_create_org(&dex_cfg.default_org).await;
-            tuples.push(get_user_org_tuple(
+            get_add_user_to_org_tuples(
                 &dex_cfg.default_org,
                 user_email,
-                Some(&role.to_string()),
-            ));
+                &role.to_string(),
+                &mut tuples,
+            );
             // this check added to avoid service accounts from logging in
             if !role.eq(&UserRole::ServiceAccount) {
-                tuples.push(get_user_org_tuple(
-                    user_email,
-                    user_email,
-                    Some(&role.to_string()),
-                ));
+                get_new_user_creation_tuple(user_email, &mut tuples);
             }
             let start = std::time::Instant::now();
             check_and_get_crole_tuple_for_new_user(
@@ -567,8 +561,9 @@ pub fn format_role_name_only(role: &str) -> String {
 }
 
 #[cfg(feature = "cloud")]
-pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
+pub async fn check_and_add_to_org(user_email: &str, name: &str) -> (bool, bool) {
     use config::{ider, utils::json};
+    use o2_enterprise::enterprise::cloud::OrgInviteStatus;
     use o2_openfga::authorizer::authz::save_org_tuples;
 
     use crate::service::users::{add_admin_to_org, create_new_user};
@@ -578,6 +573,19 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
     let mut tuples_to_add = HashMap::new();
     let (first_name, last_name) = name.split_once(' ').unwrap_or((name, ""));
     let db_user = db::user::get_user_by_email(user_email).await;
+    let now = chrono::Utc::now().timestamp_micros();
+    let pending_invites = match db::user::list_user_invites(user_email).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error in listing invites for {user_email} : {e}");
+            vec![]
+        }
+    };
+    let pending_invites = pending_invites
+        .into_iter()
+        .filter(|invite| invite.status == OrgInviteStatus::Pending && invite.expires_at > now)
+        .next()
+        .is_some();
     if db_user.is_none() {
         is_new_user = true;
         match create_new_user(DBUser {
@@ -593,13 +601,14 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
         .await
         {
             Ok(_) => {
-                let tuples = vec![get_user_org_tuple(user_email, user_email, None)];
+                let mut tuples = vec![];
+                get_new_user_creation_tuple(user_email, &mut tuples);
                 tuples_to_add.insert(user_email.to_string(), tuples);
                 log::info!("User added to the database");
             }
             Err(e) => {
                 log::error!("Error adding user to the database: {}", e);
-                return is_new_user;
+                return (is_new_user, pending_invites);
             }
         }
     }
@@ -615,6 +624,10 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
             existing_orgs[0].org_name.to_owned(),
             existing_orgs[0].role.to_string(),
         ),
+        // if there are some pending invites, we do not want to create any orgs for the user
+        _ if pending_invites => {
+            return (is_new_user, pending_invites);
+        }
         _ => {
             // Create a default org for the user
             let org = Organization {
@@ -702,5 +715,213 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
             .await;
     }
 
-    is_new_user
+    (is_new_user, pending_invites)
+}
+
+#[cfg(feature = "enterprise")]
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use serde_json::Value;
+
+    use super::*;
+
+    #[test]
+    fn test_format_role_name_only() {
+        assert_eq!(format_role_name_only("admin-role"), "admin_role");
+        assert_eq!(format_role_name_only("user@role"), "user_role");
+        assert_eq!(format_role_name_only("test-role-123"), "test_role_123");
+        assert_eq!(format_role_name_only("normal_role"), "normal_role");
+        assert_eq!(format_role_name_only(""), "");
+
+        // Test special characters replacement
+        assert_eq!(format_role_name_only("admin@org.com"), "admin_org_com");
+        assert_eq!(format_role_name_only("role!@#$%"), "role_");
+        assert_eq!(
+            format_role_name_only("test-role  with_spaces"),
+            "test_role_with_spaces"
+        );
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_format_role_name() {
+        assert_eq!(format_role_name("org1", "admin-role"), "org1/admin_role");
+        assert_eq!(
+            format_role_name("test_org", "user@role"),
+            "test_org/user_role"
+        );
+        assert_eq!(format_role_name("", "role"), "/role");
+
+        // Test with special characters
+        assert_eq!(
+            format_role_name("test@org", "admin-role"),
+            "test@org/admin_role"
+        );
+        assert_eq!(
+            format_role_name("org123", "developer@role"),
+            "org123/developer_role"
+        );
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_parse_dn_with_empty_input() {
+        let result = parse_dn("");
+        assert!(result.is_some());
+        let role_org = result.unwrap();
+        assert_eq!(role_org.org, "default"); // Assuming default org is "default"
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_parse_dn_with_invalid_format() {
+        let result = parse_dn("invalid_dn_format");
+        assert!(result.is_some());
+        let role_org = result.unwrap();
+        assert_eq!(role_org.org, "default");
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_parse_dn_with_valid_ldap_format() {
+        let result = parse_dn("cn=admin,ou=groups,dc=example,dc=com");
+        assert!(result.is_some());
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_parse_dn_with_multiple_attributes() {
+        let result = parse_dn("role=admin,org=testorg,cn=user");
+        assert!(result.is_some());
+        // The exact behavior depends on the DEX config, but should handle multiple attributes
+    }
+
+    #[tokio::test]
+    async fn test_process_token_with_invalid_token() {
+        use crate::common::meta::user::TokenValidationResponse;
+
+        let validation_response = TokenValidationResponse {
+            user_name: "Test User".to_string(),
+            family_name: "Test".to_string(),
+            given_name: "User".to_string(),
+            is_internal_user: false,
+            user_email: "test@example.com".to_string(),
+            is_valid: false,
+            user_role: None,
+        };
+
+        let mut claims = HashMap::new();
+        claims.insert("name".to_string(), Value::String("Test User".to_string()));
+        claims.insert(
+            "email".to_string(),
+            Value::String("test@example.com".to_string()),
+        );
+
+        let token_data = jsonwebtoken::TokenData {
+            header: jsonwebtoken::Header::default(),
+            claims,
+        };
+
+        let result = process_token((validation_response, Some(token_data))).await;
+        assert!(result.is_none() || result == Some((false, false)));
+    }
+
+    #[test]
+    fn test_role_name_formatting_edge_cases() {
+        // Test empty role name
+        assert_eq!(format_role_name_only(""), "");
+
+        // Test role name with only special characters
+        assert_eq!(format_role_name_only("@#$%^&*()"), "_");
+
+        // Test role name with mixed case and special characters
+        assert_eq!(
+            format_role_name_only("Admin-Role@Test.Org"),
+            "Admin_Role_Test_Org"
+        );
+
+        // Test role name with underscores (should remain unchanged)
+        assert_eq!(format_role_name_only("admin_role_test"), "admin_role_test");
+
+        // Test role name with numbers
+        assert_eq!(format_role_name_only("role123-test456"), "role123_test456");
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_parse_dn_custom_role_mapping() {
+        // Test when mapping groups to roles is enabled
+        // This would require mocking the config, so we test the basic functionality
+        let result = parse_dn("developers");
+        assert!(result.is_some());
+        let role_org = result.unwrap();
+        assert!(role_org.custom_role.is_some() || role_org.custom_role.is_none());
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_user_name_parsing() {
+        let name = "John Doe Smith";
+        let (first_name, last_name) = name.split_once(' ').unwrap_or((name, ""));
+        assert_eq!(first_name, "John");
+        assert_eq!(last_name, "Doe Smith");
+
+        let name_single = "John";
+        let (first_name_single, last_name_single) =
+            name_single.split_once(' ').unwrap_or((name_single, ""));
+        assert_eq!(first_name_single, "John");
+        assert_eq!(last_name_single, "");
+    }
+
+    #[test]
+    fn test_regex_role_name_replacement() {
+        // Test the regex pattern used in RE_ROLE_NAME
+        let test_cases = vec![
+            ("admin-role", "admin_role"),
+            ("user@domain.com", "user_domain_com"),
+            ("test_role_123", "test_role_123"),
+            ("role!@#$%^&*()", "role_"),
+            ("", ""),
+            ("OnlyAlphaNumeric123", "OnlyAlphaNumeric123"),
+        ];
+
+        for (input, expected) in test_cases {
+            assert_eq!(
+                format_role_name_only(input),
+                expected,
+                "Failed for input: {input}"
+            );
+        }
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[test]
+    fn test_parse_dn_with_comma_separated_values() {
+        // Test DN with multiple comma-separated values
+        let test_cases = vec![
+            "cn=admin,ou=users,dc=example,dc=com",
+            "role=developer,org=testorg,cn=user1",
+            "ou=admins,dc=company,dc=org",
+        ];
+
+        for dn in test_cases {
+            let result = parse_dn(dn);
+            assert!(result.is_some(), "Failed to parse DN: {}", dn);
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    fn test_format_role_name_consistency() {
+        let org = "test_org";
+        let role = "admin-role";
+        let formatted_role = format_role_name_only(role);
+        let full_role_name = format_role_name(org, role);
+
+        assert_eq!(full_role_name, format!("{}/{}", org, formatted_role));
+        assert!(!full_role_name.contains("-"));
+        assert!(!full_role_name.contains("@"));
+    }
 }

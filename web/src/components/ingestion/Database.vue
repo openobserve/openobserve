@@ -207,6 +207,18 @@ export default defineComponent({
         label: t("ingestion.mysql"),
         contentClass: "tab_content",
       },
+      {
+        name: "oracle",
+        to: {
+          name: "oracle",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/ingestion/oracle.svg"),
+        label: t("ingestion.oracle"),
+        contentClass: "tab_content",
+      },
       // {
       //   name: "saphana",
       //   to: {
@@ -314,6 +326,7 @@ export default defineComponent({
       ingestTabType,
       tabsFilter,
       filteredList,
+      databaseTabs,
     };
   },
 });

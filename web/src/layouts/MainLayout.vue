@@ -15,7 +15,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  
   <q-layout
     view="hHh Lpr lff"
     :class="[store.state.printMode === true ? 'printMode' : '']"
@@ -105,9 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="router.replace('/billings/plans')"
             >Upgrade to PRO Plan</q-btn
           >
-        </div>   
+        </div>
         <q-btn
-          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+          v-if="
+            config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
+          "
           :ripple="false"
           @click="toggleAIChat"
           data-test="menu-link-ai-item"
@@ -117,27 +118,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           class="o2-button ai-hover-btn q-px-sm q-py-sm"
           :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-          style="border-radius: 100%;"
+          style="border-radius: 100%"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
-          <div class="row items-center no-wrap tw-gap-2  ">
-            <img  :src="getBtnLogo" class="header-icon ai-icon" />
+          <div class="row items-center no-wrap tw-gap-2">
+            <img :src="getBtnLogo" class="header-icon ai-icon" />
           </div>
         </q-btn>
-        <div
-          data-test="navbar-organizations-select"
-          class="q-mx-sm row"
-        >
-          <q-btn 
-            style="max-width: 250px;" 
-            dense 
-            no-caps 
-            flat 
+        <div data-test="navbar-organizations-select" class="q-mx-sm row">
+          <q-btn
+            style="max-width: 250px"
+            dense
+            no-caps
+            flat
             class="tw-text-ellipsis tw-overflow-hidden"
           >
             <div class="row items-center no-wrap full-width">
-              <div class="col tw-truncate">{{ userClickedOrg?.label || '' }}</div>
+              <div class="col tw-truncate">
+                {{ userClickedOrg?.label || "" }}
+              </div>
               <q-icon name="arrow_drop_down" class="q-ml-xs" />
             </div>
             <q-menu
@@ -147,63 +147,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-list data-test="organization-menu-list" style="width: 250px">
                 <q-item data-test="organization-menu-item" style="padding: 0">
-                  <q-item-section data-test="organization-menu-item-section" class="column" style="padding: 0px">
+                  <q-item-section
+                    data-test="organization-menu-item-section"
+                    class="column"
+                    style="padding: 0px"
+                  >
                     <q-table
                       data-test="organization-menu-table"
                       :rows="filteredOrganizations"
-                      :row-key="row => 'org_' + row.identifier"
+                      :row-key="(row) => 'org_' + row.identifier"
                       :visible-columns="['label']"
                       hide-header
                       :pagination="{ rowsPerPage }"
                       :rows-per-page-options="[]"
                       class="org-table"
                     >
-                    <template #top>
-                      <div class="full-width">
-                        <q-input
-                          data-test="organization-search-input"
-                          v-model="searchQuery"
-                          data-cy="index-field-search-input"
-                          filled
-                          borderless
-                          dense
-                          clearable
-                          debounce="1"
-                          :placeholder="'Search Organization'"
-                        >
-                          <template #prepend>
-                            <q-icon name="search"/>
-                          </template>
-                        </q-input>
-                      </div>
-                    </template>
+                      <template #top>
+                        <div class="full-width">
+                          <q-input
+                            data-test="organization-search-input"
+                            v-model="searchQuery"
+                            data-cy="index-field-search-input"
+                            filled
+                            borderless
+                            dense
+                            clearable
+                            debounce="1"
+                            :placeholder="'Search Organization'"
+                          >
+                            <template #prepend>
+                              <q-icon name="search" />
+                            </template>
+                          </q-input>
+                        </div>
+                      </template>
 
                       <template v-slot:body-cell-label="props">
-                        <q-td data-test="organization-menu-item-label" :props="props" class="org-list-item">
+                        <q-td
+                          data-test="organization-menu-item-label"
+                          :props="props"
+                          class="org-list-item"
+                        >
                           <q-item
                             data-test="organization-menu-item-label-item"
                             clickable
                             v-close-popup
                             dense
-                            :class="{'text-primary': props.row.identifier === userClickedOrg?.identifier                            }"
-                            @click="selectedOrg = props.row; updateOrganization()"
+                            :class="{
+                              'text-primary':
+                                props.row.identifier ===
+                                userClickedOrg?.identifier,
+                            }"
+                            @click="
+                              selectedOrg = props.row;
+                              updateOrganization();
+                            "
                           >
                             <q-item-section>
                               <q-item-label
-                                  data-test="organization-menu-item-label-item-label"
-                                  class="tw-overflow-hidden tw-whitespace-nowrap tw-text-ellipsis tw-max-w-[230px]"
+                                data-test="organization-menu-item-label-item-label"
+                                class="tw-overflow-hidden tw-whitespace-nowrap tw-text-ellipsis tw-max-w-[230px]"
+                              >
+                                {{ props.row.label }}
+                                <q-tooltip
+                                  v-if="props.row.label.length > 35"
+                                  anchor="bottom middle"
+                                  self="top start"
                                 >
                                   {{ props.row.label }}
-                                  <q-tooltip v-if="props.row.label.length > 35"  anchor="bottom middle" self="top start">
-                                    {{ props.row.label }}
-                                  </q-tooltip>
-                                </q-item-label>
+                                </q-tooltip>
+                              </q-item-label>
                             </q-item-section>
                           </q-item>
                         </q-td>
                       </template>
-                      <template  v-slot:no-data>
-                        <div data-test="organization-menu-no-data" class="text-center q-pa-sm tw-w-full tw-flex tw-justify-center">
+                      <template v-slot:no-data>
+                        <div
+                          data-test="organization-menu-no-data"
+                          class="text-center q-pa-sm tw-w-full tw-flex tw-justify-center"
+                        >
                           No organizations found
                         </div>
                       </template>
@@ -253,8 +275,6 @@ class="padding-none" />
         </div> -->
 
         <ThemeSwitcher></ThemeSwitcher>
-
-
 
         <q-btn
           round
@@ -402,7 +422,9 @@ class="padding-none" />
                   <q-icon size="xs" name="language" class="padding-none" />
                 </q-item-section>
                 <q-item-section>
-                  <q-item-label>{{ t("menu.language") }}</q-item-label>
+                  <q-item-label class="tw-max-w-[150px]">{{
+                    t("menu.language")
+                  }}</q-item-label>
                 </q-item-section>
                 <q-item-section></q-item-section>
                 <q-item-section side>
@@ -476,10 +498,8 @@ class="padding-none" />
             </q-list>
           </q-menu>
         </q-btn>
-        
       </q-toolbar>
     </q-header>
-    
 
     <q-drawer
       v-model="drawer"
@@ -499,35 +519,43 @@ class="padding-none" />
       </q-list>
     </q-drawer>
     <div class="row full-height no-wrap">
-    <!-- Left Panel -->
-    <div
-      class="col"
-      v-show="isLoading"
-      :style="{ width: store.state.isAiChatEnabled ? '75%' : '100%' }"
-      :key="store.state.selectedOrganization?.identifier"
-    >
-    <q-page-container v-if="isLoading">
-      <router-view v-slot="{ Component }">
-        <component :is="Component"  @sendToAiChat="sendToAiChat" />
-      </router-view>
-    </q-page-container>
+      <!-- Left Panel -->
+      <div
+        class="col"
+        v-show="isLoading"
+        :style="{ width: store.state.isAiChatEnabled ? '75%' : '100%' }"
+        :key="store.state.selectedOrganization?.identifier"
+      >
+        <q-page-container v-if="isLoading">
+          <router-view v-slot="{ Component }">
+            <component :is="Component" @sendToAiChat="sendToAiChat" />
+          </router-view>
+        </q-page-container>
+      </div>
+
+      <!-- Right Panel (AI Chat) -->
+
+      <div
+        class="col-auto"
+        v-show="store.state.isAiChatEnabled && isLoading"
+        style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10"
+        :class="
+          store.state.theme == 'dark'
+            ? 'dark-mode-chat-container'
+            : 'light-mode-chat-container'
+        "
+      >
+        <O2AIChat
+          :header-height="82.5"
+          :is-open="store.state.isAiChatEnabled"
+          @close="closeChat"
+          :aiChatInputContext="aiChatInputContext"
+        />
+      </div>
     </div>
-
-    <!-- Right Panel (AI Chat) -->
-
-    <div
-      class="col-auto"
-      v-show="store.state.isAiChatEnabled && isLoading"
-      style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10 "
-      :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
-    >
-      <O2AIChat :header-height="82.5" :is-open="store.state.isAiChatEnabled" @close="closeChat"   :aiChatInputContext="aiChatInputContext"  />
-    </div>
-  </div>
-  <q-dialog v-model="showGetStarted" maximized full-height>
-    <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
-  </q-dialog>
-
+    <q-dialog v-model="showGetStarted" maximized full-height>
+      <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
+    </q-dialog>
   </q-layout>
 </template>
 
@@ -558,7 +586,7 @@ import {
   useLocalOrganization,
   useLocalUserInfo,
   getImageURL,
-  invlidateLoginData,
+  invalidateLoginData,
   getDueDays,
   trialPeriodAllowedPath,
 } from "../utils/zincutils";
@@ -611,7 +639,7 @@ import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
-import O2AIChat from '@/components/O2AIChat.vue';
+import O2AIChat from "@/components/O2AIChat.vue";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -667,7 +695,7 @@ export default defineComponent({
       this.closeSocket();
 
       if (config.isEnterprise == "true") {
-        invlidateLoginData();
+        invalidateLoginData();
       }
       this.store.dispatch("logout");
 
@@ -696,17 +724,19 @@ export default defineComponent({
     const { closeSocket } = useSearchWebSocket();
 
     const isMonacoEditorLoaded = ref(false);
-    const showGetStarted = ref((localStorage.getItem('isFirstTimeLogin') ?? 'false') === 'true');
+    const showGetStarted = ref(
+      (localStorage.getItem("isFirstTimeLogin") ?? "false") === "true",
+    );
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
     const rowsPerPage = ref(10);
-    const searchQuery = ref('');
-    
+    const searchQuery = ref("");
+
     const filteredOrganizations = computed(() => {
       if (!searchQuery.value) return orgOptions.value;
       const toBeSearched = searchQuery.value.toLowerCase();
-      return orgOptions.value.filter((org: any) => 
-        org.label?.toLowerCase().includes(toBeSearched)
+      return orgOptions.value.filter((org: any) =>
+        org.label?.toLowerCase().includes(toBeSearched),
       );
     });
 
@@ -1102,79 +1132,82 @@ export default defineComponent({
               user_email: store.state.userInfo.email,
             };
           }
-          orgOptions.value = store.state.organizations.map(
-            (data: {
-              id: any;
-              name: any;
-              type: any;
-              identifier: any;
-              UserObj: any;
-              ingest_threshold: number;
-              search_threshold: number;
-              CustomerBillingObj: { subscription_type: string; note: string };
-              status: string;
-            }) => {
-              const optiondata: any = {
-                label: data.name,
-                id: data.id,
-                identifier: data.identifier,
-                user_email: store.state.userInfo.email,
-                ingest_threshold: data.ingest_threshold,
-                search_threshold: data.search_threshold,
-                subscription_type: data.hasOwnProperty("CustomerBillingObj")
-                  ? data.CustomerBillingObj.subscription_type
-                  : "",
-                status: data.status,
-                note: data.hasOwnProperty("CustomerBillingObj")
-                  ? data.CustomerBillingObj.note
-                  : "",
-              };
+          orgOptions.value = store.state.organizations
+            .map(
+              (data: {
+                id: any;
+                name: any;
+                type: any;
+                identifier: any;
+                UserObj: any;
+                ingest_threshold: number;
+                search_threshold: number;
+                CustomerBillingObj: { subscription_type: string; note: string };
+                status: string;
+              }) => {
+                const optiondata: any = {
+                  label: data.name,
+                  id: data.id,
+                  identifier: data.identifier,
+                  user_email: store.state.userInfo.email,
+                  ingest_threshold: data.ingest_threshold,
+                  search_threshold: data.search_threshold,
+                  subscription_type: data.hasOwnProperty("CustomerBillingObj")
+                    ? data.CustomerBillingObj.subscription_type
+                    : "",
+                  status: data.status,
+                  note: data.hasOwnProperty("CustomerBillingObj")
+                    ? data.CustomerBillingObj.note
+                    : "",
+                };
 
-              if (
-                config.isCloud == "true" &&
-                localOrg.value?.identifier == data?.identifier &&
-                (customOrganization == "" || customOrganization == undefined)
-              ) {
-                // localOrg.value.subscription_type =
-                //   data.CustomerBillingObj.subscription_type;
-                // useLocalOrganization(localOrg.value);
-                useLocalOrganization(optiondata);
-              }
+                if (
+                  config.isCloud == "true" &&
+                  localOrg.value?.identifier == data?.identifier &&
+                  (customOrganization == "" || customOrganization == undefined)
+                ) {
+                  // localOrg.value.subscription_type =
+                  //   data.CustomerBillingObj.subscription_type;
+                  // useLocalOrganization(localOrg.value);
+                  useLocalOrganization(optiondata);
+                }
 
-              if (
-                localOrg.value.identifier == data.identifier ||
-                url.searchParams.get("org_identifier") == data.identifier
-              ) {
-                localOrgFlag = true;
-              }
+                if (
+                  localOrg.value.identifier == data.identifier ||
+                  url.searchParams.get("org_identifier") == data.identifier
+                ) {
+                  localOrgFlag = true;
+                }
 
-              if (
-                (Object.keys(selectedOrg.value).length == 0 &&
-                  data.type == "default" &&
-                  store.state.userInfo.email == data.UserObj.email &&
-                  (customOrganization == "" ||
-                    customOrganization == undefined)) ||
-                (store.state.organizations?.length == 1 &&
-                  (customOrganization == "" || customOrganization == undefined))
-              ) {
-                selectedOrg.value = localOrg.value
-                  ? localOrg.value
-                  : optiondata;
-                useLocalOrganization(optiondata);
-                store.dispatch("setSelectedOrganization", optiondata);
-              } else if (data.identifier == customOrganization) {
-                selectedOrg.value = optiondata;
-                useLocalOrganization(optiondata);
-                store.dispatch("setSelectedOrganization", optiondata);
-              }
+                if (
+                  (Object.keys(selectedOrg.value).length == 0 &&
+                    data.type == "default" &&
+                    store.state.userInfo.email == data.UserObj.email &&
+                    (customOrganization == "" ||
+                      customOrganization == undefined)) ||
+                  (store.state.organizations?.length == 1 &&
+                    (customOrganization == "" ||
+                      customOrganization == undefined))
+                ) {
+                  selectedOrg.value = localOrg.value
+                    ? localOrg.value
+                    : optiondata;
+                  useLocalOrganization(optiondata);
+                  store.dispatch("setSelectedOrganization", optiondata);
+                } else if (data.identifier == customOrganization) {
+                  selectedOrg.value = optiondata;
+                  useLocalOrganization(optiondata);
+                  store.dispatch("setSelectedOrganization", optiondata);
+                }
 
-              if (data.type == "default") {
-                tempDefaultOrg = optiondata;
-              }
+                if (data.type == "default") {
+                  tempDefaultOrg = optiondata;
+                }
 
-              return optiondata;
-            },
-          ).sort((a: any, b: any) => a.label.localeCompare(b.label));
+                return optiondata;
+              },
+            )
+            .sort((a: any, b: any) => a.label.localeCompare(b.label));
         }
 
         if (localOrgFlag == false) {
@@ -1252,20 +1285,30 @@ export default defineComponent({
             orgSettings?.data?.data?.enable_websocket_search ?? false,
           enable_streaming_search:
             orgSettings?.data?.data?.enable_streaming_search ?? false,
-          aggregation_cache_enabled:
-            orgSettings?.data?.data?.aggregation_cache_enabled ?? false,
+          streaming_aggregation_enabled:
+            orgSettings?.data?.data?.streaming_aggregation_enabled ?? false,
           free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? "",
         });
 
-        if(orgSettings?.data?.data?.free_trial_expiry != null && orgSettings?.data?.data?.free_trial_expiry != "") {
-          const trialDueDays = getDueDays(orgSettings?.data?.data?.free_trial_expiry);
-          if(trialDueDays <= 0 && trialPeriodAllowedPath.indexOf(router.currentRoute.value.name) == -1) {
-            router.push({name: "plans", query: {
-              org_identifier: selectedOrg.value.identifier,
-            },})
+        if (
+          orgSettings?.data?.data?.free_trial_expiry != null &&
+          orgSettings?.data?.data?.free_trial_expiry != ""
+        ) {
+          const trialDueDays = getDueDays(
+            orgSettings?.data?.data?.free_trial_expiry,
+          );
+          if (
+            trialDueDays <= 0 &&
+            trialPeriodAllowedPath.indexOf(router.currentRoute.value.name) == -1
+          ) {
+            router.push({
+              name: "plans",
+              query: {
+                org_identifier: selectedOrg.value.identifier,
+              },
+            });
           }
         }
-        
       } catch (error) {
         console.error("Error in getOrganizationSettings:", error);
       }
@@ -1342,7 +1385,6 @@ export default defineComponent({
       const isEnabled = !store.state.isAiChatEnabled;
       store.dispatch("setIsAiChatEnabled", isEnabled);
       window.dispatchEvent(new Event("resize"));
-
     };
 
     const closeChat = () => {
@@ -1352,40 +1394,42 @@ export default defineComponent({
 
     const getBtnLogo = computed(() => {
       if (isHovered.value || store.state.isAiChatEnabled) {
-        return getImageURL('images/common/ai_icon_dark.svg')
+        return getImageURL("images/common/ai_icon_dark.svg");
       }
 
-      return store.state.theme === 'dark'
-        ? getImageURL('images/common/ai_icon_dark.svg')
-        : getImageURL('images/common/ai_icon.svg')
-    })
+      return store.state.theme === "dark"
+        ? getImageURL("images/common/ai_icon_dark.svg")
+        : getImageURL("images/common/ai_icon.svg");
+    });
     //this will be the function used to cancel the get started dialog and remove the isFirstTimeLogin from local storage
     //this will be called from the get started component whenever users clicks on the submit button
     const removeFirstTimeLogin = (val: boolean) => {
       showGetStarted.value = val;
-      localStorage.removeItem('isFirstTimeLogin');
-    }
+      localStorage.removeItem("isFirstTimeLogin");
+    };
 
     const sendToAiChat = (value: any) => {
-      if(!store.state.isAiChatEnabled){
+      if (!store.state.isAiChatEnabled) {
         store.dispatch("setIsAiChatEnabled", true);
       }
       //here we reset the value befoere setting it because if user clears the input then again click on the same value it wont trigger the watcher that is there in the child component
       //so to force trigger we do this
-      aiChatInputContext.value = '';
+      aiChatInputContext.value = "";
       nextTick(() => {
         aiChatInputContext.value = value;
       });
-    }
+    };
     //this is the used to set the selected org to the user clicked org because all the operations are happening on the selected org
     //to make sync with the user clicked org
     //we dont need search query after selectedOrg has been changed so resetting it
-    watch(selectedOrg, (newVal) => {
-      userClickedOrg.value = newVal;
-      searchQuery.value = "";
-    }, { immediate: true });
-
-
+    watch(
+      selectedOrg,
+      (newVal) => {
+        userClickedOrg.value = newVal;
+        searchQuery.value = "";
+      },
+      { immediate: true },
+    );
 
     return {
       t,
@@ -1426,7 +1470,12 @@ export default defineComponent({
       userClickedOrg,
       searchQuery,
       filteredOrganizations,
-      rowsPerPage
+      rowsPerPage,
+      verifyStreamExist,
+      filterMenus,
+      updateActionsMenu,
+      getConfig,
+      setRumUser,
     };
   },
   computed: {
@@ -1464,10 +1513,11 @@ export default defineComponent({
 
       this.isLoading = true;
       // Find the matching organization from orgOptions
-      const matchingOrg = this.orgOptions.find(org => 
-        org.identifier === this.store.state.selectedOrganization.identifier
+      const matchingOrg = this.orgOptions.find(
+        (org) =>
+          org.identifier === this.store.state.selectedOrganization.identifier,
       );
-      
+
       if (matchingOrg) {
         this.selectedOrg = matchingOrg;
       }
@@ -1765,104 +1815,104 @@ body.ai-chat-open {
   transition: width 0.3s ease;
 }
 
-.o2-button{
-   border-radius: 4px;
-    padding: 0px 8px;
-     color: white;
+.o2-button {
+  border-radius: 4px;
+  padding: 0px 8px;
+  color: white;
 }
-.dark-mode-chat-container{
-  border-left: 1.5px solid #232323FF ;
+.dark-mode-chat-container {
+  border-left: 1.5px solid #232323ff;
 }
-.light-mode-chat-container{
-  border-left: 1.5px solid #F7F7F7;
-  }
+.light-mode-chat-container {
+  border-left: 1.5px solid #f7f7f7;
+}
 
-  .ai-btn-active{
-    background-color: #5960b2 !important;
-  }
-  .ai-hover-btn {
-    transition: background-color 1s ease;
-  }
+.ai-btn-active {
+  background-color: #5960b2 !important;
+}
+.ai-hover-btn {
+  transition: background-color 1s ease;
+}
 
-  .ai-hover-btn:hover {
-    background-color: #5960b2; 
-  }
+.ai-hover-btn:hover {
+  background-color: #5960b2;
+}
 
-  .ai-icon {
-    transition: transform 0.6s ease;
-  }
+.ai-icon {
+  transition: transform 0.6s ease;
+}
 
-  .ai-hover-btn:hover .ai-icon {
-    transform: rotate(-180deg);
-  }
+.ai-hover-btn:hover .ai-icon {
+  transform: rotate(-180deg);
+}
 
 .organization-menu-o2 {
   .org-table {
-  td {
-    padding: 0;
-    height: 25px !important;
-    min-height: 25px !important;
-  }
-
-  .q-table__control {
-    margin: 0px !important;
-    width: 100% !important;
-    text-align: right;
-  }
-
-  .q-table__bottom {
-    padding: 0px !important;
-    min-height: 35px;
-
-    .q-table__control {
-      padding: 0px 10px !important;
-    }
-  }
-
-  .q-table__top {
-    padding: 0px !important;
-    margin: 0px !important;
-    left: 0px;
-    width: 100%;
-
-    .q-table__separator {
-      display: none;
+    td {
+      padding: 0;
+      height: 25px !important;
+      min-height: 25px !important;
     }
 
     .q-table__control {
+      margin: 0px !important;
+      width: 100% !important;
+      text-align: right;
+    }
+
+    .q-table__bottom {
       padding: 0px !important;
+      min-height: 35px;
+
+      .q-table__control {
+        padding: 0px 10px !important;
+      }
+    }
+
+    .q-table__top {
+      padding: 0px !important;
+      margin: 0px !important;
+      left: 0px;
+      width: 100%;
+
+      .q-table__separator {
+        display: none;
+      }
+
+      .q-table__control {
+        padding: 0px !important;
+      }
+    }
+
+    .q-field--filled .q-field__control {
+      padding: 0px 5px !important;
+    }
+
+    .saved-view-item {
+      padding: 4px 5px 4px 10px !important;
+    }
+
+    .q-item__section--main ~ .q-item__section--side {
+      padding-left: 5px !important;
+    }
+    .org-table {
+      .text-primary {
+        color: var(--q-primary) !important;
+        font-weight: 500;
+        background: rgba(89, 96, 178, 0.08);
+      }
     }
   }
-
-  .q-field--filled .q-field__control {
-    padding: 0px 5px !important;
-  }
-
-  .saved-view-item {
-    padding: 4px 5px 4px 10px !important;
-  }
-
-  .q-item__section--main ~ .q-item__section--side {
-    padding-left: 5px !important;
-  }
-  .org-table {
-    .text-primary {
-      color: var(--q-primary) !important;
-      font-weight: 500;
-      background: rgba(89, 96, 178, 0.08);
-    }
-  }
-}
   .q-menu {
-  .q-input {
-    .q-field__control {
-      height: 40px;
-    }
+    .q-input {
+      .q-field__control {
+        height: 40px;
+      }
 
-    input {
-      font-size: 14px;
+      input {
+        font-size: 14px;
+      }
     }
-  }
   }
 }
 </style>

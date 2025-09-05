@@ -15,12 +15,16 @@
 
 use anyhow::{Result, anyhow};
 use bytes::Bytes;
-use config::utils::{
-    enrichment_local_cache::{
-        get_key, get_metadata_content, get_metadata_path, get_table_dir, get_table_path,
+use config::{
+    spawn_pausable_job,
+    utils::{
+        enrichment_local_cache::{
+            get_key, get_metadata_content, get_metadata_path, get_table_dir, get_table_path,
+        },
+        json::Value,
     },
-    json::Value,
 };
+use tokio::task::JoinHandle;
 
 pub mod remote {
     use std::sync::Arc;
@@ -35,7 +39,7 @@ pub mod remote {
 
     use super::*;
 
-    fn get_remote_key_prefix(org_id: &str, table_name: &str) -> String {
+    pub(crate) fn get_remote_key_prefix(org_id: &str, table_name: &str) -> String {
         format!(
             "files/{}/{}/{}",
             org_id,
@@ -45,7 +49,7 @@ pub mod remote {
     }
 
     /// Create remote key with enrichment table prefix
-    fn create_remote_key(org_id: &str, table_name: &str, created_at: i64) -> String {
+    pub(crate) fn create_remote_key(org_id: &str, table_name: &str, created_at: i64) -> String {
         let ts = chrono::DateTime::from_timestamp_micros(created_at).unwrap();
         let file_name = format!(
             "{:04}/{:02}/{:02}/{:02}/{}.parquet",
@@ -81,7 +85,7 @@ pub mod remote {
 
         crate::service::db::file_list::set(&account, &remote_key, Some(file_meta), false).await?;
 
-        log::debug!("Uploaded enrichment table {} to remote", table_name);
+        log::debug!("Uploaded enrichment table {table_name} to remote");
         Ok(())
     }
 
@@ -128,10 +132,7 @@ pub mod remote {
 
         upload_to_remote(org_id, table_name, file_meta, &data, min_ts).await?;
 
-        log::debug!(
-            "Merged and uploaded enrichment table {} to remote",
-            table_name
-        );
+        log::debug!("Merged and uploaded enrichment table {table_name} to remote");
 
         // Delete the data from the db
         database::delete(org_id, table_name).await?;
@@ -186,41 +187,41 @@ pub mod remote {
         Ok(merge_threshold_mb as i64)
     }
 
-    pub async fn run_merge_job() -> Result<()> {
+    pub async fn run_merge_job() -> JoinHandle<()> {
         log::info!("[ENRICHMENT::STORAGE] Running enrichment table merge job");
-        let cfg = config::get_config();
-        // let merge_threshold_mb = cfg.enrichment_table.merge_threshold_mb;
-        let merge_interval = cfg.enrichment_table.merge_interval;
 
-        loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(merge_interval)).await;
-            let org_table_pairs = database::list().await?;
-            if org_table_pairs.is_empty() {
-                continue;
-            }
-            log::info!(
-                "[ENRICHMENT::STORAGE] Found {} enrichment tables, {:?}",
-                org_table_pairs.len(),
-                org_table_pairs
-            );
-            for (org_id, table_name) in org_table_pairs {
-                match merge_and_upload_to_remote(&org_id, &table_name).await {
-                    Ok(_) => {
-                        log::debug!(
-                            "Merged and uploaded enrichment table {} to remote",
-                            table_name
-                        );
-                    }
-                    Err(e) => {
-                        log::error!(
-                            "Failed to merge and upload enrichment table {}: {}",
-                            table_name,
-                            e
-                        );
+        config::spawn_pausable_job!(
+            "enchrichment_table_merge_job",
+            config::get_config().enrichment_table.merge_interval,
+            {
+                let Ok(org_table_pairs) = database::list().await else {
+                    log::error!("[ENRICHMENT::STORAGE] Failed to list enrichment tables");
+                    return;
+                };
+                if org_table_pairs.is_empty() {
+                    continue;
+                }
+                log::info!(
+                    "[ENRICHMENT::STORAGE] Found {} enrichment tables, {:?}",
+                    org_table_pairs.len(),
+                    org_table_pairs
+                );
+                for (org_id, table_name) in org_table_pairs {
+                    match merge_and_upload_to_remote(&org_id, &table_name).await {
+                        Ok(_) => {
+                            log::debug!(
+                                "Merged and uploaded enrichment table {table_name} to remote"
+                            );
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "Failed to merge and upload enrichment table {table_name}: {e}"
+                            );
+                        }
                     }
                 }
             }
-        }
+        )
     }
 }
 
@@ -267,7 +268,7 @@ pub mod local {
             .await
             .map_err(|e| anyhow!("Failed to write metadata file: {}", e))?;
 
-        log::debug!("Stored enrichment table {} to local storage", key);
+        log::debug!("Stored enrichment table {key} to local storage");
         Ok(())
     }
 
@@ -329,7 +330,7 @@ pub mod local {
             .await
             .map_err(|e| anyhow!("Failed to write metadata file: {}", e))?;
 
-        log::debug!("Deleted enrichment table {} from local storage", key);
+        log::debug!("Deleted enrichment table {key} from local storage");
         Ok(())
     }
 
@@ -415,7 +416,7 @@ pub mod database {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to save enrichment data: {}", e))?;
 
-        log::debug!("Stored enrichment table {} to database", table_name);
+        log::debug!("Stored enrichment table {table_name} to database");
         Ok(())
     }
 
@@ -425,11 +426,7 @@ pub mod database {
         {
             Ok(data) => Ok(data.0),
             Err(e) => {
-                log::error!(
-                    "Failed to retrieve enrichment table {} from database: {}",
-                    table_name,
-                    e
-                );
+                log::error!("Failed to retrieve enrichment table {table_name} from database: {e}");
                 Err(anyhow::anyhow!(
                     "Failed to retrieve enrichment table {}: {}",
                     table_name,
@@ -447,10 +444,7 @@ pub mod database {
                 anyhow::anyhow!("Failed to delete enrichment table {}: {e}", table_name)
             })?;
 
-        log::debug!(
-            "Deleted enrichment table {} from database storage",
-            table_name
-        );
+        log::debug!("Deleted enrichment table {table_name} from database storage");
         Ok(())
     }
 

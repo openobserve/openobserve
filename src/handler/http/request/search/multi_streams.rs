@@ -21,7 +21,7 @@ use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
         function::{RESULT_ARRAY, VRLResultResolver},
-        search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE, SearchEventType},
+        search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE},
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -43,9 +43,9 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_dashboard_info_from_request, get_or_create_trace_id,
-                get_search_event_context_from_request, get_search_type_from_request,
-                get_stream_type_from_request,
+                get_dashboard_info_from_request, get_enable_align_histogram_from_request,
+                get_or_create_trace_id, get_search_event_context_from_request,
+                get_search_type_from_request, get_stream_type_from_request,
             },
             stream::get_settings_max_query_range,
         },
@@ -59,9 +59,11 @@ use crate::{
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchSQL",
+    summary = "Search across multiple streams",
+    description = "Executes SQL queries that can span across multiple data streams within the organization. This enables cross-stream analytics, joins, and aggregations to analyze data relationships and patterns across different log streams, metrics, or traces. The query engine automatically handles data from different streams and returns unified results.",
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(
-        content = SearchRequest,
+        content = Object,
         description = "Search query",
         content_type = "application/json",
         example = json!({
@@ -79,7 +81,7 @@ use crate::{
             status = 200,
             description = "Success",
             content_type = "application/json",
-            body = SearchResponse,
+            body = Object,
             example = json!({
             "took": 155,
             "hits": [
@@ -110,13 +112,13 @@ use crate::{
             status = 400,
             description = "Failure",
             content_type = "application/json",
-            body = HttpResponse,
+            body = (),
         ),
         (
             status = 500,
             description = "Failure",
             content_type = "application/json",
-            body = HttpResponse,
+            body = (),
         )
     )
 )]
@@ -355,6 +357,9 @@ pub async fn search_multi(
             range_error.clone(),
             false,
             dashboard_info.clone(),
+            // `is_multi_stream_search` is false here because search happens for every sql query in
+            // the given array of queries
+            false,
         )
         .instrument(http_span.clone())
         .await;
@@ -634,12 +639,14 @@ pub async fn search_multi(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchPartitionMulti",
+    summary = "Search partition data across multiple streams",
+    description = "Executes search queries across partitioned data in multiple log streams",
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("search_type" = String, Query, description = "query param with value 'ui', 'dashboards', 'reports', 'alerts' , 'rum' or 'values' allowed"),
+        ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
     ),
     request_body(
-        content = SearchRequest,
+        content = Object,
         description = "Search query",
         content_type = "application/json",
         example = json!({
@@ -653,7 +660,7 @@ pub async fn search_multi(
             status = 200,
             description = "Success",
             content_type = "application/json",
-            body = SearchResponse,
+            body = Object,
             example = json!({
             "took": 155,
             "file_num": 10,
@@ -669,13 +676,13 @@ pub async fn search_multi(
             status = 400,
             description = "Failure",
             content_type = "application/json",
-            body = HttpResponse,
+            body = (),
         ),
         (
             status = 500,
             description = "Failure",
             content_type = "application/json",
-            body = HttpResponse,
+            body = (),
         )
     )
 )]
@@ -707,9 +714,7 @@ pub async fn _search_partition_multi(
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let search_type = get_search_type_from_request(&query).map_or(SearchEventType::Other, |opt| {
-        opt.unwrap_or(SearchEventType::Other)
-    });
+    let enable_align_histogram = get_enable_align_histogram_from_request(&query);
 
     #[cfg(feature = "cloud")]
     {
@@ -742,8 +747,8 @@ pub async fn _search_partition_multi(
         &org_id,
         &user_id,
         stream_type,
-        search_type,
         &req,
+        enable_align_histogram,
     );
     let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         search_fut.instrument(http_span).await
@@ -809,6 +814,8 @@ pub async fn _search_partition_multi(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchAroundMulti",
+    summary = "Search around specific record across multiple streams",
+    description = "Searches for log entries around a specific record across multiple data streams",
     security(
         ("Authorization"= [])
     ),
@@ -820,7 +827,7 @@ pub async fn _search_partition_multi(
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -845,7 +852,7 @@ pub async fn _search_partition_multi(
             "size": 10,
             "scan_size": 28943
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[get("/{org_id}/{stream_names}/_around_multi")]
@@ -968,7 +975,7 @@ mod tests {
         let request = MultiStreamRequest {
             sql: vec![config::meta::search::SqlQuery {
                 sql: "SELECT * FROM logs".to_string(),
-                start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                start_time: Some(Utc::now().timestamp_micros() - 3_600_000_000),
                 end_time: Some(Utc::now().timestamp_micros()),
                 query_fn: None,
                 is_old_format: false,
@@ -977,7 +984,7 @@ mod tests {
             timeout: 0,
             from: 0,
             size: 10,
-            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            start_time: Utc::now().timestamp_micros() - 3_600_000_000,
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
@@ -1003,7 +1010,7 @@ mod tests {
     fn test_multi_search_partition_request_structure() {
         let request = MultiSearchPartitionRequest {
             sql: vec!["SELECT * FROM logs".to_string()],
-            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            start_time: Utc::now().timestamp_micros() - 3_600_000_000,
             end_time: Utc::now().timestamp_micros(),
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: vec![],
@@ -1023,7 +1030,7 @@ mod tests {
             sql: vec![config::meta::search::SqlQuery {
                 sql: "SELECT * FROM logs".to_string(),
                 start_time: Some(Utc::now().timestamp_micros()),
-                end_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                end_time: Some(Utc::now().timestamp_micros() - 3_600_000_000),
                 query_fn: None,
                 is_old_format: false,
             }],
@@ -1032,7 +1039,7 @@ mod tests {
             from: 0,
             size: 10,
             start_time: Utc::now().timestamp_micros(),
-            end_time: Utc::now().timestamp_micros() - 3600_000_000,
+            end_time: Utc::now().timestamp_micros() - 3_600_000_000,
             sort_by: None,
             quick_mode: false,
             query_type: "".to_string(),
@@ -1060,7 +1067,7 @@ mod tests {
             timeout: 0,
             from: 0,
             size: 10,
-            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            start_time: Utc::now().timestamp_micros() - 3_600_000_000,
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
@@ -1085,7 +1092,7 @@ mod tests {
         let request = MultiStreamRequest {
             sql: vec![config::meta::search::SqlQuery {
                 sql: "SELECT * FROM logs".to_string(),
-                start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                start_time: Some(Utc::now().timestamp_micros() - 3_600_000_000),
                 end_time: Some(Utc::now().timestamp_micros()),
                 query_fn: Some("base64_encoded_vrl_function".to_string()),
                 is_old_format: false,
@@ -1094,7 +1101,7 @@ mod tests {
             timeout: 0,
             from: 0,
             size: 10,
-            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            start_time: Utc::now().timestamp_micros() - 3_600_000_000,
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
@@ -1120,7 +1127,7 @@ mod tests {
         let request = MultiStreamRequest {
             sql: vec![config::meta::search::SqlQuery {
                 sql: "SELECT * FROM logs".to_string(),
-                start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                start_time: Some(Utc::now().timestamp_micros() - 3_600_000_000),
                 end_time: Some(Utc::now().timestamp_micros()),
                 query_fn: None,
                 is_old_format: false,
@@ -1129,7 +1136,7 @@ mod tests {
             timeout: 0,
             from: 0,
             size: 10,
-            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            start_time: Utc::now().timestamp_micros() - 3_600_000_000,
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
@@ -1155,14 +1162,14 @@ mod tests {
             sql: vec![
                 config::meta::search::SqlQuery {
                     sql: "SELECT * FROM logs".to_string(),
-                    start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                    start_time: Some(Utc::now().timestamp_micros() - 3_600_000_000),
                     end_time: Some(Utc::now().timestamp_micros()),
                     query_fn: None,
                     is_old_format: false,
                 },
                 config::meta::search::SqlQuery {
                     sql: "SELECT * FROM metrics".to_string(),
-                    start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                    start_time: Some(Utc::now().timestamp_micros() - 3_600_000_000),
                     end_time: Some(Utc::now().timestamp_micros()),
                     query_fn: None,
                     is_old_format: false,
@@ -1172,7 +1179,7 @@ mod tests {
             timeout: 0,
             from: 0,
             size: 10,
-            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            start_time: Utc::now().timestamp_micros() - 3_600_000_000,
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
@@ -1199,7 +1206,7 @@ mod tests {
         let request = MultiStreamRequest {
             sql: vec![config::meta::search::SqlQuery {
                 sql: "SELECT * FROM logs".to_string(),
-                start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                start_time: Some(Utc::now().timestamp_micros() - 3_600_000_000),
                 end_time: Some(Utc::now().timestamp_micros()),
                 query_fn: None,
                 is_old_format: false,
@@ -1208,7 +1215,7 @@ mod tests {
             timeout: 0,
             from: 0,
             size: 10000,
-            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            start_time: Utc::now().timestamp_micros() - 3_600_000_000,
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
@@ -1246,10 +1253,10 @@ mod tests {
     #[test]
     fn test_time_range_validation() {
         let start_time = Utc::now().timestamp_micros();
-        let end_time = start_time + 3600_000_000; // 1 hour later
+        let end_time = start_time + 3_600_000_000; // 1 hour later
 
         assert!(end_time > start_time);
-        assert_eq!(end_time - start_time, 3600_000_000);
+        assert_eq!(end_time - start_time, 3_600_000_000);
     }
 
     #[test]

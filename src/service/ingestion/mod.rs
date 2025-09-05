@@ -15,7 +15,7 @@
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
-    sync::Arc,
+    sync::{Arc, atomic::Ordering},
 };
 
 use chrono::{Duration, TimeZone, Utc};
@@ -432,9 +432,7 @@ pub async fn check_ingestion_allowed(
     #[cfg(feature = "cloud")]
     {
         if !super::organization::is_org_in_free_trial_period(org_id).await? {
-            return Err(Error::IngestionError(format!(
-                "org {org_id} has expired its trial period"
-            )));
+            return Err(Error::TrialPeriodExpired);
         }
     }
 
@@ -568,7 +566,7 @@ pub fn generate_record_id(org_id: &str, stream_name: &str, stream_type: &StreamT
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     STREAM_RECORD_ID_GENERATOR
         .entry(key)
-        .or_insert_with(|| SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }))
+        .or_insert_with(|| SnowflakeIdGenerator::new(LOCAL_NODE_ID.load(Ordering::Relaxed)))
         .generate()
 }
 

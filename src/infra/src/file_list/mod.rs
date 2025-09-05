@@ -111,24 +111,25 @@ pub trait FileList: Sync + Send + 'static {
         limit: i64,
     ) -> Result<Vec<FileListDeleted>>;
     async fn list_deleted(&self) -> Result<Vec<FileListDeleted>>;
-    // stream stats
     async fn get_min_ts(
         &self,
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
     ) -> Result<i64>;
-    async fn get_max_pk_value(&self) -> Result<i64>;
-    async fn get_min_pk_value(&self) -> Result<i64>;
-    async fn clean_by_min_pk_value(&self, val: i64) -> Result<()>;
-    async fn stats(
+    async fn get_min_date(
         &self,
         org_id: &str,
-        stream_type: Option<StreamType>,
-        stream_name: Option<&str>,
-        pk_value: Option<(i64, i64)>,
-        deleted: bool,
-    ) -> Result<Vec<(String, StreamStats)>>;
+        stream_type: StreamType,
+        stream_name: &str,
+        date_range: Option<(String, String)>,
+    ) -> Result<String>;
+    async fn get_min_update_at(&self) -> Result<i64>;
+    async fn get_max_update_at(&self) -> Result<i64>;
+    async fn clean_by_min_update_at(&self, val: i64) -> Result<()>;
+
+    // stream stats table
+    async fn stats(&self, time_range: (i64, i64)) -> Result<Vec<(String, StreamStats)>>;
     async fn get_stream_stats(
         &self,
         org_id: &str,
@@ -143,9 +144,8 @@ pub trait FileList: Sync + Send + 'static {
     ) -> Result<()>;
     async fn set_stream_stats(
         &self,
-        org_id: &str,
         streams: &[(String, StreamStats)],
-        pk_value: Option<(i64, i64)>,
+        time_range: (i64, i64),
     ) -> Result<()>;
     async fn reset_stream_stats(&self) -> Result<()>;
     async fn reset_stream_stats_min_ts(
@@ -178,7 +178,7 @@ pub trait FileList: Sync + Send + 'static {
         stream: Option<&str>,
         start_time: i64,
         end_time: i64,
-        min_id: Option<i64>,
+        min_updated_at: Option<i64>,
     ) -> Result<Vec<FileRecord>>;
     async fn get_pending_dump_jobs(&self) -> Result<Vec<(i64, String, String, i64)>>;
     async fn set_job_dumped_status(&self, id: i64, dumped: bool) -> Result<()>;
@@ -362,26 +362,30 @@ pub async fn get_min_ts(org_id: &str, stream_type: StreamType, stream_name: &str
 }
 
 #[inline]
-pub async fn get_max_pk_value() -> Result<i64> {
-    CLIENT.get_max_pk_value().await
-}
-
-#[inline]
-pub async fn get_min_pk_value() -> Result<i64> {
-    CLIENT.get_min_pk_value().await
-}
-
-#[inline]
-pub async fn stats(
+pub async fn get_min_date(
     org_id: &str,
-    stream_type: Option<StreamType>,
-    stream_name: Option<&str>,
-    pk_value: Option<(i64, i64)>,
-    deleted: bool,
-) -> Result<Vec<(String, StreamStats)>> {
+    stream_type: StreamType,
+    stream_name: &str,
+    date_range: Option<(String, String)>,
+) -> Result<String> {
     CLIENT
-        .stats(org_id, stream_type, stream_name, pk_value, deleted)
+        .get_min_date(org_id, stream_type, stream_name, date_range)
         .await
+}
+
+#[inline]
+pub async fn get_min_update_at() -> Result<i64> {
+    CLIENT.get_min_update_at().await
+}
+
+#[inline]
+pub async fn get_max_update_at() -> Result<i64> {
+    CLIENT.get_max_update_at().await
+}
+
+#[inline]
+pub async fn stats(time_range: (i64, i64)) -> Result<Vec<(String, StreamStats)>> {
+    CLIENT.stats(time_range).await
 }
 
 #[inline]
@@ -408,11 +412,10 @@ pub async fn del_stream_stats(
 
 #[inline]
 pub async fn set_stream_stats(
-    org_id: &str,
     streams: &[(String, StreamStats)],
-    pk_value: Option<(i64, i64)>,
+    time_range: (i64, i64),
 ) -> Result<()> {
-    CLIENT.set_stream_stats(org_id, streams, pk_value).await
+    CLIENT.set_stream_stats(streams, time_range).await
 }
 
 #[inline]
@@ -493,10 +496,10 @@ pub async fn get_entries_in_range(
     stream: Option<&str>,
     start_time: i64,
     end_time: i64,
-    min_id: Option<i64>,
+    min_updated_at: Option<i64>,
 ) -> Result<Vec<FileRecord>> {
     CLIENT
-        .get_entries_in_range(org, stream, start_time, end_time, min_id)
+        .get_entries_in_range(org, stream, start_time, end_time, min_updated_at)
         .await
 }
 
@@ -518,18 +521,16 @@ pub async fn local_cache_gc() -> Result<()> {
         }
 
         // gc every hour
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600));
-        interval.tick().await; // the first tick is immediate
         loop {
-            if let Ok(min_id) = get_min_pk_value().await
-                && min_id > 0
+            if let Ok(min_update_at) = get_min_update_at().await
+                && min_update_at > 0
             {
-                match LOCAL_CACHE.clean_by_min_pk_value(min_id).await {
+                match LOCAL_CACHE.clean_by_min_update_at(min_update_at).await {
                     Ok(_) => log::info!("[file_list] local cache gc done"),
                     Err(e) => log::error!("[file_list] local cache gc failed: {e}"),
                 }
             }
-            interval.tick().await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
         }
     });
 
@@ -552,6 +553,17 @@ pub fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i
     } else {
         time_end + second_micros(PartitionTimeLevel::Hourly.duration())
     }
+}
+
+pub fn parse_stream_key(key: &str) -> Option<(String, StreamType, String)> {
+    let parts = key.split('/').collect::<Vec<_>>();
+    if parts.len() != 3 {
+        return None;
+    }
+    let org_id = parts[0].to_string();
+    let stream_type = parts[1].into();
+    let stream_name = parts[2].to_string();
+    Some((org_id, stream_type, stream_name))
 }
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
@@ -577,6 +589,10 @@ pub struct FileRecord {
     pub index_size: i64,
     #[sqlx(default)]
     pub flattened: bool,
+    #[sqlx(default)]
+    pub created_at: i64,
+    #[sqlx(default)]
+    pub updated_at: i64,
 }
 
 impl From<&FileRecord> for FileKey {

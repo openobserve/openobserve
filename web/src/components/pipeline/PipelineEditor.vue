@@ -200,7 +200,6 @@ import {
   watch,
   ref,
   type Ref,
-  defineEmits,
 } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import AssociateFunction from "@/components/pipeline/NodeForm/AssociateFunction.vue";
@@ -222,6 +221,7 @@ import { MarkerType } from "@vue-flow/core";
 import ExternalDestination from "./NodeForm/ExternalDestination.vue";
 import JsonEditor from "../common/JsonEditor.vue";
 import { validatePipeline as validatePipelineUtil, type ValidationResult } from '../../utils/validatePipeline';
+import { useReo } from "@/services/reodotdev_analytics";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
@@ -450,6 +450,45 @@ const dialog = ref({
 });
 
 const validationErrors = ref<string[]>([]);
+
+const { track } = useReo();
+
+// Watch for dialog changes to track node drops
+watch(
+  () => pipelineObj.dialog.show,
+  (newShow, oldShow) => {
+    // Track when dialog opens (node is dropped)
+    if (newShow && !oldShow && pipelineObj.dialog.name) {
+      let buttonName = "";
+      
+      if (pipelineObj.dialog.name === "stream") {
+        // Check if it's input or output stream from the current selected node data
+        const ioType = pipelineObj.currentSelectedNodeData?.type;
+        if (ioType === "input") {
+          buttonName = "Add Input Stream Node";
+        } else if (ioType === "output") {
+          buttonName = "Add Output Stream Node";
+        } else {
+          buttonName = "Add Stream Node";
+        }
+      } else {
+        const nodeTypeMap: { [key: string]: string } = {
+          query: "Add Query Node",
+          condition: "Add Condition Node", 
+          function: "Add Function Node",
+          remote_stream: "Add Remote Stream Node"
+        };
+        buttonName = nodeTypeMap[pipelineObj.dialog.name] || `Add ${pipelineObj.dialog.name}`;
+      }
+      
+      track("Button Click", {
+        button: buttonName,
+        page: "Pipeline Editor"
+      });
+    }
+  },
+  { immediate: false }
+);
 
 onBeforeMount(() => {
   if (config.isEnterprise == "true") {
@@ -851,6 +890,10 @@ const onSubmitPipeline = async () => {
       isPipelineSaving.value = false;
       dismiss();
     });
+    track("Button Click", {
+      button: "Save Pipeline",
+      page: "Add Pipeline"
+    });
 };
 
 const openCancelDialog = () => {
@@ -870,6 +913,10 @@ const openCancelDialog = () => {
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
+      });
+      track("Button Click", {
+        button: "Cancel Pipeline",
+        page: "Add Pipeline"
       });
     };
   } else {

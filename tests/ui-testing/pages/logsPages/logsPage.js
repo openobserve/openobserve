@@ -114,6 +114,7 @@ export class LogsPage {
         this.cmContent = '.cm-content';
         this.cmLine = '.cm-line';
         this.searchFunctionInput = { placeholder: 'Search Function' };
+        this.timestampFieldTable = '[data-test="log-search-index-list-fields-table"]';
     }
 
 
@@ -153,7 +154,47 @@ export class LogsPage {
     async navigateToLogs(orgIdentifier) {
         const logsUrl = '/web/logs'; // Using the same pattern as in test files
         const orgId = orgIdentifier || process.env["ORGNAME"];
-        await this.page.goto(`${logsUrl}?org_identifier=${orgId}`);
+        const fullUrl = `${logsUrl}?org_identifier=${orgId}&fn_editor=true`;
+        
+        
+        // Include fn_editor=true to ensure VRL editor is available for tests that need it
+        await this.page.goto(fullUrl);
+        
+        
+        // Wait for page load and check for VRL editor
+        await this.page.waitForLoadState('domcontentloaded');
+        
+        // Wait for VRL editor to be available (with retries)
+        let fnEditorExists = 0;
+        let retries = 5;
+        
+        while (fnEditorExists === 0 && retries > 0) {
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+            fnEditorExists = await this.page.locator('#fnEditor').count();
+            
+            if (fnEditorExists === 0) {
+                await this.page.waitForTimeout(2000);
+                retries--;
+            }
+        }
+        
+        if (fnEditorExists === 0) {
+            
+            // Try reloading with explicit parameters
+            const currentUrl = new URL(this.page.url());
+            currentUrl.searchParams.set('fn_editor', 'true');
+            currentUrl.searchParams.set('vrl', 'true'); // Try alternative parameter
+            
+            await this.page.goto(currentUrl.toString());
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 });
+            
+            fnEditorExists = await this.page.locator('#fnEditor').count();
+            
+            if (fnEditorExists === 0) {
+                // Take screenshot for debugging
+            }
+        } else {
+        }
     }
 
     async validateLogsPage() {
@@ -313,7 +354,11 @@ export class LogsPage {
 
     async applyQueryButton(expectedUrl) {
         await this.page.locator(this.queryButton).click();
-        await expect(this.page).toHaveURL(expectedUrl);
+        // Handle both full URLs and path-only URLs, allow query parameters
+        const urlPattern = expectedUrl.startsWith('http') 
+            ? expectedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            : `.*${expectedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`;
+        await expect(this.page).toHaveURL(new RegExp(urlPattern));
     }
 
     async clearAndRunQuery() {
@@ -725,6 +770,52 @@ export class LogsPage {
         } else {
             console.log("[DEBUG] Unexpected response structure:", JSON.stringify(searchData, null, 2));
             throw new Error(`Unexpected response structure: ${JSON.stringify(searchData)}`);
+        }
+    }
+
+    async clickRunQueryButtonAndVerifyStreamingResponse() {
+        console.log("[DEBUG] Setting up response listener before clicking run query button");
+        const searchPromise = this.page.waitForResponse(response => {
+            const url = response.url();
+            const method = response.request().method();
+            console.log(`[DEBUG] Response: ${method} ${url}`);
+            return url.includes('/api/default/_search') && method === 'POST';
+        });
+        
+        await this.clickRunQueryButton();
+        
+        const searchResponse = await searchPromise;
+        console.log(`[DEBUG] Search response status: ${searchResponse.status()}`);
+        expect(searchResponse.status()).toBe(200);
+        
+        // Check if this is a streaming response (SSE format) or JSON response
+        const responseUrl = searchResponse.url();
+        if (responseUrl.includes('_search_stream')) {
+            console.log("[DEBUG] Received streaming response (SSE format)");
+            const responseText = await searchResponse.text();
+            console.log("[DEBUG] Streaming response text (first 200 chars):", responseText.substring(0, 200));
+            expect(responseText).toBeDefined();
+            expect(responseText.length).toBeGreaterThan(0);
+        } else {
+            console.log("[DEBUG] Received JSON response");
+            const searchData = await searchResponse.json();
+            console.log("[DEBUG] Search response data:", JSON.stringify(searchData, null, 2));
+            console.log("[DEBUG] searchData type:", typeof searchData);
+            console.log("[DEBUG] searchData keys:", Object.keys(searchData || {}));
+            expect(searchData).toBeDefined();
+            
+            // Check if this is a partition response or regular search response
+            if (searchData.partitions) {
+                console.log("[DEBUG] Received partition response (non-streaming mode)");
+                expect(searchData.partitions).toBeDefined();
+                expect(searchData.histogram_interval).toBeDefined();
+            } else if (searchData.hits) {
+                console.log("[DEBUG] Received regular search response");
+                expect(searchData.hits).toBeDefined();
+            } else {
+                console.log("[DEBUG] Unexpected response structure:", JSON.stringify(searchData, null, 2));
+                throw new Error(`Unexpected response structure: ${JSON.stringify(searchData)}`);
+            }
         }
     }
 
@@ -1522,6 +1613,10 @@ export class LogsPage {
         return await this.page.locator(this.timestampColumnMenu).first().click({ force: true });
     }
 
+    async toggleVrlEditor() {
+        return await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
+    }
+
     async clickVrlEditor() {
         return await this.page.locator(this.vrlEditor).first().getByRole('textbox').fill('.a=2');
     }
@@ -1626,7 +1721,7 @@ export class LogsPage {
     }
 
     async expectQueryEditorContainsText(text) {
-        return await expect(this.page.locator(this.queryEditor)).toContainText(text);
+        return await expect(this.page.locator(this.queryEditor).locator('.cm-content')).toContainText(text);
     }
 
     async expectQueryEditorEmpty() {
@@ -1953,5 +2048,66 @@ export class LogsPage {
 
     async waitForDownload() {
         return await this.page.waitForEvent('download');
+    }
+
+    async clickAllFieldsButton() {
+        return await this.page.locator('[data-test="logs-all-fields-btn"]').click();
+    }
+
+    async enableQuickModeIfDisabled() {
+        // Enable quick mode toggle if it's not already enabled
+        const toggleButton = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
+        if (toggleButton) {
+            // Evaluate the class attribute to determine if the toggle is in the off state
+            const isSwitchedOff = await toggleButton.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
+            if (isSwitchedOff) {
+                await toggleButton.click();
+            }
+        }
+    }
+
+    async clickTimestampField() {
+        return await this.page.locator(this.timestampFieldTable).getByTitle('_timestamp').click();
+    }
+
+    async clickSchemaButton() {
+        return await this.page.getByRole('button').filter({ hasText: /^schema$/ }).click();
+    }
+
+    async clickInfoSchemaButton() {
+        return await this.page.getByRole('button').filter({ hasText: 'infoschema' }).click();
+    }
+
+    async clickClearButton() {
+        return await this.page.getByRole('button', { name: 'Clear' }).click();
+    }
+
+    async expectTimestampFieldVisible() {
+        return await expect(this.page.locator(this.timestampFieldTable).getByTitle('_timestamp')).toBeVisible();
+    }
+
+    // Field management methods for add/remove fields to table
+    async hoverOnFieldExpandButton(fieldName) {
+        await this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`).hover();
+        await this.page.waitForTimeout(300);
+    }
+
+    async clickAddFieldToTableButton(fieldName) {
+        await this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`).click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async clickRemoveFieldFromTableButton(fieldName) {
+        await this.page.locator(`[data-test="log-search-index-list-remove-${fieldName}-field-btn"]`).click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async expectFieldInTableHeader(fieldName) {
+        return await expect(this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`)).toBeVisible();
+    }
+
+    async expectFieldNotInTableHeader(fieldName) {
+        // When field is removed, the source column should be visible again
+        return await expect(this.page.locator('[data-test="log-search-result-table-th-source"]').getByText('source')).toBeVisible();
     }
 } 

@@ -1,25 +1,14 @@
-import { test, expect } from "../baseFixtures.js";
-import PageManager from "../../pages/page-manager.js";
-import logData from "../../cypress/fixtures/log.json";
-import logsdata from "../../../test-data/logs_data.json";
-// (duplicate import removed)
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const testLogger = require('../utils/test-logger.js');
+const PageManager = require('../../pages/page-manager.js');
+const logData = require('../../fixtures/log.json');
+const logsdata = require('../../../test-data/logs_data.json');
 
-test.describe.configure({ mode: 'parallel' });
+// Utility Functions
 
-async function login(page) {
-  await page.goto(process.env["ZO_BASE_URL"]);
-  await page.waitForTimeout(1000);
-  if (await page.getByText('Login as internal user').isVisible()) {
-    await page.getByText('Login as internal user').click();
-  }
+// Legacy login function replaced by global authentication via navigateToBase
 
-  await page.locator('[data-cy="login-user-id"]').fill(process.env["ZO_ROOT_USER_EMAIL"]);
-  await page.locator("label").filter({ hasText: "Password *" }).click();
-  await page.locator('[data-cy="login-password"]').fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-  await page.locator('[data-cy="login-sign-in"]').click();
-}
-
-async function ingestion(page) {
+async function ingestTestData(page) {
   const orgId = process.env["ORGNAME"];
   const streamName = "e2e_automate";
   const basicAuthCredentials = Buffer.from(
@@ -44,169 +33,226 @@ async function ingestion(page) {
     streamName: streamName,
     logsdata: logsdata
   });
-  console.log(response);
+  testLogger.debug('API response received', { response });
 }
 
 test.describe("Logs Histogram testcases", () => {
-  let pageManager;
+  test.describe.configure({ mode: 'parallel' });
+  let pm; // Page Manager instance
 
-  test.beforeEach(async ({ page }) => {
-    await login(page);
-    pageManager = new PageManager(page);
-    await page.waitForTimeout(5000);
-    await ingestion(page);
-    await page.waitForTimeout(2000);
+  test.beforeEach(async ({ page }, testInfo) => {
+    // Initialize test setup
+    testLogger.testStart(testInfo.title, testInfo.file);
+    
+    // Navigate to base URL with authentication
+    await navigateToBase(page);
+    pm = new PageManager(page);
+    
+    // Strategic post-authentication stabilization wait - this is functionally necessary
+    await page.waitForTimeout(1000);
+    
+    // Data ingestion for histogram testing (preserve exact logic)
+    await ingestTestData(page);
+    // Strategic wait for data ingestion completion - this is functionally necessary
+    await page.waitForTimeout(1000);
 
+    // Navigate to logs page and setup for histogram testing
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await pageManager.logsPage.selectStream("e2e_automate"); 
+    await pm.logsPage.selectStream("e2e_automate"); 
+    
+    testLogger.info('Histogram test setup completed');
   });
 
   test.afterEach(async ({ page }) => {
-    await pageManager.commonActions.flipStreaming();
+    try {
+      await pm.commonActions.flipStreaming();
+      testLogger.info('Streaming flipped after test');
+    } catch (error) {
+      testLogger.warn('Streaming flip failed', { error: error.message });
+    }
   });
 
   test("Verify error handling and no results found with histogram", {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
+    testLogger.info('Testing error handling and no results found with histogram');
+    
     // Check if histogram is off and toggle it on if needed
-    const isHistogramOn = await pageManager.logsPage.isHistogramOn();
+    const isHistogramOn = await pm.logsPage.isHistogramOn();
     if (!isHistogramOn) {
-      await pageManager.logsPage.toggleHistogram();
+      await pm.logsPage.toggleHistogram();
     }
 
     // Type invalid query and verify error
-    await pageManager.logsPage.typeQuery("match_all('invalid')");
-    await pageManager.logsPage.setDateTimeFilter();
-    await pageManager.logsPage.waitForTimeout(2000);
-    await pageManager.logsPage.clickRefresh();
-    await pageManager.logsPage.clickErrorMessage();
-    await pageManager.logsPage.clickResetFilters();
+    await pm.logsPage.typeQuery("match_all('invalid')");
+    await pm.logsPage.setDateTimeFilter();
+    // Strategic 500ms wait for query processing - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clickRefresh();
+    // Strategic 500ms wait for refresh completion - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clickErrorMessage();
+    await pm.logsPage.clickResetFilters();
 
     // Type SQL query and verify no results
-    await pageManager.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate' where code > 500");
-    await pageManager.logsPage.waitForTimeout(2000);
-    await pageManager.logsPage.clickRefresh();
-    await pageManager.logsPage.waitForTimeout(2000);
-    await pageManager.logsPage.clickNoDataFound();
-    await pageManager.logsPage.clickResultDetail();
+    await pm.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate' where code > 500");
+    // Strategic 500ms wait for SQL query processing - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clickRefresh();
+    // Strategic 500ms wait for SQL refresh completion - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clickNoDataFound();
+    await pm.logsPage.clickResultDetail();
+    
+    testLogger.info('Error handling and no results verification completed');
   });
 
   test("Verify error handling with histogram toggle off and on", {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
+    testLogger.info('Testing error handling with histogram toggle off and on');
+    
     // Check if histogram is on and toggle it off
-    const isHistogramOn = await pageManager.logsPage.isHistogramOn();
+    const isHistogramOn = await pm.logsPage.isHistogramOn();
     if (isHistogramOn) {
-      await pageManager.logsPage.toggleHistogram();
+      await pm.logsPage.toggleHistogram();
     }
 
     // Type invalid query and verify error
-    await pageManager.logsPage.typeQuery("match_all('invalid')");
-    await pageManager.logsPage.setDateTimeFilter();
-    await pageManager.logsPage.waitForTimeout(2000);
-    await pageManager.logsPage.clickRefresh();
-    await pageManager.logsPage.clickErrorMessage();
-    await pageManager.logsPage.clickResetFilters();
+    await pm.logsPage.typeQuery("match_all('invalid')");
+    await pm.logsPage.setDateTimeFilter();
+    // Strategic 500ms wait for query processing - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clickRefresh();
+    await pm.logsPage.clickErrorMessage();
+    await pm.logsPage.clickResetFilters();
 
     // Toggle histogram back on
-    await pageManager.logsPage.toggleHistogram();
+    await pm.logsPage.toggleHistogram();
 
     // Type SQL query and verify no results
-    await pageManager.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate' where code > 500");
-    await pageManager.logsPage.waitForTimeout(2000);
-    await pageManager.logsPage.clickRefresh();
-    await pageManager.logsPage.waitForTimeout(2000);
-    await pageManager.logsPage.clickNoDataFound();
-    await pageManager.logsPage.clickResultDetail();
+    await pm.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate' where code > 500");
+    // Strategic 500ms wait for SQL query processing - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clickRefresh();
+    // Strategic 500ms wait for SQL refresh completion - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clickNoDataFound();
+    await pm.logsPage.clickResultDetail();
+    
+    testLogger.info('Histogram toggle error handling verification completed');
   });
 
   test("Verify histogram toggle persistence after multiple queries", {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
+    testLogger.info('Testing histogram toggle persistence after multiple queries');
+    
     // Start with histogram on
-    const isHistogramOn = await pageManager.logsPage.isHistogramOn();
+    const isHistogramOn = await pm.logsPage.isHistogramOn();
     if (!isHistogramOn) {
-      await pageManager.logsPage.toggleHistogram();
+      await pm.logsPage.toggleHistogram();
     }
 
     // Run first query
-    await pageManager.logsPage.typeQuery("SELECT * FROM 'e2e_automate' LIMIT 10");
-    await pageManager.logsPage.setDateTimeFilter();
-    await pageManager.logsPage.waitForTimeout(2000);
-    await pageManager.logsPage.clickRefresh();
-    await pageManager.logsPage.waitForTimeout(2000);
+    await pm.logsPage.typeQuery("SELECT * FROM 'e2e_automate' LIMIT 10");
+    await pm.logsPage.setDateTimeFilter();
+    // Strategic 500ms wait for SQL query processing - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clickRefresh();
+    // Strategic 500ms wait for refresh completion - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
 
     // Toggle histogram off
-    await pageManager.logsPage.toggleHistogram();
-    await pageManager.logsPage.enableSQLMode();
-    await pageManager.logsPage.waitForTimeout(1000);
-    await pageManager.logsPage.enableSQLMode();
+    await pm.logsPage.toggleHistogram();
+    await pm.logsPage.enableSQLMode();
+    // Strategic 500ms wait for SQL mode transition - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.enableSQLMode();
 
     // Run second query
-    await pageManager.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate'");
-    await pageManager.logsPage.waitForTimeout(2000);
-    await pageManager.logsPage.clickRefresh();
-    await pageManager.logsPage.waitForTimeout(2000);
+    await pm.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate'");
+    // Strategic 500ms wait for query processing - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clickRefresh();
+    // Strategic 500ms wait for refresh completion - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
 
     // Verify histogram stays off
-    await pageManager.logsPage.verifyHistogramState();
+    await pm.logsPage.verifyHistogramState();
+    
+    testLogger.info('Histogram persistence verification completed');
   });
 
   test("Verify histogram toggle with empty query", {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
+    testLogger.info('Testing histogram toggle with empty query');
+    
     // Start with histogram off
-    const isHistogramOn = await pageManager.logsPage.isHistogramOn();
+    const isHistogramOn = await pm.logsPage.isHistogramOn();
     if (isHistogramOn) {
-      await pageManager.logsPage.toggleHistogram();
+      await pm.logsPage.toggleHistogram();
     }
 
     // Clear query and refresh
-    await pageManager.logsPage.typeQuery("");
-    await pageManager.logsPage.setDateTimeFilter();
-    await pageManager.logsPage.waitForTimeout(2000);
-    await pageManager.logsPage.clickRefresh();
-    await pageManager.logsPage.waitForTimeout(2000);
+    await pm.logsPage.typeQuery("");
+    await pm.logsPage.setDateTimeFilter();
+    // Strategic 500ms wait for query processing - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clickRefresh();
+    // Strategic 500ms wait for refresh completion - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
 
     // Toggle histogram on
-    await pageManager.logsPage.toggleHistogram();
+    await pm.logsPage.toggleHistogram();
 
     // Verify histogram state
-    const isHistogramOnAfterToggle = await pageManager.logsPage.isHistogramOn();
+    const isHistogramOnAfterToggle = await pm.logsPage.isHistogramOn();
     expect(isHistogramOnAfterToggle).toBeTruthy();
+    
+    testLogger.info('Empty query histogram toggle verification completed');
   });
 
   test("Verify histogram toggle with complex query", {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
+    testLogger.info('Testing histogram toggle with complex query');
+    
     // Start with histogram on
-    const isHistogramOn = await pageManager.logsPage.isHistogramOn();
+    const isHistogramOn = await pm.logsPage.isHistogramOn();
     if (!isHistogramOn) {
-      await pageManager.logsPage.toggleHistogram();
+      await pm.logsPage.toggleHistogram();
     }
 
     // Run complex query
-    await pageManager.logsPage.typeQuery("SELECT * FROM 'e2e_automate' WHERE timestamp > '2024-01-01' AND code < 400 GROUP BY code ORDER BY count(*) DESC LIMIT 5");
-    await pageManager.logsPage.setDateTimeFilter();
-    await pageManager.logsPage.waitForTimeout(2000);
-    await pageManager.logsPage.clickRefresh();
-    await pageManager.logsPage.waitForTimeout(2000);
+    await pm.logsPage.typeQuery("SELECT * FROM 'e2e_automate' WHERE timestamp > '2024-01-01' AND code < 400 GROUP BY code ORDER BY count(*) DESC LIMIT 5");
+    await pm.logsPage.setDateTimeFilter();
+    // Strategic 500ms wait for complex SQL query processing - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clickRefresh();
+    // Strategic 500ms wait for refresh completion - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
 
     // Toggle histogram off and verify
-    await pageManager.logsPage.toggleHistogram();
-    const isHistogramOff = await pageManager.logsPage.isHistogramOn();
+    await pm.logsPage.toggleHistogram();
+    const isHistogramOff = await pm.logsPage.isHistogramOn();
     expect(!isHistogramOff).toBeTruthy();
 
     // Run another query and verify histogram stays off
-    await pageManager.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate'");
-    await pageManager.logsPage.waitForTimeout(2000);
-    await pageManager.logsPage.clickRefresh();
-    await pageManager.logsPage.waitForTimeout(2000);
+    await pm.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate'");
+    // Strategic 500ms wait for query processing - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
+    await pm.logsPage.clickRefresh();
+    // Strategic 500ms wait for refresh completion - this is functionally necessary
+    await pm.logsPage.waitForTimeout(500);
 
-    const isHistogramStillOff = await pageManager.logsPage.isHistogramOn();
+    const isHistogramStillOff = await pm.logsPage.isHistogramOn();
     expect(!isHistogramStillOff).toBeTruthy();
+    
+    testLogger.info('Complex query histogram toggle verification completed');
   });
 }); 

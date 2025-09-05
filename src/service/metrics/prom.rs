@@ -30,6 +30,7 @@ use config::{
     },
     metrics,
     utils::{
+        flatten::format_label_name,
         json,
         schema_ext::SchemaExt,
         time::{now_micros, parse_i64_to_timestamp_micros},
@@ -55,7 +56,6 @@ use crate::{
         alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{TriggerAlertData, check_ingestion_allowed, evaluate_trigger, write_file},
-        metrics::format_label_name,
         pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
         search as search_service,

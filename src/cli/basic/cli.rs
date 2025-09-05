@@ -135,6 +135,15 @@ fn create_cli_app() -> Command {
             ]),
             Command::new("upgrade-db")
                 .about("upgrade db table schemas").args(dataArgs()),
+            Command::new("query-optimiser").about("query optimiser").args([
+                    arg!("url", 'u', "url", "url", true),
+                    arg!("token", 't', "token", "token", true),
+                    arg!("meta-token", 'm', "meta-token", "meta-token"),
+                    arg!("duration", 'd', "duration", "duration", true),
+                    arg!("stream-name", 's', "stream-name", "stream-name"),
+                    arg!("top-x", 'x', "top-x", "top-x").default_value("5"),
+                    arg!("org-id", 'o', "org-id", "org-id").default_value("default"),
+            ])
         ])
 }
 
@@ -390,6 +399,14 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         "parse-id" => {
             let id = command.get_one::<String>("id").unwrap();
             println!("id: {id}");
+            // Snowflake IDs are expected to be 19 digits. If the input ID is longer,
+            // we truncate to the first 19 digits to ensure correct parsing; any extra digits are
+            // ignored.
+            let id = if id.len() > 19 {
+                id[..19].to_string()
+            } else {
+                id.to_string()
+            };
             let id = id.parse::<i64>().unwrap();
             let ts = config::ider::to_timestamp_millis(id);
             println!("timestamp: {ts}");
@@ -407,6 +424,37 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         }
         "upgrade-db" => {
             crate::migration::init_db().await?;
+        }
+        "query-optimiser" => {
+            let stream_name = command
+                .get_one::<String>("stream-name")
+                .map(|stream_name| stream_name.to_string());
+
+            let meta_token = command
+                .get_one::<String>("meta-token")
+                .map(|meta_token| meta_token.to_string());
+
+            let url = command.get_one::<String>("url").expect("url is required");
+            let token = command
+                .get_one::<String>("token")
+                .expect("token is required");
+
+            let duration = command.get_one::<String>("duration").unwrap();
+            let duration = duration.parse::<i64>().unwrap_or(12);
+            let top_x = command.get_one::<String>("top-x").unwrap();
+            let top_x = top_x.parse::<usize>().unwrap_or(5);
+            let org_id = command.get_one::<String>("org-id").unwrap();
+
+            super::query_optimiser::query_optimiser(
+                url,
+                token,
+                &meta_token,
+                duration,
+                &stream_name,
+                top_x,
+                org_id,
+            )
+            .await?;
         }
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));

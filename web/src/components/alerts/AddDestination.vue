@@ -333,11 +333,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   ref,
   computed,
-  defineProps,
   onBeforeMount,
   onActivated,
-  defineEmits,
-  reactive,
 } from "vue";
 import type { Ref, PropType } from "vue";
 import { useI18n } from "vue-i18n";
@@ -353,9 +350,9 @@ import type {
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
-import actionService from "@/services/action_scripts";
 import config from "@/aws-exports";
 import useActions from "@/composables/useActions";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const props = defineProps({
   templates: {
@@ -377,6 +374,7 @@ const apiMethods = ["get", "post", "put"];
 const outputFormats = ["json", "ndjson"];
 const store = useStore();
 const { t } = useI18n();
+const { track } = useReo();
 const formData: Ref<DestinationData> = ref({
   name: "",
   url: "",
@@ -619,6 +617,10 @@ const saveDestination = () => {
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
+    track("Button Click", {
+      button: "Update Destination",
+      page: "Add Destination"
+    });
   } else {
     destinationService
       .create({
@@ -645,6 +647,10 @@ const saveDestination = () => {
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
+    track("Button Click", {
+      button: "Create Destination",
+      page: "Add Destination"
+    });
   }
 };
 const addApiHeader = (key: string = "", value: string = "") => {

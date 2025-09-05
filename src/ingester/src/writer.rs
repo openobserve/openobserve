@@ -116,10 +116,23 @@ pub async fn get_writer(
             start.elapsed().as_millis()
         );
     }
+    let mut is_existing_writer_channel_closed = false;
     if let Some(w) = data {
-        return w.clone();
+        if !w.is_channel_closed() {
+            return w.clone();
+        }
+        is_existing_writer_channel_closed = true;
     }
     drop(r);
+
+    if is_existing_writer_channel_closed {
+        log::warn!(
+            "[INGESTER:MEM:{idx}] Writer channel closed for {org_id}/{stream_type}, removing from cache",
+        );
+        let mut w = WRITERS[idx].write().await;
+        w.remove(&key);
+        drop(w);
+    }
 
     // slow path
     let start = std::time::Instant::now();
@@ -182,7 +195,7 @@ pub async fn check_ttl() -> Result<()> {
                 .send((WriterSignal::Rotate, vec![], false))
                 .await
             {
-                log::error!("[INGESTER:MEM] writer queue rotate error: {e}");
+                log::error!("[INGESTER:MEM:{}] writer queue rotate error: {e}", r.idx);
             }
         }
     }
@@ -190,15 +203,15 @@ pub async fn check_ttl() -> Result<()> {
 }
 
 pub async fn flush_all() -> Result<()> {
+    log::info!("[INGESTER:MEM] start flush all writers");
     for w in WRITERS.iter() {
         let mut w = w.write().await;
         let keys = w.keys().cloned().collect::<Vec<_>>();
-        for r in w.values() {
-            r.close().await?; // close writer
-            metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
-        }
         for key in keys {
-            w.remove(&key);
+            if let Some(r) = w.remove(&key) {
+                r.flush().await?; // close writer
+                metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
+            }
         }
     }
     Ok(())
@@ -280,6 +293,10 @@ impl Writer {
 
     pub fn get_key_str(&self) -> String {
         format!("{}/{}", self.key.org_id, self.key.stream_type)
+    }
+
+    pub fn is_channel_closed(&self) -> bool {
+        self.write_queue.is_closed()
     }
 
     // check_ttl is used to check if the memtable has expired
@@ -466,7 +483,7 @@ impl Writer {
         Ok(())
     }
 
-    pub async fn close(&self) -> Result<()> {
+    pub async fn flush(&self) -> Result<()> {
         // wait for all messages to be processed
         if let Err(e) = self
             .write_queue
@@ -476,6 +493,7 @@ impl Writer {
             log::error!("[INGESTER:MEM:{}] close writer error: {}", self.idx, e);
         }
         self.write_queue.closed().await;
+        log::info!("[INGESTER:MEM:{}] writer queue closed", self.idx);
 
         // rotation wal
         let mut wal = self.wal.write().await;

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, fmt::Display};
+use std::{cmp::max, fmt::Display, str::FromStr};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
@@ -30,6 +30,81 @@ use crate::{
         json::{self, Map, Value},
     },
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "PascalCase")]
+pub enum DataType {
+    #[default]
+    Utf8,
+    LargeUtf8,
+    Int64,
+    Uint64,
+    Float64,
+    Boolean,
+}
+
+impl From<DataType> for arrow_schema::DataType {
+    fn from(data_type: DataType) -> Self {
+        match data_type {
+            DataType::Utf8 => Self::Utf8,
+            DataType::LargeUtf8 => Self::LargeUtf8,
+            DataType::Int64 => Self::Int64,
+            DataType::Uint64 => Self::UInt64,
+            DataType::Float64 => Self::Float64,
+            DataType::Boolean => Self::Boolean,
+        }
+    }
+}
+
+impl Display for DataType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DataType::Utf8 => write!(f, "Utf8"),
+            DataType::LargeUtf8 => write!(f, "LargeUtf8"),
+            DataType::Int64 => write!(f, "Int64"),
+            DataType::Uint64 => write!(f, "Uint64"),
+            DataType::Float64 => write!(f, "Float64"),
+            DataType::Boolean => write!(f, "Boolean"),
+        }
+    }
+}
+
+impl FromStr for DataType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "utf8" => Ok(DataType::Utf8),
+            "largeutf8" => Ok(DataType::LargeUtf8),
+            "int64" => Ok(DataType::Int64),
+            "uint64" => Ok(DataType::Uint64),
+            "float64" => Ok(DataType::Float64),
+            "boolean" => Ok(DataType::Boolean),
+            _ => Err(format!("Unknown data type: {s}")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
+pub struct DataField {
+    pub name: String,
+    pub r#type: DataType,
+}
+
+impl DataField {
+    pub fn new(name: &str, r#type: DataType) -> Self {
+        Self {
+            name: name.to_string(),
+            r#type,
+        }
+    }
+}
+
+impl PartialEq for DataField {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.r#type == other.r#type
+    }
+}
 
 pub const ALL_STREAM_TYPES: [StreamType; 7] = [
     StreamType::Logs,
@@ -112,18 +187,22 @@ impl std::fmt::Display for StreamType {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
 #[serde(default)]
 pub struct StreamParams {
+    #[schema(value_type = String)]
     pub org_id: faststr::FastStr,
+    #[schema(value_type = String)]
     pub stream_name: faststr::FastStr,
     pub stream_type: StreamType,
 }
 
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
 #[serde(default)]
 pub struct RemoteStreamParams {
+    #[schema(value_type = String)]
     pub org_id: faststr::FastStr,
+    #[schema(value_type = String)]
     pub destination_name: faststr::FastStr,
 }
 
@@ -552,7 +631,7 @@ pub struct UpdateSettingsWrapper<D> {
     pub remove: Vec<D>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, ToSchema)]
 pub struct PatternAssociation {
     pub field: String,
     pub pattern_name: String,
@@ -563,8 +642,16 @@ pub struct PatternAssociation {
     pub apply_at: String,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
+pub struct StreamField {
+    pub name: String,
+    pub r#type: String,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct UpdateStreamSettings {
+    #[serde(skip_serializing, default)]
+    pub fields: UpdateSettingsWrapper<StreamField>,
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -692,23 +779,24 @@ impl TimeRange {
         result
     }
 }
-#[derive(Clone, Debug, Default, Deserialize, ToSchema, PartialEq)]
+
+#[derive(Clone, Debug, Deserialize, ToSchema, PartialEq)]
 pub struct StreamSettings {
-    #[serde(skip_serializing_if = "Option::None")]
+    #[serde(default)]
     pub partition_time_level: Option<PartitionTimeLevel>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub partition_keys: Vec<StreamPartition>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub full_text_search_keys: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub index_fields: Vec<String>,
     #[serde(default)]
     pub bloom_filter_fields: Vec<String>,
     #[serde(default)]
     pub data_retention: i64,
-    #[serde(skip_serializing_if = "Option::None")]
+    #[serde(default)]
     pub flatten_level: Option<i64>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub defined_schema_fields: Vec<String>,
     #[serde(default)]
     pub max_query_range: i64, // hours
@@ -716,7 +804,7 @@ pub struct StreamSettings {
     pub store_original_data: bool,
     #[serde(default)]
     pub approx_partition: bool,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub distinct_value_fields: Vec<DistinctField>,
     #[serde(default)]
     pub index_updated_at: i64,
@@ -728,6 +816,30 @@ pub struct StreamSettings {
     pub index_all_values: bool,
     #[serde(default)]
     pub enable_distinct_fields: bool,
+}
+
+impl Default for StreamSettings {
+    fn default() -> Self {
+        Self {
+            partition_time_level: None,
+            partition_keys: Vec::new(),
+            full_text_search_keys: Vec::new(),
+            index_fields: Vec::new(),
+            bloom_filter_fields: Vec::new(),
+            data_retention: 0,
+            flatten_level: None,
+            defined_schema_fields: Vec::new(),
+            max_query_range: 0,
+            store_original_data: false,
+            approx_partition: false,
+            distinct_value_fields: Vec::new(),
+            index_updated_at: 0,
+            extended_retention_days: Vec::new(),
+            index_original_data: false,
+            index_all_values: false,
+            enable_distinct_fields: true,
+        }
+    }
 }
 
 impl Serialize for StreamSettings {
@@ -757,7 +869,7 @@ impl Serialize for StreamSettings {
         state.serialize_field("extended_retention_days", &self.extended_retention_days)?;
         state.serialize_field("index_original_data", &self.index_original_data)?;
         state.serialize_field("index_all_values", &self.index_all_values)?;
-        state.serialize_field("disable_distinct_fields", &self.enable_distinct_fields)?;
+        state.serialize_field("enable_distinct_fields", &self.enable_distinct_fields)?;
 
         if !self.defined_schema_fields.is_empty() {
             let mut fields = self.defined_schema_fields.clone();

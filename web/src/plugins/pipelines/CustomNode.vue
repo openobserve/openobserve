@@ -17,20 +17,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup>
 import { Handle } from "@vue-flow/core";
 import useDragAndDrop from "./useDnD";
-import { defineEmits, ref } from "vue";
+import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { getImageURL } from "@/utils/zincutils";
 
 import config from "@/aws-exports";
 
-const streamImage = getImageURL("images/pipeline/stream.svg");
-
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
-const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
-const queryImage = getImageURL("images/pipeline/query.svg");
 const externalOutputImage = getImageURL("images/pipeline/externalOutput.svg");
 
 

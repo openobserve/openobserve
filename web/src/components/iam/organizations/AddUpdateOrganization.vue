@@ -114,6 +114,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const defaultValue = () => {
   return {
@@ -149,6 +150,7 @@ export default defineComponent({
     const organizationData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
+    const { track } = useReo();
 
     return {
       t,
@@ -160,6 +162,7 @@ export default defineComponent({
       addOrganizationForm,
       store,
       isValidIdentifier,
+      track,
     };
   },
   created() {
@@ -268,6 +271,10 @@ export default defineComponent({
               ),
             });
             dismiss();
+          });
+          this.track("Button Click", {
+            button: "Save Organization",
+            page: "Add Organization"
           });
       });
     },

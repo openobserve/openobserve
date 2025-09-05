@@ -20,7 +20,7 @@ use actix_web::{
 };
 use chrono::{TimeZone, Utc};
 use config::{
-    meta::stream::{StreamSettings, StreamType, TimeRange, UpdateStreamSettings},
+    meta::stream::{StreamType, TimeRange, UpdateStreamSettings},
     utils::schema::format_stream_name,
 };
 use hashbrown::HashMap;
@@ -34,7 +34,7 @@ use crate::{
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
-            stream::{ListStream, StreamDeleteFields},
+            stream::{ListStream, StreamCreate, StreamDeleteFields},
         },
         utils::http::{get_stream_type_from_request, get_ts_from_request_with_key},
     },
@@ -43,12 +43,12 @@ use crate::{
 };
 
 /// GetSchema
-///
-/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
     operation_id = "StreamSchema",
+    summary = "Get stream schema",
+    description = "Retrieves the schema definition for a specific stream, including field types and metadata. Supports filtering by keyword and pagination",
     security(
         ("Authorization"= [])
     ),
@@ -61,8 +61,11 @@ use crate::{
         ("limit" = u32, Query, description = "Limit"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Stream),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/streams/{stream_name}/schema")]
@@ -127,13 +130,13 @@ async fn schema(
     Ok(HttpResponse::Ok().json(schema))
 }
 
-/// CreateStreamSettings
-///
-/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"create"}#
+/// CreateStream
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
-    operation_id = "StreamSettings",
+    operation_id = "StreamCreate",
+    summary = "Create new stream",
+    description = "Creates a new stream with specified settings and schema definition. The stream will be used to store and organize data of the specified type",
     security(
         ("Authorization"= [])
     ),
@@ -142,16 +145,20 @@ async fn schema(
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
     ),
-    request_body(content = StreamSettings, description = "Stream settings", content_type = "application/json"),
+    request_body(content = StreamCreate, description = "Stream create", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "create"}))
     )
 )]
-#[post("/{org_id}/streams/{stream_name}/settings")]
-async fn settings(
+#[post("/{org_id}/streams/{stream_name}")]
+async fn create(
     path: web::Path<(String, String)>,
-    settings: web::Json<StreamSettings>,
+    stream: web::Json<StreamCreate>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, mut stream_name) = path.into_inner();
@@ -168,16 +175,17 @@ async fn settings(
             )),
         );
     }
-    stream::save_stream_settings(&org_id, &stream_name, stream_type, settings.into_inner()).await
+    stream::create_stream(&org_id, &stream_name, stream_type, stream.into_inner()).await
 }
 
 /// UpdateStreamSettings
-///
-/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
     operation_id = "UpdateStreamSettings",
+    summary = "Update stream settings",
+    description = "Updates configuration settings for an existing stream, including retention policies, partitioning, and other stream-specific options",
     security(
         ("Authorization"= [])
     ),
@@ -188,8 +196,13 @@ async fn settings(
     ),
     request_body(content = UpdateStreamSettings, description = "Stream settings", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/streams/{stream_name}/settings")]
@@ -214,59 +227,18 @@ async fn update_settings(
         );
     }
     let stream_settings: UpdateStreamSettings = stream_settings.into_inner();
-    let main_stream_res =
-        stream::update_stream_settings(&org_id, &stream_name, stream_type, stream_settings.clone())
-            .await?;
-
-    // sync the data retention to index stream
-    if stream_type.is_basic_type() && stream_settings.data_retention.is_some() {
-        #[allow(deprecated)]
-        let index_stream_name =
-            if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
-                stream_name.to_string()
-            } else {
-                format!("{stream_name}_{stream_type}")
-            };
-        if infra::schema::get(&org_id, &index_stream_name, StreamType::Index)
-            .await
-            .is_ok()
-        {
-            let index_stream_settings = UpdateStreamSettings {
-                data_retention: stream_settings.data_retention,
-                ..Default::default()
-            };
-            match stream::update_stream_settings(
-                &org_id,
-                &index_stream_name,
-                StreamType::Index,
-                index_stream_settings,
-            )
-            .await
-            {
-                Ok(_) => {
-                    log::debug!(
-                        "Data retention settings for {stream_name} synced to index stream {index_stream_name}"
-                    );
-                }
-                Err(e) => {
-                    log::error!(
-                        "Failed to sync data retention settings to index stream {index_stream_name}: {e}"
-                    );
-                }
-            }
-        }
-    }
-
-    Ok(main_stream_res)
+    stream::update_stream_settings(&org_id, &stream_name, stream_type, stream_settings.clone())
+        .await
 }
 
 /// DeleteStreamFields
-///
-/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
     operation_id = "StreamDeleteFields",
+    summary = "Delete stream fields",
+    description = "Removes specified fields from the stream schema. This operation will affect how future data is indexed and queried for this stream",
     security(
         ("Authorization"= [])
     ),
@@ -277,8 +249,12 @@ async fn update_settings(
     ),
     request_body(content = StreamDeleteFields, description = "Stream delete fields", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "delete"}))
     )
 )]
 #[put("/{org_id}/streams/{stream_name}/delete_fields")]
@@ -311,12 +287,13 @@ async fn delete_fields(
 }
 
 /// DeleteStream
-///
-/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
     operation_id = "StreamDelete",
+    summary = "Delete stream",
+    description = "Permanently deletes a stream and all its associated data. Use delete_all parameter to remove related resources like alerts and dashboards",
     security(
         ("Authorization"= [])
     ),
@@ -327,8 +304,11 @@ async fn delete_fields(
         ("delete_all" = bool, Query, description = "Delete all related feature resources"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/streams/{stream_name}")]
@@ -356,12 +336,13 @@ async fn delete(
 }
 
 /// ListStreams
-///
-/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
     operation_id = "StreamList",
+    summary = "List organization streams",
+    description = "Retrieves a paginated list of streams within the organization, with optional filtering by type and keyword. Supports sorting by various metrics",
     security(
         ("Authorization"= [])
     ),
@@ -375,7 +356,10 @@ async fn delete(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = ListStream),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/streams")]
@@ -522,12 +506,13 @@ fn stream_comparator(
 }
 
 /// StreamDeleteCache
-///
-/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
     operation_id = "StreamDeleteCache",
+    summary = "Delete stream result cache",
+    description = "Clears cached search results for a stream. Optionally specify a timestamp to retain cache from that point forward and delete older cache",
     security(
         ("Authorization"= [])
     ),
@@ -538,8 +523,11 @@ fn stream_comparator(
         ("ts" = i64, Query, description = "Timestamp in microseconds. If provided, must be > 0. Cache from this timestamp onwards will be retained, older cache will be deleted."),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/streams/{stream_name}/cache/results")]
@@ -580,12 +568,13 @@ async fn delete_stream_cache(
 }
 
 /// StreamDeleteDataByTimeRange
-///
-/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
     operation_id = "StreamDeleteDataByTimeRange",
+    summary = "Delete stream data by time range",
+    description = "Creates a deletion job to permanently remove stream data within the specified time range. Returns a job ID to track the deletion progress",
     security(
         ("Authorization"= [])
     ),
@@ -597,8 +586,11 @@ async fn delete_stream_cache(
         ("end" = i64, Query, description = "End timestamp in microseconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/streams/{stream_name}/data_by_time_range")]
@@ -668,7 +660,7 @@ async fn delete_stream_data_by_time_range(
     );
 
     // Create a job to delete the data by the time range
-    let key = match crate::service::db::compact::retention::delete_stream(
+    let (key, _created) = match crate::service::db::compact::retention::delete_stream(
         &org_id,
         stream_type,
         &stream_name,
@@ -708,12 +700,13 @@ async fn delete_stream_data_by_time_range(
 }
 
 /// StreamDeleteDataByTimeRangeJobStatus
-///
-/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
     operation_id = "StreamDeleteDataByTimeRangeJobStatus",
+    summary = "Get deletion job status",
+    description = "Retrieves the current status of a stream data deletion job, including progress information and any errors encountered",
     security(
         ("Authorization"= [])
     ),
@@ -722,8 +715,11 @@ async fn delete_stream_data_by_time_range(
         ("stream_name" = String, Path, description = "Stream name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/streams/{stream_name}/data_by_time_range/status/{id}")]
@@ -813,7 +809,7 @@ async fn get_super_cluster_delete_status(
     {
         Ok(nodes) => nodes,
         Err(e) => {
-            log::error!("Failed to get super cluster nodes: {:?}", e);
+            log::error!("Failed to get super cluster nodes: {e:?}");
             return Err(anyhow::anyhow!(
                 "Failed to get super cluster nodes: {:?}",
                 e

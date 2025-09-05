@@ -15,42 +15,61 @@
 
 use std::sync::Arc;
 
-use add_sort_and_limit::AddSortAndLimitRule;
-use add_timestamp::AddTimestampRule;
-#[cfg(feature = "enterprise")]
-use cipher::{RewriteCipherCall, RewriteCipherKey};
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME};
-use datafusion::optimizer::{
-    AnalyzerRule, OptimizerRule, common_subexpr_eliminate::CommonSubexprEliminate,
-    decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
-    eliminate_cross_join::EliminateCrossJoin, eliminate_duplicated_expr::EliminateDuplicatedExpr,
-    eliminate_filter::EliminateFilter, eliminate_group_by_constant::EliminateGroupByConstant,
-    eliminate_join::EliminateJoin, eliminate_limit::EliminateLimit,
-    eliminate_nested_union::EliminateNestedUnion, eliminate_one_union::EliminateOneUnion,
-    eliminate_outer_join::EliminateOuterJoin, extract_equijoin_predicate::ExtractEquijoinPredicate,
-    filter_null_join_keys::FilterNullJoinKeys, optimize_projections::OptimizeProjections,
-    propagate_empty_relation::PropagateEmptyRelation, push_down_filter::PushDownFilter,
-    push_down_limit::PushDownLimit, replace_distinct_aggregate::ReplaceDistinctWithAggregate,
-    scalar_subquery_to_join::ScalarSubqueryToJoin, simplify_expressions::SimplifyExpressions,
-    single_distinct_to_groupby::SingleDistinctToGroupBy,
+use datafusion::{
+    common::Result,
+    optimizer::{
+        AnalyzerRule, OptimizerRule, common_subexpr_eliminate::CommonSubexprEliminate,
+        decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
+        eliminate_cross_join::EliminateCrossJoin,
+        eliminate_duplicated_expr::EliminateDuplicatedExpr, eliminate_filter::EliminateFilter,
+        eliminate_group_by_constant::EliminateGroupByConstant, eliminate_join::EliminateJoin,
+        eliminate_limit::EliminateLimit, eliminate_nested_union::EliminateNestedUnion,
+        eliminate_one_union::EliminateOneUnion, eliminate_outer_join::EliminateOuterJoin,
+        extract_equijoin_predicate::ExtractEquijoinPredicate,
+        filter_null_join_keys::FilterNullJoinKeys, optimize_projections::OptimizeProjections,
+        propagate_empty_relation::PropagateEmptyRelation, push_down_filter::PushDownFilter,
+        push_down_limit::PushDownLimit, replace_distinct_aggregate::ReplaceDistinctWithAggregate,
+        scalar_subquery_to_join::ScalarSubqueryToJoin, simplify_expressions::SimplifyExpressions,
+        single_distinct_to_groupby::SingleDistinctToGroupBy,
+    },
+    physical_optimizer::PhysicalOptimizerRule,
+    physical_plan::ExecutionPlan,
+    prelude::SessionContext,
 };
 use infra::schema::get_stream_setting_fts_fields;
-use limit_join_right_side::LimitJoinRightSide;
-use remove_index_fields::RemoveIndexFieldsRule;
-use rewrite_histogram::RewriteHistogram;
-use rewrite_match::RewriteMatch;
-
-use crate::service::search::sql::Sql;
-
-pub mod add_sort_and_limit;
-pub mod add_timestamp;
 #[cfg(feature = "enterprise")]
-pub mod cipher;
-pub mod join_reorder;
-pub mod limit_join_right_side;
-pub mod remove_index_fields;
-pub mod rewrite_histogram;
-pub mod rewrite_match;
+use {
+    crate::service::search::datafusion::optimizer::context::generate_streaming_agg_rules,
+    crate::service::search::datafusion::optimizer::logical_optimizer::cipher::{
+        RewriteCipherCall, RewriteCipherKey,
+    },
+    o2_enterprise::enterprise::search::datafusion::optimizer::aggregate_topk::AggregateTopkRule,
+    o2_enterprise::enterprise::search::datafusion::optimizer::eliminate_aggregate::EliminateAggregateRule,
+};
+
+use crate::service::search::{
+    datafusion::optimizer::{
+        analyze::remove_index_fields::RemoveIndexFieldsRule,
+        context::PhysicalOptimizerContext,
+        logical_optimizer::{
+            add_sort_and_limit::AddSortAndLimitRule, add_timestamp::AddTimestampRule,
+            limit_join_right_side::LimitJoinRightSide, rewrite_histogram::RewriteHistogram,
+            rewrite_match::RewriteMatch,
+        },
+        physical_optimizer::{
+            distribute_analyze::optimize_distribute_analyze, join_reorder::JoinReorderRule,
+            remote_scan::generate_remote_scan_rules,
+        },
+    },
+    request::Request,
+    sql::Sql,
+};
+
+pub mod analyze;
+pub mod context;
+pub mod logical_optimizer;
+pub mod physical_optimizer;
 pub mod utils;
 
 pub fn generate_analyzer_rules(sql: &Sql) -> Vec<Arc<dyn AnalyzerRule + Send + Sync>> {
@@ -81,7 +100,7 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     let mut rules: Vec<Arc<dyn OptimizerRule + Send + Sync>> = Vec::with_capacity(64);
 
     // get full text search fields
-    if sql.match_items.is_some() && sql.stream_names.len() == 1 {
+    if sql.has_match_all {
         let mut fields = Vec::new();
         let stream_name = &sql.stream_names[0];
         let schema = sql.schemas.get(stream_name).unwrap();
@@ -160,4 +179,48 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     // ************************************
 
     rules
+}
+
+pub fn generate_physical_optimizer_rules(
+    req: &Request,
+    sql: &Sql,
+    contexts: Vec<PhysicalOptimizerContext>,
+) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
+    let mut rules = vec![Arc::new(JoinReorderRule::new()) as _];
+    for context in contexts.into_iter() {
+        match context {
+            PhysicalOptimizerContext::RemoteScan(context) => {
+                rules.push(generate_remote_scan_rules(req, sql, context));
+            }
+            PhysicalOptimizerContext::AggregateTopk => {
+                #[cfg(feature = "enterprise")]
+                rules.push(Arc::new(AggregateTopkRule::new(sql.limit)));
+                #[cfg(not(feature = "enterprise"))]
+                continue;
+            }
+            PhysicalOptimizerContext::StreamingAggregation(context) => {
+                if let Some(_context) = context {
+                    #[cfg(feature = "enterprise")]
+                    rules.push(generate_streaming_agg_rules(_context));
+                    #[cfg(feature = "enterprise")]
+                    rules.push(Arc::new(EliminateAggregateRule::new()) as _);
+                    #[cfg(not(feature = "enterprise"))]
+                    continue;
+                }
+            }
+        }
+    }
+    rules
+}
+
+// create physical plan
+// NOTE: this function only can rewrite AnalyzeExec
+// another rewrite should move to optimize rule
+pub async fn create_physical_plan(
+    ctx: &SessionContext,
+    sql: &str,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    let plan = ctx.state().create_logical_plan(sql).await?;
+    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+    optimize_distribute_analyze(physical_plan)
 }

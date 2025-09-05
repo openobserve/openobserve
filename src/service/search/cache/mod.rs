@@ -16,6 +16,8 @@
 use std::str::FromStr;
 
 use chrono::{TimeZone, Utc};
+#[cfg(feature = "enterprise")]
+use config::meta::projections::ProjectionColumnMapping;
 use config::{
     TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -33,13 +35,15 @@ use config::{
         hash::Sum64,
         json,
         sql::{is_aggregate_query, is_eligible_for_histogram},
-        time::format_duration,
+        time::{format_duration, second_micros},
     },
 };
 use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
 use tracing::Instrument;
@@ -75,6 +79,7 @@ pub async fn search(
     range_error: String,
     is_http2_streaming: bool,
     dashboard_info: Option<DashboardInfo>,
+    is_multi_stream_search: bool,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
@@ -88,7 +93,7 @@ pub async fn search(
 
     // Result caching check start
     let mut origin_sql = in_req.query.sql.clone();
-    let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
+    let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or(true);
     let (stream_name, all_streams) = match resolve_stream_names(&origin_sql) {
         // TODO: cache don't not support multiple stream names
         Ok(v) => (v[0].clone(), v.join(",")),
@@ -395,7 +400,7 @@ pub async fn search(
             None
         },
         request_body: Some(req.query.sql.clone()),
-        function: req.query.query_fn,
+        function: req.query.query_fn.clone(),
         user_email: user_id,
         min_ts: Some(req.query.start_time),
         max_ts: Some(req.query.end_time),
@@ -452,7 +457,7 @@ pub async fn search(
         res.new_end_time = Some(req.query.end_time);
     }
 
-    res.is_histogram_eligible = is_eligible_for_histogram(&req.query.sql)
+    res.is_histogram_eligible = is_eligible_for_histogram(&req.query.sql, is_multi_stream_search)
         .ok()
         .map(|(is_eligible, _)| is_eligible);
 
@@ -491,6 +496,16 @@ pub async fn search(
     }
     // result cache save changes Ends
 
+    #[cfg(feature = "enterprise")]
+    crate::service::search::cache::apply_regex_to_response(
+        &req,
+        org_id,
+        &stream_name,
+        stream_type,
+        &mut local_res,
+    )
+    .await?;
+
     if is_result_array_skip_vrl {
         local_res.hits = apply_vrl_to_response(
             backup_query_fn,
@@ -502,7 +517,7 @@ pub async fn search(
         return Ok(local_res);
     }
 
-    Ok(res)
+    Ok(local_res)
 }
 
 // based on _timestamp of first record in config::meta::search::Response either add it in start
@@ -739,7 +754,7 @@ pub async fn _write_results(
     let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
 
     let smallest_ts = std::cmp::min(first_rec_ts, last_rec_ts);
-    let discard_duration = get_config().common.result_cache_discard_duration * 1000 * 1000;
+    let discard_duration = second_micros(get_config().limit.cache_delay_secs);
 
     if (last_rec_ts - first_rec_ts).abs() < discard_duration
         && smallest_ts > Utc::now().timestamp_micros() - discard_duration
@@ -893,7 +908,7 @@ pub async fn write_results_v2(
     let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
 
     let smallest_ts = std::cmp::min(first_rec_ts, last_rec_ts);
-    let discard_duration = get_config().common.result_cache_discard_duration * 1000 * 1000;
+    let discard_duration = second_micros(get_config().limit.cache_delay_secs);
 
     if (last_rec_ts - first_rec_ts).abs() < discard_duration
         && smallest_ts > Utc::now().timestamp_micros() - discard_duration
@@ -1160,4 +1175,45 @@ pub fn is_result_array_skip_vrl(vrl_fn: &str) -> bool {
 fn deep_copy_response(res: &config::meta::search::Response) -> config::meta::search::Response {
     let serialized = serde_json::to_string(res).expect("Failed to serialize response");
     serde_json::from_str(&serialized).expect("Failed to deserialize response")
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn apply_regex_to_response(
+    req: &config::meta::search::Request,
+    org_id: &str,
+    all_streams: &str,
+    stream_type: StreamType,
+    res: &mut config::meta::search::Response,
+) -> Result<(), infra::errors::Error> {
+    if res.hits.is_empty() {
+        return Ok(());
+    }
+
+    let pattern_manager = get_pattern_manager().await?;
+
+    let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
+    let sql =
+        match crate::service::search::sql::Sql::new(&query, org_id, stream_type, req.search_type)
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("Error parsing sql: {e}");
+                return Ok(());
+            }
+        };
+
+    let projections: std::collections::HashMap<String, Vec<ProjectionColumnMapping>> =
+        crate::service::search::datafusion::plan::regex_projections::get_columns_from_projections(
+            sql,
+        )
+        .await?;
+
+    match pattern_manager.process_at_search(org_id, StreamType::Logs, &mut res.hits, projections) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            log::error!("error in processing records for patterns for stream {all_streams} : {e}");
+            Err(infra::errors::Error::Message(e.to_string()))
+        }
+    }
 }

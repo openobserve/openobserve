@@ -33,25 +33,37 @@ vi.mock("@/services/search", () => ({
 
 // Mock useLogs composable
 vi.mock("@/composables/useLogs", () => ({
-  default: () => ({
-    searchObj: {
-      data: {
-        datetime: {
-          type: 'relative'
+  default: () => {
+    const { ref } = require('vue');
+    return {
+      searchObj: ref({
+        data: {
+          datetime: {
+            type: 'relative'
+          }
         }
-      }
-    },
-    extractTimestamps: vi.fn().mockReturnValue({ from: 1000, to: 2000 })
-  })
+      }),
+      extractTimestamps: vi.fn().mockReturnValue({ from: 1000, to: 2000 })
+    };
+  }
 }));
 
 // Mock vue-router
 vi.mock('vue-router', () => ({
   useRouter: vi.fn(() => ({
-    push: vi.fn()
+    push: vi.fn(),
+    currentRoute: {
+      value: {
+        query: {
+          org_identifier: 'test-org'
+        }
+      }
+    }
   })),
   useRoute: vi.fn(() => ({
-    query: {},
+    query: {
+      org_identifier: 'test-org'
+    },
     params: {},
     path: '/search-history'
   }))
@@ -68,10 +80,6 @@ vi.mock('vue-i18n', async (importOriginal) => {
   };
 });
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
-
 describe("SearchHistory Component", () => {
   let wrapper;
   let mockStore;
@@ -79,6 +87,10 @@ describe("SearchHistory Component", () => {
   let routerPushMock;
 
   beforeEach(() => {
+    // Install Quasar for this test instance
+    installQuasar({
+      plugins: [Dialog, Notify],
+    });
     // Setup mock store
     mockStore = {
       state: {
@@ -105,7 +117,14 @@ describe("SearchHistory Component", () => {
     // Setup router mock
     routerPushMock = vi.fn();
     vi.mocked(useRouter).mockImplementation(() => ({
-      push: routerPushMock
+      push: routerPushMock,
+      currentRoute: {
+        value: {
+          query: {
+            org_identifier: 'test-org'
+          }
+        }
+      }
     }));
 
     // Mount component with default props
@@ -225,11 +244,20 @@ describe("SearchHistory Component", () => {
 
   describe("Data Fetching", () => {
     it("sets loading state correctly during fetch", async () => {
-      searchService.get_history.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
+      searchService.get_history.mockImplementation(() => 
+        new Promise(resolve => 
+          setTimeout(() => resolve({
+            data: {
+              hits: []
+            }
+          }), 100)
+        )
+      );
       
       await wrapper.setProps({ isClicked: true });
       
       await flushPromises();
+      await new Promise(resolve => setTimeout(resolve, 150)); // Wait for async operations
       expect(wrapper.vm.isLoading).toBe(false);
     });
   });

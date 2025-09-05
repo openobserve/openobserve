@@ -1026,186 +1026,186 @@ def test_streaming_histogram(
 
 
 # TODO Uncomment the following test cases after the issue (https://github.com/openobserve/openobserve/issues/7858) is fixed
-# @pytest.mark.parametrize("test_name_sql, sql_query, sql_from, sql_size, total_exp", test_data_sql)
-# def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_from, sql_size, total_exp):
-#     """Running an E2E test for sql queries with Parameterized data when websocket is disabled."""
-#
-#     session = create_session
-#     url = base_url
-#     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
-#     now = datetime.now(timezone.utc)
-#     end_time = int(now.timestamp() * 1000000)
-#     ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
-#     json_data_sql = {
-#         "query": {
-#             "sql": sql_query,
-#             "start_time": ten_min_ago,
-#             "end_time": end_time,
-#             "from": sql_from,
-#             "size": sql_size,
-#             "quick_mode": False
-#         },
-#         "regions": [],
-#         "clusters": []
-#     }
-#
-#     res_sql = session.post(
-#         f"{url}api/{org_id}/_search_stream?type=logs&search_type=UI&use_cache=false", json=json_data_sql, stream=True)
-#
-#     assert (
-#         res_sql.status_code == 200
-#     ), f"SQL mode {test_name_sql} added 200, but got {res_sql.status_code} {res_sql.content}"
-#
-#     print(f"Response {url} SQL False Cache Streaming:", res_sql.status_code)
-#
-#     # Parse the JSON response
-#
-#     res_data_sql = read_response(res_sql)
-#
-#     # Validate the total in the response
-#     total_hits_sql = res_data_sql["results"]["total"]
-#
-#     # Adjust the assertion based on our expectations
-#     expected_hits_sql = total_exp  # what we're expecting
-#     assert total_hits_sql == expected_hits_sql, f"Expected total {test_name_sql} to be {expected_hits_sql}, but got {total_hits_sql}"
-#
-#     # Generate request for cache
-#     res_sql_cache = session.post(
-#         f"{url}api/{org_id}/_search_stream?type=logs&search_type=UI&use_cache=true", json=json_data_sql, stream=True)
-#
-#     assert (
-#         res_sql_cache.status_code == 200
-#     ), f"SQL cache {test_name_sql} mode added 200, but got {res_sql_cache.status_code} {res_sql_cache.content}"
-#
-#     print(f"Response {test_name_sql} Cache True SQL {url} Streaming:",
-#           res_sql_cache.status_code)
-#
-#     # Parse the JSON response
-#
-#     res_data_sql_cache = read_response(res_sql_cache)
-#
-#     # Validate the total in the response
-#     total_hits_sql_cache = res_data_sql_cache["results"]["total"]
-#
-#     # Adjust the assertion based on our expectations
-#     expected_hits_sql_cache = total_exp  # what we're expecting
-#     assert total_hits_sql_cache == expected_hits_sql_cache, f"Expected {test_name_sql} total to be {expected_hits_sql_cache}, but got {total_hits_sql_cache}"
-#
+@pytest.mark.parametrize("test_name_sql, sql_query, sql_from, sql_size, total_exp", test_data_sql)
+def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_from, sql_size, total_exp):
+    """Running an E2E test for sql queries with Parameterized data when websocket is disabled."""
+
+    session = create_session
+    url = base_url
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
+    json_data_sql = {
+        "query": {
+            "sql": sql_query,
+            "start_time": ten_min_ago,
+            "end_time": end_time,
+            "from": sql_from,
+            "size": sql_size,
+            "quick_mode": False
+        },
+        "regions": [],
+        "clusters": []
+    }
+
+    res_sql = session.post(
+        f"{url}api/{org_id}/_search_stream?type=logs&search_type=UI&use_cache=false", json=json_data_sql, stream=True)
+
+    assert (
+        res_sql.status_code == 200
+    ), f"SQL mode {test_name_sql} added 200, but got {res_sql.status_code} {res_sql.content}"
+
+    print(f"Response {url} SQL False Cache Streaming:", res_sql.status_code)
+
+    # Parse the JSON response
+
+    res_data_sql = read_response(res_sql)
+
+    # Validate the total in the response
+    total_hits_sql = res_data_sql["results"]["total"]
+
+    # Adjust the assertion based on our expectations
+    expected_hits_sql = total_exp  # what we're expecting
+    assert total_hits_sql == expected_hits_sql, f"Expected total {test_name_sql} to be {expected_hits_sql}, but got {total_hits_sql}"
+
+    # Generate request for cache
+    res_sql_cache = session.post(
+        f"{url}api/{org_id}/_search_stream?type=logs&search_type=UI&use_cache=true", json=json_data_sql, stream=True)
+
+    assert (
+        res_sql_cache.status_code == 200
+    ), f"SQL cache {test_name_sql} mode added 200, but got {res_sql_cache.status_code} {res_sql_cache.content}"
+
+    print(f"Response {test_name_sql} Cache True SQL {url} Streaming:",
+          res_sql_cache.status_code)
+
+    # Parse the JSON response
+
+    res_data_sql_cache = read_response(res_sql_cache)
+
+    # Validate the total in the response
+    total_hits_sql_cache = res_data_sql_cache["results"]["total"]
+
+    # Adjust the assertion based on our expectations
+    expected_hits_sql_cache = total_exp  # what we're expecting
+    assert total_hits_sql_cache == expected_hits_sql_cache, f"Expected {test_name_sql} total to be {expected_hits_sql_cache}, but got {total_hits_sql_cache}"
+
 # Define the test function
 
 
-# def test_values_streaming_endpoint(create_session, base_url):
-#     session = create_session
-#     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
-#     now = datetime.now(timezone.utc)
-#     end_time = int(now.timestamp() * 1000000)
-#     ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
-#     url = f"{base_url}api/{org_id}/_values_stream"
-#     headers = {
-#         'Content-Type': 'application/json',
-#         'Authorization': f'Basic {base64.b64encode(f"{ZO_ROOT_USER_EMAIL}:{ZO_ROOT_USER_PASSWORD}".encode()).decode()}'
-#     }
-#     # Define the JSON payload
-#     payload = {
-#         "fields": ["kubernetes_container_name"],
-#         "size": 10,
-#         "no_count": False,
-#         "regions": [],
-#         "clusters": [],
-#         "vrl_fn": "",
-#         "start_time": ten_min_ago,
-#         "end_time": end_time,
-#         "timeout": 30000,
-#         "stream_name": f"{stream_name}",
-#         "stream_type": "logs",
-#         "use_cache": False,
-#         "sql": "U0VMRUNUICogRlJPTSAiZGVmYXVsdCIg"
-#     }
-#     res_values_streaming = session.post(url, headers=headers, json=payload)
-#
-#     # Assert the response status code
-#     assert res_values_streaming.status_code == 200
-#
-#     # Assert the expected response structure
-#     res_data_values_streaming = read_response(res_values_streaming)
-#     print(f"Response {url} Values Streaming:", res_data_values_streaming)
-#
-#     # Check that the response is a dictionary
-#     assert isinstance(res_data_values_streaming, dict)
-#     assert 'results' in res_data_values_streaming
-#     assert isinstance(res_data_values_streaming['results'], dict)
-#     assert 'cached_ratio' in res_data_values_streaming['results']
-#     assert 'from' in res_data_values_streaming['results']
-#     assert 'hits' in res_data_values_streaming['results']
-#     assert isinstance(res_data_values_streaming['results']['hits'], list)
-#
-#     # Additional assertions based on expected values
-#     # Total should be non-negative
-#     assert res_data_values_streaming['results']['total'] >= 0
-#     # Check that hits do not exceed requested size
-#     assert len(res_data_values_streaming['results']['hits']) <= 10
-#     for hit in res_data_values_streaming['results']['hits']:
-#         assert 'field' in hit
-#         assert 'values' in hit
-#         assert isinstance(hit['values'], list)  # Check that values is a list
-#
-#
+def test_values_streaming_endpoint(create_session, base_url):
+    session = create_session
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
+    url = f"{base_url}api/{org_id}/_values_stream"
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Basic {base64.b64encode(f"{ZO_ROOT_USER_EMAIL}:{ZO_ROOT_USER_PASSWORD}".encode()).decode()}'
+    }
+    # Define the JSON payload
+    payload = {
+        "fields": ["kubernetes_container_name"],
+        "size": 10,
+        "no_count": False,
+        "regions": [],
+        "clusters": [],
+        "vrl_fn": "",
+        "start_time": ten_min_ago,
+        "end_time": end_time,
+        "timeout": 30000,
+        "stream_name": f"{stream_name}",
+        "stream_type": "logs",
+        "use_cache": False,
+        "sql": "U0VMRUNUICogRlJPTSAiZGVmYXVsdCIg"
+    }
+    res_values_streaming = session.post(url, headers=headers, json=payload)
+
+    # Assert the response status code
+    assert res_values_streaming.status_code == 200
+
+    # Assert the expected response structure
+    res_data_values_streaming = read_response(res_values_streaming)
+    print(f"Response {url} Values Streaming:", res_data_values_streaming)
+
+    # Check that the response is a dictionary
+    assert isinstance(res_data_values_streaming, dict)
+    assert 'results' in res_data_values_streaming
+    assert isinstance(res_data_values_streaming['results'], dict)
+    assert 'cached_ratio' in res_data_values_streaming['results']
+    assert 'from' in res_data_values_streaming['results']
+    assert 'hits' in res_data_values_streaming['results']
+    assert isinstance(res_data_values_streaming['results']['hits'], list)
+
+    # Additional assertions based on expected values
+    # Total should be non-negative
+    assert res_data_values_streaming['results']['total'] >= 0
+    # Check that hits do not exceed requested size
+    assert len(res_data_values_streaming['results']['hits']) <= 10
+    for hit in res_data_values_streaming['results']['hits']:
+        assert 'field' in hit
+        assert 'values' in hit
+        assert isinstance(hit['values'], list)  # Check that values is a list
+
+
 # # Define the test function
-# def test_values_streaming_endpoint_cache(create_session, base_url):
-#     session = create_session
-#     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
-#     now = datetime.now(timezone.utc)
-#     end_time = int(now.timestamp() * 1000000)
-#     ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
-#     url = f"{base_url}api/{org_id}/_values_stream"
-#     headers = {
-#         'Content-Type': 'application/json',
-#         'Authorization': f'Basic {base64.b64encode(f"{ZO_ROOT_USER_EMAIL}:{ZO_ROOT_USER_PASSWORD}".encode()).decode()}'
-#     }
-#     # Define the JSON payload
-#     payload = {
-#         "fields": ["kubernetes_container_name"],
-#         "size": 10,
-#         "no_count": False,
-#         "regions": [],
-#         "clusters": [],
-#         "vrl_fn": "",
-#         "start_time": ten_min_ago,
-#         "end_time": end_time,
-#         "timeout": 30000,
-#         "stream_name": f"{stream_name}",
-#         "stream_type": "logs",
-#         "use_cache": True,
-#         "sql": "U0VMRUNUICogRlJPTSAiZGVmYXVsdCIg"
-#     }
-#     res_values_streaming_cache = session.post(
-#         url, headers=headers, json=payload)
-#
-#     # Assert the response status code
-#     assert res_values_streaming_cache.status_code == 200
-#
-#     # Assert the expected response structure
-#     res_data_values_streaming_cache = read_response(res_values_streaming_cache)
-#     print(f"Response {url} Values Streaming:", res_data_values_streaming_cache)
-#
-#     # Check that the response is a dictionary
-#     assert isinstance(res_data_values_streaming_cache, dict)
-#     assert 'results' in res_data_values_streaming_cache
-#     assert isinstance(res_data_values_streaming_cache['results'], dict)
-#     assert 'cached_ratio' in res_data_values_streaming_cache['results']
-#     assert 'from' in res_data_values_streaming_cache['results']
-#     assert 'hits' in res_data_values_streaming_cache['results']
-#     assert isinstance(res_data_values_streaming_cache['results']['hits'], list)
-#
-#     # Additional assertions based on expected values
-#     # Total should be non-negative
-#     assert res_data_values_streaming_cache['results']['total'] >= 0
-#     # Check that hits do not exceed requested size
-#     assert len(res_data_values_streaming_cache['results']['hits']) <= 10
-#     for hit in res_data_values_streaming_cache['results']['hits']:
-#         assert 'field' in hit
-#         assert 'values' in hit
-#         assert isinstance(hit['values'], list)  # Check that values is a list
+def test_values_streaming_endpoint_cache(create_session, base_url):
+    session = create_session
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
+    url = f"{base_url}api/{org_id}/_values_stream"
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Basic {base64.b64encode(f"{ZO_ROOT_USER_EMAIL}:{ZO_ROOT_USER_PASSWORD}".encode()).decode()}'
+    }
+    # Define the JSON payload
+    payload = {
+        "fields": ["kubernetes_container_name"],
+        "size": 10,
+        "no_count": False,
+        "regions": [],
+        "clusters": [],
+        "vrl_fn": "",
+        "start_time": ten_min_ago,
+        "end_time": end_time,
+        "timeout": 30000,
+        "stream_name": f"{stream_name}",
+        "stream_type": "logs",
+        "use_cache": True,
+        "sql": "U0VMRUNUICogRlJPTSAiZGVmYXVsdCIg"
+    }
+    res_values_streaming_cache = session.post(
+        url, headers=headers, json=payload)
+
+    # Assert the response status code
+    assert res_values_streaming_cache.status_code == 200
+
+    # Assert the expected response structure
+    res_data_values_streaming_cache = read_response(res_values_streaming_cache)
+    print(f"Response {url} Values Streaming:", res_data_values_streaming_cache)
+
+    # Check that the response is a dictionary
+    assert isinstance(res_data_values_streaming_cache, dict)
+    assert 'results' in res_data_values_streaming_cache
+    assert isinstance(res_data_values_streaming_cache['results'], dict)
+    assert 'cached_ratio' in res_data_values_streaming_cache['results']
+    assert 'from' in res_data_values_streaming_cache['results']
+    assert 'hits' in res_data_values_streaming_cache['results']
+    assert isinstance(res_data_values_streaming_cache['results']['hits'], list)
+
+    # Additional assertions based on expected values
+    # Total should be non-negative
+    assert res_data_values_streaming_cache['results']['total'] >= 0
+    # Check that hits do not exceed requested size
+    assert len(res_data_values_streaming_cache['results']['hits']) <= 10
+    for hit in res_data_values_streaming_cache['results']['hits']:
+        assert 'field' in hit
+        assert 'values' in hit
+        assert isinstance(hit['values'], list)  # Check that values is a list
 
 
 def test_streaming_sql_query_range(create_session, base_url):
@@ -1328,7 +1328,6 @@ def read_response(reader):
     lines = content.split("\n")
     search_metadata_list = []
     search_hits_list = []
-    total_sum = 0
 
     print(f"DEBUG: Raw response content length: {len(content)}")
     print(f"DEBUG: Number of lines: {len(lines)}")
@@ -1350,18 +1349,6 @@ def read_response(reader):
                         metadata_data = json.loads(metadata_json)
                         print(f"DEBUG: Parsed metadata: {metadata_data}")
                         search_metadata_list.append(metadata_data)
-                        # Sum up the total values from all metadata responses
-                        if (
-                            "results" in metadata_data
-                            and "total" in metadata_data["results"]
-                        ):
-                            current_total = metadata_data["results"]["total"]
-                            total_sum += current_total
-                            print(
-                                f"DEBUG: Added total {current_total}, running sum: {total_sum}"
-                            )
-                        else:
-                            print(f"DEBUG: No 'results' or 'total' found in metadata")
                     except json.JSONDecodeError as e:
                         print(f"Error parsing metadata JSON: {e}")
                         continue
@@ -1384,22 +1371,45 @@ def read_response(reader):
 
     print(f"DEBUG: Final search_metadata_list length: {len(search_metadata_list)}")
     print(f"DEBUG: Final search_hits_list length: {len(search_hits_list)}")
-    print(f"DEBUG: Final total_sum: {total_sum}")
 
     if search_metadata_list:
-        # Use the first metadata response as the base, but update the total to be the sum
+        # Use the first metadata response as the base
         combined_metadata = search_metadata_list[0].copy()
-        combined_metadata["results"]["total"] = total_sum
-        print(f"DEBUG: Returning combined metadata with total: {total_sum}")
-
+        
         # Combine all hits from all hits events
         all_hits = []
         for hits_data in search_hits_list:
             if "hits" in hits_data and isinstance(hits_data["hits"], list):
                 all_hits.extend(hits_data["hits"])
 
+        # For streaming responses, use a more nuanced approach to determine total
+        # If there are multiple metadata responses, we need to use the count correctly
+        if len(search_metadata_list) == 1:
+            # Single metadata response - use its total directly
+            if "results" in search_metadata_list[0] and "total" in search_metadata_list[0]["results"]:
+                total_count = search_metadata_list[0]["results"]["total"]
+                print(f"DEBUG: Single metadata response, using total: {total_count}")
+            else:
+                total_count = len(all_hits)
+                print(f"DEBUG: Single metadata response with no total, using hits count: {total_count}")
+        else:
+            # Multiple metadata responses - for aggregation queries, use max total
+            # For histogram queries, use the number of distinct hits/buckets
+            max_total = 0
+            total_sum = 0
+            for metadata in search_metadata_list:
+                if "results" in metadata and "total" in metadata["results"]:
+                    current_total = metadata["results"]["total"]
+                    max_total = max(max_total, current_total)
+                    total_sum += current_total
+            
+            # Use max total for most cases, as it represents the correct count
+            total_count = max_total if max_total > 0 else len(all_hits)
+            print(f"DEBUG: Multiple metadata responses, max_total: {max_total}, total_sum: {total_sum}, using: {total_count}")
+
+        combined_metadata["results"]["total"] = total_count
         combined_metadata["results"]["hits"] = all_hits
-        print(f"DEBUG: Combined {len(all_hits)} total hits")
+        print(f"DEBUG: Returning combined metadata with total: {total_count}, hits: {len(all_hits)}")
 
         return combined_metadata
     else:

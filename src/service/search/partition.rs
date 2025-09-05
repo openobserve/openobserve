@@ -100,11 +100,7 @@ impl PartitionGenerator {
         let mini_partition_size = self.calculate_mini_partition_size(step);
 
         log::debug!(
-            "mini_partition_size_microseconds: {}, step: {}, end_time: {}, start_time: {}",
-            mini_partition_size,
-            step,
-            end_time,
-            start_time
+            "mini_partition_size_microseconds: {mini_partition_size}, step: {step}, end_time: {end_time}, start_time: {start_time}"
         );
 
         // Add mini partition if possible
@@ -379,8 +375,8 @@ mod tests {
     use super::*;
 
     fn print_partitions(title: &str, partitions: &[[i64; 2]]) {
-        println!("{}", title);
-        for (_i, [start, end]) in partitions.iter().enumerate() {
+        println!("{title}");
+        for [start, end] in partitions.iter() {
             let start = chrono::DateTime::from_timestamp_micros(*start)
                 .unwrap()
                 .with_timezone(&chrono::Local)
@@ -391,7 +387,7 @@ mod tests {
                 .with_timezone(&chrono::Local)
                 .format("%Y-%m-%d %H:%M:%S")
                 .to_string();
-            println!("{} - {}", start, end);
+            println!("{start} - {end}");
         }
     }
 
@@ -1027,7 +1023,7 @@ mod tests {
             true, // add_mini_partition = true
         );
 
-        println!("partitions: {:#?}", partitions);
+        println!("partitions: {partitions:#?}");
         print_partitions("Input", &[[start_time, end_time]]);
         print_partitions(
             "HISTOGRAM PARTITIONS WITH MINI PARTITION (ASC):",
@@ -1119,9 +1115,7 @@ mod enterprise_tests {
         for [start, end] in &partitions {
             assert!(
                 *end > *start,
-                "Partition [{}, {}] should not be empty",
-                start,
-                end
+                "Partition [{start}, {end}] should not be empty"
             );
         }
 

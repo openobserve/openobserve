@@ -51,7 +51,7 @@ pub struct ReportDashboardVariable {
     pub id: Option<String>,
 }
 
-#[derive(Serialize, Debug, Default, Deserialize, Clone)]
+#[derive(Serialize, Debug, Default, Deserialize, Clone, PartialEq)]
 pub enum ReportTimerangeType {
     #[default]
     #[serde(rename = "relative")]

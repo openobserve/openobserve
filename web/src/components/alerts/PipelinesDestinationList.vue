@@ -167,6 +167,7 @@ import type { DestinationPayload } from "@/ts/interfaces";
 import type { Template } from "@/ts/interfaces/index";
 
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import { useReo } from "@/services/reodotdev_analytics";
 
 interface ConformDelete {
   visible: boolean;
@@ -181,6 +182,7 @@ export default defineComponent({
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
     const { t } = useI18n();
     const q = useQuasar();
+    const { track } = useReo();
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -322,6 +324,12 @@ export default defineComponent({
       );
     };
     const editDestination = (destination: any) => {
+      if (!destination) {
+        track("Button Click", {
+          button: "Add Pipeline Destination",
+          page: "Pipeline Destinations"
+        });
+      }
       toggleDestinationEditor();
       resetEditingDestination();
       if (!destination) {
@@ -442,10 +450,16 @@ export default defineComponent({
       changePagination,
       perPageOptions,
       resultTotal,
+      selectedPerPage,
       pagination,
       outlinedDelete,
       routeTo,
       store,
+      // Exposed helper functions for testing
+      getTemplates,
+      updateRoute,
+      getDestinationByName,
+      resetEditingDestination,
     };
   },
 });

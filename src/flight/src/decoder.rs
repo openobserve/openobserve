@@ -15,14 +15,14 @@
 
 use std::{collections::HashMap, fmt::Debug, pin::Pin, sync::Arc, task::Poll};
 
-use arrow::{array::ArrayRef, buffer::Buffer};
+use arrow::{array::ArrayRef, buffer::Buffer, ipc::MessageHeader};
 use arrow_flight::{
     FlightData,
     error::{FlightError, Result},
     utils::flight_data_to_arrow_batch,
 };
 use arrow_schema::{Schema, SchemaRef};
-use datafusion::parquet::data_type::AsBytes;
+use datafusion::{parquet::data_type::AsBytes, physical_plan::metrics::BaselineMetrics};
 use futures::{Stream, StreamExt, ready};
 use tonic::Streaming;
 
@@ -33,6 +33,7 @@ pub struct FlightDataDecoder {
     schema: Option<SchemaRef>,
     dictionaries_by_field: HashMap<i64, ArrayRef>,
     done: bool,
+    metrics: BaselineMetrics,
 }
 
 impl Debug for FlightDataDecoder {
@@ -48,12 +49,17 @@ impl Debug for FlightDataDecoder {
 
 impl FlightDataDecoder {
     /// Create a new wrapper around the stream of [`FlightData`]
-    pub fn new(response: Streaming<FlightData>, schema: Option<SchemaRef>) -> Self {
+    pub fn new(
+        response: Streaming<FlightData>,
+        schema: Option<SchemaRef>,
+        metrics: BaselineMetrics,
+    ) -> Self {
         Self {
             response,
             schema,
             dictionaries_by_field: HashMap::new(),
             done: false,
+            metrics,
         }
     }
 
@@ -64,11 +70,11 @@ impl FlightDataDecoder {
 
     /// Extracts flight data from the next message
     fn extract_message(&mut self, data: FlightData) -> Result<Option<FlightMessage>> {
-        use arrow::ipc::MessageHeader;
+        let timer = self.metrics.elapsed_compute().timer();
         let message = arrow::ipc::root_as_message(&data.data_header[..])
             .map_err(|e| FlightError::DecodeError(format!("Error decoding header: {e}")))?;
 
-        match message.header_type() {
+        let result = match message.header_type() {
             MessageHeader::NONE => {
                 let message = serde_json::from_slice::<CustomMessage>(data.app_metadata.as_bytes())
                     .map_err(|e| {
@@ -139,7 +145,9 @@ impl FlightDataDecoder {
                 let name = other.variant_name().unwrap_or("UNKNOWN");
                 Err(FlightError::protocol(format!("Unexpected message: {name}")))
             }
-        }
+        };
+        timer.done();
+        result
     }
 }
 
@@ -169,6 +177,208 @@ impl Stream for FlightDataDecoder {
                     },
                 }),
             });
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::{
+        array::{ArrayRef, Int32Array, RecordBatch, StringArray},
+        ipc::{
+            MessageHeader,
+            writer::{DictionaryTracker, IpcDataGenerator, IpcWriteOptions},
+        },
+    };
+    use arrow_flight::{FlightData, SchemaAsIpc};
+    use arrow_schema::{DataType, Field, Schema};
+    use config::meta::search::ScanStats;
+    use flatbuffers::FlatBufferBuilder;
+
+    use super::*;
+    use crate::common::CustomMessage;
+
+    fn create_test_schema() -> Arc<Schema> {
+        Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, true),
+        ]))
+    }
+
+    fn create_test_record_batch() -> RecordBatch {
+        let schema = create_test_schema();
+        let id_array: ArrayRef = Arc::new(Int32Array::from(vec![1, 2, 3]));
+        let name_array: ArrayRef =
+            Arc::new(StringArray::from(vec![Some("Alice"), Some("Bob"), None]));
+
+        RecordBatch::try_new(schema, vec![id_array, name_array]).unwrap()
+    }
+
+    fn create_custom_message_flight_data() -> FlightData {
+        let scan_stats = ScanStats {
+            files: 5,
+            records: 500,
+            original_size: 1024,
+            compressed_size: 512,
+            querier_files: 3,
+            querier_memory_cached_files: 1,
+            querier_disk_cached_files: 2,
+            idx_scan_size: 256,
+            idx_took: 50,
+            file_list_took: 25,
+            aggs_cache_ratio: 90,
+        };
+        let custom_message = CustomMessage::ScanStats(scan_stats);
+        let metadata = serde_json::to_string(&custom_message).unwrap();
+
+        // Create NONE header
+        let mut builder = FlatBufferBuilder::new();
+        let mut message = arrow::ipc::MessageBuilder::new(&mut builder);
+        message.add_version(arrow::ipc::MetadataVersion::V5);
+        message.add_header_type(MessageHeader::NONE);
+        message.add_bodyLength(0);
+        let data = message.finish();
+        builder.finish(data, None);
+        let header = builder.finished_data().to_vec();
+
+        FlightData::new()
+            .with_data_header(header)
+            .with_app_metadata(metadata.as_bytes().to_vec())
+    }
+
+    #[test]
+    fn test_custom_message_serialization_deserialization() {
+        let scan_stats = ScanStats {
+            files: 5,
+            records: 500,
+            original_size: 1024,
+            compressed_size: 512,
+            querier_files: 3,
+            querier_memory_cached_files: 1,
+            querier_disk_cached_files: 2,
+            idx_scan_size: 256,
+            idx_took: 50,
+            file_list_took: 25,
+            aggs_cache_ratio: 90,
+        };
+        let custom_message = CustomMessage::ScanStats(scan_stats);
+
+        // Test serialization
+        let serialized = serde_json::to_string(&custom_message).unwrap();
+
+        // Test deserialization
+        let deserialized: CustomMessage = serde_json::from_str(&serialized).unwrap();
+
+        match deserialized {
+            CustomMessage::ScanStats(stats) => {
+                assert_eq!(stats.files, 5);
+                assert_eq!(stats.records, 500);
+                assert_eq!(stats.original_size, 1024);
+                assert_eq!(stats.compressed_size, 512);
+            }
+            _ => panic!("Expected ScanStats variant"),
+        }
+    }
+
+    #[test]
+    fn test_flight_data_schema_encoding_decoding() {
+        let schema = create_test_schema();
+        let options = IpcWriteOptions::default();
+        let flight_data: FlightData = SchemaAsIpc::new(&schema, &options).into();
+
+        // Verify the flight data is properly formed
+        assert!(!flight_data.data_header.is_empty());
+        // Schema flight data may not always have a data body, only header
+
+        // Test that we can decode it back to a schema
+        let decoded_schema = Schema::try_from(&flight_data).unwrap();
+        assert_eq!(decoded_schema.fields().len(), 2);
+        assert_eq!(decoded_schema.field(0).name(), "id");
+        assert_eq!(decoded_schema.field(1).name(), "name");
+    }
+
+    #[test]
+    fn test_flight_data_record_batch_encoding_decoding() {
+        let batch = create_test_record_batch();
+        let options = IpcWriteOptions::default();
+        let data_gen = IpcDataGenerator::default();
+        let mut dictionary_tracker = DictionaryTracker::new(false);
+
+        let (_, encoded_batch) = data_gen
+            .encoded_batch(&batch, &mut dictionary_tracker, &options)
+            .unwrap();
+
+        let flight_data: FlightData = encoded_batch.into();
+
+        // Verify the flight data is properly formed
+        assert!(!flight_data.data_header.is_empty());
+        assert!(!flight_data.data_body.is_empty());
+
+        // Verify we can decode with the proper schema and empty dictionaries
+        let schema = batch.schema();
+        let dictionaries = std::collections::HashMap::new();
+        let decoded_batch =
+            arrow_flight::utils::flight_data_to_arrow_batch(&flight_data, schema, &dictionaries)
+                .unwrap();
+
+        assert_eq!(decoded_batch.num_rows(), 3);
+        assert_eq!(decoded_batch.num_columns(), 2);
+    }
+
+    #[test]
+    fn test_custom_message_flight_data_creation() {
+        let flight_data = create_custom_message_flight_data();
+
+        // Verify structure
+        assert!(!flight_data.data_header.is_empty());
+        assert!(!flight_data.app_metadata.is_empty());
+        assert!(flight_data.data_body.is_empty());
+
+        // Verify we can deserialize the custom message
+        let custom_message: CustomMessage =
+            serde_json::from_slice(&flight_data.app_metadata).unwrap();
+        match custom_message {
+            CustomMessage::ScanStats(stats) => {
+                assert_eq!(stats.files, 5);
+                assert_eq!(stats.records, 500);
+            }
+            _ => panic!("Expected ScanStats variant"),
+        }
+    }
+
+    #[test]
+    fn test_invalid_json_in_app_metadata() {
+        // Test that invalid JSON in app_metadata would cause an error during deserialization
+        let invalid_json = b"invalid json";
+        let result = serde_json::from_slice::<CustomMessage>(invalid_json);
+        assert!(result.is_err());
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("expected"));
+    }
+
+    #[test]
+    fn test_flight_message_variants() {
+        // Test FlightMessage enum construction
+        let schema = create_test_schema();
+        let schema_message = FlightMessage::Schema(schema);
+
+        match schema_message {
+            FlightMessage::Schema(s) => {
+                assert_eq!(s.fields().len(), 2);
+            }
+            _ => panic!("Expected Schema variant"),
+        }
+
+        let batch = create_test_record_batch();
+        let batch_message = FlightMessage::RecordBatch(batch);
+
+        match batch_message {
+            FlightMessage::RecordBatch(b) => {
+                assert_eq!(b.num_rows(), 3);
+            }
+            _ => panic!("Expected RecordBatch variant"),
         }
     }
 }

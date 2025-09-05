@@ -2,6 +2,7 @@
   {
     "kubernetes_container_name": "api-server",
     "kubernetes_pod_name": "api-pod-1",
+    "kubernetes_labels_app": "api-service",
     "message": "Starting org service initialization",
     "level": "info",
     "log": "level=info msg=\"Starting org service initialization\"",
@@ -20,6 +21,7 @@
   {
     "kubernetes_container_name": "frontend",
     "kubernetes_pod_name": "web-pod-1",
+    "kubernetes_labels_app": "web-app",
     "message": "User authentication successful",
     "level": "info",
     "log": "level=info msg=\"User authentication successful\"",
@@ -38,6 +40,7 @@
   {
     "kubernetes_container_name": "api-server",
     "kubernetes_pod_name": "api-pod-1",
+    "kubernetes_labels_app": "api-service",
     "message": "Organization data sync completed",
     "level": "info",
     "log": "level=info msg=\"Organization data sync completed\"",
@@ -56,6 +59,7 @@
   {
     "kubernetes_container_name": "database",
     "kubernetes_pod_name": "db-pod-1",
+    "kubernetes_labels_app": "db-service",
     "message": "Database backup started",
     "level": "info",
     "log": "level=info msg=\"Database backup started\"",
@@ -74,6 +78,7 @@
   {
     "kubernetes_container_name": "api-server",
     "kubernetes_pod_name": "api-pod-2",
+    "kubernetes_labels_app": "api-service",
     "message": "High CPU usage detected",
     "level": "warn",
     "log": "level=warn msg=\"High CPU usage detected\"",
@@ -92,6 +97,7 @@
   {
     "kubernetes_container_name": "frontend",
     "kubernetes_pod_name": "web-pod-2",
+    "kubernetes_labels_app": "web-app",
     "message": "Cache invalidation triggered",
     "level": "info",
     "log": "level=info msg=\"Cache invalidation triggered\"",
@@ -110,6 +116,7 @@
   {
     "kubernetes_container_name": "database",
     "kubernetes_pod_name": "db-pod-1",
+    "kubernetes_labels_app": "db-service",
     "message": "Slow query detected",
     "level": "error",
     "log": "level=error msg=\"Slow query detected\"",
@@ -128,6 +135,7 @@
   {
     "kubernetes_container_name": "api-server",
     "kubernetes_pod_name": "api-pod-1",
+    "kubernetes_labels_app": "api-service",
     "message": "Rate limiting applied",
     "level": "warn",
     "log": "level=warn msg=\"Rate limiting applied\"",
@@ -146,6 +154,7 @@
   {
     "kubernetes_container_name": "api-server",
     "kubernetes_pod_name": "api-pod-3",
+    "kubernetes_labels_app": "api-service",
     "message": "Request timeout: Database connection timeout after 30s",
     "level": "error",
     "log": "level=error msg=\"Request timeout: Database connection timeout after 30s\"",

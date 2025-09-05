@@ -54,7 +54,7 @@ pub struct Session {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchRequest)]
 pub struct Request {
-    #[schema(value_type = SearchQuery)]
+    #[schema(value_type = Object)]
     pub query: Query,
     #[serde(default)]
     pub encoding: RequestEncoding,
@@ -527,8 +527,6 @@ pub struct SearchPartitionRequest {
     pub streaming_output: bool,
     #[serde(default)]
     pub histogram_interval: i64,
-    #[serde(default)]
-    pub search_type: Option<SearchEventType>,
 }
 
 impl SearchPartitionRequest {
@@ -562,7 +560,6 @@ impl From<&Request> for SearchPartitionRequest {
             query_fn: req.query.query_fn.clone(),
             streaming_output: req.query.streaming_output,
             histogram_interval: req.query.histogram_interval,
-            search_type: req.search_type,
         }
     }
 }
@@ -1497,7 +1494,6 @@ mod tests {
             query_fn: Some("fn1".to_string()),
             streaming_output: false,
             histogram_interval: 0,
-            search_type: Some(SearchEventType::UI),
         };
 
         req.decode().unwrap();
@@ -2447,7 +2443,7 @@ impl StreamResponses {
                         streaming_id: streaming_id.clone(),
                     };
                     let metadata_data = serde_json::to_string(&metadata).unwrap_or_else(|_| {
-                        log::error!("Failed to serialize metadata: {:?}", metadata);
+                        log::error!("Failed to serialize metadata: {metadata:?}");
                         String::new()
                     });
                     let metadata_bytes = format_event("search_response_metadata", &metadata_data);
@@ -2457,7 +2453,7 @@ impl StreamResponses {
                         hits: results.hits.clone(),
                     };
                     let hits_data = serde_json::to_string(&hits).unwrap_or_else(|_| {
-                        log::error!("Failed to serialize hits: {:?}", hits);
+                        log::error!("Failed to serialize hits: {hits:?}");
                         String::new()
                     });
                     let hits_bytes = format_event("search_response_hits", &hits_data);

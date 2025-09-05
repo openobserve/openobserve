@@ -24,7 +24,7 @@ use std::{
 use async_recursion::async_recursion;
 use bytes::Bytes;
 use config::{
-    RwAHashMap, get_config, metrics,
+    RwAHashMap, get_config, metrics, spawn_pausable_job,
     utils::{
         file::*,
         hash::{Sum64, gxhash},
@@ -269,6 +269,7 @@ impl FileData {
     }
 
     async fn gc(&mut self, need_release_size: usize) -> Result<(), anyhow::Error> {
+        let start = std::time::Instant::now();
         log::info!(
             "[CacheType:{}] File disk cache start gc {}/{}, need to release {} bytes",
             self.file_type,
@@ -350,9 +351,10 @@ impl FileData {
             drop(r);
         }
         log::info!(
-            "[CacheType:{}] File disk cache gc done, released {} bytes",
+            "[CacheType:{}] File disk cache gc done, released {} bytes, took={}",
             self.file_type,
-            release_size
+            release_size,
+            start.elapsed().as_millis()
         );
 
         Ok(())
@@ -433,9 +435,7 @@ impl FileData {
 pub async fn init() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     // clean the tmp dir
-    if let Err(e) = std::fs::remove_dir_all(&cfg.common.data_tmp_dir) {
-        log::warn!("clean tmp dir error: {}", e);
-    }
+    _ = std::fs::remove_dir_all(&cfg.common.data_tmp_dir);
     std::fs::create_dir_all(&cfg.common.data_tmp_dir).expect("create tmp dir success");
 
     for file in FILES.iter() {
@@ -465,15 +465,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         LOADING_FROM_DISK_DONE.store(true, Ordering::SeqCst);
     });
 
-    tokio::task::spawn(async move {
-        if cfg.disk_cache.gc_interval == 0 {
-            return;
-        }
-        loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(cfg.disk_cache.gc_interval)).await;
-            if let Err(e) = gc().await {
-                log::error!("disk cache gc error: {e}");
-            }
+    spawn_pausable_job!("disk_cache_gc", get_config().disk_cache.gc_interval, {
+        if let Err(e) = gc().await {
+            log::error!("disk cache gc error: {e}");
         }
     });
     Ok(())

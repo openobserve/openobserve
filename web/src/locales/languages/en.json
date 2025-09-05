@@ -171,7 +171,8 @@
     "moreActions": "More Actions",
     "downloadCSV": "CSV",
     "downloadJSON": "JSON",
-    "fileType": "File Type"
+    "fileType": "File Type",
+    "showOnlyInterestingFields": "Interesting Fields"
   },
   "menu": {
     "home": "Home",
@@ -315,6 +316,24 @@
     "groups": "Groups",
     "customRole": "Custom Roles",
     "description": "Description"
+  },
+  "invitation": {
+    "pendingInvitations": "Pending Invitations",
+    "organizationName": "Organization Name",
+    "role": "Role",
+    "invitedBy": "Invited By",
+    "expiry": "Expiry",
+    "actions": "Actions",
+    "accept": "Accept",
+    "reject": "Reject",
+    "cancel": "Cancel",
+    "confirmAcceptHead": "Accept Invitation",
+    "confirmAcceptMsg": "Are you sure you want to join {org}?",
+    "confirmRejectHead": "Reject Invitation",
+    "confirmRejectMsg": "Are you sure you want to reject the invitation to join {org}?",
+    "expired": "Expired",
+    "expiresToday": "Expires Today",
+    "daysLeft": "{days} days left"
   },
   "serviceAccounts": {
     "header": "Service Accounts",
@@ -579,6 +598,7 @@
     "otherLabel": "Other",
     "sqlserver": "SQL Server",
     "postgres": "Postgres",
+    "oracle": "Oracle",
     "mongodb": "MongoDB",
     "redis": "Redis",
     "couchdb": "CouchDB",
@@ -629,19 +649,6 @@
     "apache": "Apache",
     "iis": "IIS",
     "pubsub": "Pub/Sub Logs"
-  },
-  "syslog": {
-    "stream": "Stream",
-    "organization": "Organization",
-    "subnets": "Subnets",
-    "deleteRoute": "Delete Route",
-    "syslog_addroute": "Add Route",
-    "save": "Save",
-    "cancel": "Cancel",
-    "delete": "Delete",
-    "edit": "Edit",
-    "on": "Turn On",
-    "off": "Turn Off"
   },
   "dashboard": {
     "selectField": "Field",
@@ -1139,7 +1146,7 @@
     "cipherKeys": "Cipher Keys",
     "nodes": "Nodes",
     "enableStreamingSearch": "Enable Streaming Search",
-    "enableAggregationCache": "Enable Aggregation Cache",
+    "enableStreamingAggregation": "Enable Streaming Aggregation",
     "organizationManagement": "Organization Management",
     "extendTrial": "Extend Trial",
     "searchOrgs": "Search Orgs",

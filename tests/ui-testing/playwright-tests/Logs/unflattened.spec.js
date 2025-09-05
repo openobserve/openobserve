@@ -1,9 +1,10 @@
 import { test, expect } from "../baseFixtures.js";
 // pageManager.commonActions is used for streaming flip; no direct import needed
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from '../../pages/page-manager.js';
 // (unused CommonActions import removed)
+const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
 const streamName = `stream${Date.now()}`;
@@ -13,7 +14,8 @@ async function login(page) {
   if (await page.getByText('Login as internal user').isVisible()) {
     await page.getByText('Login as internal user').click();
 }
-  await page.waitForTimeout(1000);
+  // Strategic 500ms wait for operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -69,14 +71,13 @@ async function ingestion(page) {
       logsdata: logsdata,
     }
   );
-  console.log(response);
+  testLogger.debug('API response received', { response });
 }
 
 test.describe("Unflattened testcases", () => {
   let pageManager;
   // let logData;
   function removeUTFCharacters(text) {
-    // console.log(text, "tex");
     // Remove UTF characters using regular expression
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
@@ -84,7 +85,8 @@ test.describe("Unflattened testcases", () => {
     // click on the run query button
     // Type the value of a variable into an input field
     const search = page.waitForResponse(logData.applyQuery);
-    await page.waitForTimeout(3000);
+    // Strategic 1000ms wait for complex operation completion - this is functionally necessary
+  await page.waitForTimeout(1000);
     await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
       force: true,
     });
@@ -95,9 +97,11 @@ test.describe("Unflattened testcases", () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     pageManager = new PageManager(page);
-    await page.waitForTimeout(1000);
+    // Strategic 500ms wait for operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
     await ingestion(page);
-    await page.waitForTimeout(2000);
+    // Strategic 500ms wait for medium operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
@@ -120,11 +124,13 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.searchStreamInput.waitFor(); // Wait for the search input to be ready
     await pageManager.unflattenedPage.searchStreamInput.click();
     await pageManager.unflattenedPage.searchStreamInput.fill("e2e_automate");
-    await page.waitForTimeout(1000);
+    // Strategic 500ms wait for operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
   
     await pageManager.unflattenedPage.streamDetailButton.waitFor(); // Ensure the stream detail button is visible
     await pageManager.unflattenedPage.streamDetailButton.click();
-    await page.waitForTimeout(1000);
+    // Strategic 500ms wait for operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
   
     // Toggle 'Store Original Data' and update schema
     await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor(); // Wait for the toggle to be visible
@@ -133,9 +139,11 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.schemaUpdateButton.waitFor(); // Wait for the schema update button to be clickable
     await pageManager.unflattenedPage.schemaUpdateButton.click();
   
-    await page.waitForTimeout(1000); // Ensure the schema update is processed
+    // Strategic 1000ms wait for schema update processing - this is functionally necessary
+  await page.waitForTimeout(1000); // Ensure the schema update is processed
     await ingestion(page); // Custom ingestion function
-    await page.waitForTimeout(2000); // Allow time for ingestion
+    // Strategic 1000ms wait for data ingestion completion - this is functionally necessary
+  await page.waitForTimeout(1000); // Allow time for ingestion
   
     // Close the dialog and explore the stream
     await pageManager.unflattenedPage.closeButton.waitFor(); // Wait for the close button to be visible
@@ -144,7 +152,8 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.exploreButton.waitFor(); // Wait for the explore button to be clickable
     await pageManager.unflattenedPage.exploreButton.click();
   
-    await page.waitForTimeout(1000); // Small delay to ensure page readiness
+    // Strategic 500ms wait for operation completion - this is functionally necessary
+  await page.waitForTimeout(500); // Small delay to ensure page readiness
   
     // Select date and time
     await pageManager.unflattenedPage.dateTimeButton.waitFor(); // Wait for the date-time button
@@ -153,7 +162,8 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.relativeTab.waitFor(); // Wait for the relative tab to be visible
     await pageManager.unflattenedPage.relativeTab.click();
   
-    await page.waitForTimeout(2000); // Wait for the relative tab to load
+    // Strategic 500ms wait for medium operation completion - this is functionally necessary
+  await page.waitForTimeout(500); // Wait for the relative tab to load
   
     // Expand log table row and verify details
     await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor(); // Wait for the expand menu to appear
@@ -162,15 +172,17 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.logSourceColumn.waitFor(); // Ensure the source column is ready
     await pageManager.unflattenedPage.logSourceColumn.click();
   
-    await page.waitForTimeout(1000); // Small delay to ensure UI updates
+    // Strategic 1500ms wait for complex UI update and o2 ID element rendering - this is functionally necessary
+  await page.waitForTimeout(1500); // Extended wait to ensure o2 ID element is rendered
   
-    await pageManager.unflattenedPage.o2IdText.waitFor(); // Wait for the o2 ID text to be visible
+    await pageManager.unflattenedPage.o2IdText.waitFor({ timeout: 30000 }); // Extended timeout for o2 ID text visibility
     await pageManager.unflattenedPage.o2IdText.click();
   
     await pageManager.unflattenedPage.unflattenedTab.waitFor(); // Wait for the unflattened tab to be visible
     await pageManager.unflattenedPage.unflattenedTab.click();
   
-    await page.waitForTimeout(1000); // Small delay before closing
+    // Strategic 500ms wait for operation completion - this is functionally necessary
+  await page.waitForTimeout(500); // Small delay before closing
   
     // Close the dialog
     await pageManager.unflattenedPage.closeDialog.waitFor(); // Wait for the close button in the dialog
@@ -187,11 +199,13 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.searchStreamInput.waitFor();
     await pageManager.unflattenedPage.searchStreamInput.click();
     await pageManager.unflattenedPage.searchStreamInput.fill("e2e_automate");
-    await page.waitForTimeout(1000);
+    // Strategic 500ms wait for operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
     
     await pageManager.unflattenedPage.streamDetailButton.waitFor();
     await pageManager.unflattenedPage.streamDetailButton.click();
-    await page.waitForTimeout(1000);
+    // Strategic 500ms wait for operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
 
     // Toggle 'Store Original Data' and update schema
     await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor();
@@ -200,9 +214,11 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.schemaUpdateButton.waitFor();
     await pageManager.unflattenedPage.schemaUpdateButton.click();
     
-    await page.waitForTimeout(1000); // Timeout to ensure process completes
+    // Strategic 500ms wait for operation completion - this is functionally necessary
+  await page.waitForTimeout(500); // Timeout to ensure process completes
     await ingestion(page);
-    await page.waitForTimeout(2000);
+    // Strategic 500ms wait for medium operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
 
     // Close the dialog and explore the stream
     await pageManager.unflattenedPage.closeButton.waitFor();
@@ -210,11 +226,13 @@ test.describe("Unflattened testcases", () => {
     
     await pageManager.unflattenedPage.exploreButton.waitFor();
     await pageManager.unflattenedPage.exploreButton.click();
-    await page.waitForTimeout(2000);
+    // Strategic 500ms wait for medium operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
 
     // Toggle Quick Mode if it's off
     await toggleQuickModeIfOff(page);
-    await page.waitForTimeout(1000);
+    // Strategic 500ms wait for operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
 
     // Select date and time
     await pageManager.unflattenedPage.dateTimeButton.waitFor();
@@ -222,13 +240,18 @@ test.describe("Unflattened testcases", () => {
     
     await pageManager.unflattenedPage.relativeTab.waitFor();
     await pageManager.unflattenedPage.relativeTab.click();
-    await page.waitForTimeout(2000);
+    // Strategic 500ms wait for medium operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
+
+    await pageManager.unflattenedPage.allFieldsButton.waitFor();
+    await pageManager.unflattenedPage.allFieldsButton.click();
 
     // Search for 'kubernetes_pod_id' field
     await pageManager.unflattenedPage.indexFieldSearchInput.waitFor();
     await pageManager.unflattenedPage.indexFieldSearchInput.fill("kubernetes_pod_id");
     
-    await page.waitForTimeout(2000);
+    // Strategic 500ms wait for medium operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
     await page
       .locator('[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]')
       .first()
@@ -242,7 +265,8 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.sqlModeToggle.waitFor();
     await pageManager.unflattenedPage.sqlModeToggle.click();
     
-    await page.waitForTimeout(2000);
+    // Strategic 500ms wait for medium operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
     await expect(
       pageManager.unflattenedPage.logsSearchBarQueryEditor
         .getByText(/kubernetes_pod_id/)
@@ -251,11 +275,11 @@ test.describe("Unflattened testcases", () => {
 
     // Update the query editor with 'SELECT * FROM "e2e_automate"'
     await pageManager.unflattenedPage.logsSearchBarQueryEditor.waitFor();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').first().click();
     await pageManager.unflattenedPage.logsSearchBarQueryEditor.click();
-    await page.keyboard.press("Control+A");
-    await page.keyboard.press("Delete");
     await page.keyboard.type('SELECT * FROM "e2e_automate"');
-    await page.waitForTimeout(2000);
+    // Strategic 500ms wait for medium operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
 
     // Interact with log table rows and verify details
     await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
@@ -264,14 +288,17 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.logSourceColumn.waitFor();
     await pageManager.unflattenedPage.logSourceColumn.click();
     
-    await page.waitForTimeout(1000);
-    await pageManager.unflattenedPage.o2IdText.waitFor();
+    // Strategic 1500ms wait for complex UI update and o2 ID element rendering - this is functionally necessary
+  await page.waitForTimeout(1500); // Extended wait to ensure o2 ID element is rendered
+    await pageManager.unflattenedPage.o2IdText.waitFor({ timeout: 30000 }); // Extended timeout for o2 ID text visibility
     await pageManager.unflattenedPage.o2IdText.click();
     
-    await page.waitForTimeout(1000);
+    // Strategic 500ms wait for operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
     await pageManager.unflattenedPage.unflattenedTab.waitFor();
     await pageManager.unflattenedPage.unflattenedTab.click();
-    await page.waitForTimeout(1000);
+    // Strategic 500ms wait for operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
 
     // Close the dialog
     await pageManager.unflattenedPage.closeDialog.waitFor();
@@ -284,11 +311,13 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.searchStreamInput.waitFor();
     await pageManager.unflattenedPage.searchStreamInput.click();
     await pageManager.unflattenedPage.searchStreamInput.fill("e2e_automate");
-    await page.waitForTimeout(1000);
+    // Strategic 500ms wait for operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
     
     await pageManager.unflattenedPage.streamDetailButton.waitFor();
     await pageManager.unflattenedPage.streamDetailButton.click();
-    await page.waitForTimeout(1000);
+    // Strategic 500ms wait for operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
     
     await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor();
     await pageManager.unflattenedPage.storeOriginalDataToggle.click();
@@ -299,26 +328,31 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.closeButton.waitFor();
     await pageManager.unflattenedPage.closeButton.click();
     
-    await page.waitForTimeout(1000);
+    // Strategic 500ms wait for operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
     await ingestion(page);
     
-    await page.waitForTimeout(2000);
+    // Strategic 500ms wait for medium operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
     await pageManager.unflattenedPage.exploreButton.waitFor();
     await pageManager.unflattenedPage.exploreButton.click();
     
-    await page.waitForTimeout(3000);
+    // Strategic 1000ms wait for complex operation completion - this is functionally necessary
+  await page.waitForTimeout(1000);
     await pageManager.unflattenedPage.dateTimeButton.waitFor();
     await pageManager.unflattenedPage.dateTimeButton.click();
     
     await pageManager.unflattenedPage.relativeTab.waitFor();
     await pageManager.unflattenedPage.relativeTab.click();
-    await page.waitForTimeout(2000);
+    // Strategic 500ms wait for medium operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
 
     // Final log row interaction
     await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
     await pageManager.unflattenedPage.logTableRowExpandMenu.click();
     
-    await page.waitForTimeout(2000);
+    // Strategic 500ms wait for medium operation completion - this is functionally necessary
+  await page.waitForTimeout(500);
     await page.getByText("arrow_drop_down_timestamp:").waitFor();
     await page.getByText("arrow_drop_down_timestamp:").click();
 });

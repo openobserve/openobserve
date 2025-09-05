@@ -18,7 +18,11 @@ use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{search::Response, sql::OrderBy, stream::StreamType},
-    utils::{file::scan_files, json, time::now_micros},
+    utils::{
+        file::scan_files,
+        json,
+        time::{now_micros, second_micros},
+    },
 };
 use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
@@ -409,7 +413,7 @@ pub async fn get_cached_results(
                 let mut matching_cache_meta = matching_meta.clone();
                 // calculate delta time range to fetch the delta data using search query
                 let cfg = get_config();
-                let discard_duration = cfg.common.result_cache_discard_duration * 1000 * 1000;
+                let discard_duration = second_micros(cfg.limit.cache_delay_secs);
 
                 let cache_duration = matching_cache_meta.end_time - matching_cache_meta.start_time;
                 // return None if cache duration is less than 2 * discard_duration
@@ -964,9 +968,8 @@ mod tests {
             org_id: "test_org".to_string(),
             stream_type: StreamType::Logs,
             stream_names: vec![TableReference::from("logs")],
-            match_items: None,
+            has_match_all: false,
             equal_items: hashbrown::HashMap::new(),
-            prefix_items: hashbrown::HashMap::new(),
             columns: {
                 let mut cols = hashbrown::HashMap::new();
                 let mut set = hashbrown::HashSet::new();
@@ -991,7 +994,6 @@ mod tests {
             order_by: vec![("_timestamp".to_string(), OrderBy::Desc)],
             histogram_interval: None,
             sorted_by_time: true,
-            use_inverted_index: false,
             index_condition: None,
             index_optimize_mode: None,
         };

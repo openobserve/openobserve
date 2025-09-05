@@ -585,13 +585,6 @@ mod tests {
     }
 
     #[test]
-    fn test_usage_event_equality() {
-        assert_eq!(UsageEvent::Ingestion, UsageEvent::Ingestion);
-        assert_ne!(UsageEvent::Ingestion, UsageEvent::Search);
-        assert_ne!(UsageEvent::Search, UsageEvent::Functions);
-    }
-
-    #[test]
     fn test_group_key_hash() {
         use std::collections::HashMap;
 

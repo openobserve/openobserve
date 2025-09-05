@@ -16,6 +16,7 @@
 use std::{fmt::Debug, str::FromStr, sync::Arc};
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{
     get_config, get_instance_id, meta::search::SearchEventType, utils::sysinfo::NodeMetrics,
@@ -38,7 +39,7 @@ pub trait NodeInfo: Debug + Send + Sync {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Node {
     pub id: i32,
     pub uuid: String,
@@ -80,7 +81,8 @@ impl Node {
     }
 
     pub fn is_same(&self, other: &Node) -> bool {
-        self.uuid == other.uuid
+        self.id == other.id
+            && self.uuid == other.uuid
             && self.name == other.name
             && self.http_addr == other.http_addr
             && self.grpc_addr == other.grpc_addr
@@ -172,15 +174,15 @@ impl IntoArcVec for Vec<Node> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum NodeStatus {
     Prepare = 1,
     Online = 2,
     Offline = 3,
 }
 
-impl From<u32> for NodeStatus {
-    fn from(value: u32) -> Self {
+impl From<i32> for NodeStatus {
+    fn from(value: i32) -> Self {
         match value {
             1 => NodeStatus::Prepare,
             2 => NodeStatus::Online,
@@ -190,7 +192,7 @@ impl From<u32> for NodeStatus {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum Role {
     All,
     Ingester,
@@ -239,7 +241,7 @@ impl std::fmt::Display for Role {
 /// None        -> All tasks
 /// Background  -> Low-priority tasks
 /// Interactive -> High-priority tasks
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Default, ToSchema)]
 pub enum RoleGroup {
     #[default]
     None,

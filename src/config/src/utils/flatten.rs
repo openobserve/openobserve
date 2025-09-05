@@ -175,6 +175,12 @@ pub fn format_key(key: &mut String) {
     }
 }
 
+pub fn format_label_name(label_name: &str) -> String {
+    let mut key = label_name.to_string();
+    format_key(&mut key);
+    key
+}
+
 fn check_key(key: &str) -> bool {
     key.chars()
         .all(|c| c.is_lowercase() || c.is_numeric() || c == '_')

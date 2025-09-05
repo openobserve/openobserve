@@ -69,13 +69,13 @@ message SearchInfo {
     int64                         timeout = 6;
     bool                        use_cache = 7;
     int64              histogram_interval = 8;
+    bool                       is_analyze = 9;
 }
 
 message IndexInfo {
     bool                   use_inverted_index = 1;
     string                    index_condition = 2;
     repeated KvItem                equal_keys = 3;
-    repeated string            match_all_keys = 4;
     IdxOptimizeMode       index_optimize_mode = 5;
 }
 

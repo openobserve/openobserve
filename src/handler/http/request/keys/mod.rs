@@ -35,8 +35,13 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 #[utoipa::path(
     post,
     context_path = "/api",
+    operation_id = "CreateCipherKey",
+    summary = "Create encryption key",
+    description = "Creates a new encryption key for data encryption and decryption operations. The key is securely stored \
+                   and validated before being made available for use. Key names cannot contain ':' characters. Only \
+                   available in enterprise deployments for enhanced data security and compliance requirements.",
     request_body(
-        content = KeyAddRequest,
+        content = Object,
         description = "Key data to add",
         content_type = "application/json",
     ),
@@ -127,6 +132,12 @@ pub async fn save(
 #[utoipa::path(
     get,
     context_path = "/api",
+    operation_id = "GetCipherKey",
+    summary = "Get encryption key details",
+    description = "Retrieves the configuration and metadata for a specific encryption key by name. Returns key \
+                   information without exposing sensitive key material. Used for managing and auditing encryption \
+                   keys within the organization. Only available in enterprise deployments for enhanced security \
+                   management.",
     params(
         ("key_name" = String, Path, description = "Name of the key to retrieve", example = "test_key")
     ),
@@ -134,7 +145,7 @@ pub async fn save(
         (
             status = 200,
             description = "Key info",
-            body = KeyGetResponse,
+            body = Object,
             content_type = "application/json",
         ),
         (status = 404, description = "Key not found", content_type = "text/plain")
@@ -183,11 +194,17 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
 #[utoipa::path(
     get,
     context_path = "/api",
+    operation_id = "ListCipherKeys",
+    summary = "List encryption keys",
+    description = "Retrieves a list of all encryption keys available within the organization. Returns key names and \
+                   metadata without exposing sensitive key material. Helps administrators manage encryption keys, \
+                   audit key usage, and ensure proper key lifecycle management. Only available in enterprise \
+                   deployments for enhanced security and compliance.",
     responses(
         (
             status = 200,
             description = "list all keys in the org",
-            body = KeyListResponse,
+            body = Object,
             content_type = "application/json",
         ),
     ),
@@ -234,6 +251,12 @@ pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
 #[utoipa::path(
     delete,
     context_path = "/api",
+    operation_id = "DeleteCipherKey",
+    summary = "Delete encryption key",
+    description = "Permanently removes an encryption key from the organization. This action cannot be undone and will \
+                   prevent any future data decryption operations that depend on this key. Ensure all data encrypted \
+                   with this key is either migrated or no longer needed before deletion. Only available in enterprise \
+                   deployments for enhanced security management.",
     params(
         ("key_name" = String, Path, description = "name of the key to delete", example = "test_key")
     ),
@@ -280,11 +303,17 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 #[utoipa::path(
     post,
     context_path = "/api",
+    operation_id = "UpdateCipherKey",
+    summary = "Update encryption key",
+    description = "Updates the configuration and parameters of an existing encryption key. The key is validated after \
+                   updates to ensure it remains functional for encryption and decryption operations. Changes are \
+                   applied atomically to maintain data security and consistency. Only available in enterprise \
+                   deployments for enhanced security management.",
     params(
         ("key_name" = String, Path, description = "name of the key to update", example = "test_key")
     ),
     request_body(
-        content = KeyAddRequest,
+        content = Object,
         description = "updated key data",
         content_type = "application/json",
     ),

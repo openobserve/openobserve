@@ -329,7 +329,13 @@ async fn request(
     let url = format!("{}{}", local.http_addr, url);
     let user = cfg.auth.root_user_email.clone();
     let password = cfg.auth.root_user_password.clone();
-    let mut req = client.request(method, url).basic_auth(user, Some(password));
+    let cookie = cfg.auth.cli_user_cookie.clone();
+    let mut req = client.request(method, url);
+    if cookie.is_empty() {
+        req = req.basic_auth(user, Some(password));
+    } else {
+        req = req.header("Cookie", cookie);
+    }
     if let Some(body) = body {
         req = req.header("Content-Type", "application/json");
         req = req.body(body);
@@ -426,7 +432,7 @@ mod tests {
         table.add_row(Row::new(vec![Cell::new("Data1"), Cell::new("Data2")]));
 
         // Verify table can be created without panicking
-        let table_string = format!("{}", table);
+        let table_string = format!("{table}");
         assert!(table_string.contains("Header1"));
         assert!(table_string.contains("Data1"));
     }
@@ -499,7 +505,7 @@ mod tests {
         ];
 
         for method in methods {
-            assert!(format!("{}", method).len() > 0);
+            assert!(!format!("{method}").is_empty());
         }
     }
 
@@ -522,7 +528,7 @@ mod tests {
                 match key.as_str() {
                     "field1" => assert_eq!(string_val, "\"value1\""),
                     "field2" => assert_eq!(string_val, "42"),
-                    _ => panic!("Unexpected key: {}", key),
+                    _ => panic!("Unexpected key: {key}"),
                 }
             }
         }

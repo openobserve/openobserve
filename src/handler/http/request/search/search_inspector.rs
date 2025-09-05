@@ -48,12 +48,16 @@ use crate::{
 };
 
 /// GetSearchProfile
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
     operation_id = "GetSearchProfile",
+    summary = "Get search performance profile",
+    description = "Retrieves detailed performance profiling information for search queries executed within a specified time \
+                   range. This includes execution timing, node information, component performance metrics, and resource \
+                   usage statistics. Use this to analyze and optimize search performance, troubleshoot slow queries, and \
+                   understand query execution patterns across your cluster.",
     security(
         ("Authorization"= [])
     ),
@@ -64,7 +68,7 @@ use crate::{
         ("end_time" = i64, Query, description = "end time"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
           "sql": "SELECT count(*) FROM \"default\" WHERE match_all('m')",
           "start_time": "1744168877746000",
           "end_time": "1744773677746000",
@@ -83,8 +87,11 @@ use crate::{
               "component": "wal:memtable load",
               "desc": "wal mem search load groups 1, files 6, scan_size 16.01 MB, compressed_size 16.85 MB"
             }]})),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/search/profile")]
@@ -272,6 +279,7 @@ pub async fn get_search_profile(
         range_error,
         false,
         None,
+        false,
     )
     .instrument(http_span)
     .await;

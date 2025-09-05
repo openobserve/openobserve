@@ -44,9 +44,10 @@ use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::http::{
-            get_fallback_order_by_col_from_request, get_is_ui_histogram_from_request,
-            get_or_create_trace_id, get_search_event_context_from_request,
-            get_search_type_from_request, get_stream_type_from_request, get_use_cache_from_request,
+            get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
+            get_is_ui_histogram_from_request, get_or_create_trace_id,
+            get_search_event_context_from_request, get_search_type_from_request,
+            get_stream_type_from_request, get_use_cache_from_request,
         },
     },
     handler::http::request::search::{
@@ -55,18 +56,20 @@ use crate::{
     service::{search::streaming::process_search_stream_request, setup_tracing_with_trace_id},
 };
 /// Search HTTP2 streaming endpoint
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchStreamHttp2",
+    summary = "Stream search results",
+    description = "Executes a search query and streams the results back in real-time using HTTP/2 server-sent events. This is ideal for large result sets or long-running queries where you want to receive data as it becomes available rather than waiting for the complete response. Results are streamed as JSON objects separated by newlines.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
+        ("is_multi_stream_search" = bool, Query, description = "Indicate is search is for multi stream"),
     ),
     request_body(content = String, description = "Search query", content_type = "application/json", example = json!({
         "sql": "select * from logs LIMIT 10",
@@ -75,7 +78,10 @@ use crate::{
     })),
     responses(
         (status = 200, description = "Success", content_type = "text/event-stream"),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[post("/{org_id}/_search_stream")]
@@ -129,6 +135,7 @@ pub async fn search_http2_stream(
     };
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let is_ui_histogram = get_is_ui_histogram_from_request(&query);
+    let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
 
     // Parse the search request
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
@@ -210,11 +217,7 @@ pub async fn search_http2_stream(
     let mut sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
         Ok(sql) => sql,
         Err(e) => {
-            log::error!(
-                "[trace_id: {}] Error getting histogram interval: {:?}",
-                trace_id,
-                e
-            );
+            log::error!("[trace_id: {trace_id}] Error getting histogram interval: {e:?}");
 
             #[cfg(feature = "enterprise")]
             let error_message = e.to_string();
@@ -255,6 +258,7 @@ pub async fn search_http2_stream(
         match crate::service::search::sql::histogram::convert_to_histogram_query(
             &req.query.sql,
             &stream_names,
+            is_multi_stream_search,
         ) {
             Ok(histogram_query) => {
                 req.query.sql = histogram_query;
@@ -267,7 +271,7 @@ pub async fn search_http2_stream(
                 sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
                     Ok(v) => v,
                     Err(e) => {
-                        log::error!("[trace_id: {}] Error parsing sql: {:?}", trace_id, e);
+                        log::error!("[trace_id: {trace_id}] Error parsing sql: {e:?}");
 
                         #[cfg(feature = "enterprise")]
                         let error_message = e.to_string();
@@ -412,6 +416,7 @@ pub async fn search_http2_stream(
         None,
         fallback_order_by_col,
         audit_ctx,
+        is_multi_stream_search,
     ));
 
     // Return streaming response
@@ -501,12 +506,13 @@ pub async fn report_to_audit(
 }
 
 /// Values  HTTP2 streaming endpoint
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
     operation_id = "ValuesStreamHttp2",
+    summary = "Get field values with HTTP/2 streaming",
+    description = "Retrieves field values from logs using HTTP/2 streaming for real-time results",
     security(
         ("Authorization"= [])
     ),
@@ -520,7 +526,10 @@ pub async fn report_to_audit(
     })),
     responses(
         (status = 200, description = "Success", content_type = "text/event-stream"),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[post("/{org_id}/_values_stream")]
@@ -723,6 +732,7 @@ pub async fn values_http2_stream(
         Some(values_event_context),
         None,
         audit_ctx,
+        false,
     ));
 
     // Return streaming response

@@ -92,6 +92,7 @@ import { useQuasar } from "quasar";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const { t } = useI18n();
 const props = defineProps({
@@ -110,6 +111,8 @@ const props = defineProps({
 });
 
 const emits = defineEmits(["cancel:hideform", "added:role"]);
+
+const { track } = useReo();
 
 const name = ref(props.role?.name || "");
 
@@ -146,6 +149,10 @@ const saveRole = () => {
       });
       }
       console.log(err);
+    });
+    track("Button Click", {
+      button: "Save Role",
+      page: "Add Role"
     });
 };
 </script>

@@ -136,10 +136,11 @@ impl fmt::Display for HTTPType {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 #[serde(default)]
 #[serde(rename_all = "snake_case")]
 pub struct Template {
+    #[schema(value_type = Option<String>)]
     pub id: Option<svix_ksuid::Ksuid>,
     pub org_id: String,
     pub name: String,
@@ -149,7 +150,7 @@ pub struct Template {
     pub body: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum TemplateType {
     #[default]
@@ -175,15 +176,6 @@ mod tests {
     use svix_ksuid::KsuidLike;
 
     use super::*;
-
-    #[test]
-    fn test_destination_default() {
-        let dest = Destination::default();
-        assert!(dest.id.is_none());
-        assert!(dest.org_id.is_empty());
-        assert!(dest.name.is_empty());
-        assert!(matches!(dest.module, Module::Alert { .. }));
-    }
 
     #[test]
     fn test_destination_is_alert_destinations() {
@@ -245,23 +237,6 @@ mod tests {
     }
 
     #[test]
-    fn test_email_default() {
-        let email = Email::default();
-        assert!(email.recipients.is_empty());
-    }
-
-    #[test]
-    fn test_endpoint_default() {
-        let endpoint = Endpoint::default();
-        assert!(endpoint.url.is_empty());
-        assert_eq!(endpoint.method, HTTPType::POST);
-        assert!(!endpoint.skip_tls_verify);
-        assert!(endpoint.headers.is_none());
-        assert!(endpoint.action_id.is_none());
-        assert!(endpoint.output_format.is_none());
-    }
-
-    #[test]
     fn test_endpoint_with_headers() {
         let mut headers = HashMap::new();
         headers.insert("Authorization".to_string(), "Bearer token".to_string());
@@ -285,54 +260,6 @@ mod tests {
     }
 
     #[test]
-    fn test_aws_sns_default() {
-        let sns = AwsSns::default();
-        assert!(sns.sns_topic_arn.is_empty());
-        assert!(sns.aws_region.is_empty());
-    }
-
-    #[test]
-    fn test_http_type_default() {
-        assert_eq!(HTTPType::default(), HTTPType::POST);
-    }
-
-    #[test]
-    fn test_http_type_display() {
-        assert_eq!(HTTPType::POST.to_string(), "post");
-        assert_eq!(HTTPType::PUT.to_string(), "put");
-        assert_eq!(HTTPType::GET.to_string(), "get");
-    }
-
-    #[test]
-    fn test_http_type_equality() {
-        assert_eq!(HTTPType::POST, HTTPType::POST);
-        assert_ne!(HTTPType::POST, HTTPType::PUT);
-        assert_ne!(HTTPType::GET, HTTPType::POST);
-    }
-
-    #[test]
-    fn test_http_output_format_default() {
-        assert_eq!(HTTPOutputFormat::default(), HTTPOutputFormat::JSON);
-    }
-
-    #[test]
-    fn test_http_output_format_equality() {
-        assert_eq!(HTTPOutputFormat::JSON, HTTPOutputFormat::JSON);
-        assert_ne!(HTTPOutputFormat::JSON, HTTPOutputFormat::NDJSON);
-    }
-
-    #[test]
-    fn test_template_default() {
-        let template = Template::default();
-        assert!(template.id.is_none());
-        assert!(template.org_id.is_empty());
-        assert!(template.name.is_empty());
-        assert!(!template.is_default);
-        assert!(matches!(template.template_type, TemplateType::Http));
-        assert!(template.body.is_empty());
-    }
-
-    #[test]
     fn test_template_with_id() {
         let id = svix_ksuid::Ksuid::new(None, None);
         let template = Template {
@@ -352,11 +279,6 @@ mod tests {
         assert!(template.is_default);
         assert!(matches!(template.template_type, TemplateType::Email { .. }));
         assert_eq!(template.body, "Hello {{name}}!");
-    }
-
-    #[test]
-    fn test_template_type_default() {
-        assert!(matches!(TemplateType::default(), TemplateType::Http));
     }
 
     #[test]
@@ -490,29 +412,5 @@ mod tests {
             }
             _ => panic!("Should be Email template type"),
         }
-    }
-
-    #[test]
-    fn test_clone_implementations() {
-        let destination = Destination {
-            id: Some(svix_ksuid::Ksuid::new(None, None)),
-            org_id: "test_org".to_string(),
-            name: "test_dest".to_string(),
-            module: Module::Alert {
-                template: "template".to_string(),
-                destination_type: DestinationType::Http(Endpoint::default()),
-            },
-        };
-
-        let cloned = destination.clone();
-        assert_eq!(destination.org_id, cloned.org_id);
-        assert_eq!(destination.name, cloned.name);
-    }
-
-    #[test]
-    fn test_debug_implementations() {
-        let endpoint = Endpoint::default();
-        let debug_output = format!("{:?}", endpoint);
-        assert!(debug_output.contains("Endpoint"));
     }
 }

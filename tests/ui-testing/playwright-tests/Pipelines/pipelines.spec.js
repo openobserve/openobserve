@@ -1,8 +1,9 @@
 import { test, expect } from "../baseFixtures.js";
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 // import { log } from "console";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
+const testLogger = require('../utils/test-logger.js');
 
 
 test.describe.configure({ mode: "parallel" });
@@ -53,7 +54,7 @@ async function ingestion(page) {
     streamName: streamName,
     logsdata: logsdata
   });
-  console.log(response);
+  testLogger.debug('API response received', { response });
 }
 }
 
@@ -69,6 +70,8 @@ async function exploreStreamAndNavigateToPipeline(page, streamName) {
   // Search for the stream
   await page.getByPlaceholder('Search Stream').click();
   await page.getByPlaceholder('Search Stream').fill(streamName);
+
+  await page.waitForTimeout(1000);
   
   // Click on the 'Explore' button
   await page.getByRole('button', { name: 'Explore' }).first().click();
@@ -104,7 +107,8 @@ async function exploreStreamAndInteractWithLogDetails(page, streamName) {
   await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
   
   // Interact with the log detail key
-  await page.locator('[data-test="log-expand-detail-key-a-text"]').click();
+  // Commenting this, as a needs to be made interesting field in order to be in results. 
+  // await page.locator('[data-test="log-expand-detail-key-a-text"]').click();
   
   // Navigate to the pipeline menu
   await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
@@ -135,7 +139,6 @@ test.describe("Pipeline testcases", () => {
   let pageManager;
   // let logData;
   function removeUTFCharacters(text) {
-    // console.log(text, "tex");
     // Remove UTF characters using regular expression
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
@@ -706,7 +709,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.saveInputNodeStream();
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     page.once('dialog', async (dialog) => {
-      console.log(`Dialog message: ${dialog.message()}`);
+      testLogger.debug('Dialog message', { message: dialog.message() });
       await dialog.accept();
     });
     
@@ -740,7 +743,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.saveInputNodeStream();
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     page.once('dialog', async (dialog) => {
-      console.log(`Dialog message: ${dialog.message()}`);
+      testLogger.debug('Dialog message', { message: dialog.message() });
       await dialog.dismiss();
     });
     
@@ -752,7 +755,7 @@ test.describe("Pipeline testcases", () => {
     await expect(page).toHaveURL(/pipeline/);
 
     // Log confirmation
-    console.log('URL contains "pipeline"!')
+    testLogger.debug('URL contains pipeline')
     
   });
 

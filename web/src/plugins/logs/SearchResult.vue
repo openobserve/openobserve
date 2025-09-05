@@ -235,6 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :functionErrorMsg="searchObj?.data?.functionError"
         :expandedRows="expandedLogs"
         :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
+        :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
         :highlight-query="
           searchObj.meta.sqlMode
             ? searchObj.data.query.toLowerCase().split('where')[1]
@@ -286,6 +287,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="margin-bottom: 15px"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
           :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
+          :highlight-query="
+            searchObj.meta.sqlMode
+              ? searchObj.data.query.toLowerCase().split('where')[1]
+              : searchObj.data.query.toLowerCase()
+          "
           @showNextDetail="navigateRowDetail"
           @showPrevDetail="navigateRowDetail"
           @add:searchterm="addSearchTerm"
@@ -730,6 +736,15 @@ export default defineComponent({
         plotChart.value = {};
         searchObj.meta.resetPlotChart = false;
       }
+    });    
+    
+    const selectedStreamFullTextSearchKeys = computed(() => {
+      const defaultFTSKeys = store?.state?.zoConfig?.default_fts_keys || [];
+      const selectedStreamFTSKeys = searchObj.data.stream.selectedStreamFields.filter(
+        (field: string) => field.ftsKey
+      ).map((field: any) => field.name);
+      //merge default FTS keys with selected stream FTS keys
+      return [...new Set([...defaultFTSKeys, ...selectedStreamFTSKeys])];
     });
 
     return {
@@ -773,6 +788,12 @@ export default defineComponent({
       histogramLoader,
       sendToAiChat,
       closeTable,
+      getRowIndex,
+      getPartitionPaginations,
+      getSocketPaginations,
+      resetPlotChart,
+      columnSizes,
+      selectedStreamFullTextSearchKeys
     };
   },
   computed: {

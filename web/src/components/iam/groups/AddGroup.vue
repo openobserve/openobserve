@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="flex justify-center q-mt-lg">
             <q-btn
-              data-test="add-alert-cancel-btn"
+              data-test="add-group-cancel-btn"
               v-close-popup="true"
               class="q-mb-md text-bold"
               :label="t('alerts.cancel')"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="$emit('cancel:hideform')"
             />
             <q-btn
-              data-test="add-alert-submit-btn"
+              data-test="add-group-submit-btn"
               :label="t('alerts.save')"
               class="q-mb-md text-bold no-border q-ml-md"
               color="secondary"
@@ -94,6 +94,7 @@ import { useQuasar } from "quasar";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const { t } = useI18n();
 const props = defineProps({
@@ -116,6 +117,8 @@ const emits = defineEmits(["cancel:hideform", "added:group"]);
 const name = ref(props.group?.name || "");
 
 const q = useQuasar();
+
+const { track } = useReo();
 
 const store = useStore();
 
@@ -149,6 +152,10 @@ const saveGroup = () => {
       });
       }
       console.log(err);
+    });
+    track("Button Click", {
+      button: "Save Group",
+      page: "Add Group"
     });
 };
 </script>

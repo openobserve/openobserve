@@ -276,3 +276,259 @@ pub fn has_original_column(
     }
     has_original_column
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow_schema::{DataType, Field, Schema};
+    use config::{ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME};
+    use datafusion::common::TableReference;
+    use hashbrown::{HashMap, HashSet};
+
+    use super::*;
+
+    #[test]
+    fn test_has_original_column_with_original() {
+        let mut columns = HashMap::new();
+        let mut table_columns = HashSet::new();
+        table_columns.insert(ORIGINAL_DATA_COL_NAME.to_string());
+        table_columns.insert("other_field".to_string());
+
+        let table_ref = TableReference::bare("test_table");
+        columns.insert(table_ref.clone(), table_columns);
+
+        let result = has_original_column(&columns);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result.get(&table_ref), Some(&true));
+    }
+
+    #[test]
+    fn test_has_original_column_without_original() {
+        let mut columns = HashMap::new();
+        let mut table_columns = HashSet::new();
+        table_columns.insert("field1".to_string());
+        table_columns.insert("field2".to_string());
+
+        let table_ref = TableReference::bare("test_table");
+        columns.insert(table_ref.clone(), table_columns);
+
+        let result = has_original_column(&columns);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result.get(&table_ref), Some(&false));
+    }
+
+    #[test]
+    fn test_has_original_column_multiple_tables() {
+        let mut columns = HashMap::new();
+
+        // Table 1 - has original
+        let mut table1_columns = HashSet::new();
+        table1_columns.insert(ORIGINAL_DATA_COL_NAME.to_string());
+        table1_columns.insert("field1".to_string());
+        let table1_ref = TableReference::bare("table1");
+        columns.insert(table1_ref.clone(), table1_columns);
+
+        // Table 2 - no original
+        let mut table2_columns = HashSet::new();
+        table2_columns.insert("field2".to_string());
+        table2_columns.insert("field3".to_string());
+        let table2_ref = TableReference::bare("table2");
+        columns.insert(table2_ref.clone(), table2_columns);
+
+        let result = has_original_column(&columns);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result.get(&table1_ref), Some(&true));
+        assert_eq!(result.get(&table2_ref), Some(&false));
+    }
+
+    #[test]
+    fn test_has_original_column_empty_input() {
+        let columns = HashMap::new();
+        let result = has_original_column(&columns);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_has_original_column_empty_table_columns() {
+        let mut columns = HashMap::new();
+        let table_columns = HashSet::new();
+        let table_ref = TableReference::bare("empty_table");
+        columns.insert(table_ref.clone(), table_columns);
+
+        let result = has_original_column(&columns);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result.get(&table_ref), Some(&false));
+    }
+
+    #[test]
+    fn test_generate_quick_mode_fields_first_strategy() {
+        let fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new("field1", DataType::Utf8, true)),
+            Arc::new(Field::new("field2", DataType::Int32, true)),
+            Arc::new(Field::new("field3", DataType::Float64, true)),
+            Arc::new(Field::new("field4", DataType::Boolean, true)),
+        ];
+        let schema = Schema::new(fields);
+
+        // Mock config - default strategy is "first"
+        let result = generate_quick_mode_fields(&schema, None, &[], false, false);
+
+        // Should include timestamp and some fields (exact count depends on config)
+        assert!(!result.is_empty());
+        assert!(result.iter().any(|f| f.name() == TIMESTAMP_COL_NAME));
+    }
+
+    #[test]
+    fn test_generate_quick_mode_fields_with_columns() {
+        let fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new("field1", DataType::Utf8, true)),
+            Arc::new(Field::new("field2", DataType::Int32, true)),
+            Arc::new(Field::new("selected_field", DataType::Float64, true)),
+        ];
+        let schema = Schema::new(fields);
+
+        let mut columns = HashSet::new();
+        columns.insert("selected_field".to_string());
+
+        let result = generate_quick_mode_fields(&schema, Some(columns), &[], false, false);
+
+        // Should include timestamp and selected field
+        assert!(result.iter().any(|f| f.name() == TIMESTAMP_COL_NAME));
+        assert!(result.iter().any(|f| f.name() == "selected_field"));
+    }
+
+    #[test]
+    fn test_generate_quick_mode_fields_skip_original() {
+        let fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new(ORIGINAL_DATA_COL_NAME, DataType::Utf8, true)),
+            Arc::new(Field::new("field1", DataType::Utf8, true)),
+        ];
+        let schema = Schema::new(fields);
+
+        let result = generate_quick_mode_fields(
+            &schema,
+            None,
+            &[],
+            true, // skip_original_column = true
+            false,
+        );
+
+        // Should not include original data column
+        assert!(!result.iter().any(|f| f.name() == ORIGINAL_DATA_COL_NAME));
+        assert!(result.iter().any(|f| f.name() == TIMESTAMP_COL_NAME));
+    }
+
+    #[test]
+    fn test_generate_quick_mode_fields_with_fts_fields() {
+        let fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new("fts_field1", DataType::Utf8, true)),
+            Arc::new(Field::new("fts_field2", DataType::Utf8, true)),
+            Arc::new(Field::new("normal_field", DataType::Int32, true)),
+        ];
+        let schema = Schema::new(fields);
+
+        let fts_fields = vec!["fts_field1".to_string(), "fts_field2".to_string()];
+
+        let result = generate_quick_mode_fields(
+            &schema,
+            None,
+            &fts_fields,
+            false,
+            true, // need_fst_fields = true
+        );
+
+        // Should include FTS fields
+        assert!(result.iter().any(|f| f.name() == "fts_field1"));
+        assert!(result.iter().any(|f| f.name() == "fts_field2"));
+    }
+
+    #[test]
+    fn test_generate_schema_fields_basic() {
+        let fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new(ID_COL_NAME, DataType::Utf8, false)),
+            Arc::new(Field::new("field1", DataType::Utf8, true)),
+            Arc::new(Field::new("field2", DataType::Int32, true)),
+        ];
+        let schema_cache = SchemaCache::new(Schema::new(fields));
+
+        let mut columns = HashSet::new();
+        columns.insert("field1".to_string());
+
+        let result = generate_schema_fields(columns, &schema_cache, false);
+
+        // Should include timestamp, ID, and requested field
+        let field_names: HashSet<String> = result.iter().map(|f| f.name().to_string()).collect();
+        assert!(field_names.contains(TIMESTAMP_COL_NAME));
+        assert!(field_names.contains(ID_COL_NAME));
+        assert!(field_names.contains("field1"));
+    }
+
+    #[test]
+    fn test_generate_schema_fields_missing_timestamp_and_id() {
+        let fields = vec![
+            Arc::new(Field::new("field1", DataType::Utf8, true)),
+            Arc::new(Field::new("field2", DataType::Int32, true)),
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new(ID_COL_NAME, DataType::Utf8, false)),
+        ];
+        let schema = Schema::new(fields);
+        let schema_cache = SchemaCache::new(schema);
+
+        let mut columns = HashSet::new();
+        columns.insert("field1".to_string());
+        // Note: not including timestamp or ID in columns
+
+        let result = generate_schema_fields(columns, &schema_cache, false);
+
+        // Should automatically include timestamp and ID
+        let field_names: HashSet<String> = result.iter().map(|f| f.name().to_string()).collect();
+        assert!(field_names.contains(TIMESTAMP_COL_NAME));
+        assert!(field_names.contains(ID_COL_NAME));
+        assert!(field_names.contains("field1"));
+    }
+
+    #[test]
+    fn test_generate_schema_fields_nonexistent_field() {
+        let fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new(ID_COL_NAME, DataType::Utf8, false)),
+            Arc::new(Field::new("existing_field", DataType::Utf8, true)),
+        ];
+        let schema_cache = SchemaCache::new(Schema::new(fields));
+
+        let mut columns = HashSet::new();
+        columns.insert("existing_field".to_string());
+        columns.insert("nonexistent_field".to_string());
+
+        let result = generate_schema_fields(columns, &schema_cache, false);
+
+        // Should only include fields that exist in schema
+        let field_names: HashSet<String> = result.iter().map(|f| f.name().to_string()).collect();
+        assert!(field_names.contains("existing_field"));
+        assert!(!field_names.contains("nonexistent_field"));
+    }
+
+    // Test constants and field name validation
+
+    #[test]
+    fn test_table_reference_creation() {
+        let table_ref1 = TableReference::bare("test_table");
+        let table_ref2 = TableReference::bare("test_table");
+
+        // Test that table references with same name are equal
+        assert_eq!(table_ref1, table_ref2);
+
+        let table_ref3 = TableReference::bare("different_table");
+        assert_ne!(table_ref1, table_ref3);
+    }
+}

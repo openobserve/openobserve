@@ -1,31 +1,11 @@
-import { test, expect } from "../baseFixtures";
-import logData from "../../cypress/fixtures/log.json";
-import PageManager from '../../pages/page-manager.js';
-
-/**
- * Helper function for login
- * Handles the initial login process and navigation
- */
-async function login(page) {
-  await page.goto(process.env["ZO_BASE_URL"]);
-  await page.waitForTimeout(1000);
-  if (await page.getByText('Login as internal user').isVisible()) {
-    await page.getByText('Login as internal user').click();
-  }
-  await page
-    .locator('[data-cy="login-user-id"]')
-    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-  await page
-    .locator('[data-cy="login-password"]')
-    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-  await page.locator('[data-cy="login-sign-in"]').click();
-  await page.waitForTimeout(4000);
-  await page.goto(process.env["ZO_BASE_URL"]);
-}
+const { test, expect } = require('../utils/enhanced-baseFixtures.js');
+const logData = require("../../fixtures/log.json");
+const PageManager = require('../../pages/page-manager.js');
+const testLogger = require('../utils/test-logger.js');
 
 test.describe("Alerts E2E Flow", () => {
   // Shared test variables
-  let pageManager;
+  let pm;
   let createdTemplateName;
   let createdDestinationName;
   let sharedRandomValue;
@@ -38,18 +18,15 @@ test.describe("Alerts E2E Flow", () => {
    * - Navigates to alerts page
    */
   test.beforeEach(async ({ page }, testInfo) => {
-    await login(page);
-    pageManager = new PageManager(page);
-    await page.waitForTimeout(5000);
+    pm = new PageManager(page);
 
     // Generate shared random value if not already generated
     if (!sharedRandomValue) {
-      sharedRandomValue = pageManager.alertsPage.generateRandomString();
-      console.log('Generated shared random value for this run:', sharedRandomValue);
+      sharedRandomValue = pm.alertsPage.generateRandomString();
+      testLogger.info('Generated shared random value for this run', { sharedRandomValue });
     }
 
-
-    await pageManager.commonActions.skipDataIngestionForScheduledAlert(test.info().title);
+    await pm.commonActions.skipDataIngestionForScheduledAlert(testInfo.title);
     
     // Navigate to alerts page
     await page.goto(
@@ -71,85 +48,85 @@ test.describe("Alerts E2E Flow", () => {
 
     // Ensure prerequisites exist
     createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
-    await pageManager.alertTemplatesPage.ensureTemplateExists(createdTemplateName);
+    await pm.alertTemplatesPage.ensureTemplateExists(createdTemplateName);
     createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
     const slackUrl = "DEMO";
-    await pageManager.alertDestinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
+    await pm.alertDestinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
 
     // Navigate to alerts tab
-    await pageManager.commonActions.navigateToAlerts();
-    await page.waitForTimeout(2000);
+    await pm.commonActions.navigateToAlerts();
+    await page.waitForLoadState('networkidle');
 
     // ===== First Iteration: Initial Alert Creation and Management =====
     // Create and verify folder
     const folderName = 'auto_' + sharedRandomValue;
-    await pageManager.alertsPage.createFolder(folderName, 'Test Automation Folder');
-    await pageManager.alertsPage.verifyFolderCreated(folderName);
-    console.log('Successfully created folder:', folderName);
+    await pm.alertsPage.createFolder(folderName, 'Test Automation Folder');
+    await pm.alertsPage.verifyFolderCreated(folderName);
+    testLogger.info('Successfully created folder', { folderName });
 
     // Navigate to folder and create first alert
-    await pageManager.alertsPage.navigateToFolder(folderName);
-    const alertName = await pageManager.alertsPage.createAlert(streamName, column, value, createdDestinationName, sharedRandomValue);
-    await pageManager.alertsPage.verifyAlertCreated(alertName);
-    console.log('Successfully created alert:', alertName);
+    await pm.alertsPage.navigateToFolder(folderName);
+    const alertName = await pm.alertsPage.createAlert(streamName, column, value, createdDestinationName, sharedRandomValue);
+    await pm.alertsPage.verifyAlertCreated(alertName);
+    testLogger.info('Successfully created alert', { alertName });
 
     // Clone first alert
-    await pageManager.alertsPage.cloneAlert(alertName, 'logs', streamName);
-    console.log('Successfully cloned alert:', alertName);
+    await pm.alertsPage.cloneAlert(alertName, 'logs', streamName);
+    testLogger.info('Successfully cloned alert', { alertName });
 
     // Delete all instances of the cloned alert
-    await pageManager.alertsPage.deleteImportedAlert(alertName);
-    console.log('Successfully deleted all instances of alert:', alertName);
+    await pm.alertsPage.deleteImportedAlert(alertName);
+    testLogger.info('Successfully deleted all instances of alert', { alertName });
 
     // ===== Second Iteration: New Alert Creation and Management =====
     // Navigate back to folder and create new alert
-    await pageManager.alertsPage.navigateToFolder(folderName);
-    await page.waitForTimeout(2000);
+    await pm.alertsPage.navigateToFolder(folderName);
+    await page.waitForLoadState('networkidle');
 
-    const newAlertName = await pageManager.alertsPage.createAlert(streamName, column, value, createdDestinationName, sharedRandomValue);
-    await pageManager.alertsPage.verifyAlertCreated(newAlertName);
-    console.log('Successfully created new alert:', newAlertName);
+    const newAlertName = await pm.alertsPage.createAlert(streamName, column, value, createdDestinationName, sharedRandomValue);
+    await pm.alertsPage.verifyAlertCreated(newAlertName);
+    testLogger.info('Successfully created new alert', { alertName: newAlertName });
 
     // Update the new alert's operator
-    await pageManager.alertsPage.updateAlert(newAlertName);
-    console.log('Successfully updated new alert:', newAlertName);
+    await pm.alertsPage.updateAlert(newAlertName);
+    testLogger.info('Successfully updated new alert', { alertName: newAlertName });
 
     // Clone the new alert
-    await pageManager.alertsPage.cloneAlert(newAlertName, 'logs', streamName);
-    console.log('Successfully cloned new alert:', newAlertName);
+    await pm.alertsPage.cloneAlert(newAlertName, 'logs', streamName);
+    testLogger.info('Successfully cloned new alert', { alertName: newAlertName });
 
     // ===== Alert Pause and Resume =====
     // Pause the new alert
-    await pageManager.alertsPage.pauseAlert(newAlertName);
-    console.log('Successfully paused alert:', newAlertName);
+    await pm.alertsPage.pauseAlert(newAlertName);
+    testLogger.info('Successfully paused alert', { alertName: newAlertName });
 
     // Resume the new alert
-    await pageManager.alertsPage.resumeAlert(newAlertName);
-    console.log('Successfully resumed alert:', newAlertName);
+    await pm.alertsPage.resumeAlert(newAlertName);
+    testLogger.info('Successfully resumed alert', { alertName: newAlertName });
 
     // ===== Alert Movement and Cleanup =====
     // Move alerts to target folder
     const targetFolderName = 'testfoldermove';
-    await pageManager.alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
-    await pageManager.alertsPage.moveAllAlertsToFolder(targetFolderName);
-    await page.waitForTimeout(2000);
+    await pm.alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
+    await pm.alertsPage.moveAllAlertsToFolder(targetFolderName);
+    await page.waitForLoadState('networkidle');
 
-    await pageManager.dashboardFolder.searchFolder(folderName);
-    await expect(page.locator(`text=${folderName}`)).toBeVisible();
-    await pageManager.dashboardFolder.deleteFolder(folderName);
+    await pm.dashboardFolder.searchFolder(folderName);
+    await pm.dashboardFolder.verifyFolderVisible(folderName);
+    await pm.dashboardFolder.deleteFolder(folderName);
 
     // Verify alerts in target folder
-    await page.waitForTimeout(2000);
-    await pageManager.dashboardFolder.searchFolder(targetFolderName);
-    await expect(page.locator(`text=${targetFolderName}`)).toBeVisible();
-    await pageManager.alertsPage.navigateToFolder(targetFolderName);
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
+    await pm.dashboardFolder.searchFolder(targetFolderName);
+    await pm.dashboardFolder.verifyFolderVisible(targetFolderName);
+    await pm.alertsPage.navigateToFolder(targetFolderName);
+    await page.waitForLoadState('networkidle');
 
     // Search and verify alert instance
-    await pageManager.alertsPage.searchAlert(newAlertName);
-    await pageManager.alertsPage.verifySearchResults(2);
+    await pm.alertsPage.searchAlert(newAlertName);
+    await pm.alertsPage.verifySearchResults(2);
 
     // Delete the alert
-    await pageManager.alertsPage.deleteAlertByRow(newAlertName);
+    await pm.alertsPage.deleteAlertByRow(newAlertName);
   });
 }); 

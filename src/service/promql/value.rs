@@ -803,6 +803,8 @@ pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> u64 
 
 #[cfg(test)]
 mod tests {
+    use std::f64;
+
     use float_cmp::approx_eq;
 
     use super::*;
@@ -973,5 +975,426 @@ mod tests {
         for (expect, got) in zip(expected, output_kept.clone()) {
             assert_eq!(expect.name, got.name, "{:?}", &output_kept);
         }
+    }
+
+    #[test]
+    fn test_sample_new_and_is_nan() {
+        let sample = Sample::new(123456, 1.23);
+        assert_eq!(sample.timestamp, 123456);
+        assert_eq!(sample.value, 1.23);
+        assert!(!sample.is_nan());
+
+        let nan_sample = Sample::new(789012, f64::NAN);
+        assert!(nan_sample.is_nan());
+    }
+
+    #[test]
+    fn test_sample_serialization() {
+        let sample = Sample::new(1_609_459_200_000_000, 42.5); // 2021-01-01 00:00:00 UTC in microseconds
+        let json = serde_json::to_string(&sample).unwrap();
+        assert_eq!(json, "[1609459200,\"42.5\"]");
+    }
+
+    #[test]
+    fn test_sample_deserialization() {
+        let json = "[1609459200,\"42.5\"]";
+        let sample: Sample = serde_json::from_str(json).unwrap();
+        assert_eq!(sample.timestamp, 1_609_459_200_000_000);
+        assert_eq!(sample.value, 42.5);
+    }
+
+    #[test]
+    fn test_label_new() {
+        let label = Label::new("test_name", "test_value");
+        assert_eq!(label.name, "test_name");
+        assert_eq!(label.value, "test_value");
+    }
+
+    #[test]
+    fn test_valid_label_names() {
+        assert!(Label::is_valid_label_name("valid_label"));
+        assert!(Label::is_valid_label_name("_valid"));
+        assert!(Label::is_valid_label_name("Valid123"));
+        assert!(Label::is_valid_label_name("a"));
+
+        assert!(!Label::is_valid_label_name("123invalid"));
+        assert!(!Label::is_valid_label_name("invalid-label"));
+        assert!(!Label::is_valid_label_name("invalid.label"));
+        assert!(!Label::is_valid_label_name(""));
+    }
+
+    #[test]
+    fn test_labels_ext_without_label() {
+        let mut labels: Labels = generate_test_labels();
+        let original_len = labels.len();
+
+        labels = labels.without_label("b");
+        assert_eq!(labels.len(), original_len - 1);
+
+        let names: Vec<_> = labels.iter().map(|l| &l.name).collect();
+        assert!(!names.contains(&&"b".to_string()));
+        assert!(names.contains(&&"a".to_string()));
+    }
+
+    #[test]
+    fn test_labels_ext_set() {
+        let mut labels: Labels = generate_test_labels();
+        let original_len = labels.len();
+
+        labels.set("new_label", "new_value");
+        assert_eq!(labels.len(), original_len + 1);
+
+        let value = labels.get_value("new_label");
+        assert_eq!(value, "new_value");
+    }
+
+    #[test]
+    fn test_labels_ext_values_and_keys() {
+        let labels: Labels = generate_test_labels();
+
+        let values = labels.values();
+        assert!(values.contains(&"1".to_string()));
+        assert!(values.contains(&"2".to_string()));
+        assert!(values.contains(&"3".to_string()));
+        assert!(values.contains(&"4".to_string()));
+        assert_eq!(values.len(), 4);
+
+        let keys = labels.keys();
+        assert!(keys.contains(&"a".to_string()));
+        assert!(keys.contains(&"b".to_string()));
+        assert!(keys.contains(&"c".to_string()));
+        assert!(keys.contains(&"d".to_string()));
+        assert_eq!(keys.len(), 4);
+    }
+
+    #[test]
+    fn test_labels_ext_sort() {
+        let mut labels: Labels = vec![
+            Arc::new(Label::new("z", "26")),
+            Arc::new(Label::new("a", "1")),
+            Arc::new(Label::new("m", "13")),
+        ];
+
+        labels.sort();
+
+        assert_eq!(labels[0].name, "a");
+        assert_eq!(labels[1].name, "m");
+        assert_eq!(labels[2].name, "z");
+    }
+
+    #[test]
+    fn test_time_window_new() {
+        let eval_ts = 1_609_459_200_000_000; // 2021-01-01 00:00:00 UTC in microseconds
+        let range = Duration::from_secs(300); // 5 minutes
+
+        let window = TimeWindow::new(eval_ts, range);
+        assert_eq!(window.eval_ts, eval_ts);
+        assert_eq!(window.range, range);
+        assert_eq!(window.offset, Duration::ZERO);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_time_window_new_invalid_timestamp() {
+        let eval_ts = 0; // Invalid timestamp
+        let range = Duration::from_secs(300);
+        TimeWindow::new(eval_ts, range);
+    }
+
+    #[test]
+    fn test_range_value_get_sample_values() {
+        let samples = vec![
+            Sample::new(1000, 1.5),
+            Sample::new(2000, 2.5),
+            Sample::new(3000, 3.5),
+        ];
+        let range_value = RangeValue::new(vec![], samples);
+
+        let values = range_value.get_sample_values();
+        assert_eq!(values, vec![1.5, 2.5, 3.5]);
+    }
+
+    #[test]
+    fn test_range_value_extend() {
+        let mut range_value1 = RangeValue::new(vec![], vec![Sample::new(1000, 1.0)]);
+        let range_value2 = RangeValue::new(vec![], vec![Sample::new(2000, 2.0)]);
+
+        range_value1.extend(range_value2);
+        assert_eq!(range_value1.samples.len(), 2);
+        assert_eq!(range_value1.samples[0].value, 1.0);
+        assert_eq!(range_value1.samples[1].value, 2.0);
+    }
+
+    #[test]
+    fn test_range_value_extend_with_exemplars() {
+        let mut range_value1 = RangeValue {
+            labels: vec![],
+            samples: vec![],
+            exemplars: Some(vec![Arc::new(Exemplar {
+                timestamp: 1000,
+                value: 1.0,
+                labels: vec![],
+            })]),
+            time_window: None,
+        };
+
+        let range_value2 = RangeValue {
+            labels: vec![],
+            samples: vec![],
+            exemplars: Some(vec![Arc::new(Exemplar {
+                timestamp: 2000,
+                value: 2.0,
+                labels: vec![],
+            })]),
+            time_window: None,
+        };
+
+        range_value1.extend(range_value2);
+        assert_eq!(range_value1.exemplars.as_ref().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_range_value_new_with_exemplars() {
+        let exemplars = vec![Arc::new(Exemplar {
+            timestamp: 1000,
+            value: 1.0,
+            labels: vec![],
+        })];
+
+        let range_value = RangeValue::new_with_exemplars(vec![], exemplars.clone());
+        assert!(range_value.samples.is_empty());
+        assert_eq!(range_value.exemplars.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_labels_value() {
+        let labels: Labels = generate_test_labels();
+
+        let value = labels_value(&labels, "a");
+        assert_eq!(value, Some("1".to_string()));
+
+        let value = labels_value(&labels, "nonexistent");
+        assert_eq!(value, None);
+    }
+
+    #[test]
+    fn test_value_get_methods() {
+        let instant_value = InstantValue {
+            labels: vec![],
+            sample: Sample::new(1000, 1.0),
+        };
+        let vector = vec![instant_value.clone()];
+        let range_value = RangeValue::new(vec![], vec![Sample::new(1000, 1.0)]);
+        let matrix = vec![range_value.clone()];
+
+        let value_vector = Value::Vector(vector.clone());
+        assert!(value_vector.get_vector().is_some());
+        assert!(value_vector.get_ref_matrix_values().is_none());
+
+        let value_matrix = Value::Matrix(matrix.clone());
+        assert!(value_matrix.get_ref_matrix_values().is_some());
+        assert!(value_matrix.get_vector().is_none());
+
+        let value_string = Value::String("test".to_string());
+        assert_eq!(value_string.get_string(), Some("test".to_string()));
+
+        let value_float = Value::Float(1.23);
+        assert_eq!(value_float.get_float(), Some(1.23));
+    }
+
+    #[test]
+    fn test_value_get_type() {
+        assert_eq!(
+            Value::Instant(InstantValue {
+                labels: vec![],
+                sample: Sample::new(1000, 1.0)
+            })
+            .get_type(),
+            "vector"
+        );
+        assert_eq!(
+            Value::Range(RangeValue::new(vec![], vec![])).get_type(),
+            "matrix"
+        );
+        assert_eq!(Value::Vector(vec![]).get_type(), "vector");
+        assert_eq!(Value::Matrix(vec![]).get_type(), "matrix");
+        assert_eq!(Value::Sample(Sample::new(1000, 1.0)).get_type(), "scalar");
+        assert_eq!(Value::Float(std::f64::consts::PI).get_type(), "scalar");
+        assert_eq!(Value::String("test".to_string()).get_type(), "string");
+        assert_eq!(Value::None.get_type(), "scalar");
+    }
+
+    #[test]
+    fn test_value_contains_same_label_set() {
+        let label1 = vec![Arc::new(Label::new("name", "value1"))];
+        let label2 = vec![Arc::new(Label::new("name", "value2"))];
+        let label1_dup = vec![Arc::new(Label::new("name", "value1"))];
+
+        // Test vector with unique labels
+        let vector_unique = Value::Vector(vec![
+            InstantValue {
+                labels: label1.clone(),
+                sample: Sample::new(1000, 1.0),
+            },
+            InstantValue {
+                labels: label2.clone(),
+                sample: Sample::new(2000, 2.0),
+            },
+        ]);
+        assert!(!vector_unique.contains_same_label_set());
+
+        // Test vector with duplicate labels
+        let vector_duplicate = Value::Vector(vec![
+            InstantValue {
+                labels: label1.clone(),
+                sample: Sample::new(1000, 1.0),
+            },
+            InstantValue {
+                labels: label1_dup.clone(),
+                sample: Sample::new(2000, 2.0),
+            },
+        ]);
+        assert!(vector_duplicate.contains_same_label_set());
+
+        // Test matrix with unique labels
+        let matrix_unique = Value::Matrix(vec![
+            RangeValue::new(label1.clone(), vec![Sample::new(1000, 1.0)]),
+            RangeValue::new(label2.clone(), vec![Sample::new(2000, 2.0)]),
+        ]);
+        assert!(!matrix_unique.contains_same_label_set());
+
+        // Test matrix with duplicate labels
+        let matrix_duplicate = Value::Matrix(vec![
+            RangeValue::new(label1.clone(), vec![Sample::new(1000, 1.0)]),
+            RangeValue::new(label1_dup.clone(), vec![Sample::new(2000, 2.0)]),
+        ]);
+        assert!(matrix_duplicate.contains_same_label_set());
+
+        // Test single element cases
+        let single_vector = Value::Vector(vec![InstantValue {
+            labels: label1.clone(),
+            sample: Sample::new(1000, 1.0),
+        }]);
+        assert!(!single_vector.contains_same_label_set());
+
+        let empty_vector = Value::Vector(vec![]);
+        assert!(!empty_vector.contains_same_label_set());
+
+        // Test non-vector/matrix types
+        assert!(!Value::Float(1.0).contains_same_label_set());
+    }
+
+    #[test]
+    fn test_value_sort() {
+        let mut vector = Value::Vector(vec![
+            InstantValue {
+                labels: vec![],
+                sample: Sample::new(1000, 1.0),
+            },
+            InstantValue {
+                labels: vec![],
+                sample: Sample::new(2000, 3.0),
+            },
+            InstantValue {
+                labels: vec![],
+                sample: Sample::new(3000, 2.0),
+            },
+        ]);
+
+        vector.sort();
+
+        if let Value::Vector(ref v) = vector {
+            assert_eq!(v[0].sample.value, 3.0); // Highest value first
+            assert_eq!(v[1].sample.value, 2.0);
+            assert_eq!(v[2].sample.value, 1.0); // Lowest value last
+        }
+
+        let mut matrix = Value::Matrix(vec![
+            RangeValue::new(vec![], vec![Sample::new(1000, 1.0), Sample::new(2000, 1.0)]), /* sum = 2.0 */
+            RangeValue::new(vec![], vec![Sample::new(1000, 2.0), Sample::new(2000, 3.0)]), /* sum = 5.0 */
+            RangeValue::new(vec![], vec![Sample::new(1000, 1.5), Sample::new(2000, 1.5)]), /* sum = 3.0 */
+        ]);
+
+        matrix.sort();
+
+        if let Value::Matrix(ref m) = matrix {
+            let sum0: f64 = m[0].samples.iter().map(|s| s.value).sum();
+            let sum1: f64 = m[1].samples.iter().map(|s| s.value).sum();
+            let sum2: f64 = m[2].samples.iter().map(|s| s.value).sum();
+            assert_eq!(sum0, 5.0); // Highest sum first
+            assert_eq!(sum1, 3.0);
+            assert_eq!(sum2, 2.0); // Lowest sum last
+        }
+    }
+
+    #[test]
+    fn test_exemplar_from_json_map() {
+        let mut map = json::Map::new();
+        map.insert(
+            "_timestamp".to_string(),
+            json::Value::Number(serde_json::Number::from(1609459200)),
+        );
+        map.insert(
+            "value".to_string(),
+            json::Value::Number(serde_json::Number::from_f64(42.5).unwrap()),
+        );
+        map.insert(
+            "trace_id".to_string(),
+            json::Value::String("abc123".to_string()),
+        );
+        map.insert(
+            "span_id".to_string(),
+            json::Value::String("def456".to_string()),
+        );
+
+        let exemplar = Exemplar::from(&map);
+        assert_eq!(exemplar.timestamp, 1609459200);
+        assert_eq!(exemplar.value, 42.5);
+        assert_eq!(exemplar.labels.len(), 2);
+
+        let trace_id_value = exemplar.labels.get_value("trace_id");
+        assert_eq!(trace_id_value, "abc123");
+
+        let span_id_value = exemplar.labels.get_value("span_id");
+        assert_eq!(span_id_value, "def456");
+    }
+
+    #[test]
+    fn test_exemplar_serialization() {
+        let exemplar = Exemplar {
+            timestamp: 1_609_459_200_000_000,
+            value: 42.5,
+            labels: vec![Arc::new(Label::new("trace_id", "abc123"))],
+        };
+
+        let json = serde_json::to_string(&exemplar).unwrap();
+        assert!(json.contains("\"timestamp\":1609459200"));
+        assert!(json.contains("\"value\":\"42.5\""));
+        assert!(json.contains("\"trace_id\":\"abc123\""));
+    }
+
+    #[test]
+    fn test_extrapolated_rate_edge_cases() {
+        // Test with insufficient samples
+        let samples = [Sample::new(1000, 1.0)];
+        let result = extrapolated_rate(
+            &samples,
+            75_000_000,
+            Duration::from_secs(60),
+            Duration::ZERO,
+            ExtrapolationKind::Rate,
+        );
+        assert!(result.is_none());
+
+        // Test with empty samples
+        let empty_samples: &[Sample] = &[];
+        let result = extrapolated_rate(
+            empty_samples,
+            75_000_000,
+            Duration::from_secs(60),
+            Duration::ZERO,
+            ExtrapolationKind::Rate,
+        );
+        assert!(result.is_none());
     }
 }

@@ -1,7 +1,10 @@
-import { test, expect } from "../baseFixtures";
-import logData from "../../cypress/fixtures/log.json";
+const {
+  test,
+  expect,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
+import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
 import PageManager from "../../pages/page-manager";
@@ -14,11 +17,8 @@ test.describe.configure({ mode: "parallel" });
 // Refactored test cases using Page Object Model
 test.describe("dashboard UI testcases", () => {
   test.beforeEach(async ({ page }) => {
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestion(page);
-    await page.waitForTimeout(2000);
-
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );

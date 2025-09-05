@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div>
       <q-select
+        ref="streamSelect"
         data-test="log-search-index-list-select-stream"
         v-model="searchObj.data.stream.selectedStream"
         :options="streamOptions"
@@ -98,7 +99,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #body-cell-name="props">
           <q-tr
             :props="props"
-            v-if="props.row.label"
+            v-if="
+              props.row.label &&
+              (showOnlyInterestingFields
+                ? searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+                    props.row.group
+                  ]
+                : true)
+            "
             @click="
               searchObj.data.stream.expandGroupRows[props.row.group] =
                 !searchObj.data.stream.expandGroupRows[props.row.group]
@@ -113,9 +121,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               {{ props.row.name }} ({{
-                searchObj.data.stream.expandGroupRowsFieldCount[
-                  props.row.group
-                ]
+                showOnlyInterestingFields
+                  ? searchObj.data.stream
+                      .interestingExpandedGroupRowsFieldCount[props.row.group]
+                  : searchObj.data.stream.expandGroupRowsFieldCount[
+                      props.row.group
+                    ]
               }})
               <q-icon
                 v-if="
@@ -135,7 +146,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tr>
           <q-tr
             :props="props"
-            v-else
+            v-else-if="
+              !showOnlyInterestingFields ||
+              (showOnlyInterestingFields &&
+                props.row.isInterestingField &&
+                searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+                  props.row.group
+                ])
+            "
             v-show="searchObj.data.stream.expandGroupRows[props.row.group]"
           >
             <q-td
@@ -170,7 +188,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="float-right">
                     <q-icon
                       :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                      v-if="searchObj.meta.quickMode"
+                      v-if="
+                        searchObj.meta.quickMode &&
+                        props.row.name !== store.state.zoConfig.timestamp_column
+                      "
                       :name="
                         props.row.isInterestingField ? 'info' : 'info_outline'
                       "
@@ -187,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </span>
                 </div>
-                <div class="field_overlay">
+                <div class="field_overlay" v-if="props.row.name !== store.state.zoConfig.timestamp_column">
                   <q-btn
                     v-if="
                       props.row.isSchemaField &&
@@ -206,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="
                       !searchObj.data.stream.selectedFields.includes(
                         props.row.name,
-                      )
+                      ) && props.row.name !== store.state.zoConfig.timestamp_column
                     "
                     :name="outlinedVisibility"
                     style="margin-right: 0.375rem"
@@ -229,7 +250,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <q-icon
                     :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                    v-if="searchObj.meta.quickMode"
+                    v-if="
+                      searchObj.meta.quickMode &&
+                      props.row.name !== store.state.zoConfig.timestamp_column
+                    "
                     :name="
                       props.row.isInterestingField ? 'info' : 'info_outline'
                     "
@@ -514,12 +538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tr>
         </template>
         <template v-slot:pagination="scope">
-          <div
-            v-if="
-              store.state.zoConfig.user_defined_schemas_enabled &&
-              searchObj.meta.hasUserDefinedSchemas
-            "
-          >
+          <div v-if="showUserDefinedSchemaToggle">
             <q-btn-toggle
               no-caps
               v-model="searchObj.meta.useUserDefinedSchemas"
@@ -568,6 +587,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-tooltip>
                 </div>
               </template>
+              <template
+                v-slot:interesting_fields_slot
+                v-if="searchObj.meta.quickMode"
+              >
+                <div data-test="logs-interesting-fields-btn">
+                  <q-icon name="info" />
+                  <q-icon name="schema"></q-icon>
+                  <q-tooltip
+                    anchor="center right"
+                    self="center left"
+                    max-width="300px"
+                    class="text-body2"
+                  >
+                    <span class="text-bold" color="white">{{
+                      t("search.showOnlyInterestingFields")
+                    }}</span>
+                  </q-tooltip>
+                </div>
+              </template>
+            </q-btn-toggle>
+          </div>
+          <div v-else-if="searchObj.meta.quickMode">
+            <q-btn-toggle
+              no-caps
+              v-model="showOnlyInterestingFields"
+              data-test="logs-page-field-list-user-defined-schema-toggle"
+              class="schema-field-toggle q-mr-xs"
+              toggle-color="primary"
+              bordered
+              size="8px"
+              color="white"
+              text-color="primary"
+              :options="selectedFieldsBtnGroupOption"
+              @update:model-value="toggleInterestingFields"
+            >
+              <template v-slot:all_fields_slot>
+                <div data-test="logs-all-fields-btn">
+                  <q-icon name="schema"></q-icon>
+                  <q-tooltip
+                    data-test="logs-page-fields-list-all-fields-warning-tooltip"
+                    anchor="center right"
+                    self="center left"
+                    max-width="300px"
+                    class="text-body2"
+                  >
+                    <span class="text-bold" color="white">{{
+                      t("search.allFieldsLabel")
+                    }}</span>
+                    <q-separator color="white" class="q-mt-xs q-mb-xs" />
+                    {{ t("search.allFieldsWarningMsg") }}
+                  </q-tooltip>
+                </div>
+              </template>
+              <template
+                v-slot:interesting_fields_slot
+                v-if="searchObj.meta.quickMode"
+              >
+                <div data-test="logs-interesting-fields-btn">
+                  <q-icon name="info" />
+                  <q-icon name="schema"></q-icon>
+                  <q-tooltip
+                    anchor="center right"
+                    self="center left"
+                    max-width="300px"
+                    class="text-body2"
+                  >
+                    <span class="text-bold" color="white">{{
+                      t("search.showOnlyInterestingFields")
+                    }}</span>
+                  </q-tooltip>
+                </div>
+              </template>
             </q-btn-toggle>
           </div>
           <div class="q-ml-xs text-right col" v-if="scope.pagesNumber > 1">
@@ -586,6 +677,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : searchObj.data.stream.selectedStreamFields.length
               }}
             </q-tooltip>
+
             <q-btn
               data-test="logs-page-fields-list-pagination-firstpage-button"
               v-if="scope.pagesNumber > 2"
@@ -641,8 +733,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="scope.lastPage"
             />
           </div>
-          <div class="q-ml-xs text-right" :class="scope.pagesNumber > 1 ? 'col-1' : 'col'">
-            <q-icon name="restart_alt" size="21px" data-test="logs-page-fields-list-reset-icon" class="cursor-pointer	" @click="resetSelectedFileds" />
+          <div
+            class="q-ml-xs text-right"
+            :class="scope.pagesNumber > 1 ? 'col-1' : 'col'"
+          >
+            <q-icon
+              name="restart_alt"
+              size="21px"
+              data-test="logs-page-fields-list-reset-icon"
+              class="cursor-pointer"
+              @click="resetSelectedFileds"
+            />
             <q-tooltip
               data-test="logs-page-fields-list-reset-tooltip"
               anchor="center right"
@@ -687,6 +788,7 @@ import {
   isStreamingEnabled,
   b64EncodeStandard,
   addSpacesToOperators,
+  deepCopy,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import {
@@ -713,6 +815,16 @@ export default defineComponent({
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
     handleMultiStreamSelection() {
+      // Clear the filter input when streams change
+      //we will first check if qselect is there or not and then call the method
+      //we will use the quasar next tick to ensure that the dom is updated before we call the method
+      //we will also us the quasar's updateInputValue method to clear the input value
+      this.$nextTick(() => {
+        const indexListSelectField = this.$refs.streamSelect;
+        if (indexListSelectField && indexListSelectField.updateInputValue) {
+          indexListSelectField.updateInputValue("");
+        }
+      });
       this.onStreamChange("");
     },
     handleSingleStreamSelect(opt: any) {
@@ -720,6 +832,16 @@ export default defineComponent({
         this.searchObj.data.stream.selectedFields = [];
       }
       this.searchObj.data.stream.selectedStream = [opt.value];
+      // Clear the filter input when single stream is selected
+      //we will first check if qselect is there or not and then call the method
+      //we will use the quasar next tick to ensure that the dom is updated before we call the method
+      //we will also us the quasar's updateInputValue method to clear the input value
+      this.$nextTick(() => {
+        const indexListSelectField = this.$refs.streamSelect;
+        if (indexListSelectField && indexListSelectField.updateInputValue) {
+          indexListSelectField.updateInputValue("");
+        }
+      });
       this.onStreamChange("");
     },
   },
@@ -741,6 +863,7 @@ export default defineComponent({
       extractValueQuery,
       fnParsedSQL,
       fnUnparsedSQL,
+      streamSchemaFieldsIndexMapping,
     } = useLogs();
 
     const {
@@ -753,7 +876,9 @@ export default defineComponent({
 
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
 
-    const userDefinedSchemaBtnGroupOption = [
+    const showOnlyInterestingFields = ref(false);
+
+    const userDefinedSchemaBtnGroupOption = ref([
       {
         label: "",
         value: "user_defined_schema",
@@ -764,7 +889,21 @@ export default defineComponent({
         value: "all_fields",
         slot: "all_fields_slot",
       },
+    ]);
+
+    const selectedFieldsBtnGroupOption = [
+      {
+        label: "",
+        value: false,
+        slot: "all_fields_slot",
+      },
+      {
+        label: "",
+        value: true,
+        slot: "interesting_fields_slot",
+      },
     ];
+
     const streamOptions: any = ref([]);
     const fieldValues: Ref<{
       [key: string | number]: {
@@ -790,12 +929,18 @@ export default defineComponent({
       { label: t("search.enrichmentTables"), value: "enrichment_tables" },
     ];
 
+    const showUserDefinedSchemaToggle = computed(() => {
+      return (
+        store.state.zoConfig.user_defined_schemas_enabled &&
+        searchObj.meta.hasUserDefinedSchemas
+      );
+    });
+
     const streamList = computed(() => {
       return searchObj.data.stream.streamLists;
     });
 
     const checkSelectedFields = computed(() => {
-      console.log("checkSelectedFields", searchObj.data.stream.selectedFields);
       return (
         searchObj.data.stream.selectedFields &&
         searchObj.data.stream.selectedFields.length > 0
@@ -811,6 +956,74 @@ export default defineComponent({
       },
       {
         deep: true,
+      },
+    );
+
+    const resetFields = async () => {
+      searchObj.loadingStream = true;
+      streamSchemaFieldsIndexMapping.value = {};
+
+      // Selected streams has usd
+      setTimeout(async () => {
+        await extractFields();
+        searchObj.loadingStream = false;
+      }, 0);
+    };
+
+    watch(
+      () => searchObj.meta.quickMode,
+      (isActive) => {
+        if (isActive) {
+          // check if its present in the array dont add it again
+          if (
+            !userDefinedSchemaBtnGroupOption.value.some(
+              (option) => option.value === "interesting_fields",
+            )
+          ) {
+            userDefinedSchemaBtnGroupOption.value.push({
+              label: "",
+              value: "interesting_fields",
+              slot: "interesting_fields_slot",
+            });
+          }
+          searchObj.meta.useUserDefinedSchemas = "interesting_fields";
+          showOnlyInterestingFields.value = true;
+        } else {
+          userDefinedSchemaBtnGroupOption.value =
+            userDefinedSchemaBtnGroupOption.value.filter(
+              (option) => option.value !== "interesting_fields",
+            );
+
+          if (searchObj.meta.useUserDefinedSchemas === "interesting_fields") {
+            searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
+          }
+          showOnlyInterestingFields.value = false;
+        }
+      },
+      {
+        immediate: true,
+      },
+    );
+
+    watch(
+      () => searchObj.meta.quickMode,
+      () => {
+        // if quick mode is called, reset fields
+        resetFields();
+      },
+    );
+
+    watch(
+      () => [
+        showUserDefinedSchemaToggle.value,
+        searchObj.meta.useUserDefinedSchemas,
+      ],
+      (isActive) => {
+        showOnlyInterestingFields.value =
+          searchObj.meta.useUserDefinedSchemas === "interesting_fields";
+      },
+      {
+        immediate: true,
       },
     );
 
@@ -977,7 +1190,9 @@ export default defineComponent({
             //   "[WHERE_CLAUSE]",
             //   " WHERE " + whereClause,
             // );
-            query_context = query_context.split("[WHERE_CLAUSE]").join(" WHERE " + whereClause);
+            query_context = query_context
+              .split("[WHERE_CLAUSE]")
+              .join(" WHERE " + whereClause);
           } else {
             query_context = query_context.replace("[WHERE_CLAUSE]", "");
           }
@@ -1194,27 +1409,50 @@ export default defineComponent({
     //   handleQueryData();
     // };
 
-    let selectedFieldsName: any = [];
     let fieldIndex: any = -1;
     const addToInterestingFieldList = (
       field: any,
       isInterestingField: boolean,
     ) => {
-      if (selectedFieldsName.length == 0) {
-        selectedFieldsName = searchObj.data.stream.selectedStreamFields.map(
-          (item: any) => item.name,
-        );
+      if (!Object.keys(streamSchemaFieldsIndexMapping.value).length) {
+        return;
       }
+
+      const defaultInterestingFields = new Set(
+        store.state?.zoConfig?.default_quick_mode_fields || [],
+      );
+
       if (isInterestingField) {
         const index = searchObj.data.stream.interestingFieldList.indexOf(
           field.name,
         );
+
         if (index > -1) {
           // only splice array when item is found
           searchObj.data.stream.interestingFieldList.splice(index, 1); // 2nd parameter means remove one item only
 
+          searchObj.data.stream.selectedInterestingStreamFields =
+            searchObj.data.stream.selectedInterestingStreamFields.filter(
+              (item: any) => item.name !== field.name,
+            );
+
+          if (field.group) {
+            if (
+              searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+                field.group
+              ] > 0
+            ) {
+              searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+                field.group
+              ] =
+                searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+                  field.group
+                ] - 1;
+            }
+          }
+
           field.isInterestingField = !isInterestingField;
-          fieldIndex = selectedFieldsName.indexOf(field.name);
+          fieldIndex = streamSchemaFieldsIndexMapping.value[field.name];
           if (fieldIndex > -1) {
             searchObj.data.stream.selectedStreamFields[
               fieldIndex
@@ -1227,19 +1465,47 @@ export default defineComponent({
           if (localInterestingFields.value != null) {
             localStreamFields = localInterestingFields.value;
           }
+
           if (field.streams.length > 0) {
             let localFieldIndex = -1;
             for (const selectedStream of field.streams) {
-              localFieldIndex = localStreamFields[
+              localFieldIndex = localStreamFields?.[
                 searchObj.organizationIdentifier + "_" + selectedStream
-              ].indexOf(field.name);
+              ]?.indexOf(field.name);
               if (localFieldIndex > -1) {
                 localStreamFields[
                   searchObj.organizationIdentifier + "_" + selectedStream
                 ].splice(localFieldIndex, 1);
               }
+
+              // If the field is in the default interesting fields, add it to the deselect list
+              const deselectField =
+                localStreamFields?.[
+                  "deselect" +
+                    "_" +
+                    searchObj.organizationIdentifier +
+                    "_" +
+                    selectedStream
+                ] || [];
+              if (
+                defaultInterestingFields.has(field.name) &&
+                !deselectField.includes(field.name)
+              ) {
+                localStreamFields[
+                  "deselect" +
+                    "_" +
+                    searchObj.organizationIdentifier +
+                    "_" +
+                    selectedStream
+                ] = [...deselectField, field.name];
+              }
             }
           }
+
+          // If no interesting fields are selected, show all fields
+          if (!searchObj.data.stream.interestingFieldList.length)
+            showOnlyInterestingFields.value = false;
+
           useLocalInterestingFields(localStreamFields);
         }
       } else {
@@ -1248,9 +1514,10 @@ export default defineComponent({
         );
         if (index == -1 && field.name != "*") {
           searchObj.data.stream.interestingFieldList.push(field.name);
+
           const localInterestingFields: any = useLocalInterestingFields();
           field.isInterestingField = !isInterestingField;
-          fieldIndex = selectedFieldsName.indexOf(field.name);
+          fieldIndex = streamSchemaFieldsIndexMapping.value[field.name];
           if (fieldIndex > -1) {
             searchObj.data.stream.selectedStreamFields[
               fieldIndex
@@ -1275,23 +1542,102 @@ export default defineComponent({
                   ] = [];
                 }
 
+                // If the field is not in the local stream fields and is not the timestamp column, add it to the local stream fields
+                // As timestamp column is default interesting field, we don't need to add it to the local stream fields
                 if (
                   localStreamFields[
                     searchObj.organizationIdentifier + "_" + selectedStream
-                  ].indexOf(field.name) == -1
+                  ]?.indexOf(field.name) == -1 &&
+                  field.name !== store.state.zoConfig?.timestamp_column &&
+                  !defaultInterestingFields.has(field.name)
                 ) {
                   localStreamFields[
                     searchObj.organizationIdentifier + "_" + selectedStream
                   ].push(field.name);
                 }
+
+                // If the field is in the deselect list, remove it from the local stream fields
+                const isFieldDeselected = new Set(
+                  localStreamFields?.[
+                    "deselect" +
+                      "_" +
+                      searchObj.organizationIdentifier +
+                      "_" +
+                      selectedStream
+                  ] || [],
+                ).has(field.name);
+
+                if (
+                  defaultInterestingFields.has(field.name) &&
+                  isFieldDeselected
+                ) {
+                  localStreamFields[
+                    "deselect" +
+                      "_" +
+                      searchObj.organizationIdentifier +
+                      "_" +
+                      selectedStream
+                  ] = localStreamFields[
+                    "deselect" +
+                      "_" +
+                      searchObj.organizationIdentifier +
+                      "_" +
+                      selectedStream
+                  ].filter((item: any) => item !== field.name);
+                }
               }
             }
           }
           useLocalInterestingFields(localStreamFields);
+          addInterestingFieldToSelectedStreamFields(field);
         }
       }
 
       emit("setInterestingFieldInSQLQuery", field, isInterestingField);
+    };
+
+    const addInterestingFieldToSelectedStreamFields = (field: any) => {
+      const defaultFields = [
+        store.state.zoConfig?.timestamp_column,
+        store.state.zoConfig?.all_fields_name,
+      ];
+
+      let expandKeys = Object.keys(searchObj.data.stream.expandGroupRows);
+
+      let index = 0;
+      for (const key of expandKeys) {
+        if (Object.keys(expandKeys).length > 1) index += 1;
+
+        if (key === field.group) break;
+        index =
+          index +
+          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[key];
+      }
+
+      // Add the field to the beginning of the array, add all after timestamp column if timestamp column is present
+      if (field.name === store.state.zoConfig?.timestamp_column) {
+        searchObj.data.stream.selectedInterestingStreamFields.splice(
+          index,
+          0,
+          field,
+        );
+      } else {
+        searchObj.data.stream.selectedInterestingStreamFields.splice(
+          index +
+            searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+              field.group
+            ],
+          0,
+          field,
+        );
+      }
+
+      searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+        field.group
+      ] =
+        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+          field.group
+        ] + 1;
     };
 
     const pagination = ref({
@@ -1300,12 +1646,29 @@ export default defineComponent({
     });
 
     const toggleSchema = async () => {
-      searchObj.loadingStream = true;
-      selectedFieldsName = [];
-      setTimeout(async () => {
-        await extractFields();
-        searchObj.loadingStream = false;
-      }, 0);
+      const isInterestingFields =
+        searchObj.meta.useUserDefinedSchemas === "interesting_fields";
+
+      if (isInterestingFields) {
+        showOnlyInterestingFields.value = true;
+      } else {
+        showOnlyInterestingFields.value = false;
+      }
+
+      await resetFields();
+    };
+
+    const toggleInterestingFields = () => {
+      resetFields();
+    };
+
+    const hasUserDefinedSchemas = () => {
+      return searchObj.data.stream.selectedStream.some((stream: any) => {
+        store.state.zoConfig.user_defined_schemas_enabled &&
+          searchObj.meta.useUserDefinedSchemas == "user_defined_schema" &&
+          stream.settings.hasOwnProperty("defined_schema_fields") &&
+          (stream.settings?.defined_schema_fields?.slice() || []) > 0;
+      });
     };
 
     const sortedStreamFields = () => {
@@ -1587,7 +1950,7 @@ export default defineComponent({
           query: queryReq,
           page_type: searchObj.data.stream.streamType,
           traceparent: generateTraceContext().traceId,
-          searchType: "ui",
+          enable_align_histogram: true,
         });
 
         return res;
@@ -1620,22 +1983,27 @@ export default defineComponent({
       addToInterestingFieldList,
       extractFields,
       userDefinedSchemaBtnGroupOption,
+      selectedFieldsBtnGroupOption,
       pagination,
       toggleSchema,
+      toggleInterestingFields,
       streamFieldsRows: computed(() => {
         let expandKeys = Object.keys(
           searchObj.data.stream.expandGroupRows,
         ).reverse();
 
+        const expandGroupRowsFieldCount = showOnlyInterestingFields.value
+          ? searchObj.data.stream.interestingExpandedGroupRowsFieldCount
+          : searchObj.data.stream.expandGroupRowsFieldCount;
+
         let startIndex = 0;
         // Iterate over the keys in reverse order
         let selectedStreamFields = cloneDeep(
-          searchObj.data.stream.selectedStreamFields,
+          showOnlyInterestingFields.value
+            ? searchObj.data.stream.selectedInterestingStreamFields
+            : searchObj.data.stream.selectedStreamFields,
         );
         let count = 0;
-        // console.log(searchObj.data.stream.selectedStreamFields)
-        // console.log(searchObj.data.stream.expandGroupRows)
-        // console.log(searchObj.data.stream.expandGroupRowsFieldCount)
         for (let key of expandKeys) {
           if (
             searchObj.data.stream.expandGroupRows[key] == false &&
@@ -1643,25 +2011,24 @@ export default defineComponent({
             selectedStreamFields?.length > 0
           ) {
             startIndex =
-              selectedStreamFields.length -
-              searchObj.data.stream.expandGroupRowsFieldCount[key];
+              selectedStreamFields.length - expandGroupRowsFieldCount[key];
             if (startIndex > 0) {
-              // console.log("startIndex", startIndex)
-              // console.log("count", count)
-              // console.log("selectedStreamFields", selectedStreamFields.length)
-              // console.log(searchObj.data.stream.expandGroupRowsFieldCount[key])
-              // console.log("========")
+              // console.log("startIndex", startIndex);
+              // console.log("count", count);
+              // console.log("selectedStreamFields", selectedStreamFields.length);
+              // console.log(searchObj.data.stream.expandGroupRowsFieldCount[key]);
+              // console.log("========");
               selectedStreamFields.splice(
                 startIndex - count,
-                searchObj.data.stream.expandGroupRowsFieldCount[key],
+                expandGroupRowsFieldCount[key],
               );
             }
           } else {
-            count += searchObj.data.stream.expandGroupRowsFieldCount[key];
+            count += expandGroupRowsFieldCount[key];
           }
           count++;
         }
-        // console.log(JSON.parse(JSON.stringify(selectedStreamFields)))
+        // console.log(JSON.parse(JSON.stringify(selectedStreamFields)));
         return selectedStreamFields;
       }),
       formatLargeNumber,
@@ -1677,7 +2044,20 @@ export default defineComponent({
       checkSelectedFields,
       resetSelectedFileds,
       handleSearchResponse,
-      handleSearchReset
+      handleSearchReset,
+      showOnlyInterestingFields,
+      showUserDefinedSchemaToggle,
+      // Additional functions exposed for testing
+      resetFields,
+      sendSearchMessage,
+      handleSearchClose,
+      handleSearchError,
+      fetchValuesWithWebsocket,
+      initializeWebSocketConnection,
+      cancelValueApi,
+      getValuesPartition,
+      streamList,
+      hasUserDefinedSchemas,
     };
   },
 });

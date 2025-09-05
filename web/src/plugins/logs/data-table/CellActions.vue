@@ -49,11 +49,10 @@
 </template>
 
 <script setup lang="ts">
-import { defineProps, defineEmits, computed } from "vue";
+import { computed } from "vue";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import { getImageURL } from "@/utils/zincutils";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 
 defineProps({

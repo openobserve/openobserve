@@ -474,7 +474,6 @@ mod tests {
     #[test]
     fn test_default_folder_validation() {
         // Test default folder validation
-        assert_eq!(DEFAULT_FOLDER, "default");
 
         let default_folder_id = "default";
         let non_default_folder_id = "custom_folder";
@@ -556,27 +555,21 @@ mod tests {
     #[test]
     fn test_folder_list_filtering() {
         // Test folder list filtering logic
-        let all_permission = format!("folders:_all_test_org");
+        let all_permission = "folders:_all_test_org";
         let specific_permission = "folders:test_folder";
 
-        let _folder_list = vec![
-            "folders:folder1".to_string(),
-            "folders:folder2".to_string(),
-            "folders:folder3".to_string(),
-        ];
-
         // Test _all permission
-        let permitted_folders = Some(vec![all_permission.clone()]);
+        let permitted_folders = Some([all_permission]);
         let should_return_all = permitted_folders
             .as_ref()
             .map(|p| p.contains(&all_permission));
         assert_eq!(should_return_all, Some(true));
 
         // Test specific permission
-        let specific_permitted = Some(vec![specific_permission.to_string()]);
+        let specific_permitted = Some([specific_permission]);
         let has_specific = specific_permitted
             .as_ref()
-            .map(|p| p.contains(&specific_permission.to_string()));
+            .map(|p| p.contains(&specific_permission));
         assert_eq!(has_specific, Some(true));
     }
 

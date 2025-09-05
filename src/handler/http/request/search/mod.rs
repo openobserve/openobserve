@@ -46,7 +46,8 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_dashboard_info_from_request, get_is_ui_histogram_from_request,
+                get_dashboard_info_from_request, get_enable_align_histogram_from_request,
+                get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
                 get_or_create_trace_id, get_search_event_context_from_request,
                 get_search_type_from_request, get_stream_type_from_request,
                 get_use_cache_from_request, get_work_group,
@@ -129,7 +130,7 @@ async fn can_use_distinct_stream(
             // where clause can contain match_all and a valid field which is in distinct stream
             // but since there is match_all, we cannot infer the field from the where clause
             // so we need to return false
-            if sql.match_items.is_some() {
+            if sql.has_match_all {
                 return false;
             }
             sql.columns.values().flatten().cloned().collect()
@@ -156,20 +157,22 @@ async fn can_use_distinct_stream(
 }
 
 /// SearchStreamData
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchSQL",
+    summary = "Search data with SQL",
+    description = "Executes SQL queries against log streams with support for complex search patterns, time range filtering, aggregations, and histogram generation. Supports advanced features like multi-stream searches, caching, and UI optimizations for dashboard visualizations.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
+        ("is_multi_stream_search" = bool, Query, description = "Indicate is search is for multi stream"),
     ),
-    request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
+    request_body(content = Object, description = "Search query", content_type = "application/json", example = json!({
         "query": {
             "sql": "select * from k8s ",
             "start_time": 1675182660872049i64,
@@ -179,7 +182,7 @@ async fn can_use_distinct_stream(
         }
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -204,8 +207,11 @@ async fn can_use_distinct_stream(
             "size": 1,
             "scan_size": 28943
         })),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[post("/{org_id}/_search")]
@@ -256,6 +262,7 @@ pub async fn search(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let is_ui_histogram = get_is_ui_histogram_from_request(&query);
+    let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
 
     let dashboard_info = get_dashboard_info_from_request(&query);
 
@@ -287,6 +294,7 @@ pub async fn search(
         match crate::service::search::sql::histogram::convert_to_histogram_query(
             &req.query.sql,
             &stream_names,
+            is_multi_stream_search,
         ) {
             Ok(histogram_query) => {
                 req.query.sql = histogram_query;
@@ -407,6 +415,7 @@ pub async fn search(
         range_error,
         false,
         dashboard_info,
+        is_multi_stream_search,
     )
     .instrument(http_span)
     .await;
@@ -440,12 +449,13 @@ pub async fn search(
 }
 
 /// SearchAround
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchAround",
+    summary = "Search around specific log entry",
+    description = "Searches for log entries around a specific key (timestamp or record identifier) within a stream. Returns logs before and after the specified key, useful for investigating context around specific events or errors.",
     security(
         ("Authorization"= [])
     ),
@@ -458,7 +468,7 @@ pub async fn search(
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -483,7 +493,10 @@ pub async fn search(
             "size": 10,
             "scan_size": 28943
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/{stream_name}/_around")]
@@ -539,12 +552,13 @@ pub async fn around_v1(
 }
 
 /// SearchAroundV2
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchAroundV2",
+    summary = "Search around specific log record",
+    description = "Advanced version of around search that accepts a full log record in the request body instead of just a key. Searches for log entries around the specified record, providing better context matching based on the complete record data.",
     security(
         ("Authorization"= [])
     ),
@@ -566,7 +580,7 @@ pub async fn around_v1(
         "pod_name": "openobserve-ingester-0"
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "took": 155,
             "hits": [
                 {
@@ -591,7 +605,10 @@ pub async fn around_v1(
             "size": 10,
             "scan_size": 28943
         })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[post("/{org_id}/{stream_name}/_around")]
@@ -648,12 +665,13 @@ pub async fn around_v2(
 }
 
 /// SearchTopNValues
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchValues",
+    summary = "Get distinct field values",
+    description = "Retrieves the top N distinct values for specified fields within a stream and time range. Supports filtering, keyword search, and frequency counting. Essential for building dynamic filters, dropdowns, and understanding data cardinality in dashboards and analytics.",
     security(
         ("Authorization"= [])
     ),
@@ -671,7 +689,7 @@ pub async fn around_v2(
         ("no_count" = Option<bool>, Query, description = "no need count, true of false"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "took": 155,
             "values": [
                 {
@@ -680,8 +698,11 @@ pub async fn around_v2(
                 }
             ]
         })),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/{stream_name}/_values")]
@@ -1190,6 +1211,8 @@ async fn values_v1(
             "".to_string(),
             false,
             None,
+            // `is_multi_stream_search` false for values
+            false,
         )
         .instrument(http_span)
         .await;
@@ -1290,26 +1313,27 @@ async fn values_v1(
 }
 
 /// SearchStreamPartition
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchPartition",
+    summary = "Search partition data",
+    description = "Executes search queries on partitioned log data with specified parameters",
     security(
         ("Authorization"= [])
     ),
     params(
+        ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
         ("org_id" = String, Path, description = "Organization name"),
-        ("search_type" = String, Query, description = "query param with value 'ui', 'dashboards', 'reports', 'alerts' , 'rum' or 'values' allowed"),
     ),
-    request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
+    request_body(content = Object, description = "Search query", content_type = "application/json", example = json!({
         "sql": "select * from k8s ",
         "start_time": 1675182660872049i64,
         "end_time": 1675185660872049i64
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "took": 155,
             "file_num": 10,
             "original_size": 10240,
@@ -1319,8 +1343,11 @@ async fn values_v1(
                 [1674213225158000i64, 1674213225158000i64],
             ]
         })),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[post("/{org_id}/_search_partition")]
@@ -1348,9 +1375,7 @@ pub async fn search_partition(
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let search_type = get_search_type_from_request(&query).map_or(SearchEventType::Other, |opt| {
-        opt.unwrap_or(SearchEventType::Other)
-    });
+    let enable_align_histogram = get_enable_align_histogram_from_request(&query);
 
     #[cfg(feature = "cloud")]
     {
@@ -1375,11 +1400,9 @@ pub async fn search_partition(
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
-    req.search_type = Some(search_type);
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.sql) {
         req.sql = sql;
     }
-    req.search_type = Some(search_type);
 
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
@@ -1393,6 +1416,7 @@ pub async fn search_partition(
         &req,
         false,
         true,
+        enable_align_histogram,
     )
     .instrument(http_span)
     .await;
@@ -1431,12 +1455,13 @@ pub async fn search_partition(
 }
 
 /// Search History
-///
-/// #{"ratelimit_module":"Search", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchHistory",
+    summary = "Search query history",
+    description = "Retrieves historical search queries and their execution details",
     security(
         ("Authorization" = [])
     ),
@@ -1444,7 +1469,7 @@ pub async fn search_partition(
         ("org_id" = String, Path, description = "Organization ID"),
     ),
     request_body(
-        content = SearchHistoryRequest,
+        content = Object,
         description = "Search history request parameters",
         content_type = "application/json",
         example = json!({
@@ -1457,7 +1482,7 @@ pub async fn search_partition(
         })
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json ! ({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json ! ({
             "took": 40,
             "took_detail": {
                 "total": 40,
@@ -1491,8 +1516,11 @@ pub async fn search_partition(
             "is_partial": false,
             "result_cache_ratio": 0
         })),
-        (status = 400, description = "Bad Request - Invalid parameters or body", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Internal Server Error", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Bad Request - Invalid parameters or body", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
 #[post("/{org_id}/_search_history")]
@@ -1637,13 +1665,15 @@ pub async fn search_history(
     context_path = "/api",
     tag = "Search",
     operation_id = "ResultSchema",
+    summary = "Get search result schema",
+    description = "Returns the schema definition for search results based on query parameters",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
+    request_body(content = Object, description = "Search query", content_type = "application/json", example = json!({
         "query": {
             "sql": "select k8s_namespace_name as ns, histogram(_timestamp) from k8s group by k8s_namespace_name, histogram(_timestamp)",
             "start_time": 1675182660872049i64,
@@ -1653,13 +1683,13 @@ pub async fn search_history(
         }
     })),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "projections": ["ns","histogram(k8s._timestamp)"],
             "group_by": ["histogram(k8s._timestamp)"],
             "timeseries_field": "histogram(k8s._timestamp)",
         })),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
 #[post("/{org_id}/result_schema")]

@@ -37,6 +37,8 @@ use {
     o2_openfga::config::get_config as get_openfga_config,
 };
 
+#[cfg(feature = "cloud")]
+use crate::common::meta::user::UserList;
 use crate::{
     common::{
         meta::{
@@ -54,12 +56,15 @@ use crate::{
 pub mod service_accounts;
 
 /// ListUsers
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
     operation_id = "UserList",
+    summary = "List organization users",
+    description = "Retrieves a list of all users within the specified organization, including their roles, status, and basic \
+                   profile information. Optionally filter to list users across all organizations if the requesting user \
+                   has sufficient permissions. Returns user metadata such as email addresses, assigned roles, last login \
+                   times, and account status.",
     security(
         ("Authorization"= [])
     ),
@@ -67,7 +72,10 @@ pub mod service_accounts;
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/users")]
@@ -112,12 +120,15 @@ pub async fn list(
 }
 
 /// CreateUser
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
     operation_id = "UserSave",
+    summary = "Create new user",
+    description = "Creates a new user account within the organization with specified role and authentication credentials. \
+                   The password must be at least 8 characters long and the email address must be valid. Users are \
+                   automatically assigned to the organization with the specified role and can begin accessing resources \
+                   immediately upon creation.",
     security(
         ("Authorization"= [])
     ),
@@ -126,7 +137,10 @@ pub async fn list(
     ),
     request_body(content = PostUserRequest, description = "User data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/users")]
@@ -166,12 +180,15 @@ pub async fn save(
 }
 
 /// UpdateUser
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
     operation_id = "UserUpdate",
+    summary = "Update user account",
+    description = "Updates user account information including role assignments, password changes, or other profile details. \
+                   Users can modify their own account settings, while administrators have broader permissions to update \
+                   any user account. Password changes require the new password to be at least 8 characters long for \
+                   security compliance.",
     security(
         ("Authorization"= [])
     ),
@@ -181,7 +198,10 @@ pub async fn save(
     ),
     request_body(content = UpdateUser, description = "User data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/users/{email_id}")]
@@ -230,12 +250,14 @@ pub async fn update(
 }
 
 /// AddUserToOrganization
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
     operation_id = "AddUserToOrg",
+    summary = "Add user to organization",
+    description = "Adds an existing user account to the organization with the specified role assignment. The user must \
+                   already exist in the system with valid authentication credentials. This operation grants the user \
+                   access to organization resources and data according to their assigned role permissions.",
     security(
         ("Authorization"= [])
     ),
@@ -245,7 +267,10 @@ pub async fn update(
     ),
     request_body(content = UserRoleRequest, description = "User role", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/users/{email_id}")]
@@ -281,12 +306,14 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
     auth_cookie
 }
 /// RemoveUserFromOrganization
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
     operation_id = "RemoveUserFromOrg",
+    summary = "Remove user from organization",
+    description = "Removes a user from the organization, immediately revoking their access to all organization resources, \
+                   data, and services. The user account itself remains active and can be added back to organizations \
+                   later. This action is permanent and cannot be undone without re-adding the user explicitly.",
     security(
         ("Authorization"= [])
     ),
@@ -295,8 +322,11 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
         ("email_id" = String, Path, description = "User name"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/users/{email_id}")]
@@ -310,15 +340,21 @@ pub async fn delete(
 }
 
 /// AuthenticateUser
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
 context_path = "/auth",
     tag = "Auth",
     operation_id = "UserLoginCheck",
+    summary = "Authenticate user",
+    description = "Authenticates user credentials and returns authentication tokens stored in secure HTTP-only cookies. \
+                   Supports both JSON request body authentication and Authorization header-based authentication. \
+                   Successful authentication establishes a session that allows access to protected resources and APIs \
+                   throughout the platform.",
     request_body(content = SignInUser, description = "User login", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = SignInResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"}))
     )
 )]
 #[post("/login")]
@@ -706,12 +742,15 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
 }
 
 /// ListUserRoles
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
     operation_id = "UserRoles",
+    summary = "List available user roles",
+    description = "Retrieves a comprehensive list of all available user roles that can be assigned to users within the \
+                   organization. Includes role names, descriptions, and permission levels to help administrators \
+                   understand access control options when creating or updating user accounts. Role availability may \
+                   vary based on enterprise features and organizational settings.",
     security(
         ("Authorization"= [])
     ),
@@ -719,7 +758,10 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/users/roles")]
@@ -769,6 +811,11 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
     context_path = "/api",
     tag = "Users",
     operation_id = "UserInvitations",
+    summary = "List user invitations",
+    description = "Retrieves a list of pending organization invitations for the authenticated user across different \
+                   organizations. Shows invitation details including organization names, invited roles, expiration \
+                   dates, and invitation status. Users can review and accept invitations to join new organizations \
+                   with appropriate access permissions.",
     security(
         ("Authorization"= [])
     ),
@@ -776,13 +823,57 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
 #[get("/invites")]
 pub async fn list_invitations(user_email: UserEmail) -> Result<HttpResponse, Error> {
     let user_id = user_email.user_id.as_str();
-    users::list_user_invites(user_id).await
+    users::list_user_invites(user_id, true).await
+}
+
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "UserInvitations",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("token" = String, Path, description = "invitation token"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+    )
+)]
+#[delete("/invites/{token}")]
+pub async fn decline_invitation(
+    user_email: UserEmail,
+    path: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    use crate::service::organization;
+
+    let token = path.into_inner();
+    let user_id = user_email.user_id.as_str();
+
+    match organization::decline_invitation(user_id, &token).await {
+        Ok(_) => Ok(HttpResponse::Ok()
+            .json(serde_json::json!({"message":"Invitation declined successfully"}))),
+
+        Err(err) => {
+            Ok(HttpResponse::BadRequest().json(serde_json::json!({"message": err.to_string()})))
+        }
+    }
+}
+
+#[cfg(not(feature = "cloud"))]
+#[delete("/invites/{token}")]
+pub async fn decline_invitation(
+    _user_email: UserEmail,
+    _path: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
 #[cfg(not(feature = "cloud"))]

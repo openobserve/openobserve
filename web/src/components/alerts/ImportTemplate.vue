@@ -804,6 +804,12 @@ export default defineComponent({
       updateTemplateBody,
       updateTemplateTitle,
       url,
+      // Exposed validation and helper functions for testing
+      validateTemplateInputs,
+      checkTemplatesInList,
+      createTemplate,
+      processJsonObject,
+      readFileContent,
     };
   },
   components: {

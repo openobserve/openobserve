@@ -1,5 +1,9 @@
-import { test, expect } from "../baseFixtures";
-import logData from "../../cypress/fixtures/log.json";
+const {
+  test,
+  expect,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
+import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import { login } from "./utils/dashLogin.js";
@@ -16,10 +20,8 @@ test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard UI testcases", () => {
   test.beforeEach(async ({ page }) => {
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestion(page);
-    await page.waitForTimeout(2000);
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
@@ -746,7 +748,6 @@ test.describe("dashboard UI testcases", () => {
 
     // Listen for the dialog and assert its message
     page.once("dialog", async (dialog) => {
-      // console.log(`Dialog message: ${dialog.message()}`);
       await dialog.accept();
     });
     await pm.dashboardList.menuItem("logs-item");

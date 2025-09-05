@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="relative-position q-pt-sm" :style="{ height: '100%' }">
+  <div
+    data-test="span-renderer"
+    class="relative-position q-pt-sm"
+    :style="{ height: '100%' }"
+  >
     <template v-if="spans?.length">
       <template v-for="span in spans as any[]" :key="span.spanId"> </template>
     </template>
@@ -39,7 +43,7 @@ export default defineComponent({
     },
     collapseMapping: {
       type: Object,
-      default: () => {},
+      default: () => ({}),
     },
     baseTracePosition: {
       type: Object,
@@ -51,7 +55,7 @@ export default defineComponent({
     },
     spanDimensions: {
       type: Object,
-      default: () => {},
+      default: () => ({}),
     },
   },
   emits: ["toggleCollapse"],
