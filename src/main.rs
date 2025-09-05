@@ -30,6 +30,7 @@ use actix_web_lab::middleware::from_fn;
 use actix_web_opentelemetry::RequestTracing;
 use arrow_flight::flight_service_server::FlightServiceServer;
 use config::{get_config, utils::size::bytes_to_human_readable};
+use infra::cluster_coordinator::should_watch_through_queue;
 use log::LevelFilter;
 #[cfg(feature = "enterprise")]
 use openobserve::handler::http::{
@@ -236,6 +237,29 @@ async fn main() -> Result<(), anyhow::Error> {
         };
         let _guard = rt.enter();
         rt.block_on(async move {
+
+            // if cluster mode and nats coordinator, we don't need to watch internal coordinator
+            // we already do that above through the nats queue consumer
+            if should_watch_through_queue() {
+                log::info!("[INTERNAL_COORDINATOR::INIT] initializing internal coordinator");
+                // create the internal coordinator stream if not exists
+                if let Err(e) = infra::cluster_coordinator::create_stream().await {
+                    job_init_tx.send(false).ok();
+                    panic!(
+                        "[INTERNAL_COORDINATOR::CREATE_STREAM] Failed to create internal coordinator stream: {}",
+                        e
+                    );
+                }
+                // Except router it will run on every node. That is because this nats queue is supposed
+                // to be common for all the event types like enrichment table/schema etc.
+                tokio::task::spawn(async move {
+                    let _ = infra::cluster_coordinator::subscribe(async move |payload| {
+                        db::internal_coordinator_stream::handle_internal_coordinator_event(payload).await
+                    })
+                    .await;
+                });
+            }
+
             // it must be initialized before the server starts
             if let Err(e) = cluster::register_and_keep_alive().await {
                 job_init_tx.send(false).ok();

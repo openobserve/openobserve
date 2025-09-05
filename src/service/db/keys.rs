@@ -16,7 +16,10 @@
 use std::sync::Arc;
 
 use infra::{
-    cluster_coordinator::get_coordinator,
+    cluster_coordinator::{
+        events::{MetaAction, MetaEvent},
+        get_coordinator,
+    },
     db::Event,
     errors::{self, DbError},
     table::cipher::{CipherEntry, EntryKind},
@@ -181,45 +184,63 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
         match ev {
             Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(prefix).unwrap();
-                let (org, name) = item_key.split_once("/").unwrap();
-                let item = match infra::table::cipher::get_data(
-                    org,
-                    infra::table::cipher::EntryKind::CipherKey,
-                    name,
-                )
-                .await
-                {
-                    Ok(Some(val)) => val,
-                    Ok(None) => {
-                        log::error!("unexpected missing cipher key");
-                        continue;
-                    }
-                    Err(e) => {
-                        log::error!("Error getting value: {}", e);
-                        continue;
-                    }
-                };
-                let cd: CipherData = serde_json::from_str(&item).unwrap();
-                let kname = format!("{org}:{name}");
-                let key = cd.get_key().await.unwrap();
-                {
-                    let mut lock = REGISTRY.write();
-                    lock.add_key(kname, Box::new(key));
-                    drop(lock);
-                }
+                let _ = handle_put(&ev.key).await;
             }
             Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(prefix).unwrap();
-                let (org, name) = item_key.split_once("/").unwrap();
-                let kname = format!("{org}:{name}");
-                {
-                    let mut lock = REGISTRY.write();
-                    lock.remove_key(&kname);
-                    drop(lock);
-                }
+                let _ = handle_delete(&ev.key).await;
             }
             Event::Empty => {}
         }
     }
+}
+
+pub async fn handle_cipher_key_event(event: MetaEvent) -> Result<(), anyhow::Error> {
+    match event.action {
+        MetaAction::Put => handle_put(&event.key).await,
+        MetaAction::Delete => handle_delete(&event.key).await,
+    }
+}
+
+async fn handle_put(event_key: &str) -> Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(CIPHER_KEY_PREFIX).unwrap();
+    let (org, name) = item_key.split_once("/").unwrap();
+    let item =
+        match infra::table::cipher::get_data(org, infra::table::cipher::EntryKind::CipherKey, name)
+            .await
+        {
+            Ok(Some(val)) => val,
+            Ok(None) => {
+                log::error!("unexpected missing cipher key for key {event_key}");
+                return Err(anyhow::anyhow!(
+                    "unexpected missing cipher key for key {event_key}"
+                ));
+            }
+            Err(e) => {
+                log::error!("Error getting value for key {event_key}: {e}");
+                return Err(anyhow::anyhow!(
+                    "Error getting value for key {event_key}: {e}"
+                ));
+            }
+        };
+    let cd: CipherData = serde_json::from_str(&item).unwrap();
+    let kname = format!("{org}:{name}");
+    let key = cd.get_key().await.unwrap();
+    {
+        let mut lock = REGISTRY.write();
+        lock.add_key(kname, Box::new(key));
+        drop(lock);
+    }
+    Ok(())
+}
+
+async fn handle_delete(event_key: &str) -> Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(CIPHER_KEY_PREFIX).unwrap();
+    let (org, name) = item_key.split_once("/").unwrap();
+    let kname = format!("{org}:{name}");
+    {
+        let mut lock = REGISTRY.write();
+        lock.remove_key(&kname);
+        drop(lock);
+    }
+    Ok(())
 }

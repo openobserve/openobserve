@@ -16,8 +16,11 @@
 use std::sync::Arc;
 
 use config::{meta::function::Transform, utils::json};
+use infra::cluster_coordinator::events::{MetaAction, MetaEvent};
 
 use crate::{common::infra::config::QUERY_FUNCTIONS, service::db};
+
+pub const FUNCTIONS_KEY: &str = "/function/";
 
 pub async fn set(org_id: &str, name: &str, js_func: &Transform) -> Result<(), anyhow::Error> {
     let key = format!("/function/{org_id}/{name}");
@@ -65,7 +68,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = "/function/";
+    let key = FUNCTIONS_KEY;
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -80,29 +83,52 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: Transform = match db::get(&ev.key).await {
-                    Ok(val) => match json::from_slice(&val) {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("Error getting value: {}", e);
-                            continue;
-                        }
-                    },
-                    Err(e) => {
-                        log::error!("Error getting value: {}", e);
-                        continue;
-                    }
-                };
-                QUERY_FUNCTIONS.insert(item_key.to_owned(), item_value);
+                let _ = handle_put(&ev.key).await;
             }
             db::Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                QUERY_FUNCTIONS.remove(item_key);
+                let _ = handle_delete(&ev.key).await;
             }
             db::Event::Empty => {}
         }
     }
+    Ok(())
+}
+
+pub async fn handle_functions_event(event: MetaEvent) -> Result<(), anyhow::Error> {
+    match event.action {
+        MetaAction::Put => handle_put(&event.key).await,
+        MetaAction::Delete => handle_delete(&event.key).await,
+    }
+}
+
+async fn handle_put(event_key: &str) -> Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(FUNCTIONS_KEY).unwrap();
+    let item_value: Transform = match db::get(&event_key).await {
+        Ok(val) => match json::from_slice(&val) {
+            Ok(val) => val,
+            Err(e) => {
+                log::error!("Error getting value for key {event_key}: {}", e);
+                return Err(anyhow::anyhow!(
+                    "Error getting value for key {event_key}: {}",
+                    e
+                ));
+            }
+        },
+        Err(e) => {
+            log::error!("Error getting value for key {event_key}: {}", e);
+            return Err(anyhow::anyhow!(
+                "Error getting value for key {event_key}: {}",
+                e
+            ));
+        }
+    };
+    QUERY_FUNCTIONS.insert(item_key.to_owned(), item_value);
+    Ok(())
+}
+
+async fn handle_delete(event_key: &str) -> Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(FUNCTIONS_KEY).unwrap();
+    QUERY_FUNCTIONS.remove(item_key);
     Ok(())
 }
 

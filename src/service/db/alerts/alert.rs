@@ -24,7 +24,10 @@ use config::{
     utils::time::now_micros,
 };
 use infra::{
-    cluster_coordinator::alerts as cluster,
+    cluster_coordinator::{
+        alerts::{self as cluster, parse_alert_key},
+        events::{MetaAction, MetaEvent},
+    },
     db::{ORM_CLIENT, connect_to_orm},
     table::alerts as table,
 };
@@ -307,6 +310,36 @@ pub async fn list_with_folders<C: ConnectionTrait>(
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     cluster::watch_events(put_into_cache, delete_from_cache).await
+}
+
+pub async fn handle_alert_event(event: MetaEvent) -> Result<(), anyhow::Error> {
+    match event.action {
+        MetaAction::Put => handle_put(&event.key).await,
+        MetaAction::Delete => handle_delete(&event.key).await,
+    }
+}
+
+async fn handle_put(event_key: &str) -> Result<(), anyhow::Error> {
+    let Some((org, alert_id)) = parse_alert_key(event_key) else {
+        log::error!("watch_alerts: failed to parse event key {event_key}");
+        return Err(anyhow::anyhow!(
+            "watch_alerts: failed to parse event key {event_key}"
+        ));
+    };
+    // folder id is not needed, it is currently not used in put_into_cache
+    let _ = put_into_cache(org, alert_id, None).await;
+    Ok(())
+}
+
+async fn handle_delete(event_key: &str) -> Result<(), anyhow::Error> {
+    let Some((org, alert_id)) = parse_alert_key(event_key) else {
+        log::error!("watch_alerts: failed to parse event key {event_key}");
+        return Err(anyhow::anyhow!(
+            "watch_alerts: failed to parse event key {event_key}"
+        ));
+    };
+    let _ = delete_from_cache(org, alert_id).await;
+    Ok(())
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {

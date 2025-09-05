@@ -29,10 +29,6 @@ use once_cell::sync::Lazy;
 use serde::Serialize;
 
 use crate::{
-    cluster_coordinator::{
-        events::{InternalCoordinatorEvent, SchemaAction, SchemaEvent},
-        publish,
-    },
     db as infra_db,
     errors::{DbError, Error, Result},
 };
@@ -776,33 +772,6 @@ pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
         _ => vec![DataType::Utf8],
     };
     allowed_type.contains(to)
-}
-
-/// Publish a schema event to the cluster coordinator queue
-pub async fn publish_event(event: SchemaEvent) -> Result<()> {
-    log::debug!(
-        "[INTERNAL_COORDINATOR::PUBLISH_EVENT] publish schema event: {:?}",
-        event
-    );
-    let event = InternalCoordinatorEvent::Schema(event);
-    publish(event).await?;
-    Ok(())
-}
-
-pub fn schema_delete_event(key: &str, start_dt: Option<i64>) -> SchemaEvent {
-    SchemaEvent {
-        action: SchemaAction::Delete,
-        key: key.to_string(),
-        start_dt,
-    }
-}
-
-pub fn schema_update_event(key: &str, start_dt: Option<i64>) -> SchemaEvent {
-    SchemaEvent {
-        action: SchemaAction::Update,
-        key: key.to_string(),
-        start_dt,
-    }
 }
 
 #[cfg(test)]

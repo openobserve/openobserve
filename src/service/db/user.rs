@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use anyhow::bail;
 use config::utils::json;
+use infra::cluster_coordinator::events::{MetaAction, MetaEvent};
 
 use crate::{
     common::{
@@ -26,6 +27,8 @@ use crate::{
     },
     service::db,
 };
+
+pub const USER_KEY_PREFIX: &str = "/user/";
 
 pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyhow::Error> {
     // Do not rely on the org_id to check if the user is root. If the user is root,
@@ -151,7 +154,7 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = "/user/";
+    let key = USER_KEY_PREFIX;
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -166,76 +169,99 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-
-                let item_value: DBUser = match db::get(&ev.key).await {
-                    Ok(val) => match json::from_slice(&val) {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("Error getting value: {}", e);
-                            continue;
-                        }
-                    },
-                    Err(e) => {
-                        log::error!("Error getting value: {}", e);
-                        continue;
-                    }
-                };
-                let users = item_value.get_all_users();
-                // Invalidate the entire RUM-TOKEN-CACHE
-                for (_, user) in USERS.clone() {
-                    if user.email.eq(item_key) {
-                        USERS_RUM_TOKEN.clone().remove(&format!(
-                            "{}/{}",
-                            user.org,
-                            user.rum_token.as_ref().unwrap()
-                        ));
-                    }
-                }
-
-                #[cfg(not(feature = "enterprise"))]
-                for mut user in users {
-                    if user.role.eq(&UserRole::Root) {
-                        ROOT_USER.insert("root".to_string(), user.clone());
-                    } else if !user.role.eq(&UserRole::ServiceAccount) {
-                        user.role = UserRole::Admin;
-                    };
-                    USERS.insert(format!("{}/{}", user.org, item_key), user.clone());
-                    if let Some(rum_token) = &user.rum_token {
-                        USERS_RUM_TOKEN
-                            .clone()
-                            .insert(format!("{}/{}", user.org, rum_token), user);
-                    }
-                }
-
-                #[cfg(feature = "enterprise")]
-                for user in users {
-                    if user.role.eq(&UserRole::Root) {
-                        ROOT_USER.insert("root".to_string(), user.clone());
-                    }
-                    USERS.insert(format!("{}/{}", user.org, item_key), user.clone());
-                    if let Some(rum_token) = &user.rum_token {
-                        USERS_RUM_TOKEN
-                            .clone()
-                            .insert(format!("{}/{}", user.org, rum_token), user);
-                    }
-                }
+                let _ = handle_put(&ev.key).await;
             }
             db::Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                for (_, user) in USERS.clone() {
-                    if user.email.eq(item_key) {
-                        USERS.remove(&format!("{}/{}", user.org, user.email));
-                        // Invalidate the entire RUM-TOKEN-CACHE
-                        USERS_RUM_TOKEN.clone().remove(&format!(
-                            "{}/{}",
-                            user.org,
-                            user.rum_token.as_ref().unwrap()
-                        ));
-                    }
-                }
+                let _ = handle_delete(&ev.key).await;
             }
             db::Event::Empty => {}
+        }
+    }
+    Ok(())
+}
+
+pub async fn handle_user_event(event: MetaEvent) -> Result<(), anyhow::Error> {
+    match event.action {
+        MetaAction::Put => handle_put(&event.key).await,
+        MetaAction::Delete => handle_delete(&event.key).await,
+    }
+}
+
+async fn handle_put(event_key: &str) -> Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(USER_KEY_PREFIX).unwrap();
+
+    let item_value: DBUser = match db::get(event_key).await {
+        Ok(val) => match json::from_slice(&val) {
+            Ok(val) => val,
+            Err(e) => {
+                log::error!("Error getting value for key {event_key}: {}", e);
+                return Err(anyhow::anyhow!(
+                    "Error getting value for key {event_key}: {}",
+                    e
+                ));
+            }
+        },
+        Err(e) => {
+            log::error!("Error getting value for key {event_key}: {}", e);
+            return Err(anyhow::anyhow!(
+                "Error getting value for key {event_key}: {}",
+                e
+            ));
+        }
+    };
+    let users = item_value.get_all_users();
+    // Invalidate the entire RUM-TOKEN-CACHE
+    for (_, user) in USERS.clone() {
+        if user.email.eq(item_key) {
+            USERS_RUM_TOKEN.clone().remove(&format!(
+                "{}/{}",
+                user.org,
+                user.rum_token.as_ref().unwrap()
+            ));
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    for mut user in users {
+        if user.role.eq(&UserRole::Root) {
+            ROOT_USER.insert("root".to_string(), user.clone());
+        } else if !user.role.eq(&UserRole::ServiceAccount) {
+            user.role = UserRole::Admin;
+        };
+        USERS.insert(format!("{}/{}", user.org, item_key), user.clone());
+        if let Some(rum_token) = &user.rum_token {
+            USERS_RUM_TOKEN
+                .clone()
+                .insert(format!("{}/{}", user.org, rum_token), user);
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    for user in users {
+        if user.role.eq(&UserRole::Root) {
+            ROOT_USER.insert("root".to_string(), user.clone());
+        }
+        USERS.insert(format!("{}/{}", user.org, item_key), user.clone());
+        if let Some(rum_token) = &user.rum_token {
+            USERS_RUM_TOKEN
+                .clone()
+                .insert(format!("{}/{}", user.org, rum_token), user);
+        }
+    }
+    Ok(())
+}
+
+async fn handle_delete(event_key: &str) -> Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(USER_KEY_PREFIX).unwrap();
+    for (_, user) in USERS.clone() {
+        if user.email.eq(item_key) {
+            USERS.remove(&format!("{}/{}", user.org, user.email));
+            // Invalidate the entire RUM-TOKEN-CACHE
+            USERS_RUM_TOKEN.clone().remove(&format!(
+                "{}/{}",
+                user.org,
+                user.rum_token.as_ref().unwrap()
+            ));
         }
     }
     Ok(())

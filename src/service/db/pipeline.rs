@@ -20,7 +20,10 @@ use config::meta::{
     stream::StreamParams,
 };
 use infra::{
-    cluster_coordinator::pipelines::PIPELINES_WATCH_PREFIX,
+    cluster_coordinator::{
+        events::{MetaAction, MetaEvent},
+        pipelines::PIPELINES_WATCH_PREFIX,
+    },
     db,
     pipeline::{self as infra_pipeline},
 };
@@ -264,80 +267,99 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
-                let Ok(pipeline) = get_by_id(pipeline_id).await else {
-                    log::error!("[Pipeline::watch] error getting pipeline by id from db");
-                    continue;
-                };
-                // Only realtime & enabled pipeline should be added cache
-                if let PipelineSource::Realtime(stream_params) = &pipeline.source {
-                    let mut pipeline_stream_mapping_cache = PIPELINE_STREAM_MAPPING.write().await;
-                    let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
-                    if pipeline.enabled {
-                        match ExecutablePipeline::new(&pipeline).await {
-                            Err(e) => {
-                                log::error!(
-                                    "[Pipeline::watch] {}/{}/{}: Error initializing pipeline into ExecutablePipeline when updating cache: {}",
-                                    pipeline.org,
-                                    pipeline.name,
-                                    pipeline.id,
-                                    e
-                                );
-                            }
-                            Ok(exec_pl) => {
-                                pipeline_stream_mapping_cache
-                                    .insert(pipeline_id.to_string(), stream_params.clone());
-                                stream_exec_pl.insert(stream_params.clone(), exec_pl);
-                                log::info!(
-                                    "[Pipeline::watch]: pipeline {} added to cache.",
-                                    &pipeline.id
-                                );
-                            }
-                        };
-                    } else {
-                        // remove pipeline from cache if the update is to disable
-                        if let Some(removed) = pipeline_stream_mapping_cache.remove(pipeline_id) {
-                            if stream_exec_pl.remove(&removed).is_some() {
-                                log::info!(
-                                    "[Pipeline]: pipeline {} disabled and removed from cache.",
-                                    pipeline_id
-                                );
-                            }
-                        } else {
-                            log::error!(
-                                "[Pipeline]: pipeline {} not found in cache to remove.",
-                                pipeline_id
-                            );
-                        }
-                    }
-                }
+                let _ = handle_pipeline_put(&ev.key).await;
             }
             db::Event::Delete(ev) => {
-                let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
-                if let Some(removed) = PIPELINE_STREAM_MAPPING.write().await.remove(pipeline_id) {
-                    if STREAM_EXECUTABLE_PIPELINES
-                        .write()
-                        .await
-                        .remove(&removed)
-                        .is_some()
-                    {
-                        log::info!(
-                            "[Pipeline]: pipeline {} deleted and removed from cache.",
-                            pipeline_id
-                        );
-                    };
-                } else {
-                    log::error!(
-                        "[Pipeline]: pipeline {} not found in cache to remove.",
-                        pipeline_id
-                    );
-                }
+                let _ = handle_pipeline_delete(&ev.key).await;
             }
             db::Event::Empty => {}
         }
     }
 
     log::info!("[Pipeline::watch] His watch is ended");
+    Ok(())
+}
+
+pub async fn handle_pipeline_event(event: MetaEvent) -> Result<(), anyhow::Error> {
+    match event.action {
+        MetaAction::Put => handle_pipeline_put(&event.key).await,
+        MetaAction::Delete => handle_pipeline_delete(&event.key).await,
+    }
+}
+
+async fn handle_pipeline_put(event_key: &str) -> Result<(), anyhow::Error> {
+    let pipeline_id = event_key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
+    let Ok(pipeline) = get_by_id(pipeline_id).await else {
+        log::error!("[Pipeline::watch] error getting pipeline by id from db for key {event_key}");
+        return Err(anyhow::anyhow!(
+            "[Pipeline::watch] error getting pipeline by id from db for key {event_key}"
+        ));
+    };
+    // Only realtime & enabled pipeline should be added cache
+    if let PipelineSource::Realtime(stream_params) = &pipeline.source {
+        let mut pipeline_stream_mapping_cache = PIPELINE_STREAM_MAPPING.write().await;
+        let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
+        if pipeline.enabled {
+            match ExecutablePipeline::new(&pipeline).await {
+                Err(e) => {
+                    log::error!(
+                        "[Pipeline::watch] {}/{}/{}: Error initializing pipeline into ExecutablePipeline when updating cache: {}",
+                        pipeline.org,
+                        pipeline.name,
+                        pipeline.id,
+                        e
+                    );
+                }
+                Ok(exec_pl) => {
+                    pipeline_stream_mapping_cache
+                        .insert(pipeline_id.to_string(), stream_params.clone());
+                    stream_exec_pl.insert(stream_params.clone(), exec_pl);
+                    log::info!(
+                        "[Pipeline::watch]: pipeline {} added to cache.",
+                        &pipeline.id
+                    );
+                }
+            };
+        } else {
+            // remove pipeline from cache if the update is to disable
+            if let Some(removed) = pipeline_stream_mapping_cache.remove(pipeline_id) {
+                if stream_exec_pl.remove(&removed).is_some() {
+                    log::info!(
+                        "[Pipeline]: pipeline {} disabled and removed from cache.",
+                        pipeline_id
+                    );
+                }
+            } else {
+                log::error!(
+                    "[Pipeline]: pipeline {} not found in cache to remove.",
+                    pipeline_id
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn handle_pipeline_delete(event_key: &str) -> Result<(), anyhow::Error> {
+    let pipeline_id = event_key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
+    if let Some(removed) = PIPELINE_STREAM_MAPPING.write().await.remove(pipeline_id) {
+        if STREAM_EXECUTABLE_PIPELINES
+            .write()
+            .await
+            .remove(&removed)
+            .is_some()
+        {
+            log::info!(
+                "[Pipeline]: pipeline {} deleted and removed from cache.",
+                pipeline_id
+            );
+        };
+    } else {
+        log::error!(
+            "[Pipeline]: pipeline {} not found in cache to remove.",
+            pipeline_id
+        );
+    }
     Ok(())
 }
 

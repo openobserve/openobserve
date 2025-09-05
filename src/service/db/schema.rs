@@ -29,7 +29,7 @@ use hashbrown::{HashMap, HashSet};
 use infra::{
     cache,
     cluster_coordinator::{
-        events::{SchemaAction, SchemaEvent},
+        events::{MetaAction, MetaEvent},
         should_watch_through_queue,
     },
     schema::{
@@ -314,10 +314,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn handle_schema_event(event: SchemaEvent) -> Result<(), anyhow::Error> {
+pub async fn handle_schema_event(event: MetaEvent) -> Result<(), anyhow::Error> {
     match event.action {
-        SchemaAction::Update => handle_update(&event.key, event.start_dt).await,
-        SchemaAction::Delete => handle_delete(&event.key).await,
+        MetaAction::Put => handle_update(&event.key, event.start_dt).await,
+        MetaAction::Delete => handle_delete(&event.key).await,
     }
 }
 

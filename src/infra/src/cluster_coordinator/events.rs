@@ -13,24 +13,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum InternalCoordinatorEvent {
     EnrichmentTable(EnrichmentTableEvent),
-    Schema(SchemaEvent),
+    Meta(MetaEvent),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SchemaEvent {
-    pub action: SchemaAction,
+pub struct MetaEvent {
+    pub action: MetaAction,
     pub key: String,
     pub start_dt: Option<i64>,
+    pub value: Option<Bytes>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SchemaAction {
-    Update,
+pub enum MetaAction {
+    Put,
     Delete,
 }
 

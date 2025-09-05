@@ -18,7 +18,11 @@ use std::sync::Arc;
 use anyhow::{Context, anyhow};
 use chrono::Utc;
 use config::get_config;
-use infra::{db::Event, table::short_urls};
+use infra::{
+    cluster_coordinator::events::{MetaAction, MetaEvent},
+    db::Event,
+    table::short_urls,
+};
 
 use crate::{common::infra::config::SHORT_URLS, service::db};
 
@@ -56,19 +60,22 @@ pub async fn set(short_id: &str, entry: short_urls::ShortUrlRecord) -> Result<()
     Ok(())
 }
 
-pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = SHORT_URL_KEY;
-    let cluster_coordinator = db::get_coordinator().await;
-    let mut events = cluster_coordinator.watch(key).await?;
-    let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("Start watching short URLs");
-
+pub async fn spawn_gc_task() -> Result<(), anyhow::Error> {
     // Spawn a background task for garbage collection
     let config = get_config();
     tokio::spawn(run_gc_task(
         days_to_minutes(SHORT_URL_GC_INTERVAL),
         days_to_minutes(config.limit.short_url_retention_days),
     ));
+    Ok(())
+}
+
+pub async fn watch() -> Result<(), anyhow::Error> {
+    let key = SHORT_URL_KEY;
+    let cluster_coordinator = db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(key).await?;
+    let events = Arc::get_mut(&mut events).unwrap();
+    log::info!("Start watching short URLs");
 
     loop {
         let ev = match events.recv().await {
@@ -81,23 +88,43 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
         match ev {
             Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value = match short_urls::get(item_key).await {
-                    Ok(val) => val,
-                    Err(e) => {
-                        log::error!("Error getting value: {}", e);
-                        continue;
-                    }
-                };
-                SHORT_URLS.insert(item_key.to_string(), item_value);
+                let _ = handle_put(&ev.key).await;
             }
             Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                SHORT_URLS.remove(item_key);
+                let _ = handle_delete(&ev.key).await;
             }
             Event::Empty => {}
         }
     }
+}
+
+pub async fn handle_short_url_event(event: MetaEvent) -> Result<(), anyhow::Error> {
+    match event.action {
+        MetaAction::Put => handle_put(&event.key).await,
+        MetaAction::Delete => handle_delete(&event.key).await,
+    }
+}
+
+async fn handle_put(event_key: &str) -> Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(SHORT_URL_KEY).unwrap();
+    let item_value = match short_urls::get(item_key).await {
+        Ok(val) => val,
+        Err(e) => {
+            log::error!("Error getting value for key {event_key}: {}", e);
+            return Err(anyhow::anyhow!(
+                "Error getting value for key {event_key}: {}",
+                e
+            ));
+        }
+    };
+    SHORT_URLS.insert(item_key.to_string(), item_value);
+    Ok(())
+}
+
+async fn handle_delete(event_key: &str) -> Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(SHORT_URL_KEY).unwrap();
+    SHORT_URLS.remove(item_key);
+    Ok(())
 }
 
 /// Preload all short URLs from the database into the cache at startup.

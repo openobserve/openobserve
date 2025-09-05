@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::cluster::LOCAL_NODE;
-use infra::file_list as infra_file_list;
+use infra::{cluster_coordinator::should_watch_through_queue, file_list as infra_file_list};
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
 use regex::Regex;
@@ -87,8 +87,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // Try to download the mmdb files, if its not disabled.
         tokio::task::spawn(async move { mmdb_downloader::run().await });
     }
-    // cache users
-    tokio::task::spawn(async move { db::user::watch().await });
+
+    if !should_watch_through_queue() {
+        // cache users
+        tokio::task::spawn(async move { db::user::watch().await });
+    }
+
     db::user::cache().await.expect("user cache failed");
 
     db::organization::cache()
@@ -110,7 +114,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { self_reporting::run_audit_publish().await });
     #[cfg(feature = "enterprise")]
     {
-        tokio::task::spawn(async move { db::ofga::watch().await });
+        // if cluster mode and nats coordinator, we don't need to watch ofga model
+        // we already do that above through the nats queue consumer
+        if !should_watch_through_queue() {
+            tokio::task::spawn(async move { db::ofga::watch().await });
+        }
         db::ofga::cache().await.expect("ofga model cache failed");
         o2_openfga::authorizer::authz::init_open_fga().await;
         // RBAC model
@@ -134,49 +142,47 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { self_reporting::run().await });
 
+    // spawn gc task for short_urls
+    let _ = db::short_url::spawn_gc_task().await;
+    // if cluster mode and nats coordinator, we don't need to watch short_urls
+    // we already do that above through the nats queue consumer
+    if !should_watch_through_queue() {
+        tokio::task::spawn(async move { db::short_url::watch().await });
+    }
     // cache short_urls
-    tokio::task::spawn(async move { db::short_url::watch().await });
     db::short_url::cache()
         .await
         .expect("short url cache failed");
 
-    if !cfg.common.local_mode {
-        // Except router it will run on every node. That is because this nats queue is supposed
-        // to be common for all the event types like enrichment table/schema etc.
-        tokio::task::spawn(async move {
-            log::info!("[INTERNAL_COORDINATOR::INIT] initializing internal coordinator");
-            // create the internal coordinator stream if not exists
-            if let Err(e) = infra::cluster_coordinator::create_stream().await {
-                panic!(
-                    "[INTERNAL_COORDINATOR::CREATE_STREAM] Failed to create internal coordinator stream: {}",
-                    e
-                );
-            }
-            let _ = infra::cluster_coordinator::subscribe(async move |payload| {
-                db::internal_coordinator_stream::handle_internal_coordinator_event(payload).await
-            })
-            .await;
-        });
+    // if cluster mode and nats coordinator, we don't need to watch
+    // schema/functions/compact/metrics/alerts/dashboards/organization/pipeline we already do
+    // that above through the nats queue consumer
+    if !should_watch_through_queue() {
+        // initialize metadata watcher
+        tokio::task::spawn(async move { db::schema::watch().await });
+        tokio::task::spawn(async move { db::functions::watch().await });
+        tokio::task::spawn(async move { db::compact::retention::watch().await });
+        tokio::task::spawn(async move { db::metrics::watch_prom_cluster_leader().await });
+        tokio::task::spawn(async move { db::alerts::templates::watch().await });
+        tokio::task::spawn(async move { db::alerts::destinations::watch().await });
+        tokio::task::spawn(async move { db::alerts::realtime_triggers::watch().await });
+        tokio::task::spawn(async move { db::alerts::alert::watch().await });
+        tokio::task::spawn(async move { db::dashboards::reports::watch().await });
+        tokio::task::spawn(async move { db::organization::watch().await });
+        tokio::task::spawn(async move { db::pipeline::watch().await });
     }
-
-    // initialize metadata watcher
-    tokio::task::spawn(async move { db::schema::watch().await });
-    tokio::task::spawn(async move { db::functions::watch().await });
-    tokio::task::spawn(async move { db::compact::retention::watch().await });
-    tokio::task::spawn(async move { db::metrics::watch_prom_cluster_leader().await });
-    tokio::task::spawn(async move { db::alerts::templates::watch().await });
-    tokio::task::spawn(async move { db::alerts::destinations::watch().await });
-    tokio::task::spawn(async move { db::alerts::realtime_triggers::watch().await });
-    tokio::task::spawn(async move { db::alerts::alert::watch().await });
-    tokio::task::spawn(async move { db::dashboards::reports::watch().await });
-    tokio::task::spawn(async move { db::organization::watch().await });
-    tokio::task::spawn(async move { db::pipeline::watch().await });
 
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() {
+    // if cluster mode and nats coordinator, we don't need to watch session
+    // we already do that above through the nats queue consumer
+    if !should_watch_through_queue() && (LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier()) {
         tokio::task::spawn(async move { db::session::watch().await });
     }
-    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
+    // if cluster mode and nats coordinator, we don't need to watch enrichment_table
+    // we already do that above through the nats queue consumer
+    if !should_watch_through_queue()
+        && (LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager())
+    {
         tokio::task::spawn(async move { db::enrichment_table::watch().await });
     }
 
@@ -254,15 +260,19 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { cipher::run().await });
-    #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { db::keys::watch().await });
 
     // Shouldn't serve request until initialization finishes
     log::info!("Job initialization complete");
 
-    // Syslog server start
-    tokio::task::spawn(async move { db::syslog::watch().await });
-    tokio::task::spawn(async move { db::syslog::watch_syslog_settings().await });
+    // if cluster mode and nats coordinator, we don't need to watch syslog
+    // we already do that above through the nats queue consumer
+    if !should_watch_through_queue() {
+        #[cfg(feature = "enterprise")]
+        tokio::task::spawn(async move { db::keys::watch().await });
+        // Syslog server start
+        tokio::task::spawn(async move { db::syslog::watch().await });
+        tokio::task::spawn(async move { db::syslog::watch_syslog_settings().await });
+    }
 
     let start_syslog = *SYSLOG_ENABLED.read();
     if start_syslog {

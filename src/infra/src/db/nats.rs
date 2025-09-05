@@ -41,6 +41,7 @@ use tokio::{
 };
 
 use crate::{
+    cluster_coordinator::{coordinator_put_event, meta_delete_event, publish_event},
     db::{Event, EventData},
     dist_lock,
     errors::*,
@@ -208,20 +209,28 @@ impl super::Db for NatsDb {
         &self,
         key: &str,
         value: Bytes,
-        _need_watch: bool,
+        need_watch: bool,
         start_dt: Option<i64>,
     ) -> Result<()> {
+        let local_key = key.to_string();
         let key = if start_dt.is_some() {
             format!("{}/{}", key, start_dt.unwrap())
         } else {
             key.to_string()
         };
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, &key).await?;
-        let key = key_encode(new_key);
+        let encode_key = key_encode(new_key);
         _ = bucket
-            .put(&key, value)
+            .put(&encode_key, value.clone())
             .await
             .map_err(|e| Error::Message(format!("[NATS:put] bucket.put error: {}", e)))?;
+        if need_watch {
+            if let Err(e) =
+                publish_event(coordinator_put_event(&local_key, start_dt, Some(value))).await
+            {
+                log::error!("[NATS] send event error: {}", e);
+            }
+        }
         Ok(())
     }
 
@@ -290,7 +299,7 @@ impl super::Db for NatsDb {
         &self,
         key: &str,
         with_prefix: bool,
-        _need_watch: bool,
+        need_watch: bool,
         start_dt: Option<i64>,
     ) -> Result<()> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
@@ -305,21 +314,31 @@ impl super::Db for NatsDb {
             new_key.to_string()
         };
         if !with_prefix {
-            let key = key_encode(&new_key);
+            let purge_key = key_encode(&new_key);
             bucket
-                .purge(key)
+                .purge(purge_key)
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {}", e)))?;
+            if need_watch {
+                if let Err(e) = publish_event(meta_delete_event(&key, start_dt)).await {
+                    log::error!("[NATS] send event error: {}", e);
+                }
+            }
             return Ok(());
         }
         let keys = keys(&bucket, &new_key)
             .await
             .map_err(|e| Error::Message(format!("[NATS:delete] bucket.keys error: {}", e)))?;
-        for key in keys {
+        for purge_key in keys {
             bucket
-                .purge(key)
+                .purge(purge_key.clone())
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {}", e)))?;
+            if need_watch {
+                if let Err(e) = publish_event(meta_delete_event(&purge_key, start_dt)).await {
+                    log::error!("[NATS] send event error: {}", e);
+                }
+            }
         }
         Ok(())
     }

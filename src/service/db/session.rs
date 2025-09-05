@@ -16,6 +16,8 @@
 use std::sync::Arc;
 
 use config::utils::json;
+#[cfg(feature = "enterprise")]
+use infra::cluster_coordinator::events::{MetaAction, MetaEvent};
 
 use crate::{
     common::infra::config::USER_SESSIONS,
@@ -77,32 +79,56 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: String = match db::get(&ev.key).await {
-                    Ok(val) => match json::from_slice(&val) {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("Error getting value: {}", e);
-                            continue;
-                        }
-                    },
-                    Err(e) => {
-                        log::error!("Error getting value: {}", e);
-                        continue;
-                    }
-                };
-                if item_value.is_empty() {
-                    continue;
-                }
-                USER_SESSIONS.insert(item_key.to_string(), item_value);
+                let _ = handle_put(&ev.key).await;
             }
             db::Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                USER_SESSIONS.remove(item_key);
+                let _ = handle_delete(&ev.key).await;
             }
             db::Event::Empty => {}
         }
     }
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn handle_user_session_event(event: MetaEvent) -> Result<(), anyhow::Error> {
+    match event.action {
+        MetaAction::Put => handle_put(&event.key).await,
+        MetaAction::Delete => handle_delete(&event.key).await,
+    }
+}
+
+pub async fn handle_put(event_key: &str) -> Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(USER_SESSION_KEY).unwrap();
+    let item_value: String = match db::get(event_key).await {
+        Ok(val) => match json::from_slice(&val) {
+            Ok(val) => val,
+            Err(e) => {
+                log::error!("Error getting value for key {event_key}: {}", e);
+                return Err(anyhow::anyhow!(
+                    "Error getting value for key {event_key}: {}",
+                    e
+                ));
+            }
+        },
+        Err(e) => {
+            log::error!("Error getting value for key {event_key}: {}", e);
+            return Err(anyhow::anyhow!(
+                "Error getting value for key {event_key}: {}",
+                e
+            ));
+        }
+    };
+    if item_value.is_empty() {
+        return Ok(());
+    }
+    USER_SESSIONS.insert(item_key.to_string(), item_value);
+    Ok(())
+}
+
+pub async fn handle_delete(event_key: &str) -> Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(USER_SESSION_KEY).unwrap();
+    USER_SESSIONS.remove(item_key);
+    Ok(())
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {

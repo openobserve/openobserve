@@ -17,8 +17,11 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use config::{cluster::LOCAL_NODE, meta::promql::ClusterLeader, utils::json};
+use infra::cluster_coordinator::events::{MetaAction, MetaEvent};
 
 use crate::{common::infra::config::METRIC_CLUSTER_LEADER, service::db};
+
+pub const PROM_CLUSTER_LEADER_KEY: &str = "/metrics_leader/";
 
 pub async fn set_prom_cluster_info(cluster: &str, members: &[String]) -> Result<(), anyhow::Error> {
     let key = format!("/metrics_members/{cluster}");
@@ -54,7 +57,7 @@ pub async fn set_prom_cluster_leader(
 }
 
 pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
-    let key = "/metrics_leader/";
+    let key = PROM_CLUSTER_LEADER_KEY;
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -69,30 +72,10 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: ClusterLeader = match db::get(&ev.key).await {
-                    Ok(val) => match json::from_slice(&val) {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("Error getting value: {}", e);
-                            continue;
-                        }
-                    },
-                    Err(e) => {
-                        log::error!("Error getting value: {}", e);
-                        continue;
-                    }
-                };
-                if item_value.updated_by != LOCAL_NODE.uuid {
-                    METRIC_CLUSTER_LEADER
-                        .write()
-                        .await
-                        .insert(item_key.to_owned(), item_value);
-                }
+                let _ = handle_put(&ev.key).await;
             }
             db::Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                METRIC_CLUSTER_LEADER.write().await.remove(item_key);
+                let _ = handle_delete(&ev.key).await;
             }
             db::Event::Empty => {}
         }
@@ -100,8 +83,51 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn handle_prom_cluster_leader_event(event: MetaEvent) -> Result<(), anyhow::Error> {
+    match event.action {
+        MetaAction::Put => handle_put(&event.key).await,
+        MetaAction::Delete => handle_delete(&event.key).await,
+    }
+}
+
+async fn handle_put(event_key: &str) -> Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(PROM_CLUSTER_LEADER_KEY).unwrap();
+    let item_value: ClusterLeader = match db::get(&event_key).await {
+        Ok(val) => match json::from_slice(&val) {
+            Ok(val) => val,
+            Err(e) => {
+                log::error!("Error getting value for key {event_key}: {}", e);
+                return Err(anyhow::anyhow!(
+                    "Error getting value for key {event_key}: {}",
+                    e
+                ));
+            }
+        },
+        Err(e) => {
+            log::error!("Error getting value for key {event_key}: {}", e);
+            return Err(anyhow::anyhow!(
+                "Error getting value for key {event_key}: {}",
+                e
+            ));
+        }
+    };
+    if item_value.updated_by != LOCAL_NODE.uuid {
+        METRIC_CLUSTER_LEADER
+            .write()
+            .await
+            .insert(item_key.to_owned(), item_value);
+    }
+    Ok(())
+}
+
+async fn handle_delete(event_key: &str) -> Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(PROM_CLUSTER_LEADER_KEY).unwrap();
+    METRIC_CLUSTER_LEADER.write().await.remove(item_key);
+    Ok(())
+}
+
 pub async fn cache_prom_cluster_leader() -> Result<(), anyhow::Error> {
-    let key = "/metrics_leader/";
+    let key = PROM_CLUSTER_LEADER_KEY;
     let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let item_key_str = item_key.strip_prefix(key).unwrap();

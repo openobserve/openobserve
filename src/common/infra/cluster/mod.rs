@@ -21,6 +21,7 @@ use std::{
     time::Duration,
 };
 
+use bytes::Bytes;
 use config::{
     RwAHashMap, RwBTreeMap,
     cluster::*,
@@ -36,6 +37,7 @@ use config::{
     },
 };
 use infra::{
+    cluster_coordinator::events::{MetaAction, MetaEvent},
     db::{Event, get_coordinator},
     errors::Result,
 };
@@ -49,6 +51,7 @@ pub use scheduler::select_best_node;
 
 const CONSISTENT_HASH_PRIME: u32 = 16777619;
 
+pub const NODES_KEY: &str = "/nodes/";
 static NODES: Lazy<RwAHashMap<String, Node>> = Lazy::new(Default::default);
 static QUERIER_INTERACTIVE_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
     Lazy::new(Default::default);
@@ -311,7 +314,7 @@ pub async fn list_nodes() -> Result<Vec<Node>> {
 }
 
 async fn watch_node_list() -> Result<()> {
-    let key = "/nodes/";
+    let key = NODES_KEY;
     let client = get_coordinator().await;
     let mut events = client.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -327,135 +330,135 @@ async fn watch_node_list() -> Result<()> {
         };
         match ev {
             Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                let mut item_value: Node = match json::from_slice(ev.value.as_ref().unwrap()) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        let value_str = String::from_utf8_lossy(ev.value.as_ref().unwrap());
-                        log::error!(
-                            "[CLUSTER] watch_node_list: error parsing node: {}, payload: {value_str}",
-                            e
-                        );
-                        continue;
-                    }
-                };
-                let (_broadcasted, exist) = match NODES.read().await.get(item_key) {
-                    Some(v) => (v.broadcasted, item_value.is_same(v)),
-                    None => (false, false),
-                };
-                if exist {
-                    // update the node status metrics in local cache
-                    set_node_status_metrics(&item_value).await;
-                    continue;
-                }
-                if item_value.status == NodeStatus::Offline {
-                    log::info!("[CLUSTER] offline {:?}", item_value);
-                    if item_value.is_interactive_querier() {
-                        remove_node_from_consistent_hash(
-                            &item_value,
-                            &Role::Querier,
-                            Some(RoleGroup::Interactive),
-                        )
-                        .await;
-                    }
-                    if item_value.is_background_querier() {
-                        remove_node_from_consistent_hash(
-                            &item_value,
-                            &Role::Querier,
-                            Some(RoleGroup::Background),
-                        )
-                        .await;
-                    }
-                    if item_value.is_querier() && LOCAL_NODE.is_router() {
-                        crate::router::http::remove_querier_from_handler(&item_value.name).await;
-                    }
-                    if item_value.is_compactor() {
-                        remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;
-                    }
-                    if item_value.is_flatten_compactor() {
-                        remove_node_from_consistent_hash(
-                            &item_value,
-                            &Role::FlattenCompactor,
-                            None,
-                        )
-                        .await;
-                    }
-                    NODES.write().await.remove(item_key);
-                    continue;
-                }
-                log::info!("[CLUSTER] join {:?}", item_value);
-                item_value.broadcasted = true;
-                // check if the same node is already in the cluster
-                if let Some(node) = get_cached_node_by_name(&item_value.name).await {
-                    if node.uuid.ne(&item_value.uuid) {
-                        NODES.write().await.remove(&node.uuid);
-                    }
-                }
-                if item_value.is_interactive_querier() {
-                    add_node_to_consistent_hash(
-                        &item_value,
-                        &Role::Querier,
-                        Some(RoleGroup::Interactive),
-                    )
-                    .await;
-                }
-                if item_value.is_background_querier() {
-                    add_node_to_consistent_hash(
-                        &item_value,
-                        &Role::Querier,
-                        Some(RoleGroup::Background),
-                    )
-                    .await;
-                }
-                if item_value.is_compactor() {
-                    add_node_to_consistent_hash(&item_value, &Role::Compactor, None).await;
-                }
-                if item_value.is_flatten_compactor() {
-                    add_node_to_consistent_hash(&item_value, &Role::FlattenCompactor, None).await;
-                }
-                NODES.write().await.insert(item_key.to_string(), item_value);
+                let _ = handle_node_list_put(&ev.key, ev.value).await;
             }
             Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value = match NODES.read().await.get(item_key) {
-                    Some(v) => v.clone(),
-                    None => {
-                        continue;
-                    }
-                };
-                log::info!("[CLUSTER] leave {:?}", item_value);
-                if item_value.is_interactive_querier() {
-                    remove_node_from_consistent_hash(
-                        &item_value,
-                        &Role::Querier,
-                        Some(RoleGroup::Interactive),
-                    )
-                    .await;
-                }
-                if item_value.is_background_querier() {
-                    remove_node_from_consistent_hash(
-                        &item_value,
-                        &Role::Querier,
-                        Some(RoleGroup::Background),
-                    )
-                    .await;
-                }
-                if item_value.is_querier() && LOCAL_NODE.is_router() {
-                    crate::router::http::remove_querier_from_handler(&item_value.name).await;
-                }
-                if item_value.is_compactor() {
-                    remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;
-                }
-                if item_value.is_flatten_compactor() {
-                    remove_node_from_consistent_hash(&item_value, &Role::FlattenCompactor, None)
-                        .await;
-                }
-                NODES.write().await.remove(item_key);
+                let _ = handle_node_list_delete(&ev.key).await;
             }
             Event::Empty => {}
         }
     }
 
+    Ok(())
+}
+
+pub async fn handle_node_list_event(event: MetaEvent) -> std::result::Result<(), anyhow::Error> {
+    match event.action {
+        MetaAction::Put => handle_node_list_put(&event.key, event.value).await,
+        MetaAction::Delete => handle_node_list_delete(&event.key).await,
+    }
+}
+
+async fn handle_node_list_put(
+    event_key: &str,
+    value: Option<Bytes>,
+) -> std::result::Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(NODES_KEY).unwrap();
+    let mut item_value: Node = match json::from_slice(value.as_ref().unwrap()) {
+        Ok(v) => v,
+        Err(e) => {
+            let value_str = String::from_utf8_lossy(value.as_ref().unwrap());
+            log::error!(
+                "[CLUSTER] watch_node_list: error parsing node: {}, payload: {value_str}",
+                e
+            );
+            return Err(anyhow::anyhow!(
+                "Error parsing node: {}, payload: {value_str}",
+                e
+            ));
+        }
+    };
+    let (_broadcasted, exist) = match NODES.read().await.get(item_key) {
+        Some(v) => (v.broadcasted, item_value.is_same(v)),
+        None => (false, false),
+    };
+    if exist {
+        // update the node status metrics in local cache
+        set_node_status_metrics(&item_value).await;
+        return Ok(());
+    }
+    if item_value.status == NodeStatus::Offline {
+        log::info!("[CLUSTER] offline {:?}", item_value);
+        if item_value.is_interactive_querier() {
+            remove_node_from_consistent_hash(
+                &item_value,
+                &Role::Querier,
+                Some(RoleGroup::Interactive),
+            )
+            .await;
+        }
+        if item_value.is_background_querier() {
+            remove_node_from_consistent_hash(
+                &item_value,
+                &Role::Querier,
+                Some(RoleGroup::Background),
+            )
+            .await;
+        }
+        if item_value.is_querier() && LOCAL_NODE.is_router() {
+            crate::router::http::remove_querier_from_handler(&item_value.name).await;
+        }
+        if item_value.is_compactor() {
+            remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;
+        }
+        if item_value.is_flatten_compactor() {
+            remove_node_from_consistent_hash(&item_value, &Role::FlattenCompactor, None).await;
+        }
+        NODES.write().await.remove(item_key);
+        return Ok(());
+    }
+    log::info!("[CLUSTER] join {:?}", item_value);
+    item_value.broadcasted = true;
+    // check if the same node is already in the cluster
+    if let Some(node) = get_cached_node_by_name(&item_value.name).await {
+        if node.uuid.ne(&item_value.uuid) {
+            NODES.write().await.remove(&node.uuid);
+        }
+    }
+    if item_value.is_interactive_querier() {
+        add_node_to_consistent_hash(&item_value, &Role::Querier, Some(RoleGroup::Interactive))
+            .await;
+    }
+    if item_value.is_background_querier() {
+        add_node_to_consistent_hash(&item_value, &Role::Querier, Some(RoleGroup::Background)).await;
+    }
+    if item_value.is_compactor() {
+        add_node_to_consistent_hash(&item_value, &Role::Compactor, None).await;
+    }
+    if item_value.is_flatten_compactor() {
+        add_node_to_consistent_hash(&item_value, &Role::FlattenCompactor, None).await;
+    }
+    NODES.write().await.insert(item_key.to_string(), item_value);
+    Ok(())
+}
+
+async fn handle_node_list_delete(event_key: &str) -> std::result::Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(NODES_KEY).unwrap();
+    let item_value = match NODES.read().await.get(item_key) {
+        Some(v) => v.clone(),
+        None => {
+            return Ok(());
+        }
+    };
+    log::info!("[CLUSTER] leave {:?}", item_value);
+    if item_value.is_interactive_querier() {
+        remove_node_from_consistent_hash(&item_value, &Role::Querier, Some(RoleGroup::Interactive))
+            .await;
+    }
+    if item_value.is_background_querier() {
+        remove_node_from_consistent_hash(&item_value, &Role::Querier, Some(RoleGroup::Background))
+            .await;
+    }
+    if item_value.is_querier() && LOCAL_NODE.is_router() {
+        crate::router::http::remove_querier_from_handler(&item_value.name).await;
+    }
+    if item_value.is_compactor() {
+        remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;
+    }
+    if item_value.is_flatten_compactor() {
+        remove_node_from_consistent_hash(&item_value, &Role::FlattenCompactor, None).await;
+    }
+    NODES.write().await.remove(item_key);
     Ok(())
 }
 

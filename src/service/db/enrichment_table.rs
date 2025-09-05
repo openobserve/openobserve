@@ -16,7 +16,6 @@
 use std::sync::Arc;
 
 use config::{
-    get_config,
     meta::stream::{EnrichmentTableMetaStreamStats, StreamType},
     utils::{
         json,
@@ -27,7 +26,7 @@ use infra::{
     cache::stats,
     cluster_coordinator::{
         events::{EnrichmentTableAction, EnrichmentTableEvent, InternalCoordinatorEvent},
-        publish,
+        publish, should_watch_through_queue,
     },
     db as infra_db,
 };
@@ -311,7 +310,7 @@ pub async fn delete_meta_table_stats(org_id: &str, name: &str) -> Result<(), inf
 }
 
 pub async fn notify_update(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
-    if get_config().common.local_mode {
+    if !should_watch_through_queue() {
         let cluster_coordinator = infra_db::get_coordinator().await;
         let key: String = format!(
             "/enrichment_table/{org_id}/{}/{}",
@@ -331,7 +330,7 @@ pub async fn notify_update(org_id: &str, name: &str) -> Result<(), infra::errors
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
-    if get_config().common.local_mode {
+    if !should_watch_through_queue() {
         let cluster_coordinator = infra_db::get_coordinator().await;
         let key: String = format!(
             "/enrichment_table/{org_id}/{}/{}",
@@ -361,7 +360,7 @@ async fn publish_event(event: EnrichmentTableEvent) -> Result<(), infra::errors:
 pub async fn watch() -> Result<(), anyhow::Error> {
     // For non-local mode, we use the nats queue to watch the enrichment table events.
     // Hence no need to watch the enrichment table events here.
-    if !get_config().common.local_mode {
+    if !should_watch_through_queue() {
         return Ok(());
     }
 

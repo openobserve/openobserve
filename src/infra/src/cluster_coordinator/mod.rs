@@ -25,7 +25,7 @@ use config::{get_config, meta::meta_store::MetaStore, utils::json};
 use tokio::sync::mpsc;
 
 use crate::{
-    cluster_coordinator::events::InternalCoordinatorEvent,
+    cluster_coordinator::events::{InternalCoordinatorEvent, MetaAction, MetaEvent},
     db::Db,
     errors::Error,
     queue::{self, RetentionPolicy},
@@ -95,8 +95,48 @@ where
     Ok(())
 }
 
+/// If the cluster coordinator is nats, we use the nats queue to watch the events.
+/// Otherwise, we use the cluster coordinator to watch the events.
 pub fn should_watch_through_queue() -> bool {
     let cfg = get_config();
     let cluster_coordinator: MetaStore = cfg.common.cluster_coordinator.as_str().into();
     !cfg.common.local_mode && cluster_coordinator == MetaStore::Nats
+}
+
+/// Publish a coordinator event to the nats cluster coordinator queue
+pub async fn publish_event(event: MetaEvent) -> crate::errors::Result<()> {
+    log::debug!(
+        "[INTERNAL_COORDINATOR::PUBLISH_EVENT] publish coordinator event: {:?}",
+        event
+    );
+    let event = InternalCoordinatorEvent::Meta(event);
+    publish(event).await?;
+    Ok(())
+}
+
+pub fn meta_delete_event(key: &str, start_dt: Option<i64>) -> MetaEvent {
+    MetaEvent {
+        action: MetaAction::Delete,
+        key: key.to_string(),
+        start_dt,
+        value: None,
+    }
+}
+
+pub fn meta_put_event(key: &str, start_dt: Option<i64>) -> MetaEvent {
+    MetaEvent {
+        action: MetaAction::Put,
+        key: key.to_string(),
+        start_dt,
+        value: None,
+    }
+}
+
+pub fn coordinator_put_event(key: &str, start_dt: Option<i64>, value: Option<Bytes>) -> MetaEvent {
+    MetaEvent {
+        action: MetaAction::Put,
+        key: key.to_string(),
+        start_dt,
+        value,
+    }
 }

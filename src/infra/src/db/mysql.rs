@@ -30,11 +30,7 @@ use sqlx::{
 use tokio::sync::{OnceCell, mpsc};
 
 use super::{DBIndex, IndexStatement};
-use crate::{
-    cluster_coordinator::should_watch_through_queue,
-    errors::*,
-    schema::{SCHEMA_KEY, schema_delete_event, schema_update_event},
-};
+use crate::errors::*;
 
 pub static CLIENT: Lazy<Pool<MySql>> = Lazy::new(|| connect(false, false));
 pub static CLIENT_RO: Lazy<Pool<MySql>> = Lazy::new(|| connect(true, false));
@@ -213,23 +209,10 @@ impl super::Db for MysqlDb {
         let time = start.elapsed().as_secs_f64();
         // event watch
         if need_watch {
-            let should_use_queue = if key.starts_with(SCHEMA_KEY) {
-                should_watch_through_queue()
-            } else {
-                false
-            };
-            if should_use_queue && key.starts_with(SCHEMA_KEY) {
-                if let Err(e) =
-                    crate::schema::publish_event(schema_update_event(key, start_dt)).await
-                {
-                    log::error!("[MYSQL] send event error: {}", e);
-                }
-            } else {
-                let cluster_coordinator = super::get_coordinator().await;
-                cluster_coordinator
-                    .put(key, Bytes::from(""), true, start_dt)
-                    .await?;
-            }
+            let cluster_coordinator = super::get_coordinator().await;
+            cluster_coordinator
+                .put(key, Bytes::from(""), true, start_dt)
+                .await?;
         }
 
         DB_QUERY_TIME
@@ -471,30 +454,16 @@ impl super::Db for MysqlDb {
 
         // event watch
         if need_watch {
-            let should_use_queue = if key.starts_with(SCHEMA_KEY) {
-                should_watch_through_queue()
-            } else {
-                // we can ignore for the modules other than schema
-                // because only schema is broadcasted through the coordinator queue.
-                false
-            };
             let start_dt = if need_watch_dt > 0 {
                 Some(need_watch_dt)
             } else {
                 start_dt
             };
-            if should_use_queue && key.starts_with(SCHEMA_KEY) {
-                if let Err(e) =
-                    crate::schema::publish_event(schema_update_event(key, start_dt)).await
-                {
-                    log::error!("[MYSQL] send event error: {}", e);
-                }
-            } else {
-                let cluster_coordinator = super::get_coordinator().await;
-                cluster_coordinator
-                    .put(key, Bytes::from(""), true, start_dt)
-                    .await?;
-            }
+
+            let cluster_coordinator = super::get_coordinator().await;
+            cluster_coordinator
+                .put(key, Bytes::from(""), true, start_dt)
+                .await?;
         }
 
         Ok(())
@@ -509,11 +478,6 @@ impl super::Db for MysqlDb {
     ) -> Result<()> {
         // event watch
         if need_watch {
-            let should_use_queue = if key.starts_with(SCHEMA_KEY) {
-                should_watch_through_queue()
-            } else {
-                false
-            };
             // find all keys then send event
             let items = if with_prefix {
                 self.list_keys(key).await?
@@ -523,13 +487,7 @@ impl super::Db for MysqlDb {
             let cluster_coordinator = super::get_coordinator().await;
             tokio::task::spawn(async move {
                 for key in items {
-                    if should_use_queue && key.starts_with(SCHEMA_KEY) {
-                        if let Err(e) =
-                            crate::schema::publish_event(schema_delete_event(&key, start_dt)).await
-                        {
-                            log::error!("[MYSQL] send event error: {}", e);
-                        }
-                    } else if let Err(e) = cluster_coordinator
+                    if let Err(e) = cluster_coordinator
                         .delete(&key, false, true, start_dt)
                         .await
                     {
