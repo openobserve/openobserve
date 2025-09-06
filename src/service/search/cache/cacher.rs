@@ -178,10 +178,6 @@ pub async fn check_cache(
         req.query.sql = origin_sql.clone();
         discard_interval = interval * 1000 * 1000; // in microseconds
     }
-    // if req.query.size >= 0 {
-    //     *file_path = format!("{}", file_path, req.query.from, req.query.size);
-    // }
-    let query_key = file_path.replace('/', "_");
 
     let mut is_descending = true;
 
@@ -201,21 +197,19 @@ pub async fn check_cache(
         multi_resp.histogram_interval = discard_interval / 1000 / 1000;
     }
     if get_config().common.use_multi_result_cache {
-        let mut cached_responses =
-            crate::service::search::cluster::cache_multi::get_cached_results(
-                query_key.to_owned(),
-                file_path.to_string(),
-                trace_id.to_owned(),
-                CacheQueryRequest {
-                    q_start_time: req.query.start_time,
-                    q_end_time: req.query.end_time,
-                    is_aggregate,
-                    ts_column: result_ts_col.clone(),
-                    discard_interval,
-                    is_descending,
-                },
-            )
-            .await;
+        let mut cached_responses = crate::service::search::cache::multi::get_cached_results(
+            trace_id,
+            file_path,
+            CacheQueryRequest {
+                q_start_time: req.query.start_time,
+                q_end_time: req.query.end_time,
+                is_aggregate,
+                ts_column: result_ts_col.clone(),
+                discard_interval,
+                is_descending,
+            },
+        )
+        .await;
         if is_descending {
             cached_responses.sort_by_key(|meta| meta.response_end_time);
         } else {
@@ -281,10 +275,9 @@ pub async fn check_cache(
         multi_resp.order_by = order_by;
         multi_resp
     } else {
-        let c_resp = match crate::service::search::cluster::cacher::get_cached_results(
-            query_key.to_owned(),
-            file_path.to_string(),
-            trace_id.to_owned(),
+        let c_resp = match crate::service::search::cache::cacher::get_cached_results(
+            trace_id,
+            file_path,
             CacheQueryRequest {
                 q_start_time: req.query.start_time,
                 q_end_time: req.query.end_time,
@@ -369,8 +362,8 @@ pub async fn check_cache(
 }
 
 pub async fn get_cached_results(
-    file_path: &str,
     trace_id: &str,
+    file_path: &str,
     cache_req: CacheQueryRequest,
 ) -> Option<CachedQueryResponse> {
     let r = QUERY_RESULT_CACHE.read().await;

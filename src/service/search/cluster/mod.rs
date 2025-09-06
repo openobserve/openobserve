@@ -27,7 +27,6 @@ use {
     infra::errors::{Error, ErrorCodes, Result},
 };
 
-pub mod cache_multi;
 pub mod cacher;
 pub mod flight;
 pub mod http;
