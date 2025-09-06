@@ -375,8 +375,8 @@ export default class LogsVisualise {
       .catch(() => false);
   }
 
-  // Verify quick mode toggle state
-  async verifyQuickModeToggle(expectedState = true) {
+  // Get quick mode toggle state using the most reliable method
+  async getQuickModeToggleState() {
     const quickModeToggle = this.page.locator(
       '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
     );
@@ -385,17 +385,66 @@ export default class LogsVisualise {
     await quickModeToggle.waitFor({ state: "visible", timeout: 10000 });
 
     // Check aria-checked attribute - this is the most reliable indicator
-    const ariaChecked = await quickModeToggle.getAttribute("aria-checked");
-    const isChecked = ariaChecked === "true";
+    // Falls back to aria-pressed if aria-checked is not available
+    let ariaChecked = await quickModeToggle.getAttribute("aria-checked");
+    if (ariaChecked === null) {
+      ariaChecked = await quickModeToggle.getAttribute("aria-pressed");
+    }
+
+    return ariaChecked === "true";
+  }
+
+  // Verify quick mode toggle state
+  async verifyQuickModeToggle(expectedState = true) {
+    const isChecked = await this.getQuickModeToggleState();
 
     // Validate the toggle state matches expectation
     if (expectedState !== isChecked) {
       throw new Error(
-        `Expected quick mode to be ${expectedState} but aria-checked="${ariaChecked}"`
+        `Expected quick mode to be ${expectedState} but actual state is ${isChecked}`
       );
     }
 
     return isChecked;
+  }
+
+  // Toggle quick mode to specific state (enable/disable)
+  async setQuickModeToggle(enableState) {
+    const quickModeToggle = this.page.locator(
+      '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
+    );
+
+    await quickModeToggle.waitFor({ state: "visible", timeout: 10000 });
+
+    const currentState = await this.getQuickModeToggleState();
+
+    // Only click if we need to change the state
+    if (currentState !== enableState) {
+      await quickModeToggle.click();
+
+      // Wait for state change to complete
+      await this.page.waitForTimeout(500);
+
+      // Verify the state actually changed
+      const newState = await this.getQuickModeToggleState();
+      if (newState !== enableState) {
+        throw new Error(
+          `Failed to set quick mode to ${enableState}. Current state: ${newState}`
+        );
+      }
+    }
+
+    return enableState;
+  }
+
+  // Enable quick mode if it's currently disabled
+  async enableQuickModeIfDisabled() {
+    return await this.setQuickModeToggle(true);
+  }
+
+  // Disable quick mode if it's currently enabled
+  async disableQuickModeIfEnabled() {
+    return await this.setQuickModeToggle(false);
   }
 
   // Helper function to verify chart type selection
