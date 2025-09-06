@@ -56,7 +56,7 @@ class PageManager {
    */
   constructor(page) {
     this.page = page;
-    
+
     // ===== EXISTING DASHBOARD PAGE OBJECTS =====
     this.dashboardCreate = new DashboardCreate(page);
     this.dashboardList = new DashboardListPage(page);
@@ -75,10 +75,10 @@ class PageManager {
     this.dateTimeHelper = new DateTimeHelper(page);
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
-    
+
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
-    
+
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
     this.streamsPage = new StreamsPage(page);
@@ -87,7 +87,7 @@ class PageManager {
     this.pipelinesPage = new PipelinesPage(page);
     this.loginPage = new LoginPage(page);
     this.ingestionPage = new IngestionPage(page);
-    
+
     // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
     this.homePage = new HomePage(page);
     this.metricsPage = new MetricsPage(page);
@@ -106,7 +106,7 @@ class PageManager {
     this.enrichmentPage = new EnrichmentPage(page);
     this.schemaPage = new SchemaPage(page);
     this.schemaLoadPage = new SchemaLoadPage(page);
-    
+
     // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
     this.logsQueryPage = new LogsQueryPage(page);
     this.unflattenedPage = new UnflattenedPage(page);
