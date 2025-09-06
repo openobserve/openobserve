@@ -316,6 +316,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
+      <q-select
+        v-if="
+          dashboardPanelData.data.type != 'table' &&
+          dashboardPanelData.data.type != 'heatmap' &&
+          dashboardPanelData.data.type != 'metric' &&
+          dashboardPanelData.data.type != 'gauge' &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.type != 'pie' &&
+          dashboardPanelData.data.type != 'donut' &&
+          dashboardPanelData.data.config.show_legends &&
+          dashboardPanelData.data.type != 'sankey' &&
+          dashboardPanelData.data.type != 'maps'
+        "
+        outlined
+        v-model="dashboardPanelData.data.config.legends_type"
+        :options="legendTypeOptions"
+        dense
+        label="Legends Type"
+        class="showLabelOnTop"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.legends_type ?? 'Auto'
+        }`"
+        data-test="dashboard-config-legends-scrollable"
+      >
+      </q-select>
+
+      <div class="space"></div>
+
       <div class="input-container">
         <q-input
           v-if="
@@ -1271,6 +1301,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
+      <div class="space"></div>
+
+      <q-toggle
+        v-if="
+          dashboardPanelData.data.type != 'table' &&
+          dashboardPanelData.data.type != 'heatmap' &&
+          dashboardPanelData.data.type != 'metric' &&
+          dashboardPanelData.data.type != 'gauge' &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.type != 'pie' &&
+          dashboardPanelData.data.type != 'donut' &&
+          dashboardPanelData.data.type != 'sankey' &&
+          dashboardPanelData.data.type != 'maps'
+        "
+        v-model="dashboardPanelData.data.config.show_gridlines"
+        label="Show Gridlines"
+        data-test="dashboard-config-show-gridlines"
+      />
+
+      <div class="space"></div>
+
       <q-input
         v-if="
           [
@@ -1552,7 +1603,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount, onMounted, ref } from "vue";
+import {
+  computed,
+  defineComponent,
+  inject,
+  onBeforeMount,
+  onMounted,
+  ref,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
@@ -1692,7 +1750,9 @@ export default defineComponent({
         const isNewPanel = !dashboardPanelData.data.id;
         // if new panel, use config env
         // else always false
-        dashboardPanelData.data.config.show_symbol = isNewPanel ? store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false : false;
+        dashboardPanelData.data.config.show_symbol = isNewPanel
+          ? (store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false)
+          : false;
       }
 
       // by default, set line interpolation as smooth
@@ -1802,6 +1862,21 @@ export default defineComponent({
       {
         label: t("dashboard.bottom"),
         value: "bottom",
+      },
+    ];
+
+    const legendTypeOptions = [
+      {
+        label: "Auto",
+        value: null,
+      },
+      {
+        label: "Plain",
+        value: "plain",
+      },
+      {
+        label: "Scroll",
+        value: "scroll",
       },
     ];
     const unitOptions = [
@@ -2119,6 +2194,7 @@ export default defineComponent({
       layerTypeOptions,
       symbolOptions,
       legendsPositionOptions,
+      legendTypeOptions,
       unitOptions,
       labelPositionOptions,
       showSymbol,
