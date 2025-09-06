@@ -67,7 +67,7 @@ use {
 
 use crate::{
     common::{
-        infra::{cluster, config::*},
+        infra::cluster,
         meta::{
             http::HttpResponse as MetaHttpResponse,
             user::{AuthTokens, AuthTokensExt},
@@ -101,7 +101,6 @@ struct ConfigResponse<'a> {
     default_functions: Vec<ZoFunction<'a>>,
     sql_base64_enabled: bool,
     timestamp_column: String,
-    syslog_enabled: bool,
     data_retention_days: i64,
     extended_data_retention_days: i64,
     restricted_routes_on_empty_data: bool,
@@ -158,6 +157,11 @@ struct Rum {
 #[utoipa::path(
     path = "/healthz",
     tag = "Meta",
+    operation_id = "HealthCheck",
+    summary = "System health check",
+    description = "Performs a basic health check to verify that the OpenObserve service is running and responding to \
+                   requests. Returns a simple status indicator that can be used by load balancers, monitoring systems, \
+                   and orchestration platforms to determine service availability and readiness.",
     responses(
         (status = 200, description="Status OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"}))
     )
@@ -180,6 +184,11 @@ pub async fn healthz_head() -> Result<HttpResponse, Error> {
 #[utoipa::path(
     path = "/schedulez",
     tag = "Meta",
+    operation_id = "SchedulerHealthCheck",
+    summary = "Scheduler node health check",
+    description = "Checks the health and scheduling availability of the current node. Returns success only if the node \
+                   is both online and enabled for task scheduling. Used by cluster management systems to determine \
+                   which nodes are available for workload distribution and background job processing.",
     responses(
         (status = 200, description="Status OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"})),
         (status = 404, description="Status Not OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "not ok"})),
@@ -300,7 +309,6 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
         sql_base64_enabled: cfg.common.ui_sql_base64_enabled,
         timestamp_column: TIMESTAMP_COL_NAME.to_string(),
-        syslog_enabled: *SYSLOG_ENABLED.read(),
         data_retention_days: cfg.compact.data_retention_days,
         extended_data_retention_days: cfg.compact.extended_data_retention_days,
         restricted_routes_on_empty_data: cfg.common.restricted_routes_on_empty_data,
@@ -388,10 +396,16 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     );
 
     let file_list_num = file_list::len().await;
-    let file_list_max_id = file_list::get_max_pk_value().await.unwrap_or_default();
+    let file_list_last_update_at = file_list::get_max_update_at().await.unwrap_or_default();
+    let (last_check_updated_at, _) = db::compact::stats::get_offset().await;
+
     stats.insert(
         "FILE_LIST",
-        json::json!({"num":file_list_num,"max_id": file_list_max_id}),
+        json::json!({
+            "num":file_list_num,
+            "last_update_at": file_list_last_update_at,
+            "last_check_updated_at": last_check_updated_at,
+        }),
     );
 
     let last_file_list_offset = db::compact::file_list::get_offset().await.unwrap();
@@ -604,15 +618,15 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                         "is_valid": res.0.is_valid,
                     }))
                     .unwrap();
-                    let is_new_usr = process_token(res)
-                        .await
-                        .map(|new_user| format!("&new_user_login={new_user}"));
+                    let url_params = process_token(res).await.map(|(new_user, pending_invites)| {
+                        format!("&new_user_login={new_user}&pending_invites={pending_invites}")
+                    });
                     login_url = format!(
                         "{}#id_token={}.{}{}",
                         login_data.url,
                         ID_TOKEN_HEADER,
                         base64::encode(&id_token),
-                        is_new_usr.unwrap_or_default()
+                        url_params.unwrap_or_default()
                     );
                 }
                 Err(e) => {

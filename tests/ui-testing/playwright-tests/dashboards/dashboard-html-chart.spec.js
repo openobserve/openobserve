@@ -1,6 +1,9 @@
-import { test, expect } from "../baseFixtures";
+const {
+  test,
+  expect,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
 import logData from "../../fixtures/log.json";
-import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
@@ -48,10 +51,8 @@ test.describe.configure({ mode: "parallel" });
 
 test.describe("HTML chart dashboard", () => {
   test.beforeEach(async ({ page }) => {
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestion(page);
-    await page.waitForTimeout(2000);
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`

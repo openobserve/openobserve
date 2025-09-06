@@ -336,17 +336,35 @@ fn extract_openapi_path(path: &str, method: &Method) -> Option<String> {
             }
 
             // Check if method is supported for this path
-            let method_exists = path_item.operations.iter().any(|(op_method, _)| {
+            let method_exists = [
+                (utoipa::openapi::HttpMethod::Get, path_item.get.as_ref()),
+                (utoipa::openapi::HttpMethod::Post, path_item.post.as_ref()),
+                (utoipa::openapi::HttpMethod::Put, path_item.put.as_ref()),
+                (
+                    utoipa::openapi::HttpMethod::Delete,
+                    path_item.delete.as_ref(),
+                ),
+                (utoipa::openapi::HttpMethod::Patch, path_item.patch.as_ref()),
+                (utoipa::openapi::HttpMethod::Head, path_item.head.as_ref()),
+                (
+                    utoipa::openapi::HttpMethod::Options,
+                    path_item.options.as_ref(),
+                ),
+                (utoipa::openapi::HttpMethod::Trace, path_item.trace.as_ref()),
+            ]
+            .into_iter()
+            .filter_map(|(http_method, op)| op.map(|_| http_method))
+            .any(|op_method| {
                 matches!(
                     (method, op_method),
-                    (&Method::GET, utoipa::openapi::PathItemType::Get)
-                        | (&Method::POST, utoipa::openapi::PathItemType::Post)
-                        | (&Method::PUT, utoipa::openapi::PathItemType::Put)
-                        | (&Method::DELETE, utoipa::openapi::PathItemType::Delete)
-                        | (&Method::PATCH, utoipa::openapi::PathItemType::Patch)
-                        | (&Method::HEAD, utoipa::openapi::PathItemType::Head)
-                        | (&Method::OPTIONS, utoipa::openapi::PathItemType::Options)
-                        | (&Method::TRACE, utoipa::openapi::PathItemType::Trace)
+                    (&Method::GET, utoipa::openapi::HttpMethod::Get)
+                        | (&Method::POST, utoipa::openapi::HttpMethod::Post)
+                        | (&Method::PUT, utoipa::openapi::HttpMethod::Put)
+                        | (&Method::DELETE, utoipa::openapi::HttpMethod::Delete)
+                        | (&Method::PATCH, utoipa::openapi::HttpMethod::Patch)
+                        | (&Method::HEAD, utoipa::openapi::HttpMethod::Head)
+                        | (&Method::OPTIONS, utoipa::openapi::HttpMethod::Options)
+                        | (&Method::TRACE, utoipa::openapi::HttpMethod::Trace)
                 )
             });
 
@@ -420,22 +438,39 @@ mod tests {
         > = HashMap::new();
 
         for (path, path_item) in &api.paths.paths {
-            for (method, operation) in path_item.operations.clone() {
+            for (method, operation) in [
+                (utoipa::openapi::HttpMethod::Get, path_item.get.as_ref()),
+                (utoipa::openapi::HttpMethod::Post, path_item.post.as_ref()),
+                (utoipa::openapi::HttpMethod::Put, path_item.put.as_ref()),
+                (
+                    utoipa::openapi::HttpMethod::Delete,
+                    path_item.delete.as_ref(),
+                ),
+                (utoipa::openapi::HttpMethod::Patch, path_item.patch.as_ref()),
+                (utoipa::openapi::HttpMethod::Head, path_item.head.as_ref()),
+                (
+                    utoipa::openapi::HttpMethod::Options,
+                    path_item.options.as_ref(),
+                ),
+                (utoipa::openapi::HttpMethod::Trace, path_item.trace.as_ref()),
+            ]
+            .into_iter()
+            .filter_map(|(method, op)| op.map(|operation| (method, operation)))
+            {
                 let tags = operation
                     .tags
                     .clone()
                     .unwrap_or_else(|| vec!["untagged".to_string()]);
 
                 let method = match method {
-                    utoipa::openapi::PathItemType::Get => "GET",
-                    utoipa::openapi::PathItemType::Post => "POST",
-                    utoipa::openapi::PathItemType::Put => "PUT",
-                    utoipa::openapi::PathItemType::Delete => "DELETE",
-                    utoipa::openapi::PathItemType::Patch => "PATCH",
-                    utoipa::openapi::PathItemType::Head => "HEAD",
-                    utoipa::openapi::PathItemType::Options => "OPTIONS",
-                    utoipa::openapi::PathItemType::Trace => "TRACE",
-                    utoipa::openapi::PathItemType::Connect => "CONNECT",
+                    utoipa::openapi::HttpMethod::Get => "GET",
+                    utoipa::openapi::HttpMethod::Post => "POST",
+                    utoipa::openapi::HttpMethod::Put => "PUT",
+                    utoipa::openapi::HttpMethod::Delete => "DELETE",
+                    utoipa::openapi::HttpMethod::Patch => "PATCH",
+                    utoipa::openapi::HttpMethod::Head => "HEAD",
+                    utoipa::openapi::HttpMethod::Options => "OPTIONS",
+                    utoipa::openapi::HttpMethod::Trace => "TRACE",
                 };
 
                 let operation_info = (

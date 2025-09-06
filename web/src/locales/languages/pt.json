@@ -441,19 +441,6 @@
     "internalLabel": "Nota: Use esta opção, se o coletor estiver instalado no mesmo cluster que o O2",
     "redirectionIngestionMsg": "Observação: para acessar páginas diferentes do IAM, a ingestão de dados deve ser iniciada na organização atual."
   },
-  "syslog": {
-    "stream": "Transmita",
-    "organization": "Organização",
-    "subnets": "Sub-redes",
-    "deleteRoute": "Excluir rota",
-    "syslog_addroute": "Adicionar rota",
-    "save": "Salvar",
-    "cancel": "cancelar",
-    "delete": "Excluir",
-    "edit": "Editar",
-    "on": "Ativar",
-    "off": "Desligar"
-  },
   "dashboard": {
     "selectField": "Campo",
     "selectIndex": "Transmita",

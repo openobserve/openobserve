@@ -397,10 +397,7 @@ pub async fn delete_by_date(
     delete_from_file_list(org_id, stream_type, stream_name, time_range)
         .await
         .map_err(|e| {
-            log::error!(
-                "[COMPACTOR] delete_by_date delete_from_file_list failed: {}",
-                e
-            );
+            log::error!("[COMPACTOR] delete_by_date delete_from_file_list failed: {e}");
             e
         })?;
 
@@ -601,7 +598,7 @@ async fn handle_delete_by_date_done(
     db::compact::retention::delete_stream_done(org_id, stream_type, stream_name, Some(date_range))
         .await
         .map_err(|e| {
-            log::error!("[COMPACTOR] delete_by_date mark delete done failed: {}", e);
+            log::error!("[COMPACTOR] delete_by_date mark delete done failed: {e}");
             e
         })?;
 
@@ -625,10 +622,7 @@ async fn handle_delete_by_date_done(
     let _ = db::compact::compactor_manual_jobs::bulk_update_jobs(jobs)
         .await
         .map_err(|e| {
-            log::error!(
-                "[COMPACTOR] delete_by_date bulk update manual job failed: {}",
-                e
-            );
+            log::error!("[COMPACTOR] delete_by_date bulk update manual job failed: {e}");
             e
         });
 

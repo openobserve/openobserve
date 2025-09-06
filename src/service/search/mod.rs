@@ -1500,8 +1500,7 @@ pub fn is_use_inverted_index(sql: &Arc<Sql>) -> bool {
     }
 
     let cfg = get_config();
-    sql.use_inverted_index
-        && cfg.common.inverted_index_enabled
+    cfg.common.inverted_index_enabled
         && !cfg.common.feature_query_without_index
         && sql.index_condition.is_some()
 }

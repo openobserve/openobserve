@@ -89,6 +89,8 @@ pub enum Error {
     WalFileError(String),
     #[error("Error# {0}")]
     OtherError(#[from] anyhow::Error),
+    #[error("Expired Trial Period")]
+    TrialPeriodExpired,
     #[error("Error# {0}")]
     CockooError(#[from] cuckoofilter_mmap::CuckooError),
 }

@@ -470,7 +470,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     && let Err(e) =
                         config::utils::enrichment_local_cache::delete(org_id, stream_name).await
                 {
-                    log::error!("[Schema:watch] delete local enrichment file error: {}", e);
+                    log::error!("[Schema:watch] delete local enrichment file error: {e}");
                 }
             }
             db::Event::Empty => {}

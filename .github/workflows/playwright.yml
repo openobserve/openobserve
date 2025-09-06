@@ -109,91 +109,98 @@ jobs:
         include:
           - testfolder: "GeneralTests"
             browser: "chrome"
-            run_files: [
-              "sanity.spec.js",
-              "changeOrg.spec.js",
-              "enrichment.spec.js", 
-              "schema.spec.js",
-              "schemaload.spec.js",
-              "serviceAccount.spec.js",
-              "usersOrg.spec.js"
-            ]
+            run_files:
+              [
+                "sanity.spec.js",
+                "changeOrg.spec.js",
+                "enrichment.spec.js",
+                "schema.spec.js",
+                "schemaload.spec.js",
+                "serviceAccount.spec.js",
+                "usersOrg.spec.js",
+              ]
           - testfolder: "Logs-Core"
             browser: "chrome"
-            run_files: [
-              "join.spec.js",
-              "logshistogram.spec.js",
-              "logspage.spec.js", 
-              "logsquickmode.spec.js",
-              "pagination.spec.js",
-              "unflattened.spec.js"
-            ]
+            run_files:
+              [
+                "join.spec.js",
+                "logshistogram.spec.js",
+                "logspage.spec.js",
+                "logsquickmode.spec.js",
+                "pagination.spec.js",
+                "unflattened.spec.js",
+                "logstable.spec.js",
+              ]
           - testfolder: "Logs-Queries"
             browser: "chrome"
-            run_files: [
-              "logsqueries.spec.js",
-              "secondsPrecisionAdded.spec.js",
-              "logsqueries.cte.spec.js",
-              "logsqueries.matchall.spec.js",
-              "searchpartition.spec.js"
-            ]
+            run_files:
+              [
+                "logsDownloads.spec.js",
+                "logsqueries.spec.js",
+                "secondsPrecisionAdded.spec.js",
+                "logsqueries.cte.spec.js",
+                "logsqueries.matchall.spec.js",
+                "searchpartition.spec.js",
+              ]
           - testfolder: "Alerts"
             browser: "chrome"
-            run_files: [
-              "alerts-e2e-flow.spec.js",
-              "alerts-ui-operations.spec.js",
-              "alerts-import.spec.js"
-            ]
+            run_files:
+              [
+                "alerts-e2e-flow.spec.js",
+                "alerts-ui-operations.spec.js",
+                "alerts-import.spec.js",
+              ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"
-            run_files: [
-              "dashboard.spec.js",
-              "dashboard2.spec.js",
-              "dashboardtype.spec.js",
-              "dashboard-folder.spec.js",
-              "dashboard-import.spec.js"
-            ]
+            run_files:
+              [
+                "dashboard.spec.js",
+                "dashboard2.spec.js",
+                "dashboardtype.spec.js",
+                "dashboard-folder.spec.js",
+                "dashboard-import.spec.js",
+                "maxquery.spec.js",
+              ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
-            run_files: [
-              "dashboard-filter.spec.js",
-              "dashboard-general-setting.spec.js",
-              "dashboard-tabs-setting.spec.js",
-              "dashboard-variables-setting.spec.js",
-              "dashboard-transpose.spec.js"
-            ]
+            run_files:
+              [
+                "dashboard-filter.spec.js",
+                "dashboard-general-setting.spec.js",
+                "dashboard-tabs-setting.spec.js",
+                "dashboard-variables-setting.spec.js",
+                "dashboard-transpose.spec.js",
+              ]
           - testfolder: "Dashboards-Charts"
             browser: "chrome"
             run_files: [
-              "custom-charts.spec.js",
-              "dashboard-geoMap.spec.js",
-              "dashboard-maps.spec.js",
-              "dashboard-multi-y-axis.spec.js",
-              "dashboard-html-chart.spec.js"
-              # "visualize.spec.js",
-              # "visualization-vrl.spec.js"
-            ]
-          - testfolder: "Pipelines" 
+                "custom-charts.spec.js",
+                "dashboard-geoMap.spec.js",
+                "dashboard-maps.spec.js",
+                "dashboard-multi-y-axis.spec.js",
+                "dashboard-html-chart.spec.js",
+                "visualize.spec.js",
+                # "visualization-vrl.spec.js"
+              ]
+          - testfolder: "Pipelines"
             browser: "chrome"
             run_files: [
-              "pipelines.spec.js",
-              "pipeline-dynamic.spec.js",
-              "pipeline-core.spec.js",
-              # "remotepipeline.spec.js"
-            ]
+                "pipelines.spec.js",
+                "pipeline-dynamic.spec.js",
+                "pipeline-core.spec.js",
+                # "remotepipeline.spec.js"
+              ]
           - testfolder: "Reports"
             browser: "chrome"
-            run_files: [
-              "reportsUpdated.spec.js",
-              "reportsUpdated2.spec.js"
-            ]
+            run_files: ["reportsUpdated.spec.js", "reportsUpdated2.spec.js"]
           - testfolder: "Streams"
             browser: "chrome"
-            run_files: [
-              "multiselect-stream.spec.js",
-              "streamname.spec.js",
-              "streaming.spec.js"
-            ]
+            run_files:
+              [
+                "multiselect-stream.spec.js",
+                "streamname.spec.js",
+                "streaming.spec.js",
+              ]
 
     steps:
       - name: Clone the current repo
@@ -220,7 +227,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
-          
+
       - name: Install dependencies and run ui-tests
         run: |
           touch .env
@@ -235,12 +242,12 @@ jobs:
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
-          
+
           # Get list of files to run using join function
           FILE_LIST="${{ join(matrix.run_files, ' ') }}"
           echo "DEBUG: FILE_LIST = $FILE_LIST"
           echo "DEBUG: matrix.testfolder = ${{ matrix.testfolder }}"
-          
+
           if [ -n "$FILE_LIST" ]; then
             # Map logical folder names to actual directories
             case "${{ matrix.testfolder }}" in
@@ -290,10 +297,11 @@ jobs:
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npx nyc report
 
-      - uses: actions/upload-artifact@v4
-        if: always()
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always() && hashFiles('playwright-report/**') != ''
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.testfolder }}
           path: playwright-report/
           retention-days: 30
 
@@ -331,6 +339,7 @@ jobs:
 
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
+        if: hashFiles('tests/ui-testing/coverage-report/**') != ''
         with:
           name: coverage-report
           path: tests/ui-testing/coverage-report

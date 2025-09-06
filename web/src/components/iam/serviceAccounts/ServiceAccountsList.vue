@@ -345,6 +345,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
 import { getRoles } from "@/services/iam";
 import service_accounts from "@/services/service_accounts";
+import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "ServiceAccountsList",
   components: { QTablePagination,  NoData,AddServiceAccount},
@@ -354,6 +355,7 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
+    const { track } = useReo();
     const resultTotal = ref<number>(0);
     const confirmDelete = ref<boolean>(false);
     const selectedUser: any = ref({});
@@ -558,6 +560,10 @@ export default defineComponent({
           true
         );
       } else {
+        track("Button Click", {
+          button: "Add Service Account",
+          page: "Service Accounts"
+        });
         addUser({}, false);
         router.push({
           name: "serviceAccounts",
