@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use proto::cluster_rpc::{
-    DeleteResultCacheRequest, DeleteResultCacheResponse, MultiQueryCacheResponse,
-    QueryCacheRequest, QueryCacheRes, QueryCacheResponse, QueryResponse,
+    DeleteResultCacheByTimeRangeRequest, DeleteResultCacheRequest, DeleteResultCacheResponse,
+    MultiQueryCacheResponse, QueryCacheRequest, QueryCacheRes, QueryCacheResponse, QueryResponse,
     query_cache_server::QueryCache,
 };
 use tonic::{Request, Response, Status};
@@ -75,6 +75,18 @@ impl QueryCache for QueryCacheServerImpl {
     ) -> Result<Response<DeleteResultCacheResponse>, Status> {
         let req: DeleteResultCacheRequest = request.into_inner();
         let deleted = cacher::delete_cache(&req.path, req.ts).await.is_ok();
+
+        Ok(Response::new(DeleteResultCacheResponse { deleted }))
+    }
+
+    async fn delete_result_cache_by_time_range(
+        &self,
+        request: Request<DeleteResultCacheByTimeRangeRequest>,
+    ) -> Result<Response<DeleteResultCacheResponse>, Status> {
+        let req: DeleteResultCacheByTimeRangeRequest = request.into_inner();
+        let deleted = cacher::delete_cache_by_time_range(&req.path, req.start_time, req.end_time)
+            .await
+            .is_ok();
 
         Ok(Response::new(DeleteResultCacheResponse { deleted }))
     }

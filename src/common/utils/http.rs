@@ -139,6 +139,14 @@ pub(crate) fn get_is_multi_stream_search_from_request(
 }
 
 #[inline(always)]
+pub(crate) fn get_is_refresh_cache_from_request(query: &Query<HashMap<String, String>>) -> bool {
+    let Some(v) = query.get("is_refresh_cache") else {
+        return false;
+    };
+    v.to_lowercase().as_str().parse::<bool>().unwrap_or(false)
+}
+
+#[inline(always)]
 pub(crate) fn get_folder(query: &Query<HashMap<String, String>>) -> String {
     match query.get("folder") {
         Some(s) => s.to_string(),
