@@ -14,26 +14,37 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 mod o2_tokenizer;
+mod remove_short;
 
 pub use o2_tokenizer::O2Tokenizer;
 use tantivy::tokenizer::{SimpleTokenizer, TextAnalyzer, Token};
 
-use crate::get_config;
+use crate::{get_config, utils::tantivy::tokenizer::remove_short::RemoveShortFilter};
 
 pub const O2_TOKENIZER: &str = "o2";
+const MIN_TOKEN_LENGTH: usize = 2;
+const MAX_TOKEN_LENGTH: usize = 64;
 
 pub fn o2_tokenizer_build() -> TextAnalyzer {
-    if get_config()
-        .common
-        .inverted_index_camel_case_tokenizer_disabled
-    {
+    let cfg = get_config();
+    let min_token_length =
+        std::cmp::max(cfg.limit.inverted_index_min_token_length, MIN_TOKEN_LENGTH);
+    let max_token_length =
+        std::cmp::max(cfg.limit.inverted_index_max_token_length, MAX_TOKEN_LENGTH);
+    if cfg.common.inverted_index_camel_case_tokenizer_disabled {
         tantivy::tokenizer::TextAnalyzer::builder(SimpleTokenizer::default())
-            .filter(tantivy::tokenizer::RemoveLongFilter::limit(64))
+            .filter(RemoveShortFilter::limit(min_token_length))
+            .filter(tantivy::tokenizer::RemoveLongFilter::limit(
+                max_token_length,
+            ))
             .filter(tantivy::tokenizer::LowerCaser)
             .build()
     } else {
         tantivy::tokenizer::TextAnalyzer::builder(O2Tokenizer::default())
-            .filter(tantivy::tokenizer::RemoveLongFilter::limit(64))
+            .filter(RemoveShortFilter::limit(min_token_length))
+            .filter(tantivy::tokenizer::RemoveLongFilter::limit(
+                max_token_length,
+            ))
             .filter(tantivy::tokenizer::LowerCaser)
             .build()
     }
