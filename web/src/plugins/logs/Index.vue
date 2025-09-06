@@ -379,6 +379,7 @@ import {
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
+import useStreamFields from "@/composables/useLogs/useStreamFields";
 import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
@@ -395,6 +396,17 @@ import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import useAiChat from "@/composables/useAiChat";
 import queryService from "@/services/search";
+import {
+  logsUtils
+} from "@/composables/useLogs/logsUtils";
+import searchState from "@/composables/useLogs/searchState";
+import {searchStream} from "@/composables/useLogs/searchStream";
+import { 
+  getVisualizationConfig,
+  encodeVisualizationConfig,
+  decodeVisualizationConfig, 
+} from "@/composables/useLogs/logsVisualization";
+import useSearchBar from "@/composables/useLogs/useSearchBar";
 
 export default defineComponent({
   name: "PageSearch",
@@ -546,6 +558,9 @@ export default defineComponent({
     const $q = useQuasar();
     const disableMoreErrorDetails: boolean = ref(false);
     const searchHistoryRef = ref(null);
+    const { resetSearchObj, initialLogsState, resetStreamData } = searchState();
+    const { getStreamList } = useStreamFields();
+    const { getFunctions } = useSearchBar();
     let {
       searchObj,
       getQueryData,
@@ -560,37 +575,30 @@ export default defineComponent({
       restoreUrlQueryParams,
       handleRunQuery,
       generateHistogramData,
-      resetSearchObj,
-      resetStreamData,
       getHistogramQueryData,
       generateHistogramSkeleton,
-      fnParsedSQL,
       getRegionInfo,
-      getStreamList,
-      getFunctions,
       extractFields,
       resetHistogramWithError,
-      isLimitQuery,
       enableRefreshInterval,
-      buildWebSocketPayload,
       initializeSearchConnection,
       addTraceId,
       sendCancelSearchMessage,
-      isDistinctQuery,
-      isWithQuery,
       getStream,
-      fnUnparsedSQL,
-      initialLogsState,
       clearSearchObj,
       setCommunicationMethod,
       cancelQuery,
       processHttpHistogramResults,
       buildSearch,
       loadVisualizeData,
-      getVisualizationConfig,
-      encodeVisualizationConfig,
-      decodeVisualizationConfig,
     } = useLogs();
+
+    const {fnParsedSQL,
+  fnUnparsedSQL,
+  isDistinctQuery,
+  isWithQuery,
+  isLimitQuery,} = logsUtils();
+    const { buildWebSocketPayload } = searchStream();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const showSearchHistory = ref(false);
@@ -912,10 +920,11 @@ export default defineComponent({
           store.dispatch("logs/setIsInitialized", true);
         } else {
           await initialLogsState();
-        }
-
-        if (isCloudEnvironment()) {
-          setupCloudSpecificThreshold();
+          await nextTick();
+          await getStreamList(false);
+          await nextTick();
+          await updateGridColumns();
+          await nextTick();
         }
 
         isLogsMounted.value = true;
@@ -2240,8 +2249,6 @@ export default defineComponent({
       redirectBackToLogs,
       handleRunQuery,
       refreshTimezone,
-      resetSearchObj,
-      resetStreamData,
       getHistogramQueryData,
       generateHistogramSkeleton,
       setInterestingFieldInSQLQuery,

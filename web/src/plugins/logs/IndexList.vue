@@ -803,6 +803,7 @@ import { cloneDeep } from "lodash-es";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import searchService from "@/services/search";
 import useHttpStreaming from "@/composables/useStreamingSearch";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 interface Filter {
   fieldName: string;
@@ -861,10 +862,10 @@ export default defineComponent({
       reorderSelectedFields,
       getFilterExpressionByFieldType,
       extractValueQuery,
-      fnParsedSQL,
-      fnUnparsedSQL,
       streamSchemaFieldsIndexMapping,
     } = useLogs();
+
+    const {fnParsedSQL, fnUnparsedSQL} = logsUtils();
 
     const {
       fetchQueryDataWithWebSocket,

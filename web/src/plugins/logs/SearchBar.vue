@@ -1486,6 +1486,13 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { searchState } from "@/composables/useLogs/searchState";
+import { 
+  getVisualizationConfig,
+  encodeVisualizationConfig,
+  decodeVisualizationConfig, 
+} from "@/composables/useLogs/logsVisualization";
 
 const defaultValue: any = () => {
   return {
@@ -1638,6 +1645,9 @@ export default defineComponent({
     const rowsPerPage = ref(10);
     const regionFilter = ref();
     const regionFilterRef = ref(null);
+    const { resetStreamData } = searchState();
+
+    const {fnParsedSQL, fnUnparsedSQL} = logsUtils();
 
     const {
       searchObj,
@@ -1650,21 +1660,15 @@ export default defineComponent({
       updateUrlQueryParams,
       generateURLQuery,
       buildSearch,
-      resetStreamData,
       loadStreamLists,
-      fnParsedSQL,
-      fnUnparsedSQL,
       onStreamChange,
       moveItemsToTop,
-      validateFilterForMultiStream,
       extractFields,
       cancelQuery,
       setSelectedStreams,
       getJobData,
       routeToSearchSchedule,
       isActionsEnabled,
-      getVisualizationConfig,
-      encodeVisualizationConfig,
     } = useLogs();
 
     const { isStreamExists, isStreamFetched } = useStreams();
@@ -3889,7 +3893,6 @@ export default defineComponent({
       regionFilterRef,
       regionFilter,
       resetRegionFilter,
-      validateFilterForMultiStream,
       cancelQuery,
       onLogsVisualizeToggleUpdate,
       visualizeSearchRequestTraceIds,
