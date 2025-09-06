@@ -583,9 +583,9 @@ pub async fn get_latest_traces(
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure", content_type = "application/json", body = Object),
     )
 )]
 #[get("/{org_id}/{stream_name}/traces/detail")]
@@ -712,8 +712,7 @@ pub async fn get_trace_detail(
             Ok(ranges) => ranges,
             Err(e) => {
                 log::warn!(
-                    "[trace_id {query_trace_id}] Failed to query cuckoo filter, using original time range: {}",
-                    e
+                    "[trace_id {query_trace_id}] Failed to query cuckoo filter, using original time range: {e}",
                 );
                 vec![(start_time, end_time)]
             }

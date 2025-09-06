@@ -107,13 +107,13 @@ pub async fn query_distributed_cuckoo_filter(
             match result {
                 Ok(hours) => found_hours.extend(hours),
                 Err(e) => {
-                    log::warn!("Failed to query cuckoo filter from ingester node: {}", e)
+                    log::warn!("Failed to query cuckoo filter from ingester node: {e}")
                 }
             }
         }
     }
 
-    log::debug!("ingester found_hours: {:?}", found_hours);
+    log::debug!("ingester found_hours: {found_hours:?}");
 
     // Then, query querier nodes for historical data
     let querier_nodes = cluster::get_cached_online_querier_nodes(None).await;
@@ -167,10 +167,10 @@ pub async fn query_distributed_cuckoo_filter(
     for result in querier_results {
         match result {
             Ok(hours) => found_hours.extend(hours),
-            Err(e) => log::warn!("Failed to query cuckoo filter from querier node: {}", e),
+            Err(e) => log::warn!("Failed to query cuckoo filter from querier node: {e}"),
         }
     }
-    log::debug!("ingester and querier found_hours: {:?}", found_hours);
+    log::debug!("ingester and querier found_hours: {found_hours:?}");
     // Convert found hours back to time ranges
     let time_ranges = merge_consecutive_hours_to_ranges(found_hours, start_time, end_time);
     Ok(time_ranges)
@@ -361,9 +361,8 @@ async fn query_remote_ingester_cuckoo_filter(
         .await
         .map_err(|e| {
             log::warn!(
-                "[trace_id {trace_id}] Failed to query remote ingester cuckoo filter on node {} via GRPC: {}",
+                "[trace_id {trace_id}] Failed to query remote ingester cuckoo filter on node {} via GRPC: {e}",
                 node.uuid,
-                e
             );
             infra::errors::Error::Message(format!("GRPC request failed: {e}"))
         })
@@ -414,10 +413,7 @@ pub async fn query_local_cuckoo_filter_hours(
                         .await
                         .unwrap_or_else(|e| {
                             log::warn!(
-                                "[trace_id {trace_id}] Failed to download cuckoo filter from S3 for {}/{}: {}",
-                                org_id,
-                                hour_key,
-                                e
+                                "[trace_id {trace_id}] Failed to download cuckoo filter from S3 for {org_id}/{hour_key}: {e}",
                             );
                         });
 
@@ -434,9 +430,7 @@ pub async fn query_local_cuckoo_filter_hours(
                             // Filter not found in S3 or failed to load (not built yet)
                             // Assume data exists to avoid missing results
                             log::debug!(
-                                "[trace_id {trace_id}] Cuckoo filter not available for {}/{}, assuming data exists to avoid missing results",
-                                org_id,
-                                hour_key
+                                "[trace_id {trace_id}] Cuckoo filter not available for {org_id}/{hour_key}, assuming data exists to avoid missing results",
                             );
                             found_hours.push(hour_key.clone());
                         }
@@ -493,9 +487,7 @@ pub async fn query_local_ingester_cuckoo_filter_hours(
                     // File doesn't exist locally, ingesters don't download from S3
                     // because they only handle real-time data and don't upload to S3
                     log::debug!(
-                        "trace_id {trace_id} Cuckoo filter not found locally on ingester for {}/{}, skipping S3 download",
-                        org_id,
-                        hour_key
+                        "trace_id {trace_id} Cuckoo filter not found locally on ingester for {org_id}/{hour_key}, skipping S3 download",
                     );
                     continue;
                 }
@@ -746,8 +738,7 @@ impl CuckooFilterManager {
             };
             let filter_key = format!("{org_id}/{hour_key}");
             log::debug!(
-                "Processing hour items for org_id: {org_id}, hour_key: {hour_key}, file_path: {:?}",
-                file_path
+                "Processing hour items for org_id: {org_id}, hour_key: {hour_key}, file_path: {file_path:?}",
             );
 
             let filter_instance = filters.entry(filter_key.clone()).or_insert_with(|| {
@@ -765,7 +756,7 @@ impl CuckooFilterManager {
             for trace_id in &trace_ids {
                 // log::debug!("Inserting trace_id: {}", trace_id);
                 if let Err(e) = filter_instance.0.insert(trace_id) {
-                    log::error!("Failed to insert trace id: {}, filter_key: {filter_key}", e);
+                    log::error!("Failed to insert trace id: {e}, filter_key: {filter_key}");
                 }
             }
             log::info!(
@@ -775,7 +766,7 @@ impl CuckooFilterManager {
             let start_filter = std::time::Instant::now();
             log::info!("starting hour({hour_key}) filter flush");
             if let Err(e) = filter_instance.0.flush() {
-                log::error!("Failed to flush filter ({hour_key}) instance: {}", e);
+                log::error!("Failed to flush filter ({hour_key}) instance: {e}");
             }
             log::info!(
                 "end hour({hour_key}) filter flush, took {}ms",
@@ -831,7 +822,7 @@ impl CuckooFilterManager {
             if tmp_path.exists() && success_marker.exists() {
                 std::fs::rename(&tmp_path, &final_path)?;
                 std::fs::remove_file(&success_marker)?;
-                log::debug!("Successfully finalized hour filter: {:?}", final_path);
+                log::debug!("Successfully finalized hour filter: {final_path:?}");
             }
         }
 
@@ -953,11 +944,7 @@ impl CuckooFilterManager {
                 Ok(true)
             }
             Err(e) => {
-                log::warn!(
-                    "Failed to load cuckoo filter {} into cache: {}",
-                    file_path,
-                    e
-                );
+                log::warn!("Failed to load cuckoo filter {file_path} into cache: {e}",);
                 Err(e.into())
             }
         }
@@ -1052,9 +1039,8 @@ impl CuckooFilterManager {
 
         use arrow::array::{Int64Array, StringArray};
         log::info!(
-            "[CUCKOO_FILTER_JOB] Start processing, files len: {}, will process in chunks of {}",
+            "[CUCKOO_FILTER_JOB] Start processing, files len: {}, will process in chunks of {parquet_batch_size}",
             files.len(),
-            parquet_batch_size
         );
 
         // Process files in chunks to avoid cache overflow and GC issues
@@ -1211,7 +1197,7 @@ impl CuckooFilterManager {
                 let mut filters = self.filters.lock().unwrap();
                 for (_key, (filter, _path)) in filters.iter_mut() {
                     if let Err(e) = filter.flush() {
-                        log::error!("Failed to flush filter: {}", e);
+                        log::error!("Failed to flush filter: {e}");
                     }
                 }
             }
@@ -1231,10 +1217,7 @@ impl CuckooFilterManager {
             )
             .await?;
             log::info!(
-                "[CUCKOO_FILTER_JOB] Successfully processed {} trace items for org {} hour {}",
-                total_processed,
-                org_id,
-                hour_key
+                "[CUCKOO_FILTER_JOB] Successfully processed {total_processed} trace items for org {org_id} hour {hour_key}",
             );
         }
         Ok(())
@@ -1292,19 +1275,11 @@ impl CuckooFilterManager {
         if let Ok(data) = storage::get_bytes("", &hour_s3_key).await {
             let local_file = local_dir.join(format!("{day_key}/{hour_key}.cuckoo"));
             std::fs::write(&local_file, &data)?;
-            log::info!(
-                "[CUCKOO_FILTER_JOB] Downloaded hour filter: {}",
-                hour_s3_key
-            );
+            log::info!("[CUCKOO_FILTER_JOB] Downloaded hour filter: {hour_s3_key}",);
 
             // Load the downloaded filter into cache
             if let Err(e) = self.load_filter_into_cache(org_id, hour_key) {
-                log::warn!(
-                    "Failed to cache downloaded filter {}/{}: {}",
-                    org_id,
-                    hour_key,
-                    e
-                );
+                log::warn!("Failed to cache downloaded filter {org_id}/{hour_key}: {e}",);
             }
         }
 

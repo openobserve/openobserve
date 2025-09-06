@@ -339,15 +339,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
             )
             .await
             {
-                log::error!("[JOB] Cuckoo filter job failed: {}", e);
+                log::error!("[JOB] Cuckoo filter job failed: {e}");
             }
         });
     }
-    
+
     // Shouldn't serve request until initialization finishes
     log::info!("Job initialization complete");
-
-    
 
     Ok(())
 }

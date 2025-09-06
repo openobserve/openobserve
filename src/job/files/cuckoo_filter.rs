@@ -49,9 +49,7 @@ async fn process_cuckoo_filter_file(
     if (storage::head("", &s3_key).await).is_ok() {
         GLOBAL_CUCKOO_FILTER_MANAGER.delete_hour(org_id, key);
         log::info!(
-            "[CUCKOO_FILTER_INGESTER] Removed local and memory filter for org {} key {} as S3 exists",
-            org_id,
-            key
+            "[CUCKOO_FILTER_INGESTER] Removed local and memory filter for org {org_id} key {key} as S3 exists",
         );
     }
 
@@ -130,26 +128,12 @@ async fn process_missing_hour(
         status: JobStatus::Running,
         error_message: None,
     };
-    log::info!(
-        "[CUCKOO_FILTER_JOB] Start processing org {} hour {} (day {})",
-        org_id,
-        hour_key,
-        day_key
-    );
+    log::info!("[CUCKOO_FILTER_JOB] Start processing org {org_id} hour {hour_key} (day {day_key})",);
     // Actually process the trace data for this hour
     if let Err(e) = manager.process_organization_trace_data(&job_state).await {
-        log::error!(
-            "[CUCKOO_FILTER_JOB] Failed to process org {} hour {}: {}",
-            org_id,
-            hour_key,
-            e
-        );
+        log::error!("[CUCKOO_FILTER_JOB] Failed to process org {org_id} hour {hour_key}: {e}",);
     } else {
-        log::info!(
-            "[CUCKOO_FILTER_JOB] Finished processing org {} hour {}",
-            org_id,
-            hour_key
-        );
+        log::info!("[CUCKOO_FILTER_JOB] Finished processing org {org_id} hour {hour_key}",);
     }
 }
 
@@ -188,8 +172,7 @@ pub async fn start_hourly_job(manager: Arc<CuckooFilterManager>) -> Result<()> {
             // Only process streams of type Traces and stream_name == "default"
             let streams = db::schema::list_streams_from_cache(org_id, StreamType::Traces).await;
             log::info!(
-                "[CUCKOO_FILTER_JOB] Org {}: found {} streams",
-                org_id,
+                "[CUCKOO_FILTER_JOB] Org {org_id}: found {} streams",
                 streams.len()
             );
             for stream_name in &streams {
@@ -201,10 +184,7 @@ pub async fn start_hourly_job(manager: Arc<CuckooFilterManager>) -> Result<()> {
                 // This determines how many hours back from current time to build cuckoo filters
                 let data_lookback_hours = config::get_config().cuckoo_filter.data_lookback_hours;
                 log::info!(
-                    "[CUCKOO_FILTER_JOB] Org {} stream {}: data_lookback_hours = {}",
-                    org_id,
-                    stream_name,
-                    data_lookback_hours
+                    "[CUCKOO_FILTER_JOB] Org {org_id} stream {stream_name}: data_lookback_hours = {data_lookback_hours}",
                 );
 
                 // Calculate all needed hour keys within lookback hours
@@ -215,8 +195,7 @@ pub async fn start_hourly_job(manager: Arc<CuckooFilterManager>) -> Result<()> {
                     needed_hour_keys.push(t.format("%Y%m%d%H").to_string());
                 }
                 log::info!(
-                    "[CUCKOO_FILTER_JOB] Org {}: needed_hour_keys={}",
-                    org_id,
+                    "[CUCKOO_FILTER_JOB] Org {org_id}: needed_hour_keys={}",
                     needed_hour_keys.len()
                 );
 
@@ -245,8 +224,7 @@ pub async fn start_hourly_job(manager: Arc<CuckooFilterManager>) -> Result<()> {
                     }
                 }
                 log::info!(
-                    "[CUCKOO_FILTER_JOB] Org {}: existing_hour_keys={}",
-                    org_id,
+                    "[CUCKOO_FILTER_JOB] Org {org_id}: existing_hour_keys={}",
                     existing_hour_keys.len()
                 );
 
@@ -256,8 +234,7 @@ pub async fn start_hourly_job(manager: Arc<CuckooFilterManager>) -> Result<()> {
                     .filter(|h| !existing_hour_keys.contains(*h))
                     .collect();
                 log::info!(
-                    "[CUCKOO_FILTER_JOB] Org {}: missing_hour_keys={}",
-                    org_id,
+                    "[CUCKOO_FILTER_JOB] Org {org_id}: missing_hour_keys={}",
                     missing_hour_keys.len()
                 );
 
