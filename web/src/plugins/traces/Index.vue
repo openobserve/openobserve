@@ -664,6 +664,20 @@ async function getQueryData() {
       })
       .then(async (res) => {
         searchObj.loading = false;
+
+        if (
+          filter &&
+          filter.includes("trace_id") &&
+          res.data.hits.length === 1 &&
+          res.data.hits[0].start_time &&
+          res.data.hits[0].end_time
+        ) {
+          updateNewDateTime(
+            Math.floor(res.data.hits[0].start_time / 1000),
+            Math.ceil(res.data.hits[0].end_time / 1000),
+          );
+        }
+
         const formattedHits = getTracesMetaData(res.data.hits);
         if (res.data.from > 0) {
           searchObj.data.queryResults.from = res.data.from;
@@ -729,6 +743,24 @@ async function getQueryData() {
     showErrorNotification("Search request failed");
   }
 }
+
+/**
+ *
+ * @param startTime - start time in microseconds
+ * @param endTime - end time in microseconds
+ */
+const updateNewDateTime = (startTime: number, endTime: number) => {
+  searchBarRef.value?.updateNewDateTime({
+    startTime: startTime,
+    endTime: endTime,
+  });
+  $q.notify({
+    type: "positive",
+    message:
+      "The selected time range did not include this trace. The time range has been updated to match the trace’s timestamp.",
+    timeout: 5000,
+  });
+};
 
 const getTracesMetaData = (traces) => {
   if (!traces.length) return [];
@@ -1158,7 +1190,6 @@ const searchData = () => {
   }
 
   runQueryFn();
-  indexListRef.value.filterExpandedFieldValues();
 
   if (config.isCloud == "true") {
     segment.track("Button Click", {
