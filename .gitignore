@@ -27,3 +27,7 @@ flamegraph.html
 /web/.env
 
 CLAUDE.md
+/test-logs
+test-results/.last-run.json
+/tests/ui-testing/test-archives
+/tests/ui-testing/test-logs
