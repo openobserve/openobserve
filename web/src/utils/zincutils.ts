@@ -1156,3 +1156,27 @@ export function isAboveMinRefreshInterval(
   const minInterval = Number(config?.min_auto_refresh_interval) || 1;
   return value >= minInterval;
 }
+
+
+
+export const localTimeToMicroseconds = () => {
+  // Create a Date object representing the current local time
+  var date = new Date();
+
+  // Get the timestamp in milliseconds
+  var timestampMilliseconds = date.getTime();
+
+  // Convert milliseconds to microseconds
+  var timestampMicroseconds = timestampMilliseconds * 1000;
+
+  return timestampMicroseconds;
+};
+export const getDuration = (createdAt: number) => {
+  const currentTime = localTimeToMicroseconds();
+  const durationInSeconds = Math.floor((currentTime - createdAt) / 1000000);
+
+  return {
+    durationInSeconds,
+    duration: durationFormatter(durationInSeconds),
+  };
+};
