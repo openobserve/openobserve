@@ -22,9 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
+import { useReo } from "@/services/reodotdev_analytics";
+import { b64DecodeStandard } from "./utils/zincutils";
 export default {
   setup() {
     const store = useStore();
+    const { identify } = useReo();
     // if (
     //   config.isCloud == "false" &&
     //   window.location.origin != "http://localhost:8081"
@@ -40,6 +43,15 @@ export default {
     // }
     const router = useRouter();
     const creds = localStorage.getItem("creds");
+    const userLoggedIn = localStorage.getItem("userInfo");
+    if (userLoggedIn && localStorage.getItem("sendIdentify") === "true") {
+      const userInfo = JSON.parse(b64DecodeStandard(userLoggedIn));
+      identify({
+            username: userInfo.email,
+            type: "email"
+          });      
+      localStorage.setItem("sendIdentify", "false");
+    }
     if (creds) {
       // const credsInfo = JSON.parse(creds);
       // store.dispatch("login", credsInfo);

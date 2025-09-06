@@ -176,15 +176,9 @@ export default defineComponent({
           ) {
             localStorage.setItem("isFirstTimeLogin", "true");
           }
-          //this will identify the user for reo.dev
-          identify({
-            username: store.state.userInfo.email,
-            type: "email"
-          });
+          localStorage.setItem("sendIdentify", "true");
           // Check for pending invites
-          setTimeout(() => {
             redirectUser();
-          }, 800);
 
         })
         .catch((e: any) => {
