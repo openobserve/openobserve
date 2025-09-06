@@ -107,10 +107,6 @@ impl IndexCondition {
     pub fn add_condition(&mut self, condition: Condition) {
         self.conditions.push(condition);
     }
-
-    pub fn merge(&mut self, index_condition: IndexCondition) {
-        self.conditions.extend(index_condition.conditions);
-    }
 }
 
 impl Debug for IndexCondition {
@@ -148,6 +144,7 @@ impl IndexCondition {
     }
 
     // get the fields use for search in tantivy
+    #[allow(unused)]
     pub fn get_tantivy_fields(&self) -> HashSet<String> {
         self.conditions
             .iter()
@@ -210,6 +207,10 @@ impl IndexCondition {
     // the simple str match condition is like str_match(field, 'value')
     // use for check if the distinct query can be optimized
     pub fn is_simple_str_match(&self, field: &str) -> bool {
+        if self.is_condition_all() {
+            return true;
+        }
+
         if self.conditions.len() != 1 {
             return false;
         }
@@ -902,12 +903,26 @@ fn get_value(expr: &Expr) -> String {
     }
 }
 
+// TODO: duplication with datafusion/optimizer/physical_optimizer/utils.rs
 fn is_physical_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    expr.as_any().downcast_ref::<Column>().is_some()
+    if expr.as_any().downcast_ref::<Column>().is_some() {
+        true
+    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
+        is_physical_column(expr.expr())
+    } else {
+        false
+    }
 }
 
+// TODO: duplication with datafusion/optimizer/physical_optimizer/utils.rs
 fn get_physical_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
-    expr.as_any().downcast_ref::<Column>().unwrap().name()
+    if let Some(expr) = expr.as_any().downcast_ref::<Column>() {
+        expr.name()
+    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
+        get_physical_column_name(expr.expr())
+    } else {
+        "__o2_unknown_column__"
+    }
 }
 
 fn is_physical_value(expr: &Arc<dyn PhysicalExpr>) -> bool {
@@ -1751,21 +1766,6 @@ mod tests {
             index_condition.conditions[0],
             Condition::Equal(ref field, ref value) if field == "field1" && value == "value1"
         ));
-    }
-
-    #[test]
-    fn test_index_condition_add_index_condition() {
-        let mut index_condition1 = IndexCondition::new();
-        index_condition1
-            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-
-        let mut index_condition2 = IndexCondition::new();
-        index_condition2
-            .add_condition(Condition::Equal("field2".to_string(), "value2".to_string()));
-
-        index_condition1.merge(index_condition2);
-
-        assert_eq!(index_condition1.conditions.len(), 2);
     }
 
     #[test]

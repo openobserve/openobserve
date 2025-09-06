@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::HashSet,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use datafusion::{
     common::{
@@ -28,7 +34,7 @@ use datafusion::{
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
         ExecutionPlan, PhysicalExpr,
-        expressions::{BinaryExpr, CastExpr, Column, InListExpr, Literal, NotExpr},
+        expressions::{BinaryExpr, Column, InListExpr, NotExpr},
         filter::FilterExec,
         projection::ProjectionExec,
     },
@@ -36,10 +42,15 @@ use datafusion::{
 use parking_lot::Mutex;
 
 use crate::service::search::{
-    datafusion::udf::{
-        MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
-        STR_MATCH_UDF_NAME,
-        match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+    datafusion::{
+        optimizer::physical_optimizer::utils::{
+            get_column_name, is_column, is_only_timestamp_filter, is_value,
+        },
+        udf::{
+            MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+            STR_MATCH_UDF_NAME,
+            match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+        },
     },
     index::{Condition, IndexCondition},
 };
@@ -48,6 +59,9 @@ use crate::service::search::{
 pub struct IndexRule {
     index_fields: HashSet<String>,
     index_condition: Arc<Mutex<Option<IndexCondition>>>,
+    // this set to true when all filter can be extract to
+    // index condition(except _timestamp filter)
+    pub can_optimize: Arc<AtomicBool>,
 }
 
 impl IndexRule {
@@ -58,7 +72,12 @@ impl IndexRule {
         Self {
             index_fields,
             index_condition,
+            can_optimize: Arc::new(AtomicBool::new(false)),
         }
+    }
+
+    pub fn can_optimize(&self) -> bool {
+        self.can_optimize.load(Ordering::Relaxed)
     }
 }
 
@@ -68,9 +87,27 @@ impl PhysicalOptimizerRule for IndexRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+        if !config::get_config().common.inverted_index_enabled {
+            return Ok(plan);
+        }
+
         let mut rewriter =
             IndexOptimizer::new(self.index_fields.clone(), self.index_condition.clone());
-        plan.rewrite(&mut rewriter).data()
+        let plan = plan.rewrite(&mut rewriter).data()?;
+
+        // if all filter can be used in index, we can
+        // use index optimizer rule to optimize the query
+        if self.index_condition.lock().is_none() && rewriter.can_optimize {
+            *self.index_condition.lock() = Some(IndexCondition {
+                conditions: vec![Condition::All()],
+            });
+        }
+
+        // set can_optimize to the index_rule
+        self.can_optimize
+            .store(rewriter.can_optimize, Ordering::Relaxed);
+
+        Ok(plan)
     }
 
     fn name(&self) -> &str {
@@ -85,6 +122,10 @@ impl PhysicalOptimizerRule for IndexRule {
 struct IndexOptimizer {
     index_fields: HashSet<String>,
     index_condition: Arc<Mutex<Option<IndexCondition>>>,
+    // set to true when the filter only have _timestamp filter
+    can_optimize: bool,
+    is_remove_filter: bool,
+    optimizer_enabled: bool,
 }
 
 impl IndexOptimizer {
@@ -95,6 +136,13 @@ impl IndexOptimizer {
         Self {
             index_fields,
             index_condition,
+            can_optimize: false,
+            is_remove_filter: config::get_config()
+                .common
+                .feature_query_remove_filter_with_index,
+            optimizer_enabled: config::get_config()
+                .common
+                .inverted_index_count_optimizer_enabled,
         }
     }
 }
@@ -115,12 +163,27 @@ impl TreeNodeRewriter for IndexOptimizer {
                 }
             }
 
+            // check if we can remove the filter
+            let is_remove_filter = self.is_remove_filter || index_conditions.can_remove_filter();
+
+            // set the index condition
             if !index_conditions.is_empty() {
                 *self.index_condition.lock() = Some(index_conditions);
             }
 
-            let plan = construct_filter_exec(filter, other_conditions)?;
-            return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+            if is_remove_filter {
+                // if all filter can be used in index, we can
+                // use index optimizer rule to optimize the query
+                if self.optimizer_enabled
+                    && is_only_timestamp_filter(&other_conditions.iter().collect::<Vec<_>>())
+                {
+                    self.can_optimize = true;
+                }
+                let plan = construct_filter_exec(filter, other_conditions)?;
+                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+            } else {
+                return Ok(Transformed::new(node, false, TreeNodeRecursion::Stop));
+            }
         }
         Ok(Transformed::no(node))
     }
@@ -211,28 +274,4 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
         return false;
     }
     true
-}
-
-fn is_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    if expr.as_any().downcast_ref::<Column>().is_some() {
-        true
-    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
-        is_column(expr.expr())
-    } else {
-        false
-    }
-}
-
-fn get_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
-    if let Some(expr) = expr.as_any().downcast_ref::<Column>() {
-        expr.name()
-    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
-        get_column_name(expr.expr())
-    } else {
-        "__o2_unknown_column__"
-    }
-}
-
-fn is_value(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    expr.as_any().downcast_ref::<Literal>().is_some()
 }

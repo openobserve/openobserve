@@ -73,8 +73,6 @@ message SearchInfo {
 }
 
 message IndexInfo {
-    bool                   use_inverted_index = 1;
-    string                    index_condition = 2;
     repeated KvItem                equal_keys = 3;
     IdxOptimizeMode       index_optimize_mode = 5;
 }
@@ -89,25 +87,9 @@ message SuperClusterInfo {
 
 message IdxOptimizeMode {
   oneof mode {
-    SimpleSelect    simple_select     = 1;
-    SimpleCount     simple_count      = 2;
-    SimpleHistogram simple_histogram  = 3;
     SimpleTopN      simple_topn       = 4;
     SimpleDistinct  simple_distinct   = 5;
   }
-}
-
-message SimpleSelect {
-  uint32 index = 1;
-  bool     asc = 2;
-}
-
-message SimpleCount {}
-
-message SimpleHistogram {
-  int64 min_value = 1;
-  uint64 bucket_width = 2;
-  uint32 num_buckets = 3;
 }
 
 message SimpleTopN {

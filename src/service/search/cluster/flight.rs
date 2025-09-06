@@ -128,9 +128,6 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         )
     );
 
-    let use_inverted_index = super::super::is_use_inverted_index(&sql);
-    req.set_use_inverted_index(use_inverted_index);
-
     #[cfg(feature = "enterprise")]
     let scan_stats = ScanStats {
         files: file_id_list_num as i64,
