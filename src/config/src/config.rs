@@ -1413,12 +1413,6 @@ pub struct Limit {
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
     #[env_config(
-        name = "ZO_INVERTED_INDEX_CACHE_MAX_ENTRIES",
-        default = 100000,
-        help = "Maximum number of entries in the inverted index cache. Higher values increase memory usage but may improve query performance."
-    )]
-    pub inverted_index_cache_max_entries: usize,
-    #[env_config(
         name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
         default = 10000,
         help = "Maximum number of entries in the inverted index result cache. Higher values increase memory usage but may improve query performance."
@@ -1436,6 +1430,18 @@ pub struct Limit {
         help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
     )]
     pub inverted_index_skip_threshold: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_MIN_TOKEN_LENGTH",
+        default = 2,
+        help = "Minimum length of a token in the inverted index."
+    )]
+    pub inverted_index_min_token_length: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_MAX_TOKEN_LENGTH",
+        default = 64,
+        help = "Maximum length of a token in the inverted index."
+    )]
+    pub inverted_index_max_token_length: usize,
     #[env_config(
         name = "ZO_DEFAULT_MAX_QUERY_RANGE_DAYS",
         default = 0,
@@ -2090,6 +2096,11 @@ pub fn init() -> Config {
     // check nats config
     if let Err(e) = check_nats_config(&mut cfg) {
         panic!("nats config error: {e}");
+    }
+
+    // check inverted index config
+    if let Err(e) = check_inverted_index_config(&mut cfg) {
+        panic!("inverted index config error: {e}");
     }
 
     cfg
@@ -2896,6 +2907,25 @@ fn check_nats_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.nats.queue_max_size = 2048; // 2GB
     }
     cfg.nats.queue_max_size *= 1024 * 1024; // convert to bytes
+    Ok(())
+}
+
+fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.limit.inverted_index_result_cache_max_entries == 0 {
+        cfg.limit.inverted_index_result_cache_max_entries = 10000;
+    }
+    if cfg.limit.inverted_index_result_cache_max_entry_size == 0 {
+        cfg.limit.inverted_index_result_cache_max_entry_size = 20480;
+    }
+    if cfg.limit.inverted_index_skip_threshold == 0 {
+        cfg.limit.inverted_index_skip_threshold = 35;
+    }
+    if cfg.limit.inverted_index_min_token_length == 0 {
+        cfg.limit.inverted_index_min_token_length = 2;
+    }
+    if cfg.limit.inverted_index_max_token_length == 0 {
+        cfg.limit.inverted_index_max_token_length = 64;
+    }
     Ok(())
 }
 
