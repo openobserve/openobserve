@@ -2102,6 +2102,12 @@ pub async fn create_table_index() -> Result<()> {
             "file_list_deleted",
             &["org", "created_at"],
         ),
+        ("file_list_jobs_status_idx", "file_list_jobs", &["status"]),
+        (
+            "file_list_jobs_status_stream_idx",
+            "file_list_jobs",
+            &["status", "stream"],
+        ),
         (
             "file_list_deleted_stream_date_file_idx",
             "file_list_deleted",
