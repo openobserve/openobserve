@@ -1016,9 +1016,11 @@ async fn process_node(
                         let mut remote_stream_for_batch = remote_stream.clone();
                         remote_stream_for_batch.org_id = org_id.clone().into();
 
+                        let records_len = records_to_write.len() as i64;
+
                         let writer =
                             get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
-                        match writer.write_wal(records_to_write.clone()).await {
+                        match writer.write_wal(records_to_write).await {
                             Err(e) => {
                                 let err_msg = format!(
                                     "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
@@ -1032,18 +1034,13 @@ async fn process_node(
                                     );
                                 }
                             }
-                            Ok(_) => {
+                            Ok(data_size) => {
+                                let data_size_mb = data_size as f64 / config::SIZE_IN_MB;
                                 // Report remote destination usage after successful WAL write
-                                let data_size = records_to_write
-                                    .iter()
-                                    .map(|record| record.to_string().len() as f64)
-                                    .sum::<f64>()
-                                    / config::SIZE_IN_MB;
-
-                                if data_size > 0.0 {
+                                if data_size_mb > 0.0 {
                                     let req_stats = config::meta::self_reporting::usage::RequestStats {
-                                        size: data_size,
-                                        records: records_to_write.len() as i64,
+                                        size: data_size_mb,
+                                        records: records_len,
                                         response_time: 0.0,
                                         ..config::meta::self_reporting::usage::RequestStats::default()
                                     };
@@ -1108,7 +1105,7 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
 
         let remote_stream = config::meta::stream::RemoteStreamParams {
             org_id: org_id.clone().into(),
-            destination_name: destination_name.into(),
+            destination_name: destination_name.clone().into(),
         };
 
         let mut remote_stream_for_batch = remote_stream.clone();
@@ -1127,12 +1124,41 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
             let mut remote_stream_for_batch = remote_stream.clone();
             remote_stream_for_batch.org_id = org_id.clone().into();
 
+            let reacords_len = records_to_write.len();
+
             let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
-            if let Err(e) = writer.write_wal(records_to_write).await {
-                let err_msg = format!(
-                    "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
-                );
-                log::error!("{err_msg}");
+            match writer.write_wal(records_to_write).await {
+                Err(e) => {
+                    let err_msg = format!(
+                        "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
+                    );
+                    log::error!("{err_msg}");
+                }
+                Ok(data_size) => {
+                    let data_size_mb = data_size as f64 / config::SIZE_IN_MB;
+
+                    // Report remote destination usage after successful WAL write
+                    if data_size_mb > 0.0 {
+                        let req_stats = config::meta::self_reporting::usage::RequestStats {
+                            size: data_size_mb,
+                            records: reacords_len as i64,
+                            response_time: 0.0,
+                            ..config::meta::self_reporting::usage::RequestStats::default()
+                        };
+
+                        crate::service::self_reporting::report_request_usage_stats(
+                            req_stats,
+                            &org_id,
+                            &destination_name,
+                            config::meta::stream::StreamType::Logs, /* Default to Logs for
+                                                                     * remote destination */
+                            config::meta::self_reporting::usage::UsageType::RemotePipeline,
+                            0, // No additional functions for remote destination
+                            chrono::Utc::now().timestamp_micros(),
+                        )
+                        .await;
+                    }
+                }
             }
         }
     }
@@ -1154,7 +1180,6 @@ async fn send_to_children(
             );
         }
     } else {
-        // Send to all children
         for child_sender in child_senders.iter_mut() {
             if let Err(send_err) = child_sender.send(item.clone()).await {
                 log::error!(

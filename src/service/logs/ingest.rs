@@ -456,8 +456,8 @@ pub async fn ingest(
                         ts_data.push((timestamp, local_val));
                         *fn_num = need_usage_report.then_some(function_no);
 
-                        // since we report the size for the original stream before the pipeline
-                        // execution we need to skip the actual size.
+                        // Since we report the size for the original stream before the pipeline
+                        // execution we need to skip reporting the actual size on disk.
                         if destination_stream.ne(&stream_name) {
                             let _size = size_by_stream
                                 .entry(destination_stream.clone())
