@@ -148,30 +148,30 @@ export default class DashboardFilter {
     );
     await fieldLabelLocator.click();
 
-    ///////////////////// use below code later /////////////////////////////
+    ///////////////////////////////////////////////
 
-    // Step 2: Handle multiple matching elements for column dropdown
-    const allColumnLocators = this.page.locator(
-      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
-    );
-    const count = await allColumnLocators.count();
+    // // Step 2: Handle multiple matching elements for column dropdown
+    // const allColumnLocators = this.page.locator(
+    //   `[data-test="dashboard-add-condition-column-${idx}\\}"]`
+    // );
+    // const count = await allColumnLocators.count();
 
-    const columnLocator =
-      count === 1
-        ? allColumnLocators.first()
-        : index === 0
-        ? allColumnLocators.first()
-        : allColumnLocators.last();
+    // const columnLocator =
+    //   count === 1
+    //     ? allColumnLocators.first()
+    //     : index === 0
+    //     ? allColumnLocators.first()
+    //     : allColumnLocators.last();
 
-    await columnLocator.click();
-    await columnLocator.fill(newFieldName);
+    // await columnLocator.click();
+    // await columnLocator.fill(newFieldName);
 
-    // Wait for dropdown to appear after filling the value
-    // await this.page
-    //   .locator('div.q-menu[role="listbox"]')
-    //   .waitFor({ state: "visible", timeout: 5000 });
-    await columnLocator.press("ArrowDown");
-    await columnLocator.press("Enter");
+    // // Wait for dropdown to appear after filling the value
+    // // await this.page
+    // //   .locator('div.q-menu[role="listbox"]')
+    // //   .waitFor({ state: "visible", timeout: 5000 });
+    // await columnLocator.press("ArrowDown");
+    // await columnLocator.press("Enter");
 
     // await this.page
     //   .getByRole("option", { name: newFieldName, exact: true })
@@ -262,5 +262,28 @@ export default class DashboardFilter {
         .filter({ hasText: expectedError });
       // Optional: Assert here if needed
     }
+
+    // Step 2: Handle multiple matching elements for column dropdown
+    const allColumnLocators = this.page.locator(
+      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
+    );
+    const count = await allColumnLocators.count();
+
+    const columnLocator =
+      count === 1
+        ? allColumnLocators.first()
+        : index === 0
+        ? allColumnLocators.first()
+        : allColumnLocators.last();
+
+    await columnLocator.click();
+    await columnLocator.fill(newFieldName);
+
+    // Wait for dropdown to appear after filling the value
+    // await this.page
+    //   .locator('div.q-menu[role="listbox"]')
+    //   .waitFor({ state: "visible", timeout: 5000 });
+    await columnLocator.press("ArrowDown");
+    await columnLocator.press("Enter");
   }
 }
