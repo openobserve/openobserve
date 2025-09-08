@@ -46,9 +46,7 @@ import {
   deepCopy,
 } from "@/utils/zincutils";
 
-import {
-  logsUtils
-} from "@/composables/useLogs/logsUtils";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 let {
   searchObj,
@@ -68,18 +66,20 @@ export const useStreamFields = () => {
   const router = useRouter();
   const { t } = useI18n();
 
-  const {fnParsedSQL,
-  fnUnparsedSQL,
-  extractTimestamps,
-  hasAggregation,
-  isLimitQuery,
-  isDistinctQuery,
-  isWithQuery,
-  addTraceId,
-  removeTraceId,
-  addTransformToQuery,
-  isActionsEnabled,
-  getColumnWidth,} = logsUtils();
+  const {
+    fnParsedSQL,
+    fnUnparsedSQL,
+    extractTimestamps,
+    hasAggregation,
+    isLimitQuery,
+    isDistinctQuery,
+    isWithQuery,
+    addTraceId,
+    removeTraceId,
+    addTransformToQuery,
+    isActionsEnabled,
+    getColumnWidth,
+  } = logsUtils();
 
   const updateFieldValues = () => {
     try {
