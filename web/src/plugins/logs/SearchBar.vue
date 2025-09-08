@@ -1678,10 +1678,16 @@ export default defineComponent({
       updatedLocalLogFilterField,
       updateUrlQueryParams,
       generateURLQuery,
+      isActionsEnabled,
     } = logsUtils();
-    const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData } =
-      useSearchBar();
-    const { loadStreamLists } = useStreamFields();
+    const {
+      getSavedViews,
+      setSelectedStreams,
+      onStreamChange,
+      getQueryData,
+      cancelQuery,
+    } = useSearchBar();
+    const { loadStreamLists, extractFields } = useStreamFields();
 
     const {
       fnParsedSQL,
