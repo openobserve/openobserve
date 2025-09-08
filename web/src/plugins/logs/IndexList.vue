@@ -806,6 +806,7 @@ import useHttpStreaming from "@/composables/useStreamingSearch";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useSearchBar } from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
+import { searchState } from "@/composables/useLogs/searchState";
 
 interface Filter {
   fieldName: string;
@@ -855,19 +856,19 @@ export default defineComponent({
     const $q = useQuasar();
     const {
       searchObj,
-      updatedLocalLogFilterField,
       filterHitsColumns,
       extractFields,
       reorderSelectedFields,
       getFilterExpressionByFieldType,
       extractValueQuery,
-      streamSchemaFieldsIndexMapping,
     } = useLogs();
+
+    const { streamSchemaFieldsIndexMapping } = searchState();
 
     const { onStreamChange, handleQueryData } = useSearchBar();
     const { validateFilterForMultiStream } = useSearchStream();
 
-    const {fnParsedSQL, fnUnparsedSQL} = logsUtils();
+    const {fnParsedSQL, fnUnparsedSQL, updatedLocalLogFilterField} = logsUtils();
 
     const {
       fetchQueryDataWithWebSocket,

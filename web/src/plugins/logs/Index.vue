@@ -406,6 +406,7 @@ import {
 } from "@/composables/useLogs/logsVisualization";
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "PageSearch",
@@ -557,13 +558,12 @@ export default defineComponent({
     const $q = useQuasar();
     const disableMoreErrorDetails: boolean = ref(false);
     const searchHistoryRef = ref(null);
-    const { resetSearchObj, initialLogsState, resetStreamData } = searchState();
+    const { resetSearchObj, initialLogsState, resetStreamData, fieldValues } = searchState();
     const { getStreamList } = useStreamFields();
     const { getFunctions, getQueryData, cancelQuery } = useSearchBar();
     let {
       searchObj,
       getJobData,
-      fieldValues,
       updateGridColumns,
       refreshData,
       loadLogsData,
@@ -579,7 +579,6 @@ export default defineComponent({
       initializeSearchConnection,
       addTraceId,
       sendCancelSearchMessage,
-      getStream,
       clearSearchObj,
       setCommunicationMethod,
       processHttpHistogramResults,
@@ -587,6 +586,8 @@ export default defineComponent({
     } = useLogs();
 
     const { getHistogramQueryData, resetHistogramWithError } = useHistogram();
+
+    const { getStream } = useStreams();
 
     const {
       fnParsedSQL,

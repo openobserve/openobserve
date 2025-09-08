@@ -13,172 +13,65 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { date, useQuasar } from "quasar";
+import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import {
-  reactive,
-  ref,
-  type Ref,
-  toRaw,
-  nextTick,
-  onBeforeMount,
-  watch,
-  computed,
-  onBeforeUnmount,
-} from "vue";
+import { reactive, onBeforeMount } from "vue";
 import { useStore } from "vuex";
-import { onBeforeRouteLeave, useRouter } from "vue-router";
-import { cloneDeep, startCase } from "lodash-es";
-import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
+import { useRouter } from "vue-router";
+import { cloneDeep } from "lodash-es";
 
-import {
-  useLocalLogFilterField,
-  b64EncodeUnicode,
-  b64DecodeUnicode,
-  formatSizeFromMB,
-  timestampToTimezoneDate,
-  histogramDateTimezone,
-  useLocalWrapContent,
-  useLocalTimezone,
-  useLocalInterestingFields,
-  useLocalSavedView,
-  convertToCamelCase,
-  getFunctionErrorMessage,
-  getUUID,
-  getWebSocketUrl,
-  generateTraceContext,
-  arraysMatch,
-  isWebSocketEnabled,
-  isStreamingEnabled,
-  addSpacesToOperators,
-  deepCopy,
-} from "@/utils/zincutils";
-import {
-  convertDateToTimestamp,
-  getConsumableRelativeTime,
-} from "@/utils/date";
-import { byString } from "@/utils/json";
-import { logsErrorMessage } from "@/utils/common";
-import useSqlSuggestions from "@/composables/useSuggestions";
+import { b64DecodeUnicode, useLocalTimezone } from "@/utils/zincutils";
 
 import useNotifications from "@/composables/useNotifications";
 import useStreams from "@/composables/useStreams";
-import useWebSocket from "@/composables/useWebSocket";
 
 import searchService from "@/services/search";
-import savedviewsService from "@/services/saved_views";
-import config from "@/aws-exports";
-import useSearchWebSocket from "./useSearchWebSocket";
 
 import { searchState } from "@/composables/useLogs/searchState";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
-import { INTERVAL_MAP, DEFAULT_LOGS_CONFIG } from "@/utils/logs/constants";
-import {logsUtils} from "@/composables/useLogs/logsUtils";
-import {usePagination} from "@/composables/useLogs/usePagination";
+import { DEFAULT_LOGS_CONFIG } from "@/utils/logs/constants";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { usePagination } from "@/composables/useLogs/usePagination";
 
 import useStreamFields from "@/composables/useLogs/useStreamFields";
-import {
-  useHistogram
-} from "@/composables/useLogs/useHistogram";
+import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useSearchBar from "@/composables/useLogs/useSearchBar";
-
-// TODO OK:
-// useStreamManagement for stream-related functions
-// useQueryProcessing for query-related functions
-// useDataVisualization for histogram and data display functions
-
-// let histogramResults: any = [];
-// let histogramMappedData: any = [];
-
-const {
-  fetchQueryDataWithWebSocket,
-  sendSearchMessageBasedOnRequestId,
-  cancelSearchQueryBasedOnRequestId,
-  closeSocketBasedOnRequestId,
-} = useSearchWebSocket();
-
-// const searchPartitionMap = reactive<{ [key: string]: number }>({});
-
-let {
-  searchObj,
-  searchObjDebug,
-  searchAggData,
-  initialQueryPayload,
-  streamSchemaFieldsIndexMapping,
-  resetHistogramError,
-  resetQueryData,
-  resetFunctions,
-  resetStreamData,
-  notificationMsg,
-  histogramMappedData,
-  histogramResults,
-} = searchState();
 
 const useLogs = () => {
   const store = useStore();
   const { t } = useI18n();
   const $q = useQuasar();
 
-  const {getHistogramTitle,
-  generateHistogramData,
-  generateHistogramSkeleton,
-  getHistogramQueryData,
-  isHistogramEnabled,} = useHistogram();
+  let {
+    searchObj,
+    searchObjDebug,
+    initialQueryPayload,
+    resetFunctions,
+    notificationMsg,
+  } = searchState();
+
+  const {
+    getHistogramTitle,
+    generateHistogramData,
+    generateHistogramSkeleton,
+    getHistogramQueryData,
+  } = useHistogram();
+
   const { refreshPartitionPagination, getPaginatedData } = usePagination();
 
-  const { getQueryReq,
-buildWebSocketPayload,
-initializeSearchConnection,
-sendSearchMessage,
-handleStreamingHits,
-handleStreamingMetadata,
-updatePageCountTotal,
-trimPageCountExtraHit,
-handleHistogramStreamingHits,
-handleHistogramStreamingMetadata,
-handlePageCountStreamingHits,
-handlePageCountStreamingMetadata,
-handleSearchResponse,
-handleFunctionError,
-handleAggregation,
-updateResult,
-handleLogsResponse,
-chunkedAppend,
-handlePageCountResponse,
-handleHistogramResponse,
-shouldShowHistogram,
-processHistogramRequest,
-isHistogramDataMissing,
-handleSearchClose,
-handleSearchError,
-constructErrorMessage,
-getAggsTotal,
-refreshPagination,
-shouldGetPageCount,
-getPageCountThroughSocket,
-setCancelSearchError,
-handleSearchReset,
-validateFilterForMultiStream, buildSearch} = useSearchStream();
+  const { buildSearch } = useSearchStream();
 
-const {getFunctions, getActions, getQueryData} = useSearchBar();
+  const { getFunctions, getActions, getQueryData } = useSearchBar();
 
-  const {fnParsedSQL,
-  fnUnparsedSQL,
-  extractTimestamps,
-  hasAggregation,
-  isLimitQuery,
-  isDistinctQuery,
-  isWithQuery,
-  addTraceId,
-  removeTraceId,
-  addTransformToQuery,
-  isActionsEnabled,
-  showCancelSearchNotification,
-  updateUrlQueryParams,
-  isNonAggregatedSQLMode,
-  generateURLQuery,
-updatedLocalLogFilterField,
-isTimestampASC,} = logsUtils();
+  const {
+    fnParsedSQL,
+    fnUnparsedSQL,
+    extractTimestamps,
+    addTransformToQuery,
+    isActionsEnabled,
+    showCancelSearchNotification,
+    isTimestampASC,
+  } = logsUtils();
 
   const {
     updateFieldValues,
@@ -186,27 +79,13 @@ isTimestampASC,} = logsUtils();
     updateGridColumns,
     filterHitsColumns,
     getStreamList,
-    extractFTSFields,
-    loadStreamLists,
-    resetFieldValues,
   } = useStreamFields();
 
-  let parser: null | Parser = new Parser();
-
   const { showErrorNotification } = useNotifications();
-  const {
-    getStreams,
-    getStream,
-    getMultiStreams,
-    isStreamExists,
-    isStreamFetched,
-  } = useStreams();
+  const { getStreams } = useStreams();
 
   const router = useRouter();
-  const fieldValues = ref();
-
-  const { updateFieldKeywords } = useSqlSuggestions();
-
+  
   onBeforeMount(async () => {
     if (router.currentRoute.value.query?.quick_mode == "true") {
       searchObj.meta.quickMode = true;
@@ -214,83 +93,11 @@ isTimestampASC,} = logsUtils();
     extractValueQuery();
   });
 
-  onBeforeUnmount(() => {
-    parser = null;
-  });
-
   const clearSearchObj = () => {
     searchObj = reactive(
       Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_LOGS_CONFIG))),
     );
   };
-
-  // const updatedLocalLogFilterField = (): void => {
-  //   const identifier: string = searchObj.organizationIdentifier || "default";
-  //   const selectedFields: any =
-  //     useLocalLogFilterField()?.value != null
-  //       ? useLocalLogFilterField()?.value
-  //       : {};
-  //   const stream = searchObj.data.stream.selectedStream.sort().join("_");
-  //   selectedFields[`${identifier}_${stream}`] =
-  //     searchObj.data.stream.selectedFields;
-  //   useLocalLogFilterField(selectedFields);
-  // };
-
-  // const getFunctions = async () => {
-  //   try {
-  //     if (store.state.organizationData.functions.length == 0) {
-  //       await getAllFunctions();
-  //     }
-
-  //     store.state.organizationData.functions.map((data: any) => {
-  //       const args: any = [];
-  //       for (let i = 0; i < parseInt(data.num_args); i++) {
-  //         args.push("'${1:value}'");
-  //       }
-
-  //       const itemObj: {
-  //         name: any;
-  //         args: string;
-  //       } = {
-  //         name: data.name,
-  //         args: "(" + args.join(",") + ")",
-  //       };
-  //       searchObj.data.transforms.push({
-  //         name: data.name,
-  //         function: data.function,
-  //       });
-  //       if (!data.stream_name) {
-  //         searchObj.data.stream.functions.push(itemObj);
-  //       }
-  //     });
-  //     return;
-  //   } catch (e) {
-  //     showErrorNotification("Error while fetching functions");
-  //   }
-  // };
-
-  // const getActions = async () => {
-  //   try {
-  //     searchObj.data.actions = [];
-
-  //     if (store.state.organizationData.actions.length == 0) {
-  //       await getAllActions();
-  //     }
-
-  //     store.state.organizationData.actions.forEach((data: any) => {
-  //       if (data.execution_details_type === "service") {
-  //         searchObj.data.actions.push({
-  //           name: data.name,
-  //           id: data.id,
-  //         });
-  //       }
-  //     });
-  //     return;
-  //   } catch (e) {
-  //     showErrorNotification("Error while fetching actions");
-  //   }
-  // };
-
 
   const processHttpHistogramResults = async (queryReq: any) => {
     return new Promise(async (resolve, reject) => {
@@ -475,8 +282,6 @@ isTimestampASC,} = logsUtils();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
   };
 
-  
-
   const routeToSearchSchedule = () => {
     router.push({
       query: {
@@ -578,19 +383,6 @@ isTimestampASC,} = logsUtils();
     }
   };
 
-  // const handleQueryData = async () => {
-  //   try {
-  //     searchObj.data.tempFunctionLoading = false;
-  //     searchObj.data.tempFunctionName = "";
-  //     searchObj.data.tempFunctionContent = "";
-  //     searchObj.loading = true;
-  //     await getQueryData();
-  //   } catch (e: any) {
-  //     console.log("Error while loading logs data");
-  //   }
-  // };
-  const saveColumnSizes = () => {};
-
   const handleRunQuery = async () => {
     try {
       searchObj.loading = true;
@@ -603,13 +395,7 @@ isTimestampASC,} = logsUtils();
       ) {
         delete router.currentRoute.value.query.type;
       }
-      // const queryTimeout = setTimeout(() => {
-      //   if (searchObj.loading) {
-      //     searchObj.meta.showSearchScheduler = true;
-      //   }
-      // }, 120000);
       await getQueryData();
-      // clearTimeout(queryTimeout);
     } catch (e: any) {
       console.log("Error while loading logs data");
     }
@@ -1020,22 +806,15 @@ isTimestampASC,} = logsUtils();
 
   return {
     searchObj,
-    searchAggData,
     getStreams,
-    updatedLocalLogFilterField,
-    fieldValues,
     extractFields,
     getJobData,
     updateGridColumns,
     refreshData,
-    updateUrlQueryParams,
     loadLogsData,
     restoreUrlQueryParams,
     updateStreams,
     handleRunQuery,
-    extractFTSFields,
-    generateURLQuery,
-    loadStreamLists,
     filterHitsColumns,
     generateHistogramSkeleton,
     fnParsedSQL,
@@ -1047,17 +826,14 @@ isTimestampASC,} = logsUtils();
     enableRefreshInterval,
     routeToSearchSchedule,
     isActionsEnabled,
-    getStream,
     updateFieldValues,
     getHistogramTitle,
     processPostPaginationData,
-    parser,
     router,
     $q,
     clearSearchObj,
     loadVisualizeData,
     processHttpHistogramResults,
-    streamSchemaFieldsIndexMapping,
     notificationMsg,
     showErrorNotification,
     setDateTime,
