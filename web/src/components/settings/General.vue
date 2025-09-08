@@ -206,7 +206,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Custom logo text is used to change the default branding text displayed in the application.
           </span>
         </div>
-        <q-separator class="q-mt-sm"></q-separator>
         <div class="settings-grid-item q-ml-xs">
           <div class="q-pt-sm individual-setting-title  full-width">
             {{ t("settings.customLogoTitle") }}
