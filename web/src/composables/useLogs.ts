@@ -2018,18 +2018,12 @@ const useLogs = () => {
   };
 
   return {
-    searchObj,
-    getStreams,
-    extractFields,
     getJobData,
-    updateGridColumns,
     refreshData,
     loadLogsData,
     restoreUrlQueryParams,
     updateStreams,
     handleRunQuery,
-    filterHitsColumns,
-    generateHistogramSkeleton,
     fnParsedSQL,
     reorderSelectedFields,
     getFilterExpressionByFieldType,
@@ -2038,7 +2032,6 @@ const useLogs = () => {
     loadJobData,
     enableRefreshInterval,
     routeToSearchSchedule,
-    isActionsEnabled,
     updateFieldValues,
     getHistogramTitle,
     processPostPaginationData,
