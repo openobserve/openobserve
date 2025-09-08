@@ -1426,14 +1426,21 @@ export default defineComponent({
             // Enable quick mode automatically when switching to visualization if:
             // 1. SQL mode is disabled OR 
             // 2. Query is "SELECT * FROM some_stream" (simple select all query)
+            // 3. Default quick mode config is true
             const shouldEnableQuickMode =
               !searchObj.meta.sqlMode ||
               isSimpleSelectAllQuery(searchObj.data.query);
 
-            if (shouldEnableQuickMode && !searchObj.meta.quickMode) {
-              searchObj.meta.quickMode = true;
+            const isQuickModeDisabled = !searchObj.meta.quickMode;
+            const isQuickModeConfigEnabled =
+              store.state.zoConfig.quick_mode_enabled === true;
 
-              // handle quick mode change
+            if (
+              shouldEnableQuickMode &&
+              isQuickModeDisabled &&
+              isQuickModeConfigEnabled
+            ) {
+              searchObj.meta.quickMode = true;
               handleQuickModeChange();
             }
 
@@ -1711,7 +1718,10 @@ export default defineComponent({
           }
           
           // Check if query is SELECT * which is not supported for visualization
-          if (isSimpleSelectAllQuery(logsPageQuery)) {
+          if (
+            store.state.zoConfig.quick_mode_enabled === true &&
+            isSimpleSelectAllQuery(logsPageQuery)
+          ) {
             showErrorNotification(
               "Select * query is not supported for visualization",
             );
