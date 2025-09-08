@@ -34,6 +34,7 @@ mod compactor;
 mod file_downloader;
 pub(crate) mod files;
 mod flatten_compactor;
+pub mod grpc;
 pub mod metrics;
 mod mmdb_downloader;
 #[cfg(feature = "enterprise")]
