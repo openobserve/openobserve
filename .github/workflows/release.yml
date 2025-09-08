@@ -182,7 +182,7 @@ jobs:
         uses: actions/download-artifact@v5
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: arn:aws:iam::325553860333:role/github-actions-s3-uploader
           role-session-name: GithubActionsSession

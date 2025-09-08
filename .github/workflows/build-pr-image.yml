@@ -65,7 +65,7 @@ jobs:
           mv target/x86_64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
@@ -159,7 +159,7 @@ jobs:
           mv target/aarch64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
@@ -210,7 +210,7 @@ jobs:
           echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
           echo "GIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
