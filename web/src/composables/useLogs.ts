@@ -102,14 +102,13 @@ const useLogs = () => {
   } = logsUtils();
 
   const {getHistogramTitle,
-  resetHistogramWithError,
   generateHistogramData,
   generateHistogramSkeleton,
-  setMultiStreamHistogramQuery,
+  getHistogramQueryData,
   isHistogramEnabled,} = useHistogram();
+  const { refreshPartitionPagination, getPaginatedData } = usePagination();
 
   const { getQueryReq,
-getDataThroughStream,
 buildWebSocketPayload,
 initializeSearchConnection,
 sendSearchMessage,
@@ -140,9 +139,10 @@ refreshPagination,
 shouldGetPageCount,
 getPageCountThroughSocket,
 setCancelSearchError,
-handleSearchReset} = searchStream();
+handleSearchReset,
+validateFilterForMultiStream, buildSearch} = useSearchStream();
 
-const {getFunctions, getActions} = useSearchBar();
+const {getFunctions, getActions, getQueryData} = useSearchBar();
 
   const {fnParsedSQL,
   fnUnparsedSQL,
@@ -158,7 +158,9 @@ const {getFunctions, getActions} = useSearchBar();
   showCancelSearchNotification,
   updateUrlQueryParams,
   isNonAggregatedSQLMode,
-  generateURLQuery,} = logsUtils();
+  generateURLQuery,
+updatedLocalLogFilterField,
+isTimestampASC,} = logsUtils();
 
   const {
     updateFieldValues,
