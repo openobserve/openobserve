@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    cmp::max,
     collections::HashMap,
     ops::Bound,
     sync::{Arc, atomic::Ordering},
@@ -208,13 +207,13 @@ pub async fn register_and_keep_alive() -> Result<()> {
 
     // check node heatbeat
     tokio::task::spawn(async move {
-        let cfg = get_config();
         let client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
-        let ttl_keep_alive = max(1, (cfg.limit.node_heartbeat_ttl / 2) as u64);
         loop {
+            let cfg = get_config();
+            let ttl_keep_alive = std::cmp::max(1, (cfg.limit.node_heartbeat_ttl / 2) as u64);
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             if let Err(e) = check_nodes_status(&client).await {
                 log::error!("[CLUSTER] check_nodes_status failed: {}", e);

@@ -72,12 +72,11 @@ pub fn generate_storage_file_name(
     // let hash_id = file_columns[5].to_string();
     let file_name = file_columns.last().unwrap().to_string();
     let file_name_pos = file_name.rfind('/').unwrap_or_default();
-    let id = ider::generate();
+    let id = ider::generate_file_name();
     let file_name = if file_name_pos == 0 {
         id
     } else {
         format!("{}/{}", &file_name[..file_name_pos], id)
     };
-    let rand_str = format!("{:04x}", rand::random::<u16>());
-    format!("files/{stream_key}/{file_date}/{file_name}{rand_str}{FILE_EXT_PARQUET}")
+    format!("files/{stream_key}/{file_date}/{file_name}{FILE_EXT_PARQUET}")
 }

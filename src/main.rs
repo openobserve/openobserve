@@ -340,10 +340,11 @@ async fn main() -> Result<(), anyhow::Error> {
                 init_common_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
             };
             if let Err(e) = ret {
-                log::error!("gRPC server init failed: {:?}", e);
+                log::error!("grpc_runtime gRPC server init failed: {:?}", e);
                 std::process::exit(1);
             }
         });
+        log::info!("grpc_runtime stopped");
     });
 
     // wait for gRPC init
@@ -385,6 +386,9 @@ async fn main() -> Result<(), anyhow::Error> {
     if !start_ok {
         return Err(anyhow::anyhow!("set node schedulable failed"));
     }
+
+    // init grpc health check
+    job::grpc::health_check().await;
 
     // init http server
     if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
