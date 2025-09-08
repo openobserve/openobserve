@@ -38,7 +38,6 @@ use futures::StreamExt;
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
 use ingester::WAL_PARQUET_METADATA;
-use tokio::fs;
 
 use crate::{
     common::infra::wal,
@@ -527,7 +526,7 @@ async fn get_file_list_inner(
     wal_dir: &str,
     file_ext: &str,
 ) -> Result<Vec<FileKey>, Error> {
-    let wal_dir = match fs::canonicalize(wal_dir).await {
+    let wal_dir = match tokio::fs::canonicalize(wal_dir).await {
         Ok(path) => {
             let mut path = path.to_str().unwrap().to_string();
             // Hack for windows
