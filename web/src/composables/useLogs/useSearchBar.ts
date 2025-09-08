@@ -54,6 +54,13 @@ export const useSearchBar = () => {
     initialQueryPayload,
   } = searchState();
 
+  let {
+    searchObj,
+    searchObjDebug,
+    notificationMsg,
+    resetQueryData,
+    initialQueryPayload,
+  } = searchState();
 
   const store = useStore();
   const router = useRouter();
