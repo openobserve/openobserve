@@ -1,8 +1,8 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const logsdata = require("../../../test-data/logs_data.json");
-const testLogger = require('../utils/test-logger.js');
 
 // Utility Functions
 
@@ -36,7 +36,7 @@ async function ingestTestData(page) {
     streamName: streamName,
     logsdata: logsdata
   });
-  console.log(response);
+  testLogger.debug('API response received', { response });
 }
 
 async function applyQuery(pm) {
