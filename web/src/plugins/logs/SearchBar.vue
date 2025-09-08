@@ -1651,8 +1651,16 @@ export default defineComponent({
     const { resetStreamData, searchObj } = searchState();
     const { buildSearch } = useSearchStream();
 
-    const { fnParsedSQL, fnUnparsedSQL } = logsUtils();
-    const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData, } = useSearchBar();
+    const {
+      fnParsedSQL,
+      fnUnparsedSQL,
+      updatedLocalLogFilterField,
+      updateUrlQueryParams,
+      generateURLQuery,
+    } = logsUtils();
+    const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData } =
+      useSearchBar();
+    const { loadStreamLists } = useStreamFields();
 
     const {
       fnParsedSQL,
