@@ -162,7 +162,7 @@ export const useSearchAround = () => {
 
       searchService
         .search_around({
-          org_identifier: store.state.selectedOrganization.identifier,
+          org_identifier: searchObj.organizationIdentifier,
           index: streamName,
           key: params.key,
           size: String(params.size),

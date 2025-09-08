@@ -18,7 +18,7 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
-import { b64EncodeUnicode } from "@/utils/zincUtils";
+import { b64EncodeUnicode, useLocalLogFilterField, } from "@/utils/zincUtils";
 
 import {
   encodeVisualizationConfig,
@@ -681,6 +681,34 @@ export const logsUtils = () => {
     );
   };
 
+  const updatedLocalLogFilterField = (): void => {
+    const identifier: string = searchObj.organizationIdentifier || "default";
+    const selectedFields: any =
+      useLocalLogFilterField()?.value != null
+        ? useLocalLogFilterField()?.value
+        : {};
+    const stream = searchObj.data.stream.selectedStream.sort().join("_");
+    selectedFields[`${identifier}_${stream}`] =
+      searchObj.data.stream.selectedFields;
+    useLocalLogFilterField(selectedFields);
+  };
+
+  function isTimestampASC(orderby: any) {
+    if (orderby) {
+      for (const order of orderby) {
+        if (
+          order.expr &&
+          order.expr.column === store.state.zoConfig.timestamp_column
+        ) {
+          if (order.type && order.type === "ASC") {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   return {
     fnParsedSQL,
     fnUnparsedSQL,
@@ -699,6 +727,8 @@ export const logsUtils = () => {
     generateURLQuery,
     updateUrlQueryParams,
     isNonAggregatedSQLMode,
+    updatedLocalLogFilterField,
+    isTimestampASC,
   };
 };
 

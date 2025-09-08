@@ -15,15 +15,14 @@
 
 import { searchState } from "@/composables/useLogs/searchState";
 
-import {
-  logsUtils
-} from "@/composables/useLogs/logsUtils";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useNotifications from "@/composables/useNotifications";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useStreamingSearch from "@/composables/useStreamingSearch";
 import { logsErrorMessage } from "@/utils/common";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { cloneDeep, startCase } from "lodash-es";
 import {
   SearchRequestPayload,
   WebSocketSearchResponse,
@@ -32,14 +31,14 @@ import {
 } from "@/ts/interfaces/query";
 
 import useStreamFields from "@/composables/useLogs/useStreamFields";
-import {
-  useHistogram
-} from "@/composables/useLogs/useHistogram";
+import { useHistogram } from "@/composables/useLogs/useHistogram";
 
 import {
   convertDateToTimestamp,
   getConsumableRelativeTime,
 } from "@/utils/date";
+
+import config from "@/aws-exports";
 
 import {
   useLocalLogFilterField,
@@ -64,30 +63,33 @@ import {
   deepCopy,
 } from "@/utils/zincutils";
 
-export const searchStream = () => {
+export const useSearchStream = () => {
   let histogramResults: any = [];
   const { showErrorNotification } = useNotifications();
-  const { fnParsedSQL,
-  hasAggregation,
-  isDistinctQuery,
-  isWithQuery,
-  isLimitQuery,
-  extractTimestamps,
-  addTransformToQuery,
-  addTraceId,
-  removeTraceId,
-  showCancelSearchNotification,
-  updateUrlQueryParams,
-  isNonAggregatedSQLMode, } = logsUtils();
+  const {
+    fnParsedSQL,
+    hasAggregation,
+    isDistinctQuery,
+    isWithQuery,
+    isLimitQuery,
+    extractTimestamps,
+    addTransformToQuery,
+    addTraceId,
+    removeTraceId,
+    showCancelSearchNotification,
+    updateUrlQueryParams,
+    isNonAggregatedSQLMode,
+    fnUnparsedSQL,
+  } = logsUtils();
 
-
-
-  const { getHistogramTitle,
-  generateHistogramData,
-  resetHistogramWithError,
-  generateHistogramSkeleton,
-  setMultiStreamHistogramQuery,
-  isHistogramEnabled,} = useHistogram();
+  const {
+    getHistogramTitle,
+    generateHistogramData,
+    resetHistogramWithError,
+    generateHistogramSkeleton,
+    setMultiStreamHistogramQuery,
+    isHistogramEnabled,
+  } = useHistogram();
 
   const store = useStore();
   const router = useRouter();
@@ -1710,363 +1712,440 @@ export const searchStream = () => {
   };
 
   function buildSearch() {
-      try {
-        let query = searchObj.data.query.trim();
-        searchObj.data.filterErrMsg = "";
-        searchObj.data.missingStreamMessage = "";
-        searchObj.data.stream.missingStreamMultiStreamFilter = [];
-        const req: any = {
-          query: {
-            sql: searchObj.meta.sqlMode
-              ? query
-              : 'select [FIELD_LIST][QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
-            start_time: (new Date().getTime() - 900000) * 1000,
-            end_time: new Date().getTime() * 1000,
-            from:
-              searchObj.meta.resultGrid.rowsPerPage *
-                (searchObj.data.resultGrid.currentPage - 1) || 0,
-            size: searchObj.meta.resultGrid.rowsPerPage,
-            quick_mode: searchObj.meta.quickMode,
-          },
-        };
-  
-        if (
-          config.isEnterprise == "true" &&
-          store.state.zoConfig.super_cluster_enabled
-        ) {
-          req["regions"] = searchObj.meta.regions;
-          req["clusters"] = searchObj.meta.clusters;
+    try {
+      let query = searchObj.data.query.trim();
+      searchObj.data.filterErrMsg = "";
+      searchObj.data.missingStreamMessage = "";
+      searchObj.data.stream.missingStreamMultiStreamFilter = [];
+      const req: any = {
+        query: {
+          sql: searchObj.meta.sqlMode
+            ? query
+            : 'select [FIELD_LIST][QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
+          start_time: (new Date().getTime() - 900000) * 1000,
+          end_time: new Date().getTime() * 1000,
+          from:
+            searchObj.meta.resultGrid.rowsPerPage *
+              (searchObj.data.resultGrid.currentPage - 1) || 0,
+          size: searchObj.meta.resultGrid.rowsPerPage,
+          quick_mode: searchObj.meta.quickMode,
+        },
+      };
+
+      if (
+        config.isEnterprise == "true" &&
+        store.state.zoConfig.super_cluster_enabled
+      ) {
+        req["regions"] = searchObj.meta.regions;
+        req["clusters"] = searchObj.meta.clusters;
+      }
+
+      // if (searchObj.data.stream.selectedStreamFields.length == 0) {
+      //   const streamData: any = getStreams(
+      //     searchObj.data.stream.streamType,
+      //     true,
+      //     true,
+      //   );
+
+      //   searchObj.data.stream.selectedStreamFields = streamData.schema;
+
+      //   if (
+      //     !searchObj.data.stream.selectedStreamFields ||
+      //     searchObj.data.stream.selectedStreamFields.length == 0
+      //   ) {
+      //     searchObj.data.stream.selectedStreamFields = [];
+      //     searchObj.loading = false;
+      //     return false;
+      //   }
+      // }
+
+      const streamFieldNames: any =
+        searchObj.data.stream.selectedStreamFields.map(
+          (item: any) => item.name,
+        );
+
+      for (
+        let i = searchObj.data.stream.interestingFieldList.length - 1;
+        i >= 0;
+        i--
+      ) {
+        const fieldName = searchObj.data.stream.interestingFieldList[i];
+        if (!streamFieldNames.includes(fieldName)) {
+          searchObj.data.stream.interestingFieldList.splice(i, 1);
         }
-  
-        // if (searchObj.data.stream.selectedStreamFields.length == 0) {
-        //   const streamData: any = getStreams(
-        //     searchObj.data.stream.streamType,
-        //     true,
-        //     true,
-        //   );
-  
-        //   searchObj.data.stream.selectedStreamFields = streamData.schema;
-  
-        //   if (
-        //     !searchObj.data.stream.selectedStreamFields ||
-        //     searchObj.data.stream.selectedStreamFields.length == 0
-        //   ) {
-        //     searchObj.data.stream.selectedStreamFields = [];
-        //     searchObj.loading = false;
-        //     return false;
-        //   }
-        // }
-  
-        const streamFieldNames: any =
-          searchObj.data.stream.selectedStreamFields.map(
-            (item: any) => item.name,
+      }
+
+      if (
+        searchObj.data.stream.interestingFieldList.length > 0 &&
+        searchObj.meta.quickMode
+      ) {
+        if (searchObj.data.stream.selectedStream.length == 1) {
+          req.query.sql = req.query.sql.replace(
+            "[FIELD_LIST]",
+            searchObj.data.stream.interestingFieldList.join(","),
           );
-  
-        for (
-          let i = searchObj.data.stream.interestingFieldList.length - 1;
-          i >= 0;
-          i--
-        ) {
-          const fieldName = searchObj.data.stream.interestingFieldList[i];
-          if (!streamFieldNames.includes(fieldName)) {
-            searchObj.data.stream.interestingFieldList.splice(i, 1);
-          }
         }
-  
-        if (
-          searchObj.data.stream.interestingFieldList.length > 0 &&
-          searchObj.meta.quickMode
-        ) {
-          if (searchObj.data.stream.selectedStream.length == 1) {
-            req.query.sql = req.query.sql.replace(
-              "[FIELD_LIST]",
-              searchObj.data.stream.interestingFieldList.join(","),
-            );
-          }
-        } else {
-          req.query.sql = req.query.sql.replace("[FIELD_LIST]", "*");
-        }
-  
-        const timestamps: any =
-          searchObj.data.datetime.type === "relative"
-            ? getConsumableRelativeTime(
-                searchObj.data.datetime.relativeTimePeriod,
-              )
-            : cloneDeep(searchObj.data.datetime);
-  
-        if (searchObj.data.datetime.type === "relative") {
-          searchObj.data.datetime.startTime = timestamps.startTime;
-          searchObj.data.datetime.endTime = timestamps.endTime;
-        }
-  
-        if (
-          timestamps.startTime != "Invalid Date" &&
-          timestamps.endTime != "Invalid Date"
-        ) {
-          if (timestamps.startTime > timestamps.endTime) {
-            notificationMsg.value = "Start time cannot be greater than end time";
-            // showErrorNotification("Start time cannot be greater than end time");
-            return false;
-          }
-          searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-  
-          req.query.start_time = timestamps.startTime;
-          req.query.end_time = timestamps.endTime;
-  
-          searchObj.meta.resultGrid.chartInterval = "10 second";
-          if (req.query.end_time - req.query.start_time >= 1000000 * 60 * 30) {
-            searchObj.meta.resultGrid.chartInterval = "15 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (req.query.end_time - req.query.start_time >= 1000000 * 60 * 60) {
-            searchObj.meta.resultGrid.chartInterval = "30 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 2) {
-            searchObj.meta.resultGrid.chartInterval = "1 minute";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 6) {
-            searchObj.meta.resultGrid.chartInterval = "5 minute";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 24) {
-            searchObj.meta.resultGrid.chartInterval = "30 minute";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (req.query.end_time - req.query.start_time >= 1000000 * 86400 * 7) {
-            searchObj.meta.resultGrid.chartInterval = "1 hour";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (req.query.end_time - req.query.start_time >= 1000000 * 86400 * 30) {
-            searchObj.meta.resultGrid.chartInterval = "1 day";
-            searchObj.meta.resultGrid.chartKeyFormat = "YYYY-MM-DD";
-          }
-        } else {
-          notificationMsg.value = "Invalid date format";
+      } else {
+        req.query.sql = req.query.sql.replace("[FIELD_LIST]", "*");
+      }
+
+      const timestamps: any =
+        searchObj.data.datetime.type === "relative"
+          ? getConsumableRelativeTime(
+              searchObj.data.datetime.relativeTimePeriod,
+            )
+          : cloneDeep(searchObj.data.datetime);
+
+      if (searchObj.data.datetime.type === "relative") {
+        searchObj.data.datetime.startTime = timestamps.startTime;
+        searchObj.data.datetime.endTime = timestamps.endTime;
+      }
+
+      if (
+        timestamps.startTime != "Invalid Date" &&
+        timestamps.endTime != "Invalid Date"
+      ) {
+        if (timestamps.startTime > timestamps.endTime) {
+          notificationMsg.value = "Start time cannot be greater than end time";
+          // showErrorNotification("Start time cannot be greater than end time");
           return false;
         }
-  
-        if (searchObj.meta.sqlMode == true) {
-          searchObj.data.query = query;
-          const parsedSQL: any = fnParsedSQL();
-          if (parsedSQL != undefined) {
-            //check if query is valid or not , if the query is invalid --> empty query
-  
-            if (Array.isArray(parsedSQL) && parsedSQL.length == 0) {
-              notificationMsg.value =
-                "SQL query is missing or invalid. Please submit a valid SQL statement.";
-              return false;
-            }
-  
-            if (!parsedSQL?.columns?.length && !searchObj.meta.sqlMode) {
-              notificationMsg.value = "No column found in selected stream.";
-              return false;
-            }
-  
-            if (parsedSQL.limit != null && parsedSQL.limit.value.length != 0) {
-              req.query.size = parsedSQL.limit.value[0].value;
-  
-              if (parsedSQL.limit.separator == "offset") {
-                req.query.from = parsedSQL.limit.value[1].value || 0;
-              }
-  
-              query = fnUnparsedSQL(parsedSQL);
-  
-              //replace backticks with \" for sql_mode
-              query = query.replace(/`/g, '"');
-              searchObj.data.queryResults.hits = [];
-            }
+        searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
+
+        req.query.start_time = timestamps.startTime;
+        req.query.end_time = timestamps.endTime;
+
+        searchObj.meta.resultGrid.chartInterval = "10 second";
+        if (req.query.end_time - req.query.start_time >= 1000000 * 60 * 30) {
+          searchObj.meta.resultGrid.chartInterval = "15 second";
+          searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
+        }
+        if (req.query.end_time - req.query.start_time >= 1000000 * 60 * 60) {
+          searchObj.meta.resultGrid.chartInterval = "30 second";
+          searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
+        }
+        if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 2) {
+          searchObj.meta.resultGrid.chartInterval = "1 minute";
+          searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
+        }
+        if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 6) {
+          searchObj.meta.resultGrid.chartInterval = "5 minute";
+          searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
+        }
+        if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 24) {
+          searchObj.meta.resultGrid.chartInterval = "30 minute";
+          searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
+        }
+        if (req.query.end_time - req.query.start_time >= 1000000 * 86400 * 7) {
+          searchObj.meta.resultGrid.chartInterval = "1 hour";
+          searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
+        }
+        if (req.query.end_time - req.query.start_time >= 1000000 * 86400 * 30) {
+          searchObj.meta.resultGrid.chartInterval = "1 day";
+          searchObj.meta.resultGrid.chartKeyFormat = "YYYY-MM-DD";
+        }
+      } else {
+        notificationMsg.value = "Invalid date format";
+        return false;
+      }
+
+      if (searchObj.meta.sqlMode == true) {
+        searchObj.data.query = query;
+        const parsedSQL: any = fnParsedSQL();
+        if (parsedSQL != undefined) {
+          //check if query is valid or not , if the query is invalid --> empty query
+
+          if (Array.isArray(parsedSQL) && parsedSQL.length == 0) {
+            notificationMsg.value =
+              "SQL query is missing or invalid. Please submit a valid SQL statement.";
+            return false;
           }
-  
-          req.query.sql = query
-            .split("\n")
-            .filter((line: string) => !line.trim().startsWith("--"))
-            .join("\n");
-          req.query["sql_mode"] = "full";
-          // delete req.aggs;
+
+          if (!parsedSQL?.columns?.length && !searchObj.meta.sqlMode) {
+            notificationMsg.value = "No column found in selected stream.";
+            return false;
+          }
+
+          if (parsedSQL.limit != null && parsedSQL.limit.value.length != 0) {
+            req.query.size = parsedSQL.limit.value[0].value;
+
+            if (parsedSQL.limit.separator == "offset") {
+              req.query.from = parsedSQL.limit.value[1].value || 0;
+            }
+
+            query = fnUnparsedSQL(parsedSQL);
+
+            //replace backticks with \" for sql_mode
+            query = query.replace(/`/g, '"');
+            searchObj.data.queryResults.hits = [];
+          }
+        }
+
+        req.query.sql = query
+          .split("\n")
+          .filter((line: string) => !line.trim().startsWith("--"))
+          .join("\n");
+        req.query["sql_mode"] = "full";
+        // delete req.aggs;
+      } else {
+        const parseQuery = [query];
+        let queryFunctions = "";
+        let whereClause = "";
+        if (parseQuery.length > 1) {
+          queryFunctions = "," + parseQuery[0].trim();
+          whereClause = parseQuery[1].trim();
         } else {
-          const parseQuery = [query];
-          let queryFunctions = "";
-          let whereClause = "";
-          if (parseQuery.length > 1) {
-            queryFunctions = "," + parseQuery[0].trim();
-            whereClause = parseQuery[1].trim();
-          } else {
-            whereClause = parseQuery[0].trim();
+          whereClause = parseQuery[0].trim();
+        }
+
+        whereClause = whereClause
+          .split("\n")
+          .filter((line: string) => !line.trim().startsWith("--"))
+          .join("\n");
+        if (whereClause.trim() != "") {
+          // Use efficient state-based approach to avoid regex backtracking
+          whereClause = addSpacesToOperators(whereClause);
+
+          //remove everything after -- in where clause
+          const parsedSQL = whereClause.split(" ");
+          // searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
+          //   parsedSQL.forEach((node: any, index: any) => {
+          //     if (node == field.name) {
+          //       node = node.replaceAll('"', "");
+          //       parsedSQL[index] = '"' + node + '"';
+          //     }
+          //   });
+          // });
+          let field: any;
+          let node: any;
+          let index: any;
+          for (field of searchObj.data.stream.selectedStreamFields) {
+            for ([node, index] of parsedSQL) {
+              if (node === field.name) {
+                parsedSQL[index] = '"' + node.replaceAll('"', "") + '"';
+              }
+            }
           }
-  
-          whereClause = whereClause
-            .split("\n")
-            .filter((line: string) => !line.trim().startsWith("--"))
-            .join("\n");
+
+          whereClause = parsedSQL.join(" ");
+
+          // req.query.sql = req.query.sql.replace(
+          //   "[WHERE_CLAUSE]",
+          //   " WHERE " + whereClause,
+          // );
+          req.query.sql = req.query.sql
+            .split("[WHERE_CLAUSE]")
+            .join(" WHERE " + whereClause);
+        } else {
+          req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
+        }
+
+        req.query.sql = req.query.sql.replace(
+          "[QUERY_FUNCTIONS]",
+          queryFunctions.trim(),
+        );
+
+        // in the case of multi stream, we need to pass query for each selected stream in the form of array
+        // additional checks added for filter condition,
+        // 1. all fields in filter condition should be present in same streams.
+        // if one or more fields belongs to different stream then error will be shown
+        // 2. if multiple streams are selected but filter condition contains fields from only one stream
+        // then we need to send the search request for only matched stream
+        if (searchObj.data.stream.selectedStream.length > 1) {
+          let streams: any = searchObj.data.stream.selectedStream;
           if (whereClause.trim() != "") {
-            // Use efficient state-based approach to avoid regex backtracking
-            whereClause = addSpacesToOperators(whereClause);
-  
-            //remove everything after -- in where clause
-            const parsedSQL = whereClause.split(" ");
-            // searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-            //   parsedSQL.forEach((node: any, index: any) => {
-            //     if (node == field.name) {
-            //       node = node.replaceAll('"', "");
-            //       parsedSQL[index] = '"' + node + '"';
-            //     }
-            //   });
-            // });
-            let field: any;
-            let node: any;
-            let index: any;
-            for (field of searchObj.data.stream.selectedStreamFields) {
-              for ([node, index] of parsedSQL) {
-                if (node === field.name) {
-                  parsedSQL[index] = '"' + node.replaceAll('"', "") + '"';
-                }
-              }
+            const validationFlag = validateFilterForMultiStream();
+            if (!validationFlag) {
+              return false;
             }
-  
-            whereClause = parsedSQL.join(" ");
-  
-            // req.query.sql = req.query.sql.replace(
-            //   "[WHERE_CLAUSE]",
-            //   " WHERE " + whereClause,
-            // );
-            req.query.sql = req.query.sql
-              .split("[WHERE_CLAUSE]")
-              .join(" WHERE " + whereClause);
-          } else {
-            req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
+
+            if (
+              searchObj.data.stream.missingStreamMultiStreamFilter.length > 0
+            ) {
+              streams = searchObj.data.stream.selectedStream.filter(
+                (streams: any) =>
+                  !searchObj.data.stream.missingStreamMultiStreamFilter.includes(
+                    streams,
+                  ),
+              );
+            }
           }
-  
-          req.query.sql = req.query.sql.replace(
-            "[QUERY_FUNCTIONS]",
-            queryFunctions.trim(),
-          );
-  
-          // in the case of multi stream, we need to pass query for each selected stream in the form of array
-          // additional checks added for filter condition,
-          // 1. all fields in filter condition should be present in same streams.
-          // if one or more fields belongs to different stream then error will be shown
-          // 2. if multiple streams are selected but filter condition contains fields from only one stream
-          // then we need to send the search request for only matched stream
-          if (searchObj.data.stream.selectedStream.length > 1) {
-            let streams: any = searchObj.data.stream.selectedStream;
-            if (whereClause.trim() != "") {
-              const validationFlag = validateFilterForMultiStream();
-              if (!validationFlag) {
-                return false;
-              }
-  
-              if (
-                searchObj.data.stream.missingStreamMultiStreamFilter.length > 0
-              ) {
-                streams = searchObj.data.stream.selectedStream.filter(
-                  (streams: any) =>
-                    !searchObj.data.stream.missingStreamMultiStreamFilter.includes(
-                      streams,
-                    ),
-                );
-              }
-            }
-  
-            const preSQLQuery = req.query.sql;
-            req.query.sql = [];
-  
-            streams
-              .join(",")
-              .split(",")
-              .forEach((item: any) => {
-                let finalQuery: string = preSQLQuery.replace(
-                  "[INDEX_NAME]",
-                  item,
-                );
-  
-                // const finalHistogramQuery: string = preHistogramSQLQuery.replace(
-                //   "[INDEX_NAME]",
-                //   item
-                // );
-  
-                const listOfFields: any = [];
-                let streamField: any = {};
-                for (const field of searchObj.data.stream.interestingFieldList) {
-                  for (streamField of searchObj.data.stream
-                    .selectedStreamFields) {
-                    if (
-                      streamField?.name == field &&
-                      streamField?.streams.indexOf(item) > -1 &&
-                      listOfFields.indexOf(field) == -1
-                    ) {
-                      listOfFields.push(field);
-                    }
+
+          const preSQLQuery = req.query.sql;
+          req.query.sql = [];
+
+          streams
+            .join(",")
+            .split(",")
+            .forEach((item: any) => {
+              let finalQuery: string = preSQLQuery.replace(
+                "[INDEX_NAME]",
+                item,
+              );
+
+              // const finalHistogramQuery: string = preHistogramSQLQuery.replace(
+              //   "[INDEX_NAME]",
+              //   item
+              // );
+
+              const listOfFields: any = [];
+              let streamField: any = {};
+              for (const field of searchObj.data.stream.interestingFieldList) {
+                for (streamField of searchObj.data.stream
+                  .selectedStreamFields) {
+                  if (
+                    streamField?.name == field &&
+                    streamField?.streams.indexOf(item) > -1 &&
+                    listOfFields.indexOf(field) == -1
+                  ) {
+                    listOfFields.push(field);
                   }
                 }
-  
-                let queryFieldList: string = "";
-                if (listOfFields.length > 0) {
-                  queryFieldList = "," + listOfFields.join(",");
-                }
-  
-                finalQuery = finalQuery.replace(
-                  "[FIELD_LIST]",
-                  `'${item}' as _stream_name` + queryFieldList,
-                );
-  
-                // finalHistogramQuery = finalHistogramQuery.replace(
-                //   "[FIELD_LIST]",
-                //   `'${item}' as _stream_name,` + listOfFields.join(",")
-                // );
-  
-                req.query.sql.push(finalQuery);
-                // req.aggs.histogram.push(finalHistogramQuery);
-              });
-          } else {
-            req.query.sql = req.query.sql.replace(
-              "[INDEX_NAME]",
-              searchObj.data.stream.selectedStream[0],
-            );
-          }
+              }
+
+              let queryFieldList: string = "";
+              if (listOfFields.length > 0) {
+                queryFieldList = "," + listOfFields.join(",");
+              }
+
+              finalQuery = finalQuery.replace(
+                "[FIELD_LIST]",
+                `'${item}' as _stream_name` + queryFieldList,
+              );
+
+              // finalHistogramQuery = finalHistogramQuery.replace(
+              //   "[FIELD_LIST]",
+              //   `'${item}' as _stream_name,` + listOfFields.join(",")
+              // );
+
+              req.query.sql.push(finalQuery);
+              // req.aggs.histogram.push(finalHistogramQuery);
+            });
+        } else {
+          req.query.sql = req.query.sql.replace(
+            "[INDEX_NAME]",
+            searchObj.data.stream.selectedStream[0],
+          );
         }
-  
-        if (
-          searchObj.data.resultGrid.currentPage > 1 ||
-          searchObj.meta.showHistogram === false
-        ) {
-          // delete req.aggs;
-  
-          if (searchObj.meta.showHistogram === false) {
-            // delete searchObj.data.histogram;
-            searchObj.data.histogram = {
-              xData: [],
-              yData: [],
-              chartParams: {
-                title: "",
-                unparsed_x_data: [],
-                timezone: "",
-              },
-              errorCode: 0,
-              errorMsg: "",
-              errorDetail: "",
-            };
-            searchObj.meta.histogramDirtyFlag = true;
-          } else {
-            searchObj.meta.histogramDirtyFlag = false;
-          }
+      }
+
+      if (
+        searchObj.data.resultGrid.currentPage > 1 ||
+        searchObj.meta.showHistogram === false
+      ) {
+        // delete req.aggs;
+
+        if (searchObj.meta.showHistogram === false) {
+          // delete searchObj.data.histogram;
+          searchObj.data.histogram = {
+            xData: [],
+            yData: [],
+            chartParams: {
+              title: "",
+              unparsed_x_data: [],
+              timezone: "",
+            },
+            errorCode: 0,
+            errorMsg: "",
+            errorDetail: "",
+          };
+          searchObj.meta.histogramDirtyFlag = true;
+        } else {
+          searchObj.meta.histogramDirtyFlag = false;
         }
-  
-        if (store.state.zoConfig.sql_base64_enabled) {
-          req["encoding"] = "base64";
-          req.query.sql = b64EncodeUnicode(req.query.sql);
+      }
+
+      if (store.state.zoConfig.sql_base64_enabled) {
+        req["encoding"] = "base64";
+        req.query.sql = b64EncodeUnicode(req.query.sql);
+      }
+
+      updateUrlQueryParams();
+
+      return req;
+    } catch (e: any) {
+      notificationMsg.value =
+        "An error occurred while constructing the search query.";
+      return "";
+    }
+  }
+
+  const validateFilterForMultiStream = () => {
+    const filterCondition = searchObj.data.query;
+    const parsedSQL: any = fnParsedSQL(
+      "select * from stream where " + filterCondition,
+    );
+    searchObj.data.stream.filteredField = extractFilterColumns(
+      parsedSQL?.where,
+    );
+
+    searchObj.data.filterErrMsg = "";
+    searchObj.data.missingStreamMessage = "";
+    searchObj.data.stream.missingStreamMultiStreamFilter = [];
+    for (const fieldObj of searchObj.data.stream.filteredField) {
+      const fieldName = fieldObj.expr.value;
+      const filteredFields: any =
+        searchObj.data.stream.selectedStreamFields.filter(
+          (field: any) => field.name === fieldName,
+        );
+      if (filteredFields.length > 0) {
+        const streamsCount = filteredFields[0].streams.length;
+        const allStreamsEqual = filteredFields.every(
+          (field: any) => field.streams.length === streamsCount,
+        );
+        if (!allStreamsEqual) {
+          searchObj.data.filterErrMsg += `Field '${fieldName}' exists in different number of streams.\n`;
         }
-  
-        // updateUrlQueryParams();
-  
-        return req;
-      } catch (e: any) {
-        notificationMsg.value =
-          "An error occurred while constructing the search query.";
-        return "";
+      } else {
+        searchObj.data.filterErrMsg += `Field '${fieldName}' does not exist in the one or more stream.\n`;
+      }
+
+      const fieldStreams: any = searchObj.data.stream.selectedStreamFields
+        .filter((field: any) => field.name === fieldName)
+        .map((field: any) => field.streams)
+        .flat();
+
+      searchObj.data.stream.missingStreamMultiStreamFilter =
+        searchObj.data.stream.selectedStream.filter(
+          (stream: any) => !fieldStreams.includes(stream),
+        );
+
+      if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
+        searchObj.data.missingStreamMessage = `One or more filter fields do not exist in "${searchObj.data.stream.missingStreamMultiStreamFilter.join(
+          ", ",
+        )}", hence no search is performed in the mentioned stream.\n`;
       }
     }
+
+    return searchObj.data.filterErrMsg === "" ? true : false;
+  };
+
+  function extractFilterColumns(expression: any) {
+    const columns: any[] = [];
+
+    function traverse(node: {
+      type: string;
+      column: any;
+      left: any;
+      right: any;
+      args: { type: string; value: any[] };
+    }) {
+      if (node.type === "column_ref") {
+        columns.push(node.column);
+      } else if (node.type === "binary_expr") {
+        traverse(node.left);
+        traverse(node.right);
+      } else if (node.type === "function") {
+        // Function expressions might contain columns as arguments
+        if (node.args && node.args.type === "expr_list") {
+          node.args.value.forEach((arg: any) => traverse(arg));
+        }
+      }
+    }
+
+    traverse(expression);
+    return columns;
+  }
 
   return {
     getQueryReq,
@@ -2102,5 +2181,9 @@ export const searchStream = () => {
     getPageCountThroughSocket,
     setCancelSearchError,
     handleSearchReset,
+    validateFilterForMultiStream,
+    buildSearch,
   };
 };
+
+export default useSearchStream;

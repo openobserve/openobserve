@@ -68,6 +68,7 @@ const {
   streamSchemaFieldsIndexMapping,
   histogramMappedData,
   histogramResults,
+  searchPartitionMap,
 } = searchState();
 const {
   getStreams,
