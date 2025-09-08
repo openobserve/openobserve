@@ -13,147 +13,53 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 import { searchState } from "@/composables/useLogs/searchState";
-import useStreams from "@/composables/useStreams";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
-import useSqlSuggestions from "@/composables/useSuggestions";
-import useNotifications from "@/composables/useNotifications";
 import searchService from "@/services/search";
-import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import { logsErrorMessage } from "@/utils/common";
 
-import { INTERVAL_MAP, DEFAULT_LOGS_CONFIG } from "@/utils/logs/constants";
-
 import {
-  useLocalLogFilterField,
-  b64EncodeUnicode,
-  b64DecodeUnicode,
-  formatSizeFromMB,
-  timestampToTimezoneDate,
-  histogramDateTimezone,
-  useLocalWrapContent,
-  useLocalTimezone,
-  useLocalInterestingFields,
-  useLocalSavedView,
-  convertToCamelCase,
   getFunctionErrorMessage,
-  getUUID,
-  getWebSocketUrl,
   generateTraceContext,
-  arraysMatch,
-  isWebSocketEnabled,
-  isStreamingEnabled,
-  addSpacesToOperators,
-  deepCopy,
 } from "@/utils/zincutils";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
-import {
-  convertDateToTimestamp,
-  getConsumableRelativeTime,
-} from "@/utils/date";
+import useStreamFields from "@/composables/useLogs/useStreamFields";
 
 export const usePagination = () => {
   const store = useStore();
   const router = useRouter();
   const { t } = useI18n();
-  let {
-    searchObj,
-    searchObjDebug,
-    searchAggData,
-    fieldValues,
-    notificationMsg,
-    streamSchemaFieldsIndexMapping,
-    histogramMappedData,
-    histogramResults,
-  } = searchState();
-  const {
-    getStreams,
-    getStream,
-    getMultiStreams,
-    isStreamExists,
-    isStreamFetched,
-  } = useStreams();
+  let { searchObj, searchObjDebug, searchAggData, notificationMsg } =
+    searchState();
 
+  const { getHistogramTitle } = useHistogram();
   const {
-    getHistogramTitle,
-    generateHistogramData,
-    generateHistogramSkeleton,
-    isHistogramEnabled,
-  } = useHistogram();
+    updateFieldValues,
+    extractFields,
+    updateGridColumns,
+    filterHitsColumns,
+    resetFieldValues,
+  } = useStreamFields();
 
   const {
     fnParsedSQL,
-    fnUnparsedSQL,
-    extractTimestamps,
     hasAggregation,
     isLimitQuery,
     isDistinctQuery,
     isWithQuery,
     addTraceId,
     removeTraceId,
-    addTransformToQuery,
-    isActionsEnabled,
-    getColumnWidth,
     showCancelSearchNotification,
-    isTimestampASC,
     updateUrlQueryParams,
   } = logsUtils();
 
-  const {
-    getQueryReq,
-    buildWebSocketPayload,
-    initializeSearchConnection,
-    sendSearchMessage,
-    handleStreamingHits,
-    handleStreamingMetadata,
-    updatePageCountTotal,
-    trimPageCountExtraHit,
-    handleHistogramStreamingHits,
-    handleHistogramStreamingMetadata,
-    handlePageCountStreamingHits,
-    handlePageCountStreamingMetadata,
-    handleSearchResponse,
-    handleFunctionError,
-    handleAggregation,
-    updateResult,
-    handleLogsResponse,
-    chunkedAppend,
-    handlePageCountResponse,
-    handleHistogramResponse,
-    shouldShowHistogram,
-    processHistogramRequest,
-    isHistogramDataMissing,
-    handleSearchClose,
-    handleSearchError,
-    constructErrorMessage,
-    getAggsTotal,
-    refreshPagination,
-    shouldGetPageCount,
-    getPageCountThroughSocket,
-    setCancelSearchError,
-    handleSearchReset,
-  } = useSearchStream();
-
-  const {
-    updateFieldValues,
-    extractFields,
-    updateGridColumns,
-    filterHitsColumns,
-    getStreamList,
-    extractFTSFields,
-    loadStreamLists,
-    resetFieldValues,
-  } = useStreamFields();
-
-  const { showErrorNotification } = useNotifications();
-
+  const { chunkedAppend } = useSearchStream();
 
   // Sorting function
   interface OrderByField {

@@ -14,14 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { searchState } from "@/composables/useLogs/searchState";
-import {
-  logsUtils
-} from "@/composables/useLogs/logsUtils";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { logsErrorMessage } from "@/utils/common";
 import useLogs from "@/composables/useLogs";
 import searchService from "@/services/search";
-import { useStore } from "vuex";
+import useHistogram from "@/composables/useLogs/useHistogram";
 import {
   SearchAroundParams,
   StreamField,
@@ -31,23 +29,23 @@ import {
 } from "@/ts/interfaces";
 
 export const useSearchAround = () => {
-  const store = useStore();
   const { searchObj } = searchState();
   const {
-    shouldAddFunctionToSearch,
     extractFields,
     generateHistogramSkeleton,
-    generateHistogramData,
     updateGridColumns,
     filterHitsColumns,
     notificationMsg,
     showErrorNotification,
   } = useLogs();
-
-  const { fnParsedSQL,
-  fnUnparsedSQL,
-  addTraceId,
-  removeTraceId, } = logsUtils();
+  const { generateHistogramData } = useHistogram();
+  const {
+    fnParsedSQL,
+    fnUnparsedSQL,
+    addTraceId,
+    removeTraceId,
+    shouldAddFunctionToSearch,
+  } = logsUtils();
 
   /**
    * Performs a search around operation to fetch logs data around a specific timestamp or log entry.

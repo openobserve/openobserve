@@ -22,7 +22,7 @@ import useStreamingSearch from "@/composables/useStreamingSearch";
 import { logsErrorMessage } from "@/utils/common";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { cloneDeep, startCase } from "lodash-es";
+import { cloneDeep } from "lodash-es";
 import {
   SearchRequestPayload,
   WebSocketSearchResponse,
@@ -41,26 +41,9 @@ import {
 import config from "@/aws-exports";
 
 import {
-  useLocalLogFilterField,
   b64EncodeUnicode,
-  b64DecodeUnicode,
-  formatSizeFromMB,
-  timestampToTimezoneDate,
-  histogramDateTimezone,
-  useLocalWrapContent,
-  useLocalTimezone,
-  useLocalInterestingFields,
-  useLocalSavedView,
-  convertToCamelCase,
   getFunctionErrorMessage,
-  getUUID,
-  getWebSocketUrl,
   generateTraceContext,
-  arraysMatch,
-  isWebSocketEnabled,
-  isStreamingEnabled,
-  addSpacesToOperators,
-  deepCopy,
 } from "@/utils/zincutils";
 
 export const useSearchStream = () => {
@@ -115,7 +98,6 @@ export const useSearchStream = () => {
   const {
     fetchQueryDataWithWebSocket,
     sendSearchMessageBasedOnRequestId,
-    cancelSearchQueryBasedOnRequestId,
     closeSocketBasedOnRequestId,
   } = useSearchWebSocket();
 
