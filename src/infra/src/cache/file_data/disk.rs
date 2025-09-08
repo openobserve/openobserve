@@ -33,7 +33,7 @@ use config::{
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
-use tokio::{fs, sync::RwLock};
+use tokio::{fs as tokio_fs, sync::RwLock};
 
 use super::CacheStrategy;
 use crate::{cache::meta::ResultCacheMeta, storage};
@@ -417,7 +417,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move {
         log::info!("Loading disk cache start");
         let root_dir = FILES[0].read().await.root_dir.clone();
-        let root_dir = fs::canonicalize(&root_dir).await.unwrap();
+        let root_dir = tokio_fs::canonicalize(&root_dir).await.unwrap();
         if let Err(e) = load(&root_dir, &root_dir).await {
             log::error!("load disk cache error: {}", e);
         }
@@ -573,7 +573,7 @@ pub async fn remove(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
 
 #[async_recursion]
 async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Error> {
-    let mut entries = tokio::fs::read_dir(&scan_dir).await?;
+    let mut entries = tokio_fs::read_dir(&scan_dir).await?;
     let mut result_cache: HashMap<String, Vec<ResultCacheMeta>> = HashMap::new();
     let mut metrics_cache: Vec<String> = Vec::new();
     loop {
@@ -581,7 +581,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
             Err(e) => return Err(e.into()),
             Ok(None) => break,
             Ok(Some(f)) => {
-                let fp = match fs::canonicalize(f.path()).await {
+                let fp = match tokio_fs::canonicalize(f.path()).await {
                     Ok(p) => p,
                     Err(e) => {
                         log::error!("canonicalize file path error: {}", e);
@@ -608,7 +608,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             "Removing temporary file during cache load: {}",
                             fp.display()
                         );
-                        if let Err(e) = tokio::fs::remove_file(&fp).await {
+                        if let Err(e) = tokio_fs::remove_file(&fp).await {
                             log::warn!("Failed to remove tmp file: {}, error: {}", fp.display(), e);
                         }
                         continue;
@@ -850,7 +850,7 @@ async fn write_tmp_file(file: &str, data: Bytes) -> Result<(String, String), any
             e
         ));
     }
-    let tmp_path = fs::canonicalize(&tmp_path).await.unwrap();
+    let tmp_path = tokio_fs::canonicalize(&tmp_path).await.unwrap();
     let tmp_file = tmp_path.join(format!("{}.tmp", config::ider::generate()));
     let tmp_file = tmp_file.to_str().unwrap();
     if let Err(e) = config::utils::async_file::put_file_contents(tmp_file, &data).await {
