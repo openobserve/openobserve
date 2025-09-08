@@ -331,12 +331,13 @@ import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
 import useLogs from "../../composables/useLogs";
-import {searchStream} from "@/composables/useLogs/searchStream";
+import {useSearchStream} from "@/composables/useLogs/useSearchStream";
 import { convertLogData } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useRouter } from "vue-router";
 import TenstackTable from "./TenstackTable.vue";
 import { useSearchAround } from "@/composables/useLogs/searchAround";
+import { usePagination } from "@/composables/useLogs/usePagination";
 
 export default defineComponent({
   name: "SearchResult",
@@ -526,17 +527,16 @@ export default defineComponent({
     const disableMoreErrorDetails = ref(false);
     const router = useRouter();
     const { searchAroundData } = useSearchAround();
-    const { refreshPagination } = searchStream();
+    const { refreshPagination } = useSearchStream();
+    const { refreshPartitionPagination, refreshJobPagination } = usePagination();
 
     const {
       searchObj,
       updatedLocalLogFilterField,
       extractFTSFields,
-      refreshPartitionPagination,
       filterHitsColumns,
       reorderSelectedFields,
       getFilterExpressionByFieldType,
-      refreshJobPagination,
     } = useLogs();
 
     const pageNumberInput = ref(1);

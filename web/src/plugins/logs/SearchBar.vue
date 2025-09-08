@@ -1508,11 +1508,14 @@ import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
-import { 
+import {
   getVisualizationConfig,
   encodeVisualizationConfig,
-  decodeVisualizationConfig, 
+  decodeVisualizationConfig,
 } from "@/composables/useLogs/logsVisualization";
+
+import useSearchBar from "@/composables/useLogs/useSearchBar";
+import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 
 const defaultValue: any = () => {
   return {
@@ -1666,26 +1669,23 @@ export default defineComponent({
     const regionFilter = ref();
     const regionFilterRef = ref(null);
     const { resetStreamData } = searchState();
+    const { buildSearch } = useSearchStream();
 
-    const {fnParsedSQL, fnUnparsedSQL} = logsUtils();
+    const { fnParsedSQL, fnUnparsedSQL } = logsUtils();
+    const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData, } = useSearchBar();
 
     const {
       searchObj,
       refreshData,
       handleRunQuery,
       updatedLocalLogFilterField,
-      getSavedViews,
-      getQueryData,
       getStreams,
       updateUrlQueryParams,
       generateURLQuery,
-      buildSearch,
       loadStreamLists,
-      onStreamChange,
       moveItemsToTop,
       extractFields,
       cancelQuery,
-      setSelectedStreams,
       getJobData,
       routeToSearchSchedule,
       isActionsEnabled,
@@ -2589,7 +2589,8 @@ export default defineComponent({
       }
 
       // Sync visualization data to URL
-      const currentVisualizationData = getVisualizationConfig(dashboardPanelData);
+      const currentVisualizationData =
+        getVisualizationConfig(dashboardPanelData);
       if (currentVisualizationData) {
         const encoded = encodeVisualizationConfig(currentVisualizationData);
         if (encoded) {
@@ -2598,7 +2599,7 @@ export default defineComponent({
 
           await router.replace({
             name: router.currentRoute.value.name,
-            query: currentQuery
+            query: currentQuery,
           });
         }
       }
@@ -2714,7 +2715,9 @@ export default defineComponent({
 
               // Restore visualization data if available
               if (extractedObj.data.visualizationData) {
-                await restoreVisualizationData(extractedObj.data.visualizationData);
+                await restoreVisualizationData(
+                  extractedObj.data.visualizationData,
+                );
               }
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
@@ -2804,7 +2807,9 @@ export default defineComponent({
 
               // Restore visualization data if available
               if (extractedObj.data.visualizationData) {
-                await restoreVisualizationData(extractedObj.data.visualizationData);
+                await restoreVisualizationData(
+                  extractedObj.data.visualizationData,
+                );
               }
 
               const streamData = await getStreams(
@@ -3064,7 +3069,10 @@ export default defineComponent({
         }
 
         // Include visualization data if in visualization mode
-        if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
+        if (
+          searchObj.meta.logsVisualizeToggle === "visualize" &&
+          dashboardPanelData
+        ) {
           const visualizationData = getVisualizationConfig(dashboardPanelData);
           if (visualizationData) {
             savedSearchObj.data.visualizationData = visualizationData;
