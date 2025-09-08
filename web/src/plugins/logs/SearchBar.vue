@@ -1669,7 +1669,7 @@ export default defineComponent({
     const rowsPerPage = ref(10);
     const regionFilter = ref();
     const regionFilterRef = ref(null);
-    const { resetStreamData } = searchState();
+    const { resetStreamData, searchObj } = searchState();
     const { buildSearch } = useSearchStream();
 
     const {
@@ -1678,25 +1678,25 @@ export default defineComponent({
       updatedLocalLogFilterField,
       updateUrlQueryParams,
       generateURLQuery,
+      isActionsEnabled,
     } = logsUtils();
-    const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData } =
-      useSearchBar();
-    const { loadStreamLists } = useStreamFields();
+    const {
+      getSavedViews,
+      setSelectedStreams,
+      onStreamChange,
+      getQueryData,
+      cancelQuery,
+    } = useSearchBar();
+    const { loadStreamLists, extractFields } = useStreamFields();
 
     const {
-      searchObj,
       refreshData,
       handleRunQuery,
-      getStreams,
-      moveItemsToTop,
-      extractFields,
-      cancelQuery,
       getJobData,
       routeToSearchSchedule,
-      isActionsEnabled,
     } = useLogs();
 
-    const { isStreamExists, isStreamFetched } = useStreams();
+    const { isStreamExists, isStreamFetched, getStreams } = useStreams();
     const queryEditorRef = ref(null);
 
     const formData: any = ref(defaultValue());

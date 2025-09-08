@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import useLogs from "@/composables/useLogs";
+import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 const props = defineProps<{
@@ -100,7 +100,7 @@ const emit = defineEmits(["select:function", "save:function"]);
 
 const { t } = useI18n();
 
-const { searchObj } = useLogs();
+const { searchObj } = searchState();
 
 const store = useStore();
 

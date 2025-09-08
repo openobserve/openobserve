@@ -349,7 +349,6 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
-import useLogs from "@/composables/useLogs";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { copyToClipboard, useQuasar } from "quasar";
@@ -358,6 +357,7 @@ import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { searchState } from "@/composables/useLogs/searchState";
 
 const defaultValue: any = () => {
   return {
@@ -433,7 +433,7 @@ export default defineComponent({
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
     const shouldWrapValues: any = ref(true);
-    const { searchObj } = useLogs();
+    const { searchObj } = searchState();
     const {fnParsedSQL, hasAggregation} = logsUtils();
 
     const $q = useQuasar();
