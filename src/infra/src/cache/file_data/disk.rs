@@ -15,7 +15,7 @@
 
 use std::{
     cmp::{max, min},
-    fmt, fs,
+    fmt, fs as std_fs,
     ops::Range,
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -33,7 +33,7 @@ use config::{
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
-use tokio::sync::RwLock;
+use tokio::{fs, sync::RwLock};
 
 use super::CacheStrategy;
 use crate::{cache::meta::ResultCacheMeta, storage};
@@ -202,8 +202,8 @@ impl FileData {
 
         // rename tmp file to real file
         let file_path = self.get_file_path(file);
-        fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
-        fs::rename(tmp_file, &file_path).map_err(|e| {
+        std_fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
+        std_fs::rename(tmp_file, &file_path).map_err(|e| {
             anyhow::anyhow!(
                 "[CacheType:{} trace_id {trace_id}] File disk cache rename tmp file {} to real file {} error: {}",
                 self.file_type,
@@ -270,7 +270,7 @@ impl FileData {
                 self.file_type,
                 key
             );
-            if let Err(e) = fs::remove_file(&file_path) {
+            if let Err(e) = std_fs::remove_file(&file_path) {
                 log::error!(
                     "[CacheType:{} trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
                     self.file_type,
@@ -343,7 +343,7 @@ impl FileData {
 
         // delete file from local disk
         let file_path = self.get_file_path(key.as_str());
-        if let Err(e) = fs::remove_file(&file_path) {
+        if let Err(e) = std_fs::remove_file(&file_path) {
             log::error!(
                 "[CacheType:{} trace_id {trace_id}] File disk cache remove file: {}, error: {}",
                 self.file_type,
@@ -400,24 +400,24 @@ impl FileData {
 pub async fn init() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     // clean the tmp dir
-    if let Err(e) = std::fs::remove_dir_all(&cfg.common.data_tmp_dir) {
+    if let Err(e) = std_fs::remove_dir_all(&cfg.common.data_tmp_dir) {
         log::warn!("clean tmp dir error: {}", e);
     }
-    std::fs::create_dir_all(&cfg.common.data_tmp_dir).expect("create tmp dir success");
+    std_fs::create_dir_all(&cfg.common.data_tmp_dir).expect("create tmp dir success");
 
     for file in FILES.iter() {
         let root_dir = file.read().await.root_dir.clone();
-        std::fs::create_dir_all(&root_dir).expect("create cache dir success");
+        std_fs::create_dir_all(&root_dir).expect("create cache dir success");
     }
     // trigger read only files
     for file in FILES_READER.iter() {
-        std::fs::create_dir_all(&file.root_dir).expect("create cache dir success");
+        std_fs::create_dir_all(&file.root_dir).expect("create cache dir success");
     }
 
     tokio::task::spawn(async move {
         log::info!("Loading disk cache start");
         let root_dir = FILES[0].read().await.root_dir.clone();
-        let root_dir = Path::new(&root_dir).canonicalize().unwrap();
+        let root_dir = fs::canonicalize(&root_dir).await.unwrap();
         if let Err(e) = load(&root_dir, &root_dir).await {
             log::error!("load disk cache error: {}", e);
         }
@@ -523,7 +523,7 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
     };
     if files.exist(&file).await {
         // remove the tmp file
-        if let Err(e) = std::fs::remove_file(&tmp_file) {
+        if let Err(e) = std_fs::remove_file(&tmp_file) {
             log::warn!(
                 "[CacheType:{} trace_id {trace_id}] File disk cache remove tmp file {} error: {}",
                 files.file_type,
@@ -581,7 +581,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
             Err(e) => return Err(e.into()),
             Ok(None) => break,
             Ok(Some(f)) => {
-                let fp = match f.path().canonicalize() {
+                let fp = match fs::canonicalize(f.path()).await {
                     Ok(p) => p,
                     Err(e) => {
                         log::error!("canonicalize file path error: {}", e);
@@ -843,14 +843,14 @@ async fn write_tmp_file(file: &str, data: Bytes) -> Result<(String, String), any
         get_config().common.data_tmp_dir,
         get_ymdh_from_micros(now_micros())
     );
-    if let Err(e) = std::fs::create_dir_all(&tmp_path) {
+    if let Err(e) = std_fs::create_dir_all(&tmp_path) {
         return Err(anyhow::anyhow!(
             "[FileData::Disk] create tmp dir {}, failed: {}",
             tmp_path,
             e
         ));
     }
-    let tmp_path = Path::new(&tmp_path).canonicalize().unwrap();
+    let tmp_path = fs::canonicalize(&tmp_path).await.unwrap();
     let tmp_file = tmp_path.join(format!("{}.tmp", config::ider::generate()));
     let tmp_file = tmp_file.to_str().unwrap();
     if let Err(e) = config::utils::async_file::put_file_contents(tmp_file, &data).await {
@@ -1090,11 +1090,11 @@ mod tests {
         assert!(tmp_path.is_file());
 
         // Read back the file content to verify it matches
-        let file_content = std::fs::read(tmp_path).unwrap();
+        let file_content = std_fs::read(tmp_path).unwrap();
         assert_eq!(file_content, test_data);
 
         // Clean up
-        let _ = std::fs::remove_file(tmp_path);
+        let _ = std_fs::remove_file(tmp_path);
     }
 
     #[tokio::test]
@@ -1114,7 +1114,7 @@ mod tests {
         assert_eq!(tmp_path.metadata().unwrap().len(), 0);
 
         // Clean up
-        let _ = std::fs::remove_file(tmp_path);
+        let _ = std_fs::remove_file(tmp_path);
     }
 
     #[tokio::test]
@@ -1134,10 +1134,10 @@ mod tests {
         assert_eq!(tmp_path.metadata().unwrap().len(), 1024 * 1024);
 
         // Read back the file content to verify it matches
-        let file_content = std::fs::read(tmp_path).unwrap();
+        let file_content = std_fs::read(tmp_path).unwrap();
         assert_eq!(file_content, large_data);
 
         // Clean up
-        let _ = std::fs::remove_file(tmp_path);
+        let _ = std_fs::remove_file(tmp_path);
     }
 }
