@@ -39,6 +39,7 @@ export const useHistogram = () => {
     notificationMsg,
     histogramMappedData,
     histogramResults,
+    searchAggData,
   } = searchState();
 
   const {
