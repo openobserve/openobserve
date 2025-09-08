@@ -918,7 +918,7 @@ pub async fn merge_files(
                 ));
             }
 
-            let id = ider::generate();
+            let id = ider::generate_file_name();
             let new_file_key = format!("{prefix}/{id}{FILE_EXT_PARQUET}");
             log::info!(
                 "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
@@ -966,7 +966,7 @@ pub async fn merge_files(
                     ));
                 }
 
-                let id = ider::generate();
+                let id = ider::generate_file_name();
                 let new_file_key = format!("{prefix}/{id}{FILE_EXT_PARQUET}");
 
                 // upload file to storage
