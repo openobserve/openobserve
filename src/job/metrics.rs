@@ -34,7 +34,7 @@ use opentelemetry_sdk::{
     },
     runtime,
 };
-use tokio::{fs, sync::Mutex, time};
+use tokio::{sync::Mutex, time};
 
 use crate::{
     common::infra::{cluster::get_cached_online_nodes, config::USERS},
@@ -115,7 +115,7 @@ async fn load_query_cache_limit_bytes() -> Result<(), anyhow::Error> {
 
 async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    let data_dir = match fs::canonicalize(&cfg.common.data_wal_dir).await {
+    let data_dir = match tokio::fs::canonicalize(&cfg.common.data_wal_dir).await {
         Ok(path) => path,
         Err(_) => return Ok(()),
     };
@@ -124,7 +124,7 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
     let mut sizes = HashMap::new();
     for file in files {
         let local_file = file.to_owned();
-        let Ok(local_path) = fs::canonicalize(&file).await else {
+        let Ok(local_path) = tokio::fs::canonicalize(&file).await else {
             continue;
         };
         let file_path = local_path
@@ -138,7 +138,7 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
         let org_id = columns[1].to_string();
         let stream_type = columns[2].to_string();
         let entry = sizes.entry((org_id, stream_type)).or_insert(0);
-        *entry += match fs::metadata(local_file).await {
+        *entry += match tokio::fs::metadata(local_file).await {
             Ok(metadata) => metadata.len(),
             Err(_) => 0,
         };
