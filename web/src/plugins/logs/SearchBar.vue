@@ -3988,8 +3988,6 @@ export default defineComponent({
       showSavedViewConfirmDialog,
       getFieldList,
       buildStreamQuery,
-      regionFilterMethod,
-      resetRegionFilter,
       updateActionSelection,
       updateEditorWidth,
     };

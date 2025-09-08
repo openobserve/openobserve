@@ -18,7 +18,7 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
-import { b64EncodeUnicode, useLocalLogFilterField, } from "@/utils/zincUtils";
+import { b64EncodeUnicode, useLocalLogFilterField, } from "@/utils/zincutils";
 
 import {
   encodeVisualizationConfig,
