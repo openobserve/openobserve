@@ -139,47 +139,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-px-md q-py-sm">
         <GroupHeader title="Enterprise Features" :showIcon="false" />
       </div>
-      <div class="q-mx-lg">
-        <div class="q-gutter-sm row q-mt-xs">
-          <div
-            v-if="editingText || store.state.zoConfig.custom_logo_text == ''"
-            class="q-gutter-md row items-start"
-          >
+      <div class="q-mx-md">
+        <div class="settings-grid-item no-border-bottom">
+          <span class="individual-setting-title">
+            {{ t('settings.customLogoText') }}
+          </span>
+          <div v-if="editingText || store.state.zoConfig.custom_logo_text == ''" class="tw-flex tw-gap-3 tw-items-center">
             <q-input
               color="input-border"
               bg-color="input-bg"
-              class="showLabelOnTop o2-input-text-box"
+              class="showLabelOnTop o2-text-input tw-w-[250px] tw-mr-sm"
               stack-label
               outlined
               filled
+              dense
               data-test="settings_ent_logo_custom_text"
-              :class="store.state.theme == 'dark' ? 'o2-input-text-box-dark' : 'o2-input-text-box-light'"
-              :label="t('settings.customLogoText')"
+              :class="store.state.theme == 'dark' ? 'o2-text-input-dark' : 'o2-text-input-light'"
               v-model="customText"
             />
-            <div
-              class="btn-group relative-position vertical-middle"
-              style="margin-top: 48px"
-            >
+            <div class="btn-group tw-flex tw-h-[28px]">
               <q-btn
                 type="button"
-                class="q-mr-sm tw-h-[36px] o2-secondary-button no-border"
+                class="q-mr-sm"
+                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
                 no-caps
-                :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                :label="t('common.cancel')"
+                color="red"
+                icon="close"
                 dense
                 flat
+                size="sm"
                 @click="editingText = !editingText"
               ></q-btn>
-
               <q-btn
                 data-test="settings_ent_logo_custom_text_save_btn"
                 :loading="onSubmit.isLoading.value"
-                :label="t('dashboard.save')"
-                class="tw-h-[36px] o2-primary-button no-border"
-                flat
+                icon="check"
+                class="q-mr-sm "
                 dense
-                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                size="sm"
+                flat
+                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
                 color="primary"
                 type="submit"
                 no-caps
@@ -187,29 +186,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div v-else style="margin-top: 17px">
-            <div class="q-pt-md text-bold">
-              {{ t("settings.customLogoText") }}
-            </div>
-            <br />
-            {{ store.state.zoConfig.custom_logo_text || "No Text Available" }}
+          <div v-else class="flex items-center">
+            <span class="tw-w-[190px] tw-text-center tw-truncate">{{ store.state.zoConfig.custom_logo_text || "No Text Available" }}
+              <q-tooltip v-if="store.state.zoConfig.custom_logo_text.length > 20" class="tw-text-center tw-text-[12px] tw-max-w-[250px]">
+                {{ store.state.zoConfig.custom_logo_text }}
+              </q-tooltip>
+            </span>
             <q-btn
               data-test="settings_ent_logo_custom_text_edit_btn"
               :loading="onSubmit.isLoading.value"
               icon="edit"
               size="sm"
-              class="text-bold"
+              class="text-bold q-ml-sm"
               type="submit"
               @click="editingText = !editingText"
             />
           </div>
+          <span class="individual-setting-description">
+            Custom logo text is used to change the default branding text displayed in the application.
+          </span>
         </div>
         <q-separator class="q-mt-sm"></q-separator>
-        <div class="q-gutter-sm row q-mt-xs">
-          <div class="q-pt-sm text-bold full-width">
+        <div class="settings-grid-item q-ml-xs">
+          <div class="q-pt-sm individual-setting-title  full-width">
             {{ t("settings.customLogoTitle") }}
           </div>
-          <br />
           <div
             v-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
@@ -234,25 +235,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             ></q-btn>
           </div>
-          <q-file
+          <div v-else class="tw-flex tw-items-center tw-gap-3">
+            <q-file
             data-test="setting_ent_custom_logo_img_file_upload"
-            v-else
             v-model="files"
-            :label="t('settings.logoLabel')"
+            :label="'Drag & drop or click to upload'"
             filled
             counter
             :counter-label="counterLabelFn"
-            style="width: 550px"
             max-file-size="20481"
             accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
             @rejected="onRejected"
-            @update:model-value="uploadImage"
-            class="q-mx-none"
+            dense
+            class="q-mx-none o2-file-input tw-w-[250px] "
+            :class="store.state.theme == 'dark' ? 'o2-text-input-dark' : 'o2-text-input-light'"
           >
             <template v-slot:prepend>
               <q-icon name="attach_file" />
             </template>
           </q-file>
+          <div class="btn-group tw-flex tw-h-[28px] tw-mb-5">
+              <q-btn
+                type="button"
+                class="q-mr-sm"
+                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
+                no-caps
+                color="red"
+                icon="close"
+                dense
+                flat
+                size="sm"
+                @click="files = null"
+              ></q-btn>
+              <q-btn
+                data-test="settings_ent_logo_custom_text_save_btn"
+                :loading="onSubmit.isLoading.value"
+                icon="check"
+                class="q-mr-sm "
+                dense
+                size="sm"
+                flat
+                :class="store.state.theme == 'dark' ? 'text-btn-border-dark' : 'text-btn-border-light'"
+                color="primary"
+                type="submit"
+                no-caps
+                @click="uploadImage(files)"
+              />
+            </div>
+          </div>
+          <div class="tw-flex tw-flex-col">
+            <span class="individual-setting-description">
+              Custom logo is used to change the default branding logo displayed in the application.
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -269,17 +304,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("settings.deleteLogoMessage") }}
       </q-card-section>
 
-      <q-card-actions align="right">
+      <q-card-actions align="right" class="tw-flex tw-gap-1">
         <q-btn
           data-test="logs-search-bar-confirm-dialog-cancel-btn"
           :label="t('confirmDialog.cancel')"
-          color="primary"
+          class="o2-secondary-button tw-h-[28px] no-border"
+          flat
+          no-caps
+          :class="store.state.theme == 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="cancelConfirmDialog"
         />
         <q-btn
           data-test="logs-search-bar-confirm-dialog-ok-btn"
           :label="t('confirmDialog.ok')"
-          color="positive"
+          class="o2-primary-button tw-h-[28px] no-border"
+          :class="store.state.theme == 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          no-caps
+          flat
           @click="confirmDialogOK"
         />
       </q-card-actions>
@@ -411,11 +452,23 @@ export default defineComponent({
       }
     });
 
-    const uploadImage = (event: any) => {
-      if (config.isEnterprise == "true") {
+    const uploadImage = (fileList: any = null) => {
+      const selectedFiles = fileList || files.value;
+      // Handle single file or file array
+      //but mostly we will support single file because we only show one image at a time right
+      let fileToUpload = null;
+      if (selectedFiles) {
+        if (Array.isArray(selectedFiles)) {
+          fileToUpload = selectedFiles[0];
+        } else {
+          fileToUpload = selectedFiles;
+        }
+      }
+      
+      if (config.isEnterprise == "true" && fileToUpload) {
         loadingState.value = true;
         const formData = new FormData();
-        formData.append("image", event);
+        formData.append("image", fileToUpload);
         let orgIdentifier = "default";
         for (let item of store.state.organizations) {
           if (item.type == "default") {
@@ -458,10 +511,16 @@ export default defineComponent({
           .finally(() => {
             loadingState.value = false;
           });
-      } else {
+      } else if (config.isEnterprise != "true") {
         q.notify({
           type: "negative",
           message: "You are not allowed to perform this action.",
+          timeout: 2000,
+        });
+      } else {
+        q.notify({
+          type: "negative",
+          message: "Please select a file to upload.",
           timeout: 2000,
         });
       }
@@ -591,7 +650,7 @@ export default defineComponent({
       onSubmit,
       files,
       counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any }) {
-        return `(Only .png, .jpg, .jpeg, .gif, .bmp, formats & size <=20kb & Max Size: 150x30px) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
+        return `(Only .png, .jpg, .jpeg, .gif, .bmp formats & size <=20kb & Max Size: 150x30px) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
       },
       filesImages: ref(null),
       filesMaxSize: ref(null),
@@ -654,7 +713,16 @@ export default defineComponent({
 .dark-settings-theme .settings-grid-item {
   border-bottom: 1px solid rgba(255, 255, 255, 0.15);
 }
+.text-btn-border-light{
+  border: 1px solid #D3D5DB ;
+}
+.text-btn-border-dark{
+  border: 1px solid #6F737A ;
+}
 
-
+:deep(.o2-file-input .q-field__bottom) {
+  padding: 0px;
+  padding-top: 8px;
+}
 
 </style>
