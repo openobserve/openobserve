@@ -54,6 +54,7 @@ export const useSearchBar = () => {
     initialQueryPayload,
   } = searchState();
 
+
   const store = useStore();
   const router = useRouter();
   const $q = useQuasar();

@@ -124,12 +124,6 @@ export const searchState = () => {
   // FTS (Full Text Search) fields
   const ftsFields: any = ref([]);
 
-  const histogramMappedData: any = [];
-
-  const histogramResults: any = [];
-
-  const searchPartitionMap = reactive<{ [key: string]: number }>({});
-
   /**
    * Initializes the logs state from cached store data.
    *
