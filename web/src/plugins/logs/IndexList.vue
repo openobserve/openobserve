@@ -807,6 +807,7 @@ import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useSearchBar } from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
+import { useStreamFields } from "@/composables/useLogs/useStreamFields";
 
 interface Filter {
   fieldName: string;
@@ -855,15 +856,14 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const {
-      searchObj,
-      filterHitsColumns,
-      extractFields,
       reorderSelectedFields,
       getFilterExpressionByFieldType,
       extractValueQuery,
     } = useLogs();
 
-    const { streamSchemaFieldsIndexMapping } = searchState();
+    const { filterHitsColumns, extractFields } = useStreamFields();
+
+    const { searchObj, streamSchemaFieldsIndexMapping } = searchState();
 
     const { onStreamChange, handleQueryData } = useSearchBar();
     const { validateFilterForMultiStream } = useSearchStream();
