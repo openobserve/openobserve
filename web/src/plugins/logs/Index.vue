@@ -397,7 +397,7 @@ import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import useAiChat from "@/composables/useAiChat";
 import queryService from "@/services/search";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
-import searchState from "@/composables/useLogs/searchState";
+import { searchState } from "@/composables/useLogs/searchState";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import {
   getVisualizationConfig,
@@ -558,34 +558,42 @@ export default defineComponent({
     const $q = useQuasar();
     const disableMoreErrorDetails: boolean = ref(false);
     const searchHistoryRef = ref(null);
-    const { resetSearchObj, initialLogsState, resetStreamData, fieldValues } = searchState();
-    const { getStreamList } = useStreamFields();
-    const { getFunctions, getQueryData, cancelQuery } = useSearchBar();
-    let {
+    const {
       searchObj,
+      resetSearchObj,
+      initialLogsState,
+      resetStreamData,
+      fieldValues,
+    } = searchState();
+    const { getStreamList, updateGridColumns, extractFields } =
+      useStreamFields();
+    const {
+      getFunctions,
+      getQueryData,
+      cancelQuery,
+      getRegionInfo,
+      sendCancelSearchMessage,
+      setCommunicationMethod,
+    } = useSearchBar();
+    let {
       getJobData,
-      updateGridColumns,
       refreshData,
       loadLogsData,
       updateStreams,
-      loadJobData,
       restoreUrlQueryParams,
       handleRunQuery,
-      generateHistogramData,
-      generateHistogramSkeleton,
-      getRegionInfo,
-      extractFields,
       enableRefreshInterval,
-      initializeSearchConnection,
-      addTraceId,
-      sendCancelSearchMessage,
       clearSearchObj,
-      setCommunicationMethod,
       processHttpHistogramResults,
       loadVisualizeData,
     } = useLogs();
 
-    const { getHistogramQueryData, resetHistogramWithError } = useHistogram();
+    const {
+      getHistogramQueryData,
+      resetHistogramWithError,
+      generateHistogramData,
+      generateHistogramSkeleton,
+    } = useHistogram();
 
     const { getStream } = useStreams();
 
@@ -596,8 +604,10 @@ export default defineComponent({
       isWithQuery,
       isLimitQuery,
       updateUrlQueryParams,
+      addTraceId,
     } = logsUtils();
-    const { buildWebSocketPayload, buildSearch } = useSearchStream();
+    const { buildWebSocketPayload, buildSearch, initializeSearchConnection } =
+      useSearchStream();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const showSearchHistory = ref(false);

@@ -340,6 +340,7 @@ import { useSearchAround } from "@/composables/useLogs/searchAround";
 import { usePagination } from "@/composables/useLogs/usePagination";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
+import { searchState } from "@/composables/useLogs/searchState";
 
 export default defineComponent({
   name: "SearchResult",
@@ -532,14 +533,14 @@ export default defineComponent({
     const { refreshPagination } = useSearchStream();
     const { refreshPartitionPagination, refreshJobPagination } = usePagination();
     const { updatedLocalLogFilterField } = logsUtils();
-    const { extractFTSFields } = useStreamFields();
+    const { extractFTSFields, filterHitsColumns } = useStreamFields();
 
     const {
-      searchObj,
-      filterHitsColumns,
       reorderSelectedFields,
       getFilterExpressionByFieldType,
     } = useLogs();
+
+    const { searchObj } = searchState();
 
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);

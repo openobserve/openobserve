@@ -367,7 +367,6 @@ import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { useI18n } from "vue-i18n";
-import useLogs from "../../composables/useLogs";
 import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -378,6 +377,7 @@ import { defineAsyncComponent } from "vue";
 import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+import { searchState } from "@/composables/useLogs/searchState";
 
 export default {
   name: "JsonPreview",
@@ -486,7 +486,7 @@ export default {
     const addFieldToTable = (value: string) => {
       emit("addFieldToTable", value);
     };
-    const { searchObj, searchAggData } = useLogs();
+    const { searchObj, searchAggData } = searchState();
     let multiStreamFields: any = ref([]);
 
     const showViewTraceBtn = ref(false);
