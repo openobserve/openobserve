@@ -223,7 +223,7 @@ jobs:
           body: ${{ steps.generate-body.outputs.body }}
 
       - name: Send release notification to Strapi
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             // Get release info from workflow dispatch inputs
