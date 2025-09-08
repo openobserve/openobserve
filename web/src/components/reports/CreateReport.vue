@@ -850,6 +850,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import cronParser from "cron-parser";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { convertDateToTimestamp } from "@/utils/date";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const props = defineProps({
   report: {
@@ -919,6 +920,8 @@ const step = ref(1);
 const formData = ref(defaultReport);
 
 const q = useQuasar();
+
+const { track } = useReo();
 
 const dialog = ref({
   show: false,
@@ -1391,6 +1394,10 @@ const saveReport = async () => {
     .finally(() => {
       dismiss();
     });
+    track("Button Click", {
+      button: "Save Report",
+      page: "Add Report"
+    });
 };
 
 const validateReportData = async () => {
@@ -1660,6 +1667,10 @@ const setupEditingReport = async (report: any) => {
 const openCancelDialog = () => {
   if (originalReportData.value === JSON.stringify(formData.value)) {
     goToReports();
+    track("Button Click", {
+      button: "Cancel Report",
+      page: "Add Report"
+    });
     return;
   }
   dialog.value.show = true;

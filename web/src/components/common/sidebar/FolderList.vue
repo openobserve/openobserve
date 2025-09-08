@@ -191,6 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { filter, forIn } from "lodash-es";
   import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
   import { useLoading } from "@/composables/useLoading";
+  import { useReo } from "@/services/reodotdev_analytics";
 
   const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
     return import("@/components/common/sidebar/MoveAcrossFolders.vue");
@@ -228,6 +229,7 @@ export default defineComponent({
       const selectedFolderDelete = ref(null);
       const confirmDeleteFolderDialog = ref(false);
       const searchQuery = ref('');
+      const { track } = useReo();
 
 
       const router = useRouter();
@@ -251,6 +253,10 @@ export default defineComponent({
       const addFolder = () => {
       isFolderEditMode.value = false;
       showAddFolderDialog.value = true;
+      track("Button Click", {
+        button: "Add Folder",
+        page: "Folders",
+      });
      };
 
       const updateFolderList = async (folders: any) => {

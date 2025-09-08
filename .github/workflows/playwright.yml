@@ -135,6 +135,7 @@ jobs:
             browser: "chrome"
             run_files:
               [
+                "logsDownloads.spec.js",
                 "logsqueries.spec.js",
                 "secondsPrecisionAdded.spec.js",
                 "logsqueries.cte.spec.js",
@@ -158,6 +159,7 @@ jobs:
                 "dashboardtype.spec.js",
                 "dashboard-folder.spec.js",
                 "dashboard-import.spec.js",
+                "maxquery.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
@@ -177,7 +179,7 @@ jobs:
                 "dashboard-maps.spec.js",
                 "dashboard-multi-y-axis.spec.js",
                 "dashboard-html-chart.spec.js",
-                # "visualize.spec.js",
+                "visualize.spec.js",
                 # "visualization-vrl.spec.js"
               ]
           - testfolder: "Pipelines"
@@ -295,10 +297,11 @@ jobs:
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npx nyc report
 
-      - uses: actions/upload-artifact@v4
-        if: always()
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always() && hashFiles('playwright-report/**') != ''
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.testfolder }}
           path: playwright-report/
           retention-days: 30
 
@@ -336,6 +339,7 @@ jobs:
 
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
+        if: hashFiles('tests/ui-testing/coverage-report/**') != ''
         with:
           name: coverage-report
           path: tests/ui-testing/coverage-report

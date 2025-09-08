@@ -207,6 +207,7 @@ import streamService from "@/services/stream";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
+import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
   name: "EnrichmentTableList",
@@ -235,6 +236,7 @@ export default defineComponent({
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const showEnrichmentSchema = ref<boolean>(false);
+    const { track } = useReo();
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -410,6 +412,10 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
+        track("Button Click", {
+          button: "Add Enrichment Table",
+          page: "Functions"
+        });
       } else {
         isUpdated.value = true;
         action = "Update Enrichment Table";
@@ -420,6 +426,10 @@ export default defineComponent({
             name: props.row.name,
             org_identifier: store.state.selectedOrganization.identifier,
           },
+        });
+        track("Button Click", {
+          button: "Update Enrichment Table",
+          page: "Functions"
         });
       }
       addLookupTable();

@@ -352,6 +352,7 @@ import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
 import useActions from "@/composables/useActions";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const props = defineProps({
   templates: {
@@ -373,6 +374,7 @@ const apiMethods = ["get", "post", "put"];
 const outputFormats = ["json", "ndjson"];
 const store = useStore();
 const { t } = useI18n();
+const { track } = useReo();
 const formData: Ref<DestinationData> = ref({
   name: "",
   url: "",
@@ -615,6 +617,10 @@ const saveDestination = () => {
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
+    track("Button Click", {
+      button: "Update Destination",
+      page: "Add Destination"
+    });
   } else {
     destinationService
       .create({
@@ -641,6 +647,10 @@ const saveDestination = () => {
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
+    track("Button Click", {
+      button: "Create Destination",
+      page: "Add Destination"
+    });
   }
 };
 const addApiHeader = (key: string = "", value: string = "") => {

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import PageManager from '../../pages/page-manager.js';
 import logsdata from '../../../test-data/logs_data.json';
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
+const testLogger = require('../utils/test-logger.js');
 
 test.describe('Pipeline Dynamic Stream Names', () => {
 
@@ -45,7 +46,7 @@ test.describe('Pipeline Dynamic Stream Names', () => {
     for(const streamName of streamNames) {
       const url = getIngestionUrl(orgId, streamName);
       const response = await sendRequest(page, url, logsdata, headers);
-      console.log(response);
+      testLogger.debug('API response received', { response });
     }
     await page.waitForTimeout(2000);
   });

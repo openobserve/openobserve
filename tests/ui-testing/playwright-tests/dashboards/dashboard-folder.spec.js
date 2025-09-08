@@ -4,6 +4,7 @@ import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage } from "./utils/dashCreation.js";
 import PageManager from "../../pages/page-manager";
+const testLogger = require('../utils/test-logger.js');
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -23,7 +24,7 @@ test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard folder testcases", () => {
   test.beforeEach(async ({ page }) => {
-    console.log("running before each");
+    testLogger.debug("Test setup - beforeEach hook executing");
     await login(page);
     await page.waitForTimeout(1000);
     await ingestion(page);

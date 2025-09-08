@@ -230,6 +230,7 @@ import type { Template } from "@/ts/interfaces/index";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ImportDestination from "./ImportDestination.vue";
 import useActions from "@/composables/useActions";
+import { useReo } from "@/services/reodotdev_analytics";
 
 interface ConformDelete {
   visible: boolean;
@@ -251,6 +252,7 @@ export default defineComponent({
     const { t } = useI18n();
     const q = useQuasar();
     const { getAllActions } = useActions();
+    const { track } = useReo();
 
     const columns: any = ref<QTableProps["columns"]>([
       {
@@ -420,6 +422,12 @@ export default defineComponent({
       );
     };
     const editDestination = (destination: any) => {
+      if (!destination) {
+        track("Button Click", {
+          button: "Add Destination",
+          page: "Alert Destinations"
+        });
+      }
       toggleDestinationEditor();
       resetEditingDestination();
       if (!destination) {

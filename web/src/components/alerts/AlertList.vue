@@ -667,6 +667,7 @@ import {
   verifyOrganizationStatus,
 } from "@/utils/zincutils";
 import { getFoldersListByType } from "@/utils/commons";
+import { useReo } from "@/services/reodotdev_analytics";
 import type { Alert, AlertListItem } from "@/ts/interfaces/index";
 import {
   outlinedDelete,
@@ -709,6 +710,7 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const router = useRouter();
+    const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});
     const toBeClonedAlert: Ref<any> = ref({});
     const showAddAlertDialog: any = ref(false);
@@ -1407,6 +1409,10 @@ export default defineComponent({
           page: "Alerts",
         });
       }
+      track("Button Click", {
+        button: action,
+        page: "Add Alert"
+      });
       } catch (error) {
         console.error('Navigation failed:', error);
       }
@@ -1429,6 +1435,10 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           folder: activeFolderId.value,
         },
+      });
+      track("Button Click", {
+        button: "Hide Form",
+        page: "Add Alert"
       });
     };
     const deleteAlertByAlertId = () => {
