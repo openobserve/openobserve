@@ -158,6 +158,7 @@ impl FlightService for FlightServiceImpl {
             }
         };
         // https://github.com/openobserve/openobserve/issues/8280
+        // https://github.com/apache/datafusion/pull/11587
         // add coalesce batches exec to trigger StringView gc to reduce memory usage
         let physical_plan = Arc::new(CoalesceBatchesExec::new(physical_plan, PARQUET_BATCH_SIZE));
 
