@@ -722,6 +722,14 @@
     height: 20px;
     width: 20px;
   }
+  .q-toggle__thumb{
+    &:before {
+      display: none !important;
+    }
+    &:hover:before {
+      display: none !important;
+    }
+  }
   .q-toggle__label{
     margin-top: 6px;
   }
@@ -729,6 +737,14 @@
     .q-toggle__thumb:after{
       top: 5.8px;
       left: 3.8px;
+    }
+    .q-toggle__thumb{
+      &:before {
+        display: none !important;
+      }
+      &:hover:before {
+        display: none !important;
+      }
     }
   }
 }
@@ -765,3 +781,13 @@
     }
 }
 
+
+.o2-input-text-box-light{
+  .q-field__control{
+    height: 36px !important;
+  }
+  .q-field__label{
+    padding-bottom: 6px;
+    font-size: 14px;
+  }
+}

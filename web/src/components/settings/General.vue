@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div>
+  <div :class="store.state.theme == 'dark' ? 'dark-settings-theme' : 'light-settings-theme'">
     <div class="q-px-md q-py-md">
       <div class="general-page-title">
         {{ t("settings.generalPageTitle") }}
@@ -31,85 +31,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw-w-full tw-flex tw-flex-col">
         <q-form @submit.stop="onSubmit.execute">
           <!-- scape interval section -->
-          <div class="tw-flex tw-justify-between tw-items-center">
-            <div class="tw-flex tw-flex-col tw-items-start">
-              <span class="individual-setting-title">
-                {{ t('settings.scrapintervalLabel') }}
-              </span>
-              <span class="individual-setting-description">
-                The scrape interval is the frequency, in seconds, at which the monitoring system collects metrics.
-              </span>
-            </div>
-              <q-input
+          <div class="settings-grid-item">
+            <span class="individual-setting-title">
+              {{ t('settings.scrapintervalLabel') }}
+            </span>
+            <q-input
               v-model.number="scrapeIntereval"
               type="number"
               min="0"
               color="input-border"
               bg-color="input-bg"
-              class="q-py-md showLabelOnTop o2-numeric-input"
+              class="showLabelOnTop o2-numeric-input q-ml-sm"
               :class="store.state.theme == 'dark' ? 'o2-numeric-input-dark' : 'o2-numeric-input-light' "
               stack-label
               outlined
               filled
               dense
+              hide-bottom-space
               :rules="[(val: any) => !!val || 'Scrape interval is required']"
               :lazy-rules="true"
               style="width: 120px;"
-              />
+            />
+            <span class="individual-setting-description">
+              The scrape interval is the frequency, in seconds, at which the monitoring system collects metrics.
+            </span>
           </div>
           <!-- enable web socket search section -->
-          <div v-if="store.state.zoConfig.websocket_enabled" class="tw-flex tw-justify-between tw-items-center">
-            <div class="tw-flex tw-flex-col tw-items-start">
-              <span class="individual-setting-title">
-                {{ t('settings.enableWebsocketSearch') }}
-              </span>
-              <span class="individual-setting-description">
-                Websockets Search uses sockets logic to improve performance .
-              </span>
-            </div>
+          <div v-if="store.state.zoConfig.websocket_enabled" class="settings-grid-item">
+            <span class="individual-setting-title">
+              {{ t('settings.enableWebsocketSearch') }}
+            </span>
             <q-toggle
-            style="width: 120px;"
+              style="width: 120px;"
               v-model="enableWebsocketSearch"
               :label="'enabled'"
+              size="lg"
               data-test="general-settings-enable-websocket"
-              class="q-pt-md q-pb-md showLabelOnTop"
+              class=" showLabelOnTop o2-toggle-button-lg"
+              :class="store.state.theme == 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
             />
+            <span class="individual-setting-description">
+              Websockets Search uses sockets logic to improve performance.
+            </span>
           </div>
           <!-- enable search streaming section -->
-          <div v-if="store.state.zoConfig.streaming_enabled" class="tw-flex tw-justify-between tw-items-center">
-            <div class="tw-flex tw-flex-col tw-items-start">
-              <span class="individual-setting-title">
-                {{ t('settings.enableStreamingSearch') }}
-              </span>
-              <span class="individual-setting-description">
-                Enabling search streaming will increase performance.
-              </span>
-            </div>
-              <q-toggle
+          <div v-if="store.state.zoConfig.streaming_enabled" class="settings-grid-item">
+            <span class="individual-setting-title">
+              {{ t('settings.enableStreamingSearch') }}
+            </span>
+            <q-toggle
               style="width: 120px;"
               v-model="enableStreamingSearch"
               :label="'Enabled'"
+              size="lg"
               data-test="general-settings-enable-streaming"
-              class="q-pb-lg showLabelOnTop"
-              />
+              class="showLabelOnTop o2-toggle-button-lg"
+              :class="store.state.theme == 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+            />
+            <span class="individual-setting-description">
+              Enabling search streaming will increase performance.
+            </span>
           </div>
           <!-- enable aggregation cache section -->
-          <div v-if="config.isEnterprise == 'true'" class="tw-flex tw-justify-between tw-items-center">
-            <div class="tw-flex tw-flex-col tw-items-start">
-              <span class="individual-setting-title">
-                {{ t('settings.enableStreamingAggregation') }}
-              </span>
-              <span class="individual-setting-description">
-                Enabling streaming aggregates will help improve the performance of aggregate queries.
-              </span>
-            </div>
-                <q-toggle
-                style="width: 120px;"
-                v-model="enableStreamingAggregation"
-                :label="'Enabled'"
-                data-test="general-settings-enable-streaming-aggregation"
-                class="q-pb-lg showLabelOnTop"
-              />
+          <div v-if="config.isEnterprise == 'true'" class="settings-grid-item no-border-bottom">
+            <span class="individual-setting-title">
+              {{ t('settings.enableStreamingAggregation') }}
+            </span>
+            <q-toggle
+              style="width: 120px;"
+              v-model="enableStreamingAggregation"
+              :label="'Enabled'"
+              size="lg"
+              data-test="general-settings-enable-streaming-aggregation"
+              class="showLabelOnTop o2-toggle-button-lg"
+              :class="store.state.theme == 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+            />
+            <span class="individual-setting-description">
+              Enabling streaming aggregates will help improve the performance of aggregate queries.
+            </span>
           </div>
           <span>&nbsp;</span>
 
@@ -149,24 +148,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-input
               color="input-border"
               bg-color="input-bg"
-              class="q-py-md showLabelOnTop"
+              class="showLabelOnTop o2-input-text-box"
               stack-label
               outlined
               filled
-              dense
               data-test="settings_ent_logo_custom_text"
+              :class="store.state.theme == 'dark' ? 'o2-input-text-box-dark' : 'o2-input-text-box-light'"
               :label="t('settings.customLogoText')"
               v-model="customText"
             />
             <div
               class="btn-group relative-position vertical-middle"
-              style="margin-top: 53px"
+              style="margin-top: 48px"
             >
+              <q-btn
+                type="button"
+                class="q-mr-sm tw-h-[36px] o2-secondary-button no-border"
+                no-caps
+                :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                :label="t('common.cancel')"
+                dense
+                flat
+                @click="editingText = !editingText"
+              ></q-btn>
+
               <q-btn
                 data-test="settings_ent_logo_custom_text_save_btn"
                 :loading="onSubmit.isLoading.value"
                 :label="t('dashboard.save')"
-                class="q-mr-sm tw-h-[28px] o2-primary-button-small no-border"
+                class="tw-h-[36px] o2-primary-button no-border"
                 flat
                 dense
                 :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
@@ -175,17 +185,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 @click="updateCustomText"
               />
-
-              <q-btn
-                type="button"
-                class="tw-h-[28px] o2-secondary-button-small no-border"
-                no-caps
-                :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                :label="t('common.cancel')"
-                dense
-                flat
-                @click="editingText = !editingText"
-              ></q-btn>
             </div>
           </div>
           <div v-else style="margin-top: 17px">
@@ -302,6 +301,7 @@ import config from "@/aws-exports";
 import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
+import store from "@/test/unit/helpers/store";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -638,7 +638,23 @@ export default defineComponent({
   line-height: 20px;
 }
 .individual-setting-description{
-  font-size: 12px;
-  opacity: 0.6;
+  font-size: 13px;
+  opacity: 0.7;
 }
+
+.settings-grid-item {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.dark-settings-theme .settings-grid-item {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+
+
 </style>
