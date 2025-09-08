@@ -338,6 +338,8 @@ import { useRouter } from "vue-router";
 import TenstackTable from "./TenstackTable.vue";
 import { useSearchAround } from "@/composables/useLogs/searchAround";
 import { usePagination } from "@/composables/useLogs/usePagination";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
+import useStreamFields from "@/composables/useLogs/useStreamFields";
 
 export default defineComponent({
   name: "SearchResult",
@@ -529,11 +531,11 @@ export default defineComponent({
     const { searchAroundData } = useSearchAround();
     const { refreshPagination } = useSearchStream();
     const { refreshPartitionPagination, refreshJobPagination } = usePagination();
+    const { updatedLocalLogFilterField } = logsUtils();
+    const { extractFTSFields } = useStreamFields();
 
     const {
       searchObj,
-      updatedLocalLogFilterField,
-      extractFTSFields,
       filterHitsColumns,
       reorderSelectedFields,
       getFilterExpressionByFieldType,

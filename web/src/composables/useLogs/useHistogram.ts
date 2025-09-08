@@ -13,84 +13,43 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { nextTick } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 
 import { searchState } from "@/composables/useLogs/searchState";
-import useStreams from "@/composables/useStreams";
-import useSqlSuggestions from "@/composables/useSuggestions";
 import useNotifications from "@/composables/useNotifications";
 import searchService from "@/services/search";
 import { logsErrorMessage } from "@/utils/common";
 
-import { INTERVAL_MAP, DEFAULT_LOGS_CONFIG } from "@/utils/logs/constants";
+import { INTERVAL_MAP } from "@/utils/logs/constants";
 
 import {
-  useLocalLogFilterField,
-  b64EncodeUnicode,
-  b64DecodeUnicode,
   formatSizeFromMB,
-  timestampToTimezoneDate,
   histogramDateTimezone,
-  useLocalWrapContent,
-  useLocalTimezone,
-  useLocalInterestingFields,
-  useLocalSavedView,
-  convertToCamelCase,
-  getFunctionErrorMessage,
-  getUUID,
-  getWebSocketUrl,
   generateTraceContext,
-  arraysMatch,
-  isWebSocketEnabled,
-  isStreamingEnabled,
-  addSpacesToOperators,
-  deepCopy,
 } from "@/utils/zincutils";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
-import {
-  convertDateToTimestamp,
-  getConsumableRelativeTime,
-} from "@/utils/date";
+import { convertDateToTimestamp } from "@/utils/date";
 
 export const useHistogram = () => {
   const store = useStore();
-  const router = useRouter();
   let {
     searchObj,
     searchObjDebug,
-    fieldValues,
     notificationMsg,
-    streamSchemaFieldsIndexMapping,
     histogramMappedData,
     histogramResults,
   } = searchState();
-  const {
-    getStreams,
-    getStream,
-    getMultiStreams,
-    isStreamExists,
-    isStreamFetched,
-  } = useStreams();
 
   const {
     fnParsedSQL,
-    fnUnparsedSQL,
-    extractTimestamps,
     hasAggregation,
-    isLimitQuery,
-    isDistinctQuery,
-    isWithQuery,
     addTraceId,
     removeTraceId,
-    addTransformToQuery,
-    isActionsEnabled,
-    getColumnWidth,
     showCancelSearchNotification,
     isTimestampASC,
   } = logsUtils();
+
   const { showErrorNotification } = useNotifications();
 
   const getHistogramTitle = () => {
