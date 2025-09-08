@@ -165,6 +165,11 @@ export default class DashboardFilter {
 
     await columnLocator.click();
     await columnLocator.fill(newFieldName);
+
+    // Wait for dropdown to appear after filling the value
+    await this.page
+      .locator('div.q-menu[role="listbox"]')
+      .waitFor({ state: "visible", timeout: 5000 });
     await columnLocator.press("ArrowDown");
     await columnLocator.press("Enter");
 
@@ -198,6 +203,11 @@ export default class DashboardFilter {
       const conditionLocator = this.page.locator(
         `[data-test="dashboard-add-condition-condition-${idx}"]`
       );
+
+      // Wait until visible
+      await conditionLocator.waitFor({ state: "visible", timeout: 5000 });
+
+      // Perform click
       await conditionLocator.click();
       await conditionLocator.click(); // safety click
     }
@@ -213,11 +223,17 @@ export default class DashboardFilter {
               .locator('[data-test="dashboard-add-condition-operator"]')
               .last();
 
+      // Wait until operator dropdown is visible
+      await operatorLocator.waitFor({ state: "visible", timeout: 5000 });
       await operatorLocator.click();
-      await this.page
+
+      const optionLocator = this.page
         .getByRole("option", { name: operator, exact: true })
-        .first()
-        .click();
+        .first();
+
+      // Wait until option is visible
+      await optionLocator.waitFor({ state: "visible", timeout: 5000 });
+      await optionLocator.click();
     }
 
     // Step 5: Fill value field
@@ -227,12 +243,17 @@ export default class DashboardFilter {
           ? this.page.locator('[data-test="common-auto-complete"]').first()
           : this.page.locator('[data-test="common-auto-complete"]').last();
 
+      // Wait until input is visible
+      await valueInput.waitFor({ state: "visible", timeout: 5000 });
       await valueInput.click();
       await valueInput.fill(value);
 
       const suggestion = this.page
         .locator('[data-test="common-auto-complete-option"]')
         .first();
+
+      // Wait until suggestion is visible
+      await suggestion.waitFor({ state: "visible", timeout: 5000 });
       await suggestion.click();
     } else if (operator && newFieldName) {
       const expectedError = `Filter: ${newFieldName}: Condition value required`;
