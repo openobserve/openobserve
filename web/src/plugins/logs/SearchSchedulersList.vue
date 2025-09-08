@@ -349,7 +349,7 @@ import {
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { defineAsyncComponent, defineComponent, reactive } from "vue";
-import useLogs from "../../composables/useLogs";
+import { searchState } from "@/composables/useLogs/searchState";
 import TenstackTable from "../../plugins/logs/TenstackTable.vue";
 import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -402,7 +402,7 @@ export default defineComponent({
     const qTableRef: Ref<InstanceType<typeof qTableSchedule> | null> =
       ref(null);
     const searchDateTimeRef = ref(null);
-    const { searchObj } = useLogs();
+    const { searchObj } = searchState();
     const dataToBeLoaded: any = ref([]);
     const dateTimeToBeSent = ref({
       valueType: "relative",
