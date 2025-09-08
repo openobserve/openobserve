@@ -21,7 +21,6 @@ use std::{
 };
 
 use async_recursion::async_recursion;
-use tokio::fs as tokio_fs;
 
 #[inline(always)]
 pub fn get_file_meta(path: impl AsRef<Path>) -> Result<Metadata, std::io::Error> {
@@ -128,7 +127,7 @@ pub async fn scan_files_with_channel(
 ) -> Result<(), std::io::Error> {
     let limit = limit.unwrap_or_default();
     let mut files = Vec::with_capacity(std::cmp::max(16, limit));
-    let mut dir = tokio_fs::read_dir(root).await.map_err(|e| {
+    let mut dir = tokio::fs::read_dir(root).await.map_err(|e| {
         std::io::Error::other(format!(
             "Error reading directory: {}, err: {}",
             root.display(),
