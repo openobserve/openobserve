@@ -820,3 +820,24 @@
   }
 }
 
+
+
+.o2-dropdown-select{
+  .q-field{
+    .q-field__control{
+      min-height: 36px !important;
+      max-height: 36px !important;
+      border-radius: 4px !important;
+
+    }
+  }
+}
+
+.o2-select-input{
+  .q-field__control{
+    border-radius: 4px !important;
+  }
+}
+
+
+
