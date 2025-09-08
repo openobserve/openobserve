@@ -25,38 +25,13 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 
 import {
   useLocalLogFilterField,
-  b64EncodeUnicode,
-  b64DecodeUnicode,
-  formatSizeFromMB,
   timestampToTimezoneDate,
-  histogramDateTimezone,
-  useLocalWrapContent,
-  useLocalTimezone,
   useLocalInterestingFields,
-  useLocalSavedView,
   convertToCamelCase,
-  getFunctionErrorMessage,
-  getUUID,
-  getWebSocketUrl,
-  generateTraceContext,
-  arraysMatch,
-  isWebSocketEnabled,
-  isStreamingEnabled,
-  addSpacesToOperators,
   deepCopy,
 } from "@/utils/zincutils";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
-
-let {
-  searchObj,
-  searchObjDebug,
-  fieldValues,
-  notificationMsg,
-  streamSchemaFieldsIndexMapping,
-  histogramMappedData,
-  histogramResults,
-} = searchState();
 
 export const useStreamFields = () => {
   const { getStreams, getStream } = useStreams();
@@ -66,20 +41,15 @@ export const useStreamFields = () => {
   const router = useRouter();
   const { t } = useI18n();
 
-  const {
-    fnParsedSQL,
-    fnUnparsedSQL,
-    extractTimestamps,
-    hasAggregation,
-    isLimitQuery,
-    isDistinctQuery,
-    isWithQuery,
-    addTraceId,
-    removeTraceId,
-    addTransformToQuery,
-    isActionsEnabled,
-    getColumnWidth,
-  } = logsUtils();
+  let {
+    searchObj,
+    searchObjDebug,
+    fieldValues,
+    notificationMsg,
+    streamSchemaFieldsIndexMapping,
+  } = searchState();
+
+  const { fnParsedSQL, getColumnWidth } = logsUtils();
 
   const updateFieldValues = () => {
     try {

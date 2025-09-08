@@ -14,41 +14,21 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { useQuasar } from "quasar";
-import { nextTick, ref } from "vue";
-import { byString } from "@/utils/json";
-import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { cloneDeep, startCase } from "lodash-es";
+import { cloneDeep } from "lodash-es";
 
 import { searchState } from "@/composables/useLogs/searchState";
 import useStreams from "@/composables/useStreams";
-import useSqlSuggestions from "@/composables/useSuggestions";
 import savedviewsService from "@/services/saved_views";
 import searchService from "@/services/search";
 import { logsErrorMessage } from "@/utils/common";
 
 import {
-  useLocalLogFilterField,
-  b64EncodeUnicode,
-  b64DecodeUnicode,
-  formatSizeFromMB,
-  timestampToTimezoneDate,
-  histogramDateTimezone,
-  useLocalWrapContent,
-  useLocalTimezone,
-  useLocalInterestingFields,
-  useLocalSavedView,
-  convertToCamelCase,
-  getFunctionErrorMessage,
-  getUUID,
-  getWebSocketUrl,
   generateTraceContext,
   arraysMatch,
   isWebSocketEnabled,
   isStreamingEnabled,
-  addSpacesToOperators,
-  deepCopy,
 } from "@/utils/zincutils";
 import config from "@/aws-exports";
 
@@ -63,37 +43,23 @@ import { usePagination } from "@/composables/useLogs/usePagination";
 import useSearchStream from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 
-let {
-  searchObj,
-  searchObjDebug,
-  fieldValues,
-  notificationMsg,
-  streamSchemaFieldsIndexMapping,
-  histogramMappedData,
-  histogramResults,
-  resetQueryData,
-  initialQueryPayload,
-} = searchState();
-
 export const useSearchBar = () => {
-  const {
-    getStreams,
-    getStream,
-    getMultiStreams,
-    isStreamExists,
-    isStreamFetched,
-  } = useStreams();
-  const { updateFieldKeywords } = useSqlSuggestions();
+  const { getStream, isStreamExists, isStreamFetched } = useStreams();
 
+  let {
+    searchObj,
+    searchObjDebug,
+    notificationMsg,
+    resetQueryData,
+    initialQueryPayload,
+  } = searchState();
 
   const store = useStore();
   const router = useRouter();
-  const { t } = useI18n();
   const $q = useQuasar();
 
   const {
     fnParsedSQL,
-    fnUnparsedSQL,
     extractTimestamps,
     hasAggregation,
     isLimitQuery,
@@ -102,8 +68,6 @@ export const useSearchBar = () => {
     addTraceId,
     removeTraceId,
     addTransformToQuery,
-    isActionsEnabled,
-    getColumnWidth,
     showCancelSearchNotification,
     isTimestampASC,
     isNonAggregatedSQLMode,
@@ -115,12 +79,7 @@ export const useSearchBar = () => {
   const { getAllActions } = useActions();
   const { showErrorNotification } = useNotifications();
 
-  const {
-    fetchQueryDataWithWebSocket,
-    sendSearchMessageBasedOnRequestId,
-    cancelSearchQueryBasedOnRequestId,
-    closeSocketBasedOnRequestId,
-  } = useSearchWebSocket();
+  const { cancelSearchQueryBasedOnRequestId } = useSearchWebSocket();
 
   const {
     generateHistogramData,

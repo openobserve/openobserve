@@ -1495,6 +1495,7 @@ import {
 
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
+import useStreamFields from "@/composables/useLogs/useStreamFields";
 
 const defaultValue: any = () => {
   return {
@@ -1650,18 +1651,22 @@ export default defineComponent({
     const { resetStreamData } = searchState();
     const { buildSearch } = useSearchStream();
 
-    const { fnParsedSQL, fnUnparsedSQL } = logsUtils();
-    const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData, } = useSearchBar();
+    const {
+      fnParsedSQL,
+      fnUnparsedSQL,
+      updatedLocalLogFilterField,
+      updateUrlQueryParams,
+      generateURLQuery,
+    } = logsUtils();
+    const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData } =
+      useSearchBar();
+    const { loadStreamLists } = useStreamFields();
 
     const {
       searchObj,
       refreshData,
       handleRunQuery,
-      updatedLocalLogFilterField,
       getStreams,
-      updateUrlQueryParams,
-      generateURLQuery,
-      loadStreamLists,
       moveItemsToTop,
       extractFields,
       cancelQuery,
