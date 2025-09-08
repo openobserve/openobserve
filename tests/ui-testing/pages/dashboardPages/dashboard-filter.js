@@ -29,10 +29,9 @@ export default class DashboardFilter {
       );
       await fieldDropdown.click();
       await fieldDropdown.fill(newFieldName);
-      await this.page
-        .getByRole("option", { name: newFieldName, exact: true })
-        .first()
-        .click();
+
+      // Use robust dropdown selection
+      await this.selectDropdownOptionByText(newFieldName);
     }
 
     // Step 3: Open the condition selector
@@ -56,10 +55,9 @@ export default class DashboardFilter {
               .last();
 
       await operatorLocator.click();
-      await this.page
-        .getByRole("option", { name: operator, exact: true })
-        .first()
-        .click();
+
+      // Use robust dropdown selection for operator
+      await this.selectDropdownOptionByText(operator);
     }
 
     // Step 5: Enter value (if required)
@@ -117,11 +115,18 @@ export default class DashboardFilter {
       .waitFor({ state: "visible" });
 
     for (const val of values) {
-      const option = this.page
-        .getByRole("option", { name: val, exact: true })
-        .locator('[data-test="dashboard-add-condition-list-item"]');
-      await option.waitFor({ state: "visible" });
-      await option.click();
+      // Try the original approach first for list items
+      try {
+        const option = this.page
+          .getByRole("option", { name: val, exact: true })
+          .locator('[data-test="dashboard-add-condition-list-item"]');
+        await option.waitFor({ state: "visible", timeout: 3000 });
+        await option.click();
+      } catch (error) {
+        // Fallback to robust selection if needed
+        console.log(`Using fallback selection for list item: ${val}`);
+        await this.selectDropdownOptionByText(val);
+      }
     }
   }
 
@@ -180,14 +185,8 @@ export default class DashboardFilter {
     //   .first()
     //   .click();
 
-    // Wait for the suggestion list to appear and select the first suggestion
-    const suggestion = await this.page.locator(
-      'div.q-menu[role="listbox"] div.q-item'
-    );
-    await suggestion.waitFor({ state: "visible", timeout: 10000 });
-    const firstSuggestion = suggestion.first();
-    await firstSuggestion.waitFor({ state: "visible", timeout: 10000 });
-    await firstSuggestion.click();
+    // Robust dropdown selection with proper waiting and text matching
+    await this.selectDropdownOptionByText(newFieldName);
 
     // Step 3: Condition dropdown
     if (operator || value) {
@@ -210,10 +209,9 @@ export default class DashboardFilter {
               .last();
 
       await operatorLocator.click();
-      await this.page
-        .getByRole("option", { name: operator, exact: true })
-        .first()
-        .click();
+
+      // Use robust dropdown selection for operator
+      await this.selectDropdownOptionByText(operator);
     }
 
     // Step 5: Fill value field
@@ -236,6 +234,196 @@ export default class DashboardFilter {
         .locator("div")
         .filter({ hasText: expectedError });
       // Optional: Assert here if needed
+    }
+  }
+
+  /**
+   * Robust helper method to select dropdown options by text content
+   * Handles virtual scrolling, timing issues, and provides retry mechanism
+   * @param {string} optionText - The text content to look for
+   * @param {number} timeout - Maximum time to wait for the option (default: 15000ms)
+   * @param {number} retries - Number of retry attempts (default: 3)
+   */
+  async selectDropdownOptionByText(optionText, timeout = 15000, retries = 3) {
+    let lastError;
+
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        // Wait for the dropdown menu to be visible and stable
+        const dropdownMenu = this.page.locator('div.q-menu[role="listbox"]');
+        await dropdownMenu.waitFor({ state: "visible", timeout: timeout });
+
+        // Wait for virtual scroll content to be loaded
+        const virtualScrollContent = dropdownMenu.locator(
+          ".q-virtual-scroll__content"
+        );
+        await virtualScrollContent.waitFor({ state: "visible", timeout: 5000 });
+
+        // Wait a bit for the dropdown to be fully populated after typing
+        await this.page.waitForTimeout(500);
+
+        // Strategy 1: Try to find exact match using getByRole
+        try {
+          const exactOption = this.page.getByRole("option", {
+            name: optionText,
+            exact: true,
+          });
+
+          // Check if the option exists and is visible
+          const optionCount = await exactOption.count();
+          if (optionCount > 0) {
+            const firstOption = exactOption.first();
+            await firstOption.waitFor({ state: "visible", timeout: 3000 });
+            await firstOption.click();
+            return; // Success!
+          }
+        } catch (error) {
+          console.log(
+            `Strategy 1 failed on attempt ${attempt + 1}: ${error.message}`
+          );
+        }
+
+        // Strategy 2: Find by text content within dropdown items
+        try {
+          const dropdownItems = dropdownMenu.locator(
+            'div.q-item[role="option"]'
+          );
+          await dropdownItems
+            .first()
+            .waitFor({ state: "visible", timeout: 3000 });
+
+          const itemCount = await dropdownItems.count();
+          console.log(`Found ${itemCount} dropdown items`);
+
+          for (let i = 0; i < itemCount; i++) {
+            const item = dropdownItems.nth(i);
+
+            // Wait for the item to be visible
+            try {
+              await item.waitFor({ state: "visible", timeout: 2000 });
+            } catch (e) {
+              continue; // Skip this item if not visible
+            }
+
+            // Get text content from the item
+            const itemText = await item
+              .locator(".q-item__label span, .q-item__label")
+              .textContent();
+
+            if (itemText && itemText.trim() === optionText.trim()) {
+              // Scroll item into view if needed
+              await item.scrollIntoViewIfNeeded();
+
+              // Click the item
+              await item.click();
+              return; // Success!
+            }
+          }
+        } catch (error) {
+          console.log(
+            `Strategy 2 failed on attempt ${attempt + 1}: ${error.message}`
+          );
+        }
+
+        // Strategy 3: Use text filter on items
+        try {
+          const itemByText = dropdownMenu
+            .locator('div.q-item[role="option"]')
+            .filter({ hasText: optionText })
+            .first();
+
+          await itemByText.waitFor({ state: "visible", timeout: 3000 });
+          await itemByText.scrollIntoViewIfNeeded();
+          await itemByText.click();
+          return; // Success!
+        } catch (error) {
+          console.log(
+            `Strategy 3 failed on attempt ${attempt + 1}: ${error.message}`
+          );
+          lastError = error;
+        }
+
+        // If we get here, all strategies failed for this attempt
+        console.log(
+          `All strategies failed on attempt ${attempt + 1}. Retrying...`
+        );
+
+        // Small delay before retry
+        if (attempt < retries - 1) {
+          await this.page.waitForTimeout(1000);
+        }
+      } catch (error) {
+        console.log(
+          `Attempt ${attempt + 1} failed with error: ${error.message}`
+        );
+        lastError = error;
+
+        // Small delay before retry
+        if (attempt < retries - 1) {
+          await this.page.waitForTimeout(1000);
+        }
+      }
+    }
+
+    // If all attempts failed, throw a descriptive error
+    throw new Error(
+      `Failed to select dropdown option "${optionText}" after ${retries} attempts. ` +
+        `Last error: ${lastError?.message || "Unknown error"}`
+    );
+  }
+
+  /**
+   * Alternative method with even more robust handling for special cases
+   * Use this if the main method still has issues
+   */
+  async selectDropdownOptionRobust(optionText, timeout = 20000) {
+    // Wait for dropdown to appear and stabilize
+    await this.page.waitForFunction(
+      () => {
+        const dropdown = document.querySelector('div.q-menu[role="listbox"]');
+        if (!dropdown) return false;
+
+        const items = dropdown.querySelectorAll('div.q-item[role="option"]');
+        return items.length > 0;
+      },
+      { timeout }
+    );
+
+    // Use evaluate to find and click the option in the DOM directly
+    const clicked = await this.page.evaluate((searchText) => {
+      const dropdown = document.querySelector('div.q-menu[role="listbox"]');
+      if (!dropdown) return false;
+
+      const items = dropdown.querySelectorAll('div.q-item[role="option"]');
+
+      for (const item of items) {
+        const textElement =
+          item.querySelector(".q-item__label span") ||
+          item.querySelector(".q-item__label") ||
+          item;
+
+        const text = textElement?.textContent?.trim();
+
+        if (text === searchText.trim()) {
+          // Ensure the item is visible before clicking
+          const rect = item.getBoundingClientRect();
+          const isVisible =
+            rect.top >= 0 &&
+            rect.left >= 0 &&
+            rect.bottom <= window.innerHeight &&
+            rect.right <= window.innerWidth;
+
+          if (isVisible) {
+            item.click();
+            return true;
+          }
+        }
+      }
+      return false;
+    }, optionText);
+
+    if (!clicked) {
+      throw new Error(`Could not find or click dropdown option: ${optionText}`);
     }
   }
 }
