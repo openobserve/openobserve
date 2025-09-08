@@ -227,15 +227,11 @@ pub async fn handle_internal_coordinator_event(payload: Vec<u8>) -> Result<(), a
                 }
             }
             Module::Node => {
-                if not_router() {
-                    log::debug!(
-                        "[INTERNAL_COORDINATOR::HANDLE_NODE_EVENT] handling meta coordinator event: {:?}",
-                        event
-                    );
-                    crate::common::infra::cluster::handle_node_list_event(event).await
-                } else {
-                    Ok(())
-                }
+                log::debug!(
+                    "[INTERNAL_COORDINATOR::HANDLE_NODE_EVENT] handling meta coordinator event: {:?}",
+                    event
+                );
+                crate::common::infra::cluster::handle_node_list_event(event).await
             }
             #[cfg(feature = "enterprise")]
             Module::UserSession => {
