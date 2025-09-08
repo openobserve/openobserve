@@ -107,59 +107,19 @@ const useLogs = () => {
   isHistogramEnabled,} = useHistogram();
   const { refreshPartitionPagination, getPaginatedData } = usePagination();
 
-  const { getQueryReq,
-buildWebSocketPayload,
-initializeSearchConnection,
-sendSearchMessage,
-handleStreamingHits,
-handleStreamingMetadata,
-updatePageCountTotal,
-trimPageCountExtraHit,
-handleHistogramStreamingHits,
-handleHistogramStreamingMetadata,
-handlePageCountStreamingHits,
-handlePageCountStreamingMetadata,
-handleSearchResponse,
-handleFunctionError,
-handleAggregation,
-updateResult,
-handleLogsResponse,
-chunkedAppend,
-handlePageCountResponse,
-handleHistogramResponse,
-shouldShowHistogram,
-processHistogramRequest,
-isHistogramDataMissing,
-handleSearchClose,
-handleSearchError,
-constructErrorMessage,
-getAggsTotal,
-refreshPagination,
-shouldGetPageCount,
-getPageCountThroughSocket,
-setCancelSearchError,
-handleSearchReset,
-validateFilterForMultiStream, buildSearch} = useSearchStream();
+  const { buildSearch } = useSearchStream();
 
-const {getFunctions, getActions, getQueryData} = useSearchBar();
+  const { getFunctions, getActions, getQueryData } = useSearchBar();
 
-  const {fnParsedSQL,
-  fnUnparsedSQL,
-  extractTimestamps,
-  hasAggregation,
-  isLimitQuery,
-  isDistinctQuery,
-  isWithQuery,
-  addTraceId,
-  removeTraceId,
-  addTransformToQuery,
-  isActionsEnabled,
-  showCancelSearchNotification,
-  updateUrlQueryParams,
-  isNonAggregatedSQLMode,
-  generateURLQuery,
-updatedLocalLogFilterField,
-isTimestampASC,} = logsUtils();
+  const {
+    fnParsedSQL,
+    fnUnparsedSQL,
+    extractTimestamps,
+    addTransformToQuery,
+    isActionsEnabled,
+    showCancelSearchNotification,
+    isTimestampASC,
+  } = logsUtils();
 
   const {
     updateFieldValues,
