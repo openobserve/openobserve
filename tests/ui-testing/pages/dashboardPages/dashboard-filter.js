@@ -167,9 +167,9 @@ export default class DashboardFilter {
     await columnLocator.fill(newFieldName);
 
     // Wait for dropdown to appear after filling the value
-    await this.page
-      .locator('div.q-menu[role="listbox"]')
-      .waitFor({ state: "visible", timeout: 5000 });
+    // await this.page
+    //   .locator('div.q-menu[role="listbox"]')
+    //   .waitFor({ state: "visible", timeout: 5000 });
     await columnLocator.press("ArrowDown");
     await columnLocator.press("Enter");
 
