@@ -202,8 +202,8 @@ impl FileData {
 
         // rename tmp file to real file
         let file_path = self.get_file_path(file);
-        std::fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
-        std::fs::rename(tmp_file, &file_path).map_err(|e| {
+        fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
+        fs::rename(tmp_file, &file_path).map_err(|e| {
             anyhow::anyhow!(
                 "[CacheType:{} trace_id {trace_id}] File disk cache rename tmp file {} to real file {} error: {}",
                 self.file_type,
