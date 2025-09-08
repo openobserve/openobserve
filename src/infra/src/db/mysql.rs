@@ -92,6 +92,10 @@ async fn cache_indices() -> HashSet<DBIndex> {
     }
 }
 
+pub async fn shutdown_ddl_pool() -> Result<()> {
+    CLIENT_DDL.close().await;
+    Ok(())
+}
 pub struct MysqlDb {}
 
 impl MysqlDb {
