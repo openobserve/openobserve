@@ -84,6 +84,23 @@ interface SearchObject {
   runQuery: boolean;
 }
 
+// Main search object containing all search state
+const searchObj = reactive(
+  Object.assign({}, DEFAULT_LOGS_CONFIG),
+) as SearchObject;
+
+// Debug data for search operations
+const searchObjDebug = reactive(Object.assign({}, DEFAULT_SEARCH_DEBUG_DATA));
+
+// Aggregation data for search results
+const searchAggData = reactive(Object.assign({}, DEFAULT_SEARCH_AGG_DATA));
+
+const searchPartitionMap = reactive<{ [key: string]: number }>({});
+
+const histogramMappedData: any = [];
+
+const histogramResults: any = [];
+
 /**
  * Reactive state management for logs functionality
  * Contains all reactive state variables used across logs components
@@ -92,17 +109,6 @@ export const searchState = () => {
   const store = useStore();
   const router = useRouter();
   // const { t } = useI18n();
-
-  // Main search object containing all search state
-  const searchObj = reactive(
-    Object.assign({}, DEFAULT_LOGS_CONFIG),
-  ) as SearchObject;
-
-  // Debug data for search operations
-  const searchObjDebug = reactive(Object.assign({}, DEFAULT_SEARCH_DEBUG_DATA));
-
-  // Aggregation data for search results
-  const searchAggData = reactive(Object.assign({}, DEFAULT_SEARCH_AGG_DATA));
 
   // Initial query payload reference
   const initialQueryPayload: Ref<SearchRequestPayload | null> = ref(null);
@@ -118,12 +124,6 @@ export const searchState = () => {
 
   // FTS (Full Text Search) fields
   const ftsFields: any = ref([]);
-
-  const histogramMappedData: any = [];
-
-  const histogramResults: any = [];
-
-  const searchPartitionMap = reactive<{ [key: string]: number }>({});
 
   /**
    * Initializes the logs state from cached store data.
