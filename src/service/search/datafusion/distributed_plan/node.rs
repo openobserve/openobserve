@@ -101,7 +101,7 @@ impl RemoteScanNodes {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RemoteScanNode {
     pub nodes: Vec<Arc<dyn NodeInfo>>,
     pub opentelemetry_context: opentelemetry::Context,
@@ -162,7 +162,7 @@ impl RemoteScanNode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SearchInfos {
     pub plan: Vec<u8>,
     pub file_id_list: Vec<Vec<i64>>,
