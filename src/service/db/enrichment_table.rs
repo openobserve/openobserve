@@ -25,8 +25,8 @@ use config::{
 use infra::{
     cache::stats,
     cluster_coordinator::{
-        events::{EnrichmentTableAction, EnrichmentTableEvent, InternalCoordinatorEvent},
-        publish, should_watch_through_queue,
+        events::{MetaAction, MetaEvent},
+        should_watch_through_queue,
     },
     db as infra_db,
 };
@@ -45,6 +45,7 @@ use crate::{
 pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
 pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
 pub const ENRICHMENT_TABLE_EVENTS_TOPIC: &str = "enrichment_table_events";
+pub const ENRICHMENT_TABLE_WATCH_KEY: &str = "/enrichment_table/";
 
 pub async fn get_enrichment_table_data(
     org_id: &str,
@@ -310,61 +311,33 @@ pub async fn delete_meta_table_stats(org_id: &str, name: &str) -> Result<(), inf
 }
 
 pub async fn notify_update(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
-    if !should_watch_through_queue() {
-        let cluster_coordinator = infra_db::get_coordinator().await;
-        let key: String = format!(
-            "/enrichment_table/{org_id}/{}/{}",
-            StreamType::EnrichmentTables,
-            name
-        );
-        cluster_coordinator.put(&key, "".into(), true, None).await?;
-    } else {
-        publish_event(EnrichmentTableEvent {
-            action: EnrichmentTableAction::Update,
-            org_id: org_id.to_string(),
-            name: name.to_string(),
-        })
-        .await?;
-    }
+    let cluster_coordinator = infra_db::get_coordinator().await;
+    let key: String = format!(
+        "{ENRICHMENT_TABLE_WATCH_KEY}{org_id}/{}/{name}",
+        StreamType::EnrichmentTables
+    );
+    cluster_coordinator.put(&key, "".into(), true, None).await?;
     Ok(())
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
-    if !should_watch_through_queue() {
-        let cluster_coordinator = infra_db::get_coordinator().await;
-        let key: String = format!(
-            "/enrichment_table/{org_id}/{}/{}",
-            StreamType::EnrichmentTables,
-            name
-        );
-        cluster_coordinator.delete(&key, false, true, None).await?;
-    } else {
-        publish_event(EnrichmentTableEvent {
-            action: EnrichmentTableAction::Delete,
-            org_id: org_id.to_string(),
-            name: name.to_string(),
-        })
-        .await?;
-    }
-    Ok(())
-}
-
-async fn publish_event(event: EnrichmentTableEvent) -> Result<(), infra::errors::Error> {
-    let name = event.name.clone();
-    let event = InternalCoordinatorEvent::EnrichmentTable(event);
-    publish(event).await?;
-    log::debug!("Published enrichment table event: {:?}", name);
+    let cluster_coordinator = infra_db::get_coordinator().await;
+    let key: String = format!(
+        "{ENRICHMENT_TABLE_WATCH_KEY}{org_id}/{}/{name}",
+        StreamType::EnrichmentTables
+    );
+    cluster_coordinator.delete(&key, false, true, None).await?;
     Ok(())
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     // For non-local mode, we use the nats queue to watch the enrichment table events.
     // Hence no need to watch the enrichment table events here.
-    if !should_watch_through_queue() {
+    if should_watch_through_queue() {
         return Ok(());
     }
 
-    let key = "/enrichment_table/";
+    let key = ENRICHMENT_TABLE_WATCH_KEY;
     let cluster_coordinator = infra_db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -379,19 +352,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             infra_db::Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                let keys = item_key.split('/').collect::<Vec<&str>>();
-                let org_id = keys[0];
-                let stream_name = keys[2];
-
-                let _ = handle_update(org_id, stream_name).await;
+                let _ = handle_update(&ev.key).await;
             }
             infra_db::Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                let keys = item_key.split('/').collect::<Vec<&str>>();
-                let org_id = keys[0];
-                let stream_name = keys[2];
-                let _ = handle_delete(org_id, stream_name).await;
+                let _ = handle_delete(&ev.key).await;
             }
             infra_db::Event::Empty => {}
         }
@@ -399,17 +363,18 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn handle_enrichment_table_event(
-    event: EnrichmentTableEvent,
-) -> Result<(), anyhow::Error> {
+pub async fn handle_enrichment_table_event(event: MetaEvent) -> Result<(), anyhow::Error> {
     match event.action {
-        EnrichmentTableAction::Update => handle_update(&event.org_id, &event.name).await,
-        EnrichmentTableAction::Delete => handle_delete(&event.org_id, &event.name).await,
+        MetaAction::Put => handle_update(&event.key).await,
+        MetaAction::Delete => handle_delete(&event.key).await,
     }
 }
 
-async fn handle_update(org_id: &str, stream_name: &str) -> Result<(), anyhow::Error> {
-    let item_key = format!("{org_id}/{}/{stream_name}", StreamType::EnrichmentTables);
+async fn handle_update(event_key: &str) -> Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(ENRICHMENT_TABLE_WATCH_KEY).unwrap();
+    let keys = item_key.split('/').collect::<Vec<&str>>();
+    let org_id = keys[0];
+    let stream_name = keys[2];
     let data = match super::super::enrichment::get_enrichment_table(org_id, stream_name).await {
         Ok(data) => data,
         Err(e) => {
@@ -438,9 +403,9 @@ async fn handle_update(org_id: &str, stream_name: &str) -> Result<(), anyhow::Er
     Ok(())
 }
 
-async fn handle_delete(org_id: &str, stream_name: &str) -> Result<(), anyhow::Error> {
-    let item_key = format!("{org_id}/{}/{stream_name}", StreamType::EnrichmentTables);
-    ENRICHMENT_TABLES.remove(&item_key);
+async fn handle_delete(event_key: &str) -> Result<(), anyhow::Error> {
+    let item_key = event_key.strip_prefix(ENRICHMENT_TABLE_WATCH_KEY).unwrap();
+    ENRICHMENT_TABLES.remove(item_key);
     log::debug!(
         "[ENRICHMENT::TABLE watch] Enrichment table deleted: {}",
         item_key

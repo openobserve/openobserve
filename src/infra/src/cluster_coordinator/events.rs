@@ -18,7 +18,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum InternalCoordinatorEvent {
-    EnrichmentTable(EnrichmentTableEvent),
     Meta(MetaEvent),
 }
 
@@ -33,18 +32,5 @@ pub struct MetaEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MetaAction {
     Put,
-    Delete,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EnrichmentTableEvent {
-    pub action: EnrichmentTableAction,
-    pub org_id: String,
-    pub name: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum EnrichmentTableAction {
-    Update,
     Delete,
 }
