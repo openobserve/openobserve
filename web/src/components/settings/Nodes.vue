@@ -378,8 +378,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <q-btn 
               :label="t('nodes.applyFilter')" 
-              class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm" 
-              color="secondary"
+              class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm o2-secondary-button tw-h-[36px]" 
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               @click="applyFilter()"
             >
             </q-btn>

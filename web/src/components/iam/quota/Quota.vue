@@ -629,7 +629,7 @@ export default defineComponent({
     const organizations = ref<any[]>([]);
     const isOrgLoading = ref<boolean>(false);
     const resultTotal = ref<number>(0);
-    const perPageOptions = ref<number[]>([10, 20, 50, 100]);
+    const perPageOptions = ref<number[]>([20, 50, 100, 250, 500]);
     const {
       getApiLimitsByOrganization,
       getRoleLimitsByOrganization,
