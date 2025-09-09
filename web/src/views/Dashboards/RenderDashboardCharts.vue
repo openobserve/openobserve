@@ -76,6 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardData?.tabs?.find((tab: any) => tab.tabId === selectedTabId)
               ?.name
           "
+          :dashboardName="dashboardName"
+          :folderName="folderName"
           @updated:data-zoom="$emit('updated:data-zoom', $event)"
           @onMovePanel="onMovePanel"
           @refreshPanelRequest="refreshPanelRequest"
@@ -131,6 +133,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (tab: any) => tab.tabId === selectedTabId,
                 )?.name
               "
+              :dashboardName="dashboardName"
+              :folderName="folderName"
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
               @onMovePanel="onMovePanel"
               @refreshPanelRequest="refreshPanelRequest"
@@ -250,6 +254,14 @@ export default defineComponent({
     runId: {
       type: String,
       default: null,
+    },
+    dashboardName: {
+      type: String,
+      default: "",
+    },
+    folderName: {
+      type: String,
+      default: "",
     },
   },
 
