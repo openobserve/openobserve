@@ -101,6 +101,8 @@ const histogramMappedData: any = [];
 
 const histogramResults: any = [];
 
+const initialQueryPayload: Ref<SearchRequestPayload | null> = ref(null);
+
 /**
  * Reactive state management for logs functionality
  * Contains all reactive state variables used across logs components
@@ -111,7 +113,6 @@ export const searchState = () => {
   // const { t } = useI18n();
 
   // Initial query payload reference
-  const initialQueryPayload: Ref<SearchRequestPayload | null> = ref(null);
 
   // Field schema index mapping
   const streamSchemaFieldsIndexMapping = ref<{ [key: string]: number }>({});
