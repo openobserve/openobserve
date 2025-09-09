@@ -257,6 +257,16 @@ pub async fn create_org(
     }
     org.name = org.name.trim().to_owned();
 
+    let has_valid_chars = org
+        .name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == ' ' || c == '_');
+    if !has_valid_chars {
+        return Err(anyhow::anyhow!(
+            "Only alphanumeric characters (A-Z, a-z, 0-9), spaces, and underscores are allowed"
+        ));
+    }
+
     org.identifier = ider::uuid();
     #[cfg(not(feature = "cloud"))]
     let org_type = CUSTOM.to_owned();
@@ -370,6 +380,15 @@ pub async fn rename_org(
     };
     if !is_allowed && !is_root_user(user_email) {
         return Err(anyhow::anyhow!("Not allowed to rename org"));
+    }
+
+    let has_valid_chars = name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == ' ' || c == '_');
+    if !has_valid_chars {
+        return Err(anyhow::anyhow!(
+            "Only alphanumeric characters (A-Z, a-z, 0-9), spaces, and underscores are allowed"
+        ));
     }
 
     if get_org(org_id).await.is_none() {
