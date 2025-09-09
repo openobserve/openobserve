@@ -79,16 +79,20 @@ where
         .consume(INTERNAL_COORDINATOR_STREAM)
         .await
         .unwrap_or_else(|_| {
-            panic!("failed to subscribe to topic \"{INTERNAL_COORDINATOR_STREAM}\"")
+            panic!("[INTERNAL_COORDINATOR::SUBSCRIBE] failed to subscribe to topic \"{INTERNAL_COORDINATOR_STREAM}\"")
         });
-    let receiver = Arc::get_mut(&mut receiver)
-        .unwrap_or_else(|| panic!("failed to get mutable reference to receiver"));
+    let receiver = Arc::get_mut(&mut receiver).unwrap_or_else(|| {
+        panic!("[INTERNAL_COORDINATOR::SUBSCRIBE] failed to get mutable reference to receiver")
+    });
     while let Some(message) = receiver.recv().await {
         if let Err(e) = callback(message.message().to_vec()).await {
-            log::error!("failed to process internal coordinator event: {}", e);
+            log::error!(
+                "[INTERNAL_COORDINATOR::SUBSCRIBE] failed to process internal coordinator event: {}",
+                e
+            );
         } else {
             message.ack().await.unwrap_or_else(|e| {
-                log::error!("failed to ack internal coordinator event: {}", e);
+                log::error!("[INTERNAL_COORDINATOR::SUBSCRIBE] failed to ack internal coordinator event: {}", e);
             });
         }
     }

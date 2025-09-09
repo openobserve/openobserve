@@ -85,6 +85,7 @@ pub async fn get_enrichment_table_data(
             if !res.hits.is_empty() {
                 Ok(res.hits)
             } else {
+                log::warn!("get enrichment table {}/{} data no hits", org_id, name);
                 Ok(vec![])
             }
         }
@@ -95,7 +96,9 @@ pub async fn get_enrichment_table_data(
                 name,
                 err
             );
-            Ok(vec![])
+            Err(anyhow::anyhow!(
+                "Failed to get enrichment table {org_id}/{name}: {err}"
+            ))
         }
     }
 }
