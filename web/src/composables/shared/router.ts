@@ -69,9 +69,6 @@ const PipelinesList = () => import("@/components/pipeline/PipelinesList.vue");
 
 const ImportPipeline = () => import("@/components/pipeline/ImportPipeline.vue");
 
-const ActionScipts = () =>
-  import("@/components/actionScripts/ActionScipts.vue");
-
 import useIngestionRoutes from "./useIngestionRoutes";
 import useEnterpriseRoutes from "./useEnterpriseRoutes";
 import config from "@/aws-exports";
