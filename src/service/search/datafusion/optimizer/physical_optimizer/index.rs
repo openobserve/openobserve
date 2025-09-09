@@ -145,6 +145,22 @@ impl IndexOptimizer {
                 .inverted_index_count_optimizer_enabled,
         }
     }
+
+    #[cfg(test)]
+    fn new_with_config(
+        index_fields: HashSet<String>,
+        index_condition: Arc<Mutex<Option<IndexCondition>>>,
+        is_remove_filter: bool,
+        optimizer_enabled: bool,
+    ) -> Self {
+        Self {
+            index_fields,
+            index_condition,
+            can_optimize: false,
+            is_remove_filter,
+            optimizer_enabled,
+        }
+    }
 }
 
 impl TreeNodeRewriter for IndexOptimizer {
@@ -280,223 +296,375 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
 mod tests {
     use std::{collections::HashSet, sync::Arc};
 
+    use arrow::array::{Int64Array, RecordBatch, StringArray};
+    use arrow_schema::{DataType, Field, FieldRef, Schema};
     use datafusion::{
+        catalog::MemTable,
         logical_expr::Operator,
         physical_expr::{
             PhysicalExpr,
             expressions::{BinaryExpr, Column, Literal},
         },
+        prelude::SessionContext,
         scalar::ScalarValue,
     };
 
-    use super::is_expr_valid_for_index;
+    use super::{is_expr_valid_for_index, *};
     use crate::service::search::{
-        datafusion::optimizer::physical_optimizer::utils::{
-            get_column_name, is_column, is_only_timestamp_filter, is_value,
+        datafusion::{
+            optimizer::physical_optimizer::utils::is_only_timestamp_filter,
+            udf::{
+                match_all_udf::{self, MATCH_ALL_UDF},
+                str_match_udf::{self, STR_MATCH_UDF},
+            },
         },
-        index::{Condition, IndexCondition},
+        index::Condition,
     };
 
-    // Helper function to create binary expression
-    fn create_binary_expr(
-        left: Arc<dyn PhysicalExpr>,
-        op: Operator,
-        right: Arc<dyn PhysicalExpr>,
-    ) -> Arc<dyn PhysicalExpr> {
-        Arc::new(BinaryExpr::new(left, op, right))
+    fn eq(left: Arc<dyn PhysicalExpr>, right: Arc<dyn PhysicalExpr>) -> Arc<dyn PhysicalExpr> {
+        Arc::new(BinaryExpr::new(left, Operator::Eq, right))
     }
 
-    // Helper function to create column expression
-    fn create_column_expr(name: &str) -> Arc<dyn PhysicalExpr> {
+    fn ne(left: Arc<dyn PhysicalExpr>, right: Arc<dyn PhysicalExpr>) -> Arc<dyn PhysicalExpr> {
+        Arc::new(BinaryExpr::new(left, Operator::NotEq, right))
+    }
+
+    fn gt(left: Arc<dyn PhysicalExpr>, right: Arc<dyn PhysicalExpr>) -> Arc<dyn PhysicalExpr> {
+        Arc::new(BinaryExpr::new(left, Operator::Gt, right))
+    }
+
+    fn lt(left: Arc<dyn PhysicalExpr>, right: Arc<dyn PhysicalExpr>) -> Arc<dyn PhysicalExpr> {
+        Arc::new(BinaryExpr::new(left, Operator::Lt, right))
+    }
+
+    fn column(name: &str) -> Arc<dyn PhysicalExpr> {
         Arc::new(Column::new(name, 0))
     }
 
-    // Helper function to create literal expression
-    fn create_literal_expr(value: ScalarValue) -> Arc<dyn PhysicalExpr> {
-        Arc::new(Literal::new(value))
+    fn literal(value: &str) -> Arc<dyn PhysicalExpr> {
+        Arc::new(Literal::new(ScalarValue::Utf8(Some(value.to_string()))))
     }
 
-    #[test]
-    fn test_is_expr_valid_for_index_binary_eq() {
-        let index_fields = HashSet::from(["name".to_string()]);
-
-        // Valid: name = 'test'
-        let name_col = create_column_expr("name");
-        let test_literal = create_literal_expr(ScalarValue::Utf8(Some("test".to_string())));
-        let eq_expr = create_binary_expr(name_col, Operator::Eq, test_literal.clone());
-
-        assert!(is_expr_valid_for_index(&eq_expr, &index_fields));
-
-        // Invalid: unknown_field = 'test'
-        let unknown_col = create_column_expr("unknown_field");
-        let unknown_eq_expr = create_binary_expr(unknown_col, Operator::Eq, test_literal);
-
-        assert!(!is_expr_valid_for_index(&unknown_eq_expr, &index_fields));
+    fn and(left: Arc<dyn PhysicalExpr>, right: Arc<dyn PhysicalExpr>) -> Arc<dyn PhysicalExpr> {
+        Arc::new(BinaryExpr::new(left, Operator::And, right))
     }
 
-    #[test]
-    fn test_is_expr_valid_for_index_binary_not_eq() {
-        let index_fields = HashSet::from(["age".to_string()]);
-
-        // Valid: age != 25
-        let age_col = create_column_expr("age");
-        let age_literal = create_literal_expr(ScalarValue::Int32(Some(25)));
-        let not_eq_expr = create_binary_expr(age_col, Operator::NotEq, age_literal);
-
-        assert!(is_expr_valid_for_index(&not_eq_expr, &index_fields));
+    fn or(left: Arc<dyn PhysicalExpr>, right: Arc<dyn PhysicalExpr>) -> Arc<dyn PhysicalExpr> {
+        Arc::new(BinaryExpr::new(left, Operator::Or, right))
     }
 
-    #[test]
-    fn test_is_expr_valid_for_index_binary_and() {
-        let index_fields = HashSet::from(["name".to_string(), "age".to_string()]);
-
-        // Valid: name = 'test' AND age = 25
-        let name_col = create_column_expr("name");
-        let name_literal = create_literal_expr(ScalarValue::Utf8(Some("test".to_string())));
-        let name_eq = create_binary_expr(name_col, Operator::Eq, name_literal);
-
-        let age_col = create_column_expr("age");
-        let age_literal = create_literal_expr(ScalarValue::Int32(Some(25)));
-        let age_eq = create_binary_expr(age_col, Operator::Eq, age_literal);
-
-        let and_expr = create_binary_expr(name_eq, Operator::And, age_eq);
-
-        assert!(is_expr_valid_for_index(&and_expr, &index_fields));
+    fn not(expr: Arc<dyn PhysicalExpr>) -> Arc<dyn PhysicalExpr> {
+        Arc::new(NotExpr::new(expr))
     }
 
-    #[test]
-    fn test_is_expr_valid_for_index_binary_or() {
-        let index_fields = HashSet::from(["name".to_string()]);
-
-        // Valid: name = 'test' OR name = 'other'
-        let name_col1 = create_column_expr("name");
-        let test_literal = create_literal_expr(ScalarValue::Utf8(Some("test".to_string())));
-        let name_eq1 = create_binary_expr(name_col1, Operator::Eq, test_literal.clone());
-
-        let name_col2 = create_column_expr("name");
-        let other_literal = create_literal_expr(ScalarValue::Utf8(Some("other".to_string())));
-        let name_eq2 = create_binary_expr(name_col2, Operator::Eq, other_literal);
-
-        let or_expr = create_binary_expr(name_eq1, Operator::Or, name_eq2);
-
-        assert!(is_expr_valid_for_index(&or_expr, &index_fields));
+    fn match_all(lit: &str) -> Arc<dyn PhysicalExpr> {
+        Arc::new(ScalarFunctionExpr::new(
+            MATCH_ALL_UDF_NAME,
+            Arc::new(MATCH_ALL_UDF.clone()),
+            vec![literal(lit)],
+            FieldRef::new(Field::new("name", DataType::Utf8, true)),
+        ))
     }
 
-    #[test]
-    fn test_is_expr_valid_for_index_invalid_operators() {
-        let index_fields = HashSet::from(["name".to_string()]);
-
-        // Invalid: name > 'test' (not supported for index)
-        let name_col = create_column_expr("name");
-        let test_literal = create_literal_expr(ScalarValue::Utf8(Some("test".to_string())));
-        let gt_expr = create_binary_expr(name_col, Operator::Gt, test_literal);
-
-        assert!(!is_expr_valid_for_index(&gt_expr, &index_fields));
+    fn str_match(field: &str, lit: &str) -> Arc<dyn PhysicalExpr> {
+        Arc::new(ScalarFunctionExpr::new(
+            STR_MATCH_UDF_NAME,
+            Arc::new(STR_MATCH_UDF.clone()),
+            vec![column(field), literal(lit)],
+            FieldRef::new(Field::new(field, DataType::Utf8, true)),
+        ))
     }
 
-    // Note: construct_filter_exec tests are skipped due to complex DataFusion setup requirements
-    // These would require proper FilterExec creation with valid schemas and expressions
-
-    #[test]
-    fn test_index_condition_from_physical_expr_equal() {
-        let name_col = create_column_expr("name");
-        let test_literal = create_literal_expr(ScalarValue::Utf8(Some("test".to_string())));
-        let eq_expr = create_binary_expr(name_col, Operator::Eq, test_literal);
-
-        let condition = Condition::from_physical_expr(&eq_expr);
-
-        match condition {
-            Condition::Equal(field, value) => {
-                assert_eq!(field, "name");
-                assert_eq!(value, "test");
-            }
-            _ => panic!("Expected Equal condition"),
-        }
-    }
-
-    #[test]
-    fn test_index_condition_from_physical_expr_not_equal() {
-        let age_col = create_column_expr("age");
-        let age_literal = create_literal_expr(ScalarValue::Utf8(Some("25".to_string())));
-        let not_eq_expr = create_binary_expr(age_col, Operator::NotEq, age_literal);
-
-        let condition = Condition::from_physical_expr(&not_eq_expr);
-
-        match condition {
-            Condition::NotEqual(field, value) => {
-                assert_eq!(field, "age");
-                assert_eq!(value, "25");
-            }
-            _ => panic!("Expected NotEqual condition"),
-        }
-    }
-
-    #[test]
-    fn test_index_condition_add_condition() {
-        let mut index_condition = IndexCondition::new();
-
-        let condition1 = Condition::Equal("name".to_string(), "test".to_string());
-        let condition2 = Condition::Equal("age".to_string(), "25".to_string());
-
-        index_condition.add_condition(condition1);
-        index_condition.add_condition(condition2);
-
-        assert!(!index_condition.is_empty());
-        assert_eq!(index_condition.conditions.len(), 2);
-    }
-
-    #[test]
-    fn test_index_condition_can_remove_filter() {
-        let mut index_condition = IndexCondition::new();
-
-        // With no conditions, should be able to remove filter (empty condition means all)
-        assert!(index_condition.can_remove_filter());
-
-        // With conditions, should be able to remove filter
-        let condition = Condition::Equal("name".to_string(), "test".to_string());
-        index_condition.add_condition(condition);
-        assert!(index_condition.can_remove_filter());
+    fn in_list(field: &str, list: Vec<&str>) -> Arc<dyn PhysicalExpr> {
+        Arc::new(InListExpr::new(
+            column(field),
+            list.iter().map(|lit| literal(lit)).collect(),
+            false,
+            None,
+        ))
     }
 
     #[test]
     fn test_is_only_timestamp_filter() {
         // Create timestamp filter expressions
-        let timestamp_col = create_column_expr("_timestamp");
-        let timestamp_literal = create_literal_expr(ScalarValue::Int64(Some(1234567890)));
-        let timestamp_gt = create_binary_expr(
-            timestamp_col.clone(),
-            Operator::Gt,
-            timestamp_literal.clone(),
-        );
-        let timestamp_lt = create_binary_expr(timestamp_col, Operator::Lt, timestamp_literal);
+        let timestamp_col = column("_timestamp");
+        let timestamp_literal = Arc::new(Literal::new(ScalarValue::Int64(Some(1234567890))));
+        let timestamp_gt = gt(timestamp_col.clone(), timestamp_literal.clone());
+        let timestamp_lt = lt(timestamp_col, timestamp_literal);
 
         let timestamp_filters = vec![&timestamp_gt, &timestamp_lt];
         assert!(is_only_timestamp_filter(&timestamp_filters));
 
         // Create non-timestamp filter
-        let name_col = create_column_expr("name");
-        let name_literal = create_literal_expr(ScalarValue::Utf8(Some("test".to_string())));
-        let name_eq = create_binary_expr(name_col, Operator::Eq, name_literal);
+        let name_col = column("name");
+        let name_literal = Arc::new(Literal::new(ScalarValue::Utf8(Some("test".to_string()))));
+        let name_eq = eq(name_col, name_literal);
 
         let mixed_filters = vec![&timestamp_gt, &name_eq];
         assert!(!is_only_timestamp_filter(&mixed_filters));
     }
 
     #[test]
-    fn test_utils_functions() {
-        // Test is_column
-        let name_col = create_column_expr("name");
-        assert!(is_column(&name_col));
+    fn test_is_expr_valid_for_index() {
+        let index_fields = HashSet::from(["name".to_string(), "id".to_string()]);
+        // PhysicalExpr, is_valid, Condition
+        let case = vec![
+            // name = 'test'
+            (
+                eq(column("name"), literal("test")),
+                true,
+                Some(Condition::Equal("name".to_string(), "test".to_string())),
+            ),
+            // name > 'test'
+            (gt(column("name"), literal("test")), false, None),
+            // name = 'bar' and match_all('error')
+            (
+                and(eq(column("name"), literal("bar")), match_all("error")),
+                true,
+                Some(Condition::And(
+                    Box::new(Condition::Equal("name".to_string(), "bar".to_string())),
+                    Box::new(Condition::MatchAll("error".to_string())),
+                )),
+            ),
+            // name = 'bar' or match_all('error')
+            (
+                or(eq(column("name"), literal("bar")), match_all("error")),
+                true,
+                Some(Condition::Or(
+                    Box::new(Condition::Equal("name".to_string(), "bar".to_string())),
+                    Box::new(Condition::MatchAll("error".to_string())),
+                )),
+            ),
+            // not(name = 'bar') and match_all('error') and str_match('name', 'test')
+            (
+                and(
+                    not(eq(column("name"), literal("bar"))),
+                    and(match_all("error"), str_match("name", "test")),
+                ),
+                true,
+                Some(Condition::And(
+                    Box::new(Condition::Not(Box::new(Condition::Equal(
+                        "name".to_string(),
+                        "bar".to_string(),
+                    )))),
+                    Box::new(Condition::And(
+                        Box::new(Condition::MatchAll("error".to_string())),
+                        Box::new(Condition::StrMatch(
+                            "name".to_string(),
+                            "test".to_string(),
+                            true,
+                        )),
+                    )),
+                )),
+            ),
+            // name != 'bar' and match_all('error') and str_match('name', 'test')
+            (
+                and(
+                    ne(column("name"), literal("bar")),
+                    and(match_all("error"), str_match("name", "test")),
+                ),
+                true,
+                Some(Condition::And(
+                    Box::new(Condition::NotEqual("name".to_string(), "bar".to_string())),
+                    Box::new(Condition::And(
+                        Box::new(Condition::MatchAll("error".to_string())),
+                        Box::new(Condition::StrMatch(
+                            "name".to_string(),
+                            "test".to_string(),
+                            true,
+                        )),
+                    )),
+                )),
+            ),
+            // name in ('bar', 'test') and match_all('error')
+            (
+                and(in_list("name", vec!["bar", "test"]), match_all("error")),
+                true,
+                Some(Condition::And(
+                    Box::new(Condition::In(
+                        "name".to_string(),
+                        vec!["bar".to_string(), "test".to_string()],
+                        false,
+                    )),
+                    Box::new(Condition::MatchAll("error".to_string())),
+                )),
+            ),
+            // status = 'test'
+            (eq(column("status"), literal("test")), false, None),
+        ];
 
-        let test_literal = create_literal_expr(ScalarValue::Utf8(Some("test".to_string())));
-        assert!(!is_column(&test_literal));
+        for (expr, is_valid, condition) in case {
+            if is_valid {
+                assert!(is_expr_valid_for_index(&expr, &index_fields));
+            } else {
+                assert!(!is_expr_valid_for_index(&expr, &index_fields));
+            }
+            if let Some(condition) = condition {
+                assert_eq!(Condition::from_physical_expr(&expr), condition);
+            }
+        }
+    }
 
-        // Test get_column_name
-        assert_eq!(get_column_name(&name_col), "name");
-        assert_eq!(get_column_name(&test_literal), "__o2_unknown_column__");
+    #[tokio::test]
+    async fn test_index_optimizer_optimizer_enabled() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("id", DataType::Utf8, false),
+            Field::new("status", DataType::Utf8, false),
+        ]));
 
-        // Test is_value
-        assert!(!is_value(&name_col));
-        assert!(is_value(&test_literal));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1])),
+                Arc::new(StringArray::from(vec!["openobserve"])),
+                Arc::new(StringArray::from(vec!["1"])),
+                Arc::new(StringArray::from(vec!["success"])),
+            ],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+        ctx.register_udf(str_match_udf::STR_MATCH_UDF.clone());
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        // sql, can_optimizer, except_condition
+        let cases = vec![
+            (
+                "SELECT count(*) from t where name = 'openobserve' and _timestamp > 1715395200000",
+                true,
+                Some(IndexCondition {
+                    conditions: vec![Condition::Equal(
+                        "name".to_string(),
+                        "openobserve".to_string(),
+                    )],
+                }),
+            ),
+            (
+                "SELECT count(*) from t where (name = 'openobserve' or match_all('error')) and _timestamp > 1715395200000",
+                true,
+                Some(IndexCondition {
+                    conditions: vec![Condition::Or(
+                        Box::new(Condition::Equal(
+                            "name".to_string(),
+                            "openobserve".to_string(),
+                        )),
+                        Box::new(Condition::MatchAll("error".to_string())),
+                    )],
+                }),
+            ),
+            (
+                "SELECT count(*) from t where status = 'openobserve' or match_all('error') and _timestamp > 1715395200000",
+                false,
+                None,
+            ),
+        ];
+
+        for (sql, can_optimizer, except_condition) in cases {
+            let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+            let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+            let index_fields = HashSet::from(["name".to_string(), "id".to_string()]);
+            let index_condition = Arc::new(Mutex::new(None));
+            let is_remove_filter = true;
+            let optimizer_enabled = true;
+            let mut rewriter = IndexOptimizer::new_with_config(
+                index_fields,
+                index_condition.clone(),
+                is_remove_filter,
+                optimizer_enabled,
+            );
+            let _physical_plan = physical_plan.rewrite(&mut rewriter).unwrap().data;
+
+            assert_eq!(index_condition.lock().clone(), except_condition);
+            assert_eq!(rewriter.can_optimize, can_optimizer);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_index_optimizer_remove_filter_disabled() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("id", DataType::Utf8, false),
+            Field::new("status", DataType::Utf8, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1])),
+                Arc::new(StringArray::from(vec!["openobserve"])),
+                Arc::new(StringArray::from(vec!["1"])),
+                Arc::new(StringArray::from(vec!["success"])),
+            ],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+        ctx.register_udf(str_match_udf::STR_MATCH_UDF.clone());
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        // sql, can_optimizer, except_condition
+        let cases = vec![
+            (
+                "SELECT count(*) from t where name = 'openobserve' and _timestamp > 1715395200000",
+                true,
+                Some(IndexCondition {
+                    conditions: vec![Condition::Equal(
+                        "name".to_string(),
+                        "openobserve".to_string(),
+                    )],
+                }),
+            ),
+            (
+                "SELECT count(*) from t where (name = 'openobserve' or match_all('error')) and _timestamp > 1715395200000",
+                true,
+                Some(IndexCondition {
+                    conditions: vec![Condition::Or(
+                        Box::new(Condition::Equal(
+                            "name".to_string(),
+                            "openobserve".to_string(),
+                        )),
+                        Box::new(Condition::MatchAll("error".to_string())),
+                    )],
+                }),
+            ),
+            (
+                "SELECT count(*) from t where _timestamp > 1715395200000",
+                true,
+                None,
+            ),
+            (
+                "SELECT count(*) from t where match_all('response node') and _timestamp > 1715395200000",
+                false,
+                Some(IndexCondition {
+                    conditions: vec![Condition::MatchAll("response node".to_string())],
+                }),
+            ),
+        ];
+
+        for (sql, can_optimizer, except_condition) in cases {
+            let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+            let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+            let index_fields = HashSet::from(["name".to_string(), "id".to_string()]);
+            let index_condition = Arc::new(Mutex::new(None));
+            let is_remove_filter = false;
+            let optimizer_enabled = true;
+            let mut rewriter = IndexOptimizer::new_with_config(
+                index_fields,
+                index_condition.clone(),
+                is_remove_filter,
+                optimizer_enabled,
+            );
+            let _physical_plan = physical_plan.rewrite(&mut rewriter).unwrap().data;
+
+            assert_eq!(index_condition.lock().clone(), except_condition);
+            assert_eq!(rewriter.can_optimize, can_optimizer);
+        }
     }
 }

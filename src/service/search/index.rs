@@ -35,7 +35,6 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use hashbrown::HashSet;
-use serde::{Deserialize, Serialize};
 use sqlparser::ast::{
     BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, UnaryOperator,
 };
@@ -88,7 +87,7 @@ pub fn get_index_condition_from_expr(
 }
 
 // note the condition in IndexCondition is connection by AND operator
-#[derive(Default, Clone, Serialize, Deserialize, Hash)]
+#[derive(Default, Clone, Hash, Eq, PartialEq)]
 pub struct IndexCondition {
     pub conditions: Vec<Condition>,
 }
@@ -239,7 +238,7 @@ impl IndexCondition {
 }
 
 // single condition
-#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum Condition {
     // field, value
     Equal(String, String),
@@ -940,7 +939,7 @@ fn get_physical_value(expr: &Arc<dyn PhysicalExpr>) -> String {
             ScalarValue::LargeUtf8(Some(s)) => s.clone(),
             ScalarValue::Utf8View(Some(s)) => s.clone(),
             ScalarValue::Binary(Some(b)) => String::from_utf8_lossy(b).to_string(),
-            _ => unimplemented!(),
+            _ => unimplemented!("get_physical_value not support {:?}", literal),
         }
     } else {
         unreachable!()
