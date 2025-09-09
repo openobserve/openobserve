@@ -1403,7 +1403,7 @@ export class LogsPage {
 
     async getQueryEditorText() {
         return await this.page.evaluate((selector) => {
-            const editor = document.querySelector(selector).querySelector('.monaco-editor');
+            const editor = document.querySelector(selector).querySelector('.monaco-editor').querySelector('.view-lines');
             return editor ? editor.textContent : null;
         }, this.queryEditor);
     }
@@ -1622,7 +1622,7 @@ export class LogsPage {
     }
 
     async clickVrlEditor() {
-        return await this.page.locator(this.vrlEditor).first().locator('.inputarea').fill('.a=2');
+        return await this.page.locator(this.vrlEditor).locator('.inputarea').fill('.a=2');
     }
 
     async waitForTimeout(milliseconds) {
