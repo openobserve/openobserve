@@ -89,9 +89,10 @@ impl Stream for FlightDecoderStream {
                 }
                 Some(Err(e)) => {
                     log::error!(
-                        "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {e:?}, took: {} ms",
+                        "[trace_id {}] flight->search: response node: {}, name: {}, is_super: {}, is_querier: {}, err: {e:?}, took: {} ms",
                         self.query_context.trace_id,
                         self.query_context.node.get_grpc_addr(),
+                        self.query_context.node.get_name(),
                         self.query_context.is_super,
                         self.query_context.is_querier,
                         self.query_context.start.elapsed().as_millis(),
@@ -143,14 +144,11 @@ impl Drop for FlightDecoderStream {
             "{}",
             search_inspector_fields(
                 format!(
-                    "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
-                    trace_id,
+                    "[trace_id {trace_id}] flight->search: response node: {}, name: {}, is_super: {is_super}, is_querier: {is_querier}, files: {}, scan_size: {} mb, num_rows: {num_rows}, took: {} ms",
                     node.get_grpc_addr(),
-                    is_super,
-                    is_querier,
+                    node.get_name(),
                     scan_stats.files,
                     scan_stats.original_size / 1024 / 1024,
-                    num_rows,
                     start.elapsed().as_millis(),
                 ),
                 SearchInspectorFieldsBuilder::new()
