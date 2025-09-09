@@ -165,15 +165,6 @@ export default class DashboardFilter {
     //   .first()
     //   .click();
 
-    // Wait for the suggestion list to appear and select the first suggestion
-    // const suggestion = await this.page.locator(
-    //   'div.q-menu[role="listbox"] div.q-item'
-    // );
-    // await suggestion.waitFor({ state: "visible", timeout: 10000 });
-    // const firstSuggestion = suggestion.first();
-    // await firstSuggestion.waitFor({ state: "visible", timeout: 10000 });
-    // await firstSuggestion.click();
-
     // Step 3: Open the condition selector
     if (operator || value) {
       // Target the most recent (last) visible portal to avoid strict mode violation
