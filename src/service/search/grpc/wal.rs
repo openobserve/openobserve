@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 
 use arrow::array::{ArrayRef, new_null_array};
 use config::{
@@ -526,7 +526,7 @@ async fn get_file_list_inner(
     wal_dir: &str,
     file_ext: &str,
 ) -> Result<Vec<FileKey>, Error> {
-    let wal_dir = match Path::new(wal_dir).canonicalize() {
+    let wal_dir = match tokio::fs::canonicalize(wal_dir).await {
         Ok(path) => {
             let mut path = path.to_str().unwrap().to_string();
             // Hack for windows
