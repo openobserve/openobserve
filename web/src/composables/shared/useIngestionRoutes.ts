@@ -111,6 +111,9 @@ const useIngestionRoutes = () => {
       path: "ingestion",
       name: "ingestion",
       component: Ingestion,
+      meta:{
+        title: "Ingestion",
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
