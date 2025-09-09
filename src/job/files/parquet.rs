@@ -117,7 +117,7 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
+    let wal_dir = tokio::fs::canonicalize(&cfg.common.data_wal_dir).await?;
     let pending_delete_files = db::file_list::local::get_pending_delete().await;
     let files_num = pending_delete_files.len();
     for file_key in pending_delete_files {
@@ -175,7 +175,7 @@ async fn scan_wal_files(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
+    let wal_dir = tokio::fs::canonicalize(&cfg.common.data_wal_dir).await?;
     let pattern = wal_dir.join("files/");
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<String>>(1);
@@ -239,13 +239,13 @@ async fn prepare_files(
     files: Vec<String>,
 ) -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Error> {
     let cfg = get_config();
-    let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
+    let wal_dir = tokio::fs::canonicalize(&cfg.common.data_wal_dir).await?;
 
     // do partition by partition key
     let mut partition_files_with_size: FxIndexMap<String, Vec<FileKey>> = FxIndexMap::default();
     for file in files {
         let file_key = {
-            let file = match Path::new(&file).canonicalize() {
+            let file = match tokio::fs::canonicalize(&file).await {
                 Ok(v) => v,
                 Err(_) => {
                     continue;
@@ -313,7 +313,7 @@ async fn move_files(
     }
 
     let cfg = get_config();
-    let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
+    let wal_dir = tokio::fs::canonicalize(&cfg.common.data_wal_dir).await?;
     let (org_id, stream_type, stream_name, prefix_date) = split_perfix(prefix);
 
     // check if we are allowed to ingest or just delete the file

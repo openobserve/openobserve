@@ -121,15 +121,21 @@ pub async fn scan_files_with_channel(
 ) -> Result<(), std::io::Error> {
     let limit = limit.unwrap_or_default();
     let mut files = Vec::with_capacity(std::cmp::max(16, limit));
-    let dir = std::fs::read_dir(root).map_err(|e| {
+    let mut dir = tokio::fs::read_dir(root).await.map_err(|e| {
         std::io::Error::other(format!(
             "Error reading directory: {}, err: {}",
             root.display(),
             e
         ))
     })?;
-    for entry in dir {
-        let path = entry?.path();
+    while let Some(entry) = dir.next_entry().await.map_err(|e| {
+        std::io::Error::other(format!(
+            "Error reading directory entry: {}, err: {}",
+            root.display(),
+            e
+        ))
+    })? {
+        let path = entry.path();
         if !path.is_file() {
             scan_files_with_channel(&path, ext, Some(limit), tx.clone()).await?;
         } else {
