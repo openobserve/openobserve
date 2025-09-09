@@ -54,7 +54,7 @@ use crate::service::{
             },
             exec::{DataFusionContextBuilder, register_udf},
             optimizer::physical_optimizer::{
-                index::IndexRule, index_optimizer::FollowerIndexOptimizerule,
+                index::IndexRule, index_optimizer::FollowerIndexOptimizerRule,
                 rewrite_match::RewriteMatchPhysical,
             },
             table_provider::{enrich_table::EnrichTable, uniontable::NewUnionTable},
@@ -511,7 +511,7 @@ fn optimizer_physical_plan(
         && index_rule.can_optimize()
     {
         let index_optimizer_rule =
-            FollowerIndexOptimizerule::new(time_range, index_optimizer_rule_ref.clone());
+            FollowerIndexOptimizerRule::new(time_range, index_optimizer_rule_ref.clone());
         plan = index_optimizer_rule.optimize(plan, ctx.state().config_options())?;
     }
 

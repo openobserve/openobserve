@@ -50,12 +50,12 @@ use crate::service::search::datafusion::{
 /// NOTE: use this optimizer in follower only when all filter
 /// can be extract to index condition(except _timestamp filter)
 #[derive(Default, Debug)]
-pub struct FollowerIndexOptimizerule {
+pub struct FollowerIndexOptimizerRule {
     time_range: (i64, i64),
     index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
 }
 
-impl FollowerIndexOptimizerule {
+impl FollowerIndexOptimizerRule {
     pub fn new(
         time_range: (i64, i64),
         index_optimizer_mode: Arc<Mutex<Option<IndexOptimizeMode>>>,
@@ -67,7 +67,7 @@ impl FollowerIndexOptimizerule {
     }
 }
 
-impl PhysicalOptimizerRule for FollowerIndexOptimizerule {
+impl PhysicalOptimizerRule for FollowerIndexOptimizerRule {
     fn optimize(
         &self,
         plan: Arc<dyn ExecutionPlan>,
@@ -143,17 +143,17 @@ impl TreeNodeRewriter for FollowerIndexOptimizer {
 /// this is used for optimizer that need global information
 /// like order and limit
 #[derive(Default, Debug)]
-pub struct LeaderIndexOptimizerule {
+pub struct LeaderIndexOptimizerRule {
     index_fields: HashSet<String>,
 }
 
-impl LeaderIndexOptimizerule {
+impl LeaderIndexOptimizerRule {
     pub fn new(index_fields: HashSet<String>) -> Self {
         Self { index_fields }
     }
 }
 
-impl PhysicalOptimizerRule for LeaderIndexOptimizerule {
+impl PhysicalOptimizerRule for LeaderIndexOptimizerRule {
     fn optimize(
         &self,
         plan: Arc<dyn ExecutionPlan>,

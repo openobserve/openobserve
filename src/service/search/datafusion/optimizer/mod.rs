@@ -58,7 +58,7 @@ use crate::service::search::{
         },
         physical_optimizer::{
             distribute_analyze::optimize_distribute_analyze,
-            index_optimizer::LeaderIndexOptimizerule, join_reorder::JoinReorderRule,
+            index_optimizer::LeaderIndexOptimizerRule, join_reorder::JoinReorderRule,
             remote_scan::generate_remote_scan_rules,
         },
     },
@@ -210,7 +210,7 @@ pub fn generate_physical_optimizer_rules(
                 }
             })
             .collect();
-        rules.push(Arc::new(LeaderIndexOptimizerule::new(index_fields)) as _);
+        rules.push(Arc::new(LeaderIndexOptimizerRule::new(index_fields)) as _);
     }
 
     rules
