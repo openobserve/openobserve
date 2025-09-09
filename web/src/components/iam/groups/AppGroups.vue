@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <app-table
         data-test="iam-groups-table-section"
         class="iam-table o2-quasar-app-table o2-quasar-table-header-sticky"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-app-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-app-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
+        :class="store.state.theme == 'dark' ? 'o2-quasar-app-table-dark o2-quasar-table-header-sticky-dark' : 'o2-quasar-app-table-light o2-quasar-table-header-sticky-light'"
         :tableStyle="hasVisibleRows ? 'height: calc(100vh - 114px); overflow-y: auto;' : ''"
         :rows="visibleRows"
         :columns="columns"
