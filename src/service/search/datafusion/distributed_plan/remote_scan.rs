@@ -249,6 +249,7 @@ async fn get_remote_batch(
             trace_id,
             schema,
             node.get_grpc_addr(),
+            node.get_name(),
             is_querier,
             partial_err,
             tonic::Status::new(tonic::Code::Ok, ""),
@@ -313,6 +314,7 @@ async fn get_remote_batch(
                 trace_id,
                 schema,
                 node.get_grpc_addr(),
+                node.get_name(),
                 is_querier,
                 partial_err,
                 e,
@@ -351,6 +353,7 @@ async fn get_remote_batch(
                     trace_id,
                     schema,
                     node.get_grpc_addr(),
+                    node.get_name(),
                     is_querier,
                     partial_err,
                     e,
@@ -358,9 +361,10 @@ async fn get_remote_batch(
                 ));
             }
             log::error!(
-                "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
+                "[trace_id {}] flight->search: response node: {}, name: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
                 trace_id,
                 node.get_grpc_addr(),
+                node.get_name(),
                 is_super,
                 is_querier,
                 e,
@@ -372,9 +376,10 @@ async fn get_remote_batch(
     .into_inner();
 
     log::info!(
-        "[trace_id {}] flight->search: prepare to response node: {}, is_super: {}, is_querier: {}",
+        "[trace_id {}] flight->search: prepare to response node: {} , name: {}, is_super: {}, is_querier: {}",
         trace_id,
         &node.get_grpc_addr(),
+        node.get_name(),
         is_super,
         is_querier,
     );
@@ -384,9 +389,10 @@ async fn get_remote_batch(
         Ok(Some(flight_data)) => flight_data,
         Ok(None) => {
             log::error!(
-                "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {}, took: {} ms",
+                "[trace_id {}] flight->search: response node: {} , name: {}, is_super: {}, is_querier: {}, err: {}, took: {} ms",
                 trace_id,
                 node.get_grpc_addr(),
+                node.get_name(),
                 is_super,
                 is_querier,
                 "No schema returned",
@@ -400,6 +406,7 @@ async fn get_remote_batch(
                     trace_id,
                     schema,
                     node.get_grpc_addr(),
+                    node.get_name(),
                     is_querier,
                     partial_err,
                     e,
@@ -424,9 +431,10 @@ async fn get_remote_batch(
         Ok(schema) => Arc::new(schema),
         Err(e) => {
             log::error!(
-                "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
+                "[trace_id {}] flight->search: response node: {}, name: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
                 trace_id,
                 node.get_grpc_addr(),
+                node.get_name(),
                 is_super,
                 is_querier,
                 e,
@@ -461,10 +469,12 @@ async fn get_remote_batch(
     )))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn get_empty_record_batch_stream(
     trace_id: String,
     schema: SchemaRef,
     node_addr: String,
+    node_name: String,
     is_querier: bool,
     partial_err: Arc<Mutex<String>>,
     e: tonic::Status,
@@ -472,9 +482,10 @@ fn get_empty_record_batch_stream(
 ) -> SendableRecordBatchStream {
     if e.code() != tonic::Code::Ok {
         log::info!(
-            "[trace_id {}] flight->search: response node: {}, is_querier: {}, err: {:?}, took: {} ms",
+            "[trace_id {}] flight->search: response node: {}, name: {}, is_querier: {}, err: {:?}, took: {} ms",
             trace_id,
             node_addr,
+            node_name,
             is_querier,
             e,
             start.elapsed().as_millis(),
@@ -578,9 +589,10 @@ impl FlightStream {
                 };
                 let event = search_inspector_fields(
                     format!(
-                        "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
+                        "[trace_id {}] flight->search: response node: {} , name: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
                         self.trace_id,
                         self.node.get_grpc_addr(),
+                        self.node.get_name(),
                         self.is_super,
                         self.is_querier,
                         self.files,
@@ -626,9 +638,10 @@ impl Stream for FlightStream {
         if self.start.elapsed().as_secs() > self.timeout {
             let e = tonic::Status::new(tonic::Code::DeadlineExceeded, "timeout");
             log::error!(
-                "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
+                "[trace_id {}] flight->search: response node: {} , name: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
                 self.trace_id,
                 self.node.get_grpc_addr(),
+                self.node.get_name(),
                 self.is_super,
                 self.is_querier,
                 e,
@@ -653,9 +666,10 @@ impl Stream for FlightStream {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Some(Err(e))) => {
                 log::error!(
-                    "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
+                    "[trace_id {}] flight->search: response node: {} , name: {}, is_super: {}, is_querier: {}, err: {:?}, took: {} ms",
                     self.trace_id,
                     self.node.get_grpc_addr(),
+                    self.node.get_name(),
                     self.is_super,
                     self.is_querier,
                     e,
@@ -677,9 +691,10 @@ impl Drop for FlightStream {
             log::error!("error creating stream span: {e}");
         }
         log::info!(
-            "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
+            "[trace_id {}] flight->search: response node: {} , name: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
             self.trace_id,
             self.node.get_grpc_addr(),
+            self.node.get_name(),
             self.is_super,
             self.is_querier,
             self.files,
