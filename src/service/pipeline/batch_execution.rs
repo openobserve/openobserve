@@ -902,6 +902,7 @@ async fn process_node(
                 let PipelineItem {
                     mut record,
                     flattened,
+                    ..
                 } = pipeline_item;
                 // handle timestamp before sending to remote_write service
                 if !flattened {
