@@ -247,6 +247,7 @@ async fn get_remote_batch(
     let is_querier = node.is_querier();
     let is_ingester = node.is_ingester();
     let grpc_addr = node.get_grpc_addr();
+    let node_name = node.get_name();
     let search_type = remote_scan_node
         .super_cluster_info
         .search_event_type
@@ -288,7 +289,7 @@ async fn get_remote_batch(
     request.query_identifier.enrich_mode = enrich_mode;
 
     log::info!(
-        "[trace_id {trace_id}] flight->search: request node: {grpc_addr}, query_type: {}, is_super: {is_super}, is_querier: {is_querier}, timeout: {timeout}, files: {}",
+        "[trace_id {trace_id}] flight->search: request node: {grpc_addr}, name: {node_name}, query_type: {}, is_super: {is_super}, is_querier: {is_querier}, timeout: {timeout}, files: {}",
         search_type.unwrap_or(SearchEventType::UI),
         request.search_info.file_id_list.len(),
     );
@@ -310,7 +311,7 @@ async fn get_remote_batch(
     };
 
     log::info!(
-        "[trace_id {trace_id}] flight->search: prepare to request node: {grpc_addr}, is_super: {is_super}, is_querier: {is_querier}",
+        "[trace_id {trace_id}] flight->search: prepare to request node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}",
     );
 
     let stream = match client.do_get(request).await {
@@ -320,7 +321,7 @@ async fn get_remote_batch(
                 return Ok(get_empty_stream(empty_stream.with_error(e)));
             }
             log::error!(
-                "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
+                "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
                 start.elapsed().as_millis(),
             );
             return Err(DataFusionError::Execution(e.to_string()));
@@ -329,7 +330,7 @@ async fn get_remote_batch(
     .into_inner();
 
     log::info!(
-        "[trace_id {trace_id}] flight->search: prepare to response node: {grpc_addr}, is_super: {is_super}, is_querier: {is_querier}",
+        "[trace_id {trace_id}] flight->search: prepare to response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}",
     );
 
     let query_context = QueryContext::new(node)
@@ -357,7 +358,7 @@ async fn get_remote_batch(
                 _ = &mut timeout => {
                     let e = tonic::Status::new(tonic::Code::DeadlineExceeded, "timeout");
                     log::error!(
-                        "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
+                        "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
                         start.elapsed().as_millis(),
                     );
                     process_partial_err(partial_err, e);
