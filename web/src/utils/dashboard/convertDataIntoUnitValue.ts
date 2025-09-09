@@ -1575,6 +1575,25 @@ export const calculateRightLegendWidth = (
   // Total width reserved for legends
   const totalLegendWidth = cols * perColumnWidth + HORIZONTAL_PADDING * 2;
 
-  // Allow using up to 80% of chart width to fully show legends
-  return Math.min(totalLegendWidth, Math.floor(chartWidth * 0.8));
+  // Apply constraint: max 80% of chart width to ensure chart remains visible
+  const maxAllowedWidth = chartWidth * 0.8;
+  return Math.min(totalLegendWidth, maxAllowedWidth);
+};
+
+/**
+ * Calculates the available container width for chart positioning after accounting for legends
+ * @param {number} totalWidth - Total width of the chart container (green outlined section)
+ * @param {number} legendWidth - Width taken by the legend
+ * @param {string} legendPosition - Position of the legend ('right', 'bottom', null)
+ * @returns {number} Available width for chart container positioning
+ */
+export const calculateChartContainerWidth = (
+  totalWidth: number,
+  legendWidth: number = 0,
+  legendPosition: string | null = null,
+): number => {
+  if (legendPosition === "right") {
+    return totalWidth - legendWidth;
+  }
+  return totalWidth;
 };
