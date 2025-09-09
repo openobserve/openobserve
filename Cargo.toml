@@ -14,7 +14,7 @@ keywords = [
     "open-source",
     "opensource",
 ]
-license = "AGPL-3.0"
+license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
 version = "0.15.0"
@@ -22,9 +22,14 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = []
-enterprise = []
-cloud = []
+default = ["enterprise"]
+enterprise = [
+    "dep:o2_enterprise",
+    "dep:o2_openfga",
+    "dep:o2_dex",
+    "dep:o2_ratelimit",
+]
+cloud = ["infra/cloud", "enterprise", "o2_enterprise/cloud"]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = ["dep:pprof"]
@@ -102,12 +107,17 @@ hashlink.workspace = true
 hashbrown.workspace = true
 hex.workspace = true
 http-auth-basic = "0.3"
+ipnetwork.workspace = true
 itertools.workspace = true
 jsonwebtoken = "9.3"
 log.workspace = true
 maxminddb = "0.25"
 memchr.workspace = true
 mimalloc = { version = "0.1.43", default-features = false, optional = true }
+o2_dex = { version = "0.1.0", path = "../o2-enterprise/o2_dex", optional = true }
+o2_enterprise = { version = "0.1.0", path = "../o2-enterprise/o2_enterprise", optional = true, default-features = false }
+o2_openfga = { version = "0.1.0", path = "../o2-enterprise/o2_openfga", optional = true }
+o2_ratelimit = { version = "0.1.0", path = "../o2-enterprise/o2_ratelimit", optional = true }
 once_cell.workspace = true
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
@@ -141,6 +151,7 @@ snap.workspace = true
 sqlparser.workspace = true
 strum.workspace = true
 svix-ksuid.workspace = true
+syslog_loose = "0.21"
 thiserror.workspace = true
 time.workspace = true
 tikv-jemallocator = { version = "0.6", optional = true }
@@ -280,6 +291,7 @@ hashlink = "0.10"
 hashbrown = { version = "0.15", features = ["serde"] }
 hex = "0.4"
 indexmap = { version = "2.7", features = ["serde"] }
+ipnetwork = "0.20"
 itertools = "0.13"
 lettre = { version = "0.11", default-features = false, features = [
     "builder",
