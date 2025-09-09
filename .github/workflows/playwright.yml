@@ -164,14 +164,13 @@ jobs:
           #     ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
-            run_files:
-              [
+            run_files: [
                 "dashboard-filter.spec.js",
                 # "dashboard-general-setting.spec.js",
                 # "dashboard-tabs-setting.spec.js",
                 # "dashboard-variables-setting.spec.js",
                 # "dashboard-transpose.spec.js",
-          #     ]
+              ]
           # - testfolder: "Dashboards-Charts"
           #   browser: "chrome"
           #   run_files: [
