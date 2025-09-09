@@ -37,9 +37,10 @@ export default class DashboardFilter {
 
     // Step 3: Open the condition selector
     if (operator || value) {
-      const conditionLocator = this.page.locator(
-        `[data-test="dashboard-add-condition-condition-${idx}"]`
-      );
+      // Target the most recent (last) visible portal to avoid strict mode violation
+      const conditionLocator = this.page
+        .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
+        .last();
       await conditionLocator.waitFor({ state: "visible" });
       await conditionLocator.click(); // double click for stability
     }
@@ -200,9 +201,10 @@ export default class DashboardFilter {
 
     // Step 3: Condition dropdown
     if (operator || value) {
-      const conditionLocator = this.page.locator(
-        `[data-test="dashboard-add-condition-condition-${idx}"]`
-      );
+      // Target the most recent (last) visible portal to avoid strict mode violation
+      const conditionLocator = this.page
+        .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
+        .last();
 
       // Wait until visible
       await conditionLocator.waitFor({ state: "visible", timeout: 5000 });
