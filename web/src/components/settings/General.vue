@@ -119,7 +119,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('dashboard.save')"
               class="q-mb-md o2-primary-button no-border tw-h-[36px]"
               :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-              @click="onSubmit.execute"
               type="submit"
               no-caps
               size="md"
