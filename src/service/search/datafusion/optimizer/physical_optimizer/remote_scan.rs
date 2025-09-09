@@ -174,7 +174,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
         if node.name() == "RepartitionExec" || node.name() == "CoalescePartitionsExec" {
             let mut visitor = TableNameVisitor::new();
             node.visit(&mut visitor)?;
-            if visitor.is_remote_scan {
+            if !visitor.has_remote_scan {
                 let table_name = visitor.table_name.clone().unwrap();
                 let input = node.children()[0];
                 let remote_scan = Arc::new(RemoteScanExec::new(
@@ -192,7 +192,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
         } else if node.name() == "SortPreservingMergeExec" {
             let mut visitor = TableNameVisitor::new();
             node.visit(&mut visitor)?;
-            if visitor.is_remote_scan {
+            if !visitor.has_remote_scan {
                 let table_name = visitor.table_name.clone().unwrap();
                 let follow_merge_node = node.clone();
                 let new_input =
@@ -210,7 +210,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             let mut visitor = TableNameVisitor::new();
             node.visit(&mut visitor)?;
             // add each remote scan for each child
-            if visitor.is_remote_scan {
+            if !visitor.has_remote_scan {
                 let mut new_children: Vec<Arc<dyn ExecutionPlan>> = vec![];
                 for child in node.children() {
                     let mut visitor = TableNameVisitor::new();
@@ -244,6 +244,31 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
             }
+        } else if node.name() == "HashJoinExec" {
+            let mut new_children: Vec<Arc<dyn ExecutionPlan>> = vec![];
+            for child in node.children() {
+                let mut visitor = TableNameVisitor::new();
+                child.visit(&mut visitor)?;
+                if !visitor.has_remote_scan {
+                    let table_name = visitor.table_name.clone().unwrap();
+                    let remote_scan = Arc::new(RemoteScanExec::new(
+                        child.clone(),
+                        self.remote_scan_nodes.get_remote_node(&table_name),
+                    )?);
+                    // add repartition for better performance(imporve parallelism)
+                    let output_partitioning = Partitioning::RoundRobinBatch(
+                        child.output_partitioning().partition_count(),
+                    );
+                    let repartition =
+                        Arc::new(RepartitionExec::try_new(remote_scan, output_partitioning)?);
+                    new_children.push(repartition);
+                } else {
+                    new_children.push(child.clone());
+                }
+            }
+            let new_node = node.with_new_children(new_children)?;
+            self.is_changed = true;
+            return Ok(Transformed::yes(new_node));
         }
         Ok(Transformed::no(node))
     }
@@ -263,7 +288,7 @@ fn remote_scan_to_top_if_needed(
 ) -> Result<Arc<dyn ExecutionPlan>> {
     let mut visitor = TableNameVisitor::new();
     plan.visit(&mut visitor)?;
-    if visitor.is_remote_scan {
+    if !visitor.has_remote_scan {
         let table_name = visitor.table_name.clone().unwrap();
         let remote_scan = Arc::new(RemoteScanExec::new(
             plan,
@@ -278,14 +303,15 @@ fn remote_scan_to_top_if_needed(
 // physical plan
 struct TableNameVisitor {
     table_name: Option<TableReference>,
-    is_remote_scan: bool, // is add remote scan after current physical plan
+    // if RemoteScanExec appear in the physical plan
+    has_remote_scan: bool,
 }
 
 impl TableNameVisitor {
     pub fn new() -> Self {
         Self {
             table_name: None,
-            is_remote_scan: true,
+            has_remote_scan: false,
         }
     }
 }
@@ -296,7 +322,7 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
     fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
         let name = node.name();
         if name == "RemoteScanExec" {
-            self.is_remote_scan = false;
+            self.has_remote_scan = true;
             Ok(TreeNodeRecursion::Stop)
         } else if name == "NewEmptyExec" {
             let table = node.as_any().downcast_ref::<NewEmptyExec>().unwrap();
@@ -317,7 +343,6 @@ impl NewEmptyExecCountVisitor {
         Self { count: 0 }
     }
 
-    #[allow(dead_code)]
     pub fn get_count(&self) -> usize {
         self.count
     }
