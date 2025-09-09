@@ -27,9 +27,8 @@ flamegraph.html
 /web/.env
 
 CLAUDE.md
-tests/ui-testing/playwright-tests/utils/auth/user.json
 /tests/ui-testing/test-logs
-/test-logs
-/test-results
-tests/ui-testing/playwright-tests/utils/README.md
 /tests/ui-testing/test-archives
+/test-logs
+test-results/.last-run.json
+tests/ui-testing/playwright-tests/utils/auth/user.json

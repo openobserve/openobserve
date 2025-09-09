@@ -34,6 +34,7 @@ import {
   convertToUtcTimestamp,
   mergeDeep,
   getUUID,
+  getUUIDv7,
   maskText,
   queryIndexSplit,
   convertToCamelCase,
@@ -475,6 +476,29 @@ describe("zincutils", () => {
       });
     });
 
+    describe("getUUIDv7", () => {
+      it("should generate valid UUID v7", () => {
+        const uuid = getUUIDv7();
+        expect(uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      });
+
+      it("should generate unique UUID v7s", () => {
+        const uuid1 = getUUIDv7();
+        const uuid2 = getUUIDv7();
+        expect(uuid1).not.toBe(uuid2);
+      });
+
+      it("should generate time-ordered UUID v7s", async () => {
+        const uuid1 = getUUIDv7();
+        // Use a proper delay instead of busy-waiting
+        await new Promise(resolve => setTimeout(resolve, 2));
+        const uuid2 = getUUIDv7();
+        
+        // UUID v7 should be lexicographically sortable by time
+        expect(uuid1 < uuid2).toBe(true);
+      });
+    });
+
     describe("generateTraceContext", () => {
       it("should generate valid trace context", () => {
         const context = generateTraceContext();
@@ -482,6 +506,24 @@ describe("zincutils", () => {
         expect(context).toHaveProperty("traceId");
         expect(context).toHaveProperty("spanId");
         expect(context.traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
+      });
+
+      it("should use UUID v7 for trace ID", () => {
+        const context = generateTraceContext();
+        // Trace ID should be 32 characters (UUID without hyphens)
+        expect(context.traceId).toHaveLength(32);
+        expect(context.traceId).toMatch(/^[0-9a-f]{32}$/i);
+        
+        // Convert back to UUID format to verify it's v7
+        const uuidFormat = context.traceId.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
+        expect(uuidFormat).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      });
+
+      it("should generate unique trace contexts", () => {
+        const context1 = generateTraceContext();
+        const context2 = generateTraceContext();
+        expect(context1.traceId).not.toBe(context2.traceId);
+        expect(context1.spanId).not.toBe(context2.spanId);
       });
     });
   });

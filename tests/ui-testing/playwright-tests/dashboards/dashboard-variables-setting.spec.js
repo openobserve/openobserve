@@ -1,5 +1,4 @@
-import { test, expect } from "../baseFixtures";
-import { login } from "./utils/dashLogin.js";
+const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 
@@ -10,8 +9,7 @@ test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard variables settings", () => {
   test.beforeEach(async ({ page }) => {
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestion(page);
   });
 

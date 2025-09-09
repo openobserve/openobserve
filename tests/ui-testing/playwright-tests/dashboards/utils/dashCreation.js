@@ -1,5 +1,6 @@
 import { expect } from "playwright/test";
 import logData from "../../../fixtures/log.json";
+const testLogger = require('../../utils/test-logger.js');
 
 // Function to wait for the dashboard page to load
 export const waitForDashboardPage = async function (page) {
@@ -36,7 +37,8 @@ export const applyQueryButton = async function (page) {
 };
 
 export async function deleteDashboard(page, dashboardName) {
-  console.log(`Deleting dashboard with name: ${dashboardName}`);
+  const testLogger = require('../../utils/test-logger.js');
+  testLogger.info('Deleting dashboard', { dashboardName });
 
   // Wait for page to be fully loaded
   await page.waitForLoadState('networkidle');
