@@ -172,3 +172,80 @@ fn is_timestamp_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
         false
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow_schema::{DataType, Field, Schema};
+    use datafusion::{
+        common::Result,
+        execution::{SessionStateBuilder, runtime_env::RuntimeEnvBuilder},
+        prelude::{SessionConfig, SessionContext},
+    };
+
+    use super::*;
+    use crate::service::search::datafusion::{
+        optimizer::{
+            logical_optimizer::rewrite_histogram::RewriteHistogram,
+            physical_optimizer::index_optimizer::utils::tests::get_partial_aggregate_plan,
+        },
+        table_provider::empty_table::NewEmptyTable,
+        udf::histogram_udf,
+    };
+
+    #[tokio::test]
+    async fn test_is_simple_histogram() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+
+        let start_time = 1757401694060000;
+        let end_time = 1757402594060000;
+        let histogram_interval = 60; // 60s
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .with_optimizer_rule(Arc::new(RewriteHistogram::new(
+                start_time,
+                end_time,
+                histogram_interval,
+            )))
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let provider = NewEmptyTable::new("t", schema);
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+        ctx.register_udf(histogram_udf::HISTOGRAM_UDF.clone());
+
+        let cases = vec![
+            (
+                "SELECT histogram(_timestamp) as ts, count(*) as cnt from t group by ts",
+                Some(IndexOptimizeMode::SimpleHistogram(
+                    1757401680000000,
+                    60000000,
+                    16,
+                )),
+            ),
+            (
+                "SELECT name, histogram(_timestamp) as ts, count(*) as cnt from t group by name, ts",
+                None,
+            ),
+        ];
+
+        for (sql, expected) in cases {
+            let plan = ctx.state().create_logical_plan(sql).await?;
+            let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+
+            let partial_aggregate_plan =
+                Arc::new(get_partial_aggregate_plan(physical_plan).unwrap()) as _;
+            assert_eq!(
+                expected,
+                is_simple_histogram(partial_aggregate_plan, (start_time, end_time))
+            );
+        }
+
+        Ok(())
+    }
+}

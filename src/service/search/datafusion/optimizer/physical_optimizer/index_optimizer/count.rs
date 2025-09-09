@@ -95,3 +95,47 @@ impl<'n> TreeNodeVisitor<'n> for SimpleCountVisitor {
         Ok(TreeNodeRecursion::Continue)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow_schema::{DataType, Field, Schema};
+    use datafusion::{common::Result, prelude::SessionContext};
+
+    use super::*;
+    use crate::service::search::datafusion::table_provider::empty_table::NewEmptyTable;
+
+    #[tokio::test]
+    async fn test_is_simple_count() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+
+        let ctx = SessionContext::new();
+        let provider = NewEmptyTable::new("t", schema);
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let cases = vec![
+            (
+                "SELECT count(*) from t",
+                Some(IndexOptimizeMode::SimpleCount),
+            ),
+            (
+                "SELECT count(*) as cnt from t",
+                Some(IndexOptimizeMode::SimpleCount),
+            ),
+            ("SELECT name, count(*) as cnt from t group by name", None),
+        ];
+
+        for (sql, expected) in cases {
+            let plan = ctx.state().create_logical_plan(sql).await?;
+            let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+
+            assert_eq!(expected, is_simple_count(physical_plan));
+        }
+
+        Ok(())
+    }
+}

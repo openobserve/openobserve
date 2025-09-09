@@ -98,6 +98,11 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
                     self.simple_topn = None;
                     return Ok(TreeNodeRecursion::Stop);
                 }
+                // only support desc order by count(*)
+                if !sort_merge.expr().first().options.descending {
+                    self.simple_topn = None;
+                    return Ok(TreeNodeRecursion::Stop);
+                }
                 self.simple_topn = Some((
                     "".to_string(), // Will be set when we find the group by field
                     fetch,
@@ -161,5 +166,68 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
             return Ok(TreeNodeRecursion::Stop);
         }
         Ok(TreeNodeRecursion::Continue)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::array::{Int64Array, RecordBatch, StringArray};
+    use arrow_schema::{DataType, Field, Schema};
+    use datafusion::{catalog::MemTable, prelude::SessionContext};
+
+    use super::*;
+    use crate::service::search::datafusion::udf::match_all_udf;
+
+    #[tokio::test]
+    async fn test_is_simple_topn() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("id", DataType::Utf8, false),
+            Field::new("status", DataType::Utf8, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1])),
+                Arc::new(StringArray::from(vec!["openobserve"])),
+                Arc::new(StringArray::from(vec!["1"])),
+                Arc::new(StringArray::from(vec!["success"])),
+            ],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        let provider = MemTable::try_new(schema, vec![vec![batch.clone()], vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+
+        // sql, can_optimizer, except_condition
+        let cases = vec![
+            (
+                "select name, count(*) as cnt from t where match_all('error') group by name order by cnt desc limit 10",
+                Some(IndexOptimizeMode::SimpleTopN("name".to_string(), 10, false)),
+            ),
+            (
+                "select name, count(*) as cnt from t where match_all('error') group by name order by cnt asc limit 10",
+                None,
+            ),
+            (
+                "select name as key, count(*) as cnt from t where match_all('error') group by key order by cnt desc limit 10",
+                Some(IndexOptimizeMode::SimpleTopN("name".to_string(), 10, false)),
+            ),
+            ("SELECT count(*) from t", None),
+        ];
+
+        for (sql, expected) in cases {
+            let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+            let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+
+            let index_fields = HashSet::from(["name".to_string(), "id".to_string()]);
+            assert_eq!(expected, is_simple_topn(physical_plan, index_fields));
+        }
     }
 }

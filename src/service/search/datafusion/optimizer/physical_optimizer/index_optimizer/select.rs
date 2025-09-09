@@ -101,3 +101,59 @@ impl<'n> TreeNodeVisitor<'n> for SimpleSelectVisitor {
         Ok(TreeNodeRecursion::Continue)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::array::{Int64Array, RecordBatch, StringArray};
+    use arrow_schema::{DataType, Field, Schema};
+    use datafusion::{catalog::MemTable, common::Result, prelude::SessionContext};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_is_simple_select() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1])),
+                Arc::new(StringArray::from(vec!["openobserve"])),
+            ],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        let provider = MemTable::try_new(schema, vec![vec![batch.clone()], vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let cases = vec![
+            (
+                "SELECT * from t order by _timestamp desc limit 10",
+                Some(IndexOptimizeMode::SimpleSelect(10, false)),
+            ),
+            (
+                "SELECT name from t order by _timestamp asc limit 10",
+                Some(IndexOptimizeMode::SimpleSelect(10, true)),
+            ),
+            (
+                "SELECT name, count(*) as cnt from t group by name order by cnt desc limit 10",
+                None,
+            ),
+        ];
+
+        for (sql, expected) in cases {
+            let plan = ctx.state().create_logical_plan(sql).await?;
+            let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+
+            assert_eq!(expected, is_simple_select(physical_plan));
+        }
+
+        Ok(())
+    }
+}

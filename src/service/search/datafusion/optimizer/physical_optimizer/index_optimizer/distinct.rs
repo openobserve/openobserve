@@ -33,7 +33,7 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::utils::{
 };
 
 #[rustfmt::skip]
-/// SimpleDistinct(String, usize, bool): select name from table where str_match(name, 'a') order by name asc limit 10;
+/// SimpleDistinct(String, usize, bool): select name from table where str_match(name, 'a') group by name order by name asc limit 10;
 /// condition：name is index field, group by name, order by name asc, have limit, and where only the str_match()(expect _timestamp)
 /// example plan:
 ///   SortPreservingMergeExec: [kubernetes_namespace_name@0 ASC NULLS LAST], fetch=10
@@ -137,6 +137,8 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
                 && self.index_fields.contains(&column_name)
             {
                 return Ok(TreeNodeRecursion::Continue);
+            } else if exprs.len() == 2 && is_only_timestamp_filter(&exprs) {
+                return Ok(TreeNodeRecursion::Continue);
             }
             // If projection doesn't have exactly 2 expressions, stop visiting
             self.simple_distinct = None;
@@ -170,5 +172,80 @@ fn is_simple_str_match(expr: &Arc<dyn PhysicalExpr>) -> Option<String> {
         Some(get_column_name(&func.args()[0]).to_string())
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::array::{Int64Array, RecordBatch, StringArray};
+    use arrow_schema::{DataType, Field, Schema};
+    use datafusion::{catalog::MemTable, prelude::SessionContext};
+
+    use super::*;
+    use crate::service::search::datafusion::udf::str_match_udf;
+
+    #[tokio::test]
+    async fn test_is_simple_distinct() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("id", DataType::Utf8, false),
+            Field::new("status", DataType::Utf8, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1])),
+                Arc::new(StringArray::from(vec!["openobserve"])),
+                Arc::new(StringArray::from(vec!["1"])),
+                Arc::new(StringArray::from(vec!["success"])),
+            ],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        let provider = MemTable::try_new(schema, vec![vec![batch.clone()], vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+        ctx.register_udf(str_match_udf::STR_MATCH_UDF.clone());
+
+        // sql, can_optimizer, except_condition
+        let cases = vec![
+            (
+                "select name from t where str_match(name, 'a') and _timestamp >= 175256100000000 and _timestamp < 17525610000000000 group by name order by name asc limit 10",
+                Some(IndexOptimizeMode::SimpleDistinct(
+                    "name".to_string(),
+                    10,
+                    true,
+                )),
+            ),
+            (
+                "select name from t where str_match(name, 'a') and _timestamp >= 175256100000000 and _timestamp < 17525610000000000 group by name order by name desc limit 10",
+                Some(IndexOptimizeMode::SimpleDistinct(
+                    "name".to_string(),
+                    10,
+                    false,
+                )),
+            ),
+            (
+                "select id from t where _timestamp >= 175256100000000 and _timestamp < 17525610000000000 group by id order by id asc limit 10",
+                Some(IndexOptimizeMode::SimpleDistinct(
+                    "id".to_string(),
+                    10,
+                    true,
+                )),
+            ),
+            ("SELECT count(*) from t", None),
+        ];
+
+        for (sql, expected) in cases {
+            let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+            let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+
+            let index_fields = HashSet::from(["name".to_string(), "id".to_string()]);
+            assert_eq!(expected, is_simple_distinct(physical_plan, index_fields));
+        }
     }
 }

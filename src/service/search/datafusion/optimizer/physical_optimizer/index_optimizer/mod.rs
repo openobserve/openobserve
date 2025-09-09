@@ -35,6 +35,7 @@ mod distinct;
 mod histogram;
 mod select;
 mod topn;
+mod utils;
 
 use crate::service::search::datafusion::{
     distributed_plan::remote_scan::RemoteScanExec,
@@ -46,6 +47,8 @@ use crate::service::search::datafusion::{
 
 /// this use in query follower to generate [`IndexOptimizeMode`]
 /// this is used for optimizer that do not need global information
+/// NOTE: use this optimizer in follower only when all filter
+/// can be extract to index condition(except _timestamp filter)
 #[derive(Default, Debug)]
 pub struct FollowerIndexOptimizerule {
     time_range: (i64, i64),
