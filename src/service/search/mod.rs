@@ -91,8 +91,11 @@ use crate::{
     handler::grpc::request::search::Searcher,
     service::search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        sql::visitor::histogram_interval::{
-            convert_histogram_interval_to_seconds, generate_histogram_interval,
+        sql::{
+            rewriter::index::use_inverted_index,
+            visitor::histogram_interval::{
+                convert_histogram_interval_to_seconds, generate_histogram_interval,
+            },
         },
     },
 };
@@ -1063,8 +1066,7 @@ pub async fn search_partition(
         is_histogram,
     );
 
-    // TODO: how to recover this feature
-    if cfg.common.align_partitions_for_index {
+    if cfg.common.align_partitions_for_index && use_inverted_index(&sql) {
         step *= step_factor;
     }
 

@@ -18,7 +18,6 @@ pub mod add_o2_id;
 pub mod add_ordering_term;
 pub mod add_timestamp;
 pub mod approx_percentile;
-#[allow(dead_code)]
 pub mod index;
 pub mod remove_dashboard_placeholder;
 pub mod track_total_hits;
