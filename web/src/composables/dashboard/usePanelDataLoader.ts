@@ -663,6 +663,7 @@ export const usePanelDataLoader = (
         pageType: string;
         searchType: string;
         meta: any;
+        is_refresh_cache: boolean;
       } = {
         queryReq: {
           query: {
@@ -694,8 +695,8 @@ export const usePanelDataLoader = (
           tab_name: tabName?.value,
           fallback_order_by_col: getFallbackOrderByCol(),
           is_ui_histogram: is_ui_histogram.value,
-          is_refresh_cache: shouldRefreshWithoutCache?.value || false,
         },
+        is_refresh_cache: shouldRefreshWithoutCache?.value || false,
       };
 
       // type: "search",
