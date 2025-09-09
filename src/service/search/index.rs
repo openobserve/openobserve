@@ -142,17 +142,6 @@ impl IndexCondition {
         Ok(Box::new(BooleanQuery::from(queries)))
     }
 
-    // get the fields use for search in tantivy
-    #[allow(unused)]
-    pub fn get_tantivy_fields(&self) -> HashSet<String> {
-        self.conditions
-            .iter()
-            .fold(HashSet::new(), |mut acc, condition| {
-                acc.extend(condition.get_tantivy_fields());
-                acc
-            })
-    }
-
     // get the fields use for search in datafusion(for add filter back logical)
     pub fn get_schema_fields(&self, fst_fields: &[String]) -> HashSet<String> {
         self.conditions
@@ -294,6 +283,7 @@ impl Condition {
         }
     }
 
+    // NOTE: current only used in [`use_inverted_index`]
     pub fn from_expr(expr: &Expr) -> Self {
         match expr {
             Expr::BinaryOp {
@@ -822,6 +812,7 @@ impl Condition {
 // check if function is match_all and only have one argument
 // check if binary operator is equal and one side is field and the other side is value
 // and the field is in the index_fields
+// NOTE: current only used in [`use_inverted_index`]
 fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool {
     match expr {
         Expr::BinaryOp {
@@ -1255,50 +1246,6 @@ mod tests {
 
         assert_eq!(fields.len(), 1);
         assert!(fields.contains("поле"));
-    }
-
-    #[test]
-    fn test_index_condition_get_tantivy_fields() {
-        let mut index_condition = IndexCondition::new();
-        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-        index_condition.add_condition(Condition::MatchAll("search_term".to_string()));
-        index_condition.add_condition(Condition::In(
-            "field2".to_string(),
-            vec!["val1".to_string()],
-            false,
-        ));
-
-        let fields = index_condition.get_tantivy_fields();
-
-        assert_eq!(fields.len(), 3);
-        assert!(fields.contains("field1"));
-        assert!(fields.contains("field2"));
-        assert!(fields.contains(INDEX_FIELD_NAME_FOR_ALL));
-    }
-
-    #[test]
-    fn test_index_condition_get_tantivy_fields_empty() {
-        let index_condition = IndexCondition::new();
-        let fields = index_condition.get_tantivy_fields();
-
-        assert_eq!(fields.len(), 0);
-    }
-
-    #[test]
-    fn test_index_condition_get_tantivy_fields_duplicate_fields() {
-        let mut index_condition = IndexCondition::new();
-        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-        index_condition.add_condition(Condition::Equal("field1".to_string(), "value2".to_string()));
-        index_condition.add_condition(Condition::Regex(
-            "field1".to_string(),
-            "pattern.*".to_string(),
-        ));
-
-        let fields = index_condition.get_tantivy_fields();
-
-        // Should deduplicate the field names
-        assert_eq!(fields.len(), 1);
-        assert!(fields.contains("field1"));
     }
 
     // add some test for str_match
