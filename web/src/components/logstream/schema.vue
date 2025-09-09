@@ -418,19 +418,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-slot:body-cell-name="props">
                   <q-td class="q-td--no-hover field-name"
                     >{{ props.row.name }}
-                    <img
-                      :src="quickModeIcon"
-                      v-if="isEnvQuickModeField(props.row.name)"
-                      :alt="t('logStream.envQuickModeMsg')"
-                      class="tw-inline-block q-ml-xs tw-w-[20px]"
-                    >
+                    <span v-if="isEnvQuickModeField(props.row.name)">
+                      <img
+                        :src="quickModeIcon"
+                        :alt="t('logStream.envQuickModeMsg')"
+                        class="tw-inline-block q-ml-xs tw-w-[20px]"
+                      />
                       <q-tooltip
-                      v-if="isEnvQuickModeField(props.row.name)"
                       class="tw-text-[12px] tw-w-[200px]"
                     >
                       {{ t('logStream.envQuickModeMsg') }}
                     </q-tooltip>
-                  </img>
+                  </span>
                   </q-td>
                 </template>
                 <template v-slot:body-cell-type="props">
@@ -1855,7 +1854,7 @@ export default defineComponent({
     // store.state.zoConfig.default_quick_mode_fields: ["field1", "job", "log"]
     const isEnvQuickModeField = (fieldName: string) => {
       return (
-        store.state.zoConfig.default_quick_mode_fields.indexOf(fieldName) > -1
+        store.state.zoConfig.default_quick_mode_fields.includes(fieldName)
       );
     };
 
