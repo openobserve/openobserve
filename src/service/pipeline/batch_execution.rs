@@ -607,7 +607,6 @@ async fn process_node(
                         idx,
                         mut record,
                         flattened,
-                        ..
                     } = pipeline_item;
                     if !flattened {
                         record = match flatten::flatten_with_level(
@@ -903,7 +902,6 @@ async fn process_node(
                 let PipelineItem {
                     mut record,
                     flattened,
-                    ..
                 } = pipeline_item;
                 // handle timestamp before sending to remote_write service
                 if !flattened {
@@ -1124,7 +1122,7 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
             let mut remote_stream_for_batch = remote_stream.clone();
             remote_stream_for_batch.org_id = org_id.clone().into();
 
-            let reacords_len = records_to_write.len();
+            let records_len = records_to_write.len();
 
             let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
             match writer.write_wal(records_to_write).await {
@@ -1141,7 +1139,7 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
                     if data_size_mb > 0.0 {
                         let req_stats = config::meta::self_reporting::usage::RequestStats {
                             size: data_size_mb,
-                            records: reacords_len as i64,
+                            records: records_len as i64,
                             response_time: 0.0,
                             ..config::meta::self_reporting::usage::RequestStats::default()
                         };
