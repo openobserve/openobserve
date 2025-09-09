@@ -37,24 +37,16 @@ export default class DashboardFilter {
 
     // Step 3: Open the condition selector
     if (operator || value) {
-      // Find the visible modal/dialog container and scope the search within it
-      const visibleModal = this.page
-        .locator('[id^="q-portal--menu-"]')
-        .filter({ hasText: "Condition" })
-        .first();
-      const conditionLocator = visibleModal.locator(
-        `[data-test="dashboard-add-condition-condition-${idx}"]`
-      );
+      // Target the most recent (last) visible portal to avoid strict mode violation
+      const conditionLocator = this.page
+        .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
+        .last();
       await conditionLocator.waitFor({ state: "visible" });
       await conditionLocator.click(); // double click for stability
-
-      // Wait for DOM to stabilize after condition tab click
-      await this.page.waitForTimeout(1000);
     }
 
-    // Step 4: Operator dropdown (re-locate after DOM changes)
+    // Step 4: Operator dropdown
     if (operator) {
-      // Re-locate operator dropdown after condition tab click to avoid stale elements
       const operatorLocator =
         index === 0
           ? this.page
@@ -64,41 +56,31 @@ export default class DashboardFilter {
               .locator('[data-test="dashboard-add-condition-operator"]')
               .last();
 
-      // Wait until operator dropdown is visible and stable
-      await operatorLocator.waitFor({ state: "visible", timeout: 5000 });
-      await operatorLocator.waitFor({ state: "attached", timeout: 5000 });
-
-      // Wait for element to be stable before clicking
-      await this.page.waitForTimeout(500);
       await operatorLocator.click();
-
       await this.page
         .getByRole("option", { name: operator, exact: true })
         .first()
         .click();
     }
 
-    // Step 5: Enter value (if required, re-locate after DOM changes)
+    // Step 5: Enter value (if required)
     if (value) {
-      // Re-locate value input after operator selection to avoid stale elements
       const valueInput =
         index === 0
           ? this.page.locator('[data-test="common-auto-complete"]').first()
           : this.page.locator('[data-test="common-auto-complete"]').last();
 
       await valueInput.waitFor({ state: "visible", timeout: 10000 });
-      await valueInput.waitFor({ state: "attached", timeout: 5000 });
-
-      // Wait for element to be stable before interacting
-      await this.page.waitForTimeout(500);
+      // await expect(valueInput).toBeVisible({ timeout: 10000 });
       await valueInput.click();
       await valueInput.fill(value);
 
       const suggestion = this.page
         .locator('[data-test="common-auto-complete-option"]')
         .first();
-
+      // await expect(suggestion).toBeVisible({ timeout: 10000 });
       await suggestion.waitFor({ state: "visible", timeout: 10000 });
+
       await suggestion.click();
     } else if (operator && (newFieldName || initialFieldName)) {
       const selectedField = newFieldName || initialFieldName;
@@ -192,31 +174,18 @@ export default class DashboardFilter {
     // await firstSuggestion.waitFor({ state: "visible", timeout: 10000 });
     // await firstSuggestion.click();
 
-    // Step 3: Condition dropdown
+    // Step 3: Open the condition selector
     if (operator || value) {
-      // Find the visible modal/dialog container and scope the search within it
-      const visibleModal = this.page
-        .locator('[id^="q-portal--menu-"]')
-        .filter({ hasText: "Condition" })
-        .first();
-      const conditionLocator = visibleModal.locator(
-        `[data-test="dashboard-add-condition-condition-${idx}"]`
-      );
-
-      // Wait until visible
-      await conditionLocator.waitFor({ state: "visible", timeout: 5000 });
-
-      // Perform click
-      await conditionLocator.click();
-      await conditionLocator.click(); // safety click
-
-      // Wait for DOM to stabilize after condition tab click
-      await this.page.waitForTimeout(1000);
+      // Target the most recent (last) visible portal to avoid strict mode violation
+      const conditionLocator = this.page
+        .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
+        .last();
+      await conditionLocator.waitFor({ state: "visible" });
+      await conditionLocator.click(); // double click for stability
     }
 
-    // Step 4: Operator dropdown (re-locate after DOM changes)
+    // Step 4: Operator dropdown
     if (operator) {
-      // Re-locate operator dropdown after condition tab click to avoid stale elements
       const operatorLocator =
         index === 0
           ? this.page
@@ -226,12 +195,8 @@ export default class DashboardFilter {
               .locator('[data-test="dashboard-add-condition-operator"]')
               .last();
 
-      // Wait until operator dropdown is visible and stable
+      // Wait until operator dropdown is visible
       await operatorLocator.waitFor({ state: "visible", timeout: 5000 });
-      await operatorLocator.waitFor({ state: "attached", timeout: 5000 });
-
-      // Wait for element to be stable before clicking
-      await this.page.waitForTimeout(500);
       await operatorLocator.click();
 
       const optionLocator = this.page
@@ -243,20 +208,15 @@ export default class DashboardFilter {
       await optionLocator.click();
     }
 
-    // Step 5: Fill value field (re-locate after DOM changes)
+    // Step 5: Fill value field
     if (value) {
-      // Re-locate value input after operator selection to avoid stale elements
       const valueInput =
         index === 0
           ? this.page.locator('[data-test="common-auto-complete"]').first()
           : this.page.locator('[data-test="common-auto-complete"]').last();
 
-      // Wait until input is visible and stable
+      // Wait until input is visible
       await valueInput.waitFor({ state: "visible", timeout: 5000 });
-      await valueInput.waitFor({ state: "attached", timeout: 5000 });
-
-      // Wait for element to be stable before interacting
-      await this.page.waitForTimeout(500);
       await valueInput.click();
       await valueInput.fill(value);
 
