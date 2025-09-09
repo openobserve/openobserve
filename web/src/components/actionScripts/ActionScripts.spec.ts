@@ -17,7 +17,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
-import ActionScipts from "@/components/actionScripts/ActionScipts.vue";
+import ActionScripts from "@/components/actionScripts/ActionScripts.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -71,7 +71,7 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-describe("ActionScipts", () => {
+describe("ActionScripts", () => {
   let wrapper: any;
 
   beforeEach(async () => {
@@ -94,7 +94,7 @@ describe("ActionScipts", () => {
       }),
     );
 
-    wrapper = mount(ActionScipts, {
+    wrapper = mount(ActionScripts, {
       attachTo: "#app",
       global: {
         plugins: [i18n, router],
@@ -139,7 +139,7 @@ describe("ActionScipts", () => {
     vi.restoreAllMocks();
   });
 
-  it("should mount ActionScipts component", () => {
+  it("should mount ActionScripts component", () => {
     expect(wrapper.exists()).toBe(true);
     expect(
       wrapper.find('[data-test="action-scripts-list-page"]').exists(),
