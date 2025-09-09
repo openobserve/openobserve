@@ -183,7 +183,7 @@ test.describe("Sanity Test Cases", () => {
     testLogger.info('Histogram SQL mode test completed');
   });
 
-  test.only("should display results when SQL+histogram is on and then stream is selected", async ({ page }) => {
+  test("should display results when SQL+histogram is on and then stream is selected", async ({ page }) => {
     testLogger.info('Testing SQL+histogram with stream selection functionality');
     
     await pm.sanityPage.displayResultsWhenSQLHistogramOnWithStreamSelection();
