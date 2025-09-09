@@ -52,15 +52,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <q-table
       ref="qTable"
-      :rows="organizations"
+      :rows="visibleRows"
       :columns="columns"
       row-key="id"
       :pagination="pagination"
-      :filter="filterQuery"
-      :filter-method="filterData"
       :loading="loading"
       class="o2-quasar-table o2-quasar-table-header-sticky"
-      style="height: calc(100vh - 114px); overflow-y: auto;"
+      style="overflow-y: auto;"
+      :style="hasVisibleRows
+            ? 'height: calc(100vh - 114px); overflow-y: auto;' 
+            : ''"
       :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
     >
       <template #no-data><NoData /></template>
@@ -130,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, onBeforeMount, onUpdated } from "vue";
+import { defineComponent, ref, watch, onMounted, onBeforeMount, onUpdated, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, date, copyToClipboard } from "quasar";
@@ -164,6 +165,7 @@ export default defineComponent({
     const showOrgAPIKeyDialog = ref(false);
     const organizationAPIKey = ref("");
     const qTable: any = ref(null);
+    const filterQuery = ref("");
     const toBeUpdatedOrganization = ref({
       id: "",
       name: "",
@@ -434,6 +436,23 @@ export default defineComponent({
       });
     };
 
+    const filterData = (rows: string | any[], terms: string) => {
+        const filtered = [];
+        terms = terms.toLowerCase();
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i]["name"].toLowerCase().includes(terms)) {
+            filtered.push(rows[i]);
+          }
+        }
+        return filtered;
+      };
+
+    const visibleRows = computed(() => {
+      if (!filterQuery.value) return organizations.value || []
+      return filterData(organizations.value || [], filterQuery.value)
+    });
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+
     const renameOrganization = (props: any) => {
       router.push({
         query: {
@@ -473,18 +492,12 @@ export default defineComponent({
       perPageOptions,
       selectedPerPage,
       changePagination,
-      filterQuery: ref(""),
-      filterData(rows: string | any[], terms: string) {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms.trim()) || rows[i]["identifier"].toLowerCase().includes(terms.trim())) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
+      filterQuery,
+      filterData,
       hideAddOrgDialog,
+      visibleRows,
+      hasVisibleRows,
+
       renameOrganization,
       toBeUpdatedOrganization,
     };

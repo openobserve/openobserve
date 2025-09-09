@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
         <div class="settings-grid-item q-ml-xs">
-          <div class="q-pt-sm individual-setting-title  full-width">
+          <div class="q-pt-sm individual-setting-title  full-width tw-mb-5">
             {{ t("settings.customLogoTitle") }}
           </div>
           <div
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class="tw-flex tw-flex-col">
+          <div class="tw-flex tw-flex-col tw-mb-5">
             <span class="individual-setting-description">
               Custom logo is used to change the default branding logo displayed in the application.
             </span>

@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             accept=".csv"
             dense
             :rules="[(val: any) => !!val || 'CSV File is required!']"
+            hide-bottom-space
           >
             <template v-slot:prepend>
               <q-icon name="attachment" />
