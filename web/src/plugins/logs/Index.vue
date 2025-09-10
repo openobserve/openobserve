@@ -388,7 +388,7 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep, debounce } from "lodash-es";
-import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
+import { buildSqlQuery, getFieldsFromQuery, isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
@@ -1317,18 +1317,6 @@ export default defineComponent({
       return parsedSQL;
     };
 
-    // Helper function to check if the query is a simple "SELECT * FROM....." query
-    const isSimpleSelectAllQuery = (query: string): boolean => {
-      if (!query || typeof query !== 'string') return false;
-      
-      // Normalize the query by removing extra whitespace
-      const normalizedQuery = query.trim().replace(/\s+/g, ' ');
-      
-      // Pattern to match: SELECT * FROM followed by anything (case insensitive)
-      const selectAllPattern = /^select\s+\*\s+from\s+/i;
-      
-      return selectAllPattern.test(normalizedQuery);
-    };
 
     const handleQuickModeChange = () => {
       if (searchObj.meta.quickMode == true) {
