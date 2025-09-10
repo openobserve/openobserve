@@ -36,7 +36,7 @@ use config::{
 use flate2::read::GzDecoder;
 use infra::{
     errors::{Error, Result},
-    schema,
+    schema::get_flatten_level,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
@@ -240,8 +240,7 @@ pub async fn ingest(
             *_size += estimate_json_bytes(&item);
 
             // JSON Flattening - use per-stream flatten level
-            let flatten_level =
-                schema::get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+            let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
             let mut res = flatten::flatten_with_level(item, flatten_level)?;
 
             // handle timestamp

@@ -34,7 +34,7 @@ use config::{
         time::parse_timestamp_micro_from_value,
     },
 };
-use infra::{errors::Result, schema};
+use infra::{errors::Result, schema::get_flatten_level};
 
 use super::{ingestion_log_enabled, log_failed_record};
 use crate::{
@@ -230,8 +230,7 @@ pub async fn ingest(
                 let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
                 *_size += estimate_json_bytes(&value);
                 // JSON Flattening - use per-stream flatten level
-                let flatten_level =
-                    schema::get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+                let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
                 value = flatten::flatten_with_level(value, flatten_level)?;
 
                 // get json object

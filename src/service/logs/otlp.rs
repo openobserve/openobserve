@@ -31,7 +31,7 @@ use config::{
         json::{self, estimate_json_bytes},
     },
 };
-use infra::{errors::Result, schema};
+use infra::{errors::Result, schema::get_flatten_level};
 use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
@@ -250,7 +250,7 @@ pub async fn handle_request(
                     *_size += estimate_json_bytes(&rec);
                     // JSON Flattening - use per-stream flatten level
                     let flatten_level =
-                        schema::get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+                        get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
                     rec = flatten::flatten_with_level(rec, flatten_level)?;
 
                     // get json object
