@@ -118,10 +118,8 @@ jobs:
                 "schemaload.spec.js",
                 "serviceAccount.spec.js",
                 "usersOrg.spec.js",
+                "org.spec.js",
               ]
-          - testfolder: "Organizations"
-            browser: "chrome"
-            run_files: ["org.spec.js"]
           - testfolder: "Logs-Core"
             browser: "chrome"
             run_files:
