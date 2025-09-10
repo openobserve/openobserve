@@ -754,7 +754,7 @@ export default defineComponent({
           "#": index < 9 ? `0${index + 1}` : index + 1,
           user_id: row?.user_id,
           org_id: row?.org_id,
-          duration: row.created_at,
+          duration: getDuration(row.created_at).durationInSeconds,
           queryRange: queryRange(row?.query?.start_time, row?.query?.end_time).queryRangeInSeconds,
           status: row?.status,
           work_group: row?.work_group,
