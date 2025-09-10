@@ -119,6 +119,9 @@ jobs:
                 "serviceAccount.spec.js",
                 "usersOrg.spec.js",
               ]
+          - testfolder: "Organizations"
+            browser: "chrome"
+            run_files: ["org.spec.js"]
           - testfolder: "Logs-Core"
             browser: "chrome"
             run_files:

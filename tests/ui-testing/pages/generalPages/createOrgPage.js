@@ -1,4 +1,6 @@
 
+const { expect } = require('@playwright/test');
+
 export class CreateOrgPage {
     constructor(page) {
         this.page = page;
@@ -101,7 +103,7 @@ export class CreateOrgPage {
         await this.page.waitForTimeout(5000);
     }
     
-    async verifyOrgNotExists(expect) {
+    async verifyOrgNotExists() {
         const mainSection = this.page.locator('[data-test="iam-page"]').getByRole('main');
         const textContent = await mainSection.textContent();
         console.log('Main section text:', textContent); // Debugging line
@@ -109,11 +111,119 @@ export class CreateOrgPage {
     }
     
     async verifyOrgExists(orgName) {
-
         await expect(this.page.locator('tbody')).toContainText(orgName);
-
     }
-    
 
+    async deleteOrgViaAPI(orgIdentifier) {
+        const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        try {
+            const fetchResponse = await fetch(
+                `${process.env.INGESTION_URL}/api/organizations/${orgIdentifier}`,
+                {
+                    method: "DELETE",
+                    headers: headers,
+                }
+            );
+            
+            const response = await fetchResponse;
+            console.log('Delete org response status:', response.status);
+            
+            if (response.ok) {
+                console.log(`Organization ${orgIdentifier} deleted successfully`);
+                return true;
+            } else {
+                const errorText = await response.text();
+                console.log(`Failed to delete organization ${orgIdentifier}:`, errorText);
+                return false;
+            }
+        } catch (error) {
+            console.error("Failed to delete organization:", error);
+            return false;
+        }
+    }
+
+    async deleteOrgViaUI(orgName) {
+        try {
+            // Search for the organization first
+            await this.searchOrg(orgName);
+            await this.page.waitForTimeout(1000);
+            
+            // Look for delete button in the organization row
+            const deleteButton = this.page.locator(`[data-test="org-delete-${orgName}"]`).or(
+                this.page.locator('tbody tr').filter({ hasText: orgName }).locator('[data-test*="delete"]')
+            );
+            
+            if (await deleteButton.isVisible({ timeout: 5000 })) {
+                await deleteButton.click();
+                await this.page.waitForTimeout(1000);
+                
+                // Confirm deletion if confirmation dialog appears
+                const confirmButton = this.page.locator('[data-test="confirm-delete"]').or(
+                    this.page.getByRole('button', { name: /delete|confirm|yes/i })
+                );
+                
+                if (await confirmButton.isVisible({ timeout: 3000 })) {
+                    await confirmButton.click();
+                }
+                
+                await this.page.waitForTimeout(2000);
+                console.log(`Organization ${orgName} deleted via UI`);
+                return true;
+            } else {
+                console.log(`Delete button not found for organization ${orgName}`);
+                return false;
+            }
+        } catch (error) {
+            console.error(`Failed to delete organization ${orgName} via UI:`, error);
+            return false;
+        }
+    }
+
+    async getOrgIdentifierFromTable(orgName) {
+        try {
+            // Ensure we search for the organization first to make it visible
+            await this.searchOrg(orgName);
+            await this.page.waitForTimeout(2000);
+            
+            // Find the row containing the organization name
+            const orgRow = this.page.locator('tbody tr').filter({ hasText: orgName });
+            
+            if (await orgRow.isVisible({ timeout: 5000 })) {
+                // Try to extract identifier from the row - check multiple possible column positions
+                const cells = orgRow.locator('td');
+                const cellCount = await cells.count();
+                
+                // Try different columns to find the identifier (usually looks like a short hash)
+                for (let i = 0; i < cellCount; i++) {
+                    const cellText = await cells.nth(i).textContent();
+                    const trimmedText = cellText?.trim();
+                    
+                    // Skip the org name column and look for identifier-like strings
+                    if (trimmedText && trimmedText !== orgName && trimmedText.length > 10 && trimmedText.length < 50) {
+                        // This looks like an identifier
+                        console.log(`Found identifier for ${orgName}: ${trimmedText}`);
+                        return trimmedText;
+                    }
+                }
+                
+                // Fallback: assume identifier is in second column
+                const identifierCell = cells.nth(1);
+                const identifier = await identifierCell.textContent();
+                console.log(`Fallback identifier for ${orgName}: ${identifier?.trim()}`);
+                return identifier?.trim() || null;
+            }
+            
+            console.log(`Organization row not found for: ${orgName}`);
+            return null;
+        } catch (error) {
+            console.error(`Failed to get identifier for organization ${orgName}:`, error);
+            return null;
+        }
+    }
 
 }
