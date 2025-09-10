@@ -256,7 +256,7 @@ mod tests {
         // Should extract limit
         assert_eq!(column_visitor.limit, Some(1000));
     }
-      
+
     #[test]
     fn test_column_visitor_with_wildcard() {
         let sql = "SELECT * FROM users union select * from users";
