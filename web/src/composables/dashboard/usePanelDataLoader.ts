@@ -74,6 +74,8 @@ export const usePanelDataLoader = (
   tabName?: any,
   searchResponse: any,
   is_ui_histogram: any,
+  dashboardName?: any,
+  folderName?: any,
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -539,7 +541,9 @@ export const usePanelDataLoader = (
                   page_type: pageType,
                   traceparent,
                   dashboard_id: dashboardId?.value,
+                  dashboard_name: dashboardName?.value,
                   folder_id: folderId?.value,
+                  folder_name: folderName?.value,
                   panel_id: panelSchema.value.id,
                   panel_name: panelSchema.value.title,
                   run_id: runId?.value,
@@ -865,7 +869,9 @@ export const usePanelDataLoader = (
         org_id: store?.state?.selectedOrganization?.identifier,
         use_cache: (window as any).use_cache ?? true,
         dashboard_id: dashboardId?.value,
+        dashboard_name: dashboardName?.value,
         folder_id: folderId?.value,
+        folder_name: folderName?.value,
         panel_id: panelSchema.value.id,
         panel_name: panelSchema.value.title,
         run_id: runId?.value,
@@ -997,6 +1003,8 @@ export const usePanelDataLoader = (
           run_id: runId?.value,
           tab_id: tabId?.value,
           tab_name: tabName?.value,
+          dashboard_name: dashboardName?.value,
+          folder_name: folderName?.value,
         },
       };
 
@@ -1065,7 +1073,9 @@ export const usePanelDataLoader = (
         meta: {
           currentQueryIndex,
           dashboard_id: dashboardId?.value,
+          dashboard_name: dashboardName?.value,
           folder_id: folderId?.value,
+          folder_name: folderName?.value,
           panel_id: panelSchema.value.id,
           panel_name: panelSchema.value.title,
           run_id: runId?.value,
@@ -1263,7 +1273,9 @@ export const usePanelDataLoader = (
                     end_time: endISOTimestamp,
                     step: panelSchema.value.config.step_value ?? "0",
                     dashboard_id: dashboardId?.value,
+                    dashboard_name: dashboardName?.value,
                     folder_id: folderId?.value,
+                    folder_name: folderName?.value,
                     panel_id: panelSchema.value.id,
                     panel_name: panelSchema.value.title,
                     run_id: runId?.value,
@@ -1435,7 +1447,9 @@ export const usePanelDataLoader = (
                           page_type: pageType,
                           traceparent,
                           dashboard_id: dashboardId?.value,
+                          dashboard_name: dashboardName?.value,
                           folder_id: folderId?.value,
+                          folder_name: folderName?.value,
                           panel_id: panelSchema.value.id,
                           panel_name: panelSchema.value.title,
                           run_id: runId?.value,

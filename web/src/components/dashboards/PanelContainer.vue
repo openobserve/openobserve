@@ -334,6 +334,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :runId="runId"
       :tabId="props.tabId"
       :tabName="props.tabName"
+      :dashboardName="props.dashboardName"
+      :folderName="props.folderName"
       @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
       @limit-number-of-series-warning-message-update="
@@ -442,6 +444,8 @@ export default defineComponent({
     "runId",
     "tabId",
     "tabName",
+    "dashboardName",
+    "folderName",
   ],
   components: {
     PanelSchemaRenderer,
