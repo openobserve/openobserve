@@ -32,6 +32,14 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     let app = clap::Command::new("openobserve")
         .version(config::VERSION)
         .about(clap::crate_description!())
+        .arg(
+            clap::Arg::new("env-file")
+                .short('e')
+                .long("env-file")
+                .value_name("FILE")
+                .help("Path to environment file to load and watch for changes")
+                .global(true)
+        )
         .subcommands(&[
             clap::Command::new("reset")
                 .about("reset openobserve data")
@@ -269,6 +277,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 ])
         ])
         .get_matches();
+
+    // Handle env file argument
+    if let Some(env_file_path) = app.get_one::<String>("env-file") {
+        use std::path::PathBuf;
+        let path = PathBuf::from(env_file_path);
+        config::set_env_file_path(path).await?;
+    }
 
     if app.subcommand().is_none() {
         return Ok(false);

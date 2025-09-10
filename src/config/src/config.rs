@@ -20,7 +20,6 @@ use arc_swap::ArcSwap;
 use base64::{Engine, prelude::BASE64_STANDARD};
 use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
-use dotenvy::dotenv_override;
 use hashbrown::{HashMap, HashSet};
 use itertools::chain;
 use lettre::{
@@ -31,6 +30,9 @@ use lettre::{
     },
 };
 use once_cell::sync::Lazy;
+use sha256::digest;
+use std::path::PathBuf;
+use tokio::sync::OnceCell;
 
 use crate::{
     meta::cluster,
@@ -268,6 +270,10 @@ pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
 pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
+// Environment file management
+static ENV_FILE_PATH: OnceCell<PathBuf> = OnceCell::const_new();
+static ENV_FILE_LAST_HASH: Lazy<ArcSwap<Option<String>>> = Lazy::new(|| ArcSwap::from(Arc::new(None)));
+
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(
         reqwest::Client::builder()
@@ -298,6 +304,45 @@ pub fn get_instance_id() -> String {
     }
 }
 
+// Environment file utilities
+pub async fn set_env_file_path(path: PathBuf) -> Result<(), anyhow::Error> {
+    ENV_FILE_PATH.set(path).map_err(|_| anyhow::anyhow!("Env file path already set"))?;
+    Ok(())
+}
+
+pub fn get_env_file_path() -> Option<&'static PathBuf> {
+    ENV_FILE_PATH.get()
+}
+
+pub fn load_env_file_if_set() -> Result<(), anyhow::Error> {
+    if let Some(path) = get_env_file_path() {
+        log::info!("Loading environment file from: {:?}", path);
+        dotenvy::from_path_override(path)?;
+        
+        // Calculate and store initial hash
+        if let Ok(hash) = calculate_env_file_hash(path) {
+            ENV_FILE_LAST_HASH.store(Arc::new(Some(hash)));
+            log::info!("Environment file loaded and hash calculated");
+        }
+    } else {
+        // Fall back to default .env discovery
+        dotenvy::dotenv_override().ok();
+    }
+    Ok(())
+}
+
+pub fn calculate_env_file_hash(path: &PathBuf) -> Result<String, anyhow::Error> {
+    let content = std::fs::read_to_string(path)?;
+    Ok(digest(content))
+}
+
+pub fn get_env_file_last_hash() -> Option<String> {
+    ENV_FILE_LAST_HASH.load().as_ref().clone()
+}
+
+pub fn update_env_file_last_hash(hash: String) {
+    ENV_FILE_LAST_HASH.store(Arc::new(Some(hash)));
+}
 static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =
     tokio::sync::OnceCell::const_new();
 
@@ -1990,9 +2035,7 @@ pub struct EnrichmentTable {
 }
 
 pub fn init() -> Config {
-    std::env::var("ZO_ENV_FILE_PATH").ok()
-        .and_then(|path| dotenvy::from_path_override(path).ok())
-        .or_else(|| dotenv_override().ok().map(|_| ()));
+    load_env_file_if_set().expect("failed to load env file");
     let mut cfg = Config::init().expect("config init error");
 
     // set local mode
