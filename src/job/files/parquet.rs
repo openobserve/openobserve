@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs::remove_file, path::Path, sync::Arc, time::UNIX_EPOCH};
+use std::{path::Path, sync::Arc, time::UNIX_EPOCH};
 
 use arrow_schema::Schema;
 use bytes::Bytes;
@@ -26,8 +26,8 @@ use config::{
     },
     metrics,
     utils::{
-        async_file::get_file_meta,
-        file::{get_file_size, scan_files_with_channel},
+        async_file::{get_file_meta, get_file_size},
+        file::scan_files_with_channel,
         parquet::{
             get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
         },
@@ -45,7 +45,10 @@ use infra::{
 };
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
-use tokio::sync::{Mutex, RwLock};
+use tokio::{
+    fs::remove_file,
+    sync::{Mutex, RwLock},
+};
 
 use crate::{
     common::infra::wal,
@@ -129,13 +132,13 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
             file_key
         );
         let file = wal_dir.join(&file_key);
-        let Ok(file_size) = get_file_size(&file) else {
+        let Ok(file_size) = get_file_size(&file).await else {
             continue;
         };
         // delete metadata from cache
         WAL_PARQUET_METADATA.write().await.remove(&file_key);
         // delete file from disk
-        if let Err(e) = remove_file(&file) {
+        if let Err(e) = remove_file(&file).await {
             log::error!(
                 "[INGESTER:JOB] Failed to remove parquet file: {}, {}",
                 file_key,
@@ -279,7 +282,7 @@ async fn prepare_files(
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(&file_key);
             // delete file from disk
-            if let Err(e) = remove_file(wal_dir.join(&file)) {
+            if let Err(e) = remove_file(wal_dir.join(&file)).await {
                 log::error!(
                     "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
                     file,
@@ -329,7 +332,7 @@ async fn move_files(
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(&file.key);
             // delete file from disk
-            if let Err(e) = remove_file(wal_dir.join(&file.key)) {
+            if let Err(e) = remove_file(wal_dir.join(&file.key)).await {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                     file.key,
@@ -375,7 +378,7 @@ async fn move_files(
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(&file.key);
             // delete file from disk
-            if let Err(e) = remove_file(wal_dir.join(&file.key)) {
+            if let Err(e) = remove_file(wal_dir.join(&file.key)).await {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                     file.key,
@@ -415,7 +418,7 @@ async fn move_files(
                 // delete metadata from cache
                 WAL_PARQUET_METADATA.write().await.remove(&file.key);
                 // delete file from disk
-                if let Err(e) = remove_file(wal_dir.join(&file.key)) {
+                if let Err(e) = remove_file(wal_dir.join(&file.key)).await {
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                         file.key,
@@ -556,7 +559,7 @@ async fn move_files(
                 // delete metadata from cache
                 WAL_PARQUET_METADATA.write().await.remove(&file.key);
                 // delete file from disk
-                match remove_file(wal_dir.join(&file.key)) {
+                match remove_file(wal_dir.join(&file.key)).await {
                     Err(e) => {
                         log::warn!(
                             "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk, set to pending delete list: {}, {}",
