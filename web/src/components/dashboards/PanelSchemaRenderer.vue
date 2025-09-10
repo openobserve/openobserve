@@ -400,6 +400,14 @@ export default defineComponent({
       type: String,
       default: null,
     },
+    dashboardName: {
+      type: String,
+      default: null,
+    },
+    folderName: {
+      type: String,
+      default: null,
+    },
     searchResponse: {
       required: false,
       type: Object,
@@ -463,6 +471,8 @@ export default defineComponent({
       runId,
       tabId,
       tabName,
+      dashboardName,
+      folderName,
       searchResponse,
       is_ui_histogram,
     } = toRefs(props);
@@ -494,6 +504,8 @@ export default defineComponent({
       tabName,
       searchResponse,
       is_ui_histogram,
+      dashboardName,
+      folderName,
     );
 
     const {
