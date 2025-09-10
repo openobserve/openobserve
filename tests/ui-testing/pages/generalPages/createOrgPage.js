@@ -130,14 +130,13 @@ export class CreateOrgPage {
                 }
             );
             
-            const response = await fetchResponse;
-            console.log('Delete org response status:', response.status);
+            console.log('Delete org response status:', fetchResponse.status);
             
-            if (response.ok) {
+            if (fetchResponse.ok) {
                 console.log(`Organization ${orgIdentifier} deleted successfully`);
                 return true;
             } else {
-                const errorText = await response.text();
+                const errorText = await fetchResponse.text();
                 console.log(`Failed to delete organization ${orgIdentifier}:`, errorText);
                 return false;
             }
@@ -185,45 +184,102 @@ export class CreateOrgPage {
     }
 
     async getOrgIdentifierFromTable(orgName) {
-        try {
-            // Ensure we search for the organization first to make it visible
-            await this.searchOrg(orgName);
-            await this.page.waitForTimeout(2000);
-            
-            // Find the row containing the organization name
-            const orgRow = this.page.locator('tbody tr').filter({ hasText: orgName });
-            
-            if (await orgRow.isVisible({ timeout: 5000 })) {
-                // Try to extract identifier from the row - check multiple possible column positions
-                const cells = orgRow.locator('td');
-                const cellCount = await cells.count();
+        const maxRetries = 3;
+        const retryDelay = 1000;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`Attempting to get identifier for ${orgName} (attempt ${attempt}/${maxRetries})`);
                 
-                // Try different columns to find the identifier (usually looks like a short hash)
-                for (let i = 0; i < cellCount; i++) {
-                    const cellText = await cells.nth(i).textContent();
-                    const trimmedText = cellText?.trim();
+                // Ensure we search for the organization first to make it visible
+                await this.searchOrg(orgName);
+                await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+                
+                // Wait for table to be stable
+                await this.page.locator('tbody tr').first().waitFor({ state: 'visible', timeout: 5000 });
+                
+                // Find the row containing the organization name with exact match
+                const orgRow = this.page.locator('tbody tr').filter({ hasText: new RegExp(`\\b${orgName}\\b`) });
+                
+                if (!(await orgRow.isVisible({ timeout: 3000 }))) {
+                    console.log(`Organization row not visible for ${orgName} on attempt ${attempt}`);
+                    if (attempt < maxRetries) {
+                        await this.page.waitForTimeout(retryDelay);
+                        continue;
+                    }
+                    return null;
+                }
+                
+                // Get all cell text content at once for analysis
+                const cellTexts = await orgRow.locator('td').allTextContents();
+                console.log(`Row data for ${orgName}:`, cellTexts);
+                
+                // Find identifier using multiple strategies with improved patterns
+                let identifier = null;
+                
+                // Strategy 1: Look for UUID pattern (32 chars, alphanumeric)
+                for (let i = 0; i < cellTexts.length; i++) {
+                    const text = cellTexts[i]?.trim();
+                    if (!text || text === orgName) continue;
                     
-                    // Skip the org name column and look for identifier-like strings
-                    if (trimmedText && trimmedText !== orgName && trimmedText.length > 10 && trimmedText.length < 50) {
-                        // This looks like an identifier
-                        console.log(`Found identifier for ${orgName}: ${trimmedText}`);
-                        return trimmedText;
+                    // Check for standard UUID pattern (32 chars, alphanumeric)
+                    if (/^[a-zA-Z0-9]{32}$/.test(text)) {
+                        identifier = text;
+                        console.log(`Found UUID identifier: ${identifier}`);
+                        break;
                     }
                 }
                 
-                // Fallback: assume identifier is in second column
-                const identifierCell = cells.nth(1);
-                const identifier = await identifierCell.textContent();
-                console.log(`Fallback identifier for ${orgName}: ${identifier?.trim()}`);
-                return identifier?.trim() || null;
+                // Strategy 2: Look for shorter hash pattern (16-24 chars)
+                if (!identifier) {
+                    for (let i = 0; i < cellTexts.length; i++) {
+                        const text = cellTexts[i]?.trim();
+                        if (!text || text === orgName) continue;
+                        
+                        // Check for shorter hash pattern
+                        if (/^[a-zA-Z0-9]{16,24}$/.test(text)) {
+                            identifier = text;
+                            console.log(`Found hash identifier: ${identifier}`);
+                            break;
+                        }
+                    }
+                }
+                
+                // Strategy 3: Use positional approach - identifier typically in second column
+                if (!identifier && cellTexts.length >= 2) {
+                    const secondCol = cellTexts[1]?.trim();
+                    // Validate it's not a common non-identifier value
+                    if (secondCol && 
+                        secondCol !== orgName && 
+                        secondCol.length >= 8 && 
+                        secondCol.length <= 50 &&
+                        !/^(active|inactive|enabled|disabled|default|admin|user|root|true|false|\d{4}-\d{2}-\d{2})$/i.test(secondCol) &&
+                        !/\s/.test(secondCol)) {
+                        identifier = secondCol;
+                        console.log(`Using positional identifier: ${identifier}`);
+                    }
+                }
+                
+                if (identifier) {
+                    console.log(`Successfully found identifier for ${orgName}: ${identifier}`);
+                    return identifier;
+                }
+                
+                console.log(`No suitable identifier found for ${orgName} on attempt ${attempt}`);
+                if (attempt < maxRetries) {
+                    await this.page.waitForTimeout(retryDelay);
+                }
+                
+            } catch (error) {
+                console.error(`Error getting identifier for ${orgName} on attempt ${attempt}:`, error.message);
+                if (attempt < maxRetries) {
+                    await this.page.waitForTimeout(retryDelay);
+                }
             }
-            
-            console.log(`Organization row not found for: ${orgName}`);
-            return null;
-        } catch (error) {
-            console.error(`Failed to get identifier for organization ${orgName}:`, error);
-            return null;
         }
+        
+        console.warn(`Failed to get identifier for ${orgName} after ${maxRetries} attempts`);
+        return null;
     }
 
 }
