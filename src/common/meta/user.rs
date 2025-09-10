@@ -127,6 +127,23 @@ pub struct UpdateUser {
     pub token: Option<String>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum UserUpdateMode {
+    OtherUpdate,
+    SelfUpdate,
+    CliUpdate,
+}
+
+impl UserUpdateMode {
+    pub fn is_self_update(&self) -> bool {
+        self == &UserUpdateMode::SelfUpdate
+    }
+
+    pub fn is_cli_update(&self) -> bool {
+        self == &UserUpdateMode::CliUpdate
+    }
+}
+
 pub fn get_default_user_org() -> UserOrg {
     UserOrg {
         name: "".to_string(),

@@ -44,7 +44,8 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             organization::{DEFAULT_ORG, OrgRoleMapping},
             user::{
-                UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse, get_default_user_org,
+                UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse, UserUpdateMode,
+                get_default_user_org,
             },
         },
         utils::auth::{get_hash, get_role, is_root_user, is_valid_email},
@@ -246,9 +247,9 @@ pub async fn create_new_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
 pub async fn update_user(
     org_id: &str,
     email: &str,
-    self_update: bool,
+    update_mode: UserUpdateMode,
     initiator_id: &str,
-    user: UpdateUser,
+    mut user: UpdateUser,
 ) -> Result<HttpResponse, Error> {
     let mut allow_password_update = false;
     if !is_valid_email(email) {
@@ -259,8 +260,17 @@ pub async fn update_user(
     }
     let is_email_root = is_root_user(email);
 
+    #[cfg(not(feature = "enterprise"))]
+    if is_email_root {
+        user.role = Some(crate::common::meta::user::UserRoleRequest {
+            role: UserRole::Root.to_string(),
+            custom: None,
+        });
+    }
+    user.role = user.role.clone();
+
     // Only root user can update root user
-    if is_email_root && !self_update {
+    if is_email_root && !update_mode.is_self_update() && !update_mode.is_cli_update() {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
             http::StatusCode::BAD_REQUEST,
             "Root user cannot be updated",
@@ -307,7 +317,7 @@ pub async fn update_user(
                         "Updates not allowed with external users, please update with source system",
                     )));
                 }
-                if !self_update {
+                if !update_mode.is_self_update() {
                     if is_root_user(initiator_id) {
                         allow_password_update = true
                     } else {
@@ -325,14 +335,20 @@ pub async fn update_user(
                         }
                     }
                 }
-                if !self_update && local_user.role.eq(&UserRole::Root) {
+                if local_user.role.eq(&UserRole::Root)
+                    && !update_mode.is_self_update()
+                    && !update_mode.is_cli_update()
+                {
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
                         http::StatusCode::BAD_REQUEST,
                         "Only root user can update its details",
                     )));
                 }
                 new_user = local_user.clone();
-                if self_update && user.old_password.is_some() && user.new_password.is_some() {
+                if update_mode.is_self_update()
+                    && user.old_password.is_some()
+                    && user.new_password.is_some()
+                {
                     if local_user.password.eq(&get_hash(
                         &user.clone().old_password.unwrap(),
                         &local_user.salt,
@@ -350,10 +366,12 @@ pub async fn update_user(
                             message,
                         )));
                     }
-                } else if self_update && user.new_password.is_some() && user.old_password.is_none()
+                } else if update_mode.is_self_update()
+                    && user.new_password.is_some()
+                    && user.old_password.is_none()
                 {
                     message = "Please provide existing password";
-                } else if !self_update
+                } else if !update_mode.is_self_update()
                     && allow_password_update
                     && user.new_password.is_some()
                     && !local_user.is_external
@@ -378,7 +396,7 @@ pub async fn update_user(
                 }
                 if user.role.is_some()
                     && !local_user.is_external
-                    && (!self_update
+                    && (!update_mode.is_self_update()
                         || (local_user.role.eq(&UserRole::Admin)
                             // Editor can update other's roles, but viewer can update only self
                             || local_user.role.eq(&UserRole::Editor)
@@ -393,7 +411,7 @@ pub async fn update_user(
                     new_role = Some(new_user.role.clone());
                     if local_user.role.eq(&UserRole::Root) && new_user.role.ne(&UserRole::Root) {
                         message = "Root user role cannot be changed";
-                    } else if self_update && local_user.role < new_user.role {
+                    } else if update_mode.is_self_update() && local_user.role < new_user.role {
                         message = "Self role cannot be upgraded";
                     } else if local_user.role.ne(&new_user.role) {
                         #[cfg(feature = "enterprise")]
@@ -1380,7 +1398,7 @@ mod tests {
         let resp = update_user(
             "dummy",
             "user2@example.com",
-            true,
+            UserUpdateMode::SelfUpdate,
             "user2@example.com",
             UpdateUser {
                 token: Some("new_token".to_string()),
@@ -1402,7 +1420,7 @@ mod tests {
         let resp = update_user(
             "dummy",
             "user2@example.com",
-            false,
+            UserUpdateMode::OtherUpdate,
             "admin@zo.dev",
             UpdateUser {
                 token: Some("new_token".to_string()),
@@ -1635,7 +1653,7 @@ mod tests {
         let resp = update_user(
             "dummy",
             "invalid-email",
-            false,
+            UserUpdateMode::OtherUpdate,
             "admin@zo.dev",
             UpdateUser {
                 token: None,
@@ -1655,7 +1673,7 @@ mod tests {
         let resp = update_user(
             "dummy",
             "nonexistent@example.com",
-            false,
+            UserUpdateMode::OtherUpdate,
             "admin@zo.dev",
             UpdateUser {
                 token: None,
