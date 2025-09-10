@@ -15,7 +15,6 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
-    fs::remove_file,
     path::Path,
     sync::Arc,
     time::UNIX_EPOCH,
@@ -44,8 +43,8 @@ use config::{
     metrics,
     utils::{
         arrow::record_batches_to_json_rows,
-        async_file::get_file_meta,
-        file::{get_file_size, scan_files_with_channel},
+        async_file::{get_file_meta, get_file_size},
+        file::scan_files_with_channel,
         inverted_index::split_token,
         json,
         parquet::{
@@ -66,7 +65,10 @@ use infra::{
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
 use parquet::arrow::async_reader::ParquetRecordBatchStream;
-use tokio::sync::{Mutex, RwLock};
+use tokio::{
+    fs::remove_file,
+    sync::{Mutex, RwLock},
+};
 
 use crate::{
     common::{
@@ -154,13 +156,13 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
             file_key
         );
         let file = wal_dir.join(&file_key);
-        let Ok(file_size) = get_file_size(&file) else {
+        let Ok(file_size) = get_file_size(&file).await else {
             continue;
         };
         // delete metadata from cache
         WAL_PARQUET_METADATA.write().await.remove(&file_key);
         // delete file from disk
-        if let Err(e) = remove_file(&file) {
+        if let Err(e) = remove_file(&file).await {
             log::error!(
                 "[INGESTER:JOB] Failed to remove parquet file: {}, {}",
                 file_key,
@@ -305,7 +307,7 @@ async fn prepare_files(
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(&file_key);
             // delete file from disk
-            if let Err(e) = remove_file(wal_dir.join(&file)) {
+            if let Err(e) = remove_file(wal_dir.join(&file)).await {
                 log::error!(
                     "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
                     file,
@@ -355,7 +357,7 @@ async fn move_files(
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(&file.key);
             // delete file from disk
-            if let Err(e) = remove_file(wal_dir.join(&file.key)) {
+            if let Err(e) = remove_file(wal_dir.join(&file.key)).await {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                     file.key,
@@ -401,7 +403,7 @@ async fn move_files(
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(&file.key);
             // delete file from disk
-            if let Err(e) = remove_file(wal_dir.join(&file.key)) {
+            if let Err(e) = remove_file(wal_dir.join(&file.key)).await {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                     file.key,
@@ -441,7 +443,7 @@ async fn move_files(
                 // delete metadata from cache
                 WAL_PARQUET_METADATA.write().await.remove(&file.key);
                 // delete file from disk
-                if let Err(e) = remove_file(wal_dir.join(&file.key)) {
+                if let Err(e) = remove_file(wal_dir.join(&file.key)).await {
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                         file.key,
@@ -588,7 +590,7 @@ async fn move_files(
                 // delete metadata from cache
                 WAL_PARQUET_METADATA.write().await.remove(&file.key);
                 // delete file from disk
-                match remove_file(wal_dir.join(&file.key)) {
+                match remove_file(wal_dir.join(&file.key)).await {
                     Err(e) => {
                         log::warn!(
                             "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk, set to pending delete list: {}, {}",
