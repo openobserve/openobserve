@@ -40,7 +40,20 @@ pub async fn get_license_info() -> HttpResponse {
 
 #[post("/license")]
 pub async fn store_license(body: web::Bytes) -> HttpResponse {
-    let req: SaveLicenseRequest = serde_json::from_slice(&body).unwrap();
+    let req: SaveLicenseRequest = match serde_json::from_slice(&body) {
+        Ok(v) => v,
+        Err(e) => {
+            return HttpResponse::BadRequest().json(serde_json::json!({"message":e.to_string()}));
+        }
+    };
+
+    match License::load_from_str(&req.key) {
+        Ok(_) => {}
+        Err(e) => {
+            return HttpResponse::BadRequest().json(serde_json::json!({"message":e.to_string()}));
+        }
+    }
+
     let db = infra::db::get_db().await;
     db.put(LICENSE_DB_KEY, req.key.into(), false, None)
         .await
