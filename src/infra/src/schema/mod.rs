@@ -246,6 +246,15 @@ pub async fn get_settings(
     settings
 }
 
+pub async fn get_flatten_level(org_id: &str, stream_name: &str, stream_type: StreamType) -> u32 {
+    if let Some(settings) = get_settings(org_id, stream_name, stream_type).await
+        && let Some(level) = settings.flatten_level
+    {
+        return level as u32;
+    }
+    get_config().limit.ingest_flatten_level
+}
+
 pub fn unwrap_stream_settings(schema: &Schema) -> Option<StreamSettings> {
     if schema.metadata().is_empty() {
         return None;

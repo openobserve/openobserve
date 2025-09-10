@@ -63,16 +63,6 @@ use crate::{
     },
 };
 
-async fn get_stream_flatten_level(org_id: &str, stream_name: &str, stream_type: StreamType) -> u32 {
-    let cfg = config::get_config();
-    if let Some(settings) = schema::get_settings(org_id, stream_name, stream_type).await
-        && let Some(level) = settings.flatten_level
-    {
-        return level as u32;
-    }
-    cfg.limit.ingest_flatten_level
-}
-
 pub async fn ingest(
     thread_id: usize,
     org_id: &str,
@@ -251,7 +241,7 @@ pub async fn ingest(
 
             // JSON Flattening - use per-stream flatten level
             let flatten_level =
-                get_stream_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+                schema::get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
             let mut res = flatten::flatten_with_level(item, flatten_level)?;
 
             // handle timestamp
