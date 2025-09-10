@@ -169,7 +169,7 @@ pub async fn test_run_function(
                 return;
             }
 
-            let transform = if !ret_val.is_null() {
+            let transform = if !ret_val.is_null() && ret_val.is_object() {
                 config::utils::flatten::flatten(ret_val).unwrap_or("".into())
             } else {
                 "".into()
