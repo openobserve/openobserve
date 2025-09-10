@@ -3,6 +3,23 @@ import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 let parser: any;
 let parserInitialized = false;
 
+/**
+ * Helper function to check if the query is a simple "SELECT * FROM....." query
+ * @param query The SQL query string to check
+ * @returns true if the query is a SELECT * query, false otherwise
+ */
+export const isSimpleSelectAllQuery = (query: string): boolean => {
+  if (!query || typeof query !== 'string') return false;
+  
+  // Normalize the query by removing extra whitespace
+  const normalizedQuery = query.trim().replace(/\s+/g, ' ');
+  
+  // Pattern to match: SELECT * FROM followed by anything (case insensitive)
+  const selectAllPattern = /^select\s+\*\s+from\s+/i;
+  
+  return selectAllPattern.test(normalizedQuery);
+};
+
 const importSqlParser = async () => {
   if (!parserInitialized) {
     const useSqlParser: any = await import("@/composables/useParser");
