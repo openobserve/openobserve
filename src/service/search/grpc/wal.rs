@@ -26,7 +26,8 @@ use config::{
         stream::{FileKey, StreamParams, StreamPartition},
     },
     utils::{
-        file::{is_exists, scan_files_filtered, wal_dir_datetime_filter_builder},
+        async_file::scan_files_filtered,
+        file::{is_exists, wal_dir_datetime_filter_builder},
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
         record_batch_ext::concat_batches,
         size::bytes_to_human_readable,
