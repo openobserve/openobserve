@@ -747,10 +747,7 @@ test.describe(" visualize UI testcases", () => {
       await page.waitForTimeout(3000);
 
       // Check for dashboard errors
-      const errorResult = await dashboardVisualise.checkDashboardErrors(
-        page,
-        chartType.name
-      );
+      const errorResult = await dashboardVisualise.checkDashboardErrors();
 
       if (errorResult.hasErrors) {
         console.log(`Dashboard error found for ${chartType.name} chart:`);
@@ -766,7 +763,7 @@ test.describe(" visualize UI testcases", () => {
       }
 
       // Verify the chart renders successfully
-      const chartRendered = await dashboardVisualise.verifyChartRenders(page);
+      const chartRendered = await dashboardVisualise.verifyChartRenders();
       expect(chartRendered).toBe(true);
     }
   });
@@ -799,10 +796,10 @@ test.describe(" visualize UI testcases", () => {
     await page.waitForTimeout(3000);
 
     // Verify line chart is selected as default for histogram queries
-    await dashboardVisualise.verifyChartTypeSelected(page, "line", true);
+    await dashboardVisualise.verifyChartTypeSelected("line", true);
 
     // Verify table chart is NOT selected for histogram queries
-    await dashboardVisualise.verifyChartTypeSelected(page, "table", false);
+    await dashboardVisualise.verifyChartTypeSelected("table", false);
 
     // Verify chart canvas renders successfully
     await expect(
@@ -810,7 +807,7 @@ test.describe(" visualize UI testcases", () => {
     ).toBeVisible();
 
     // Verify chart renders without errors
-    const chartRendered = await dashboardVisualise.verifyChartRenders(page);
+    const chartRendered = await dashboardVisualise.verifyChartRenders();
     expect(chartRendered).toBe(true);
   });
   test("Should display the correct query in the dashboard when saved from a Table chart.", async ({
