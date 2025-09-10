@@ -881,7 +881,6 @@ async fn process_node(
                         }
                     };
                 }
-               if !record.is_null() && record.is_object() {
                 if let Err(e) =
                     crate::service::logs::ingest::handle_timestamp(&mut record, min_ts, max_ts)
                 {
@@ -907,7 +906,6 @@ async fn process_node(
                     records.push(record);
                     count += 1;
                 }
-            }
             }
 
             log::debug!(
