@@ -4658,7 +4658,9 @@ const useLogs = () => {
           }
         }, searchObj.meta.refreshInterval * 1000);
         store.dispatch("setRefreshIntervalID", refreshIntervalID);
-
+        if(searchObj.meta.refreshInterval > 0){
+          searchObj.meta.refreshCache = false;
+        }
         // only notify if user is in logs page
         if (searchObj.meta.logsVisualizeToggle == "logs") {
           $q.notify({
@@ -4763,7 +4765,7 @@ const useLogs = () => {
       //   }
       // }, 120000);
       await getQueryData();
-      if(searchObj.meta.refreshInterval){
+      if(searchObj.meta.refreshInterval > 0){
         searchObj.meta.refreshCache = false;
       }
       // clearTimeout(queryTimeout);
