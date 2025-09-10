@@ -812,6 +812,11 @@ impl VisitorMut for ColumnVisitor<'_> {
             if select.distinct.is_some() {
                 self.is_distinct = true;
             }
+        } else if let sqlparser::ast::SetExpr::SetOperation { left, right, .. } =
+            query.body.as_mut()
+            && (has_wildcard(left) || has_wildcard(right))
+        {
+            self.is_wildcard = true;
         }
         if let Some(limit) = query.limit.as_ref()
             && let Expr::Value(ValueWithSpan { value, span: _ }) = limit
@@ -828,6 +833,21 @@ impl VisitorMut for ColumnVisitor<'_> {
             self.offset = Some(num);
         }
         ControlFlow::Continue(())
+    }
+}
+
+fn has_wildcard(set: &SetExpr) -> bool {
+    match set {
+        SetExpr::Select(select) => {
+            for item in select.projection.iter() {
+                if let SelectItem::Wildcard(_) = item {
+                    return true;
+                }
+            }
+            false
+        }
+        SetExpr::SetOperation { left, right, .. } => has_wildcard(left) || has_wildcard(right),
+        _ => false,
     }
 }
 
@@ -3673,6 +3693,32 @@ mod tests {
             column_visitor.order_by,
             vec![("name".to_string(), OrderBy::Asc)]
         );
+    }
+
+    #[test]
+    fn test_column_visitor_with_wildcard() {
+        let sql = "SELECT * FROM users union select * from users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut schemas = HashMap::new();
+        let schema = Schema::new(vec![
+            Arc::new(Field::new("name", DataType::Utf8, false)),
+            Arc::new(Field::new("age", DataType::Int32, false)),
+            Arc::new(Field::new("status", DataType::Utf8, false)),
+        ]);
+        schemas.insert(
+            TableReference::from("users"),
+            Arc::new(SchemaCache::new(schema)),
+        );
+
+        let mut column_visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut column_visitor);
+
+        // Should extract columns, group by, order by, and detect aggregate function
+        assert!(column_visitor.is_wildcard);
     }
 
     #[test]
