@@ -348,6 +348,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :runId="runId"
       :tabId="props.tabId"
       :tabName="props.tabName"
+      :dashboardName="props.dashboardName"
+      :folderName="props.folderName"
       :shouldRefreshWithoutCache="props.shouldRefreshWithoutCache"
       @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
@@ -458,6 +460,8 @@ export default defineComponent({
     "runId",
     "tabId",
     "tabName",
+    "dashboardName",
+    "folderName",
     "shouldRefreshWithoutCache",
   ],
   components: {

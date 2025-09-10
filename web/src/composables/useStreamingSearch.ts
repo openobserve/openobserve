@@ -194,7 +194,11 @@ const useHttpStreaming = () => {
     if (type === "search" || type === "histogram" || type === "pageCount") {
       url = `/_search_stream?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
       if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
+      if (meta?.dashboard_name)
+        url += `&dashboard_name=${encodeURIComponent(meta?.dashboard_name)}`;
       if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;
+      if (meta?.folder_name)
+        url += `&folder_name=${encodeURIComponent(meta?.folder_name)}`;
       if (meta?.panel_id) url += `&panel_id=${meta?.panel_id}`;
       if (meta?.panel_name)
         url += `&panel_name=${encodeURIComponent(meta?.panel_name)}`;

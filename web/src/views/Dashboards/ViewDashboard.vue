@@ -257,6 +257,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :folderId="route.query.folder"
         :reportId="reportId"
         :currentTimeObj="currentTimeObjPerPanel"
+        :dashboardName="currentDashboardData.data?.title"
+        :folderName="folderNameFromFolderId"
         :shouldRefreshWithoutCacheObj="shouldRefreshWithoutCachePerPanel"
         :selectedDateForViewPanel="selectedDate"
         @onDeletePanel="onDeletePanel"

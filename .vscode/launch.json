@@ -7,6 +7,25 @@
     {
       "type": "lldb",
       "request": "launch",
+      "name": "Debug executable 'openobserve' (server)",
+      "cargo": {
+        "args": ["build", "--bin=openobserve", "--package=openobserve"],
+        "filter": {
+          "name": "openobserve",
+          "kind": "bin"
+        }
+      },
+      "env": {
+        "ZO_ROOT_USER_EMAIL": "root@example.com",
+        "ZO_ROOT_USER_PASSWORD": "Complexpass#123",
+        
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
       "name": "Debug unit tests in library 'openobserve'",
       "cargo": {
         "args": ["test", "--no-run", "--lib", "--package=openobserve"],
