@@ -259,6 +259,7 @@ pub async fn update_user(
         )));
     }
     let is_email_root = is_root_user(email);
+
     #[cfg(not(feature = "enterprise"))]
     if is_email_root {
         user.role = Some(crate::common::meta::user::UserRoleRequest {
@@ -266,6 +267,7 @@ pub async fn update_user(
             custom: None,
         });
     }
+    user.role = user.role.clone();
 
     // Only root user can update root user
     if is_email_root && !update_mode.is_self_update() && !update_mode.is_cli_update() {
