@@ -57,15 +57,18 @@ test.describe("Organization Management - CRUD Operations", () => {
             testLogger.info(`✓ Organization ${orgName} created successfully with identifier: ${orgIdentifier}`);
             
         } finally {
-            // Cleanup: Delete the organization
+            // NOTE: Organization deletion is not supported in this environment
+            // Organizations created during tests will persist
             if (orgIdentifier) {
-                testLogger.info(`Cleaning up organization: ${orgName}`);
+                testLogger.info(`⚠️  Organization cleanup skipped - deletion not supported in this environment`);
+                testLogger.info(`Organization ${orgName} (${orgIdentifier}) will remain in the system`);
+                
+                // Attempt cleanup anyway to log the actual response
+                testLogger.info(`Attempting cleanup for diagnostic purposes...`);
                 const deleted = await pageManager.createOrgPage.deleteOrgViaAPI(orgIdentifier);
                 if (!deleted) {
-                    // Fallback to UI deletion if API fails
                     await pageManager.createOrgPage.deleteOrgViaUI(orgName);
                 }
-                testLogger.info(`Organization ${orgName} cleanup completed`);
             }
         }
     });
@@ -106,14 +109,16 @@ test.describe("Organization Management - CRUD Operations", () => {
             testLogger.info(`✓ Organization ${orgName} found via name search`);
             
         } finally {
-            // Cleanup: Delete the organization
+            // NOTE: Organization deletion is not supported in this environment  
             if (orgIdentifier) {
-                testLogger.info(`Cleaning up organization: ${orgName}`);
+                testLogger.info(`⚠️  Organization cleanup skipped - deletion not supported`);
+                testLogger.info(`Organization ${orgName} (${orgIdentifier}) will remain in the system`);
+                
+                // Attempt cleanup for diagnostic purposes
                 const deleted = await pageManager.createOrgPage.deleteOrgViaAPI(orgIdentifier);
                 if (!deleted) {
                     await pageManager.createOrgPage.deleteOrgViaUI(orgName);
                 }
-                testLogger.info(`Organization ${orgName} cleanup completed`);
             }
         }
     });
@@ -154,11 +159,13 @@ test.describe("Organization Management - CRUD Operations", () => {
             testLogger.info(`✓ Organization ${orgName} verified in UI with identifier ${orgIdentifier}`);
             
         } finally {
-            // Cleanup: Delete the organization
+            // NOTE: Organization deletion is not supported in this environment
             if (orgIdentifier) {
-                testLogger.info(`Cleaning up organization: ${orgName}`);
+                testLogger.info(`⚠️  Organization cleanup skipped - deletion not supported`);
+                testLogger.info(`Organization ${orgName} (${orgIdentifier}) will remain in the system`);
+                
+                // Attempt cleanup for diagnostic purposes
                 await pageManager.createOrgPage.deleteOrgViaAPI(orgIdentifier);
-                testLogger.info(`Organization ${orgName} cleanup completed`);
             }
         }
     });
@@ -367,8 +374,9 @@ test.describe("Organization Management - CRUD Operations", () => {
             } catch (error) {
                 testLogger.info(`ℹ Error with ${testCase.description}: ${error.message}`);
             } finally {
-                // Cleanup if organization was created
+                // NOTE: Organization deletion is not supported - org will persist
                 if (orgIdentifier) {
+                    testLogger.info(`⚠️  Organization ${testCase.name} (${orgIdentifier}) will remain in system`);
                     await pageManager.createOrgPage.deleteOrgViaAPI(orgIdentifier);
                 }
                 
@@ -413,8 +421,9 @@ test.describe("Organization Management - CRUD Operations", () => {
             testLogger.info('✓ Numeric-only organization name accepted');
             
         } finally {
-            // Cleanup
+            // NOTE: Organization deletion is not supported - org will persist
             if (orgIdentifier) {
+                testLogger.info(`⚠️  Organization ${numericName} (${orgIdentifier}) will remain in system`);
                 await pageManager.createOrgPage.deleteOrgViaAPI(orgIdentifier);
             }
         }
@@ -537,13 +546,13 @@ test.describe("Organization Management - CRUD Operations", () => {
             testLogger.info(`✓ Workflow completed successfully. API org identifier: ${orgIdentifier2}`);
             
         } finally {
-            // Cleanup both organizations
+            // NOTE: Organization deletion is not supported - orgs will persist
             if (orgIdentifier1) {
-                testLogger.info(`Cleaning up organization: ${orgName}`);
+                testLogger.info(`⚠️  Organization ${orgName} (${orgIdentifier1}) will remain in system`);
                 await pageManager.createOrgPage.deleteOrgViaAPI(orgIdentifier1);
             }
             if (orgIdentifier2) {
-                testLogger.info(`Cleaning up organization: ${apiOrgName}`);
+                testLogger.info(`⚠️  Organization ${apiOrgName} (${orgIdentifier2}) will remain in system`);
                 await pageManager.createOrgPage.deleteOrgViaAPI(orgIdentifier2);
             }
             testLogger.info('Workflow test cleanup completed');

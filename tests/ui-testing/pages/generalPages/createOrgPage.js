@@ -115,6 +115,8 @@ export class CreateOrgPage {
     }
 
     async deleteOrgViaAPI(orgIdentifier) {
+        console.log(`⚠️  WARNING: Organization deletion may not be supported in this environment`);
+        
         const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
         const headers = {
             "Authorization": `Basic ${basicAuthCredentials}`,
@@ -130,27 +132,46 @@ export class CreateOrgPage {
                 }
             );
             
-            console.log('Delete org response status:', fetchResponse.status);
+            console.log(`Delete org API response - Status: ${fetchResponse.status}`);
+            const responseText = await fetchResponse.text();
+            console.log(`Delete org API response - Body: ${responseText}`);
             
             if (fetchResponse.ok) {
-                console.log(`Organization ${orgIdentifier} deleted successfully`);
+                console.log(`✓ Organization ${orgIdentifier} deletion API call succeeded`);
                 return true;
+            } else if (fetchResponse.status === 403) {
+                console.log(`✗ Organization deletion forbidden (403) - deletion not allowed in this environment`);
+                return false;
+            } else if (fetchResponse.status === 404) {
+                console.log(`ℹ Organization ${orgIdentifier} not found (404) - may already be deleted`);
+                return true; // Consider 404 as success since org doesn't exist
             } else {
-                const errorText = await fetchResponse.text();
-                console.log(`Failed to delete organization ${orgIdentifier}:`, errorText);
+                console.log(`✗ Failed to delete organization ${orgIdentifier}: Status ${fetchResponse.status} - ${responseText}`);
                 return false;
             }
         } catch (error) {
-            console.error("Failed to delete organization:", error);
+            console.error(`✗ Error during organization deletion API call:`, error);
             return false;
         }
     }
 
     async deleteOrgViaUI(orgName) {
+        console.log(`⚠️  WARNING: UI deletion may not be supported - delete buttons might not exist`);
+        
         try {
             // Search for the organization first
             await this.searchOrg(orgName);
             await this.page.waitForTimeout(1000);
+            
+            // Check if any delete buttons exist in the table at all
+            const anyDeleteButtons = this.page.locator('[data-test*="delete"]', '[title*="delete" i]', 'button:has-text("Delete")');
+            const deleteButtonCount = await anyDeleteButtons.count();
+            console.log(`Found ${deleteButtonCount} delete buttons in the organization table`);
+            
+            if (deleteButtonCount === 0) {
+                console.log(`✗ No delete buttons found in organization table - deletion likely not supported in UI`);
+                return false;
+            }
             
             // Look for delete button in the organization row
             const deleteButton = this.page.locator(`[data-test="org-delete-${orgName}"]`).or(
@@ -158,6 +179,7 @@ export class CreateOrgPage {
             );
             
             if (await deleteButton.isVisible({ timeout: 5000 })) {
+                console.log(`Found delete button for organization ${orgName}, attempting to click...`);
                 await deleteButton.click();
                 await this.page.waitForTimeout(1000);
                 
@@ -167,18 +189,31 @@ export class CreateOrgPage {
                 );
                 
                 if (await confirmButton.isVisible({ timeout: 3000 })) {
+                    console.log(`Confirmation dialog appeared, confirming deletion...`);
                     await confirmButton.click();
+                    await this.page.waitForTimeout(2000);
+                    
+                    // Check if organization is actually gone
+                    await this.searchOrg(orgName);
+                    const stillExists = await this.page.locator('tbody tr').filter({ hasText: orgName }).isVisible({ timeout: 2000 });
+                    
+                    if (stillExists) {
+                        console.log(`✗ Organization ${orgName} still exists after UI deletion - deletion may be restricted`);
+                        return false;
+                    } else {
+                        console.log(`✓ Organization ${orgName} successfully deleted via UI`);
+                        return true;
+                    }
+                } else {
+                    console.log(`✗ No confirmation dialog appeared for ${orgName} deletion`);
+                    return false;
                 }
-                
-                await this.page.waitForTimeout(2000);
-                console.log(`Organization ${orgName} deleted via UI`);
-                return true;
             } else {
-                console.log(`Delete button not found for organization ${orgName}`);
+                console.log(`✗ Delete button not found for organization ${orgName}`);
                 return false;
             }
         } catch (error) {
-            console.error(`Failed to delete organization ${orgName} via UI:`, error);
+            console.error(`✗ Failed to delete organization ${orgName} via UI:`, error);
             return false;
         }
     }
