@@ -24,7 +24,8 @@ use config::{
         stream::{FileKey, StreamParams, StreamPartition},
     },
     utils::{
-        file::{is_exists, scan_files},
+        async_file::scan_files,
+        file::is_exists,
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
         record_batch_ext::concat_batches,
         size::bytes_to_human_readable,
@@ -546,7 +547,9 @@ async fn get_file_list_inner(
         "{}/files/{}/{}/{}/",
         wal_dir, query.org_id, query.stream_type, query.stream_name
     );
-    let files = scan_files(&pattern, file_ext, None).unwrap_or_default();
+    let files = scan_files(&pattern, file_ext, None)
+        .await
+        .unwrap_or_default();
     let files = files
         .iter()
         .map(|f| {

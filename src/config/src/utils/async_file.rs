@@ -142,6 +142,43 @@ pub async fn clean_empty_dirs(
     Ok(())
 }
 
+#[inline(always)]
+pub async fn scan_files<P: AsRef<Path>>(
+    root: P,
+    ext: &str,
+    limit: Option<usize>,
+) -> Result<Vec<String>, std::io::Error> {
+    let limit = limit.unwrap_or_default();
+    let mut files = Vec::with_capacity(std::cmp::max(16, limit));
+    let mut dir = tokio::fs::read_dir(root).await?;
+    while let Some(entry) = dir.next_entry().await? {
+        let path = entry.path();
+        let metadata = entry.metadata().await?;
+        if metadata.is_file() {
+            let path_ext = path
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or_default();
+            if path_ext == ext {
+                files.push(path.to_str().unwrap().to_string());
+                if limit > 0 && files.len() >= limit {
+                    return Ok(files);
+                }
+            }
+        } else if metadata.is_dir() {
+            let fl = if limit > 0 { limit - files.len() } else { 0 };
+            let ff = Box::pin(scan_files(path, ext, Some(fl))).await?;
+            if !ff.is_empty() {
+                files.extend(ff);
+            };
+            if limit > 0 && files.len() >= limit {
+                return Ok(files);
+            }
+        }
+    }
+    Ok(files)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,6 +201,170 @@ mod tests {
 
         // Test out of bounds should error
         assert!(get_file_contents(file_name, Some(0..100)).await.is_err());
+
+        std::fs::remove_file(file_name).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_get_file_meta() {
+        let content = b"Test content for metadata";
+        let file_name = "meta_test_async.txt";
+
+        put_file_contents(file_name, content).await.unwrap();
+
+        let meta = get_file_meta(file_name).await.unwrap();
+        assert!(meta.is_file());
+        assert_eq!(meta.len(), content.len() as u64);
+
+        std::fs::remove_file(file_name).unwrap();
+
+        // Test non-existent file
+        assert!(get_file_meta("non_existent_file.txt").await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_file_size() {
+        let content = b"Test content for size check";
+        let file_name = "size_test_async.txt";
+
+        put_file_contents(file_name, content).await.unwrap();
+
+        let size = get_file_size(file_name).await.unwrap();
+        assert_eq!(size, content.len() as u64);
+
+        std::fs::remove_file(file_name).unwrap();
+
+        // Test non-existent file
+        assert!(get_file_size("non_existent_file.txt").await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_is_exists() {
+        let content = b"Test content for existence check";
+        let file_name = "exists_test_async.txt";
+
+        // File doesn't exist yet
+        assert!(!is_exists(file_name).await);
+
+        put_file_contents(file_name, content).await.unwrap();
+
+        // File exists now
+        assert!(is_exists(file_name).await);
+
+        std::fs::remove_file(file_name).unwrap();
+
+        // File doesn't exist again
+        assert!(!is_exists(file_name).await);
+    }
+
+    #[tokio::test]
+    async fn test_put_file_contents() {
+        let content1 = b"First content";
+        let content2 = b"Second content with different length";
+        let file_name = "put_test_async.txt";
+
+        // Test creating new file
+        put_file_contents(file_name, content1).await.unwrap();
+        let read_content = get_file_contents(file_name, None).await.unwrap();
+        assert_eq!(read_content, content1);
+
+        // Test overwriting existing file
+        put_file_contents(file_name, content2).await.unwrap();
+        let read_content = get_file_contents(file_name, None).await.unwrap();
+        assert_eq!(read_content, content2);
+
+        std::fs::remove_file(file_name).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_clean_empty_dirs() {
+        let test_dir = "test_clean_dirs";
+        let empty_dir1 = format!("{}/empty1", test_dir);
+        let empty_dir2 = format!("{}/empty2", test_dir);
+        let non_empty_dir = format!("{}/nonempty", test_dir);
+        let test_file = format!("{}/test.txt", non_empty_dir);
+
+        // Create directory structure
+        tokio::fs::create_dir_all(&empty_dir1).await.unwrap();
+        tokio::fs::create_dir_all(&empty_dir2).await.unwrap();
+        tokio::fs::create_dir_all(&non_empty_dir).await.unwrap();
+        put_file_contents(&test_file, b"test content")
+            .await
+            .unwrap();
+
+        // Verify directories exist
+        assert!(is_exists(&empty_dir1).await);
+        assert!(is_exists(&empty_dir2).await);
+        assert!(is_exists(&non_empty_dir).await);
+        assert!(is_exists(&test_file).await);
+
+        // Clean empty directories
+        clean_empty_dirs(test_dir, None).await.unwrap();
+
+        // Empty directories should be removed, non-empty should remain
+        assert!(!is_exists(&empty_dir1).await);
+        assert!(!is_exists(&empty_dir2).await);
+        assert!(is_exists(&non_empty_dir).await);
+        assert!(is_exists(&test_file).await);
+
+        // Cleanup
+        std::fs::remove_file(&test_file).unwrap();
+        std::fs::remove_dir_all(test_dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_scan_files() {
+        let test_dir = "test_scan_files";
+        let sub_dir = format!("{}/subdir", test_dir);
+
+        // Create test directory structure
+        tokio::fs::create_dir_all(&sub_dir).await.unwrap();
+
+        // Create test files with different extensions
+        put_file_contents(&format!("{}/file1.txt", test_dir), b"content1")
+            .await
+            .unwrap();
+        put_file_contents(&format!("{}/file2.txt", test_dir), b"content2")
+            .await
+            .unwrap();
+        put_file_contents(&format!("{}/file3.log", test_dir), b"log content")
+            .await
+            .unwrap();
+        put_file_contents(&format!("{}/file4.txt", sub_dir), b"sub content")
+            .await
+            .unwrap();
+
+        // Test scanning for txt files without limit
+        let txt_files = scan_files(test_dir, "txt", None).await.unwrap();
+        assert_eq!(txt_files.len(), 3);
+        assert!(txt_files.iter().all(|f| f.ends_with(".txt")));
+
+        // Test scanning with limit
+        let limited_files = scan_files(test_dir, "txt", Some(2)).await.unwrap();
+        assert_eq!(limited_files.len(), 2);
+
+        // Test scanning for log files
+        let log_files = scan_files(test_dir, "log", None).await.unwrap();
+        assert_eq!(log_files.len(), 1);
+        assert!(log_files[0].ends_with(".log"));
+
+        // Test scanning for non-existent extension
+        let empty_files = scan_files(test_dir, "nonexistent", None).await.unwrap();
+        assert!(empty_files.is_empty());
+
+        // Cleanup
+        std::fs::remove_dir_all(test_dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_get_file_contents_without_range() {
+        let content = b"Complete file content without range";
+        let file_name = "complete_test_async.txt";
+
+        put_file_contents(file_name, content).await.unwrap();
+
+        let read_content = get_file_contents(file_name, None).await.unwrap();
+        assert_eq!(read_content, content);
 
         std::fs::remove_file(file_name).unwrap();
     }
