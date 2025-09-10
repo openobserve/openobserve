@@ -92,17 +92,16 @@ impl Searcher {
         for query_status in &mut status {
             if let Some(ref mut ctx) = query_status.search_event_context
                 && matches!(query_status.search_type.as_deref(), Some("dashboards"))
-                    && let Some(dashboard_id) = &ctx.dashboard_id
-                    && ctx.dashboard_name.is_none()
-                    && let Some(org_id) = &query_status.org_id
-                    && let Ok((folder, dashboard)) =
-                        crate::service::dashboards::get_folder_and_dashboard(org_id, dashboard_id)
-                            .await
-                    {
-                        ctx.dashboard_name = Some(dashboard.title().unwrap_or("").to_string());
-                        ctx.dashboard_folder_name = Some(folder.name);
-                        ctx.dashboard_folder_id = Some(folder.folder_id);
-                    }
+                && let Some(dashboard_id) = &ctx.dashboard_id
+                && ctx.dashboard_name.is_none()
+                && let Some(org_id) = &query_status.org_id
+                && let Ok((folder, dashboard)) =
+                    crate::service::dashboards::get_folder_and_dashboard(org_id, dashboard_id).await
+            {
+                ctx.dashboard_name = Some(dashboard.title().unwrap_or("").to_string());
+                ctx.dashboard_folder_name = Some(folder.name);
+                ctx.dashboard_folder_id = Some(folder.folder_id);
+            }
         }
 
         status

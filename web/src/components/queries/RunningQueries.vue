@@ -765,7 +765,7 @@ export default defineComponent({
           compressed_size: row?.scan_stats?.compressed_size,
           search_type: row?.search_type,
           search_type_label: row?.search_type_label,
-          query_source: row?.search_event_context?.dashboard_name || "-",
+          query_source: row?.search_event_context?.folder_name + "/" + row?.search_event_context?.dashboard_name || "-",
         };
       });
     });
