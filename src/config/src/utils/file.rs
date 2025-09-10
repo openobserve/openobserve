@@ -17,11 +17,10 @@ use std::{
     fs::{File, Metadata, metadata},
     io::{Read, Seek, Write},
     ops::Range,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use async_recursion::async_recursion;
-use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 
 #[inline(always)]
 pub fn get_file_meta(path: impl AsRef<Path>) -> Result<Metadata, std::io::Error> {
@@ -81,109 +80,6 @@ pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Err
     std::fs::rename(temp_file, file)?;
 
     Ok(())
-}
-
-/// Creates a closure that filters file paths based on a datetime range extracted
-/// from the directory structure.
-///
-/// This function is designed to work with a directory hierarchy where dates are
-/// embedded in the path, such as `/skippable/base/path/YYYY/MM/DD/HH/`. It constructs
-/// a filter that checks if the date derived from a path falls within the
-/// specified `start_time` and `end_time`.
-///
-/// The filter also ensures that if the path points to a file, its extension
-/// matches the provided `extension_pattern`.
-///
-/// # Arguments
-///
-/// * `start_time` - The inclusive start of the datetime range for the filter.
-/// * `end_time` - The inclusive end of the datetime range for the filter.
-/// * `extension_pattern` - The file extension to match (e.g., "json").
-/// * `skip_count` - The number of initial path components to skip before starting to parse the date
-///   parts (year, month, etc.). This is not guaranteed to be the same as
-///   "$WAL_ROOT/files/<org_id>/<stream_type>/<stream_name>/" as there can be more skippable
-///   segments after <stream_name> which may only be decided by the use of the API.
-///
-/// # Returns
-///
-/// A closure that takes a `PathBuf` and returns `true` if the path matches the
-/// criteria, and `false` otherwise. This closure is `Send`, `Clone`, and
-/// `'static`.
-pub fn wal_dir_datetime_filter_builder(
-    start_time: DateTime<Utc>,
-    end_time: DateTime<Utc>,
-    extension_pattern: String,
-    skip_count: usize,
-) -> impl Fn(PathBuf) -> bool + Send + Clone + 'static {
-    let extension_pattern = extension_pattern.to_lowercase();
-    move |path: PathBuf| {
-        let mut components = path
-            .components()
-            .skip(skip_count)
-            .map(|c| c.as_os_str())
-            .filter_map(|osc| osc.to_str());
-
-        let year = match components.next().map(|c| c.parse::<i32>()) {
-            Some(Ok(y @ 1901..=9999)) => y, // A plausible year
-            Some(_) => return false,        // Parsed, but not a plausible year
-            None => return true,            /* Not present or failed to parse, could be a
-                                              * skippable path */
-        };
-
-        let month = match components.next().map(|c| c.parse::<u32>()) {
-            Some(Ok(m @ 1..=12)) => m,
-            Some(_) => return false,    // Parsed, but invalid month number
-            None => start_time.month(), // Not present or failed to parse
-        };
-
-        let month_days = [31u32, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        let days = month_days[month as usize] + if month == 2 && year % 4 == 0 { 1 } else { 0 };
-        let day = match components.next().map(|c| c.parse::<u32>()) {
-            Some(Ok(day)) => {
-                if 1 <= day && day <= days {
-                    day
-                } else {
-                    return false;
-                }
-            }
-            Some(_) => return false,
-            None => start_time.day(),
-        };
-
-        let hour = match components.next().map(|c| c.parse::<u32>()) {
-            Some(Ok(hour @ 0..24)) => hour,
-            Some(_) => return false,
-            None => start_time.hour(),
-        };
-
-        let date_range_check = if let Some(datetime) = Utc
-            .with_ymd_and_hms(
-                year,
-                month,
-                day,
-                hour,
-                start_time.minute(),
-                start_time.second(),
-            )
-            .single()
-            .and_then(|dt| dt.with_nanosecond(start_time.timestamp_subsec_nanos()))
-        {
-            datetime >= start_time && datetime <= end_time
-        } else {
-            false
-        };
-
-        date_range_check
-            && (!path.is_file()
-                || path
-                    .extension()
-                    .and_then(|extension| {
-                        extension
-                            .to_str()
-                            .map(|s| s.to_lowercase() == extension_pattern)
-                    })
-                    .unwrap_or_default())
-    }
 }
 
 #[inline(always)]
