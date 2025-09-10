@@ -440,7 +440,7 @@ export default defineComponent({
         const filtered = [];
         terms = terms.toLowerCase();
         for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
+          if (rows[i]["name"].toLowerCase().includes(terms.trim()) || rows[i]["identifier"].toLowerCase().includes(terms.trim())) {
             filtered.push(rows[i]);
           }
         }
