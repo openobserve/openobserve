@@ -716,10 +716,19 @@ export default defineComponent({
             ) {
               startTime = Math.floor(res.data.hits[0].start_time / 1000);
               endTime = Math.ceil(res.data.hits[0].end_time / 1000);
-              updateUrlQueryParams({
-                from: startTime,
-                to: endTime,
-              });
+
+              // If the trace is not in the current time range, update the time range
+              if (
+                !(
+                  startTime >= Number(router.currentRoute.value.query.from) &&
+                  endTime <= Number(router.currentRoute.value.query.to)
+                )
+              ) {
+                updateUrlQueryParams({
+                  from: startTime,
+                  to: endTime,
+                });
+              }
             }
 
             getTraceDetails({

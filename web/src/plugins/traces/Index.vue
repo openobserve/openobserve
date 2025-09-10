@@ -672,10 +672,17 @@ async function getQueryData() {
           res.data.hits[0].start_time &&
           res.data.hits[0].end_time
         ) {
-          updateNewDateTime(
-            Math.floor(res.data.hits[0].start_time / 1000),
-            Math.ceil(res.data.hits[0].end_time / 1000),
-          );
+          const startTime = Math.floor(res.data.hits[0].start_time / 1000);
+          const endTime = Math.ceil(res.data.hits[0].end_time / 1000);
+          // If the trace is not in the current time range, update the time range
+          if (
+            !(
+              startTime >= queryReq.query.start_time &&
+              endTime <= queryReq.query.end_time
+            )
+          ) {
+            updateNewDateTime(startTime, endTime);
+          }
         }
 
         const formattedHits = getTracesMetaData(res.data.hits);
