@@ -603,7 +603,14 @@ pub async fn do_partitioned_search(
             format!("{trace_id}-{idx}")
         };
         let mut search_res =
-            do_search(&trace_id, org_id, stream_type, &req, user_id, false).await?;
+            match do_search(&trace_id, org_id, stream_type, &req, user_id, false).await {
+                Ok(res) => res,
+                Err(e) => {
+                    log::error!("[trace_id {trace_id} do_partitioned_search error {e}");
+                    // TODO: send partial error with `is_partital_error` set to true
+                    continue;
+                }
+            };
 
         let mut total_hits = search_res.total as i64;
 
@@ -1071,7 +1078,15 @@ async fn process_delta(
         }
 
         // use cache for delta search
-        let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, true).await?;
+        let mut search_res =
+            match do_search(&trace_id, org_id, stream_type, &req, user_id, false).await {
+                Ok(res) => res,
+                Err(e) => {
+                    log::error!("[trace_id {trace_id} do_partitioned_search error {e}");
+                    // TODO: send partial error with `is_partital_error` set to true
+                    continue;
+                }
+            };
 
         let total_hits = search_res.total as i64;
 
