@@ -200,21 +200,23 @@ where
         item.ok().and_then(|dir_entry| {
             let pb = dir_entry.path();
 
-            if !pb.is_file() {
-                None
-            } else {
-                pb.canonicalize()
-                    .ok()
-                    .and_then(|cpath| cpath.to_str().map(String::from))
-            }
+            if pb.is_file() { Some(pb) } else { None }
         })
     });
 
-    let files = if let Some(limit_count) = limit {
+    let uncanonicalized_paths: Vec<PathBuf> = if let Some(limit_count) = limit {
         walker.take(limit_count).collect().await
     } else {
         walker.collect().await
     };
+
+    let files =
+        futures::future::join_all(uncanonicalized_paths.iter().map(tokio::fs::canonicalize))
+            .await
+            .into_iter()
+            .map(Result::ok)
+            .filter_map(|path| path.and_then(|pbuf| pbuf.to_str().map(String::from)))
+            .collect();
 
     Ok(files)
 }
