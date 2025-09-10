@@ -5,6 +5,7 @@ import logsdata from "../../../test-data/logs_data.json";
 import { deleteDashboard } from "../utils/dashCreation.js";
 import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
+import DashboardVisualise from "../../pages/dashboardPages/dashboard-visualise.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -700,24 +701,24 @@ test.describe(" visualize UI testcases", () => {
   test("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
     page,
   }) => {
+    const dateTimeHelper = new DateTimeHelper(page);
+
+    await page.locator(".view-line").first().click();
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
+      .getByRole("textbox", { name: "Editor content" })
       .fill(largeDatasetSqlQuery);
 
-    // Apply the time filter and refresh the search
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    // Switch to SQL mode, apply the query, and refresh the search
-    await page
-      .getByRole("switch", { name: "SQL Mode" })
-      .locator("div")
-      .nth(2)
-      .click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
+
+    await dateTimeHelper.clickLogsRefreshBtn();
+
+    await page.waitForTimeout(3000);
     // Toggle visualization
     await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    await page.waitForTimeout(3000);
+
     // Check for any error messages or indicators
     const errorMessage = page.locator('[data-test="error-message"]'); // Update the selector based on your app's error message display
     const errorCount = await errorMessage.count();
@@ -727,21 +728,22 @@ test.describe(" visualize UI testcases", () => {
   test("Stream should be correct on visualize page after switching between logs and visualize", async ({
     page,
   }) => {
+    const dateTimeHelper = new DateTimeHelper(page);
+
     // Extract stream name from the SQL query dynamically
     const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
     const expectedStreamName = streamNameMatch
       ? streamNameMatch[1]
       : STREAM_NAME;
 
+    await page.locator(".view-line").first().click();
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
+      .getByRole("textbox", { name: "Editor content" })
       .fill(largeDatasetSqlQuery);
 
     // Apply the time filter and refresh the search
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
 
     // Switch to SQL mode and refresh the search
     await page
@@ -749,8 +751,7 @@ test.describe(" visualize UI testcases", () => {
       .locator("div")
       .nth(2)
       .click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-
+    await dateTimeHelper.clickLogsRefreshBtn();
     // Toggle visualization
     await page.locator('[data-test="logs-visualize-toggle"]').click();
     await page
@@ -798,27 +799,32 @@ test.describe(" visualize UI testcases", () => {
   test("should redirect the correct chart type when added the aggregation query", async ({
     page,
   }) => {
+    const dateTimeHelper = new DateTimeHelper(page);
+
     // Extract stream name from the SQL query dynamically
     const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
     const expectedStreamName = streamNameMatch
       ? streamNameMatch[1]
       : STREAM_NAME;
 
+    await page.locator(".view-line").first().click();
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
+      .getByRole("textbox", { name: "Editor content" })
       .fill(largeDatasetSqlQuery);
 
     // Apply the time filter and refresh the search
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
 
     // Toggle visualization
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    await dateTimeHelper.clickLogsRefreshBtn();
 
     // Wait for visualization to load
     await page.waitForTimeout(2000);
+
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    await page.waitForTimeout(3000);
 
     // Robust check: wait for table panel to render (source of truth for selected type)
     await page.waitForSelector('[data-test="dashboard-panel-table"]', {
@@ -841,8 +847,29 @@ test.describe(" visualize UI testcases", () => {
   test("should not show dashboard errors when changing chart types with aggregation query", async ({
     page,
   }) => {
+    const dateTimeHelper = new DateTimeHelper(page);
     // Setup the test with aggregation query
-    await setupAggregationQueryTest(page);
+    // await setupAggregationQueryTest(page);
+    await page.locator(".view-line").first().click();
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox", { name: "Editor content" })
+      .fill(largeDatasetSqlQuery);
+
+    await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
+
+    // Switch to SQL mode
+    await page
+      .getByRole("switch", { name: "SQL Mode" })
+      .locator("div")
+      .nth(2)
+      .click();
+
+    await dateTimeHelper.clickLogsRefreshBtn();
+
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    await page.waitForTimeout(3000);
 
     // Define chart types to test
     const chartTypes = [
@@ -897,9 +924,10 @@ test.describe(" visualize UI testcases", () => {
     // Setup the test with aggregation query
     const dateTimeHelper = new DateTimeHelper(page);
 
+    await page.locator(".view-line").first().click();
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
+      .getByRole("textbox", { name: "Editor content" })
       .fill(histogramQuery);
 
     await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
@@ -936,6 +964,7 @@ test.describe(" visualize UI testcases", () => {
     page,
   }) => {
     const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardVisualise = new DashboardVisualise(page);
 
     // Extract stream name from the SQL query dynamically
     const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
@@ -943,9 +972,10 @@ test.describe(" visualize UI testcases", () => {
       ? streamNameMatch[1]
       : STREAM_NAME;
 
+    await page.locator(".view-line").first().click();
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
+      .getByRole("textbox", { name: "Editor content" })
       .fill(largeDatasetSqlQuery);
 
     await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
@@ -957,7 +987,11 @@ test.describe(" visualize UI testcases", () => {
 
     await page.waitForTimeout(2000);
 
-    await addPanelToNewDashboard(page, randomDashboardName, panelName);
+    // await addPanelToNewDashboard(page, randomDashboardName, panelName);
+    await dashboardVisualise.addPanelToNewDashboard(
+      randomDashboardName,
+      panelName
+    );
 
     // Wait for visualization to load
     await page.waitForTimeout(3000);
@@ -983,28 +1017,34 @@ test.describe(" visualize UI testcases", () => {
   test("should display the correct query in the dashboard when saved from a Line chart.", async ({
     page,
   }) => {
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardVisualise = new DashboardVisualise(page);
+
     // Extract stream name from the SQL query dynamically
     const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
     const expectedStreamName = streamNameMatch
       ? streamNameMatch[1]
       : STREAM_NAME;
 
+    await page.locator(".view-line").first().click();
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
+      .getByRole("textbox", { name: "Editor content" })
       .fill(histogramQuery);
 
     // Apply the time filter and refresh the search
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
+    await dateTimeHelper.clickLogsRefreshBtn();
 
     // Toggle visualization
     await page.locator('[data-test="logs-visualize-toggle"]').click();
 
     await page.waitForTimeout(2000);
 
-    await addPanelToNewDashboard(page, randomDashboardName, panelName);
+    await dashboardVisualise.addPanelToNewDashboard(
+      randomDashboardName,
+      panelName
+    );
 
     await page.waitForTimeout(2000);
     await page
