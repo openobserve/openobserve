@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >{{ t("logStream.flattenLevel") }}</label
                   >
                   <span class="tw-text-xs tw-font-normal">
-                    (Global default is
+                    (Global is
                     {{ store.state.zoConfig.ingest_flatten_level || 3 }})
                   </span>
                 </div>
