@@ -115,6 +115,7 @@ pub fn wal_dir_datetime_filter_builder(
     extension_pattern: String,
     skip_count: usize,
 ) -> impl Fn(PathBuf) -> bool + Send + Clone + 'static {
+    let extension_pattern = extension_pattern.to_lowercase();
     move |path: PathBuf| {
         let mut components = path
             .components()
@@ -176,7 +177,11 @@ pub fn wal_dir_datetime_filter_builder(
             && (!path.is_file()
                 || path
                     .extension()
-                    .and_then(|extension| extension.to_str().map(|s| s == extension_pattern))
+                    .and_then(|extension| {
+                        extension
+                            .to_str()
+                            .map(|s| s.to_lowercase() == extension_pattern)
+                    })
                     .unwrap_or_default())
     }
 }

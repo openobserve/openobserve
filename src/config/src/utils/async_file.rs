@@ -225,7 +225,7 @@ pub async fn scan_files<P: AsRef<Path>>(
     ext: &str,
     limit: Option<usize>,
 ) -> Result<Vec<String>, std::io::Error> {
-    let ext = ext.to_string();
+    let ext = ext.to_lowercase();
     scan_files_filtered(
         root,
         move |f| {
@@ -233,8 +233,8 @@ pub async fn scan_files<P: AsRef<Path>>(
                 true
             } else {
                 f.extension()
-                    .and_then(|ext| ext.to_str())
-                    .map(|s| s == ext)
+                    .and_then(|file_ext| file_ext.to_str())
+                    .map(|s| s.to_lowercase() == ext)
                     .unwrap_or_default()
             }
         },
