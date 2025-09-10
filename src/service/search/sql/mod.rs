@@ -157,6 +157,11 @@ impl Sql {
             .collect::<Vec<_>>();
         let group_by = column_visitor.group_by;
         let mut order_by = column_visitor.order_by;
+        if aliases.iter().any(|(_, alias)| alias == TIMESTAMP_COL_NAME) {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "Using _timestamp as alias is not supported".to_string(),
+            )));
+        }
 
         // check if need sort by time
         if order_by.is_empty()
