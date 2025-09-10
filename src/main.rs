@@ -332,10 +332,13 @@ async fn main() -> Result<(), anyhow::Error> {
             .max_blocking_threads(cfg.limit.grpc_runtime_blocking_worker_num)
             .build()
             .expect("grpc runtime init failed");
-            
+
         // Register gRPC runtime for metrics collection
-        openobserve::service::runtime_metrics::register_runtime("grpc".to_string(), rt.handle().clone());
-        
+        openobserve::service::runtime_metrics::register_runtime(
+            "grpc".to_string(),
+            rt.handle().clone(),
+        );
+
         let _guard = rt.enter();
         rt.block_on(async move {
             let ret = if config::cluster::LOCAL_NODE.is_router() {

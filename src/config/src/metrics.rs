@@ -1050,12 +1050,22 @@ pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// Runtime metrics - consolidated into fewer metrics with different labels
-pub static RUNTIME_TASKS: Lazy<IntGaugeVec> = Lazy::new(|| {
+// Tokio runtime metrics - consolidated into fewer metrics with different labels
+pub static TOKIO_RUNTIME_TASKS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
+        Opts::new("tokio_runtime_tasks", "Tokio runtime task statistics")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["runtime", "metric_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static TOKIO_RUNTIME_TASKS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
         Opts::new(
-            "runtime_tasks",
-            "Runtime task statistics",
+            "tokio_runtime_tasks_total",
+            "Total tokio runtime task counters",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -1064,24 +1074,11 @@ pub static RUNTIME_TASKS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-pub static RUNTIME_TASKS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static TOKIO_RUNTIME_WORKER_METRICS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
-            "runtime_tasks_total",
-            "Total runtime task counters",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["runtime", "metric_type"],
-    )
-    .expect("Metric created")
-});
-
-pub static RUNTIME_WORKER_METRICS: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "runtime_worker_metrics_total",
-            "Runtime worker metrics",
+            "tokio_runtime_worker_metrics_total",
+            "Tokio runtime worker metrics",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -1090,11 +1087,11 @@ pub static RUNTIME_WORKER_METRICS: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-pub static RUNTIME_WORKER_DURATION_SECONDS: Lazy<CounterVec> = Lazy::new(|| {
+pub static TOKIO_RUNTIME_WORKER_DURATION_SECONDS: Lazy<CounterVec> = Lazy::new(|| {
     CounterVec::new(
         Opts::new(
-            "runtime_worker_duration_seconds_total",
-            "Runtime worker duration metrics in seconds",
+            "tokio_runtime_worker_duration_seconds_total",
+            "Tokio runtime worker duration metrics in seconds",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -1103,15 +1100,16 @@ pub static RUNTIME_WORKER_DURATION_SECONDS: Lazy<CounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-pub static RUNTIME_WORKER_POLL_TIME_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+pub static TOKIO_RUNTIME_WORKER_POLL_TIME_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
         HistogramOpts::new(
-            "runtime_worker_poll_time_seconds",
-            "Runtime worker poll time distribution in seconds",
+            "tokio_runtime_worker_poll_time_seconds",
+            "Tokio runtime worker poll time distribution in seconds",
         )
         .namespace(NAMESPACE)
         .buckets(vec![
-            0.000001, 0.000005, 0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0,
+            0.000001, 0.000005, 0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1,
+            0.5, 1.0,
         ])
         .const_labels(create_const_labels()),
         &["runtime", "worker"],
@@ -1395,21 +1393,21 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(TANTIVY_RESULT_CACHE_HITS_TOTAL.clone()))
         .expect("Metric registered");
 
-    // runtime metrics
+    // tokio runtime metrics
     registry
-        .register(Box::new(RUNTIME_TASKS.clone()))
+        .register(Box::new(TOKIO_RUNTIME_TASKS.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(RUNTIME_TASKS_TOTAL.clone()))
+        .register(Box::new(TOKIO_RUNTIME_TASKS_TOTAL.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(RUNTIME_WORKER_METRICS.clone()))
+        .register(Box::new(TOKIO_RUNTIME_WORKER_METRICS.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(RUNTIME_WORKER_DURATION_SECONDS.clone()))
+        .register(Box::new(TOKIO_RUNTIME_WORKER_DURATION_SECONDS.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(RUNTIME_WORKER_POLL_TIME_SECONDS.clone()))
+        .register(Box::new(TOKIO_RUNTIME_WORKER_POLL_TIME_SECONDS.clone()))
         .expect("Metric registered");
 }
 
