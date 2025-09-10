@@ -3,6 +3,8 @@ import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 
 import { deleteDashboard } from "../utils/dashCreation.js";
+import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
+import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -689,32 +691,51 @@ test.describe(" visualize UI testcases", () => {
   }
   async function addPanelToNewDashboard(page, randomDashboardName, panelName) {
     //add to dashboard and submit it
+    await page
+      .getByRole("button", { name: "Add To Dashboard" })
+      .waitFor({ state: "visible", timeout: 15000 });
     await page.getByRole("button", { name: "Add To Dashboard" }).click();
     await page
       .locator('[data-test="dashboard-dashboard-new-add"]')
-      .waitFor({ state: "visible" });
+      .waitFor({ state: "visible", timeout: 15000 });
 
     //Adding dashboard
     await page.locator('[data-test="dashboard-dashboard-new-add"]').click();
+
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .waitFor({ state: "visible", timeout: 15000 });
     await page.locator('[data-test="add-dashboard-name"]').click();
     await page
       .locator('[data-test="add-dashboard-name"]')
       .fill(randomDashboardName);
+
+    await page
+      .locator('[data-test="dashboard-add-submit"]')
+      .waitFor({ state: "visible", timeout: 15000 });
     await page.locator('[data-test="dashboard-add-submit"]').click();
 
     await page.waitForTimeout(3000);
+
+    // Wait for dashboard creation and navigation to panel editing
     await page
       .locator('[data-test="metrics-new-dashboard-panel-title"]')
-      .waitFor({ state: "visible" });
+      .waitFor({ state: "visible", timeout: 15000 });
     await page
       .locator('[data-test="metrics-new-dashboard-panel-title"]')
       .click();
     await page
       .locator('[data-test="metrics-new-dashboard-panel-title"]')
       .fill(panelName);
+
+    await page
+      .locator('[data-test="metrics-schema-update-settings-button"]')
+      .waitFor({ state: "visible", timeout: 15000 });
     await page
       .locator('[data-test="metrics-schema-update-settings-button"]')
       .click();
+
+    await page.waitForTimeout(3000);
   }
   test("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
     page,
@@ -918,7 +939,27 @@ test.describe(" visualize UI testcases", () => {
     page,
   }) => {
     // Setup the test with aggregation query
-    await setupAggregationQueryTest(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(histogramQuery);
+
+    await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
+
+    // Switch to SQL mode
+    await page
+      .getByRole("switch", { name: "SQL Mode" })
+      .locator("div")
+      .nth(2)
+      .click();
+
+    await dateTimeHelper.clickLogsRefreshBtn();
+
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    await page.waitForTimeout(3000);
 
     // Verify line chart is selected as default for histogram queries
     await verifyChartTypeSelected(page, "line", true);
@@ -938,6 +979,8 @@ test.describe(" visualize UI testcases", () => {
   test("Should display the correct query in the dashboard when saved from a Table chart.", async ({
     page,
   }) => {
+    const dateTimeHelper = new DateTimeHelper(page);
+
     // Extract stream name from the SQL query dynamically
     const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
     const expectedStreamName = streamNameMatch
@@ -949,19 +992,19 @@ test.describe(" visualize UI testcases", () => {
       .getByLabel("Editor content;Press Alt+F1")
       .fill(largeDatasetSqlQuery);
 
-    // Apply the time filter and refresh the search
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
+
+    await dateTimeHelper.clickLogsRefreshBtn();
 
     // Toggle visualization
     await page.locator('[data-test="logs-visualize-toggle"]').click();
 
     await page.waitForTimeout(2000);
+
     await addPanelToNewDashboard(page, randomDashboardName, panelName);
 
     // Wait for visualization to load
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
 
     await page
       .locator('[data-test="dashboard-edit-panel-' + panelName + '-dropdown"]')

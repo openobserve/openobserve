@@ -8,6 +8,9 @@ export default class DashboardactionPage {
     this.panelNameInput = page.locator('[data-test="dashboard-panel-name"]');
     this.panelSaveBtn = page.locator('[data-test="dashboard-panel-save"]');
     this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
+    this.visualizeRefreshBtn = page.locator(
+      '[data-test="logs-search-bar-visualize-refresh-btn"]'
+    );
   }
 
   // Add panel name
