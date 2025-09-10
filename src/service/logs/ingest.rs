@@ -34,7 +34,10 @@ use config::{
     },
 };
 use flate2::read::GzDecoder;
-use infra::errors::{Error, Result};
+use infra::{
+    errors::{Error, Result},
+    schema,
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use opentelemetry_proto::tonic::{
@@ -59,6 +62,16 @@ use crate::{
         schema::{get_future_discard_error, get_upto_discard_error},
     },
 };
+
+async fn get_stream_flatten_level(org_id: &str, stream_name: &str, stream_type: StreamType) -> u32 {
+    let cfg = config::get_config();
+    if let Some(settings) = schema::get_settings(org_id, stream_name, stream_type).await
+        && let Some(level) = settings.flatten_level
+    {
+        return level as u32;
+    }
+    cfg.limit.ingest_flatten_level
+}
 
 pub async fn ingest(
     thread_id: usize,
@@ -236,8 +249,10 @@ pub async fn ingest(
             let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
             *_size += estimate_json_bytes(&item);
 
-            // JSON Flattening
-            let mut res = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
+            // JSON Flattening - use per-stream flatten level
+            let flatten_level =
+                get_stream_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+            let mut res = flatten::flatten_with_level(item, flatten_level)?;
 
             // handle timestamp
             let timestamp = match handle_timestamp(&mut res, min_ts, max_ts) {

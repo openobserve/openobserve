@@ -34,7 +34,7 @@ use config::{
         time::parse_timestamp_micro_from_value,
     },
 };
-use infra::errors::Result;
+use infra::{errors::Result, schema};
 
 use super::{ingestion_log_enabled, log_failed_record};
 use crate::{
@@ -51,6 +51,16 @@ pub const TRANSFORM_FAILED: &str = "document_failed_transform";
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 pub const PIPELINE_EXEC_FAILED: &str = "pipeline_execution_failed";
+
+async fn get_stream_flatten_level(org_id: &str, stream_name: &str, stream_type: StreamType) -> u32 {
+    let cfg = get_config();
+    if let Some(settings) = schema::get_settings(org_id, stream_name, stream_type).await
+        && let Some(level) = settings.flatten_level
+    {
+        return level as u32;
+    }
+    cfg.limit.ingest_flatten_level
+}
 
 pub async fn ingest(
     thread_id: usize,
@@ -229,8 +239,10 @@ pub async fn ingest(
             } else {
                 let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
                 *_size += estimate_json_bytes(&value);
-                // JSON Flattening
-                value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
+                // JSON Flattening - use per-stream flatten level
+                let flatten_level =
+                    get_stream_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+                value = flatten::flatten_with_level(value, flatten_level)?;
 
                 // get json object
                 let mut local_val = match value.take() {

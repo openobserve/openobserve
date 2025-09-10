@@ -31,7 +31,7 @@ use config::{
         json::{self, estimate_json_bytes},
     },
 };
-use infra::errors::Result;
+use infra::{errors::Result, schema};
 use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
@@ -53,6 +53,16 @@ use crate::{
         schema::{get_future_discard_error, get_upto_discard_error},
     },
 };
+
+async fn get_stream_flatten_level(org_id: &str, stream_name: &str, stream_type: StreamType) -> u32 {
+    let cfg = get_config();
+    if let Some(settings) = schema::get_settings(org_id, stream_name, stream_type).await
+        && let Some(level) = settings.flatten_level
+    {
+        return level as u32;
+    }
+    cfg.limit.ingest_flatten_level
+}
 
 pub async fn handle_request(
     thread_id: usize,
@@ -248,8 +258,10 @@ pub async fn handle_request(
                 } else {
                     let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
                     *_size += estimate_json_bytes(&rec);
-                    // JSON Flattening
-                    rec = flatten::flatten_with_level(rec, cfg.limit.ingest_flatten_level)?;
+                    // JSON Flattening - use per-stream flatten level
+                    let flatten_level =
+                        get_stream_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+                    rec = flatten::flatten_with_level(rec, flatten_level)?;
 
                     // get json object
                     let mut local_val = match rec.take() {
