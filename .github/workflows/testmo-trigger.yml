@@ -1,5 +1,8 @@
 name: Testmo Triggered Tests
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:
@@ -11,10 +14,6 @@ on:
         description: 'Test folder (e.g., Alerts)'
         required: true
         default: 'Alerts'
-      testmo_run_id:
-        description: 'Testmo Run ID for result submission'
-        required: false
-        default: ''
 
 env:
   COLUMNS: 150
@@ -154,7 +153,7 @@ jobs:
           TESTMO_TOKEN: ${{ secrets.TESTMO_TOKEN }}
         run: |
           cd tests/ui-testing
-          TESTMO_TOKEN="${{ secrets.TESTMO_TOKEN }}" npx testmo automation:run:submit \
+          npx testmo automation:run:submit \
             --instance https://openobserve.testmo.net \
             --project-id 1 \
             --name "Testmo Triggered: ${{ github.event.inputs.test_file }}" \
