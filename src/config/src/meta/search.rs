@@ -1060,6 +1060,20 @@ impl From<proto::cluster_rpc::SearchEventContext> for SearchEventContext {
     }
 }
 
+impl From<SearchEventContext> for proto::cluster_rpc::SearchEventContext {
+    fn from(sec: SearchEventContext) -> Self {
+        Self {
+            alert_key: sec.alert_key,
+            derived_stream_key: sec.derived_stream_key,
+            report_key: sec.report_key,
+            dashboard_id: sec.dashboard_id,
+            dashboard_name: sec.dashboard_name,
+            dashboard_folder_id: sec.dashboard_folder_id,
+            dashboard_folder_name: sec.dashboard_folder_name,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct MultiSearchPartitionRequest {
     pub sql: Vec<String>,
