@@ -2781,7 +2781,7 @@ pub mod query_cache_server {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PhysicalPlanNode {
-    #[prost(oneof = "physical_plan_node::Plan", tags = "1, 2, 3")]
+    #[prost(oneof = "physical_plan_node::Plan", tags = "1, 2, 3, 4")]
     pub plan: ::core::option::Option<physical_plan_node::Plan>,
 }
 /// Nested message and enum types in `PhysicalPlanNode`.
@@ -2796,6 +2796,8 @@ pub mod physical_plan_node {
         AggregateTopk(super::AggregateTopkExecNode),
         #[prost(message, tag = "3")]
         StreamingAggs(super::StreamingAggsExecNode),
+        #[prost(message, tag = "4")]
+        TmpExec(super::TmpExecNode),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2815,6 +2817,16 @@ pub struct NewEmptyExecNode {
     pub sorted_by_time: bool,
     #[prost(message, optional, tag = "7")]
     pub full_schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TmpExecNode {
+    #[prost(string, tag = "1")]
+    pub cluster: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub path: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "3")]
+    pub schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

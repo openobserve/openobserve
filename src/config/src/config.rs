@@ -784,6 +784,12 @@ pub struct Common {
     )]
     pub feature_join_right_side_max_rows: usize,
     #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_ENABLED",
+        default = false,
+        help = "Enable broadcast join"
+    )]
+    pub feature_broadcast_join_enabled: bool,
+    #[env_config(
         name = "ZO_FEATURE_QUERY_SKIP_WAL",
         default = false,
         help = "Skip WAL for query"

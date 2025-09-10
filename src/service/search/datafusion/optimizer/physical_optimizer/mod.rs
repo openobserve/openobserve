@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod broadcast_join;
 pub mod distribute_analyze;
-#[allow(dead_code)]
 pub mod index;
 pub mod join_reorder;
 pub mod remote_scan;

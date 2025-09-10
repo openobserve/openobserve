@@ -38,7 +38,13 @@ use crate::service::search::{
         distributed_plan::{
             empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec,
         },
-        optimizer::{context::RemoteScanContext, utils::is_place_holder_or_empty},
+        optimizer::{
+            context::RemoteScanContext,
+            physical_optimizer::broadcast_join::{
+                broadcast_join_rewrite, should_use_broadcast_join,
+            },
+            utils::is_place_holder_or_empty,
+        },
     },
     index::IndexCondition,
     request::Request,
@@ -127,6 +133,12 @@ impl PhysicalOptimizerRule for RemoteScanRule {
         // should not add remote scan for placeholder or emptyplan
         if is_place_holder_or_empty(&plan) {
             return Ok(plan);
+        }
+
+        if config::get_config().common.feature_broadcast_join_enabled
+            && should_use_broadcast_join(&plan)
+        {
+            return broadcast_join_rewrite(plan, self.remote_scan_nodes.clone());
         }
 
         // if single node and can optimize, add remote scan to top
@@ -282,7 +294,7 @@ fn is_single_node_optimize(plan: &Arc<dyn ExecutionPlan>) -> bool {
     empty_exec_count <= 1 && config::cluster::LOCAL_NODE.is_single_node()
 }
 
-fn remote_scan_to_top_if_needed(
+pub fn remote_scan_to_top_if_needed(
     plan: Arc<dyn ExecutionPlan>,
     remote_scan_nodes: Arc<RemoteScanNodes>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
