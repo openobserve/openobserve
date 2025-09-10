@@ -388,7 +388,7 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep, debounce } from "lodash-es";
-import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
+import { buildSqlQuery, getFieldsFromQuery, isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
@@ -1317,18 +1317,6 @@ export default defineComponent({
       return parsedSQL;
     };
 
-    // Helper function to check if the query is a simple "SELECT * FROM....." query
-    const isSimpleSelectAllQuery = (query: string): boolean => {
-      if (!query || typeof query !== 'string') return false;
-      
-      // Normalize the query by removing extra whitespace
-      const normalizedQuery = query.trim().replace(/\s+/g, ' ');
-      
-      // Pattern to match: SELECT * FROM followed by anything (case insensitive)
-      const selectAllPattern = /^select\s+\*\s+from\s+/i;
-      
-      return selectAllPattern.test(normalizedQuery);
-    };
 
     const handleQuickModeChange = () => {
       if (searchObj.meta.quickMode == true) {
@@ -1426,14 +1414,21 @@ export default defineComponent({
             // Enable quick mode automatically when switching to visualization if:
             // 1. SQL mode is disabled OR 
             // 2. Query is "SELECT * FROM some_stream" (simple select all query)
+            // 3. Default quick mode config is true
             const shouldEnableQuickMode =
               !searchObj.meta.sqlMode ||
               isSimpleSelectAllQuery(searchObj.data.query);
 
-            if (shouldEnableQuickMode && !searchObj.meta.quickMode) {
-              searchObj.meta.quickMode = true;
+            const isQuickModeDisabled = !searchObj.meta.quickMode;
+            const isQuickModeConfigEnabled =
+              store.state.zoConfig.quick_mode_enabled === true;
 
-              // handle quick mode change
+            if (
+              shouldEnableQuickMode &&
+              isQuickModeDisabled &&
+              isQuickModeConfigEnabled
+            ) {
+              searchObj.meta.quickMode = true;
               handleQuickModeChange();
             }
 
@@ -1700,6 +1695,27 @@ export default defineComponent({
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
+          let logsPageQuery = "";
+          
+          // handle sql mode
+          if(!searchObj.meta.sqlMode){
+            const queryBuild = buildSearch();
+            logsPageQuery = queryBuild?.query?.sql ?? "";
+          } else {
+            logsPageQuery = searchObj.data.query;
+          }
+          
+          // Check if query is SELECT * which is not supported for visualization
+          if (
+            store.state.zoConfig.quick_mode_enabled === true &&
+            isSimpleSelectAllQuery(logsPageQuery)
+          ) {
+            showErrorNotification(
+              "Select * query is not supported for visualization",
+            );
+            return;
+          }
+
           const success = await updateVisualization(false);
           if (!success) {
             return;
