@@ -49,4 +49,79 @@ export default class LogstoVisualise {
     await this.updateSettingsBtn.waitFor({ state: "visible", timeout: 5000 });
     await this.updateSettingsBtn.click();
   }
+
+  // Helper function to check for dashboard errors
+  async checkDashboardErrors(page, chartTypeName) {
+    const dashboardErrorContainer = page.locator(
+      '[data-test="dashboard-error"]'
+    );
+    const errorContainerExists = await dashboardErrorContainer.count();
+
+    if (errorContainerExists === 0) {
+      return { hasErrors: false, errors: [] };
+    }
+
+    const isErrorVisible = await dashboardErrorContainer.first().isVisible();
+    if (!isErrorVisible) {
+      return { hasErrors: false, errors: [] };
+    }
+
+    const errors = [];
+
+    // Check for error indicator text
+    const errorText = page
+      .locator('[data-test="dashboard-error"]')
+      .getByText(/Errors \(\d+\)/);
+    const errorTextCount = await errorText.count();
+
+    if (errorTextCount > 0) {
+      const errorTextContent = await errorText.first().textContent();
+      errors.push(`Error indicator: ${errorTextContent}`);
+    }
+
+    // Check for error list items
+    const errorListItems = page.locator('[data-test="dashboard-error"] ul li');
+    const errorListCount = await errorListItems.count();
+
+    if (errorListCount > 0) {
+      for (let i = 0; i < errorListCount; i++) {
+        const errorItem = errorListItems.nth(i);
+        const errorItemText = await errorItem.textContent();
+        if (errorItemText && errorItemText.trim().length > 0) {
+          errors.push(`Error ${i + 1}: ${errorItemText.trim()}`);
+        }
+      }
+    }
+
+    return {
+      hasErrors: errors.length > 0,
+      errors,
+      errorTextCount,
+      errorListCount,
+    };
+  }
+  // Helper function to verify chart renders successfully
+  async verifyChartRenders(page) {
+    const chartRenderer = page.locator(
+      '[data-test="chart-renderer"], [data-test="dashboard-panel-table"]'
+    );
+    const chartExists = await chartRenderer.count();
+
+    if (chartExists > 0) {
+      await expect(chartRenderer.first()).toBeVisible();
+    }
+
+    return chartExists > 0;
+  }
+  // Helper function to verify chart type selection
+  async verifyChartTypeSelected(page, chartType, shouldBeSelected = true) {
+    const selector = `[data-test="selected-chart-${chartType}-item"]`;
+    const locator = page.locator(selector).locator("..");
+
+    if (shouldBeSelected) {
+      await expect(locator).toHaveClass(/bg-grey-[35]/);
+    } else {
+      await expect(locator).not.toHaveClass(/bg-grey-[35]/);
+    }
+  }
 }

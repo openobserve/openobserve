@@ -548,156 +548,6 @@ test.describe(" visualize UI testcases", () => {
     // Verify the field is empty
     await expect(page.locator(".view-line").first()).toBeEmpty();
   });
-  // Helper function to setup aggregation query test
-  async function setupAggregationQueryTest(page) {
-    await page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
-      .fill(largeDatasetSqlQuery);
-
-    // Apply time filter and search
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-
-    // Switch to SQL mode
-    await page
-      .getByRole("switch", { name: "SQL Mode" })
-      .locator("div")
-      .nth(2)
-      .click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-
-    // Switch to visualization
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page.waitForTimeout(3000);
-  }
-  // Helper function to check for dashboard errors
-  async function checkDashboardErrors(page, chartTypeName) {
-    const dashboardErrorContainer = page.locator(
-      '[data-test="dashboard-error"]'
-    );
-    const errorContainerExists = await dashboardErrorContainer.count();
-
-    if (errorContainerExists === 0) {
-      return { hasErrors: false, errors: [] };
-    }
-
-    const isErrorVisible = await dashboardErrorContainer.first().isVisible();
-    if (!isErrorVisible) {
-      return { hasErrors: false, errors: [] };
-    }
-
-    const errors = [];
-
-    // Check for error indicator text
-    const errorText = page
-      .locator('[data-test="dashboard-error"]')
-      .getByText(/Errors \(\d+\)/);
-    const errorTextCount = await errorText.count();
-
-    if (errorTextCount > 0) {
-      const errorTextContent = await errorText.first().textContent();
-      errors.push(`Error indicator: ${errorTextContent}`);
-    }
-
-    // Check for error list items
-    const errorListItems = page.locator('[data-test="dashboard-error"] ul li');
-    const errorListCount = await errorListItems.count();
-
-    if (errorListCount > 0) {
-      for (let i = 0; i < errorListCount; i++) {
-        const errorItem = errorListItems.nth(i);
-        const errorItemText = await errorItem.textContent();
-        if (errorItemText && errorItemText.trim().length > 0) {
-          errors.push(`Error ${i + 1}: ${errorItemText.trim()}`);
-        }
-      }
-    }
-
-    return {
-      hasErrors: errors.length > 0,
-      errors,
-      errorTextCount,
-      errorListCount,
-    };
-  }
-  // Helper function to verify chart renders successfully
-  async function verifyChartRenders(page) {
-    const chartRenderer = page.locator(
-      '[data-test="chart-renderer"], [data-test="dashboard-panel-table"]'
-    );
-    const chartExists = await chartRenderer.count();
-
-    if (chartExists > 0) {
-      await expect(chartRenderer.first()).toBeVisible();
-    }
-
-    return chartExists > 0;
-  }
-  // Helper function to verify chart type selection
-  async function verifyChartTypeSelected(
-    page,
-    chartType,
-    shouldBeSelected = true
-  ) {
-    const selector = `[data-test="selected-chart-${chartType}-item"]`;
-    const locator = page.locator(selector).locator("..");
-
-    if (shouldBeSelected) {
-      await expect(locator).toHaveClass(/bg-grey-[35]/);
-    } else {
-      await expect(locator).not.toHaveClass(/bg-grey-[35]/);
-    }
-  }
-  async function addPanelToNewDashboard(page, randomDashboardName, panelName) {
-    //add to dashboard and submit it
-    await page
-      .getByRole("button", { name: "Add To Dashboard" })
-      .waitFor({ state: "visible", timeout: 15000 });
-    await page.getByRole("button", { name: "Add To Dashboard" }).click();
-    await page
-      .locator('[data-test="dashboard-dashboard-new-add"]')
-      .waitFor({ state: "visible", timeout: 15000 });
-
-    //Adding dashboard
-    await page.locator('[data-test="dashboard-dashboard-new-add"]').click();
-
-    await page
-      .locator('[data-test="add-dashboard-name"]')
-      .waitFor({ state: "visible", timeout: 15000 });
-    await page.locator('[data-test="add-dashboard-name"]').click();
-    await page
-      .locator('[data-test="add-dashboard-name"]')
-      .fill(randomDashboardName);
-
-    await page
-      .locator('[data-test="dashboard-add-submit"]')
-      .waitFor({ state: "visible", timeout: 15000 });
-    await page.locator('[data-test="dashboard-add-submit"]').click();
-
-    await page.waitForTimeout(3000);
-
-    // Wait for dashboard creation and navigation to panel editing
-    await page
-      .locator('[data-test="metrics-new-dashboard-panel-title"]')
-      .waitFor({ state: "visible", timeout: 15000 });
-    await page
-      .locator('[data-test="metrics-new-dashboard-panel-title"]')
-      .click();
-    await page
-      .locator('[data-test="metrics-new-dashboard-panel-title"]')
-      .fill(panelName);
-
-    await page
-      .locator('[data-test="metrics-schema-update-settings-button"]')
-      .waitFor({ state: "visible", timeout: 15000 });
-    await page
-      .locator('[data-test="metrics-schema-update-settings-button"]')
-      .click();
-
-    await page.waitForTimeout(3000);
-  }
   test("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
     page,
   }) => {
@@ -848,8 +698,9 @@ test.describe(" visualize UI testcases", () => {
     page,
   }) => {
     const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardVisualise = new DashboardVisualise(page);
+
     // Setup the test with aggregation query
-    // await setupAggregationQueryTest(page);
     await page.locator(".view-line").first().click();
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
@@ -896,7 +747,10 @@ test.describe(" visualize UI testcases", () => {
       await page.waitForTimeout(3000);
 
       // Check for dashboard errors
-      const errorResult = await checkDashboardErrors(page, chartType.name);
+      const errorResult = await dashboardVisualise.checkDashboardErrors(
+        page,
+        chartType.name
+      );
 
       if (errorResult.hasErrors) {
         console.log(`Dashboard error found for ${chartType.name} chart:`);
@@ -912,17 +766,16 @@ test.describe(" visualize UI testcases", () => {
       }
 
       // Verify the chart renders successfully
-      const chartRendered = await verifyChartRenders(page);
+      const chartRendered = await dashboardVisualise.verifyChartRenders(page);
       expect(chartRendered).toBe(true);
     }
-
-    console.log("All chart types tested successfully without dashboard errors");
   });
   test("should set line chart as default when using histogram query", async ({
     page,
   }) => {
     // Setup the test with aggregation query
     const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardVisualise = new DashboardVisualise(page);
 
     await page.locator(".view-line").first().click();
     await page
@@ -946,10 +799,10 @@ test.describe(" visualize UI testcases", () => {
     await page.waitForTimeout(3000);
 
     // Verify line chart is selected as default for histogram queries
-    await verifyChartTypeSelected(page, "line", true);
+    await dashboardVisualise.verifyChartTypeSelected(page, "line", true);
 
     // Verify table chart is NOT selected for histogram queries
-    await verifyChartTypeSelected(page, "table", false);
+    await dashboardVisualise.verifyChartTypeSelected(page, "table", false);
 
     // Verify chart canvas renders successfully
     await expect(
@@ -957,7 +810,7 @@ test.describe(" visualize UI testcases", () => {
     ).toBeVisible();
 
     // Verify chart renders without errors
-    const chartRendered = await verifyChartRenders(page);
+    const chartRendered = await dashboardVisualise.verifyChartRenders(page);
     expect(chartRendered).toBe(true);
   });
   test("Should display the correct query in the dashboard when saved from a Table chart.", async ({
