@@ -36,8 +36,7 @@ export default class LogsVisualise {
 
     // Query editor locators
     this.logsQueryEditor = page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".inputarea");
+      .locator('[data-test="logs-search-bar-query-editor"]');
     //Functions
   }
   async openLogs() {
@@ -221,8 +220,8 @@ export default class LogsVisualise {
   //fill logs query editor with SQL query
   async fillLogsQueryEditor(sqlQuery) {
     await this.logsQueryEditor.waitFor({ state: "visible", timeout: 5000 });
-    await this.logsQueryEditor.click();
-    await this.logsQueryEditor.fill(sqlQuery);
+    await this.logsQueryEditor.locator('.monaco-editor').click();
+    await this.logsQueryEditor.locator('.inputarea').fill(sqlQuery);
   }
 
   // Open the first VRL Function Editor
