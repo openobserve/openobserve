@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #body-cell-duration="props">
         <q-td :props="props">
-          {{ getDuration(props.row.created_at).duration }}
+          {{ durationFormatter(props.row.duration) }}
         </q-td>
       </template>
       <template #body-cell-queryRange="props">
