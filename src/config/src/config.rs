@@ -1990,7 +1990,9 @@ pub struct EnrichmentTable {
 }
 
 pub fn init() -> Config {
-    dotenv_override().ok();
+    std::env::var("ZO_ENV_FILE_PATH").ok()
+        .and_then(|path| dotenvy::from_path_override(path).ok())
+        .or_else(|| dotenv_override().ok().map(|_| ()));
     let mut cfg = Config::init().expect("config init error");
 
     // set local mode
