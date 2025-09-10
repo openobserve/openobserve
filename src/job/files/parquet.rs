@@ -19,7 +19,7 @@ use std::{
     sync::Arc,
     time::UNIX_EPOCH,
 };
-use tokio::fs::remove_file;
+
 use arrow::{
     array::{
         Array, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array, Int64Builder,
@@ -32,12 +32,16 @@ use arrow_schema::{DataType, Schema, SchemaRef};
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{
-    cluster, get_config, meta::{
+    FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH, PARQUET_BATCH_SIZE,
+    TIMESTAMP_COL_NAME, cluster, get_config,
+    meta::{
         bitvec::BitVec,
         inverted_index::InvertedIndexFormat,
         search::StorageType,
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
-    }, metrics, utils::{
+    },
+    metrics,
+    utils::{
         arrow::record_batches_to_json_rows,
         async_file::{get_file_meta, get_file_size},
         file::scan_files_with_channel,
@@ -47,7 +51,7 @@ use config::{
             get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
         },
         schema_ext::SchemaExt,
-    }, FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH, PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME
+    },
 };
 use futures::TryStreamExt;
 use hashbrown::HashSet;
@@ -61,7 +65,10 @@ use infra::{
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
 use parquet::arrow::async_reader::ParquetRecordBatchStream;
-use tokio::sync::{Mutex, RwLock};
+use tokio::{
+    fs::remove_file,
+    sync::{Mutex, RwLock},
+};
 
 use crate::{
     common::{
