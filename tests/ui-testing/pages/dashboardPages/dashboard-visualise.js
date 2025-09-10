@@ -51,8 +51,8 @@ export default class LogstoVisualise {
   }
 
   // Helper function to check for dashboard errors
-  async checkDashboardErrors(page, chartTypeName) {
-    const dashboardErrorContainer = page.locator(
+  async checkDashboardErrors() {
+    const dashboardErrorContainer = this.page.locator(
       '[data-test="dashboard-error"]'
     );
     const errorContainerExists = await dashboardErrorContainer.count();
@@ -69,7 +69,7 @@ export default class LogstoVisualise {
     const errors = [];
 
     // Check for error indicator text
-    const errorText = page
+    const errorText = this.page
       .locator('[data-test="dashboard-error"]')
       .getByText(/Errors \(\d+\)/);
     const errorTextCount = await errorText.count();
@@ -80,7 +80,9 @@ export default class LogstoVisualise {
     }
 
     // Check for error list items
-    const errorListItems = page.locator('[data-test="dashboard-error"] ul li');
+    const errorListItems = this.page.locator(
+      '[data-test="dashboard-error"] ul li'
+    );
     const errorListCount = await errorListItems.count();
 
     if (errorListCount > 0) {
@@ -101,8 +103,8 @@ export default class LogstoVisualise {
     };
   }
   // Helper function to verify chart renders successfully
-  async verifyChartRenders(page) {
-    const chartRenderer = page.locator(
+  async verifyChartRenders() {
+    const chartRenderer = this.page.locator(
       '[data-test="chart-renderer"], [data-test="dashboard-panel-table"]'
     );
     const chartExists = await chartRenderer.count();
@@ -114,9 +116,9 @@ export default class LogstoVisualise {
     return chartExists > 0;
   }
   // Helper function to verify chart type selection
-  async verifyChartTypeSelected(page, chartType, shouldBeSelected = true) {
+  async verifyChartTypeSelected(chartType, shouldBeSelected = true) {
     const selector = `[data-test="selected-chart-${chartType}-item"]`;
-    const locator = page.locator(selector).locator("..");
+    const locator = this.page.locator(selector).locator("..");
 
     if (shouldBeSelected) {
       await expect(locator).toHaveClass(/bg-grey-[35]/);
