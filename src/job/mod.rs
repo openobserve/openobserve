@@ -92,10 +92,8 @@ async fn get_license_check_lock() -> Result<bool, anyhow::Error> {
         log::info!("[o2::ENT] License check lock acquired");
         drop(locker);
         ret?;
-        Ok(true)
-    } else {
-        Ok(false)
     }
+    Ok(true)
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
