@@ -845,6 +845,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 :title="t('search.cancel')"
                 class="q-pa-none search-button cancel-search-button"
+                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 @click="cancelVisualizeQueries"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -855,38 +856,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 :title="t('search.runQuery')"
                 class="q-pa-none search-button"
+                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 @click="handleRunQueryFn"
                 :disable="disable"
                 >{{ t("search.runQuery") }}</q-btn
                 >
-              <q-separator  class="tw-h-[29px] tw-w-[1px]" />
-              <q-btn-dropdown
-                flat
-                class="tw-h-[29px] search-button-dropdown"
-                :class="
-                  config.isEnterprise == 'true' &&
-                  visualizeSearchRequestTraceIds.length
-                    ? 'tw-bg-[#ec1414]'
-                    : 'tw-bg-[#5ca380]'
-                "
-                unelevated
-                dense
-              >
-                <q-btn
-                  data-test="logs-visualize-search-bar-refresh-btn"
-                  data-cy="search-bar-visuzlie-hard-refresh-button"
-                  dense
+                <div v-if="config.isEnterprise == 'true'" class="tw-flex tw-items-center">
+                <q-separator class="tw-h-[29px] tw-w-[1px]" />
+                <q-btn-dropdown
                   flat
-                  no-caps
-                  :title="'Refresh Cache & Run Query'"
-                  class="q-pa-sm search-button tw-rounded-r-none tw-text-[12px]"
-                  @click="handleRunQueryFn(true)"
-                  :disable="disable"
+                  class="tw-h-[29px] search-button-dropdown"
+                  :class="
+                    config.isEnterprise == 'true' &&
+                    visualizeSearchRequestTraceIds.length
+                      ? 'tw-bg-[#ec1414]'
+                      : 'tw-bg-[#5ca380]'
+                  "
+                  unelevated
+                  dense
                 >
-                  <q-icon name="refresh" class="q-mr-xs" />
-                  Refresh Cache & Run Query</q-btn
-                >
-              </q-btn-dropdown>
+                  <q-btn
+                    data-test="logs-visualize-search-bar-refresh-btn"
+                    data-cy="search-bar-visuzlie-hard-refresh-button"
+                    dense
+                    flat
+                    no-caps
+                    :title="'Refresh Cache & Run Query'"
+                    class="q-pa-sm search-button tw-rounded-r-none tw-text-[12px] search-button-normal-border-radius"
+                    @click="handleRunQueryFn(true)"
+                    :disable="disable"
+                  >
+                    <q-icon name="refresh" class="q-mr-xs" />
+                    Refresh Cache & Run Query</q-btn
+                  >
+                </q-btn-dropdown>
+              </div>
+
             </div>
             <div v-else class="tw-flex tw-items-center">
               <q-btn
@@ -903,6 +908,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 :title="t('search.cancel')"
                 class="q-pa-none search-button cancel-search-button"
+                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 @click="cancelQuery"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -913,7 +919,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.runQuery')"
-                class="q-pa-none search-button tw-rounded-r-none"
+                class="q-pa-none search-button"
+                :class="config.isEnterprise == 'true' ? 'search-button-enterprise-border-radius' : 'search-button-normal-border-radius'"
                 @click="handleRunQueryFn"
                 :disable="
                   searchObj.loading == true ||
@@ -921,7 +928,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 >{{ t("search.runQuery") }}</q-btn
               >
-              <q-separator  class="tw-h-[29px] tw-w-[1px]" />
+              <div class="tw-flex tw-items-center" v-if="config.isEnterprise == 'true'">
+                <q-separator  class="tw-h-[29px] tw-w-[1px]" />
               <q-btn-dropdown flat class="tw-h-[29px] search-button-dropdown" 
               :class="
               config.isEnterprise == 'true' &&
@@ -937,7 +945,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       flat
                       no-caps
                       :title="'Refresh Cache & Run Query'"
-                      class="q-pa-sm search-button tw-rounded-r-none tw-text-[12px] "
+                      class="q-pa-sm search-button tw-rounded-r-none tw-text-[12px] search-button-normal-border-radius"
                       @click="handleRunQueryFn(true)"
                       :disable="
                         searchObj.loading == true ||
@@ -947,6 +955,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-icon name="refresh" class="q-mr-xs" />
                       Refresh Cache & Run Query</q-btn>
               </q-btn-dropdown>
+              </div>
             </div>
           </div>
         </div>
@@ -4418,13 +4427,23 @@ export default defineComponent({
 
     .q-btn__content {
       background: $secondary;
-      border-radius: 3px 0px 0px 3px;
       padding: 0px 5px;
 
       .q-icon {
         font-size: 15px;
         color: #ffffff;
       }
+    }
+  }
+
+  .search-button-enterprise-border-radius{
+    .q-btn__content{
+      border-radius: 3px 0px 0px 3px !important;
+    }
+  }
+  .search-button-normal-border-radius{
+    .q-btn__content{
+      border-radius: 3px;
     }
   }
 
