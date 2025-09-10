@@ -55,7 +55,10 @@ export class CreateOrgPage {
     }
 
     async fillOrgName(orgName) {
-        await this.page.locator('[data-test="org-name"]').fill(orgName);
+        //check if element is visible before filling
+        const orgNameField = this.page.locator('[data-test="org-name"]');
+        await orgNameField.waitFor({ state: 'visible' });
+        await orgNameField.fill(orgName);
     }
 
     async clickSaveOrg() {
