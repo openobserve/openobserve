@@ -41,7 +41,7 @@ use crate::{
     },
 };
 
-const STREAM_NAME: &str = "trace_list_index";
+pub const STREAM_NAME: &str = "trace_list_index";
 
 pub(crate) static INSTANCE: Lazy<TraceListIndex> = Lazy::new(TraceListIndex::new);
 
