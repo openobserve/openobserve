@@ -375,7 +375,7 @@ export default defineComponent({
       if (isIngestionUnlimited.value) {
         return 0;
       }
-      return licenseData.value.license?.ingestion_used || 0;
+      return licenseData.value.ingestion_used || 0;
     });
 
     const getIngestionUsageColor = () => {
