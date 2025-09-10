@@ -45,7 +45,7 @@ use crate::{
             self,
             user::{
                 AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser, UpdateUser,
-                UserOrgRole, UserRequest, UserRoleRequest, get_roles,
+                UserOrgRole, UserRequest, UserRoleRequest, UserUpdateMode, get_roles,
             },
         },
         utils::auth::{UserEmail, generate_presigned_url, is_valid_email},
@@ -245,8 +245,12 @@ pub async fn update(
         });
     }
     let initiator_id = &user_email.user_id;
-    let self_update = user_email.user_id.eq(&email_id);
-    users::update_user(&org_id, &email_id, self_update, initiator_id, user).await
+    let update_mode = if user_email.user_id.eq(&email_id) {
+        UserUpdateMode::SelfUpdate
+    } else {
+        UserUpdateMode::OtherUpdate
+    };
+    users::update_user(&org_id, &email_id, update_mode, initiator_id, user).await
 }
 
 /// AddUserToOrganization

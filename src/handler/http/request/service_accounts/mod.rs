@@ -29,7 +29,7 @@ use crate::{
             self,
             http::HttpResponse as MetaHttpResponse,
             service_account::{APIToken, ServiceAccountRequest, UpdateServiceAccountRequest},
-            user::{UpdateUser, UserRequest},
+            user::{UpdateUser, UserRequest, UserUpdateMode},
         },
         utils::auth::UserEmail,
     },
@@ -226,7 +226,14 @@ pub async fn update(
     };
     let initiator_id = &user_email.user_id;
 
-    users::update_user(&org_id, &email_id, false, initiator_id, user).await
+    users::update_user(
+        &org_id,
+        &email_id,
+        UserUpdateMode::OtherUpdate,
+        initiator_id,
+        user,
+    )
+    .await
 }
 
 /// RemoveServiceAccount
