@@ -1,0 +1,174 @@
+name: Testmo Triggered Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_file:
+        description: 'Test file to run (e.g., alerts-e2e-flow.spec.js)'
+        required: true
+        default: 'alerts-e2e-flow.spec.js'
+      test_folder:
+        description: 'Test folder (e.g., Alerts)'
+        required: true
+        default: 'Alerts'
+      testmo_run_id:
+        description: 'Testmo Run ID for result submission'
+        required: false
+        default: ''
+
+env:
+  COLUMNS: 150
+  ZO_ROOT_USER_EMAIL: root@example.com
+  ZO_ROOT_USER_PASSWORD: Complexpass#123
+  ZO_BASE_URL: http://localhost:5080
+  WS_ZO_BASE_URL: ws://localhost:5080
+  ZO_BASE_URL_SC: http://localhost:5080
+  ZO_BASE_URL_SC_UI: http://localhost:5080
+  INGESTION_URL: http://localhost:5080
+  ORGNAME: default
+  ZO_QUICK_MODE_NUM_FIELDS: 100
+  ZO_QUICK_MODE_STRATEGY: first
+  ZO_ALLOW_USER_DEFINED_SCHEMAS: true
+  ZO_INGEST_ALLOWED_UPTO: 5
+  ZO_FEATURE_QUERY_EXCLUDE_ALL: false
+  ZO_USAGE_BATCH_SIZE: 200
+  ZO_USAGE_PUBLISH_INTERVAL: 2
+  ZO_USAGE_REPORTING_ENABLED: true
+  ZO_MIN_AUTO_REFRESH_INTERVAL: 5
+  ZO_STREAMING_ENABLED: true
+  ZO_COLS_PER_RECORD_LIMIT: "80000"
+  ZO_SMTP_ENABLED: true
+  ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
+  ZO_CREATE_ORG_THROUGH_INGESTION: true
+  ZO_UTF8_VIEW_ENABLED: false
+
+jobs:
+  build_binary:
+    name: build_binary
+    runs-on:
+      labels: ubicloud-standard-16
+
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-05-20
+          targets: x86_64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "21.12"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Build frontend code
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+          VITE_COVERAGE: "true"
+          COVERAGE: "true"
+        run: cd web && npm install && npm run build
+
+      - name: Build and run binary
+        run: cargo build --release --target x86_64-unknown-linux-gnu
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-binary-testmo
+          path: target/x86_64-unknown-linux-gnu/release/openobserve
+          retention-days: 1
+
+  testmo_triggered_test:
+    name: Testmo Triggered Test
+    needs: [build_binary]
+    runs-on:
+      labels: ubicloud-standard-8
+    container:
+      image: mcr.microsoft.com/playwright:v1.50.0-jammy
+      options: --user root
+
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: debug-binary-testmo
+          path: debug-binary
+
+      - name: Start OpenObserve
+        run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
+
+      - name: Wait for start
+        run: sleep 15
+
+      - name: Ensure we are getting a reply from the server
+        run: curl http://localhost:5080/web/login
+
+      - name: Create coverage json folder
+        run: mkdir -p tests/ui-testing/.nyc_output
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+
+      - name: Install dependencies and run specific test
+        run: |
+          touch .env
+          echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
+          echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}" >> .env
+          echo "ZO_BASE_URL=${ZO_BASE_URL}" >> .env
+          echo "WS_ZO_BASE_URL=${WS_ZO_BASE_URL}" >> .env
+          echo "ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
+          echo "ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
+          echo "INGESTION_URL=${INGESTION_URL}" >> .env
+          echo "ORGNAME=${ORGNAME}" >> .env
+          echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
+          mv .env tests/ui-testing
+          cd tests/ui-testing && npm ci
+          
+          echo "Running test file: ${{ github.event.inputs.test_file }}"
+          echo "From folder: ${{ github.event.inputs.test_folder }}"
+          
+          # Run the specific test file
+          npx playwright test "./playwright-tests/${{ github.event.inputs.test_folder }}/${{ github.event.inputs.test_file }}"
+
+      - name: Submit results to Testmo
+        if: always()
+        env:
+          TESTMO_TOKEN: ${{ secrets.TESTMO_TOKEN }}
+        run: |
+          cd tests/ui-testing
+          TESTMO_TOKEN="${{ secrets.TESTMO_TOKEN }}" npx testmo automation:run:submit \
+            --instance https://openobserve.testmo.net \
+            --project-id 1 \
+            --name "Testmo Triggered: ${{ github.event.inputs.test_file }}" \
+            --source "Testmo-Triggered-${{ github.event.inputs.test_folder }}" \
+            --results test-results/results.xml
+
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always() && hashFiles('playwright-report/**') != ''
+        with:
+          name: playwright-report-testmo-${{ github.event.inputs.test_folder }}
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Check OpenObserve logs
+        if: always()
+        run: cat o2.log
