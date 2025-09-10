@@ -107,13 +107,21 @@ async fn register() -> Result<()> {
     // Except router it will run on every node. That is because this nats queue is supposed
     // to be common for all the event types like enrichment table/schema etc.
     tokio::task::spawn(async move {
-        let _ = infra::cluster_coordinator::subscribe(async move |payload| {
+        if let Err(e) = infra::cluster_coordinator::subscribe(async move |payload| {
             crate::service::db::internal_coordinator_stream::handle_internal_coordinator_event(
                 payload,
             )
             .await
         })
-        .await;
+        .await
+        {
+            panic!(
+                "[INTERNAL_COORDINATOR::SUBSCRIBE] failed to subscribe to internal coordinator stream: {e}"
+            );
+        }
+        log::warn!(
+            "[INTERNAL_COORDINATOR::SUBSCRIBE] the internal queue coordinator is not running on this node."
+        );
     });
 
     // task::spawn(async move { super::watch_node_list().await });

@@ -225,10 +225,11 @@ impl super::Db for NatsDb {
             .await
             .map_err(|e| Error::Message(format!("[NATS:put] bucket.put error: {}", e)))?;
         if need_watch {
+            log::debug!("[INTERNAL_COORDINATOR::PUT] publishing event for key: {local_key}");
             if let Err(e) =
                 publish_event(coordinator_put_event(&local_key, start_dt, Some(value))).await
             {
-                log::error!("[NATS] send event error: {}", e);
+                log::error!("[INTERNAL_COORDINATOR::PUT] nats send event error: {}", e);
             }
         }
         Ok(())
@@ -320,8 +321,12 @@ impl super::Db for NatsDb {
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {}", e)))?;
             if need_watch {
+                log::debug!("[INTERNAL_COORDINATOR::DELETE] publishing event for key: {key}");
                 if let Err(e) = publish_event(meta_delete_event(&key, start_dt)).await {
-                    log::error!("[NATS] send event error: {}", e);
+                    log::error!(
+                        "[INTERNAL_COORDINATOR::DELETE] nats send event error: {}",
+                        e
+                    );
                 }
             }
             return Ok(());
@@ -335,8 +340,12 @@ impl super::Db for NatsDb {
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {}", e)))?;
             if need_watch {
+                log::debug!("[INTERNAL_COORDINATOR::DELETE] publishing event for key: {purge_key}");
                 if let Err(e) = publish_event(meta_delete_event(&purge_key, start_dt)).await {
-                    log::error!("[NATS] send event error: {}", e);
+                    log::error!(
+                        "[INTERNAL_COORDINATOR::DELETE] nats send event error: {}",
+                        e
+                    );
                 }
             }
         }
