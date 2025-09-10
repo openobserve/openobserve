@@ -25,7 +25,8 @@ use config::{
         stream::{FileKey, StreamParams, StreamPartition},
     },
     utils::{
-        file::{is_exists, scan_files_filtered, wal_dir_datetime_filter_builder},
+        async_file::{create_wal_dir_datetime_filter, scan_files_filtered},
+        file::is_exists,
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
         record_batch_ext::concat_batches,
         size::bytes_to_human_readable,
@@ -554,12 +555,8 @@ async fn get_file_list_inner(
         let extension_pattern = file_ext.to_string();
         // Skip count is the number of segments in the cannonicalised path before
         // <YY>/<MM>/<DD>/<HH>/<file> appear
-        let filter = wal_dir_datetime_filter_builder(
-            start_time,
-            end_time,
-            extension_pattern,
-            skip_count + 1,
-        );
+        let filter =
+            create_wal_dir_datetime_filter(start_time, end_time, extension_pattern, skip_count + 1);
 
         scan_files_filtered(&pattern, filter, None).await?
     } else {
