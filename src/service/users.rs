@@ -266,7 +266,6 @@ pub async fn update_user(
             custom: None,
         });
     }
-    user.role = user.role.clone();
 
     // Only root user can update root user
     if is_email_root && !update_mode.is_self_update() && !update_mode.is_cli_update() {

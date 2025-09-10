@@ -23,9 +23,11 @@ use infra::{
 
 use crate::{
     cli::data::{
-        cli::{args as dataArgs, Cli as dataCli}, export, import, Context
+        Context,
+        cli::{Cli as dataCli, args as dataArgs},
+        export, import,
     },
-    common::{infra::config::USERS, meta::{self, user::UserUpdateMode}},
+    common::{infra::config::USERS, meta},
     migration,
     service::{compact, db, file_list, users},
 };
@@ -177,7 +179,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     let ret = users::update_user(
                         meta::organization::DEFAULT_ORG,
                         cfg.auth.root_user_email.as_str(),
-                        UserUpdateMode::CliUpdate,
+                        meta::user::UserUpdateMode::CliUpdate,
                         cfg.auth.root_user_email.as_str(),
                         meta::user::UpdateUser {
                             change_password: true,
@@ -197,8 +199,11 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         },
                     )
                     .await?;
-                    if !ret.status().is_success(){
-                        return Err(anyhow::anyhow!("reset root user failed, error: {:?}", ret.body()));
+                    if !ret.status().is_success() {
+                        return Err(anyhow::anyhow!(
+                            "reset root user failed, error: {:?}",
+                            ret.body()
+                        ));
                     }
                 }
                 "user" => {
