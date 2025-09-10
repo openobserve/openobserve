@@ -24,9 +24,10 @@
       <q-spinner size="40px" />
       <div class="q-mt-md">Loading license information...</div>
     </div>
+    <div v-else class="tw-grid tw-grid-cols-3 tw-gap-4">
 
-    <div v-else>
-      <div v-if="licenseData.license === null || !licenseData.license" class="q-mb-lg">
+    <div class="tw-col-span-2" >
+      <div v-if="licenseData.license === null || !licenseData.license">
         <q-card class="q-mb-md">
           <q-card-section>
             <div class="text-h6">No License Found</div>
@@ -136,57 +137,6 @@
               </q-card-section>
             </q-card>
           </div>
-
-          <div class="col" style="flex: 1">
-            <q-card style="height: 100%">
-              <q-card-section class="full-height column">
-                <div class="text-h6 q-mb-md tw-mx-auto">Usage Information</div>
-                <div v-if="licenseData.license && licenseData.license.limits" class="text-center q-mb-md tw-mt-[10px]">
-                  <div class="text-subtitle2 q-mb-sm">Ingestion Usage</div>
-                  <q-circular-progress
-                    :value="ingestionUsagePercent"
-                    size="120px"
-                    :thickness="0.15"
-                    :color="getIngestionUsageColor()"
-                    track-color="grey-3"
-                    show-value
-                    class="q-ma-md"
-                  >
-                    <span class="text-h6">{{ ingestionUsagePercent }}%</span>
-                  </q-circular-progress>
-                  <div class="text-caption text-weight-bold">
-                    {{ isIngestionUnlimited ? 'Limit: Unlimited' : `Limit: ${licenseData.license.limits.Ingestion.value}GB / day` }}
-                  </div>
-                  <div v-if="isIngestionUnlimited" class="text-caption text-grey-6 q-mt-xs" style="font-size: 10px;">
-                    * Usage shows 0% for unlimited plans
-                  </div>
-                </div>
-                <div v-else class="text-center q-mb-md tw-mt-[70px] column items-center">
-                  <q-icon name="info" size="60px" color="grey-5" class="q-mb-md" />
-                  <div class="text-body2 text-grey-7">
-                    Add license key to enable usage information
-                  </div>
-                </div>
-                <q-markup-table v-if="licenseData.license && licenseData.license.limits" flat bordered dense class="q-mt-auto compact-table">
-                  <thead>
-                    <tr>
-                      <th colspan="2" class="text-center text-weight-bold">Ingestion</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td class="text-weight-bold">Type</td>
-                      <td>{{ licenseData.license.limits.Ingestion.typ }}</td>
-                    </tr>
-                    <tr>
-                      <td class="text-weight-bold">Value</td>
-                      <td>{{ licenseData.license.limits.Ingestion.value }}</td>
-                    </tr>
-                  </tbody>
-                </q-markup-table>
-              </q-card-section>
-            </q-card>
-          </div>
         </div>
 
         <q-card v-if="showUpdateForm" class="q-mt-md">
@@ -222,6 +172,52 @@
         </q-card>
       </div>
     </div>
+
+    <div class="tw-col-span-1">
+            <q-card style="height: 100%">
+              <q-card-section class="full-height column">
+                <div class="text-h6 q-mb-md tw-mx-auto">Usage Information</div>
+                <div  class="text-center q-mb-md tw-mt-[10px]">
+                  <div class="text-subtitle2 q-mb-sm">Ingestion Usage</div>
+                  <q-circular-progress
+                    :value="ingestionUsagePercent"
+                    size="120px"
+                    :thickness="0.15"
+                    :color="getIngestionUsageColor()"
+                    track-color="grey-3"
+                    show-value
+                    class="q-ma-md"
+                  >
+                    <span class="text-h6">{{ ingestionUsagePercent }}%</span>
+                  </q-circular-progress>
+                  <div class="text-caption text-weight-bold">
+                    {{ isIngestionUnlimited ? 'Limit: Unlimited' : `Limit: ${licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB / day` : '200 GB / day'}` }}
+                  </div>
+                  <div v-if="isIngestionUnlimited" class="text-caption text-grey-6 q-mt-xs" style="font-size: 10px;">
+                    * Usage shows 0% for unlimited plans
+                  </div>
+                </div>
+                <q-markup-table flat bordered dense class="q-mt-auto compact-table">
+                  <thead>
+                    <tr>
+                      <th colspan="2" class="text-center text-weight-bold">Ingestion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="text-weight-bold">Type</td>
+                      <td>{{ licenseData?.license?.limits?.Ingestion?.typ ? licenseData?.license?.limits?.Ingestion?.typ : 'PerDayCount' }}</td>
+                    </tr>
+                    <tr>
+                      <td class="text-weight-bold">Value</td>
+                      <td>{{ licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB / day` : '200 GB / day' }}</td>
+                    </tr>
+                  </tbody>
+                </q-markup-table>
+              </q-card-section>
+            </q-card>
+    </div>
+  </div>
 
     <!-- License Key Modal -->
     <q-dialog v-model="showLicenseKeyModal" persistent>
