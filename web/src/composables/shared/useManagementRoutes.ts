@@ -34,7 +34,7 @@ const useManagementRoutes = () => {
           path: "organization",
           name: "organizationSettings",
           meta:{
-            title: "Organization Settings",
+            title: "Organization Parameters",
           },
           component: () =>
             import("@/components/settings/OrganizationSettings.vue"),
@@ -57,7 +57,7 @@ const useManagementRoutes = () => {
           path: "templates",
           name: "alertTemplates",
           meta:{
-            title: "Alert Templates",
+            title: "Templates",
           },
           component: TemplateList,
           beforeEnter(to: any, from: any, next: any) {

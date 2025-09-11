@@ -25,7 +25,9 @@ const search = {
       page_type = "logs",
       traceparent,
       dashboard_id,
+      dashboard_name,
       folder_id,
+      folder_name,
       panel_id,
       panel_name,
       run_id,
@@ -38,7 +40,9 @@ const search = {
       page_type: string;
       traceparent?: string;
       dashboard_id?: string;
+      dashboard_name?: string;
       folder_id?: string;
+      folder_name?: string;
       panel_id?: string;
       panel_name?: string;
       run_id?: string;
@@ -57,7 +61,10 @@ const search = {
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
+    if (dashboard_name)
+      url += `&dashboard_name=${encodeURIComponent(dashboard_name)}`;
     if (folder_id) url += `&folder_id=${folder_id}`;
+    if (folder_name) url += `&folder_name=${encodeURIComponent(folder_name)}`;
     if (panel_id) url += `&panel_id=${panel_id}`;
     if (panel_name) url += `&panel_name=${encodeURIComponent(panel_name)}`;
     if (run_id) url += `&run_id=${run_id}`;
@@ -68,7 +75,10 @@ const search = {
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
       if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
+      if (dashboard_name)
+        url += `&dashboard_name=${encodeURIComponent(dashboard_name)}`;
       if (folder_id) url += `&folder_id=${folder_id}`;
+      if (folder_name) url += `&folder_name=${encodeURIComponent(folder_name)}`;
       if (panel_id) url += `&panel_id=${panel_id}`;
       if (panel_name) url += `&panel_name=${encodeURIComponent(panel_name)}`;
       if (run_id) url += `&run_id=${run_id}`;
@@ -189,7 +199,9 @@ const search = {
     end_time,
     step,
     dashboard_id,
+    dashboard_name,
     folder_id,
+    folder_name,
     panel_id,
     panel_name,
     run_id,
@@ -202,7 +214,9 @@ const search = {
     end_time: number;
     step: string;
     dashboard_id?: string;
+    dashboard_name?: string;
     folder_id?: string;
+    folder_name?: string;
     panel_id?: string;
     panel_name?: string;
     run_id?: string;
@@ -213,7 +227,10 @@ const search = {
       query,
     )}`;
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
+    if (dashboard_name)
+      url += `&dashboard_name=${encodeURIComponent(dashboard_name)}`;
     if (folder_id) url += `&folder_id=${folder_id}`;
+    if (folder_name) url += `&folder_name=${encodeURIComponent(folder_name)}`;
     if (panel_id) url += `&panel_id=${panel_id}`;
     if (panel_name) url += `&panel_name=${encodeURIComponent(panel_name)}`;
     if (run_id) url += `&run_id=${run_id}`;

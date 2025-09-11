@@ -75,7 +75,7 @@ jobs:
         uses: arduino/setup-protoc@v3
         with:
           version: "21.12"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
@@ -118,6 +118,7 @@ jobs:
                 "schemaload.spec.js",
                 "serviceAccount.spec.js",
                 "usersOrg.spec.js",
+                "org.spec.js",
               ]
           - testfolder: "Logs-Core"
             browser: "chrome"
@@ -224,7 +225,7 @@ jobs:
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: lts/*
 
