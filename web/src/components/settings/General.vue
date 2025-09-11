@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outlined
               filled
               dense
+              data-test="general-settings-scrape-interval"
               hide-bottom-space
               :rules="[(val: any) => !!val || 'Scrape interval is required']"
               :lazy-rules="true"
