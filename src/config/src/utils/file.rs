@@ -184,7 +184,6 @@ pub fn set_permission<P: AsRef<std::path::Path>>(
 mod tests {
     use std::fs;
 
-    use chrono::{TimeZone, Utc};
     use tempfile::TempDir;
 
     use super::*;

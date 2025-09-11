@@ -1144,12 +1144,9 @@ pub async fn list_user_invites(user_id: &str, only_pending: bool) -> Result<Http
             if only_pending {
                 let now = chrono::Utc::now().timestamp_micros();
 
-                result = result
-                    .into_iter()
-                    .filter(|invite| {
-                        invite.status == InviteStatus::Pending && invite.expires_at > now
-                    })
-                    .collect();
+                result.retain(|invite| {
+                    invite.status == InviteStatus::Pending && invite.expires_at > now
+                });
             }
             Ok(HttpResponse::Ok().json(UserInviteList { data: result }))
         }

@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-mx-md q-my-md">
+  <div class="q-px-md q-py-md"
+  :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  >
     <div class="row items-center no-wrap">
       <div class="col">
         <div v-if="isUpdating" class="text-h6">
@@ -57,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             accept=".csv"
             dense
             :rules="[(val: any) => !!val || 'CSV File is required!']"
+            hide-bottom-space
           >
             <template v-slot:prepend>
               <q-icon name="attachment" />
@@ -71,27 +74,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <pre class="q-py-md showLabelOnTop text-bold text-h7">{{
+        <pre v-if="compilationErr" class="q-py-md showLabelOnTop text-bold text-h7">{{
           compilationErr
         }}</pre>
 
-        <div class="flex justify-center q-mt-lg">
+        <div class="flex justify-start">
           <q-btn
-            v-close-popup="true"
-            class="q-mb-md text-bold"
+            v-close-popup
+            class="q-mr-md o2-secondary-button tw-h-[36px]"
             :label="t('function.cancel')"
-            text-color="light-text"
-            padding="sm md"
             no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             @click="$emit('cancel:hideform')"
           />
           <q-btn
+            class="o2-primary-button no-border tw-h-[36px]"
             :label="t('function.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
             type="submit"
             no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           />
         </div>
       </q-form>

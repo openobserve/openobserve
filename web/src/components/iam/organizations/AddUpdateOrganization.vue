@@ -15,29 +15,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md">
-      <div class="row items-center no-wrap">
+  <q-card class="column full-height" style="width: 30vw">
+    <q-card-section class="q-px-md q-py-sm ">
+      <div class="row items-center no-wrap q-py-sm">
         <div class="col">
           <div
             v-if="beingUpdated"
-            class="text-body1 text-bold"
             data-test="update-org"
+            style="font-size: 18px"
           >
             {{ t("organization.updateOrganization") }}
           </div>
-          <div v-else class="text-body1 text-bold" data-test="create-org">
+          <div v-else style="font-size: 18px" data-test="create-org">
             {{ t("organization.createOrganization") }}
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
-            data-test="close-organizations-modal"
-            v-close-popup="true"
-            round
-            flat
-            icon="close"
-            @click="router.replace({ name: 'organizations' })"
+          <q-icon
+            data-test="add-org-close-dialog-btn"
+            name="cancel"
+            class="cursor-pointer"
+            size="20px"
+            @click="$emit('cancel:hideform')"
           />
         </div>
       </div>
@@ -83,25 +82,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
       </q-input>
 
-        <div class="flex q-mt-lg">
+        <div class="flex ">
           <q-btn
             v-close-popup="true"
-            class="q-mb-md text-bold"
+            class="q-mr-md o2-secondary-button tw-h-[36px]"
             :label="t('organization.cancel')"
-            text-color="light-text"
-            padding="sm md"
             no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             @click="router.replace({ name: 'organizations' })"
             data-test="cancel-organizations-modal"
           />
           <q-btn
             :disable="organizationData.name === '' && !proPlanRequired"
             :label="t('organization.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
+            class="o2-primary-button no-border tw-h-[36px]"
             type="submit"
             no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             data-test="add-org"
           />
         </div>
@@ -156,7 +155,7 @@ export default defineComponent({
       newOrgIdentifier: "",
     };
   },
-  emits: ["update:modelValue", "updated", "finish"],
+  emits: ["update:modelValue", "updated", "finish", "cancel:hideform"],
   setup() {
     const store: any = useStore();
     const router: any = useRouter();

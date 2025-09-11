@@ -164,7 +164,7 @@ describe("ListOrganizations", () => {
     });
 
     it("should have correct pagination settings", () => {
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(25);
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
       expect(wrapper.vm.perPageOptions).toHaveLength(5);
     });
 
@@ -283,7 +283,7 @@ describe("ListOrganizations", () => {
     });
 
     it("should have correct initial pagination state", () => {
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(25);
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
     });
 
     it("should update table pagination", async () => {

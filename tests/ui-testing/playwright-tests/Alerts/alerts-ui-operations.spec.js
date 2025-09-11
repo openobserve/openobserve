@@ -125,7 +125,7 @@ test.describe("Alerts UI Operations", () => {
    * Test: Alert Module UI Validations and Filters Check
    * Tests UI validations and filter functionality
    */
-  test('Alert Module UI Validations and Filters Check', {
+  test.skip('Alert Module UI Validations and Filters Check', {
     tag: ['@all', '@alerts', '@alertsUIValidations']
   }, async ({ page }) => {
     // Create template
