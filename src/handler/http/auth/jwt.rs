@@ -583,9 +583,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> (bool, bool) 
     };
     let pending_invites = pending_invites
         .into_iter()
-        .filter(|invite| invite.status == OrgInviteStatus::Pending && invite.expires_at > now)
-        .next()
-        .is_some();
+        .any(|invite| invite.status == OrgInviteStatus::Pending && invite.expires_at > now);
     if db_user.is_none() {
         is_new_user = true;
         match create_new_user(DBUser {
