@@ -164,7 +164,13 @@ impl super::Queue for NatsQueue {
             loop {
                 let message = match messages.try_next().await {
                     Ok(Some(message)) => message,
-                    Ok(None) => break,
+                    Ok(None) => {
+                        log::warn!(
+                            "Nats consumer messages for stream {} is closed",
+                            stream_name
+                        );
+                        break;
+                    }
                     Err(e) => {
                         log::error!(
                             "Failed to get nats consumer messages for stream {}: {}",
