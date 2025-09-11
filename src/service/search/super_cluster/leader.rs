@@ -84,9 +84,6 @@ pub async fn search(
         return Ok((vec![], ScanStats::new(), 0, false, "".to_string()));
     }
 
-    let use_inverted_index = super::super::is_use_inverted_index(&sql);
-    req.set_use_inverted_index(use_inverted_index);
-
     // 2. get nodes
     let get_node_start = std::time::Instant::now();
     let role_group = req

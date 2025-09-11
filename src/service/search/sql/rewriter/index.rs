@@ -18,15 +18,50 @@ use std::{ops::ControlFlow, sync::Arc};
 use datafusion::common::TableReference;
 use hashbrown::{HashMap, HashSet};
 use infra::schema::{SchemaCache, get_stream_setting_index_fields, unwrap_stream_settings};
-use sqlparser::ast::{Query, VisitorMut};
+use sqlparser::{
+    ast::{Query, VisitMut, VisitorMut},
+    dialect::PostgreSqlDialect,
+};
 
 use crate::service::search::{
     index::{IndexCondition, get_index_condition_from_expr},
-    sql::visitor::utils::{
-        is_simple_count_query, is_simple_distinct_query, is_simple_histogram_query,
-        is_simple_topn_query,
+    sql::{
+        Sql,
+        visitor::utils::{
+            is_simple_count_query, is_simple_distinct_query, is_simple_histogram_query,
+            is_simple_topn_query,
+        },
     },
 };
+
+// this is for feature query_align_partitions_for_index
+// but this is only can check the simple table,
+// not able to check join or subquery
+pub fn use_inverted_index(sql: &Sql) -> bool {
+    let cfg = config::get_config();
+    if !cfg.common.inverted_index_enabled {
+        return false;
+    }
+
+    let mut index_condition = None;
+    let mut can_optimize = false;
+    let mut statement = sqlparser::parser::Parser::parse_sql(&PostgreSqlDialect {}, &sql.sql)
+        .unwrap()
+        .pop()
+        .unwrap();
+    if sql.stream_names.len() == 1 {
+        let mut index_visitor = IndexVisitor::new(
+            &sql.schemas,
+            cfg.common.feature_query_remove_filter_with_index,
+            cfg.common.inverted_index_count_optimizer_enabled,
+        );
+        let _ = statement.visit(&mut index_visitor);
+        index_condition = index_visitor.index_condition;
+        can_optimize = index_visitor.can_optimize;
+    }
+
+    index_condition.is_some() || can_optimize
+}
 
 // generate tantivy from sql and remove filter when we can
 pub struct IndexVisitor {
