@@ -2845,7 +2845,7 @@ fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.pipeline.wal_size_limit *= 1024 * 1024;
     }
-    
+
     if cfg.pipeline.pipeline_file_push_back_interval == 0 {
         cfg.pipeline.pipeline_file_push_back_interval = 2; // 2 seconds
     }
