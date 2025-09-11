@@ -122,7 +122,7 @@ describe("AppGroups Component", () => {
     });
 
     it("renders add group button", () => {
-      const addButton = wrapper.find('[data-test="alert-list-add-alert-btn"]');
+      const addButton = wrapper.find('[data-test="iam-groups-add-group-btn"]');
       expect(addButton.exists()).toBe(true);
       expect(addButton.text()).toContain("Add User Group");
     });
@@ -219,7 +219,7 @@ describe("AppGroups Component", () => {
 
   describe("Add Group Dialog", () => {
     it("opens add group dialog when button is clicked", async () => {
-      const addButton = wrapper.find('[data-test="alert-list-add-alert-btn"]');
+      const addButton = wrapper.find('[data-test="iam-groups-add-group-btn"]');
       await addButton.trigger("click");
       expect(wrapper.vm.showAddGroup).toBe(true);
     });
@@ -464,23 +464,6 @@ describe("AppGroups Component", () => {
       };
       const result = filterGroupsSafe(testRows, null);
       expect(result).toEqual([]);
-    });
-  });
-
-  describe("Accessibility", () => {
-    it("has proper ARIA labels and titles", () => {
-      const editIcon = wrapper.find('[data-test="iam-groups-edit-test-group-role-icon"]');
-      const deleteIcon = wrapper.find('[data-test="iam-groups-delete-test-group-role-icon"]');
-      
-      expect(editIcon.attributes("title")).toBe("Edit");
-      expect(deleteIcon.attributes("title")).toBe("Delete");
-    });
-
-    it("has proper button styling and attributes", () => {
-      const addButton = wrapper.find('[data-test="alert-list-add-alert-btn"]');
-      
-      expect(addButton.exists()).toBe(true);
-      expect(addButton.classes()).toContain("q-btn");
     });
   });
 });

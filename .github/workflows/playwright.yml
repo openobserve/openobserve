@@ -75,7 +75,7 @@ jobs:
         uses: arduino/setup-protoc@v3
         with:
           version: "21.12"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
@@ -118,6 +118,7 @@ jobs:
                 "schemaload.spec.js",
                 "serviceAccount.spec.js",
                 "usersOrg.spec.js",
+                "org.spec.js",
               ]
           - testfolder: "Logs-Core"
             browser: "chrome"
@@ -135,6 +136,7 @@ jobs:
             browser: "chrome"
             run_files:
               [
+                "logsDownloads.spec.js",
                 "logsqueries.spec.js",
                 "secondsPrecisionAdded.spec.js",
                 "logsqueries.cte.spec.js",
@@ -158,6 +160,7 @@ jobs:
                 "dashboardtype.spec.js",
                 "dashboard-folder.spec.js",
                 "dashboard-import.spec.js",
+                "maxquery.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
@@ -177,7 +180,7 @@ jobs:
                 "dashboard-maps.spec.js",
                 "dashboard-multi-y-axis.spec.js",
                 "dashboard-html-chart.spec.js",
-                # "visualize.spec.js",
+                "visualize.spec.js",
                 # "visualization-vrl.spec.js"
               ]
           - testfolder: "Pipelines"
@@ -222,7 +225,7 @@ jobs:
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: lts/*
 
@@ -295,10 +298,11 @@ jobs:
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npx nyc report
 
-      - uses: actions/upload-artifact@v4
-        if: always()
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always() && hashFiles('playwright-report/**') != ''
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.testfolder }}
           path: playwright-report/
           retention-days: 30
 
@@ -336,6 +340,7 @@ jobs:
 
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
+        if: hashFiles('tests/ui-testing/coverage-report/**') != ''
         with:
           name: coverage-report
           path: tests/ui-testing/coverage-report

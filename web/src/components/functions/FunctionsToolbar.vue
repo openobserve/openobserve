@@ -92,41 +92,41 @@
       <q-btn
         data-test="add-function-fullscreen-btn"
         v-close-popup="true"
-        class="text-bold tw-border-primary add-function-fullscreen-btn"
+        class="o2-secondary-button tw-h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         :label="t('common.fullscreen')"
-        :text-color="store.state.theme === 'dark' ? 'grey-1' : 'primary'"
-        padding="sm"
         no-caps
+        flat
         icon="fullscreen"
         @click="handleFullScreen"
       />
       <q-btn
+        data-test="add-function-cancel-btn"
+        class="tw-ml-[12px] o2-secondary-button no-border tw-h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        flat
+        :label="t('function.cancel')"
+        no-caps
+        @click="emit('cancel')"
+      />
+      <q-btn
         data-test="add-function-test-btn"
         :label="t('function.testFunction')"
-        class="text-bold no-border tw-ml-[12px] add-function-test-btn"
-        color="primary"
-        padding="sm md"
+        class="tw-ml-[12px] o2-secondary-button no-border tw-h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         no-caps
+        icon="play_arrow"
         @click="emit('test')"
       />
       <q-btn
         data-test="add-function-save-btn"
         :label="t('function.save')"
-        class="text-bold no-border tw-ml-[12px] add-function-save-btn"
-        color="secondary"
-        padding="sm md"
+        class="tw-ml-[12px] o2-primary-button no-border tw-h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+        flat
         type="submit"
         no-caps
         @click="onSave"
-      />
-      <q-btn
-        data-test="add-function-cancel-btn"
-        class="cancel-btn text-bold tw-ml-[12px] tw-border-3 tw-border-red-600 add-function-cancel-btn"
-        :label="t('function.cancel')"
-        text-color="negative"
-        padding="sm md"
-        no-caps
-        @click="emit('cancel')"
       />
     </div>
   </div>

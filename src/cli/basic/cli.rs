@@ -170,15 +170,16 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     // init infra, create data dir & tables
     let cfg = config::get_config();
     infra::init().await.expect("infra init failed");
+    db::org_users::cache().await?;
     match name.as_str() {
         "reset" => {
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "root" => {
-                    let _ = users::update_user(
+                    let ret = users::update_user(
                         meta::organization::DEFAULT_ORG,
                         cfg.auth.root_user_email.as_str(),
-                        false,
+                        meta::user::UserUpdateMode::CliUpdate,
                         cfg.auth.root_user_email.as_str(),
                         meta::user::UpdateUser {
                             change_password: true,
@@ -198,6 +199,12 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         },
                     )
                     .await?;
+                    if !ret.status().is_success() {
+                        return Err(anyhow::anyhow!(
+                            "reset root user failed, error: {:?}",
+                            ret.body()
+                        ));
+                    }
                 }
                 "user" => {
                     db::user::reset().await?;

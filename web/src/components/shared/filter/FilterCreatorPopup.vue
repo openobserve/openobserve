@@ -44,8 +44,20 @@
         </div>
       </q-card-section>
       <q-card-actions align="right">
-        <q-btn flat :label="t('common.cancel')" color="primary" v-close-popup="true" />
-        <q-btn flat :label="t('common.apply')" color="primary" @click="applyFilter" />
+        <q-btn
+          v-close-popup
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
+          :label="t('common.cancel')"
+          no-caps
+          flat
+        />
+        <q-btn
+          class="o2-primary-button no-border tw-h-[36px]"
+          :label="t('common.apply')"
+          no-caps
+          flat
+          @click="applyFilter"
+        />
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -55,6 +67,7 @@
 // Define setup function
 import { defineComponent, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 export default defineComponent({
   name: "FilterCreatorPopup",
   props: [

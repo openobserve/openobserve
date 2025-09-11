@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
     <q-card class="column full-height">
-      <q-card-section class="q-px-md q-py-md">
+      <q-card-section class="q-px-md q-py-sm">
         <div class="row items-center no-wrap">
           <div class="col">
             <div v-if="editMode" class="text-body1 text-bold">
               {{ t("dashboard.updateFolder") }}
             </div>
             <div v-else class="text-body1 text-bold">
-              {{ t("dashboard.newFolder") }}
+              {{ t("common.addFolder") }}
             </div>
           </div>
           <div class="col-auto">
@@ -38,14 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-card-section>
       <q-separator />
-      <q-card-section class="q-w-md q-mx-lg">
+      <q-card-section>
         <q-form ref="addFolderForm" @submit.stop="onSubmit.execute">
           <q-input
             v-model="folderData.name"
             :label="t('dashboard.nameOfVariable') + '*'"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-md showLabelOnTop"
+            class="q-py-none showLabelOnTop"
             data-test="dashboard-folder-add-name"
             stack-label
             outlined
@@ -68,13 +66,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
           />
   
-          <div class="flex justify-center q-mt-lg">
+          <div class="flex justify-start q-mt-sm">
             <q-btn
               v-close-popup="true"
-              class="q-mb-md text-bold"
+              class="o2-secondary-button tw-h-[36px]"
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              flat
               :label="t('dashboard.cancel')"
-              text-color="light-text"
-              padding="sm md"
               no-caps
               data-test="dashboard-folder-add-cancel"
             />
@@ -82,10 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-folder-add-save"
               :disable="folderData.name.trim() === ''"
               :loading="onSubmit.isLoading.value"
-              :label="t('dashboard.save')"
-              class="q-mb-md text-bold no-border q-ml-md"
-              color="secondary"
-              padding="sm xl"
+              :label="t('common.save')"
+              class="o2-primary-button tw-h-[36px] q-ml-md"
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              flat
               type="submit"
               no-caps
             />

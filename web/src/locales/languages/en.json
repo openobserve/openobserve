@@ -82,7 +82,8 @@
     "update": "Update",
     "favourite": "Favorite",
     "refresh": "Refresh",
-    "contactUs": "Contact Us"
+    "contactUs": "Contact Us",
+    "addFolder": "Add Folder"
   },
   "search": {
     "resetFields": "Reset selected table fields",
@@ -494,11 +495,13 @@
     "addSchemaField": "Add to Defined Schema",
     "removeSchemaField": "Remove Defined Schema",
     "storeOriginalData": "Store Original Data",
+    "flattenLevel": "Flatten Level",
     "approxPartition": "Use Stream Stats for Partitioning",
     "indexSize": "Index Size",
     "extendedStartDate": "Start Date",
     "extendedEndDate": "End Date",
-    "regexPatterns": "Regex Patterns"
+    "regexPatterns": "Regex Patterns",
+    "envQuickModeMsg": "Environment quick mode field"
   },
   "pipeline": {
     "header": "Pipelines",
@@ -1098,7 +1101,8 @@
     "output_format": "Output Format"
   },
   "pipeline_destinations": {
-    "header": "Pipeline Destinations"
+    "header": "Pipeline Destinations",
+    "search": "Search destination"
   },
   "metrics": {
     "searchMetric": "Search for a Metric",
@@ -1226,7 +1230,8 @@
     "numOfQueries": "Number of Queries",
     "totalDuration": "Total Exec. Duration",
     "totalTimeRange": "Total Query Range",
-    "searchType": "Search Type"
+    "searchType": "Search Type",
+    "querySource": "Query Source"
   },
   "traces": {
     "viewLogs": "View Logs",
@@ -1318,7 +1323,7 @@
     "searchRegion": "Search Region"
   },
   "regex_patterns": {
-    "header": "Regex Pattern",
+    "header": "Regex Patterns",
     "create_pattern": "Create Pattern",
     "search": "Search Regex Pattern",
     "no_data": "No Patterns in the Library",

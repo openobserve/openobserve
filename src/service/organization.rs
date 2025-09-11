@@ -19,10 +19,11 @@ use config::{
         alerts::alert::ListAlertsParams,
         dashboards::ListDashboardsParams,
         pipeline::components::PipelineSource,
+        self_reporting::usage,
         stream::StreamType,
         user::{UserOrg, UserRole},
     },
-    utils::rand::generate_random_string,
+    utils::{json, rand::generate_random_string, time},
 };
 use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
@@ -45,11 +46,13 @@ use crate::{
         meta::organization::{
             AlertSummary, CUSTOM, DEFAULT_ORG, IngestionPasscode, IngestionTokensContainer,
             OrgSummary, Organization, PipelineSummary, RumIngestionToken, StreamSummary,
+            TriggerStatus, TriggerStatusSearchResult,
         },
         utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
     service::{
         db::{self, org_users},
+        self_reporting,
         stream::get_streams,
         users::add_admin_to_org,
     },
@@ -70,6 +73,20 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
         }
     }
 
+    let sql = format!(
+        "SELECT module, status FROM {} WHERE org = '{}' GROUP BY module, status, key",
+        usage::TRIGGERS_USAGE_STREAM,
+        org_id
+    );
+    let end_time = time::now_micros();
+    let start_time = end_time - time::second_micros(900); // 15 mins
+    let trigger_status_results = self_reporting::search::get_usage(sql, start_time, end_time)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|v| json::from_value::<TriggerStatusSearchResult>(v).ok())
+        .collect::<Vec<_>>();
+
     let pipelines = db::pipeline::list_by_org(org_id).await.unwrap_or_default();
     let pipeline_summary = PipelineSummary {
         num_realtime: pipelines
@@ -80,6 +97,10 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             .iter()
             .filter(|p| matches!(p.source, PipelineSource::Scheduled(_)))
             .count() as i64,
+        trigger_status: TriggerStatus::from_search_results(
+            &trigger_status_results,
+            usage::TriggerDataType::DerivedStream,
+        ),
     };
 
     let alerts = super::alerts::alert::list_with_folders_db(ListAlertsParams::new(org_id))
@@ -88,6 +109,10 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     let alert_summary = AlertSummary {
         num_realtime: alerts.iter().filter(|(_, a)| a.is_real_time).count() as i64,
         num_scheduled: alerts.iter().filter(|(_, a)| !a.is_real_time).count() as i64,
+        trigger_status: TriggerStatus::from_search_results(
+            &trigger_status_results,
+            usage::TriggerDataType::Alert,
+        ),
     };
 
     let functions = db::functions::list(org_id).await.unwrap_or_default();
@@ -257,6 +282,16 @@ pub async fn create_org(
     }
     org.name = org.name.trim().to_owned();
 
+    let has_valid_chars = org
+        .name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == ' ' || c == '_');
+    if !has_valid_chars {
+        return Err(anyhow::anyhow!(
+            "Only alphanumeric characters (A-Z, a-z, 0-9), spaces, and underscores are allowed"
+        ));
+    }
+
     org.identifier = ider::uuid();
     #[cfg(not(feature = "cloud"))]
     let org_type = CUSTOM.to_owned();
@@ -370,6 +405,15 @@ pub async fn rename_org(
     };
     if !is_allowed && !is_root_user(user_email) {
         return Err(anyhow::anyhow!("Not allowed to rename org"));
+    }
+
+    let has_valid_chars = name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == ' ' || c == '_');
+    if !has_valid_chars {
+        return Err(anyhow::anyhow!(
+            "Only alphanumeric characters (A-Z, a-z, 0-9), spaces, and underscores are allowed"
+        ));
     }
 
     if get_org(org_id).await.is_none() {

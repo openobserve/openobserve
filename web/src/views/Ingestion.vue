@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
           store.state.organizationData.rumToken.rum_token != ''
         "
-        class="q-ml-md q-mb-xs text-bold no-border right float-right"
-        padding="sm lg"
-        color="secondary"
+        class="o2-primary-button tw-h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+        flat
         no-caps
         :label="t(`ingestion.resetRUMTokenLabel`)"
         @click="showRUMUpdateDialogFn"
@@ -37,18 +37,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
           store.state.organizationData.rumToken.rum_token == ''
         "
-        class="q-ml-md q-mb-xs text-bold no-border right float-right"
-        padding="sm lg"
-        color="secondary"
+        class="o2-primary-button tw-h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+        flat
         no-caps
         :label="t(`ingestion.generateRUMTokenLabel`)"
         @click="generateRUMToken"
       />
       <q-btn
         v-else
-        class="q-ml-md q-mb-xs text-bold no-border right float-right"
-        padding="sm lg"
-        color="secondary"
+        class="o2-primary-button tw-h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+        flat
         no-caps
         :label="t(`ingestion.resetTokenBtnLabel`)"
         @click="showUpdateDialogFn"
