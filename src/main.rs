@@ -283,6 +283,11 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("meter provider init failed");
             };
 
+            // Register job runtime for metrics collection
+            if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                openobserve::service::runtime_metrics::register_runtime("job".to_string(), handle);
+            }
+
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
@@ -327,6 +332,13 @@ async fn main() -> Result<(), anyhow::Error> {
             .max_blocking_threads(cfg.limit.grpc_runtime_blocking_worker_num)
             .build()
             .expect("grpc runtime init failed");
+
+        // Register gRPC runtime for metrics collection
+        openobserve::service::runtime_metrics::register_runtime(
+            "grpc".to_string(),
+            rt.handle().clone(),
+        );
+
         let _guard = rt.enter();
         rt.block_on(async move {
             let ret = if config::cluster::LOCAL_NODE.is_router() {
@@ -343,6 +355,14 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // wait for gRPC init
     grpc_init_rx.await.ok();
+
+    // Register main HTTP runtime for metrics collection
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        openobserve::service::runtime_metrics::register_runtime("http".to_string(), handle);
+    }
+
+    // Start runtime metrics collector
+    openobserve::service::runtime_metrics::start_metrics_collector().await;
 
     // let node online
     let _ = cluster::set_online(false).await;

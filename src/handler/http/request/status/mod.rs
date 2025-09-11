@@ -137,6 +137,7 @@ struct ConfigResponse<'a> {
     ai_enabled: bool,
     dashboard_placeholder: String,
     dashboard_show_symbol_enabled: bool,
+    ingest_flatten_level: u32,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -356,6 +357,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         ai_enabled,
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
+        ingest_flatten_level: cfg.limit.ingest_flatten_level,
     }))
 }
 

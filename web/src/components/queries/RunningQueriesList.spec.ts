@@ -213,7 +213,7 @@ describe('RunningQueriesList.vue', () => {
     });
 
     it('should have correct number of columns', () => {
-      expect(wrapper.vm.columns).toHaveLength(10);
+      expect(wrapper.vm.columns).toHaveLength(11);
     });
 
     it('should have correct column for row number', () => {

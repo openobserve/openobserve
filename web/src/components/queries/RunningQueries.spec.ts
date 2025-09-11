@@ -68,6 +68,10 @@ describe("RunningQueries", () => {
         original_size: 1024,
         compressed_size: 512,
       },
+      search_event_context: {
+        dashboard_name: "MyDashboard",
+        dashboard_folder: "MyDashboardFolder",
+      }
     },
     {
       trace_id: "trace-2",
@@ -91,6 +95,33 @@ describe("RunningQueries", () => {
         original_size: 512,
         compressed_size: 256,
       },
+    },
+    {
+      trace_id: "trace-1",
+      user_id: "user@example.com",
+      org_id: "org-1",
+      search_type: "alerts",
+      search_type_label: "alerts",
+      created_at: 1640995200000000,
+      started_at: 1640995200000000,
+      status: "running",
+      work_group: "default",
+      stream_type: "alerts",
+      query: {
+        start_time: 1640995200000000,
+        end_time: 1640995260000000,
+        sql: "SELECT * FROM logs",
+      },
+      scan_stats: {
+        files: 10,
+        records: 100,
+        original_size: 1024,
+        compressed_size: 512,
+      },
+      search_event_context: {
+        alert_name: "MyALert",
+        alert_key: "/alerts/_meta/logs/default/MyAlert",
+      }
     },
   ];
 
@@ -326,8 +357,8 @@ describe("RunningQueries", () => {
     await wrapper.vm.getRunningQueries();
     
     expect(SearchService.get_running_queries).toHaveBeenCalledWith("test-org");
-    expect(wrapper.vm.queries).toHaveLength(2);
-    expect(wrapper.vm.resultTotal).toBe(2);
+    expect(wrapper.vm.queries).toHaveLength(3);
+    expect(wrapper.vm.resultTotal).toBe(3);
   });
 
   // Test 20: deleteQuery success

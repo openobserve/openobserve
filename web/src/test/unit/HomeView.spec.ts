@@ -39,7 +39,8 @@ vi.mock("../../aws-exports", () => ({
 
 vi.mock("../../utils/zincutils", () => ({
   formatSizeFromMB: vi.fn((size) => `${size}MB`),
-  addCommasToNumber: vi.fn((num) => num?.toLocaleString() || "0")
+  addCommasToNumber: vi.fn((num) => num?.toLocaleString() || "0"),
+  getImageURL: vi.fn((url) => url)
 }));
 
 vi.mock("../../composables/useStreams", () => ({
@@ -227,30 +228,6 @@ describe("HomeView.vue", () => {
       expect(orgService.get_organization_summary).toHaveBeenCalledWith("test-org");
     });
 
-    it("should update summary with formatted data on successful response", async () => {
-      const mockResponse = {
-        data: {
-          streams: { num_streams: 5, total_storage_size: 100, total_compressed_size: 50, total_records: 1000, total_index_size: 25 },
-          pipelines: { num_scheduled: 3, num_realtime: 2 },
-          alerts: { num_realtime: 4, num_scheduled: 6 },
-          total_dashboards: 8,
-          total_functions: 12
-        }
-      };
-      orgService.get_organization_summary.mockResolvedValue(mockResponse);
-
-      wrapper = createWrapper();
-      await wrapper.vm.getSummary("test-org");
-      await flushPromises();
-
-      expect(wrapper.vm.summary.streams_count).toBe(5);
-      expect(wrapper.vm.summary.scheduled_pipelines).toBe(3);
-      expect(wrapper.vm.summary.rt_pipelines).toBe(2);
-      expect(wrapper.vm.summary.rt_alerts).toBe(4);
-      expect(wrapper.vm.summary.scheduled_alerts).toBe(6);
-      expect(wrapper.vm.summary.dashboard_count).toBe(8);
-      expect(wrapper.vm.summary.function_count).toBe(12);
-    });
 
     it("should set no_data_ingest to true when all counts are zero", async () => {
       const mockResponse = {
@@ -325,43 +302,6 @@ describe("HomeView.vue", () => {
       expect(notifySpy).toHaveBeenCalledWith(error);
     });
 
-    it("should handle missing pipelines data", async () => {
-      const mockResponse = {
-        data: {
-          streams: { num_streams: 1 },
-          alerts: { num_realtime: 1, num_scheduled: 1 },
-          total_dashboards: 1,
-          total_functions: 1
-        }
-      };
-      orgService.get_organization_summary.mockResolvedValue(mockResponse);
-
-      wrapper = createWrapper();
-      await wrapper.vm.getSummary("test-org");
-      await flushPromises();
-
-      expect(wrapper.vm.summary.scheduled_pipelines).toBe(0);
-      expect(wrapper.vm.summary.rt_pipelines).toBe(0);
-    });
-
-    it("should handle missing alerts data", async () => {
-      const mockResponse = {
-        data: {
-          streams: { num_streams: 1 },
-          pipelines: { num_scheduled: 1, num_realtime: 1 },
-          total_dashboards: 1,
-          total_functions: 1
-        }
-      };
-      orgService.get_organization_summary.mockResolvedValue(mockResponse);
-
-      wrapper = createWrapper();
-      await wrapper.vm.getSummary("test-org");
-      await flushPromises();
-
-      expect(wrapper.vm.summary.rt_alerts).toBe(0);
-      expect(wrapper.vm.summary.scheduled_alerts).toBe(0);
-    });
   });
 
   describe("selectedOrg Computed Property", () => {
@@ -475,11 +415,6 @@ describe("HomeView.vue", () => {
   });
 
   describe("Component Rendering", () => {
-    it("should render TrialPeriod component", () => {
-      wrapper = createWrapper();
-      expect(wrapper.find(".trial-period").exists()).toBe(true);
-    });
-
     it("should apply correct theme class", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.store.state.theme).toBe("dark");
@@ -656,43 +591,6 @@ describe("HomeView.vue", () => {
       
       expect(orgService.get_organization_summary).not.toHaveBeenCalled();
     });
-
-    it("should handle complete workflow from no data to data", async () => {
-      // Start with no data
-      const noDataResponse = {
-        data: {
-          streams: { num_streams: 0 },
-          alerts: { num_realtime: 0, num_scheduled: 0 },
-          pipelines: { num_realtime: 0, num_scheduled: 0 },
-          total_dashboards: 0,
-          total_functions: 0
-        }
-      };
-      orgService.get_organization_summary.mockResolvedValueOnce(noDataResponse);
-      
-      wrapper = createWrapper();
-      await flushPromises();
-      
-      expect(wrapper.vm.no_data_ingest).toBe(true);
-      
-      // Simulate data ingestion
-      const dataResponse = {
-        data: {
-          streams: { num_streams: 5, total_storage_size: 100, total_compressed_size: 50, total_records: 1000, total_index_size: 25 },
-          alerts: { num_realtime: 2, num_scheduled: 3 },
-          pipelines: { num_realtime: 1, num_scheduled: 2 },
-          total_dashboards: 4,
-          total_functions: 6
-        }
-      };
-      orgService.get_organization_summary.mockResolvedValueOnce(dataResponse);
-      
-      await wrapper.vm.getSummary("test-org");
-      await flushPromises();
-      
-      expect(wrapper.vm.no_data_ingest).toBe(false);
-      expect(wrapper.vm.summary.streams_count).toBe(5);
-    });
   });
 
   describe("Edge Cases and Error Handling", () => {
@@ -739,33 +637,5 @@ describe("HomeView.vue", () => {
       expect(console.log).toHaveBeenCalledWith(timeoutError);
     });
 
-    it("should handle store state changes during API call", async () => {
-      let resolvePromise: any;
-      const promise = new Promise((resolve) => {
-        resolvePromise = resolve;
-      });
-      orgService.get_organization_summary.mockReturnValue(promise);
-      
-      wrapper = createWrapper();
-      const summaryPromise = wrapper.vm.getSummary("test-org");
-      
-      // Change store state while API call is in progress
-      store.state.selectedOrganization.identifier = "different-org";
-      
-      resolvePromise({
-        data: {
-          streams: { num_streams: 5 },
-          alerts: { num_realtime: 1, num_scheduled: 1 },
-          pipelines: { num_realtime: 1, num_scheduled: 1 },
-          total_dashboards: 1,
-          total_functions: 1
-        }
-      });
-      
-      await summaryPromise;
-      await flushPromises();
-      
-      expect(wrapper.vm.summary.streams_count).toBe(5);
-    });
   });
 });

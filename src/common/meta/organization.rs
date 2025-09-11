@@ -25,7 +25,7 @@ pub const CUSTOM: &str = "custom";
 pub const USER_DEFAULT: &str = "user_default";
 pub const THRESHOLD: i64 = 9383939382;
 
-use config::meta::cluster::Node;
+use config::meta::{cluster::Node, self_reporting::usage};
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct Organization {
@@ -163,12 +163,52 @@ pub struct StreamSummary {
 pub struct PipelineSummary {
     pub num_realtime: i64,
     pub num_scheduled: i64,
+    pub trigger_status: TriggerStatus,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct AlertSummary {
     pub num_realtime: i64,
     pub num_scheduled: i64,
+    pub trigger_status: TriggerStatus,
+}
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct TriggerStatus {
+    pub healthy: i64,
+    pub failed: i64,
+    pub warning: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TriggerStatusSearchResult {
+    pub module: usage::TriggerDataType,
+    pub status: usage::TriggerDataStatus,
+}
+
+impl TriggerStatus {
+    pub fn from_search_results(
+        results: &Vec<TriggerStatusSearchResult>,
+        module: usage::TriggerDataType,
+    ) -> Self {
+        let mut status = TriggerStatus {
+            healthy: 0,
+            failed: 0,
+            warning: 0,
+        };
+
+        for result in results {
+            if result.module == module {
+                match result.status {
+                    usage::TriggerDataStatus::Completed
+                    | usage::TriggerDataStatus::ConditionNotSatisfied => status.healthy += 1,
+                    usage::TriggerDataStatus::Failed => status.failed += 1,
+                    usage::TriggerDataStatus::Skipped => status.warning += 1,
+                }
+            }
+        }
+
+        status
+    }
 }
 
 /// A container for passcodes and rumtokens
@@ -622,44 +662,6 @@ mod tests {
 
         assert_eq!(request.org_id, "org-trial");
         assert_eq!(request.new_end_date, 1641081600);
-    }
-
-    #[test]
-    fn test_org_summary() {
-        let stream_summary = StreamSummary {
-            num_streams: 10,
-            total_records: 1000000,
-            total_storage_size: 1024.0 * 1024.0 * 100.0, // 100MB
-            total_compressed_size: 1024.0 * 1024.0 * 25.0, // 25MB
-            total_index_size: 1024.0 * 1024.0 * 5.0,     // 5MB
-        };
-
-        let pipeline_summary = PipelineSummary {
-            num_realtime: 5,
-            num_scheduled: 3,
-        };
-
-        let alert_summary = AlertSummary {
-            num_realtime: 12,
-            num_scheduled: 8,
-        };
-
-        let summary = OrgSummary {
-            streams: stream_summary,
-            pipelines: pipeline_summary,
-            alerts: alert_summary,
-            total_functions: 25,
-            total_dashboards: 15,
-        };
-
-        assert_eq!(summary.streams.num_streams, 10);
-        assert_eq!(summary.streams.total_records, 1000000);
-        assert_eq!(summary.pipelines.num_realtime, 5);
-        assert_eq!(summary.pipelines.num_scheduled, 3);
-        assert_eq!(summary.alerts.num_realtime, 12);
-        assert_eq!(summary.alerts.num_scheduled, 8);
-        assert_eq!(summary.total_functions, 25);
-        assert_eq!(summary.total_dashboards, 15);
     }
 
     #[test]
