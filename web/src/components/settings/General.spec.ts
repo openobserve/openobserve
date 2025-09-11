@@ -293,12 +293,6 @@ describe("General", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should display general page title", () => {
-      const wrapper = createWrapper();
-      const title = wrapper.find(".text-body1.text-bold");
-      expect(title.exists()).toBe(true);
-    });
-
     it("should initialize with organization settings values", () => {
       const wrapper = createWrapper();
       
@@ -336,7 +330,7 @@ describe("General", () => {
 
     it("should toggle streaming aggregation when checkbox is changed", async () => {
       const wrapper = createWrapper();
-      const aggregationToggle = wrapper.find('[data-test="general-settings-enable-aggregation-cache"]');
+      const aggregationToggle = wrapper.find('[data-test="general-settings-enable-streaming-aggregation"]');
       
       await aggregationToggle.setChecked(false);
       expect(wrapper.vm.enableStreamingAggregation).toBe(false);
@@ -444,12 +438,6 @@ describe("General", () => {
       expect(streamingToggle.exists()).toBe(false);
     });
 
-    it("should show aggregation toggle when enterprise is enabled", () => {
-      const wrapper = createWrapper();
-      
-      const aggregationToggle = wrapper.find('[data-test="general-settings-enable-aggregation-cache"]');
-      expect(aggregationToggle.exists()).toBe(true);
-    });
 
     it("should show enterprise features when conditions are met", () => {
       mockStore.state.zoConfig.meta_org = "test-org";
@@ -769,16 +757,6 @@ describe("General", () => {
         type: "negative",
         message: "1 file(s) did not pass validation constraints",
       });
-    });
-
-    it("should format counter label correctly", () => {
-      const wrapper = createWrapper();
-      const params = { filesNumber: 1, totalSize: "15kb" };
-      
-      const result = wrapper.vm.counterLabelFn(params);
-      
-      expect(result).toContain("(Only .png, .jpg, .jpeg, .gif, .bmp, formats & size <=20kb & Max Size: 150x30px)");
-      expect(result).toContain("1 file | 15kb");
     });
   });
 

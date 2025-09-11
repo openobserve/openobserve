@@ -50,14 +50,12 @@
           :label="t('common.cancel')"
           no-caps
           flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         />
         <q-btn
           class="o2-primary-button no-border tw-h-[36px]"
           :label="t('common.apply')"
           no-caps
           flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           @click="applyFilter"
         />
       </q-card-actions>
@@ -83,7 +81,6 @@ export default defineComponent({
     const selectedValues = ref(props.defaultValues);
     const selectedOperator = ref(props.defaultOperator);
     const { t } = useI18n();
-    const store = useStore();
 
     onBeforeMount(() => {});
 
@@ -104,7 +101,6 @@ export default defineComponent({
       selectedValues,
       selectedOperator,
       applyFilter,
-      store,
     };
   },
 });

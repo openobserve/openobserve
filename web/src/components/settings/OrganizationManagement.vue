@@ -390,6 +390,7 @@ export default defineComponent({
         }
         return filtered;
       },
+      store,
     };
   },
 });
