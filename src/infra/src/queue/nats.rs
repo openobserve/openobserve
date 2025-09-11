@@ -161,7 +161,19 @@ impl super::Queue for NatsQueue {
                     stream_name, e
                 ))
             })?;
-            while let Ok(Some(message)) = messages.try_next().await {
+            loop {
+                let message = match messages.try_next().await {
+                    Ok(Some(message)) => message,
+                    Ok(None) => break,
+                    Err(e) => {
+                        log::error!(
+                            "Failed to get nats consumer messages for stream {}: {}",
+                            stream_name,
+                            e
+                        );
+                        continue;
+                    }
+                };
                 let message = super::Message::Nats(message);
                 tx.send(message).await.map_err(|e| {
                     log::error!(
