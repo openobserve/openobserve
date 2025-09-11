@@ -23,7 +23,7 @@ use utoipa::ToSchema;
 
 use crate::{
     config::get_config,
-    meta::{sql::OrderBy, stream::StreamType},
+    meta::{search, sql::OrderBy, stream::StreamType},
     utils::{base64, json},
 };
 
@@ -780,6 +780,7 @@ pub struct QueryStatus {
     pub query: Option<QueryInfo>,
     pub scan_stats: Option<ScanStats>,
     pub search_type: Option<SearchEventType>,
+    pub search_event_context: Option<search::SearchEventContext>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -991,6 +992,9 @@ pub struct SearchEventContext {
     pub alert_key: Option<String>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub alert_name: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub derived_stream_key: Option<String>,
     #[serde(default)]
     #[serde(rename = "report_id")]
@@ -1058,6 +1062,36 @@ impl SearchEventContext {
         self.dashboard_name = Some(dashboard_title);
         self.dashboard_folder_name = Some(folder_name);
         self.dashboard_folder_id = Some(folder_id);
+    }
+}
+
+impl From<proto::cluster_rpc::SearchEventContext> for SearchEventContext {
+    fn from(proto_sec: proto::cluster_rpc::SearchEventContext) -> Self {
+        Self {
+            alert_key: proto_sec.alert_key,
+            alert_name: proto_sec.alert_name,
+            derived_stream_key: proto_sec.derived_stream_key,
+            report_key: proto_sec.report_key,
+            dashboard_id: proto_sec.dashboard_id,
+            dashboard_name: proto_sec.dashboard_name,
+            dashboard_folder_id: proto_sec.dashboard_folder_id,
+            dashboard_folder_name: proto_sec.dashboard_folder_name,
+        }
+    }
+}
+
+impl From<SearchEventContext> for proto::cluster_rpc::SearchEventContext {
+    fn from(sec: SearchEventContext) -> Self {
+        Self {
+            alert_key: sec.alert_key,
+            alert_name: sec.alert_name,
+            derived_stream_key: sec.derived_stream_key,
+            report_key: sec.report_key,
+            dashboard_id: sec.dashboard_id,
+            dashboard_name: sec.dashboard_name,
+            dashboard_folder_id: sec.dashboard_folder_id,
+            dashboard_folder_name: sec.dashboard_folder_name,
+        }
     }
 }
 
