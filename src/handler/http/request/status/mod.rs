@@ -138,6 +138,8 @@ struct ConfigResponse<'a> {
     dashboard_placeholder: String,
     dashboard_show_symbol_enabled: bool,
     ingest_flatten_level: u32,
+    #[cfg(feature = "enterprise")]
+    license_expiry: i64,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -290,6 +292,9 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
     let build_type = "opensource";
 
+    #[cfg(feature = "enterprise")]
+    let expiry_time = o2_enterprise::enterprise::license::get_expiry_time().await;
+
     let cfg = get_config();
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: config::VERSION.to_string(),
@@ -358,6 +363,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
         ingest_flatten_level: cfg.limit.ingest_flatten_level,
+        #[cfg(feature = "enterprise")]
+        license_expiry: expiry_time,
     }))
 }
 
