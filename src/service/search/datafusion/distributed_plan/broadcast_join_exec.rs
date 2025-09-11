@@ -13,19 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    any::Any,
-    io::Cursor,
-    pin::Pin,
-    sync::{Arc, Mutex},
-    task::Poll,
-};
+use std::{any::Any, io::Cursor, pin::Pin, sync::Arc, task::Poll};
 
 use arrow::{array::RecordBatch, ipc::writer::FileWriter};
 use datafusion::{
     arrow::datatypes::SchemaRef,
     common::{Result, Statistics, internal_err},
-    error::DataFusionError,
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, Partitioning},
     physical_plan::{
@@ -49,8 +42,6 @@ pub struct BroadcastJoinExec {
     cluster: String,
     path: String,
     left_data: OnceAsync<()>,
-    // check if we already store the left data to s3
-    is_store_left_data: Arc<Mutex<bool>>,
 }
 
 impl BroadcastJoinExec {
@@ -71,7 +62,6 @@ impl BroadcastJoinExec {
             cluster,
             path,
             left_data: OnceAsync::default(),
-            is_store_left_data: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -148,7 +138,6 @@ impl ExecutionPlan for BroadcastJoinExec {
             left_data,
             // create the right stream, but not actually execute it
             self.hash_join.execute(partition, context)?,
-            self.is_store_left_data.clone(),
         )))
     }
 
@@ -191,7 +180,6 @@ struct BroadcastJoinStream {
     schema: SchemaRef,
     left_data: OnceFut<()>,
     right_stream: SendableRecordBatchStream,
-    is_store_left_data: Arc<Mutex<bool>>,
     state: BroadcastJoinStreamState,
 }
 
@@ -200,13 +188,11 @@ impl BroadcastJoinStream {
         schema: SchemaRef,
         left_data: OnceFut<()>,
         right_stream: SendableRecordBatchStream,
-        is_store_left_data: Arc<Mutex<bool>>,
     ) -> Self {
         Self {
             schema,
             left_data,
             right_stream,
-            is_store_left_data,
             state: BroadcastJoinStreamState::WaitBuildSide,
         }
     }
@@ -227,14 +213,6 @@ impl BroadcastJoinStream {
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Option<Result<RecordBatch>>> {
         let _left_data = ready!(self.left_data.get_shared(cx))?;
-
-        let mut is_store_left_data = self
-            .is_store_left_data
-            .lock()
-            .map_err(|e| DataFusionError::Internal(e.to_string()))?;
-        if !*is_store_left_data {
-            *is_store_left_data = true;
-        }
 
         self.state = BroadcastJoinStreamState::ProcessProbeBatch;
 
