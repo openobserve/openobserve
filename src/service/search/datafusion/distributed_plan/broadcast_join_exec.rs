@@ -13,28 +13,44 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::Arc};
+use std::{
+    any::Any,
+    io::Cursor,
+    pin::Pin,
+    sync::{Arc, Mutex},
+    task::Poll,
+};
 
+use arrow::{array::RecordBatch, ipc::writer::FileWriter};
 use datafusion::{
     arrow::datatypes::SchemaRef,
-    common::{Result, Statistics},
-    execution::{SendableRecordBatchStream, TaskContext},
+    common::{Result, Statistics, internal_err},
+    error::DataFusionError,
+    execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, Partitioning},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, PlanProperties,
+        execute_stream,
         execution_plan::{Boundedness, EmissionType},
-        memory::MemoryStream,
     },
 };
+use futures::{Stream, StreamExt};
+use futures_util::ready;
+
+use crate::service::search::datafusion::distributed_plan::utils::{OnceAsync, OnceFut};
 
 #[derive(Debug)]
 pub struct BroadcastJoinExec {
     left: Arc<dyn ExecutionPlan>,
     hash_join: Arc<dyn ExecutionPlan>,
     schema: SchemaRef,
+    cache: PlanProperties,
+    // left table result store path in s3
     cluster: String,
     path: String,
-    cache: PlanProperties,
+    left_data: OnceAsync<()>,
+    // check if we already store the left data to s3
+    is_store_left_data: Arc<Mutex<bool>>,
 }
 
 impl BroadcastJoinExec {
@@ -54,6 +70,8 @@ impl BroadcastJoinExec {
             cache,
             cluster,
             path,
+            left_data: OnceAsync::default(),
+            is_store_left_data: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -62,9 +80,7 @@ impl BroadcastJoinExec {
         let output_partitioning = Partitioning::UnknownPartitioning(n_partitions);
         PlanProperties::new(
             eq_properties,
-            // Output Partitioning
             output_partitioning,
-            // Execution Mode
             EmissionType::Incremental,
             Boundedness::Bounded,
         )
@@ -100,24 +116,160 @@ impl ExecutionPlan for BroadcastJoinExec {
 
     fn with_new_children(
         self: Arc<Self>,
-        _: Vec<Arc<dyn ExecutionPlan>>,
+        children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        Ok(self)
+        if children.len() != 2 {
+            return internal_err!("BroadcastJoinExec should have 2 children");
+        }
+        let left = children[0].clone();
+        let hash_join = children[1].clone();
+        Ok(Arc::new(BroadcastJoinExec::new(
+            left,
+            hash_join,
+            self.cluster.clone(),
+            self.path.clone(),
+        )))
     }
 
     fn execute(
         &self,
-        _partition: usize,
-        _context: Arc<TaskContext>,
+        partition: usize,
+        context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
-        Ok(Box::pin(MemoryStream::try_new(
-            vec![],
-            Arc::clone(&self.schema),
-            None,
-        )?))
+        let schema = self.left.schema().clone();
+        let path = self.path.clone();
+        let left_data = self.left_data.try_once(|| {
+            let left_stream = execute_stream(self.left.clone(), context.clone())?;
+            Ok(collect_left_data(left_stream, schema, path))
+        })?;
+
+        Ok(Box::pin(BroadcastJoinStream::new(
+            self.left.schema().clone(),
+            left_data,
+            // create the right stream, but not actually execute it
+            self.hash_join.execute(partition, context)?,
+            self.is_store_left_data.clone(),
+        )))
     }
 
     fn statistics(&self) -> Result<Statistics> {
         Ok(Statistics::new_unknown(&self.schema))
+    }
+}
+
+async fn collect_left_data(
+    mut stream: SendableRecordBatchStream,
+    schema: SchemaRef,
+    path: String,
+) -> Result<()> {
+    let mut batches = Vec::new();
+    while let Some(batch) = stream.next().await.transpose()? {
+        batches.push(batch);
+    }
+
+    let mut buffer = Cursor::new(Vec::new());
+    let mut writer = FileWriter::try_new(&mut buffer, &schema)?;
+    for batch in batches {
+        writer.write(&batch)?;
+    }
+    writer.finish()?;
+    let buf = buffer.into_inner();
+
+    infra::storage::put("", &path, buf.into()).await?;
+
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+pub(super) enum BroadcastJoinStreamState {
+    WaitBuildSide,
+    ProcessProbeBatch,
+    Completed,
+}
+
+struct BroadcastJoinStream {
+    schema: SchemaRef,
+    left_data: OnceFut<()>,
+    right_stream: SendableRecordBatchStream,
+    is_store_left_data: Arc<Mutex<bool>>,
+    state: BroadcastJoinStreamState,
+}
+
+impl BroadcastJoinStream {
+    pub fn new(
+        schema: SchemaRef,
+        left_data: OnceFut<()>,
+        right_stream: SendableRecordBatchStream,
+        is_store_left_data: Arc<Mutex<bool>>,
+    ) -> Self {
+        Self {
+            schema,
+            left_data,
+            right_stream,
+            is_store_left_data,
+            state: BroadcastJoinStreamState::WaitBuildSide,
+        }
+    }
+
+    fn poll_next_inner(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Result<RecordBatch>>> {
+        match &mut self.state {
+            BroadcastJoinStreamState::WaitBuildSide => self.handle_wait_build_side(cx),
+            BroadcastJoinStreamState::ProcessProbeBatch => self.handle_process_probe_batch(cx),
+            BroadcastJoinStreamState::Completed => Poll::Ready(None),
+        }
+    }
+
+    fn handle_wait_build_side(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Result<RecordBatch>>> {
+        let _left_data = ready!(self.left_data.get_shared(cx))?;
+
+        let mut is_store_left_data = self
+            .is_store_left_data
+            .lock()
+            .map_err(|e| DataFusionError::Internal(e.to_string()))?;
+        if !*is_store_left_data {
+            *is_store_left_data = true;
+        }
+
+        self.state = BroadcastJoinStreamState::ProcessProbeBatch;
+
+        Poll::Ready(Some(Ok(RecordBatch::new_empty(self.schema.clone()))))
+    }
+
+    fn handle_process_probe_batch(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Result<RecordBatch>>> {
+        let res = ready!(self.right_stream.poll_next_unpin(cx));
+        match res {
+            Some(Ok(batch)) => Poll::Ready(Some(Ok(batch))),
+            Some(Err(e)) => Poll::Ready(Some(Err(e))),
+            None => {
+                self.state = BroadcastJoinStreamState::Completed;
+                Poll::Ready(None)
+            }
+        }
+    }
+}
+
+impl Stream for BroadcastJoinStream {
+    type Item = Result<RecordBatch>;
+
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Result<RecordBatch>>> {
+        self.poll_next_inner(cx)
+    }
+}
+
+impl RecordBatchStream for BroadcastJoinStream {
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
     }
 }

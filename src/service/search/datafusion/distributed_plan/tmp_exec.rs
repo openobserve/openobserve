@@ -29,7 +29,6 @@ use datafusion::{
     },
 };
 use futures::TryStreamExt;
-use infra::storage;
 
 #[derive(Debug)]
 pub struct TmpExec {
@@ -127,12 +126,11 @@ impl ExecutionPlan for TmpExec {
 }
 
 async fn fetch_data(
-    cluster: String,
+    _cluster: String,
     path: String,
     schema: SchemaRef,
 ) -> Result<SendableRecordBatchStream> {
-    let buf = storage::get_bytes(&cluster, &path).await?;
-
+    let buf = infra::storage::get_bytes("", &path).await?;
     let reader = unsafe { FileReader::try_new(Cursor::new(buf), None)?.with_skip_validation(true) };
     let mut batches = Vec::new();
     for batch in reader {

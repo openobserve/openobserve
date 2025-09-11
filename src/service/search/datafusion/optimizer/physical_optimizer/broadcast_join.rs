@@ -22,7 +22,10 @@ use datafusion::{
         Result,
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter},
     },
-    physical_plan::ExecutionPlan,
+    physical_plan::{
+        ExecutionPlan,
+        joins::{HashJoinExec, PartitionMode},
+    },
 };
 
 use crate::service::search::datafusion::{
@@ -101,6 +104,10 @@ pub fn should_use_broadcast_join(plan: &Arc<dyn ExecutionPlan>) -> bool {
     plan.apply(|node| {
         Ok(if node.name() == "HashJoinExec" {
             count += 1;
+            let hash_join = node.as_any().downcast_ref::<HashJoinExec>().unwrap();
+            if *hash_join.partition_mode() != PartitionMode::CollectLeft {
+                count += 1;
+            }
             TreeNodeRecursion::Stop
         } else {
             TreeNodeRecursion::Continue
@@ -110,12 +117,13 @@ pub fn should_use_broadcast_join(plan: &Arc<dyn ExecutionPlan>) -> bool {
     count == 1
 }
 
+// TODO: delete file after join done
 fn generate_result_path(trace_id: &str) -> String {
     let datetime: DateTime<Utc> = Utc::now();
 
     let id = uuid();
     format!(
-        "join/{}/{}/{}/{trace_id}-{id}.arrow",
+        "join/{}/{}/{}/{trace_id}/{id}.arrow",
         datetime.year(),
         datetime.month(),
         datetime.day(),
