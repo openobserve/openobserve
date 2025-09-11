@@ -1,0 +1,1308 @@
+// Copyright 2023 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
+import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
+import WebVitalsDashboard from "./WebVitalsDashboard.vue";
+import { createI18n } from "vue-i18n";
+import { createStore } from "vuex";
+import { nextTick, ref } from "vue";
+
+// vi.mock("@/utils/date", () => ({
+//   parseDuration: vi.fn((duration) => {
+//     if (duration === "15m") return 15;
+//     if (duration === "1h") return 60;
+//     if (duration === "6h") return 360;
+//     return 0;
+//   }),
+//   generateDurationLabel: vi.fn((duration) => {
+//     if (duration === 15) return "15m";
+//     if (duration === 60) return "1h";
+//     if (duration === 360) return "6h";
+//     return "0s";
+//   }),
+//   getDurationObjectFromParams: vi.fn((params) => ({
+//     startTime: params.from || "2023-01-01T00:00:00Z",
+//     endTime: params.to || "2023-01-02T00:00:00Z",
+//     relativeTimePeriod: params.period,
+//   })),
+// }));
+
+vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
+  convertDashboardSchemaVersion: vi.fn((data) => data),
+}));
+
+vi.mock("@/utils/rum/web_vitals.json", () => ({
+  default: {
+    version: 2,
+    title: "Web Vitals Dashboard",
+    panels: [
+      { id: "panel1", title: "LCP" },
+      { id: "panel2", title: "FID" },
+      { id: "panel3", title: "CLS" },
+    ],
+  },
+}));
+
+// Create mock router functions
+const mockRouterPush = vi.fn();
+const mockRouterReplace = vi.fn();
+
+// Mock vue-router
+vi.mock("vue-router", () => ({
+  useRoute: () => ({
+    query: {
+      dashboard: "web-vitals-dashboard",
+      folder: "rum",
+      refresh: "15m",
+      period: "1h",
+    },
+  }),
+  useRouter: () => ({
+    push: mockRouterPush,
+    replace: mockRouterReplace,
+  }),
+}));
+
+vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
+  default: {
+    name: "RenderDashboardCharts",
+    template:
+      '<div class="render-dashboard-charts">Mock Web Vitals Charts</div>',
+    props: ["viewOnly", "dashboardData", "currentTimeObj", "searchType"],
+    methods: {
+      layoutUpdate: vi.fn(),
+    },
+  },
+}));
+
+installQuasar();
+
+const mockStore = createStore({
+  state: {
+    selectedOrganization: {
+      identifier: "test-org",
+    },
+    theme: "light",
+  },
+});
+
+const mockRouter = {
+  push: vi.fn(),
+  replace: vi.fn(),
+};
+
+const mockI18n = createI18n({
+  locale: "en",
+  messages: {
+    en: {
+      rum: {
+        learnWebVitalsLabel: "Learn about Web Vitals:",
+        clickHereLabel: "Click here",
+      },
+    },
+  },
+});
+
+describe("WebVitalsDashboard.vue", () => {
+  let wrapper: any;
+  let mockConvertDashboardSchemaVersion: any;
+  let mockGetDashboard: any;
+  let mockParseDuration: any;
+  let mockGenerateDurationLabel: any;
+
+  // Helper function to mount component with default options
+  const mountComponent = (props = {}, options = {}) => {
+    return mount(WebVitalsDashboard, {
+      props,
+      global: {
+        plugins: [mockI18n],
+        provide: {
+          store: mockStore,
+        },
+        mocks: {
+          $store: mockStore,
+          $router: mockRouter,
+          $route: { query: {} },
+        },
+        ...options.global,
+      },
+      ...options,
+    });
+  };
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+
+    // Setup mocks
+    const { convertDashboardSchemaVersion } = await import(
+      "@/utils/dashboard/convertDashboardSchemaVersion"
+    );
+    mockConvertDashboardSchemaVersion = vi.mocked(
+      convertDashboardSchemaVersion,
+    );
+
+    const { getDashboard } = await import("@/utils/commons.ts");
+    mockGetDashboard = vi.mocked(getDashboard);
+
+    const { parseDuration, generateDurationLabel } = await import(
+      "@/utils/date"
+    );
+    mockParseDuration = vi.mocked(parseDuration);
+    mockGenerateDurationLabel = vi.mocked(generateDurationLabel);
+
+    // Clear router mocks
+    mockRouterPush.mockClear();
+    mockRouterReplace.mockClear();
+
+    // Mock window methods
+    Object.defineProperty(window, "dispatchEvent", {
+      value: vi.fn(),
+      writable: true,
+    });
+
+    // Mount component with default setup for most tests
+    wrapper = mountComponent();
+  });
+
+  afterEach(() => {
+    if (wrapper) {
+      wrapper.unmount();
+    }
+    vi.restoreAllMocks();
+  });
+
+  describe("Component Mounting", () => {
+    it("should mount successfully with default props", async () => {
+      // Component is already mounted in beforeEach
+      await nextTick();
+      expect(wrapper.exists()).toBe(true);
+      expect(wrapper.find(".performance-dashboard").exists()).toBe(true);
+    });
+
+    it("should have correct component name", () => {
+      // Component is already mounted in beforeEach
+      expect(wrapper.vm.$options.name).toBe("WebVitalsDashboard");
+    });
+
+    it("should mount with custom dateTime prop", async () => {
+      const customDateTime = {
+        start_time: new Date("2023-01-01"),
+        end_time: new Date("2023-01-02"),
+      };
+
+      const customWrapper = mountComponent({ dateTime: customDateTime });
+      expect(customWrapper.props("dateTime")).toEqual(customDateTime);
+      customWrapper.unmount();
+    });
+  });
+
+  describe("Web Vitals Info Banner", () => {
+    it("should render learn web vitals info banner", () => {
+      const banner = wrapper.find(".learn-web-vitals-link");
+      expect(banner.exists()).toBe(true);
+      expect(banner.text()).toContain("Learn about Web Vitals:");
+      expect(banner.text()).toContain("Click here");
+    });
+
+    it("should have correct banner styling for light theme", () => {
+      mockStore.state.theme = "light";
+
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      const banner = wrapper.find(".learn-web-vitals-link");
+      expect(banner.classes()).toContain("bg-indigo-2");
+
+      const link = banner.find("a");
+      expect(link.classes()).toContain("text-dark");
+    });
+
+    it("should have correct banner styling for dark theme", async () => {
+      mockStore.state.theme = "dark";
+
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      await nextTick();
+
+      const banner = wrapper.find(".learn-web-vitals-link");
+      expect(banner.classes()).toContain("bg-indigo-7");
+
+      const link = banner.find("a");
+      expect(link.classes()).toContain("text-white");
+    });
+
+    it("should have external link with correct attributes", () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      const link = wrapper.find('a[href="https://web.dev/articles/vitals"]');
+      expect(link.exists()).toBe(true);
+      expect(link.attributes("target")).toBe("_blank");
+      expect(link.attributes("title")).toBe("https://web.dev/articles/vitals");
+    });
+
+    it("should render info icon in banner", () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+          stubs: {
+            "q-icon": {
+              template: '<i class="q-icon" />',
+              props: ["name", "size"],
+            },
+          },
+        },
+      });
+
+      const icon = wrapper.find(".q-icon");
+      expect(icon.exists()).toBe(true);
+    });
+  });
+
+  describe("Dashboard Loading", () => {
+    it("should call loadDashboard on mount", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      await nextTick();
+      expect(mockConvertDashboardSchemaVersion).toHaveBeenCalled();
+    });
+
+    it("should load dashboard data correctly", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      await wrapper.vm.loadDashboard();
+      expect(mockConvertDashboardSchemaVersion).toHaveBeenCalled();
+      expect(wrapper.vm.currentDashboardData.data).toBeDefined();
+    });
+
+    it("should handle variables data when dashboard has no variables", async () => {
+      mockConvertDashboardSchemaVersion.mockReturnValue({
+        panels: [],
+        variables: null,
+      });
+
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      await wrapper.vm.loadDashboard();
+
+      expect(wrapper.vm.variablesData.isVariablesLoading).toBe(false);
+      expect(wrapper.vm.variablesData.values).toEqual([]);
+    });
+
+    it("should handle existing variables data", async () => {
+      const mockDashboardWithVars = {
+        variables: {
+          list: [{ name: "service", value: "frontend" }],
+        },
+      };
+      mockConvertDashboardSchemaVersion.mockReturnValue(mockDashboardWithVars);
+
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      await wrapper.vm.loadDashboard();
+
+      expect(wrapper.vm.currentDashboardData.data).toEqual(
+        mockDashboardWithVars,
+      );
+    });
+  });
+
+  describe("Component Layout", () => {
+    it("should execute updateLayout correctly", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      expect(typeof wrapper.vm.updateLayout).toBe("function");
+
+      await wrapper.vm.updateLayout();
+      expect(window.dispatchEvent).toHaveBeenCalledWith(expect.any(Event));
+    });
+
+    it("should handle updateLayout with null ref gracefully", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      wrapper.vm.webVitalsChartsRef = null;
+
+      await wrapper.vm.updateLayout();
+      expect(true).toBe(true); // Test passes if no error is thrown
+    });
+  });
+
+  describe("Loading States", () => {
+    it("should show loading spinner when isLoading has items", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+          stubs: {
+            "q-spinner-hourglass": true,
+          },
+        },
+      });
+
+      wrapper.vm.isLoading.push("loading");
+      await nextTick();
+
+      expect(wrapper.find("q-spinner-hourglass-stub").exists()).toBe(true);
+      expect(wrapper.text()).toContain("Loading Dashboard");
+    });
+
+    it("should hide loading spinner when isLoading is empty", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      wrapper.vm.isLoading.splice(0);
+      await nextTick();
+
+      const dashboardDiv = wrapper.find(".performance-dashboard");
+      expect(dashboardDiv.attributes("style")).toContain("visibility: visible");
+    });
+
+    it("should hide dashboard when loading", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      wrapper.vm.isLoading.push("dashboard-loading");
+      await nextTick();
+
+      const dashboardDiv = wrapper.find(".performance-dashboard");
+      expect(dashboardDiv.attributes("style")).toContain("visibility: hidden");
+    });
+  });
+
+  describe("RenderDashboardCharts Integration", () => {
+    it("should render RenderDashboardCharts with correct props", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      const dashboardCharts = wrapper.findComponent({
+        name: "RenderDashboardCharts",
+      });
+      expect(dashboardCharts.exists()).toBe(true);
+      expect(dashboardCharts.props("viewOnly")).toBe(true);
+      expect(dashboardCharts.props("searchType")).toBe("RUM");
+    });
+
+    it("should pass dashboard data to RenderDashboardCharts", async () => {
+      const testDashboardData = {
+        title: "Test Web Vitals Dashboard",
+        panels: [{ id: "panel1", title: "LCP" }],
+      };
+
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      wrapper.vm.currentDashboardData.data = testDashboardData;
+      await nextTick();
+
+      const dashboardCharts = wrapper.findComponent({
+        name: "RenderDashboardCharts",
+      });
+      expect(dashboardCharts.props("dashboardData")).toEqual(testDashboardData);
+    });
+
+    it("should pass dateTime prop to RenderDashboardCharts", async () => {
+      const customDateTime = {
+        start_time: new Date("2023-01-01"),
+        end_time: new Date("2023-01-02"),
+      };
+
+      wrapper = mount(WebVitalsDashboard, {
+        props: {
+          dateTime: customDateTime,
+        },
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      const dashboardCharts = wrapper.findComponent({
+        name: "RenderDashboardCharts",
+      });
+      expect(dashboardCharts.props("currentTimeObj")).toEqual(customDateTime);
+    });
+  });
+
+  describe("Navigation Functions", () => {
+    it("should navigate back to dashboard list", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: {
+              query: {
+                dashboard: "web-vitals-dashboard",
+                folder: "rum",
+              },
+            },
+          },
+        },
+      });
+
+      await wrapper.vm.goBackToDashboardList();
+
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        path: "/dashboards",
+        query: {
+          dashboard: "web-vitals-dashboard",
+          folder: "rum",
+        },
+      });
+    });
+
+    it("should navigate back to dashboard list with default folder", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: {
+              query: {
+                dashboard: "web-vitals-dashboard",
+              },
+            },
+          },
+        },
+      });
+
+      await wrapper.vm.goBackToDashboardList();
+
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        path: "/dashboards",
+        query: {
+          dashboard: "web-vitals-dashboard",
+          folder: "rum",
+        },
+      });
+    });
+
+    it("should navigate to add panel page", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: {
+              query: {
+                dashboard: "web-vitals-dashboard",
+                folder: "rum",
+              },
+            },
+          },
+        },
+      });
+
+      await wrapper.vm.addPanelData();
+
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        path: "/dashboards/add_panel",
+        query: {
+          dashboard: "web-vitals-dashboard",
+          folder: "rum",
+        },
+      });
+    });
+
+    it("should navigate to add panel page with default folder", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: {
+              query: {
+                dashboard: "web-vitals-dashboard",
+              },
+            },
+          },
+        },
+      });
+
+      await wrapper.vm.addPanelData();
+
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        path: "/dashboards/add_panel",
+        query: {
+          dashboard: "web-vitals-dashboard",
+          folder: "rum",
+        },
+      });
+    });
+  });
+
+  describe("Variables Data", () => {
+    it("should update variables data correctly", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      const testVariablesData = {
+        values: [
+          { name: "service", value: "frontend" },
+          { name: "environment", value: "production" },
+        ],
+      };
+
+      wrapper.vm.variablesDataUpdated(testVariablesData);
+
+      expect(wrapper.vm.variablesData).toMatchObject(testVariablesData);
+    });
+
+    it("should handle empty variables data", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      const emptyVariablesData = { values: [] };
+
+      wrapper.vm.variablesDataUpdated(emptyVariablesData);
+
+      expect(wrapper.vm.variablesData).toMatchObject(emptyVariablesData);
+    });
+  });
+
+  describe("Settings Dialog", () => {
+    it("should open settings dialog", () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      expect(wrapper.vm.showDashboardSettingsDialog).toBe(false);
+      wrapper.vm.addSettingsData();
+      expect(wrapper.vm.showDashboardSettingsDialog).toBe(true);
+    });
+  });
+
+  describe("Filter Function", () => {
+    it("should filter data correctly", () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      const testData = [
+        { name: "Frontend Service" },
+        { name: "Backend API" },
+        { name: "Database Service" },
+      ];
+
+      const filteredResults = wrapper.vm.filterData(testData, "frontend");
+
+      expect(filteredResults).toHaveLength(1);
+      expect(filteredResults[0].name).toBe("Frontend Service");
+    });
+
+    it("should handle case insensitive filtering", () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      const testData = [
+        { name: "Frontend Service" },
+        { name: "BACKEND API" },
+        { name: "database service" },
+      ];
+
+      const filteredResults = wrapper.vm.filterData(testData, "SERVICE");
+
+      expect(filteredResults).toHaveLength(2);
+      expect(filteredResults.map((r) => r.name)).toContain("Frontend Service");
+      expect(filteredResults.map((r) => r.name)).toContain("database service");
+    });
+
+    it("should return empty array when no matches found", () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      const testData = [{ name: "Frontend Service" }, { name: "Backend API" }];
+
+      const filteredResults = wrapper.vm.filterData(testData, "nonexistent");
+
+      expect(filteredResults).toHaveLength(0);
+    });
+  });
+
+  describe("Query Params and Watchers", () => {
+    it("should update router query when refreshInterval changes", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: {
+              query: {
+                dashboard: "web-vitals-dashboard",
+                folder: "rum",
+              },
+            },
+          },
+        },
+      });
+
+      wrapper.vm.selectedDate = {
+        tab: "relative",
+        relative: { value: 1, period: "days" },
+        absolute: {
+          date: {
+            from: "2025-01-01",
+            to: "2025-01-02",
+          },
+        },
+      };
+
+      await nextTick();
+      await nextTick();
+      mockRouterReplace.mockClear();
+      wrapper.vm.refreshInterval = 60;
+
+      expect(mockRouterReplace).toHaveBeenCalled();
+    });
+
+    it("should update router query when selectedDate changes", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: {
+              query: {
+                dashboard: "web-vitals-dashboard",
+                folder: "rum",
+              },
+            },
+          },
+        },
+      });
+
+      wrapper.vm.selectedDate = {
+        tab: "relative",
+        relative: { value: 1, period: "days" },
+        absolute: {
+          date: {
+            from: "2025-01-01",
+            to: "2025-01-02",
+          },
+        },
+      };
+
+      await nextTick();
+      await nextTick();
+
+      mockRouterReplace.mockClear();
+
+      const newSelectedDate = {
+        tab: "absolute",
+        relative: { value: 1, period: "days" },
+        absolute: {
+          from: "2025-01-01",
+          to: "2025-01-02",
+          startTime: "00:00:00",
+          endTime: "00:00:00",
+        },
+      };
+
+      wrapper.vm.selectedDate = newSelectedDate;
+      await nextTick();
+      await nextTick();
+
+      expect(mockRouterReplace).toHaveBeenCalled();
+    });
+  });
+
+  describe("Component Properties", () => {
+    it("should have all required reactive properties", () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      expect(wrapper.vm.currentDashboardData).toBeDefined();
+      expect(wrapper.vm.showDashboardSettingsDialog).toBe(false);
+      expect(wrapper.vm.viewOnly).toBe(true);
+      expect(wrapper.vm.eventLog).toEqual([]);
+      expect(wrapper.vm.refDateTime).toBe(null);
+      expect(wrapper.vm.refreshInterval).toBe(0);
+      expect(wrapper.vm.selectedDate).toBeDefined();
+      expect(wrapper.vm.isLoading).toEqual([]);
+      expect(wrapper.vm.variablesData).toBeDefined();
+    });
+
+    it("should expose all required methods", () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      expect(typeof wrapper.vm.loadDashboard).toBe("function");
+      expect(typeof wrapper.vm.updateLayout).toBe("function");
+      expect(typeof wrapper.vm.goBackToDashboardList).toBe("function");
+      expect(typeof wrapper.vm.addPanelData).toBe("function");
+      expect(typeof wrapper.vm.variablesDataUpdated).toBe("function");
+      expect(typeof wrapper.vm.addSettingsData).toBe("function");
+      expect(typeof wrapper.vm.filterData).toBe("function");
+    });
+
+    it("should have access to store and utilities", () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      expect(wrapper.vm.store).toBeDefined();
+      expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe(
+        "test-org",
+      );
+      expect(typeof wrapper.vm.t).toBe("function");
+      expect(wrapper.vm.getDashboard).toBeDefined();
+    });
+  });
+
+  describe("Default Props", () => {
+    it("should use default props when none provided", () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      expect(wrapper.props("dateTime")).toEqual({});
+    });
+
+    it("should validate props correctly", () => {
+      const validDateTime = {
+        start_time: new Date(),
+        end_time: new Date(),
+      };
+
+      wrapper = mount(WebVitalsDashboard, {
+        props: {
+          dateTime: validDateTime,
+        },
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      expect(wrapper.props("dateTime")).toEqual(validDateTime);
+    });
+  });
+
+  describe("Component Lifecycle", () => {
+    it("should call loadDashboard and updateLayout on mount", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      await nextTick();
+
+      expect(mockConvertDashboardSchemaVersion).toHaveBeenCalled();
+      expect(window.dispatchEvent).toHaveBeenCalledWith(expect.any(Event));
+    });
+
+    it("should call updateLayout on activated", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      (window.dispatchEvent as any).mockClear();
+
+      await wrapper.vm.updateLayout();
+
+      expect(window.dispatchEvent).toHaveBeenCalledWith(expect.any(Event));
+    });
+
+    it("should unmount cleanly without errors", () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      expect(() => wrapper.unmount()).not.toThrow();
+    });
+  });
+
+  describe("Error Handling", () => {
+    it("should handle schema conversion errors gracefully", async () => {
+      mockConvertDashboardSchemaVersion.mockImplementation(() => {
+        throw new Error("Schema conversion failed");
+      });
+
+      expect(() => {
+        wrapper = mount(WebVitalsDashboard, {
+          global: {
+            plugins: [mockI18n],
+            provide: {
+              store: mockStore,
+            },
+            mocks: {
+              $store: mockStore,
+              $router: mockRouter,
+              $route: { query: {} },
+            },
+          },
+        });
+      }).not.toThrow();
+
+      // Reset mock for cleanup
+      mockConvertDashboardSchemaVersion.mockImplementation((data) => data);
+    });
+
+    it("should handle missing webVitalsChartsRef", async () => {
+      wrapper = mount(WebVitalsDashboard, {
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: { query: {} },
+          },
+        },
+      });
+
+      wrapper.vm.webVitalsChartsRef = null;
+
+      expect(async () => {
+        await wrapper.vm.updateLayout();
+      }).not.toThrow();
+    });
+  });
+
+  describe("Integration Tests", () => {
+    it("should perform complete component workflow", async () => {
+      const customProps = {
+        dateTime: {
+          start_time: new Date("2023-01-01"),
+          end_time: new Date("2023-01-02"),
+        },
+      };
+
+      wrapper = mount(WebVitalsDashboard, {
+        props: customProps,
+        global: {
+          plugins: [mockI18n],
+          provide: {
+            store: mockStore,
+          },
+          mocks: {
+            $store: mockStore,
+            $router: mockRouter,
+            $route: {
+              query: {
+                dashboard: "web-vitals-dashboard",
+                folder: "rum",
+                refresh: "15m",
+              },
+            },
+          },
+        },
+      });
+
+      // Verify component mounted
+      expect(wrapper.exists()).toBe(true);
+
+      // Test web vitals banner
+      const banner = wrapper.find(".learn-web-vitals-link");
+      expect(banner.exists()).toBe(true);
+      expect(banner.text()).toContain("Learn about Web Vitals:");
+
+      // Test loadDashboard was called
+      expect(mockConvertDashboardSchemaVersion).toHaveBeenCalled();
+
+      // Test variables data update
+      const variableData = {
+        values: [{ name: "service", value: "frontend" }],
+      };
+      wrapper.vm.variablesDataUpdated(variableData);
+      expect(wrapper.vm.variablesData).toMatchObject(variableData);
+
+      // Test navigation functions
+      await wrapper.vm.goBackToDashboardList();
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        path: "/dashboards",
+        query: {
+          dashboard: "web-vitals-dashboard",
+          folder: "rum",
+        },
+      });
+
+      await wrapper.vm.addPanelData();
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        path: "/dashboards/add_panel",
+        query: {
+          dashboard: "web-vitals-dashboard",
+          folder: "rum",
+        },
+      });
+
+      // Test settings dialog
+      wrapper.vm.addSettingsData();
+      expect(wrapper.vm.showDashboardSettingsDialog).toBe(true);
+
+      // Test layout update
+      await wrapper.vm.updateLayout();
+      expect(window.dispatchEvent).toHaveBeenCalled();
+
+      // Test filter functionality
+      const testData = [{ name: "Frontend" }, { name: "Backend" }];
+      const filtered = wrapper.vm.filterData(testData, "front");
+      expect(filtered).toHaveLength(1);
+
+      // Verify dashboard charts integration
+      const chartsComponent = wrapper.findComponent({
+        name: "RenderDashboardCharts",
+      });
+      expect(chartsComponent.exists()).toBe(true);
+      expect(chartsComponent.props()).toMatchObject({
+        viewOnly: true,
+        searchType: "RUM",
+        currentTimeObj: customProps.dateTime,
+      });
+    });
+  });
+});

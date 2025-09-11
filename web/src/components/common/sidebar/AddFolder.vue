@@ -103,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { getImageURL } from "@/utils/zincutils";
   import { useLoading } from "@/composables/useLoading";
   import useNotifications from "@/composables/useNotifications";
+  import { useReo } from "@/services/reodotdev_analytics";
   
   const defaultValue = () => {
     return {
@@ -148,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       const { t } = useI18n();
       const { showPositiveNotification, showErrorNotification } =
         useNotifications();
+      const { track } = useReo();
   
       const onSubmit = useLoading(async () => {
         await addFolderForm.value.validate().then(async (valid: any) => {
@@ -194,6 +196,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               { timeout: 2000 }
             );
           }
+          track("Button Click", {
+            button: "Save New Folder",
+            page: "Folders",
+          });
         });
       });
   
@@ -208,6 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         isValidIdentifier,
         getImageURL,
         onSubmit,
+        defaultValue,
       };
     },
   });

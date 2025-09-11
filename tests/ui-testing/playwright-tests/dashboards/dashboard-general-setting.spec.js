@@ -1,8 +1,12 @@
-import { test, expect } from "../baseFixtures";
-import { login } from "./utils/dashLogin.js";
+const {
+  test,
+  expect,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
 
@@ -12,16 +16,12 @@ test.describe("dashboard general setting", () => {
 
   test.beforeEach(async ({ page }) => {
     console.log("running before each");
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestion(page);
-    await page.waitForTimeout(2000);
 
     await page.goto(
       `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=${process.env["ORGNAME"]}`
     );
-
-    // Instantiate with page
   });
 
   test("should verify that adding a default duration time and add tab on dashboard settings", async ({

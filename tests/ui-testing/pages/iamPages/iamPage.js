@@ -29,7 +29,7 @@ export class IamPage {
 
         this.updateButton = emailName => `//td[contains(text(),'${emailName}')]/following-sibling::td/button[@title='Update Service Account']`;
 
-        this.alertMessage = this.page.getByRole('alert').first();
+        // Removed deprecated alert reference - use specific alert verification in methods
 
 
     }
@@ -78,7 +78,10 @@ export class IamPage {
 
         await this.page.getByRole('button', { name: 'Save' }).click();
 
-        await expect(this.page.getByRole('alert').nth(2)).toContainText('Please enter a valid email address');
+        // Wait for validation alert and verify it contains the expected message
+        await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
+        const alertLocator = this.page.getByRole('alert').filter({ hasText: 'Please enter a valid email address' });
+        await expect(alertLocator).toBeVisible({ timeout: 5000 });
 
 
     }
@@ -120,9 +123,14 @@ export class IamPage {
 
 
     async verifySuccessMessage(expectedMessage) {
-        await expect(this.page.locator('role=alert').first()).toBeVisible();
-        await expect(this.alertMessage).toContainText(expectedMessage);
-
+        // Wait for alert to appear and verify the message
+        await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
+        
+        // Find the alert that contains the expected message (instead of just checking the first one)
+        const specificAlert = this.page.getByRole('alert').filter({ hasText: expectedMessage });
+        
+        // Verify the specific alert with our expected message is visible
+        await expect(specificAlert).toBeVisible({ timeout: 5000 });
     }
 
     async validateServiceAccountToken() {

@@ -46,7 +46,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 7;
+pub const DB_SCHEMA_VERSION: u64 = 8;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -429,7 +429,6 @@ pub struct Config {
     pub nats: Nats,
     pub s3: S3,
     pub sns: Sns,
-    pub tcp: TCP,
     pub prom: Prometheus,
     pub profiling: Profiling,
     pub smtp: Smtp,
@@ -576,6 +575,8 @@ pub struct Auth {
     pub root_user_password: String,
     #[env_config(name = "ZO_ROOT_USER_TOKEN")]
     pub root_user_token: String,
+    #[env_config(name = "ZO_CLI_USER_COOKIE")]
+    pub cli_user_cookie: String,
     #[env_config(name = "ZO_COOKIE_MAX_AGE", default = 2592000)] // seconds, 30 days
     pub cookie_max_age: i64,
     #[env_config(name = "ZO_COOKIE_SAME_SITE_LAX", default = true)]
@@ -642,22 +643,6 @@ pub struct Grpc {
     pub tls_cert_path: String,
     #[env_config(name = "ZO_GRPC_TLS_KEY_PATH", default = "")]
     pub tls_key_path: String,
-}
-
-#[derive(EnvConfig, Default)]
-pub struct TCP {
-    #[env_config(name = "ZO_TCP_PORT", default = 5514)]
-    pub tcp_port: u16,
-    #[env_config(name = "ZO_UDP_PORT", default = 5514)]
-    pub udp_port: u16,
-    #[env_config(name = "ZO_TCP_TLS_ENABLED", default = false)]
-    pub tcp_tls_enabled: bool,
-    #[env_config(name = "ZO_TCP_TLS_CERT_PATH", default = "")]
-    pub tcp_tls_cert_path: String,
-    #[env_config(name = "ZO_TCP_TLS_KEY_PATH", default = "")]
-    pub tcp_tls_key_path: String,
-    #[env_config(name = "ZO_TCP_TLS_CA_CERT_PATH", default = "")]
-    pub tcp_tls_ca_cert_path: String,
 }
 
 #[derive(PartialEq, Default)]
@@ -788,8 +773,6 @@ pub struct Common {
     pub feature_query_without_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
     pub feature_query_remove_filter_with_index: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_NOT_FILTER_WITH_INDEX", default = false)]
-    pub feature_query_not_filter_with_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
     pub feature_query_streaming_aggs: bool,
     #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]
@@ -1073,12 +1056,6 @@ pub struct Common {
     )]
     pub result_cache_selection_strategy: String,
     #[env_config(
-        name = "ZO_RESULT_CACHE_DISCARD_DURATION",
-        default = 60,
-        help = "Discard data of last n seconds from cached results"
-    )]
-    pub result_cache_discard_duration: i64,
-    #[env_config(
         name = "ZO_METRICS_CACHE_ENABLED",
         default = true,
         help = "Enable result cache for PromQL metrics queries"
@@ -1289,8 +1266,8 @@ pub struct Limit {
     pub job_runtime_shutdown_timeout: u64,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 60)] // seconds
     pub calculate_stats_interval: u64,
-    #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT", default = 1000000)] // records
-    pub calculate_stats_step_limit: i64,
+    #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT_SECS", default = 600)] // seconds
+    pub calculate_stats_step_limit_secs: i64,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 5)] // seconds
     pub http_request_timeout: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 5)] // seconds
@@ -1330,7 +1307,7 @@ pub struct Limit {
     #[env_config(name = "ZO_SEARCH_JOB_SCHEDULE_INTERVAL", default = 10)] // seconds
     pub search_job_scheduler_interval: i64,
     #[env_config(
-        name = "ZO_SEARCH_JOB_RUM_TIMEOUT",
+        name = "ZO_SEARCH_JOB_RUN_TIMEOUT",
         default = 600, // seconds
         help = "Timeout for update check"
     )]
@@ -1436,12 +1413,6 @@ pub struct Limit {
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
     #[env_config(
-        name = "ZO_INVERTED_INDEX_CACHE_MAX_ENTRIES",
-        default = 100000,
-        help = "Maximum number of entries in the inverted index cache. Higher values increase memory usage but may improve query performance."
-    )]
-    pub inverted_index_cache_max_entries: usize,
-    #[env_config(
         name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
         default = 10000,
         help = "Maximum number of entries in the inverted index result cache. Higher values increase memory usage but may improve query performance."
@@ -1459,6 +1430,18 @@ pub struct Limit {
         help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
     )]
     pub inverted_index_skip_threshold: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_MIN_TOKEN_LENGTH",
+        default = 2,
+        help = "Minimum length of a token in the inverted index."
+    )]
+    pub inverted_index_min_token_length: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_MAX_TOKEN_LENGTH",
+        default = 64,
+        help = "Maximum length of a token in the inverted index."
+    )]
+    pub inverted_index_max_token_length: usize,
     #[env_config(
         name = "ZO_DEFAULT_MAX_QUERY_RANGE_DAYS",
         default = 0,
@@ -1495,6 +1478,8 @@ pub struct Limit {
         default = true
     )]
     pub histogram_enabled: bool,
+    #[env_config(name = "ZO_CACHE_DELAY_SECS", default = 300)] // seconds
+    pub cache_delay_secs: i64,
 }
 
 #[derive(EnvConfig, Default)]
@@ -1638,12 +1623,6 @@ pub struct DiskCache {
     pub gc_interval: u64,
     #[env_config(name = "ZO_DISK_CACHE_MULTI_DIR", default = "")] // dir1,dir2,dir3...
     pub multi_dir: String,
-    #[env_config(
-        name = "ZO_DISK_CACHE_DELAY_WINDOW_MINS",
-        default = 10,
-        help = "Delay window indicates the time range from now to skip caching to disk, default is 10 minutes"
-    )]
-    pub delay_window_mins: i64,
 }
 
 #[derive(EnvConfig, Default)]
@@ -2066,10 +2045,6 @@ pub fn init() -> Config {
         panic!("common config error: {e}")
     }
 
-    if let Err(e) = check_tcp_tls_config(&mut cfg) {
-        panic!("syslog config error: {e}")
-    }
-
     // check data path config
     if let Err(e) = check_path_config(&mut cfg) {
         panic!("data path config error: {e}");
@@ -2121,6 +2096,11 @@ pub fn init() -> Config {
     // check nats config
     if let Err(e) = check_nats_config(&mut cfg) {
         panic!("nats config error: {e}");
+    }
+
+    // check inverted index config
+    if let Err(e) = check_inverted_index_config(&mut cfg) {
+        panic!("inverted index config error: {e}");
     }
 
     cfg
@@ -2239,8 +2219,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // check for calculate stats
-    if cfg.limit.calculate_stats_step_limit < 1 {
-        cfg.limit.calculate_stats_step_limit = 1000000;
+    if cfg.limit.calculate_stats_step_limit_secs < 1 {
+        cfg.limit.calculate_stats_step_limit_secs = 600;
+    }
+    if cfg.limit.calculate_stats_step_limit_secs > 86400 {
+        cfg.limit.calculate_stats_step_limit_secs = 86400;
     }
 
     Ok(())
@@ -2906,19 +2889,6 @@ fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn check_tcp_tls_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.tcp.tcp_tls_enabled
-        && (cfg.tcp.tcp_tls_cert_path.is_empty()
-            || cfg.tcp.tcp_tls_key_path.is_empty()
-            || cfg.tcp.tcp_tls_ca_cert_path.is_empty())
-    {
-        return Err(anyhow::anyhow!(
-            "ZO_TCP_TLS_CERT_PATH, ZO_TCP_TLS_KEY_PATH and ZO_TCP_TLS_CA_CERT_PATH must be set when ZO_TCP_TLS_ENABLED is true"
-        ));
-    }
-    Ok(())
-}
-
 #[inline]
 pub fn get_parquet_compression(compression: &str) -> parquet::basic::Compression {
     match compression.to_lowercase().as_str() {
@@ -2937,6 +2907,25 @@ fn check_nats_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.nats.queue_max_size = 2048; // 2GB
     }
     cfg.nats.queue_max_size *= 1024 * 1024; // convert to bytes
+    Ok(())
+}
+
+fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.limit.inverted_index_result_cache_max_entries == 0 {
+        cfg.limit.inverted_index_result_cache_max_entries = 10000;
+    }
+    if cfg.limit.inverted_index_result_cache_max_entry_size == 0 {
+        cfg.limit.inverted_index_result_cache_max_entry_size = 20480;
+    }
+    if cfg.limit.inverted_index_skip_threshold == 0 {
+        cfg.limit.inverted_index_skip_threshold = 35;
+    }
+    if cfg.limit.inverted_index_min_token_length == 0 {
+        cfg.limit.inverted_index_min_token_length = 2;
+    }
+    if cfg.limit.inverted_index_max_token_length == 0 {
+        cfg.limit.inverted_index_max_token_length = 64;
+    }
     Ok(())
 }
 

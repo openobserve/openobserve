@@ -55,6 +55,10 @@ export default defineComponent({
       docURL,
       getImageURL,
       content,
+      name,
+      endpoint,
+      databaseContent,
+      databaseDocURLs,
     };
   },
 });

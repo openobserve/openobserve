@@ -30,10 +30,10 @@ export
     }
 
     async goToManagement() {
-
-       // await this.page.locator('[data-test="menu-link-settings-item"]').click();
-
-       // await this.page.waitForSelector('[data-test="menu-link-/settings/-item"]');
+ // Follow same pattern as navigateToManagement() but with validation
+    await this.page.waitForSelector("[name ='home']");
+    await this.homeIcon.hover();
+    await this.page.waitForSelector('[data-test="menu-link-settings-item"]');
         await this.managementMenuItem.click({ force: true });
         await expect(this.page.getByRole('main')).toContainText('Management');
     }
@@ -51,6 +51,43 @@ export
         await expect(this.page).toHaveURL(/settings/);
     } 
     
+    async checkAndEnableWebSocket() {
+        // Selector for the WebSocket toggle
+        const toggleSelector = '[data-test="general-settings-enable-websocket"]';
+        
+        // Wait for the toggle element to be visible
+        await this.page.waitForSelector(toggleSelector);
+    
+        // Get the current state of the toggle
+        const isChecked = await this.page.$eval(toggleSelector, (toggle) => {
+            return toggle.getAttribute('aria-checked') === 'true';
+        });
+    
+        // Log the current state
+        console.log(`WebSocket is currently ${isChecked ? 'enabled' : 'disabled'}.`);
+    
+        // If the WebSocket is not enabled, click to enable it
+        if (!isChecked) {
+            console.log('Enabling WebSocket...');
+            await this.page.click(toggleSelector);
+            
+            // Optionally, wait for a brief moment to ensure the toggle action is completed
+            await this.page.waitForTimeout(500); // Adjust the timeout as needed
+    
+            // Verify if the toggle is now enabled
+            const newCheckedState = await this.page.$eval(toggleSelector, (toggle) => {
+                return toggle.getAttribute('aria-checked') === 'true';
+            });
+    
+            if (newCheckedState) {
+                console.log('WebSocket has been successfully enabled.');
+            } else {
+                console.log('Failed to enable WebSocket.');
+            }
+        } else {
+            console.log('WebSocket is already enabled.');
+        }
+    }
 
     async checkStreaming() {
 
@@ -84,21 +121,41 @@ export
             
             // Optionally, wait for a brief moment to ensure the toggle action is completed
             await this.page.waitForTimeout(500); // Adjust the timeout as needed
-      
-            // Verify if the toggle is now enabled
-            const newCheckedState = await this.page.$eval(toggleSelector, (toggle) => {
-                return toggle.getAttribute('aria-checked') === 'true';
-            });
-      
-            if (newCheckedState) {
-                console.log('Streaming has been successfully enabled.');
-            } else {
-                console.log('Failed to enable Streaming.');
-            }
-        } else {
-            console.log('Streaming is already enabled.');
         }
-      }
-      
-    
+    }
+  async ensureStreamingDisabled() {
+    // Navigate to logs page first to ensure we are in the correct org context
+    await this.page.goto(
+      process.env["ZO_BASE_URL"] + "/web/logs?org_identifier=default"
+    );
+    await this.page.waitForLoadState("networkidle");
+
+    // Navigate to the General Settings page
+    await this.page.locator('[data-test="menu-link-settings-item"]').click();
+    await this.page.goto(
+      process.env["ZO_BASE_URL"] +
+        "/web/settings/general?org_identifier=default"
+    );
+    await this.page.waitForLoadState("networkidle");
+
+    const toggleSelector = '[data-test="general-settings-enable-streaming"]';
+
+    // Wait for the toggle element to be visible
+    await this.page.waitForSelector(toggleSelector);
+
+    // Determine current toggle state
+    const isChecked = await this.page.$eval(toggleSelector, (toggle) => {
+      return toggle.getAttribute("aria-checked") === "true";
+    });
+
+    // If Streaming is enabled, click to disable it
+    if (isChecked) {
+      await this.page.click(toggleSelector);
+      await this.page.waitForTimeout(500); // allow UI to update
+
+      // Verify toggle is now disabled
+
+      await this.page.locator('[data-test="dashboard-add-submit"]').click();
+    }
+  }
 }

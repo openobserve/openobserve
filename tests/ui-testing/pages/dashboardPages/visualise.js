@@ -1,5 +1,6 @@
 //logs visualise page object
 //Methods: openLogs, openVisualiseTab, logsApplyQueryButton, Visualize run query button, setRelative, searchAndAddField, showQueryToggle, enableSQLMode, streamIndexList, logsSelectStream, logsToggle, selectChartType, removeField, chartRender, backToLogs, openQueryEditor, fillQueryEditor
+import { expect } from "@playwright/test";
 export default class LogsVisualise {
   constructor(page) {
     this.page = page;
@@ -15,6 +16,29 @@ export default class LogsVisualise {
       .locator("#fnEditor")
       .getByRole("textbox")
       .locator("div");
+
+    // Dashboard locators
+    this.addToDashboardBtn = page.getByRole("button", {
+      name: "Add To Dashboard",
+    });
+    this.newDashboardBtn = page.locator(
+      '[data-test="dashboard-dashboard-new-add"]'
+    );
+    this.dashboardNameInput = page.locator('[data-test="add-dashboard-name"]');
+    this.dashboardSubmitBtn = page.locator(
+      '[data-test="dashboard-add-submit"]'
+    );
+    this.panelTitleInput = page.locator(
+      '[data-test="metrics-new-dashboard-panel-title"]'
+    );
+    this.updateSettingsBtn = page.locator(
+      '[data-test="metrics-schema-update-settings-button"]'
+    );
+
+    // Query editor locators
+    this.logsQueryEditor = page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox");
     //Functions
   }
   async openLogs() {
@@ -101,8 +125,7 @@ export default class LogsVisualise {
   //stream index list
   async streamIndexList() {
     await this.page
-      .locator('[data-test="logs-search-index-list"]')
-      .getByText("arrow_drop_down")
+      .locator('[data-test="dashboard-field-list-collapsed-icon"]')
       .click();
   }
   //logs: Select stream
@@ -196,6 +219,13 @@ export default class LogsVisualise {
     await queryEditor.type(sqlQuery);
   }
 
+  //fill logs query editor with SQL query
+  async fillLogsQueryEditor(sqlQuery) {
+    await this.logsQueryEditor.waitFor({ state: "visible", timeout: 5000 });
+    await this.logsQueryEditor.click();
+    await this.logsQueryEditor.fill(sqlQuery);
+  }
+
   // Open the first VRL Function Editor
   async vrlFunctionEditor(vrl) {
     await this.functionEditor.first().click();
@@ -209,15 +239,257 @@ export default class LogsVisualise {
     const cancelBtn = this.page.locator(
       '[data-test="logs-search-bar-visualize-cancel-btn"]'
     );
-
     await runBtn.waitFor({ state: "visible" });
-    // Click "Run query"
     await runBtn.click();
-
-    // Wait for "Run query" to reappear (query is finished)
     await runBtn.waitFor({ state: "visible" });
-
     // Optional: small buffer to ensure UI is stable
     await this.page.waitForTimeout(300);
+  }
+
+  // Helper function to check for dashboard errors
+  async checkDashboardErrors(page, chartTypeName) {
+    const dashboardErrorContainer = page.locator(
+      '[data-test="dashboard-error"]'
+    );
+    const errorContainerExists = await dashboardErrorContainer.count();
+
+    if (errorContainerExists === 0) {
+      return { hasErrors: false, errors: [] };
+    }
+
+    const isErrorVisible = await dashboardErrorContainer.first().isVisible();
+    if (!isErrorVisible) {
+      return { hasErrors: false, errors: [] };
+    }
+
+    const errors = [];
+
+    // Check for error indicator text
+    const errorText = page
+      .locator('[data-test="dashboard-error"]')
+      .getByText(/Errors \(\d+\)/);
+    const errorTextCount = await errorText.count();
+
+    if (errorTextCount > 0) {
+      const errorTextContent = await errorText.first().textContent();
+      errors.push(`Error indicator: ${errorTextContent}`);
+    }
+
+    // Check for error list items
+    const errorListItems = page.locator('[data-test="dashboard-error"] ul li');
+    const errorListCount = await errorListItems.count();
+
+    if (errorListCount > 0) {
+      for (let i = 0; i < errorListCount; i++) {
+        const errorItem = errorListItems.nth(i);
+        const errorItemText = await errorItem.textContent();
+        if (errorItemText && errorItemText.trim().length > 0) {
+          errors.push(`Error ${i + 1}: ${errorItemText.trim()}`);
+        }
+      }
+    }
+
+    return {
+      hasErrors: errors.length > 0,
+      errors,
+      errorTextCount,
+      errorListCount,
+    };
+  }
+
+  async verifyChartRenders(page) {
+    const chartRenderer = page.locator(
+      '[data-test="chart-renderer"], [data-test="dashboard-panel-table"]'
+    );
+
+    try {
+      // Wait for chart renderer to be present and visible
+      await chartRenderer.first().waitFor({
+        state: "visible",
+        timeout: 15000,
+      });
+
+      // Additional check to ensure the chart is actually rendered
+      const chartExists = await chartRenderer.count();
+
+      if (chartExists > 0) {
+        // Double-check visibility after waiting
+        const isVisible = await chartRenderer.first().isVisible();
+        if (!isVisible) {
+          // Wait for chart content to be rendered intelligently
+          const chartContentReady = await this.waitForChartContent(page, 3000);
+
+          if (!chartContentReady) {
+            // Fallback: try waiting for chart renderer to be stable
+            try {
+              await chartRenderer.first().waitFor({
+                state: "visible",
+                timeout: 2000,
+              });
+            } catch (fallbackError) {
+              throw new Error(
+                `Chart renderer present but content failed to load after intelligent waiting. Error: ${fallbackError.message}`
+              );
+            }
+          }
+
+          // Final visibility check after intelligent waiting
+          const isVisibleRetry = await chartRenderer.first().isVisible();
+          if (!isVisibleRetry) {
+            throw new Error(
+              "Chart renderer is present but not visible after intelligent retry"
+            );
+          }
+        }
+      }
+
+      return chartExists > 0;
+    } catch (error) {
+      // If waiting times out, check if element exists but is not visible
+      const chartExists = await chartRenderer.count();
+      if (chartExists > 0) {
+        const isVisible = await chartRenderer.first().isVisible();
+        throw new Error(
+          `Chart renderer found (${chartExists} elements) but visibility check failed. Is visible: ${isVisible}. Original error: ${error.message}`
+        );
+      } else {
+        throw new Error(
+          `No chart renderer found. Original error: ${error.message}`
+        );
+      }
+    }
+  }
+
+  // RECOMMENDED: Native browser function (fastest & most reliable)
+  async waitForChartContent(page, timeout = 5000) {
+    return page
+      .waitForFunction(
+        () =>
+          document.querySelector(
+            '[data-test="chart-renderer"], [data-test="dashboard-panel-table"]'
+          )?.offsetParent !== null,
+        {},
+        { timeout }
+      )
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  // Get quick mode toggle state using the most reliable method
+  async getQuickModeToggleState() {
+    const quickModeToggle = this.page.locator(
+      '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
+    );
+
+    // Wait for the toggle to be present
+    await quickModeToggle.waitFor({ state: "visible", timeout: 10000 });
+
+    // Check aria-checked attribute - this is the most reliable indicator
+    // Falls back to aria-pressed if aria-checked is not available
+    let ariaChecked = await quickModeToggle.getAttribute("aria-checked");
+    if (ariaChecked === null) {
+      ariaChecked = await quickModeToggle.getAttribute("aria-pressed");
+    }
+
+    return ariaChecked === "true";
+  }
+
+  // Verify quick mode toggle state
+  async verifyQuickModeToggle(expectedState = true) {
+    const isChecked = await this.getQuickModeToggleState();
+
+    // Validate the toggle state matches expectation
+    if (expectedState !== isChecked) {
+      throw new Error(
+        `Expected quick mode to be ${expectedState} but actual state is ${isChecked}`
+      );
+    }
+
+    return isChecked;
+  }
+
+  // Toggle quick mode to specific state (enable/disable)
+  async setQuickModeToggle(enableState) {
+    const quickModeToggle = this.page.locator(
+      '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
+    );
+
+    await quickModeToggle.waitFor({ state: "visible", timeout: 10000 });
+
+    const currentState = await this.getQuickModeToggleState();
+
+    // Only click if we need to change the state
+    if (currentState !== enableState) {
+      await quickModeToggle.click();
+
+      // Wait for state change to complete
+      await this.page.waitForTimeout(500);
+
+      // Verify the state actually changed
+      const newState = await this.getQuickModeToggleState();
+      if (newState !== enableState) {
+        throw new Error(
+          `Failed to set quick mode to ${enableState}. Current state: ${newState}`
+        );
+      }
+    }
+
+    return enableState;
+  }
+
+  // Enable quick mode if it's currently disabled
+  async enableQuickModeIfDisabled() {
+    return await this.setQuickModeToggle(true);
+  }
+
+  // Disable quick mode if it's currently enabled
+  async disableQuickModeIfEnabled() {
+    return await this.setQuickModeToggle(false);
+  }
+
+  // Helper function to verify chart type selection
+  async verifyChartTypeSelected(page, chartType, shouldBeSelected = true) {
+    const selector = `[data-test="selected-chart-${chartType}-item"]`;
+    const locator = page.locator(selector).locator("..");
+
+    if (shouldBeSelected) {
+      await expect(locator).toHaveClass(/bg-grey-[35]/);
+    } else {
+      await expect(locator).not.toHaveClass(/bg-grey-[35]/);
+    }
+  }
+
+  async addPanelToNewDashboard(randomDashboardName, panelName) {
+    // Add to dashboard and submit it
+    await this.addToDashboardBtn.waitFor({ state: "visible", timeout: 5000 });
+    await this.addToDashboardBtn.click();
+
+    // Wait for and click new dashboard option
+    await this.newDashboardBtn.waitFor({ state: "visible", timeout: 5000 });
+    await this.newDashboardBtn.click();
+
+    // Fill dashboard name
+    await this.dashboardNameInput.waitFor({ state: "visible", timeout: 5000 });
+    await this.dashboardNameInput.click();
+    await this.dashboardNameInput.fill(randomDashboardName);
+
+    // Submit dashboard creation
+    await this.dashboardSubmitBtn.waitFor({ state: "visible", timeout: 5000 });
+    await this.dashboardSubmitBtn.click();
+
+    // Wait for panel title input to be available (replacing hardcoded timeout)
+    await this.panelTitleInput.waitFor({ state: "visible", timeout: 10000 });
+    await this.panelTitleInput.click();
+    await this.panelTitleInput.fill(panelName);
+
+    // Submit panel settings
+    await this.updateSettingsBtn.waitFor({ state: "visible", timeout: 5000 });
+    await this.updateSettingsBtn.click();
+  }
+
+  //wait for query inspector to be visible
+  async waitForQueryInspector(page) {
+    const queryInspector = page.getByText("Query Inspectorclose");
+    await expect(queryInspector).toBeVisible({ timeout: 10000 });
   }
 }

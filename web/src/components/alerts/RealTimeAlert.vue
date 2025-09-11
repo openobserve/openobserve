@@ -346,6 +346,25 @@ function updateGroup(updatedGroup:any) {
       );
     });
   };
+
+    // Expose methods and data for testing
+    defineExpose({
+    triggerData,
+    destinations,
+    filteredDestinations,
+    inputData,
+    destinationSelectRef,
+    isDestinationDropdownOpen,
+    updateTrigger,
+    addField,
+    removeField,
+    routeToCreateDestination,
+    updateDestinations,
+    updateGroup,
+    removeConditionGroup,
+    conditionsImage,
+    filterDestinations,
+  });
 </script>
 
 <style lang="scss" scoped></style>

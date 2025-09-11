@@ -22,6 +22,8 @@ use datafusion::execution::SendableRecordBatchStream;
 use flight::{common::PreCustomMessage, encoder::FlightDataEncoder};
 use futures::{Stream, StreamExt};
 use futures_core::ready;
+use tracing::info_span;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{handler::grpc::flight::clear_session_data, service::search::utils::AsyncDefer};
 
@@ -67,7 +69,13 @@ impl FlightEncoderStreamBuilder {
         self
     }
 
-    pub fn build(self, inner: SendableRecordBatchStream) -> FlightEncoderStream {
+    pub fn build(
+        self,
+        inner: SendableRecordBatchStream,
+        span: tracing::Span,
+    ) -> FlightEncoderStream {
+        let child_span = info_span!("grpc:search:flight:execute_physical_plan");
+        child_span.set_parent(span.context());
         FlightEncoderStream {
             inner,
             encoder: self.encoder,
@@ -77,6 +85,9 @@ impl FlightEncoderStreamBuilder {
             trace_id: self.trace_id,
             defer: self.defer,
             start: self.start,
+            first_batch: true,
+            span,
+            child_span,
         }
     }
 }
@@ -86,11 +97,14 @@ pub struct FlightEncoderStream {
     encoder: FlightDataEncoder,
     queue: VecDeque<FlightData>,
     done: bool,
+    first_batch: bool,
     custom_messages: Vec<PreCustomMessage>,
     // query context
     trace_id: String,
     defer: Option<AsyncDefer>,
     start: std::time::Instant,
+    span: tracing::Span,
+    child_span: tracing::Span,
 }
 
 impl FlightEncoderStream {
@@ -110,6 +124,24 @@ impl FlightEncoderStream {
                 self.queue.push_back(flight_data);
             }
         }
+        Ok(())
+    }
+
+    fn encode_custom_scan_stats(&mut self) -> Result<(), FlightError> {
+        let custom_messages = std::mem::take(&mut self.custom_messages);
+        let mut remainder_messages = Vec::new();
+        for message in custom_messages.into_iter() {
+            if message.is_scan_stats() {
+                let message = message.get_custom_message();
+                if let Some(message) = message {
+                    let flight_data = self.encoder.encode_custom(&message)?;
+                    self.queue.push_back(flight_data);
+                }
+            } else {
+                remainder_messages.push(message);
+            }
+        }
+        self.custom_messages = remainder_messages;
         Ok(())
     }
 }
@@ -156,6 +188,15 @@ impl Stream for FlightEncoderStream {
                     return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
                 }
                 Some(Ok(batch)) => {
+                    // before send the first batch, send the scan_stats first
+                    if self.first_batch && !self.custom_messages.is_empty() {
+                        if let Err(e) = self.encode_custom_scan_stats() {
+                            self.done = true;
+                            self.queue.clear();
+                            return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
+                        }
+                        self.first_batch = false;
+                    }
                     if let Err(e) = self.encode_batch(batch) {
                         self.done = true;
                         self.queue.clear();
@@ -172,6 +213,11 @@ impl Drop for FlightEncoderStream {
         let trace_id = &self.trace_id;
         let took = self.start.elapsed().as_millis();
         log::info!("[trace_id {trace_id}] flight->search: stream end, took: {took} ms",);
+
+        let _child_enter = self.child_span.enter();
+        let _enter = self.span.enter();
+        drop(_child_enter);
+        drop(_enter);
 
         // metrics
         let time = self.start.elapsed().as_secs_f64();

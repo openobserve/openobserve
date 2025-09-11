@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         flexWrap: 'nowrap',
       }"
       class="flex"
+      :data-test="`trace-tree-span-container-${span.spanId}`"
     >
       <div :style="{ width: leftWidth + 'px' }">
         <div
@@ -46,10 +47,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :style="{ height: '30px' }"
             @mouseover="() => (spanHoveredIndex = index)"
             @mouseout="() => (spanHoveredIndex = -1)"
+            :data-test="`trace-tree-span-operation-name-container-${span.spanId}`"
           >
             <div
               class="absolute view-logs-container"
               :class="spanHoveredIndex === index ? 'show' : ''"
+              :data-test="`trace-tree-span-view-logs-container-${span.spanId}`"
             >
               <q-btn
                 class="q-mx-xs view-span-logs"
@@ -60,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 :title="t('traces.viewLogs')"
                 @click.stop="viewSpanLogs(span)"
+                :data-test="`trace-tree-span-view-logs-btn-${span.spanId}`"
               >
                 <!-- <span class="text view-logs-btn-text">View Logs</span> -->
               </q-btn>
@@ -72,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               class="q-pt-xs flex justify-center items-center collapse-container cursor-pointer"
               @click.stop="toggleSpanCollapse(span.spanId)"
+              :data-test="`trace-tree-span-collapse-btn-${span.spanId}`"
             >
               <q-icon
                 dense
@@ -91,12 +96,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 borderLeft: `3px solid ${span.style.color}`,
               }"
               @click="selectSpan(span.spanId)"
+              :data-test="`trace-tree-span-select-btn-${span.spanId}`"
             >
               <q-icon
                 v-if="span.spanStatus === 'ERROR'"
                 name="error"
                 class="text-red-6 q-mr-xs"
                 title="Error Span"
+                :data-test="`trace-tree-span-error-icon-${span.spanId}`"
               />
               <span
                 class="text-subtitle2 text-bold q-mr-sm"
@@ -106,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     store.state.theme === 'dark' && isHighlighted(span.spanId),
                   'current-match': currentSelectedValue === span.spanId, // Current match class
                 }"
+                :data-test="`trace-tree-span-service-name-${span.spanId}`"
               >
                 {{ span.serviceName }}
               </span>
@@ -116,6 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'text-grey-5'
                     : 'text-blue-grey-9'
                 "
+                :data-test="`trace-tree-span-operation-name-${span.spanId}`"
                 >{{ span.operationName }}</span
               >
             </div>
@@ -128,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               marginLeft: span.hasChildSpans ? '14px' : '0',
               width: '100%',
             }"
+            :data-test="`trace-tree-span-background-${span.spanId}`"
           ></div>
         </div>
       </div>
@@ -158,22 +168,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  onBeforeMount,
-  nextTick,
-  ref,
-  watch,
-  defineExpose,
-  computed,
-} from "vue";
+import { defineComponent, nextTick, ref, watch, computed } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
 import SpanBlock from "./SpanBlock.vue";
-import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { b64EncodeStandard } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 
 export default defineComponent({
@@ -251,14 +251,19 @@ export default defineComponent({
     const searchResults = ref<any[]>([]);
     const currentIndex = ref<number | null>(null);
     const currentSelectedValue = computed(() => {
-      if (currentIndex.value === -1 || searchResults.value.length === 0) {
+      if (
+        currentIndex.value === -1 ||
+        currentIndex.value === null ||
+        searchResults.value.length === 0
+      ) {
         return null;
       }
-      return searchResults.value[currentIndex.value ?? 0];
+      return searchResults.value[currentIndex.value];
     });
 
     const findMatches = (spanList: any, searchQuery: any) => {
       const query = searchQuery.toLowerCase().trim();
+      if (!query) return [];
       return spanList
         .map((span: any, index: any) => {
           // Check if any span value matches the query
@@ -338,10 +343,6 @@ export default defineComponent({
         });
       }
     };
-    defineExpose({
-      nextMatch,
-      prevMatch,
-    });
 
     watch(
       () => props.searchQuery,
@@ -371,6 +372,8 @@ export default defineComponent({
       prevMatch,
       isHighlighted,
       currentSelectedValue,
+      scrollToMatch,
+      findMatches,
     };
   },
   components: { SpanBlock },

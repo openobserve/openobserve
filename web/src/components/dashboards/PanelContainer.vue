@@ -334,6 +334,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :runId="runId"
       :tabId="props.tabId"
       :tabName="props.tabName"
+      :dashboardName="props.dashboardName"
+      :folderName="props.folderName"
       @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
       @limit-number-of-series-warning-message-update="
@@ -442,6 +444,8 @@ export default defineComponent({
     "runId",
     "tabId",
     "tabName",
+    "dashboardName",
+    "folderName",
   ],
   components: {
     PanelSchemaRenderer,
@@ -594,6 +598,13 @@ export default defineComponent({
         metaData.value.queries[0]?.endTime.toString(),
       );
       logsUrl.searchParams.set("functionContent", vrlFunctionQueryEncoded);
+      //this url paramater have been added to show the function editor in the logs page when the query has vrl function
+      //otherwise it will be false and the function editor will not be shown
+      if (vrlFunctionQueryEncoded.length > 0) {
+        logsUrl.searchParams.set("fn_editor", "true");
+      } else {
+        logsUrl.searchParams.set("fn_editor", "false");
+      }
       logsUrl.searchParams.set("sql_mode", "true");
       logsUrl.searchParams.set("query", encodedQuery);
       logsUrl.searchParams.set(

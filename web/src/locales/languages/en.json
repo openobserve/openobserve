@@ -317,6 +317,24 @@
     "customRole": "Custom Roles",
     "description": "Description"
   },
+  "invitation": {
+    "pendingInvitations": "Pending Invitations",
+    "organizationName": "Organization Name",
+    "role": "Role",
+    "invitedBy": "Invited By",
+    "expiry": "Expiry",
+    "actions": "Actions",
+    "accept": "Accept",
+    "reject": "Reject",
+    "cancel": "Cancel",
+    "confirmAcceptHead": "Accept Invitation",
+    "confirmAcceptMsg": "Are you sure you want to join {org}?",
+    "confirmRejectHead": "Reject Invitation",
+    "confirmRejectMsg": "Are you sure you want to reject the invitation to join {org}?",
+    "expired": "Expired",
+    "expiresToday": "Expires Today",
+    "daysLeft": "{days} days left"
+  },
   "serviceAccounts": {
     "header": "Service Accounts",
     "search": "Search Service Account",
@@ -476,11 +494,13 @@
     "addSchemaField": "Add to Defined Schema",
     "removeSchemaField": "Remove Defined Schema",
     "storeOriginalData": "Store Original Data",
+    "flattenLevel": "Flatten Level",
     "approxPartition": "Use Stream Stats for Partitioning",
     "indexSize": "Index Size",
     "extendedStartDate": "Start Date",
     "extendedEndDate": "End Date",
-    "regexPatterns": "Regex Patterns"
+    "regexPatterns": "Regex Patterns",
+    "envQuickModeMsg": "Environment quick mode field"
   },
   "pipeline": {
     "header": "Pipelines",
@@ -580,6 +600,7 @@
     "otherLabel": "Other",
     "sqlserver": "SQL Server",
     "postgres": "Postgres",
+    "oracle": "Oracle",
     "mongodb": "MongoDB",
     "redis": "Redis",
     "couchdb": "CouchDB",
@@ -630,19 +651,6 @@
     "apache": "Apache",
     "iis": "IIS",
     "pubsub": "Pub/Sub Logs"
-  },
-  "syslog": {
-    "stream": "Stream",
-    "organization": "Organization",
-    "subnets": "Subnets",
-    "deleteRoute": "Delete Route",
-    "syslog_addroute": "Add Route",
-    "save": "Save",
-    "cancel": "Cancel",
-    "delete": "Delete",
-    "edit": "Edit",
-    "on": "Turn On",
-    "off": "Turn Off"
   },
   "dashboard": {
     "selectField": "Field",
@@ -1220,7 +1228,8 @@
     "numOfQueries": "Number of Queries",
     "totalDuration": "Total Exec. Duration",
     "totalTimeRange": "Total Query Range",
-    "searchType": "Search Type"
+    "searchType": "Search Type",
+    "querySource": "Query Source"
   },
   "traces": {
     "viewLogs": "View Logs",

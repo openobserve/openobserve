@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::cluster::LOCAL_NODE;
+use config::{cluster::LOCAL_NODE, spawn_pausable_job};
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_enterprise_config;
@@ -22,12 +22,9 @@ use o2_openfga::config::get_config as get_openfga_config;
 use regex::Regex;
 
 use crate::{
-    common::{
-        infra::config::SYSLOG_ENABLED,
-        meta::{
-            organization::DEFAULT_ORG,
-            user::{UserOrgRole, UserRequest},
-        },
+    common::meta::{
+        organization::DEFAULT_ORG,
+        user::{UserOrgRole, UserRequest},
     },
     service::{db, self_reporting, users},
 };
@@ -49,8 +46,6 @@ pub(crate) mod pipeline;
 mod promql;
 mod promql_self_consume;
 mod stats;
-pub(crate) mod syslog_server;
-mod telemetry;
 
 pub use file_downloader::{download_from_node, queue_download};
 pub use file_list_dump::FILE_LIST_SCHEMA;
@@ -121,6 +116,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::org_users::watch());
     tokio::task::spawn(db::organization::watch());
 
+    #[cfg(feature = "cloud")]
+    tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
+
     // check version
     db::metas::version::set()
         .await
@@ -133,7 +131,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(self_reporting::run_audit_publish());
+    if self_reporting::run_audit_publish().is_none() {
+        log::error!("Failed to run audit publish");
+    };
     #[cfg(feature = "cloud")]
     tokio::task::spawn(self_reporting::cloud_events::flush_cloud_events());
 
@@ -158,7 +158,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // telemetry run
     if cfg.common.telemetry_enabled && LOCAL_NODE.is_querier() {
-        tokio::task::spawn(telemetry::run());
+        spawn_pausable_job!(
+            "telemetry",
+            config::get_config().common.telemetry_heartbeat,
+            {
+                crate::common::meta::telemetry::Telemetry::new()
+                    .heart_beat("OpenObserve - heartbeat", None)
+                    .await;
+            }
+        );
     }
 
     tokio::task::spawn(self_reporting::run());
@@ -226,10 +234,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::alerts::alert::cache()
         .await
         .expect("alerts cache failed");
-    db::syslog::cache().await.expect("syslog cache failed");
-    db::syslog::cache_syslog_settings()
-        .await
-        .expect("syslog settings cache failed");
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::domain_management::db::cache()
         .await
@@ -267,15 +271,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 .expect("load system prompt failed");
         });
     }
-
-    tokio::task::spawn(files::run());
-    tokio::task::spawn(stats::run());
-    tokio::task::spawn(compactor::run());
-    tokio::task::spawn(flatten_compactor::run());
-    tokio::task::spawn(metrics::run());
-    tokio::task::spawn(promql::run());
-    tokio::task::spawn(alert_manager::run());
-    tokio::task::spawn(file_downloader::run());
+    tokio::task::spawn(async move { files::run().await });
+    tokio::task::spawn(async move { stats::run().await });
+    tokio::task::spawn(async move { compactor::run().await });
+    tokio::task::spawn(async move { flatten_compactor::run().await });
+    tokio::task::spawn(async move { metrics::run().await });
+    let _ = promql::run();
+    tokio::task::spawn(async move { alert_manager::run().await });
+    tokio::task::spawn(async move { file_downloader::run().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { pipeline::run().await });
 
@@ -325,17 +328,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // Shouldn't serve request until initialization finishes
     log::info!("Job initialization complete");
-
-    // Syslog server start
-    tokio::task::spawn(db::syslog::watch());
-    tokio::task::spawn(db::syslog::watch_syslog_settings());
-
-    let start_syslog = *SYSLOG_ENABLED.read();
-    if start_syslog {
-        syslog_server::run(start_syslog, true)
-            .await
-            .expect("syslog server run failed");
-    }
 
     Ok(())
 }

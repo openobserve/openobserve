@@ -50,11 +50,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="organizationData.id"
           :readonly="beingUpdated"
           :disabled="beingUpdated"
+          stack-label
+          outlined
+          filled
+          dense
           :label="t('organization.id')"
+          class="showLabelOnTop"
         />
 
         <q-input
-          v-model="organizationData.name"
+          v-model.trim="organizationData.name"
           :label="t('organization.name') + '*'"
           color="input-border"
           bg-color="input-bg"
@@ -63,10 +68,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           filled
           dense
-          :rules="[(val: any) => !!val || t('organization.nameRequired')]"
+          :rules="[
+            (val: any) =>
+              !!val
+                ? isValidOrgName ||
+                  'Use alphanumeric characters, space and underscore only.'
+                : t('organization.nameRequired'),
+          ]"
           data-test="org-name"
           maxlength="100"
-        />
+        >
+        <template v-slot:hint>
+                Use alphanumeric characters, space and underscore only.
+          </template>
+      </q-input>
 
         <div class="flex q-mt-lg">
           <q-btn
@@ -108,12 +123,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import organizationService from "@/services/organizations";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
+import { useReo } from "@/services/reodotdev_analytics";
+import { useQuasar } from "quasar";
 
 const defaultValue = () => {
   return {
@@ -149,6 +166,14 @@ export default defineComponent({
     const organizationData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
+    const { track } = useReo();
+    const q = useQuasar();
+
+    const isValidOrgName = computed(() => {
+      const orgNameRegex = /^[a-zA-Z0-9_ ]+$/;
+      return orgNameRegex.test(organizationData.value.name);
+    });
+
 
     return {
       t,
@@ -160,6 +185,8 @@ export default defineComponent({
       addOrganizationForm,
       store,
       isValidIdentifier,
+      track,
+      isValidOrgName,
     };
   },
   created() {
@@ -191,7 +218,6 @@ export default defineComponent({
       });
     },
     completeSubscriptionProcess() {
-      console.log(this.store.state);
       // this.store.state.dispatch("setSelectedOrganization",)
       this.router.push(
         `/billings/plans?org_identifier=${this.newOrgIdentifier}`
@@ -199,6 +225,9 @@ export default defineComponent({
     },
     onSubmit() {
       this.organizationData.name = this.organizationData.name.trim();
+      if(!this.isValidOrgName){
+        return;
+      }
       const dismiss = this.$q.notify({
         spinner: true,
         message: "Please wait...",
@@ -211,16 +240,17 @@ export default defineComponent({
 
         const organizationId = this.organizationData.id;
         delete this.organizationData.id;
-
+        //here we will check if organizationId is there or not because we only get org id when we are updating the organization
+        //if organizationId is not there we will create a new organization else we will update the existing organization
         if (organizationId == "") {
           callOrganization = organizationService.create(this.organizationData);
         }
-        // else {
-        //   callOrganization = organizationService.update(
-        //     organizationId,
-        //     this.organizationData
-        //   );
-        // }
+        else {
+          callOrganization = organizationService.rename_organization(
+            organizationId,
+            this.organizationData.name,
+          );
+        }
 
         callOrganization
           .then((res: any) => {
@@ -264,10 +294,14 @@ export default defineComponent({
             this.$q.notify({
               type: "negative",
               message: JSON.stringify(
-                err?.response?.data["message"] || "Organization creation failed."
+                err?.response?.data["message"] || ( organizationId ? "Organization Update failed." : "Organization creation failed.")
               ),
             });
             dismiss();
+          });
+          this.track("Button Click", {
+            button: "Save Organization",
+            page: "Add Organization"
           });
       });
     },

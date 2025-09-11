@@ -19,7 +19,8 @@ use arc_swap::ArcSwap;
 use chrono::Utc;
 use config::{
     ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, ORIGINAL_DATA_COL_NAME, RwAHashMap,
-    RwHashMap, SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS, get_config,
+    RwHashMap, RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS,
+    get_config,
     ider::SnowflakeIdGenerator,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt},
@@ -45,6 +46,8 @@ pub static STREAM_SETTINGS: Lazy<RwAHashMap<String, StreamSettings>> = Lazy::new
 /// SnowflakeIdGenerator::generate() requires a &mut
 pub static STREAM_RECORD_ID_GENERATOR: Lazy<RwHashMap<String, SnowflakeIdGenerator>> =
     Lazy::new(Default::default);
+/// Cache if the stream stats exist, used for calculating stats
+pub static STREAM_STATS_EXISTS: Lazy<RwHashSet<String>> = Lazy::new(Default::default);
 
 // atomic version of cache
 type StreamSettingsCache = hashbrown::HashMap<String, StreamSettings>;
@@ -62,6 +65,20 @@ pub fn get_stream_settings_atomic(key: &str) -> Option<StreamSettings> {
 
 pub fn set_stream_settings_atomic(settings: StreamSettingsCache) {
     STREAM_SETTINGS_ATOMIC.store(Arc::new(settings));
+}
+
+pub async fn get_stream_schema_from_cache(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> Option<Schema> {
+    let key = mk_key(org_id, stream_type, stream_name);
+    let cache_key = key.strip_prefix("/schema/").unwrap();
+    STREAM_SCHEMAS_LATEST
+        .read()
+        .await
+        .get(cache_key)
+        .map(|schema| schema.schema().as_ref().clone())
 }
 
 pub fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
@@ -227,6 +244,16 @@ pub async fn get_settings(
     }
 
     settings
+}
+
+pub async fn get_flatten_level(org_id: &str, stream_name: &str, stream_type: StreamType) -> u32 {
+    if let Some(settings) = get_settings(org_id, stream_name, stream_type).await
+        && let Some(level) = settings.flatten_level
+        && level > 0
+    {
+        return level as u32;
+    }
+    get_config().limit.ingest_flatten_level
 }
 
 pub fn unwrap_stream_settings(schema: &Schema) -> Option<StreamSettings> {

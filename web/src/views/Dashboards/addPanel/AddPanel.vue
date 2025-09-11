@@ -444,6 +444,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </template>
                   </q-splitter>
+                </div>
+                <div class="col-auto" style="flex-shrink: 0">
                   <DashboardErrorsComponent
                     :errors="errorData"
                     class="col-auto"
@@ -800,7 +802,7 @@ export default defineComponent({
             store,
             route.query.dashboard,
             route.query.folder ?? "default",
-          ),
+          ) ?? {},
         ),
       );
       // console.timeEnd("AddPanel:loadDashboard");

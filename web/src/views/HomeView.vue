@@ -15,236 +15,320 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page>
-    <div
-      v-if="!no_data_ingest"
-      class="q-pa-md row items-start"
-      style="margin: 0 auto; justify-content: center"
-      :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
-    >
-      <TrialPeriod></TrialPeriod>
-      <div :class="!store.state.isAiChatEnabled ? 'my-card-wide' : 'my-card-narrow'" class="my-card-wide my-card card-container q-mt-lg q-mb-lg">
-        <div align="center" flat
-        :class="!store.state.isAiChatEnabled ? 'my-card-wide' : 'my-card-narrow'" bordered class=" my-card q-py-md">
-          <div class="text-subtitle1">{{ t("home.streams") }}</div>
-          <q-separator class="q-ma-md " />
-          <div class="row justify-center" v-if="isCloud == 'false'">
-            <div class="col">
-              <div class="text-subtitle1">
-                {{ t("home.streamTotal") }}
+  <q-page class="q-px-md" style="overflow-y: auto;" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
+    <div v-if="!no_data_ingest && !isLoadingSummary" class="column q-pt-md" style="height: auto; overflow-y: auto; ">
+        <!-- 1st section -->
+         <div>
+          <TrialPeriod></TrialPeriod>
+         </div>
+        <div class="streams-container q-px-lg q-py-md "
+        :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
+         >
+          <div class="row justify-between items-center q-mb-md">
+            <div class="text-h6 ">Streams</div>
+              <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+               >View
+                <router-link
+                  exact
+                  :to="{ name: 'logstreams' }"
+                  class="absolute full-width full-height"
+                ></router-link>
+            </q-btn>
+          </div>
+
+
+          <!-- Tiles -->
+          <div class="row wrap justify-evenly q-gutter-md ">
+            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
+              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+               style="height: 100%; gap: 12px">
+              <!-- Top Section (60%) -->
+              <div class="column justify-between">
+                <!-- Title row -->
+                <div class="row justify-between">
+                  <div class="tile-title"> {{ t("home.totalDataCompressed") }}</div>
+                  <div style="opacity: 0.8;">
+                    <img :src="compressedSizeIcon" />
+                  </div>
+                </div>
+
+                <!-- Performance text -->
+                <div v-if="false" class="performance-text "
+                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
+                >
+                  <q-icon name="arrow_upward" size="14px" /> 2.89% from last week
+                </div>
               </div>
-              <div class="text-h6">{{ summary.streams_count }}</div>
+
+            <!-- Bottom Section (40%) -->
+            <div class="data-to-display row items-end ">
+              {{ summary.compressed_data }}
             </div>
-            <q-separator vertical />
-            <div class="col">
-              <div class="text-subtitle1">
-                {{ t("home.docsCountLbl") }}
-              </div>
-              <div class="text-h6">{{ summary.doc_count }}</div>
             </div>
-            <q-separator vertical />
-            <div class="col">
-              <div class="text-subtitle1">
-                {{ t("home.totalDataIngested") }}
-              </div>
-              <div class="text-h6">{{ summary.ingested_data }}</div>
             </div>
-            <q-separator vertical />
-            <div class="col">
-              <div class="text-subtitle1">
-                {{ t("home.totalDataCompressed") }}
+
+            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
+              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+               style="height: 100%; gap: 12px">
+              <!-- Top Section (60%) -->
+              <div class="column justify-between" >
+                <!-- Title row -->
+                <div class="row justify-between">
+                  <div class="tile-title"> {{ t("home.totalDataIngested") }}</div>
+                  <div>
+                    <img :src="ingestedSizeIcon" />
+                  </div>
+                </div>
+
+                <!-- Performance text -->
+                <div v-if="false" class="performance-text "
+                :class="store.state.theme === 'dark' ? 'negative-increase-dark' : 'negative-increase-light'"
+                >
+                  <q-icon name="arrow_downward" size="14px" /> 2.89% from last week
+                </div>
               </div>
-              <div class="text-h6">{{ summary.compressed_data }}</div>
+
+            <!-- Bottom Section (40%) -->
+            <div class="data-to-display row items-end ">
+              {{ summary.ingested_data }}
             </div>
-            <q-separator vertical />
-            <div class="col">
-              <div class="text-subtitle1">
-                {{ t("home.indexSizeLbl") }}
+            </div>
+            </div>
+
+            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
+              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+               style="height: 100%; gap: 12px">
+              <!-- Top Section (60%) -->
+              <div class="column justify-between">
+                <!-- Title row -->
+                <div class="row justify-between">
+                  <div class="tile-title">  {{ t("home.indexSizeLbl") }}</div>
+                  <div>
+                    <img :src="indexSizeIcon" />
+                  </div>
+                </div>
+
+                <!-- Performance text -->
+                <div v-if="false" class="performance-text "
+                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
+                >
+                  <q-icon name="arrow_upward" size="14px" /> 0.00% from last week
+                </div>
               </div>
-              <div class="text-h6">{{ summary.index_size }}</div>
+
+            <!-- Bottom Section (40%) -->
+            <div class="data-to-display row items-end ">
+              {{ summary.index_size }}
+            </div>
+            </div>
+            </div>
+
+            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
+              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+               style="height: 100%; gap: 12px">
+              <!-- Top Section (60%) -->
+              <div class="column justify-between" >
+                <!-- Title row -->
+                <div class="row justify-between">
+                  <div class="tile-title">   {{ t("home.docsCountLbl") }}</div>
+                  <div>
+                    <img :src="recordsIcon" />
+                  </div>
+                </div>
+
+                <!-- Performance text -->
+                <div v-if="false" class="performance-text "
+                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
+                >
+                  <q-icon name="arrow_upward" size="14px" /> 2.89% from last week
+                </div>
+              </div>
+
+            <!-- Bottom Section (40%) -->
+            <div class="data-to-display row items-end ">
+              {{ summary.doc_count }}
+            </div>
+            </div>
+            </div>
+
+            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
+              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+               style="height: 100%; gap: 12px">
+              <!-- Top Section (60%) -->
+              <div class="column justify-between">
+                <!-- Title row -->
+                <div class="row justify-between">
+                  <div class="tile-title">   {{ t("home.streams") }}</div>
+                  <div>
+                    <img height="32px" :src="streamsIcon" />
+                  </div>
+                </div>
+
+                <!-- Performance text -->
+                <div v-if="false" class="performance-text"
+                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
+                >
+                  <q-icon name="arrow_upward" size="14px"  /> 2.89% from last week
+                </div>
+              </div>
+
+            <!-- Bottom Section (40%) -->
+            <div class="data-to-display row items-end ">
+              {{ summary.streams_count }} 
+            </div>
+            </div>
+            </div>
+        </div>
+
+        </div>
+      <!-- 2nd section -->
+        <div class="charts-main-container row tw-gap-4 q-mt-md xl:tw-min-h-[330px] " style="display: flex; gap: 16px; height: calc(100% - 22px);  ">
+          <!-- Chart 1 --> 
+          <div class=" first-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[35%]  tw-p-4" style= " display: flex; flex-direction: column;"
+          :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
+          >
+            <div class="details-container" style="margin-bottom: 16px;">
+              <div class="row justify-between items-center">
+                <span class="text-title tw-flex tw-items-center tw-gap-2">
+                  <div style="opacity: 0.8;" class="tw-bg-[#F5EB93] tw-flex tw-items-center tw-justify-center tw-rounded-[9px] tw-h-[33px] tw-w-[33px]">
+                      <img :src="alertsIcon" class="tw-h-[18px] tw-w-[18px] tw-mx-[7px] tw-my-[7px] tw-text-[#ea580b]" />
+                  </div>
+                  {{ t("home.alertTitle") }}
+                </span>
+                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
+                  <router-link
+                    exact
+                    :to="{ name: 'alertList' }"
+                    class="absolute full-width full-height"
+                  ></router-link>
+              </q-btn>
+              </div>
+              <div class="row q-pt-sm" style="gap: 16px;">
+                <div class="column">
+                  <span class="text-subtitle">{{ t("home.scheduledAlert") }}</span>
+                  <span class="results-count">{{ summary.scheduled_alerts }}</span>
+                </div>
+                <q-separator vertical />
+                <div class="column">
+                  <span class="text-subtitle">{{ t("home.rtAlert") }}</span>
+                  <span class="results-count">{{ summary.rt_alerts }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="custom-first-chart xl:tw-min-h-[200px] tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)] tw-w-full"  >
+              <CustomChartRenderer
+                :key="alertsPanelDataKey"
+                :data="alertsPanelData"
+                class="tw-w-full tw-h-full md:tw-h-[calc(100vh-400px)] "
+              />
             </div>
           </div>
-          <div v-else class="row justify-center">
-            <div class="col">
-              <div class="text-subtitle1">
-                {{ t("home.streamTotal") }}
+          <div class=" second-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[calc(65%-16px)] tw-p-4 " style=" display: flex; flex-direction: column;"
+          :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
+          >
+            <div class="details-container" style="margin-bottom: 16px;">
+              <div class="row justify-between items-center">
+                <span class="text-title tw-flex tw-items-center tw-gap-2">
+                  <div style="opacity: 0.8;" class="tw-bg-[#F2DCF5] tw-flex tw-items-center tw-justify-center tw-rounded-[9px] tw-h-[33px] tw-w-[33px]">
+                      <img :src="pipelinesIcon" class="tw-h-[18px] tw-w-[18px] tw-mx-[7px] tw-my-[7px]" />
+                  </div>
+                  {{ t("home.pipelineTitle") }}
+                </span>
+                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
+                  <router-link
+                    exact
+                    :to="{ name: 'pipelines' }"
+                    class="absolute full-width full-height"
+                  ></router-link>
+              </q-btn>
               </div>
-              <div class="text-h6">{{ summary.streams_count }}</div>
+              <div class="row q-pt-sm" style="gap: 16px;">
+                <div class="column">
+                  <span class="text-subtitle"> {{ t("home.schedulePipelineTitle") }}</span>
+                  <span class="results-count">{{ summary.scheduled_pipelines }}</span>
+                </div>
+                <q-separator vertical />
+                <div class="column">
+                  <span class="text-subtitle">{{ t("home.rtPipelineTitle") }}</span>
+                  <span class="results-count">{{ summary.rt_pipelines }}</span>
+                </div>
+              </div>
             </div>
-            <q-separator vertical />
-            <div class="col">
-              <div class="text-subtitle1">
-                {{ t("home.docsCountLbl") }}
-              </div>
-              <div class="text-h6">{{ summary.doc_count }}</div>
-            </div>
-            <q-separator vertical />
-            <div class="col">
-              <div class="text-subtitle1">
-                {{ t("home.totalDataIngested") }}
-              </div>
-              <div class="text-h6">{{ summary.ingested_data }}</div>
-            </div>
-            <q-separator vertical />
-            <div class="col">
-              <div class="text-subtitle1">
-                {{ t("home.indexSizeLbl") }}
-              </div>
-              <div class="text-h6">{{ summary.index_size }}</div>
-            </div>
-          </div>
-        </div>
-
-        <q-separator />
-
-        <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary"
-flat
-            >{{ t("home.view") }}
-            <router-link
-              exact
-              :to="{ name: 'logstreams' }"
-              class="absolute full-width full-height"
-            ></router-link>
-          </q-btn>
-        </div>
-      </div>
-
-      <div align="center" class="q-w-sm my-card card-container">
-        <div align="center" flat
-bordered class="q-w-sm my-card q-py-md">
-          <div class="text-subtitle1">{{ t("home.pipelineTitle") }}</div>
-          <q-separator class="q-ma-md" />
-          <div class="row justify-center">
-            <div class="col-4">
-              <div class="text-subtitle1">
-                {{ t("home.schedulePipelineTitle") }}
-              </div>
-              <div class="text-h6">{{ summary.scheduled_pipelines }}</div>
-            </div>
-            <q-separator vertical />
-            <div class="col-4">
-              <div class="text-subtitle1">
-                {{ t("home.rtPipelineTitle") }}
-              </div>
-              <div class="text-h6">{{ summary.rt_pipelines }}</div>
+            <div class="custom-second-chart xl:tw-min-h-[200px] tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)]"  >
+              <CustomChartRenderer
+                :key="pipelinesPanelDataKey"
+                :data="pipelinesPanelData"
+                class="tw-w-full tw-h-full "
+              />
             </div>
           </div>
         </div>
-        <q-separator />
-        <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary"
-flat
-            >{{ t("home.view") }}
-            <router-link
-              exact
-              :to="{ name: 'pipeline' }"
-              class="absolute full-width full-height"
-            ></router-link>
-          </q-btn>
-        </div>
-      </div>
+        <!-- 3rd section -->
+        <div class="tw-flex flex-col sm:tw-flex-row tw-justify-evenly sm:tw-justify-start tw-flex-wrap tw-gap-4 q-mt-md " >
 
-      <div class="q-w-sm my-card card-container">
-        <div align="center" flat
-bordered class="q-w-sm my-card q-py-md">
-          <div class="text-subtitle1">{{ t("home.alertTitle") }}</div>
-          <q-separator class="q-ma-md" />
-          <div class="row justify-center">
-            <div class="col-4">
-              <div class="text-subtitle1">
-                {{ t("home.scheduledAlert") }}
+          <div class="tw-w-full sm:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
+            <div class="tile-content q-pa-md rounded-borders text-center column justify-between"
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+              style="min-height: 150px; gap: 12px;">
+              <div class="column justify-between">
+                <div class="row justify-between">
+                  <div class="tile-title">{{ t("home.functionTitle") }}</div>
+                  <div>
+                    <img :src="functionsIcon" />
+                  </div>
+                </div>
               </div>
-              <div class="text-h6">{{ summary.scheduled_alerts }}</div>
-            </div>
-            <q-separator vertical />
-            <div class="col-4">
-              <div class="text-subtitle1">
-                {{ t("home.rtAlert") }}
-              </div>
-              <div class="text-h6">{{ summary.rt_alerts }}</div>
-            </div>
-          </div>
-        </div>
-        <q-separator />
-        <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary"
-flat
-            >{{ t("home.view") }}
-            <router-link
-              exact
-              :to="{ name: 'alertList' }"
-              class="absolute full-width full-height"
-            ></router-link>
-          </q-btn>
-        </div>
-      </div>
-
-      <div class="q-w-sm my-card card-container">
-        <div align="center" flat
-bordered class="q-w-sm my-card q-py-md">
-          <div class="row justify-center">
-            <div class="col-12">
-              <div class="text-subtitle1">
-                {{ t("home.functionTitle") }}
-              </div>
-              <q-separator class="q-ma-md" />
-              <div class="row justify-center">
-                <div class="col-4">
-                  <div class="text-h4 q-pa-sm">{{ summary.function_count }}</div>
+              <div class="data-to-display row items-end tw-flex tw-justify-between">
+                {{ summary.function_count }}
+                <div>
+                      <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                    >View
+                      <router-link
+                        exact
+                        :to="{ name: 'functionList' }"
+                        class="absolute full-width full-height"
+                      ></router-link>
+                  </q-btn>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-        <q-separator />
-        <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary"
-flat
-            >{{ t("home.view") }}
-            <router-link
-              exact
-              :to="{ name: 'functionList' }"
-              class="absolute full-width full-height"
-            ></router-link>
-          </q-btn>
-        </div>
-      </div>
 
-      <div class="q-w-sm my-card card-container">
-        <div align="center" flat
-bordered class="q-w-sm my-card q-py-md">
-          <div class="row justify-center">
-            <div class="col-12">
-              <div class="text-subtitle1">
-                {{ t("home.dashboardTitle") }}
-              </div>
-              <q-separator class="q-ma-md" />
-              <div class="row justify-center">
-                <div class="col-4">
-                  <div class="text-h4 q-pa-sm">{{ summary.dashboard_count }}</div>
+          <!-- Tile 2 -->
+          <div class="tw-w-full sm:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
+            <div class="tile-content q-pa-md rounded-borders text-center column justify-between"
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+              style="min-height: 150px; gap: 12px;">
+              <div class="column justify-between">
+                <div class="row justify-between">
+                  <div class="tile-title">{{ t("home.dashboardTitle") }}</div>
+                  <div>
+                    <img :src="dashboardsIcon" />
+                  </div>
                 </div>
+              </div>
+              <div class="data-to-display row items-end tw-flex tw-justify-between">
+                {{ summary.dashboard_count }}
+                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                    >View
+                      <router-link
+                        exact
+                        :to="{ name: 'dashboards' }"
+                        class="absolute full-width full-height"
+                      ></router-link>
+                  </q-btn>
               </div>
             </div>
           </div>
         </div>
-        <q-separator />
-        <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary"
-flat
-            >{{ t("home.view") }}
-            <router-link
-              exact
-              :to="{ name: 'dashboards' }"
-              class="absolute full-width full-height"
-            ></router-link>
-          </q-btn>
-        </div>
       </div>
-    </div>
-
-    <div
-      v-if="no_data_ingest"
+      <div
+      v-if="no_data_ingest && !isLoadingSummary"
       class="q-pa-md row items-start q-gutter-md"
       style="margin: 0 auto; justify-content: center"
     >
@@ -269,24 +353,30 @@ bordered class="my-card q-py-md">
         </div>
       </div>
     </div>
+    <div v-if="isLoadingSummary" style="height: calc(100vh - 200px);" class=" tw-w-full tw-h-full q-mt-lg tw-flex tw-justify-center tw-items-center">
+      <q-spinner-hourglass color="primary" size="lg" />
+    </div>
   </q-page>
+
+
 </template>
 
 <script lang="ts">
 import { useQuasar } from "quasar";
-import { defineComponent, ref } from "vue";
+import { computed, defineComponent, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import orgService from "../services/organizations";
 import config from "../aws-exports";
-import { formatSizeFromMB, addCommasToNumber } from "@/utils/zincutils";
+import { formatSizeFromMB, addCommasToNumber, getImageURL } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
 import pipelines from "@/services/pipelines";
+import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 
 export default defineComponent({
   name: "PageHome",
-  components: {TrialPeriod},
+
   setup() {
     const store = useStore();
     const { t } = useI18n();
@@ -295,8 +385,13 @@ export default defineComponent({
     const no_data_ingest = ref(false);
     const isCloud = config.isCloud;
     const { setStreams } = useStreams();
+    const alertsPanelDataKey = ref(0);
+    const pipelinesPanelDataKey = ref(0);
+    const isLoadingSummary = ref(false);
+
 
     const getSummary = (org_id: any) => {
+      isLoadingSummary.value = true;
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading summary...",
@@ -337,6 +432,12 @@ export default defineComponent({
             scheduled_alerts: res.data.alerts?.num_scheduled ?? 0,
             dashboard_count: res.data.total_dashboards ?? 0,
             function_count: res.data.total_functions ?? 0,
+            failed_pipelines: res.data.pipelines?.trigger_status.failed ?? 0,
+            healthy_pipelines: res.data.pipelines?.trigger_status.healthy ?? 0,
+            warning_pipelines: res.data.pipelines?.trigger_status.warning ?? 0,
+            failed_alerts: res.data.alerts?.trigger_status.failed ?? 0,
+            healthy_alerts: res.data.alerts?.trigger_status.healthy ?? 0,
+            warning_alerts: res.data.alerts?.trigger_status.warning ?? 0,
           };
           no_data_ingest.value = false;
           dismiss();
@@ -345,10 +446,13 @@ export default defineComponent({
           console.log(err);
           dismiss();
           $q.notify({
-            type: "negative",
+            type: "negative-increase",
             message: "Error while pulling summary.",
             timeout: 2000,
           });
+        })
+        .finally(() => {
+          isLoadingSummary.value = false;
         });
     };
 
@@ -359,6 +463,191 @@ export default defineComponent({
       getSummary(store.state.selectedOrganization.identifier);
     }
 
+  const alertsPanelData = computed (() => ({
+    chartType: "custom_chart",
+    title: {
+      text: "Last 15 minutes",
+      left: "70%",
+      top: "35%",
+      textStyle: {
+        fontSize: 16,
+        fontWeight: "normal",
+        color: store.state.theme === 'dark' ? '#D9D9D9' : '#262626'
+      }
+    },
+    tooltip: {
+      trigger: "item"
+    },
+    legend: {
+      top: "50%",
+      orient: "vertical",
+      left: "70%",
+      textStyle: {
+        color: store.state.theme === 'dark' ? '#DCDCDC' : '#232323'
+      }
+    },
+    series: [
+      {
+        name: "Alert Status",
+        type: "pie",
+        radius: ["35%", "55%"],
+        center: ["50%", "50%"],
+        right: "40%",
+        startAngle: 0,
+        endAngle: 360,
+        label: {
+          formatter: "{d}%",
+          show: true,
+          fontSize: 16,
+          color: store.state.theme === 'dark' ? '#ffffff' : '#000000'
+        },
+        labelLine: {
+          show: true,
+          length: 10,
+          length2: 10,
+          lineStyle: {
+            width: 2
+          }
+        },
+        data: [
+          {
+            value: summary.value.healthy_alerts,
+            name: "Success Alerts",
+            itemStyle: {
+              color: "#15ba73"
+            }
+          },
+          {
+            value: summary.value.failed_alerts,
+            name: "Failed Alerts",
+            itemStyle: {
+              color: "#db373a"
+            }
+          }
+        ]
+      }
+    ]
+  }));
+
+  const pipelinesPanelData = computed(() => {
+
+      return {
+        chartType: "custom_chart",
+        xAxis: {
+          type: "category",
+          data: ["Healthy", "Failed", "Warning"],
+          name: "Last 15 minutes",
+          nameLocation: "middle",
+          nameGap: 30,
+          nameTextStyle: {
+            fontSize: 16,
+            fontWeight: "normal",
+            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+          },
+          axisLabel: {
+            fontSize: 14,
+            color: store.state.theme === 'dark' ? '#CCCFD1' : '#2E3133'
+          }
+        },
+        yAxis: {
+          type: "value",
+          min: 0,
+          max:Math.ceil((summary.value.healthy_pipelines + summary.value.failed_pipelines + summary.value.warning_pipelines) / 3 / 10) * 10 ,
+          interval: 10,
+          name: "Number of Pipelines",
+          nameLocation: "middle",
+          nameGap: 60,
+          nameRotate: 90,
+          nameTextStyle: {
+            fontSize: 16,
+            fontWeight: "normal",
+            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+          },
+          axisLabel: {
+            fontSize: 12,
+            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+          },
+          splitLine: {
+            lineStyle: {
+              color: store.state.theme === 'dark' ? '#444' : '#e0e0e0'
+            }
+          }
+
+        },
+
+        series: [
+          {
+            data: [summary.value.healthy_pipelines, summary.value.failed_pipelines, summary.value.warning_pipelines],
+            type: "bar",
+            barWidth: "50%",
+            label: {
+              show: true,
+              position: "top",
+              fontSize: 14,
+              fontWeight: "bold",
+              color: store.state.theme === 'dark' ? '#CCCFD1' : '#2E3133'
+            },
+            itemStyle: {
+              color: function (params: any) {
+                const colors = ['#16b26a', '#db373b', '#ffc328'];
+                return colors[params.dataIndex];
+              }
+            }
+          }
+          ]
+      };
+  });
+
+  const compressedSizeIcon = computed(() => {
+    const icon = store.state.theme === 'dark' ? 'images/home/compressed_size_dark.svg' : 'images/home/compressed_size.svg';
+    return getImageURL(icon);
+  });
+
+  const ingestedSizeIcon = computed(() => {
+    const icon = store.state.theme === 'dark' ? 'images/home/ingested_size_dark.svg' : 'images/home/ingested_size.svg';
+    return getImageURL(icon);
+  });
+
+  const indexSizeIcon = computed(() => {
+    const icon = store.state.theme === 'dark' ? 'images/home/index_size_dark.svg' : 'images/home/index_size.svg';
+    return getImageURL(icon);
+  });
+
+  const recordsIcon = computed(() => {
+    const icon = store.state.theme === 'dark' ? 'images/home/records_dark.svg' : 'images/home/records.svg';
+    return getImageURL(icon);
+  });
+
+  const streamsIcon = computed(() => {
+    const icon = store.state.theme === 'dark' ? 'images/home/streams_dark.svg' : 'images/home/streams.svg';
+    return getImageURL(icon);
+  });
+
+  const functionsIcon = computed(() => {
+    const icon = store.state.theme === 'dark' ? 'images/home/function_dark.svg' : 'images/home/function.svg';
+    return getImageURL(icon);
+  });
+
+  const dashboardsIcon = computed(() => {
+    const icon = store.state.theme === 'dark' ? 'images/home/dashboard_dark.svg' : 'images/home/dashboard.svg';
+    return getImageURL(icon);
+  });
+
+
+  const alertsIcon = computed(() => {
+    return getImageURL('images/home/alerts.svg');
+  });
+
+  const pipelinesIcon = computed(() => {
+    return getImageURL('images/home/pipeline.svg');
+  });
+
+
+
+
+
+
+
     return {
       t,
       store,
@@ -366,6 +655,21 @@ export default defineComponent({
       no_data_ingest,
       getSummary,
       isCloud,
+      getImageURL,
+      alertsPanelData,
+      pipelinesPanelData,
+      alertsPanelDataKey,
+      pipelinesPanelDataKey,
+      compressedSizeIcon,
+      ingestedSizeIcon,
+      indexSizeIcon,
+      recordsIcon,
+      streamsIcon,
+      functionsIcon,
+      dashboardsIcon,
+      isLoadingSummary,
+      pipelinesIcon,
+      alertsIcon,
     };
   },
   computed: {
@@ -381,50 +685,134 @@ export default defineComponent({
       }
     },
   },
+  components: {
+    CustomChartRenderer,
+    TrialPeriod,
+  },
 });
 </script>
 
 <style scoped lang="scss">
-.pointer-to-demo {
-  margin-left: auto;
-  margin-right: 0;
+.streams-container {
+  background: linear-gradient(to bottom, #fdfdfe, #f3f3f9);
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+.dark-stream-container {
+  background: #222526;
+  border: 1px solid #444444;
+}
+.light-stream-container {
+  background: linear-gradient(to bottom, #fdfdfe, #f3f3f9);
+  border: 1px solid #E7EAEE;
+}
+.view-button-light {
+  cursor: pointer;
+  color: #5960B2;
+  padding: 0px
+}
+.view-button-dark {
+  cursor: pointer;
+  color: #929BFF;
+  padding: 0px;
+  margin: 0px;
+}
+.tile {
+  flex: 1 1 240px; /* grow, shrink, basis */
+  max-width: 100%; /* prevents overflow */
 }
 
-.pointer-description {
+.tile-content {
+  height: 140px !important; /* or any fixed height */
+  padding: 16px;
+  border-radius: 8px;
+}
+.dark-tile-content {
+  background: #2B2C2D;
+  border: 1px solid #444444;
+  color: #D2D2D2;
+}
+
+.light-tile-content {
+  background: #ffffff;
+  border: 1px solid #E7EAEE;
+  color: #2D2D2D;
+}
+.tile-title {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: 0%;
+}
+.performance-text{
+  border-radius: 50px;
+  width: 160px;
+  padding: 0px 8px;
   display: flex;
   align-items: center;
+  background-color: #EBFDF5;
+  color: #0e6842;
+  font-size: 12px !important;
 }
+.positive-increase-light{
+  background-color: #EBFDF5;
+  border: 1px solid #E4E7EC;
+  color: #0e6842;
+}
+.negative-increase-light{
+  background-color: #FFEBE9;
+  border: 1px solid #E4E7EC;
+  color: #B42318;
+}
+.positive-increase-dark{
+  background-color: #254421;
+  color: #A1FFd6;
+}
+.negative-increase-dark{
+  background-color: #4A2323;
+  color: #FFD6D6;
+}
+.data-to-display{
+  font-size: 24px;
+  font-weight: 600;
+}
+.chart-container-light{
+  border: 1px solid #E7EAEE;
+}
+.chart-container-dark{
+  border: 1px solid #444444;
+  background: #2B2C2D;
+}
+.text-title{
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: 0%;
+}
+.text-subtitle{
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  letter-spacing: 0%;
+}
+.results-count{
+  font-size: 20px;
+  font-weight: 600;
+}
+.details-container{
+  gap: 12px;
+}
+.charts-main-container{
+  gap: 12px;
+}
+// .first-chart-container{
+//   width: 35%;
+// }
+// .second-chart-container{
+//   width: calc(65% - 16px);
+// }
 
-.my-card {
-  background-color: rgba(0, 0, 0, 0.045);
-}
-
-.my-card-wide {
-  width: 100%;
-}
-.my-card-narrow{
-  width: 66.6vw;
-}
-
-.card-container {
-  border-radius: 6px;
-}
-
-.dark-theme {
-  .card-container {
-    box-shadow:
-      0 1px 5px #fff3,
-      0 2px 2px #ffffff24,
-      0 3px 1px -2px #ffffff1f;
-  }
-}
-
-.light-theme {
-  .card-container {
-    box-shadow:
-      0 1px 5px #0003,
-      0 2px 2px #00000024,
-      0 3px 1px -2px #0000001f;
-  }
+.ai-enabled-home-view{
+  height: calc(100vh - 120px);
 }
 </style>

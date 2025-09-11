@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import http from "./http";
 import config from "../aws-exports";
 
@@ -24,10 +23,10 @@ const organizations = {
     sort_by: string,
     desc: boolean,
     name: string,
-    org_identifier: string
+    org_identifier: string,
   ) => {
     return http().get(
-      `/api/organizations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
+      `/api/organizations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`,
     );
   },
   list: (
@@ -35,10 +34,10 @@ const organizations = {
     page_size: number,
     sort_by: string,
     desc: boolean,
-    name: string
+    name: string,
   ) => {
     return http().get(
-      `/api/organizations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
+      `/api/organizations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`,
     );
   },
   create: (data: any) => {
@@ -49,8 +48,12 @@ const organizations = {
   },
   process_subscription: (s: string, action: string, orgIdentifier: string) => {
     return http().put(
-      `api/${orgIdentifier}/member_subscription/${s}?action=${action}`, {}
+      `api/${orgIdentifier}/member_subscription/${s}?action=${action}`,
+      {},
     );
+  },
+  decline_subscription: (s: string) => {
+    return http().delete(`api/invites/${s}`, {});
   },
   get_associated_members: (orgIdentifier: string) => {
     return http().get(`api/${orgIdentifier}/organizations/associated_members`);
@@ -81,6 +84,11 @@ const organizations = {
   },
   extend_trial_period: (orgIdentifier: string, data: any) => {
     return http().put(`/api/${orgIdentifier}/extend_trial_period`, data);
+  },
+  rename_organization: (orgIdentifier: string, newOrgName: string) => {
+    return http().put(`/api/${orgIdentifier}/rename`, {
+      new_name: newOrgName,
+    });
   }
 };
 

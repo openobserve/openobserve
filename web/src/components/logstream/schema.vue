@@ -161,6 +161,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div class="row flex items-center q-pb-xs q-mt-lg">
+                <div>
+                  <label class="q-pr-sm tw-font-medium"
+                    >{{ t("logStream.flattenLevel") }}</label
+                  >
+                  <span class="tw-text-xs tw-font-normal">
+                    (Global is
+                    {{ store.state.zoConfig.ingest_flatten_level || 3 }})
+                  </span>
+                </div>
+                <q-input
+                  data-test="stream-details-flatten-level-input"
+                  v-model="flattenLevel"
+                  type="number"
+                  dense
+                  filled
+                  min="0"
+                  round
+                  class="q-mr-sm q-ml-sm data-retention-input"
+                  hide-bottom-space
+                  @change="formDirtyFlag = true"
+                  @update:model-value="markFormDirty"
+                />
+                <div></div>
+              </div>
+
+              <div class="row flex items-center q-pb-xs q-mt-lg">
                 <q-toggle
                   data-test="log-stream-use_approx-toggle-btn"
                   v-model="approxPartition"
@@ -416,9 +442,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template v-slot:body-cell-name="props">
-                  <q-td class="q-td--no-hover field-name">{{
-                    props.row.name
-                  }}</q-td>
+                  <q-td class="q-td--no-hover field-name"
+                    >{{ props.row.name }}
+                    <span v-if="isEnvQuickModeField(props.row.name)">
+                      <img
+                        :src="quickModeIcon"
+                        :alt="t('logStream.envQuickModeMsg')"
+                        class="tw-inline-block q-ml-xs tw-w-[20px]"
+                      />
+                      <q-tooltip
+                      class="tw-text-[12px] tw-w-[200px]"
+                    >
+                      {{ t('logStream.envQuickModeMsg') }}
+                    </q-tooltip>
+                  </span>
+                  </q-td>
                 </template>
                 <template v-slot:body-cell-type="props">
                   <q-td>{{ props.row.type }}</q-td>
@@ -440,9 +478,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           props.row.name == allFieldsName
                         )
                       "
-                      :disable="isEnvironmentSettings(props.row)"
-                      v-model="props.row.index_type"
+                      :model-value="computedIndexType(props).value"
                       :options="streamIndexType"
+                      option-label="label"
+                      option-value="value"
                       :popup-content-style="{ textTransform: 'capitalize' }"
                       color="input-border"
                       bg-color="input-bg"
@@ -462,14 +501,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       filled
                       dense
                       style="min-width: 15rem; max-width: 15rem"
-                      @update:model-value="isEnvironmentSettings(props.row) == false ? markFormDirty(props.row.name, 'fts') : null"
-                    />
-                    <q-tooltip
-                      v-if="isEnvironmentSettings(props.row)"
-                      style="font-size: 14px; width: 250px;"
+                      @update:model-value="val => updateIndexType(props, val)"
                     >
-                      This is a predefined environment setting and cannot be changed.
-                    </q-tooltip>
+                    <template v-slot:option="scope">
+                      <q-item style="margin: 0px !important; border-radius: 0px !important;" v-bind="scope.itemProps" :disable="disableOptions(props.row, scope.opt)">
+                        <q-item-section>
+                          <q-item-label>
+                            {{ scope.opt.label }}
+                          </q-item-label>
+                        </q-item-section>
+                        <q-tooltip class="tw-text-[12px] tw-w-[200px]" v-if="checkIfOptionPresentInDefaultEnv(props.row.name, scope.opt) == true">
+                          This is a predefined environment setting and cannot be changed.
+                        </q-tooltip>
+                      </q-item>
+                    </template>
+                  </q-select>
                   </q-td>
                 </template>
                 <!-- here we will render the number of regex patterns associated with the specific field -->
@@ -759,7 +805,7 @@ export default defineComponent({
     AppTabs,
     QTablePagination,
     DateTime,
-    AssociatedRegexPatterns
+    AssociatedRegexPatterns,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
@@ -778,6 +824,7 @@ export default defineComponent({
     const dataRetentionDays = ref(0);
     const storeOriginalData = ref(false);
     const maxQueryRange = ref(0);
+    const flattenLevel = ref(null);
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDeleteDatesDialog = ref(false);
     const formDirtyFlag = ref(false);
@@ -810,16 +857,6 @@ export default defineComponent({
       { label: "All", value: 0 },
     ];
 
-    const isEnvironmentSettings = computed(() => {
-      return (row: any) => {
-        if (!row || !row.index_type) return false;
-        return (
-          row?.index_type?.includes("fullTextSearchKeyEnv") ||
-          row?.index_type?.includes("secondaryIndexKeyEnv")
-        );
-      };
-    });
-
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
@@ -833,7 +870,7 @@ export default defineComponent({
     const patternAssociationDialog = ref({
       show: false,
       data: [],
-      fieldName: ""
+      fieldName: "",
     });
 
     const selectedFields = ref([]);
@@ -891,8 +928,6 @@ export default defineComponent({
     const streamIndexType = [
       { label: "Full text search", value: "fullTextSearchKey" },
       { label: "Secondary index", value: "secondaryIndexKey" },
-      { label: "Full text search (Environment setting)", value: "fullTextSearchKeyEnv" },
-      { label: "Secondary index (Environment setting)", value: "secondaryIndexKeyEnv" },
       { label: "Bloom filter", value: "bloomFilterKey" },
       { label: "KeyValue partition", value: "keyPartition" },
       { label: "Prefix partition", value: "prefixPartition" },
@@ -985,19 +1020,11 @@ export default defineComponent({
         fieldIndices.push("fullTextSearchKey");
       }
 
-      if(!settings?.full_text_search_keys.includes(property.name) && store.state.zoConfig.default_fts_keys.includes(property.name)) {
-        fieldIndices.push("fullTextSearchKeyEnv");
-      }
-
       if (
         settings.index_fields.length > 0 &&
         settings.index_fields.includes(property.name)
       ) {
         fieldIndices.push("secondaryIndexKey");
-      }
-
-      if(!settings?.index_fields.includes(property.name) && store.state.zoConfig.default_secondary_index_fields.includes(property.name)) {
-        fieldIndices.push("secondaryIndexKeyEnv");
       }
 
       if (
@@ -1112,6 +1139,7 @@ export default defineComponent({
       calculateDateRange();
 
       maxQueryRange.value = streamResponse.settings.max_query_range || 0;
+      flattenLevel.value = streamResponse.settings.flatten_level || null;
       storeOriginalData.value =
         streamResponse.settings.store_original_data || false;
       approxPartition.value = streamResponse.settings.approx_partition || false;
@@ -1211,6 +1239,10 @@ export default defineComponent({
 
       settings["store_original_data"] = storeOriginalData.value;
       settings["approx_partition"] = approxPartition.value;
+
+      if (flattenLevel.value !== null) {
+        settings["flatten_level"] = Number(flattenLevel.value);
+      }
 
       const newSchemaFieldSet = new Set(
         newSchemaFields.value.map((field) => {
@@ -1426,7 +1458,21 @@ export default defineComponent({
         option.value.includes("hashPartition")
       )
         return true;
-
+            //handle if fulltextsearchkey or secondaryindexkey is selected by env then we need to disable the option
+            if (
+        store.state.zoConfig.default_fts_keys.includes(schema.name) &&
+        option.value.includes("fullTextSearchKey")
+      )
+      {
+        return true;
+      }
+      if (
+        store.state.zoConfig.default_secondary_index_fields.includes(schema.name) &&
+        option.value.includes("secondaryIndexKey")
+      )
+      {
+        return true;
+      }
       return false;
     };
 
@@ -1434,23 +1480,66 @@ export default defineComponent({
       let [field, fieldType] = terms.split("@");
 
       var filtered = [];
+      const searchTerm = field?.toLowerCase() || "";
 
-      field = field.toLowerCase();
-      for (var i = 0; i < rows.length; i++) {
+      // Map labels -> values for index types
+      const labelToValueMap = {};
+      streamIndexType.forEach(({ label, value }) => {
+        labelToValueMap[label.toLowerCase()] = value;
+      });
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        let match = false;
+
         if (fieldType === "schemaFields") {
-          if (indexData.value.defined_schema_fields.includes(rows[i]["name"])) {
-            if (!field) {
-              filtered.push(rows[i]);
+          if (indexData.value.defined_schema_fields.includes(row.name)) {
+            // If no search field given, include directly
+            if (!searchTerm) {
+              match = true;
             } else {
-              if (rows[i]["name"].toLowerCase().includes(field)) {
-                filtered.push(rows[i]);
+              // Match by name
+              if (row.name.toLowerCase().includes(searchTerm)) {
+                match = true;
+              }
+              // Match by index_type (convert search label to value)
+              else if (
+                row.index_type.some((t) => {
+                  // check if search is label
+                  return (
+                    t.toLowerCase().includes(searchTerm) || // direct match with stored value
+                    labelToValueMap[searchTerm] === t // label → value match
+                  );
+                })
+              ) {
+                match = true;
               }
             }
           }
         } else {
-          if (rows[i]["name"].toLowerCase().includes(field)) {
-            filtered.push(rows[i]);
+          if (!searchTerm) {
+            match = true;
+          } else {
+            // Match by name
+            if (row.name.toLowerCase().includes(searchTerm)) {
+              match = true;
+            }
+            // Match by index_type
+            else if (
+              row.index_type.some((t) => {
+                return (
+                  t.toLowerCase().includes(searchTerm) ||
+                  labelToValueMap[searchTerm] === t
+                );
+              })
+            ) {
+              match = true;
+            }
           }
+        }
+
+        if (match) {
+          filtered.push(row);
         }
       }
 
@@ -1778,8 +1867,77 @@ export default defineComponent({
       if(patternAssociations.value[fieldName]){
         patternAssociationDialog.value.data = [...patternAssociations.value[fieldName]];
       }
-    }
+    };
 
+
+  //this is used to compute the index_type value based on the env
+  //so instead of directly showing the value of the index_type we will add the values of fulltextsearchkey and secondaryindexkey if it is set by the env
+  //and if it is not set by the env then we will not add the values of fulltextsearchkey and secondaryindexkey becuase those will be already there and we don't want to show them twice
+  const computedIndexType = (props) => {
+    return computed(() => {
+      let keysToBeDisplayed = props.row.index_type || [];
+      // return the actual index_type value from the row
+      //merge env fts and secondary index keys
+      //check for the props.row.name is in the env fts and secondary index keys
+      if (store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1
+        ) {
+        keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "fullTextSearchKey"])];
+      }
+      if (store.state.zoConfig.default_secondary_index_fields.indexOf(props.row.name) > -1
+      ) {
+        keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "secondaryIndexKey"])];
+      }
+      return keysToBeDisplayed || []
+    })
+  };
+  //this function is used to check if the option is present in the default env
+  //if present then we will return true else false
+  //this is used to show the tooltip in the q-select for disabled options
+  //why there are disabled
+  const checkIfOptionPresentInDefaultEnv = (name, option) => {
+    if (store.state.zoConfig.default_fts_keys.indexOf(name) > -1 && option.value == "fullTextSearchKey") {
+      return true;
+    }
+    if (store.state.zoConfig.default_secondary_index_fields.indexOf(name) > -1 && option.value == "secondaryIndexKey") {
+      return true;
+  }
+  return false;
+  };
+  //this is used to upate the model value of the index_type
+  const updateIndexType = (props, value) => {
+    props.row.index_type = filterValueBasedOnEnv(props, value ?? []);
+    markFormDirty(props.row.name, 'fts');
+  };
+  //this function is used while we update the index_type value so if the value is set by the env then we need to remove it from the value because 
+  //we don't give access to the user to change the value of the env set by the env
+  //and if it is empty then we will return empty array 
+  //if the value is not empty then we will remove the value if it is set by the env
+  const filterValueBasedOnEnv = (props, value) => {
+    if(value.length == 0){
+      return [];
+    }
+    let filteredValue = value;
+    if (store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1 && value.includes("fullTextSearchKey")) {
+      filteredValue = value.filter(item => item !== "fullTextSearchKey");
+    }
+    if (store.state.zoConfig.default_secondary_index_fields.indexOf(props.row.name) > -1 && value.includes("secondaryIndexKey")) {
+      filteredValue = value.filter(item => item !== "secondaryIndexKey");
+    }
+    return filteredValue;
+  };
+
+    // store.state.zoConfig.default_quick_mode_fields: ["field1", "job", "log"]
+    const isEnvQuickModeField = (fieldName: string) => {
+      return (
+        store.state.zoConfig.default_quick_mode_fields.includes(fieldName)
+      );
+    };
+
+    const quickModeIcon = computed(() => {
+      return store.state.theme === "dark"
+        ? getImageURL("images/common/quick_mode_light.svg")
+        : getImageURL("images/common/quick_mode.svg");
+    });
 
     return {
       t,
@@ -1799,6 +1957,7 @@ export default defineComponent({
       storeOriginalData,
       approxPartition,
       maxQueryRange,
+      flattenLevel,
       showDataRetention,
       formatSizeFromMB,
       confirmQueryModeChangeDialog,
@@ -1856,7 +2015,18 @@ export default defineComponent({
       handleAddPattern,
       handleRemovePattern,
       handleUpdateAppliedPattern,
-      isEnvironmentSettings,
+      getFieldIndices,
+      setSchema,
+      formatDate,
+      convertUnixToQuasarFormat,
+      computedSchemaFieldsName,
+      groupPatternAssociationsByField,
+      ungroupPatternAssociations,
+      computedIndexType,
+      checkIfOptionPresentInDefaultEnv,
+      updateIndexType,
+      isEnvQuickModeField,
+      quickModeIcon,
     };
   },
   created() {

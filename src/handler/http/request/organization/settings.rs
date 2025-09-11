@@ -35,12 +35,15 @@ use crate::{
 };
 
 /// Organization specific settings
-///
-/// #{"ratelimit_module":"Settings", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "OrganizationSettingCreate",
+    summary = "Update organization settings",
+    description = "Creates or updates organization-specific settings such as scrape interval, trace field names, ingestion \
+                   toggles, and streaming configurations. Allows administrators to customize organizational behavior and \
+                   operational parameters to match specific requirements and use cases.",
     security(
         ("Authorization"= [])
     ),
@@ -49,8 +52,11 @@ use crate::{
     ),
     request_body(content = OrganizationSettingPayload, description = "Organization settings", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/settings")]
@@ -125,12 +131,15 @@ async fn create(
 }
 
 /// Retrieve organization specific settings
-///
-/// #{"ratelimit_module":"Settings", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "OrganizationSettingGet",
+    summary = "Get organization settings",
+    description = "Retrieves the current configuration settings for an organization, including scrape intervals, field \
+                   mappings, ingestion preferences, and streaming options. Returns default settings if none have been \
+                   configured previously for the organization.",
     security(
         ("Authorization"= [])
     ),
@@ -138,8 +147,11 @@ async fn create(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/settings")]

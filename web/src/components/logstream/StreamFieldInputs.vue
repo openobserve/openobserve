@@ -301,6 +301,23 @@ const handleDataTypeFocus = () => {
 const handleDataTypeBlur = () => {
   isDataTypeFocused.value = false
 }
+
+// Expose methods and data for testing
+defineExpose({
+  deleteApiHeader,
+  addApiHeader,
+  disableOptions,
+  handleFocus,
+  handleBlur,
+  handleDataTypeFocus,
+  handleDataTypeBlur,
+  streamIndexType,
+  dataTypes,
+  isFocused,
+  isDataTypeFocused,
+  store,
+  t
+});
 </script>
 
 <style lang="scss">

@@ -1452,6 +1452,12 @@ export default defineComponent({
     const searchResponseForVisualization = ref({});
 
     const shouldUseHistogramQuery = ref(false);
+    
+    // Flag to prevent unnecessary chart type changes during URL restoration
+    const isRestoringFromUrl = ref(false);
+    
+    // Flag to track if this is the first time switching to visualization mode
+    const isFirstVisualizationToggle = ref(true);
 
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
@@ -1480,83 +1486,100 @@ export default defineComponent({
               dashboardPanelData.layout.currentQueryIndex
             ].customQuery = true;
 
-            // Restore visualization data from URL parameters if available
+            // Store current config and chart type to preserve them during rebuild
             const queryParams = router.currentRoute.value.query;
-            if (queryParams.visualization_data) {
-              const restoredData = decodeVisualizationConfig(
-                queryParams.visualization_data,
-              );
-              if (restoredData && dashboardPanelData.data) {
-                dashboardPanelData.data = {
-                  ...dashboardPanelData.data,
-                  ...restoredData,
-                };
-              }
-            } else {
-              shouldUseHistogramQuery.value =
-                await extractVisualizationFields(true);
+            let preservedConfig = null;
+            let shouldAutoSelectChartType = true;
+            // Always try to restore config from URL if present
+            const visualizationDataParam = queryParams.visualization_data;
+            if (visualizationDataParam && typeof visualizationDataParam === 'string') {
+              try {
+                const restoredData = decodeVisualizationConfig(visualizationDataParam);
 
-              // if not able to parse query, do not do anything
-              if (shouldUseHistogramQuery.value === null) {
-                return;
-              }
+                if (restoredData && typeof restoredData === 'object') {
+                  // Always restore config from URL on every toggle
+                  if (restoredData.config && typeof restoredData.config === 'object') {
+                    preservedConfig = { ...restoredData.config };
+                  }
 
-              // set logs page data to searchResponseForVisualization
-              if (shouldUseHistogramQuery.value === true) {
-                // only do it if is_histogram_eligible is true on logs page
-                // and showHistogram is true on logs page
-                if (
-                  searchObj?.data?.queryResults?.is_histogram_eligible ===
-                    true &&
-                  searchObj?.meta?.showHistogram === true
-                ) {
-                  // replace hits with histogram query data
-                  searchResponseForVisualization.value = {
-                    ...searchObj.data.queryResults,
-                    hits: searchObj.data.queryResults.aggs,
-                    histogram_interval:
-                      searchObj?.data?.queryResults
-                        ?.visualization_histogram_interval,
-                  };
-
-                  // assign converted_histogram_query to dashboardPanelData
-                  if (searchObj.data.queryResults.converted_histogram_query) {
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].query =
-                      searchObj.data.queryResults.converted_histogram_query;
-
-                    // assign to visualizeChartData as well
-                    visualizeChartData.value.queries[0].query =
-                      dashboardPanelData.data.queries[0].query;
+                  // Only check for chart type from URL on first visualization toggle
+                  if (isFirstVisualizationToggle.value && restoredData.type && typeof restoredData.type === 'string') {
+                    const validLogsChartTypes = ['area', 'bar', 'h-bar', 'line', 'scatter', 'table'];
+                    if (validLogsChartTypes.includes(restoredData.type)) {
+                      // Valid chart type found in URL - set it and disable auto-selection
+                      dashboardPanelData.data.type = restoredData.type;
+                      shouldAutoSelectChartType = false;
+                    }
                   }
                 }
-              } else {
+              } catch (error) {
+                console.warn('Failed to restore visualization config from URL:', error);
+              }
+            }
+
+            // Mark that we've processed the first toggle
+            if (isFirstVisualizationToggle.value) {
+              isFirstVisualizationToggle.value = false;
+            }
+
+            // Use conditional auto-selection based on first toggle and URL chart type
+            isRestoringFromUrl.value = true;
+            shouldUseHistogramQuery.value = await extractVisualizationFields(shouldAutoSelectChartType);
+
+            // if not able to parse query, do not do anything
+            if (shouldUseHistogramQuery.value === null) {
+              return;
+            }
+
+            // set logs page data to searchResponseForVisualization
+            if (shouldUseHistogramQuery.value === true) {
+
+              // only do it if is_histogram_eligible is true on logs page
+              // and showHistogram is true on logs page
+              if (searchObj?.data?.queryResults?.is_histogram_eligible === true && searchObj?.meta?.showHistogram === true) {
+
+                // replace hits with histogram query data
                 searchResponseForVisualization.value = {
                   ...searchObj.data.queryResults,
+                  hits: searchObj.data.queryResults.aggs,
                   histogram_interval:
                     searchObj?.data?.queryResults
                       ?.visualization_histogram_interval,
                 };
 
-                // if hits is empty and filteredHit is present, then set hits to filteredHit
-                if (
-                  searchResponseForVisualization?.value?.hits?.length === 0 &&
-                  searchResponseForVisualization?.value?.filteredHit
-                ) {
-                  searchResponseForVisualization.value.hits =
-                    searchResponseForVisualization?.value?.filteredHit ?? [];
+                // assign converted_histogram_query to dashboardPanelData
+                if (searchObj.data.queryResults.converted_histogram_query) {
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].query = searchObj.data.queryResults.converted_histogram_query;
+
+                  // assign to visualizeChartData as well
+                  visualizeChartData.value.queries[0].query = dashboardPanelData.data.queries[0].query
                 }
+              }
+
+            } else {
+              searchResponseForVisualization.value = {
+                ...searchObj.data.queryResults,
+                histogram_interval:
+                  searchObj?.data?.queryResults
+                    ?.visualization_histogram_interval,
+              };
+
+              // if hits is empty and filteredHit is present, then set hits to filteredHit
+              if (
+                searchResponseForVisualization?.value?.hits?.length === 0 &&
+                searchResponseForVisualization?.value?.filteredHit
+              ) {
+                searchResponseForVisualization.value.hits =
+                  searchResponseForVisualization?.value?.filteredHit ?? [];
               }
             }
 
             // reset old rendered chart
             visualizeChartData.value = {};
 
-            if (
-              searchObj?.data?.customDownloadQueryObj?.query?.end_time &&
-              searchObj?.data?.datetime?.startTime
-            ) {
+            if (searchObj?.data?.customDownloadQueryObj?.query?.start_time && searchObj?.data?.customDownloadQueryObj?.query?.end_time) {
               dashboardPanelData.meta.dateTime = {
                 start_time: new Date(
                   searchObj.data.customDownloadQueryObj.query.start_time,
@@ -1580,10 +1603,22 @@ export default defineComponent({
               };
             }
 
+            // Always restore preserved config after field extraction
+            if (preservedConfig) {
+              dashboardPanelData.data.config = {
+                ...dashboardPanelData.data.config,
+                ...preservedConfig,
+              };
+            }
+
             // run query
             visualizeChartData.value = JSON.parse(
               JSON.stringify(dashboardPanelData.data),
             );
+
+            // Clear the restoration flag after all operations are complete
+            await nextTick();
+            isRestoringFromUrl.value = false;
 
             // set fields extraction loading to false
             variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
@@ -1591,10 +1626,16 @@ export default defineComponent({
             // emit resize event
             // this will rerender/call resize method of already rendered chart to resize
             window.dispatchEvent(new Event("resize"));
+
+            // Sync visualization data to URL parameters when chart type changes
+            if (searchObj.meta.logsVisualizeToggle === "visualize") {
+              updateUrlQueryParams(dashboardPanelData);
+            }
+
           } else {
             // reset dashboard panel data as we will rebuild when user came back to visualize
             // this fixes blank chart issue when user came back to visualize
-            resetDashboardPanelData()
+            resetDashboardPanelData();
           }
         } catch (err: any) {
           // this will clear dummy trace id
@@ -1646,6 +1687,11 @@ export default defineComponent({
     watch(
       () => dashboardPanelData.data.type,
       async () => {
+        // Skip processing if we're currently restoring from URL
+        if (isRestoringFromUrl.value) {
+          return;
+        }
+        
         const currentQuery =
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
@@ -1972,7 +2018,7 @@ export default defineComponent({
         const allFieldsHaveAlias = allSelectionFieldsHaveAlias(finalQuery);
         if (!allFieldsHaveAlias) {
           showAliasErrorForVisualization(
-            "All fields must have alias to visualize, please add alias to all fields",
+            "Fields using aggregation functions must have aliases to visualize.",
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -2433,10 +2479,10 @@ export default defineComponent({
     updateSelectedColumns() {
       this.searchObj.meta.resultGrid.manualRemoveFields = true;
       // Clear any existing timeout
-      if (updateColumnsTimeout.value) {
-        clearTimeout(updateColumnsTimeout.value);
+      if (this.updateColumnsTimeout) {
+        clearTimeout(this.updateColumnsTimeout);
       }
-      updateColumnsTimeout.value = setTimeout(() => {
+      this.updateColumnsTimeout = setTimeout(() => {
         this.updateGridColumns();
       }, 50);
     },

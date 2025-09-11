@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs::remove_file, path::Path, sync::Arc, time::UNIX_EPOCH};
+use std::{path::Path, sync::Arc, time::UNIX_EPOCH};
 
 use arrow_schema::Schema;
 use bytes::Bytes;
@@ -26,8 +26,8 @@ use config::{
     },
     metrics,
     utils::{
-        async_file::get_file_meta,
-        file::{get_file_size, scan_files_with_channel},
+        async_file::{get_file_meta, get_file_size},
+        file::scan_files_with_channel,
         parquet::{
             get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
         },
@@ -44,7 +44,10 @@ use infra::{
 };
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
-use tokio::sync::{Mutex, RwLock};
+use tokio::{
+    fs::remove_file,
+    sync::{Mutex, RwLock},
+};
 
 use crate::{
     common::infra::wal,
@@ -95,7 +98,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             break;
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(
-            cfg.limit.file_push_interval,
+            get_config().limit.file_push_interval,
         ))
         .await;
         // check pending delete files
@@ -125,13 +128,13 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
         }
         log::warn!("[INGESTER:JOB] the file was released, delete it: {file_key}");
         let file = wal_dir.join(&file_key);
-        let Ok(file_size) = get_file_size(&file) else {
+        let Ok(file_size) = get_file_size(&file).await else {
             continue;
         };
         // delete metadata from cache
         WAL_PARQUET_METADATA.write().await.remove(&file_key);
         // delete file from disk
-        if let Err(e) = remove_file(&file) {
+        if let Err(e) = remove_file(&file).await {
             log::error!("[INGESTER:JOB] Failed to remove parquet file: {file_key}, {e}");
         }
         // need release the file
@@ -263,7 +266,7 @@ async fn prepare_files(
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(&file_key);
             // delete file from disk
-            if let Err(e) = remove_file(wal_dir.join(&file)) {
+            if let Err(e) = remove_file(wal_dir.join(&file)).await {
                 log::error!("[INGESTER:JOB] Failed to remove parquet file from disk: {file}, {e}");
             }
             continue;
@@ -315,7 +318,7 @@ async fn move_files(
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(&file.key);
             // delete file from disk
-            if let Err(e) = remove_file(wal_dir.join(&file.key)) {
+            if let Err(e) = remove_file(wal_dir.join(&file.key)).await {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                     file.key,
@@ -361,7 +364,7 @@ async fn move_files(
             // delete metadata from cache
             WAL_PARQUET_METADATA.write().await.remove(&file.key);
             // delete file from disk
-            if let Err(e) = remove_file(wal_dir.join(&file.key)) {
+            if let Err(e) = remove_file(wal_dir.join(&file.key)).await {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                     file.key,
@@ -403,7 +406,7 @@ async fn move_files(
                 // delete metadata from cache
                 WAL_PARQUET_METADATA.write().await.remove(&file.key);
                 // delete file from disk
-                if let Err(e) = remove_file(wal_dir.join(&file.key)) {
+                if let Err(e) = remove_file(wal_dir.join(&file.key)).await {
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                         file.key,
@@ -546,7 +549,7 @@ async fn move_files(
                 // delete metadata from cache
                 WAL_PARQUET_METADATA.write().await.remove(&file.key);
                 // delete file from disk
-                match remove_file(wal_dir.join(&file.key)) {
+                match remove_file(wal_dir.join(&file.key)).await {
                     Err(e) => {
                         log::warn!(
                             "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk, set to pending delete list: {}, {}",
@@ -796,7 +799,10 @@ async fn merge_files(
 
     // upload file
     let buf = Bytes::from(buf);
-    if cfg.cache_latest_files.cache_parquet && cfg.cache_latest_files.download_from_node {
+    if cfg.cache_latest_files.enabled
+        && cfg.cache_latest_files.cache_parquet
+        && cfg.cache_latest_files.download_from_node
+    {
         infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
         log::debug!("merge_files {new_file_key} file_data::disk::set success");
     }

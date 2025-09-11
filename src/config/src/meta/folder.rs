@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(default)]
 pub struct Folder {
     pub folder_id: String,
@@ -24,7 +25,7 @@ pub struct Folder {
 }
 
 /// Indicates the type of data that the folder can contain.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq, ToSchema)]
 pub enum FolderType {
     #[default]
     Dashboards,

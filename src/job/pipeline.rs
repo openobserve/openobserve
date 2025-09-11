@@ -10,7 +10,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         loop {
             interval.tick().await;
             if let Err(e) = crate::service::pipeline::batch_execution::flush_all_buffers().await {
-                log::error!("Error flushing all buffers: {}", e);
+                log::error!("Error flushing all buffers: {e}");
             }
         }
     });

@@ -56,6 +56,7 @@ export default defineComponent({
   components: {},
   props: {
     schemaData: Object,
+    metaData: Object,
   },
   emits: ["save"],
   setup(props: any) {
@@ -123,6 +124,8 @@ export default defineComponent({
         ["User ID", query?.user_id],
         ["Org ID", query?.org_id],
         ["Stream Type", query?.stream_type],
+        ["Search Type", query?.search_type],
+        ["Query Source", query?.query_source],
         ["SQL", query?.sql],
         ["Start Time", startTimeEntry],
         ["End Time", endTimeEntry],

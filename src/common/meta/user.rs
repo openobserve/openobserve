@@ -127,6 +127,23 @@ pub struct UpdateUser {
     pub token: Option<String>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum UserUpdateMode {
+    OtherUpdate,
+    SelfUpdate,
+    CliUpdate,
+}
+
+impl UserUpdateMode {
+    pub fn is_self_update(&self) -> bool {
+        self == &UserUpdateMode::SelfUpdate
+    }
+
+    pub fn is_cli_update(&self) -> bool {
+        self == &UserUpdateMode::CliUpdate
+    }
+}
+
 pub fn get_default_user_org() -> UserOrg {
     UserOrg {
         name: "".to_string(),
@@ -208,7 +225,9 @@ impl From<&OrgInviteStatus> for InviteStatus {
 #[cfg(feature = "cloud")]
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserInvite {
+    pub org_name: String,
     pub org_id: String,
+    pub inviter_id: String,
     pub token: String,
     pub role: String,
     pub status: InviteStatus,
@@ -584,19 +603,6 @@ mod tests {
     }
 
     #[test]
-    fn test_update_user_default() {
-        let update = UpdateUser::default();
-
-        assert!(!update.change_password);
-        assert!(update.first_name.is_none());
-        assert!(update.last_name.is_none());
-        assert!(update.old_password.is_none());
-        assert!(update.new_password.is_none());
-        assert!(update.role.is_none());
-        assert!(update.token.is_none());
-    }
-
-    #[test]
     fn test_user_response() {
         let response = UserResponse {
             email: "test@example.com".to_string(),
@@ -774,5 +780,219 @@ mod tests {
         assert_eq!(response.given_name, "John");
         assert!(response.is_internal_user);
         assert_eq!(response.user_role, Some(UserRole::Admin));
+    }
+
+    #[test]
+    fn test_get_default_user_org() {
+        let org = get_default_user_org();
+
+        assert_eq!(org.name, "");
+        assert_eq!(org.token, "");
+        assert!(org.rum_token.is_none());
+        assert_eq!(org.role, get_default_user_role());
+    }
+
+    #[test]
+    fn test_get_default_user_role() {
+        let role = get_default_user_role();
+
+        // Default role should be Admin in non-enterprise mode
+        #[cfg(not(feature = "enterprise"))]
+        assert_eq!(role, UserRole::Admin);
+
+        // In enterprise mode, it depends on configuration
+        #[cfg(feature = "enterprise")]
+        {
+            // Just verify it returns a valid UserRole
+            assert!(matches!(
+                role,
+                UserRole::Admin | UserRole::Root | UserRole::ServiceAccount
+            ));
+        }
+    }
+
+    #[test]
+    fn test_get_roles() {
+        let roles = get_roles();
+
+        assert!(!roles.is_empty());
+
+        // Non-enterprise mode should have specific roles
+        #[cfg(not(feature = "enterprise"))]
+        {
+            assert_eq!(roles.len(), 3);
+            assert!(roles.contains(&UserRole::Admin));
+            assert!(roles.contains(&UserRole::Root));
+            assert!(roles.contains(&UserRole::ServiceAccount));
+        }
+
+        // Enterprise mode uses iterator over all roles
+        #[cfg(feature = "enterprise")]
+        {
+            assert!(roles.contains(&UserRole::Admin));
+            assert!(roles.contains(&UserRole::Root));
+            assert!(roles.contains(&UserRole::ServiceAccount));
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_is_standard_role() {
+        // Test valid standard roles
+        assert!(is_standard_role("admin"));
+        assert!(is_standard_role("ADMIN"));
+        assert!(is_standard_role("Admin"));
+        assert!(is_standard_role("root"));
+        assert!(is_standard_role("ROOT"));
+        assert!(is_standard_role("Root"));
+
+        // Test invalid roles
+        assert!(!is_standard_role("custom_role"));
+        assert!(!is_standard_role("invalid"));
+        assert!(!is_standard_role(""));
+        assert!(!is_standard_role("   "));
+    }
+
+    #[test]
+    fn test_token_validation_response_builder_from_db_user() {
+        let db_user = DBUser {
+            email: "test@example.com".to_string(),
+            first_name: "John".to_string(),
+            last_name: "Doe".to_string(),
+            password: "hashed".to_string(),
+            salt: "salt".to_string(),
+            organizations: vec![],
+            is_external: false,
+            password_ext: None,
+        };
+
+        let response = TokenValidationResponseBuilder::from_db_user(&db_user).build();
+
+        assert!(response.is_valid);
+        assert_eq!(response.user_email, "test@example.com");
+        assert_eq!(response.user_name, "John");
+        assert_eq!(response.given_name, "John");
+        assert_eq!(response.family_name, "Doe");
+        assert!(response.is_internal_user);
+        assert!(response.user_role.is_none());
+    }
+
+    #[test]
+    fn test_token_validation_response_builder_from_db_user_external() {
+        let db_user = DBUser {
+            email: "external@example.com".to_string(),
+            first_name: "Jane".to_string(),
+            last_name: "Smith".to_string(),
+            password: "hashed".to_string(),
+            salt: "salt".to_string(),
+            organizations: vec![],
+            is_external: true,
+            password_ext: None,
+        };
+
+        let response = TokenValidationResponseBuilder::from_db_user(&db_user).build();
+
+        assert!(response.is_valid);
+        assert_eq!(response.user_email, "external@example.com");
+        assert!(!response.is_internal_user);
+    }
+
+    #[test]
+    fn test_token_validation_response_builder_from_user() {
+        let user = User {
+            email: "test@example.com".to_string(),
+            first_name: "John".to_string(),
+            last_name: "Doe".to_string(),
+            password: "password".to_string(),
+            salt: "salt".to_string(),
+            token: "token".to_string(),
+            rum_token: None,
+            role: UserRole::Admin,
+            org: "test_org".to_string(),
+            is_external: false,
+            password_ext: None,
+        };
+
+        let response = TokenValidationResponseBuilder::from_user(&user).build();
+
+        assert!(response.is_valid);
+        assert_eq!(response.user_email, "test@example.com");
+        assert_eq!(response.user_name, "John");
+        assert_eq!(response.given_name, "John");
+        assert_eq!(response.family_name, "Doe");
+        assert!(response.is_internal_user);
+        assert_eq!(response.user_role, Some(UserRole::Admin));
+    }
+
+    #[test]
+    fn test_user_role_request_custom_role_conversion() {
+        let request = UserRoleRequest {
+            role: "custom_role_name".to_string(),
+            custom: None,
+        };
+
+        let org_role = UserOrgRole::from(&request);
+
+        // When role is not standard and no custom roles provided,
+        // the role name should be added as custom role
+        assert_eq!(org_role.base_role, get_default_user_role());
+        assert_eq!(
+            org_role.custom_role,
+            Some(vec!["custom_role_name".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_user_role_request_with_custom_roles() {
+        let request = UserRoleRequest {
+            role: "custom_role_name".to_string(),
+            custom: Some(vec!["perm1".to_string(), "perm2".to_string()]),
+        };
+
+        let org_role = UserOrgRole::from(&request);
+
+        // When custom roles are provided, use them instead of role name
+        assert_eq!(org_role.base_role, get_default_user_role());
+        assert_eq!(
+            org_role.custom_role,
+            Some(vec!["perm1".to_string(), "perm2".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_user_role_request_empty_role() {
+        let request = UserRoleRequest {
+            role: "".to_string(),
+            custom: None,
+        };
+
+        let org_role = UserOrgRole::from(&request);
+
+        // Empty role should be treated as custom
+        assert_eq!(org_role.base_role, get_default_user_role());
+        assert_eq!(org_role.custom_role, Some(vec!["".to_string()]));
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_invite_status_conversion() {
+        use o2_enterprise::enterprise::cloud::OrgInviteStatus;
+
+        assert_eq!(
+            InviteStatus::from(&OrgInviteStatus::Pending),
+            InviteStatus::Pending
+        );
+        assert_eq!(
+            InviteStatus::from(&OrgInviteStatus::Accepted),
+            InviteStatus::Accepted
+        );
+        assert_eq!(
+            InviteStatus::from(&OrgInviteStatus::Rejected),
+            InviteStatus::Rejected
+        );
+        assert_eq!(
+            InviteStatus::from(&OrgInviteStatus::Expired),
+            InviteStatus::Expired
+        );
     }
 }

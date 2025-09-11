@@ -23,7 +23,7 @@ use crate::meta::{
     stream::{RemoteStreamParams, RoutingCondition, StreamParams, StreamType},
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(tag = "source_type")]
 #[serde(rename_all = "snake_case")]
 #[allow(clippy::large_enum_variant)]
@@ -48,7 +48,17 @@ impl PipelineSource {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+impl PipelineSource {
+    pub fn is_scheduled(&self) -> bool {
+        matches!(self, Self::Scheduled(_))
+    }
+
+    pub fn is_realtime(&self) -> bool {
+        matches!(self, Self::Realtime(_))
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default, ToSchema)]
 #[serde(rename_all = "snake_case")]
 #[serde(default)]
 pub struct DerivedStream {
@@ -79,10 +89,11 @@ impl DerivedStream {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct Node {
     pub id: String,
+    #[schema(value_type = Object)]
     pub data: NodeData,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<HashMap<String, String>>,
@@ -127,7 +138,7 @@ impl Node {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct Edge {
     pub id: String,
     pub source: String,
@@ -164,18 +175,18 @@ pub struct FunctionParams {
     pub num_args: u8,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct ConditionParams {
     pub conditions: Vec<RoutingCondition>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 struct Position {
     x: f32,
     y: f32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 struct NodeStyle {
     background_color: Option<String>,

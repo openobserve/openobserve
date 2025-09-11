@@ -17,7 +17,7 @@ use std::io::Error;
 
 use actix_multipart::Multipart;
 use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
-use config::meta::actions::action::UpdateActionDetailsRequest;
+use config::meta::{actions::action::UpdateActionDetailsRequest, destinations::Template};
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
@@ -63,22 +63,27 @@ fn validate_environment_variables(env_vars: &HashMap<String, String>) -> Result<
 }
 
 /// Delete Action
-///
-/// #{"ratelimit_module":"Actions", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Actions",
     operation_id = "DeleteAction",
+    summary = "Delete automated action",
+    description = "Permanently removes an automated action from the organization. The action must not be in use by active \
+                   workflows or schedules before deletion. Once deleted, any scheduled executions or trigger-based \
+                   invocations will stop, and the action configuration cannot be recovered.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("ksuid" = String, Path, description = "Action ID"),
     ),
-    request_body(content = Template, description = "Template data", content_type ="application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body =HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json",body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json",body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/actions/{ksuid}")]
@@ -103,22 +108,28 @@ pub async fn delete_action(path: web::Path<(String, Ksuid)>) -> Result<HttpRespo
 }
 
 /// Serve Action zip file
-///
-/// #{"ratelimit_module":"Actions", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Actions",
     operation_id = "GetActionZip",
+    summary = "Download action package",
+    description = "Downloads the complete action package as a ZIP file containing all source code, configuration files, \
+                   dependencies, and metadata for a specific automated action. Useful for backup, version control, \
+                   sharing actions across environments, or performing offline analysis of action implementations.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("ksuid" = String, Path, description = "Action ID"),
     ),
     request_body(content = Template, description = "Template data", content_type ="application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body =HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json",body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/zip", body = String),
+        (status = 400, description = "Error",   content_type = "application/json",body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/actions/download/{ksuid}")]
@@ -149,23 +160,30 @@ pub async fn serve_action_zip(path: web::Path<(String, Ksuid)>) -> Result<HttpRe
 }
 
 /// Update Action
-///
-/// #{"ratelimit_module":"Actions", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Actions",
     operation_id = "UpdateAction",
+    summary = "Update automated action",
+    description = "Updates the configuration and parameters of an existing automated action. Allows modification of \
+                   execution settings, environment variables, scheduling parameters, and other action properties. \
+                   Changes take effect on the next execution cycle, ensuring continuous operation with updated \
+                   configuration.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("action_id" = String, Path, description = "Action ID"),
     ),
-    request_body(content = Template, description = "Template data", content_type =
-"application/json"),     responses(
-        (status = 200, description = "Success", content_type = "application/json", body =
-HttpResponse),         (status = 400, description = "Error",   content_type = "application/json",
-body = HttpResponse),     )
+    request_body(content = Template, description = "Template data", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "update"}))
+    )
 )]
 #[put("/{org_id}/actions/{action_id}")]
 pub async fn update_action_details(
@@ -220,23 +238,29 @@ pub async fn update_action_details(
 }
 
 /// List Actions
-///
-/// #{"ratelimit_module":"Actions", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Actions",
     operation_id = "ListActions",
+    summary = "List automated actions",
+    description = "Retrieves a list of all automated actions configured for the organization. Returns action metadata \
+                   including names, status, execution schedules, and basic configuration details. Helps administrators \
+                   manage automation workflows, monitor action health, and understand the complete automation landscape \
+                   across the organization.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Template, description = "Template data", content_type =
-"application/json"),     responses(
-        (status = 200, description = "Success", content_type = "application/json", body =
-HttpResponse),         (status = 400, description = "Error",   content_type = "application/json",
-body = HttpResponse),     )
+    request_body(content = Template, description = "Template data", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "list"}))
+    )
 )]
 #[get("/{org_id}/actions")]
 pub async fn list_actions(path: web::Path<String>) -> Result<HttpResponse, Error> {
@@ -267,12 +291,15 @@ pub async fn list_actions(path: web::Path<String>) -> Result<HttpResponse, Error
 }
 
 /// Get single Action
-///
-/// #{"ratelimit_module":"Actions", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Actions",
     operation_id = "GetAction",
+    summary = "Get automated action details",
+    description = "Retrieves complete configuration and runtime details for a specific automated action. Returns \
+                   execution parameters, environment variables, scheduling configuration, execution history, and \
+                   performance metrics. Used for monitoring action behavior, troubleshooting issues, and reviewing \
+                   automation settings.",
     security(
         ("Authorization"= [])
     ),
@@ -280,11 +307,13 @@ pub async fn list_actions(path: web::Path<String>) -> Result<HttpResponse, Error
         ("org_id" = String, Path, description = "Organization name"),
         ("action_id" = String, Path, description = "Action ID"),
     ),
-    request_body(content = Template, description = "Template data", content_type =
-"application/json"),     responses(
-        (status = 200, description = "Success", content_type = "application/json", body =
-HttpResponse),         (status = 400, description = "Error",   content_type = "application/json",
-body = HttpResponse),     )
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "get"}))
+    )
 )]
 #[get("/{org_id}/actions/{action_id}")]
 pub async fn get_action_from_id(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
@@ -317,11 +346,15 @@ pub async fn get_action_from_id(path: web::Path<(String, String)>) -> Result<Htt
 /// Upload a zipped action file and process it.
 /// This endpoint allows uploading a ZIP file containing an action, which will be extracted,
 /// processed, and executed.
-/// #{"ratelimit_module":"Actions", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Actions",
     operation_id = "UploadZippedAction",
+    summary = "Upload automated action package",
+    description = "Uploads a ZIP file containing an automated action package with source code, configuration, and \
+                   dependencies. The package is extracted, validated, and deployed to the action execution \
+                   environment. Supports both new action creation and updates to existing actions. Includes validation \
+                   of environment variables, execution parameters, and package integrity.",
     security(
         ("Authorization"= [])
     ),
@@ -332,6 +365,9 @@ pub async fn get_action_from_id(path: web::Path<(String, String)>) -> Result<Htt
         (status = 200, description = "Action processed successfully", content_type = "application/json", body = String),
         (status = 400, description = "Error processing action", content_type = "application/json", body = String),
         (status = 500, description = "Internal server error", content_type = "application/json", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/actions/upload")]

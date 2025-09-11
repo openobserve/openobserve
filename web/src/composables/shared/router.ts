@@ -20,7 +20,6 @@ import {
 } from "@/utils/zincutils";
 import Home from "@/views/HomeView.vue";
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
-import Tickets from "@/views/TicketsView.vue";
 import About from "@/views/About.vue";
 import MemberSubscription from "@/views/MemberSubscription.vue";
 import Error404 from "@/views/Error404.vue";
@@ -84,6 +83,9 @@ const useRoutes = () => {
     {
       path: "/login",
       component: Login,
+      meta: {
+        title: "Login",
+      },
     },
     {
       path: "/logout",
@@ -98,6 +100,9 @@ const useRoutes = () => {
       path: "/cb",
       name: "callback",
       component: Login,
+      meta: {
+        title: "Login Callback",
+      },
     },
   ];
 
@@ -108,6 +113,7 @@ const useRoutes = () => {
       component: Home,
       meta: {
         keepAlive: true,
+        title: "Home",
       },
     },
     {
@@ -116,6 +122,7 @@ const useRoutes = () => {
       component: Search,
       meta: {
         keepAlive: true,
+        title: "Logs",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -127,6 +134,7 @@ const useRoutes = () => {
       component: AppMetrics,
       meta: {
         keepAlive: true,
+        title: "Metrics",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -138,6 +146,7 @@ const useRoutes = () => {
       component: AppTraces,
       meta: {
         keepAlive: true,
+        title: "Traces",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -147,6 +156,9 @@ const useRoutes = () => {
       path: "traces/trace-details",
       name: "traceDetails",
       component: TraceDetails,
+      meta: {
+        title: "Trace Details",
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -156,6 +168,9 @@ const useRoutes = () => {
       path: "streams/stream-explore",
       component: StreamExplorer,
       props: true,
+      meta: {
+        title: "Stream Explorer",
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -164,16 +179,8 @@ const useRoutes = () => {
       path: "streams",
       name: "logstreams",
       component: LogStream,
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    },
-    {
-      path: "tickets",
-      name: "tickets",
-      component: Tickets,
       meta: {
-        keepAlive: true,
+        title: "Streams",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -185,6 +192,7 @@ const useRoutes = () => {
       component: About,
       meta: {
         keepAlive: true,
+        title: "About",
       },
     },
     {
@@ -193,6 +201,7 @@ const useRoutes = () => {
       component: Dashboards,
       meta: {
         keepAlive: false,
+        title: "Dashboards",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -203,9 +212,9 @@ const useRoutes = () => {
       name: "viewDashboard",
       component: ViewDashboard,
       props: true,
-      // meta: {
-      // keepAlive: true,
-      // },
+      meta: {
+        title: "View Dashboard",
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -216,7 +225,7 @@ const useRoutes = () => {
       component: ImportDashboard,
       props: true,
       meta: {
-        // keepAlive: true,
+        title: "Import Dashboard",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -228,7 +237,7 @@ const useRoutes = () => {
       component: AddPanel,
       props: true,
       meta: {
-        // keepAlive: true,
+        title: "Add Panel",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -240,6 +249,7 @@ const useRoutes = () => {
       component: MemberSubscription,
       meta: {
         keepAlive: true,
+        title: "Member Subscription",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -250,6 +260,9 @@ const useRoutes = () => {
       path: "pipeline",
       name: "pipeline",
       component: Functions,
+      meta: {
+        title: "Pipeline",
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -310,6 +323,9 @@ const useRoutes = () => {
       path: "alerts",
       name: "alertList",
       component: AlertList,
+      meta: {
+        title: "Alerts",
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -327,6 +343,9 @@ const useRoutes = () => {
       path: "rum",
       name: "RUM",
       component: RealUserMonitoring,
+      meta: {
+        title: "Real User Monitoring",
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -432,6 +451,7 @@ const useRoutes = () => {
       component: Error404,
       meta: {
         keepAlive: true,
+        title: "404 - Not Found",
       },
     },
   ];
@@ -445,6 +465,9 @@ const useRoutes = () => {
         name: "reports",
         component: ReportList,
         props: true,
+        meta: {
+          title: "Reports",
+        },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
         },
@@ -454,6 +477,9 @@ const useRoutes = () => {
         name: "createReport",
         component: CreateReport,
         props: true,
+        meta: {
+          title: "Create Report",
+        },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
         },

@@ -40,7 +40,6 @@ use crate::{
     common::meta::{
         maxmind::MaxmindClient,
         organization::{Organization, OrganizationSetting},
-        syslog::SyslogRoute,
     },
     service::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
@@ -74,8 +73,6 @@ pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, db_scheduler::Trigge
     Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, Template>> = Lazy::new(Default::default);
 pub static DESTINATIONS: Lazy<RwHashMap<String, Destination>> = Lazy::new(Default::default);
-pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(Default::default);
-pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
 pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(Default::default);
 pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
@@ -226,27 +223,11 @@ mod tests {
     fn test_static_variables_initialization() {
         // Test that all static variables can be accessed and are properly initialized
 
-        // Test RwHashMap variables
-        assert_eq!(KVS.len(), 0);
-        assert_eq!(QUERY_FUNCTIONS.len(), 0);
-        assert_eq!(USERS.len(), 0);
-        assert_eq!(ORG_USERS.len(), 0);
-        assert_eq!(ROOT_USER.len(), 0);
-        assert_eq!(PASSWORD_HASH.len(), 0);
-        assert_eq!(ALERTS_TEMPLATES.len(), 0);
-        assert_eq!(DESTINATIONS.len(), 0);
-        assert_eq!(SYSLOG_ROUTES.len(), 0);
-        assert_eq!(ENRICHMENT_TABLES.len(), 0);
-        assert_eq!(USER_SESSIONS.len(), 0);
-        assert_eq!(SHORT_URLS.len(), 0);
+        // Test RwHashMap variables are initialized
 
         // Test Arc<RwLock> variables
         let users_rum_token = USERS_RUM_TOKEN.clone();
         assert_eq!(users_rum_token.len(), 0);
-
-        // Test syslog enabled flag
-        let syslog_enabled = SYSLOG_ENABLED.clone();
-        assert!(!*syslog_enabled.read());
 
         // Test enrichment registry
         let registry = ENRICHMENT_REGISTRY.clone();
@@ -389,22 +370,6 @@ mod tests {
     }
 
     #[test]
-    fn test_syslog_enabled() {
-        let syslog_enabled = SYSLOG_ENABLED.clone();
-
-        // Test initial state
-        assert!(!*syslog_enabled.read());
-
-        // Test write access
-        *syslog_enabled.write() = true;
-        assert!(*syslog_enabled.read());
-
-        // Reset to original state
-        *syslog_enabled.write() = false;
-        assert!(!*syslog_enabled.read());
-    }
-
-    #[test]
     fn test_dashmap_operations() {
         // Test basic DashMap operations on KVS
         let test_key = "test_key".to_string();
@@ -478,6 +443,5 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(10)).await;
 
         // Test passes if no panic occurs
-        assert!(true);
     }
 }

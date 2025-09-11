@@ -170,15 +170,16 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     // init infra, create data dir & tables
     let cfg = config::get_config();
     infra::init().await.expect("infra init failed");
+    db::org_users::cache().await?;
     match name.as_str() {
         "reset" => {
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "root" => {
-                    let _ = users::update_user(
+                    let ret = users::update_user(
                         meta::organization::DEFAULT_ORG,
                         cfg.auth.root_user_email.as_str(),
-                        false,
+                        meta::user::UserUpdateMode::CliUpdate,
                         cfg.auth.root_user_email.as_str(),
                         meta::user::UpdateUser {
                             change_password: true,
@@ -198,6 +199,12 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         },
                     )
                     .await?;
+                    if !ret.status().is_success() {
+                        return Err(anyhow::anyhow!(
+                            "reset root user failed, error: {:?}",
+                            ret.body()
+                        ));
+                    }
                 }
                 "user" => {
                     db::user::reset().await?;
@@ -399,6 +406,14 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         "parse-id" => {
             let id = command.get_one::<String>("id").unwrap();
             println!("id: {id}");
+            // Snowflake IDs are expected to be 19 digits. If the input ID is longer,
+            // we truncate to the first 19 digits to ensure correct parsing; any extra digits are
+            // ignored.
+            let id = if id.len() > 19 {
+                id[..19].to_string()
+            } else {
+                id.to_string()
+            };
             let id = id.parse::<i64>().unwrap();
             let ts = config::ider::to_timestamp_millis(id);
             println!("timestamp: {ts}");

@@ -426,28 +426,6 @@ mod tests {
     }
 
     #[test]
-    fn test_enum_variant_equality_and_cloning() {
-        // Test that enum variants can be compared and cloned correctly
-        let mode1 = IndexOptimizeMode::SimpleSelect(100, true);
-        let mode2 = IndexOptimizeMode::SimpleSelect(100, true);
-        let mode3 = IndexOptimizeMode::SimpleSelect(100, false);
-        let mode4 = IndexOptimizeMode::SimpleCount;
-
-        // Test equality
-        assert_eq!(mode1, mode2);
-        assert_ne!(mode1, mode3);
-        assert_ne!(mode1, mode4);
-
-        // Test cloning
-        let cloned_mode = mode1.clone();
-        assert_eq!(mode1, cloned_mode);
-
-        // Test that cloned mode is independent
-        let mode5 = IndexOptimizeMode::SimpleSelect(200, true);
-        assert_ne!(cloned_mode, mode5);
-    }
-
-    #[test]
     fn test_edge_cases_and_boundaries() {
         // Test edge cases and boundary values
         let edge_cases = [

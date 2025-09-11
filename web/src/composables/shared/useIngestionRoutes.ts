@@ -15,7 +15,6 @@
 
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
-import SysLog from "@/components/ingestion/logs/SysLog.vue";
 import SyslogNg from "@/components/ingestion/logs/SyslogNg.vue";
 import Ingestion from "@/views/Ingestion.vue";
 import FluentBit from "@/components/ingestion/logs/FluentBit.vue";
@@ -47,6 +46,7 @@ import WindowsConfig from "@/components/ingestion/recommended/WindowsConfig.vue"
 import DatabaseConfig from "@/components/ingestion/Database.vue";
 import SqlServer from "@/components/ingestion/databases/SqlServer.vue";
 import Postgres from "@/components/ingestion/databases/Postgres.vue";
+import Oracle from "@/components/ingestion/databases/Oracle.vue";
 import MongoDB from '@/components/ingestion/databases/MongoDB.vue';
 import Redis from '@/components/ingestion/databases/Redis.vue';
 import CouchDB from '@/components/ingestion/databases/CouchDB.vue';
@@ -111,6 +111,9 @@ const useIngestionRoutes = () => {
       path: "ingestion",
       name: "ingestion",
       component: Ingestion,
+      meta:{
+        title: "Ingestion",
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -401,6 +404,14 @@ const useIngestionRoutes = () => {
               path: "mysql",
               name: "mysql",
               component: MySQL,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "oracle",
+              name: "oracle",
+              component: Oracle,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -785,29 +796,10 @@ const useIngestionRoutes = () => {
     },
   ];
 
-  const sysLog = {
-    path: "syslog",
-    name: "syslog",
-    component: SysLog,
-    beforeEnter(to: any, from: any, next: any) {
-      routeGuard(to, from, next);
-    },
-  };
-
-  // const sysLogNg = {
-  //   path: "syslogng",
-  //   name: "syslogNg",
-  //   component: SyslogNg,
-  //   beforeEnter(to: any, from: any, next: any) {
-  //     routeGuard(to, from, next);
-  //   },
-  // };
-
   if (config.isCloud === "false" || !config.isCloud) {
     ingestionRoutes[0].children
       .find((child: any) => child.name === "custom")
-      .children.find((child: any) => child.name === "ingestLogs")
-      ?.children.push(...[sysLog]);
+      .children.find((child: any) => child.name === "ingestLogs");
   }
 
   return ingestionRoutes;

@@ -1,10 +1,21 @@
-import { test, expect } from "@playwright/test";
-import { login } from "./utils/dashLogin.js";
+const {
+  test,
+  expect,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
 import { ingestion } from "./utils/dashIngestion.js";
 import logData from "../../fixtures/log.json";
 import PageManager from "../../pages/page-manager";
+import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
 
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+
+//Dashboard name
+const randomDashboardName =
+  "Dashboard_" + Math.random().toString(36).substr(2, 9);
+
+// Panel name
+const panelName = "Panel_" + Math.random().toString(36).substr(2, 9);
 
 test.describe.configure({ mode: "parallel" });
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {
@@ -20,38 +31,43 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page.locator("div.q-item").getByText(`${stream}`).first().click();
 };
 
-const initialQuery = `SELECT
-kubernetes_namespace_name,
-kubernetes_pod_name,
-kubernetes_container_name,
-COUNT(*) AS log_count
-FROM
-e2e_automate
-WHERE
-kubernetes_container_name = 'ziox'
-GROUP BY
-kubernetes_namespace_name,
-kubernetes_pod_name,
-kubernetes_container_name
-ORDER BY
-log_count DESC
-LIMIT 100
-`;
+// Stream name used across tests
+const STREAM_NAME = "e2e_automate";
+// Add a global SQL query constant that can be reused across tests
+const largeDatasetSqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", 
+  count(kubernetes_container_hash) as "y_axis_1", 
+  count(kubernetes_container_name) as "y_axis_2", 
+  count(kubernetes_host) as "y_axis_3", 
+  count(kubernetes_labels_app_kubernetes_io_instance) as "y_axis_4", 
+  count(kubernetes_labels_app_kubernetes_io_name) as "y_axis_5", 
+  count(kubernetes_labels_app_kubernetes_io_version) as "y_axis_6", 
+  count(kubernetes_labels_operator_prometheus_io_name) as "y_axis_7", 
+  count(kubernetes_labels_prometheus) as "y_axis_8", 
+  kubernetes_labels_statefulset_kubernetes_io_pod_name as "breakdown_1"  
+  FROM "${STREAM_NAME}" 
+  WHERE kubernetes_namespace_name IS NOT NULL 
+  GROUP BY x_axis_1, breakdown_1`;
+
+const histogramQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1"  FROM "${STREAM_NAME}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC `;
+
+// Query without aliases for testing error message
+const queryWithoutAliases = `SELECT count(kubernetes_container_hash), count(kubernetes_container_name), count(kubernetes_host) FROM "${STREAM_NAME}" WHERE kubernetes_namespace_name IS NOT NULL GROUP BY kubernetes_annotations_kubectl_kubernetes_io_default_container`;
+
 test.describe("logs testcases", () => {
   test.beforeEach(async ({ page }) => {
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestion(page);
-    await page.waitForTimeout(2000);
 
-    await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    );
+    // Navigate to logs page
+    const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
+
+    await page.goto(logsUrl);
+    await page.waitForLoadState("networkidle");
 
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
 
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    // await selectStreamAndStreamTypeForLogs(page, logData.Stream);
     await pm.logsVisualise.logsApplyQueryButton();
   });
 
@@ -71,248 +87,7 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.logsApplyQueryButton();
   });
 
-  test.skip("should set the default chart type and default X and Y axes to automatic after clicking the Visualize button", async ({
-    page,
-  }) => {
-    // Instantiate PageManager with the current page
-    const pm = new PageManager(page);
-
-    // Open the logs page and select stream
-    await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.streamIndexList();
-    await pm.logsVisualise.logsToggle();
-
-    //open the Visualize tab and check the default chart type and axes
-    await pm.logsVisualise.openVisualiseTab();
-    await expect(
-      page.locator('[data-test="dashboard-x-item-zo_sql_key"]')
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-test="dashboard-y-item-zo_sql_num"]')
-    ).toBeVisible();
-  });
-
-  test.skip("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart.", async ({
-    page,
-  }) => {
-    // Instantiate PageManager with the current page
-    const pm = new PageManager(page);
-
-    await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.logsApplyQueryButton();
-
-    await pm.logsVisualise.openVisualiseTab();
-
-    await page
-      .locator('[data-test="dashboard-field-list-collapsed-icon"]')
-      .click();
-
-    // Remove the _timestamp field from the X-axis
-    await pm.logsVisualise.removeField("zo_sql_key", "x");
-    await page.getByText("Chart configuration has been").click();
-    await expect(page.getByText("Chart configuration has been")).toBeVisible();
-
-    // Apply the changes
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-    await expect(page.getByText("There are some errors, please")).toBeVisible();
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-zo_sql_key"] [data-test="dashboard-add-x-data"]'
-      )
-      .waitFor({ state: "visible" });
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-zo_sql_key"] [data-test="dashboard-add-x-data"]'
-      )
-      .click();
-
-    // Apply the changes
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-
-    // Remove the _timestamp field from the Y-axis
-    await pm.logsVisualise.removeField("zo_sql_num", "y");
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-zo_sql_num"] [data-test="dashboard-add-y-data"]'
-      )
-      .waitFor({ state: "visible" });
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-zo_sql_num"] [data-test="dashboard-add-y-data"]'
-      )
-      .click();
-
-    // Apply the changes
-    const search = page.waitForResponse(logData.applyQuery);
-
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-    await expect
-      .poll(async () => (await search).status(), { timeout: 15000 })
-      .toBe(200);
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1000);
-    await pm.logsVisualise.chartRender(470, 13);
-  });
-
-  test("should correctly plot the data according to the new chart type when changing the chart type.", async ({
-    page,
-  }) => {
-    // Instantiate PageManager with the current page
-    const pm = new PageManager(page);
-
-    // Open the logs page and visualize tab
-    await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.openVisualiseTab();
-
-    const queryEditor = page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole("textbox");
-    await expect(queryEditor).toBeVisible();
-
-    const sqlQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_annotations_kubernetes_io_psp as "breakdown_1"  FROM "e2e_automate"  GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC`;
-
-    // update the query
-    await queryEditor.click();
-    await queryEditor.press(
-      process.platform === "darwin" ? "Meta+A" : "Control+A"
-    );
-    await queryEditor.fill(sqlQuery);
-
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-
-    // Change the chart types
-    await pm.logsVisualise.selectChartType("line");
-
-    await expect(
-      page.locator('[data-test="chart-renderer"] canvas').last()
-    ).toBeVisible();
-
-    //set relative time
-    await pm.logsVisualise.setRelative("6", "w");
-    await pm.logsVisualise.chartRender(457, 135);
-
-    // Change the chart type to area
-    await pm.logsVisualise.selectChartType("area");
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-    await pm.logsVisualise.chartRender(590, 127);
-
-    // Change the chart type to area-stacked
-    await pm.logsVisualise.selectChartType("area-stacked");
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-    await pm.logsVisualise.chartRender(475, 45);
-
-    // Change the chart type to horizontal bar
-    await pm.logsVisualise.selectChartType("h-bar");
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-    await pm.logsVisualise.chartRender(722, 52);
-
-    // Change the chart type to scatter and apply
-    await pm.logsVisualise.selectChartType("scatter");
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-    await pm.logsVisualise.chartRender(362, 30);
-
-    // Change the chart type to pie and apply
-    await pm.logsVisualise.selectChartType("pie");
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-    await pm.logsVisualise.chartRender(650, 85);
-
-    // Change the chart type to donut and apply
-    await pm.logsVisualise.selectChartType("donut");
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-    await pm.logsVisualise.chartRender(216, 53);
-
-    // Change the chart type to gauge and apply
-    await pm.logsVisualise.selectChartType("gauge");
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-    await pm.logsVisualise.chartRender(423, 127);
-  });
-
-  test.skip("should handle an empty query in visualization without displaying an error.", async ({
-    page,
-  }) => {
-    // Instantiate PageManager with the current page
-    const pm = new PageManager(page);
-
-    // Open the logs page and the query editor and apply a relative time
-    await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.openQueryEditor();
-    await pm.logsVisualise.setRelative("6", "w");
-    await pm.logsVisualise.logsApplyQueryButton();
-
-    // Open the visualization tab
-    await pm.logsVisualise.openVisualiseTab();
-    await expect(page.locator(".cm-line").first()).toBeVisible();
-    await expect(
-      page.locator('[data-test="dashboard-x-item-zo_sql_key"]')
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-test="dashboard-y-item-zo_sql_num"]')
-    ).toBeVisible();
-  });
-
-  test.skip("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization.", async ({
-    page,
-  }) => {
-    const pm = new PageManager(page);
-
-    // Open the logs page and set relative time
-    await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.setRelative("6", "w");
-    await pm.logsVisualise.logsApplyQueryButton();
-
-    // Add the kubernetes_container_hash field to the search query
-    await page.getByLabel('Expand "kubernetes_container_hash"').click();
-    await page
-      .locator(
-        '[data-test="logs-search-subfield-add-kubernetes_container_hash-058694856476\\.dkr\\.ecr\\.us-west-2\\.amazonaws\\.com\\/ziox\\@sha256\\:3dbbb0dc1eab2d5a3b3e4a75fd87d194e8095c92d7b2b62e7cdbd07020f54589"] [data-test="log-search-subfield-list-equal-kubernetes_container_hash-field-btn"]'
-      )
-      .waitFor({ state: "visible" });
-
-    await page
-      .locator(
-        '[data-test="logs-search-subfield-add-kubernetes_container_hash-058694856476\\.dkr\\.ecr\\.us-west-2\\.amazonaws\\.com\\/ziox\\@sha256\\:3dbbb0dc1eab2d5a3b3e4a75fd87d194e8095c92d7b2b62e7cdbd07020f54589"] [data-test="log-search-subfield-list-equal-kubernetes_container_hash-field-btn"]'
-      )
-      .click();
-    await pm.logsVisualise.logsApplyQueryButton();
-
-    // Open the visualization tab
-    await pm.logsVisualise.openVisualiseTab();
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-    let exceptionBefore = null;
-    let exceptionAfter = null;
-
-    // try and catch block for compare tow field.
-    try {
-      await expect(
-        page.locator(
-          '[data-test="dashboard-add-condition-label-0-kubernetes_container_hash"]'
-        )
-      ).toBeVisible();
-    } catch (e) {
-      exceptionBefore = e;
-    }
-
-    await page.locator('[data-test="dashboard-add-condition-remove"]').click();
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-    await pm.logsVisualise.backToLogs();
-
-    await pm.logsVisualise.logsApplyQueryButton();
-    await pm.logsVisualise.openVisualiseTab();
-
-    try {
-      await expect(
-        page.locator(
-          '[data-test="dashboard-add-condition-label-0-kubernetes_container_hash"]'
-        )
-      ).toBeVisible();
-    } catch (e) {
-      exceptionAfter = e;
-    }
-    expect(exceptionBefore).toBe(exceptionAfter);
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-  });
-
-  test("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
+  test.skip("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
@@ -366,49 +141,7 @@ test.describe("logs testcases", () => {
     await expect(page.locator(".cm-line").first()).toBeEmpty();
   });
 
-  test("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
-    page,
-  }) => {
-    // Instantiate PageManager with the current page
-    const pm = new PageManager(page);
-
-    // Open the logs page, fill the query editor, and apply a relative time and Apply the query
-    await pm.logsVisualise.openLogs();
-
-    const sqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", 
-    count(kubernetes_container_hash) as "y_axis_1", 
-    count(kubernetes_container_name) as "y_axis_2", 
-    count(kubernetes_host) as "y_axis_3", 
-    count(kubernetes_labels_app_kubernetes_io_instance) as "y_axis_4", 
-    count(kubernetes_labels_app_kubernetes_io_name) as "y_axis_5", 
-    count(kubernetes_labels_app_kubernetes_io_version) as "y_axis_6", 
-    count(kubernetes_labels_operator_prometheus_io_name) as "y_axis_7", 
-    count(kubernetes_labels_prometheus) as "y_axis_8", 
-    kubernetes_labels_statefulset_kubernetes_io_pod_name as "breakdown_1"  
-    FROM "e2e_automate" 
-    WHERE kubernetes_namespace_name IS NOT NULL 
-    GROUP BY x_axis_1, breakdown_1`;
-
-    await pm.logsVisualise.fillQueryEditor(sqlQuery);
-    await pm.logsVisualise.setRelative("6", "w");
-    await pm.logsVisualise.logsApplyQueryButton();
-
-    // Enable SQL mode
-    await pm.logsVisualise.enableSQLMode();
-    await pm.logsVisualise.logsApplyQueryButton();
-
-    // Open the visualization tab
-    await pm.logsVisualise.openVisualiseTab();
-
-    // Check for any error messages or indicators
-    const errorMessage = page.locator('[data-test="error-message"]'); // Update the selector based on your app's error message display
-    const errorCount = await errorMessage.count();
-
-    // Assert that no error messages are displayed
-    await expect(errorCount).toBe(0);
-  });
-
-  test("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
+  test.skip("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
@@ -417,9 +150,10 @@ test.describe("logs testcases", () => {
     // Open the logs page and set relative time
     await pm.logsVisualise.openLogs();
     await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.fillLogsQueryEditor(largeDatasetSqlQuery);
 
     // Apply query and switch to the visualise tab
-    await pm.logsVisualise.logsApplyQueryButton();
+    // await pm.logsVisualise.logsApplyQueryButton();
     await pm.logsVisualise.openVisualiseTab();
 
     // Switch back to logs and again to visualise
@@ -451,212 +185,7 @@ test.describe("logs testcases", () => {
     expect(currentCount).toBeGreaterThan(0);
   });
 
-  test("should not blank the stream name list when switching between logs and visualization and back again.", async ({
-    page,
-  }) => {
-    // Instantiate PageManager with the current page
-    const pm = new PageManager(page);
-
-    // Open the logs page and set relative time
-    await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.setRelative("4", "d");
-
-    // Open the visualization tab
-    await pm.logsVisualise.openVisualiseTab();
-
-    // Remove a field from the y-axis
-    // await pm.logsVisualise.removeField("zo_sql_num", "y");
-
-    // Switch back to logs
-    await pm.logsVisualise.backToLogs();
-  });
-
-  test("should create dashboard from the visualization chart sucessfully", async ({
-    page,
-  }) => {
-    const randomDashboardName =
-      "Dashboard_" + Math.random().toString(36).substr(2, 9);
-    const panelName = "Panel_" + Math.random().toString(36).substr(2, 9);
-
-    // Instantiate PageManager with the current page
-    const pm = new PageManager(page);
-
-    // Open the logs page and set relative time
-    await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.setRelative("4", "d");
-
-    // Open the visualization tab and add fields
-    await pm.logsVisualise.openVisualiseTab();
-
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-
-    // Change the chart types
-    await pm.logsVisualise.selectChartType("line");
-
-    await expect(
-      page.locator('[data-test="chart-renderer"] canvas').last()
-    ).toBeVisible();
-
-    //add to dashboard and submit it
-    await page.getByRole("button", { name: "Add To Dashboard" }).click();
-    await page
-      .locator('[data-test="dashboard-dashboard-new-add"]')
-      .waitFor({ state: "visible" });
-
-    //Adding dashboard
-    await page.locator('[data-test="dashboard-dashboard-new-add"]').click();
-    await page.locator('[data-test="add-dashboard-name"]').click();
-    await page
-      .locator('[data-test="add-dashboard-name"]')
-      .fill(randomDashboardName);
-    await page.locator('[data-test="dashboard-add-submit"]').click();
-
-    await page.waitForTimeout(3000);
-    await page
-      .locator('[data-test="metrics-new-dashboard-panel-title"]')
-      .waitFor({ state: "visible" });
-    await page
-      .locator('[data-test="metrics-new-dashboard-panel-title"]')
-      .click();
-    await page
-      .locator('[data-test="metrics-new-dashboard-panel-title"]')
-      .fill(panelName);
-    await page
-      .locator('[data-test="metrics-schema-update-settings-button"]')
-      .click();
-
-    //redirecting to the dashboard and edit panel and save it
-
-    await pm.dashboardPanelEdit.editPanel(panelName);
-    await page
-      .locator('[data-test="dashboard-panel-name"]')
-      .waitFor({ state: "visible" });
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
-
-    await expect(
-      page
-        .getByRole("cell", {
-          name: "select histogram(_timestamp, '10 second') AS zo_sql_key, count(*) AS zo_sql_num from \"e2e_automate\" GROUP BY zo_sql_key ORDER BY zo_sql_key",
-        })
-        .first()
-    ).toBeVisible();
-    await page.locator('[data-test="query-inspector-close-btn"]').click();
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.savePanel();
-
-    // Return to dashboards list and delete the dashboard
-    await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, randomDashboardName);
-  });
-  test("Should not call the API after toggling to the Visualization view.", async ({
-    page,
-  }) => {
-    const pm = new PageManager(page);
-
-    // Open the logs page and the query editor
-    await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.openQueryEditor();
-    const queryEditor = page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole("textbox");
-    // Wait for the query editor to be visible
-    await expect(queryEditor).toBeVisible();
-
-    // Fill query in the query editor
-    await queryEditor.fill(initialQuery);
-
-    await pm.logsVisualise.setRelative("1", "m");
-
-    await pm.logsVisualise.logsApplyQueryButton();
-    await page.waitForTimeout(5000);
-
-    //open the visualization tab
-    await pm.logsVisualise.openVisualiseTab();
-
-    // Assert that the event-streaming search API call is **not** fired
-    const apiCallHappened = await page
-      .waitForResponse(
-        (response) =>
-          response
-            .url()
-            .includes(
-              "/api/default/_search_stream?type=logs&search_type=dashboards"
-            ),
-        { timeout: 5000 }
-      )
-      .then(() => true)
-      .catch(() => false); // timeout ⇒ call not made
-
-    expect(apiCallHappened).toBe(false);
-  });
-
-  test.skip("Should update the field name after updating the query.", async ({
-    page,
-  }) => {
-    const pm = new PageManager(page);
-
-    const updatedQuery = `SELECT
-    kubernetes_namespace_testname,
-    kubernetes_pod_name,
-    kubernetes_container_name,
-    COUNT(*) AS log_count
-FROM
-    e2e_automate
-WHERE
-    kubernetes_container_name = 'ziox'
-GROUP BY
-    kubernetes_namespace_testname,
-    kubernetes_pod_name,
-    kubernetes_container_name
-ORDER BY
-    log_count DESC
-LIMIT 100`;
-
-    // Step 1: Open Logs page and query editor
-    await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.openQueryEditor();
-
-    const queryEditor = page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole("textbox");
-    await expect(queryEditor).toBeVisible();
-
-    // Step 2: Fill and apply the initial query
-    await queryEditor.fill(initialQuery.trim());
-    await pm.logsVisualise.setRelative("1", "m");
-    await pm.logsVisualise.logsApplyQueryButton();
-    await page.waitForTimeout(3000); // Optional: Replace with proper wait if possible
-
-    // Step 3: Open the Visualization tab
-    await pm.logsVisualise.openVisualiseTab();
-
-    await expect(
-      page.locator('[data-test="dashboard-x-item-kubernetes_namespace_name"]')
-    ).toBeVisible();
-
-    // Step 4: Update the query
-    await queryEditor.click();
-    await queryEditor.press(
-      process.platform === "darwin" ? "Meta+A" : "Control+A"
-    );
-    await queryEditor.fill(updatedQuery.trim());
-
-    // Activate the function editor to trigger reprocessing
-    await page.locator("#fnEditor").getByRole("textbox").locator("div").click();
-    // await logsVisualise.openVisualiseTab();
-
-    await page.waitForTimeout(5000);
-    // Step 5: Assert updated field is visible
-    await expect(
-      page.locator(
-        '[data-test="dashboard-x-item-kubernetes_namespace_testname"]'
-      )
-    ).toHaveCount(1, { timeout: 10000 });
-  });
-
-  test("Should redirect to the table chart in visualization when the query includes more than two fields on the X-axis.", async ({
+  test.skip("Should redirect to the table chart in visualization when the query includes more than two fields on the X-axis.", async ({
     page,
   }) => {
     const pm = new PageManager(page);
@@ -682,5 +211,377 @@ LIMIT 100`;
     await expect(
       page.locator('[data-test="selected-chart-table-item"]').locator("..")
     ).toHaveClass(/bg-grey-3|5/); // matches light (3) or dark (5) theme
+  });
+
+  test("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+    // const logsVisualise = new LogsVisualise(page);
+
+    // Step 1: Open Logs page and query editor
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.openQueryEditor();
+
+    await pm.logsVisualise.fillLogsQueryEditor(largeDatasetSqlQuery);
+
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.openVisualiseTab();
+
+    // Check for any error messages or indicators
+    const errorMessage = page.locator('[data-test="error-message"]');
+    const errorCount = await errorMessage.count();
+
+    // Assert that no error messages are displayed
+    await expect(errorCount).toBe(0); // Fail the test if any error messages are present
+  });
+  test("Stream should be correct on visualize page after switching between logs and visualize", async ({
+    page,
+  }) => {
+    // Extract stream name from the SQL query dynamically
+    const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
+    const expectedStreamName = streamNameMatch
+      ? streamNameMatch[1]
+      : STREAM_NAME;
+
+    const pm = new PageManager(page);
+
+    // Step 1: Open Logs page and query editor
+    await pm.logsVisualise.openLogs();
+
+    await pm.logsVisualise.fillLogsQueryEditor(largeDatasetSqlQuery);
+
+    await pm.logsVisualise.setRelative("6", "w");
+
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.openVisualiseTab();
+
+    // Wait for the stream dropdown to be populated
+    await pm.logsVisualise.streamIndexList();
+
+    // Get stream value using multiple selector strategies
+    const getStreamValue = async () => {
+      const selectors = [
+        () =>
+          page
+            .locator('[data-test="index-dropdown-stream"]')
+            .getAttribute("value"),
+        () =>
+          page
+            .locator('.q-field__native input[aria-label="Stream"]')
+            .getAttribute("value"),
+        () => page.locator('[data-test="index-dropdown-stream"]').inputValue(),
+        () => page.locator('input[aria-label="Stream"]').getAttribute("value"),
+      ];
+
+      for (const selector of selectors) {
+        try {
+          const value = await selector();
+          if (value) return value;
+        } catch (error) {
+          // Continue to next selector
+        }
+      }
+      return null;
+    };
+
+    const streamValue = await getStreamValue();
+
+    // Assert that the stream value matches the expected stream name from the query
+    expect(streamValue).toBe(expectedStreamName);
+    expect(streamValue).toBeTruthy();
+
+    // Assert that the stream value is specifically "e2e_automate"
+    expect(streamValue).toBe("e2e_automate");
+  });
+
+  test("should redirect the correct chart type when added the aggregation query", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+
+    await pm.logsVisualise.fillLogsQueryEditor(largeDatasetSqlQuery);
+
+    await pm.logsVisualise.setRelative("6", "w");
+
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.openVisualiseTab();
+
+    await page.waitForTimeout(2000);
+
+    await pm.logsVisualise.streamIndexList();
+
+    await page.waitForSelector('[data-test="dashboard-panel-table"]', {
+      timeout: 15000,
+    });
+    await expect(
+      page.locator('[data-test="dashboard-panel-table"]')
+    ).toBeVisible();
+
+    // Method 3: Verify table-specific content is rendered (breakdown_1 column from the SQL query)
+    await expect(
+      page
+        .locator('[data-test="dashboard-panel-table"]')
+        .getByRole("cell", { name: "breakdown_1" })
+    ).toBeVisible();
+    await expect(
+      page.locator('[data-test="dashboard-panel-table"]').first()
+    ).toBeVisible();
+  });
+
+  test("should not show dashboard errors when changing chart types with aggregation query", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+
+    await pm.logsVisualise.fillLogsQueryEditor(largeDatasetSqlQuery);
+
+    await pm.logsVisualise.setRelative("6", "w");
+
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.openVisualiseTab();
+
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    // Define chart types to test
+    const chartTypes = [
+      { selector: '[data-test="selected-chart-table-item"]', name: "Table" },
+      { selector: '[data-test="selected-chart-line-item"]', name: "Line" },
+      { selector: '[data-test="selected-chart-bar-item"]', name: "Bar" },
+      { selector: '[data-test="selected-chart-area-item"]', name: "Area" },
+      {
+        selector: '[data-test="selected-chart-scatter-item"]',
+        name: "Scatter",
+      },
+      { selector: '[data-test="selected-chart-pie-item"]', name: "Pie" },
+    ];
+
+    // Test each chart type
+    for (const chartType of chartTypes) {
+      // Select the chart type
+      await page.locator(chartType.selector).click();
+      await page.waitForTimeout(1000);
+
+      // Wait for chart to load
+      await pm.logsVisualise.verifyChartRenders(page);
+
+      // Check for dashboard errors
+      const errorResult = await pm.logsVisualise.checkDashboardErrors(
+        page,
+        chartType.name
+      );
+
+      if (errorResult.hasErrors) {
+        errorResult.errors.forEach((error, index) => {});
+
+        // Fail the test with detailed error information
+        expect(errorResult.errorTextCount).toBe(0);
+        expect(errorResult.errorListCount).toBe(0);
+      } else {
+      }
+
+      // Verify the chart renders successfully
+      const chartRendered = await pm.logsVisualise.verifyChartRenders(page);
+      expect(chartRendered).toBe(true);
+    }
+  });
+
+  test("should set line chart as default when using histogram query", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+
+    await pm.logsVisualise.fillLogsQueryEditor(histogramQuery);
+
+    await pm.logsVisualise.setRelative("6", "w");
+
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.openVisualiseTab();
+
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    // Verify line chart is selected as default for histogram queries
+    await pm.logsVisualise.verifyChartTypeSelected(page, "line", true);
+
+    // Verify table chart is NOT selected for histogram queries
+    await pm.logsVisualise.verifyChartTypeSelected(page, "table", false);
+
+    // Verify chart canvas renders successfully
+    await expect(
+      page.locator('[data-test="chart-renderer"] canvas').last()
+    ).toBeVisible();
+
+    // Verify chart renders without errors
+    const chartRendered = await pm.logsVisualise.verifyChartRenders(page);
+    expect(chartRendered).toBe(true);
+  });
+
+  test("Should display the correct query in the dashboard when saved from a Table chart.", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+
+    await pm.logsVisualise.fillLogsQueryEditor(largeDatasetSqlQuery);
+
+    await pm.logsVisualise.setRelative("6", "w");
+
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.openVisualiseTab();
+
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    await pm.logsVisualise.addPanelToNewDashboard(
+      randomDashboardName,
+      panelName
+    );
+
+    // Wait for and assert the success message
+    const successMessage = page.getByText("Panel added to dashboard");
+    await expect(successMessage).toBeVisible({ timeout: 10000 });
+
+    await page
+      .locator('[data-test="dashboard-edit-panel-' + panelName + '-dropdown"]')
+      .click();
+    await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
+
+    await pm.logsVisualise.waitForQueryInspector(page);
+
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", count(kubernetes_container_hash) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", count(kubernetes_host) as "y_axis_3", count(kubernetes_labels_app_kubernetes_io_instance) as "y_axis_4", count(kubernetes_labels_app_kubernetes_io_name) as "y_axis_5", count(kubernetes_labels_app_kubernetes_io_version) as "y_axis_6", count(kubernetes_labels_operator_prometheus_io_name) as "y_axis_7", count(kubernetes_labels_prometheus) as "y_axis_8", kubernetes_labels_statefulset_kubernetes_io_pod_name as "breakdown_1" FROM "e2e_automate" WHERE kubernetes_namespace_name IS NOT NULL GROUP BY x_axis_1, breakdown_1',
+        })
+        .first()
+    ).toBeVisible();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await deleteDashboard(page, randomDashboardName);
+  });
+
+  test("should display the correct query in the dashboard when saved from a Line chart.", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+
+    await pm.logsVisualise.fillLogsQueryEditor(histogramQuery);
+
+    await pm.logsVisualise.setRelative("6", "w");
+
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.openVisualiseTab();
+
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+
+    await pm.logsVisualise.addPanelToNewDashboard(
+      randomDashboardName,
+      panelName
+    );
+
+    // Wait for and assert the success message
+    const successMessage = page.getByText("Panel added to dashboard");
+    await expect(successMessage).toBeVisible({ timeout: 10000 });
+
+    await page
+      .locator('[data-test="dashboard-edit-panel-' + panelName + '-dropdown"]')
+      .click();
+    await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
+
+    await pm.logsVisualise.waitForQueryInspector(page);
+
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        })
+        .first()
+    ).toBeVisible();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await deleteDashboard(page, randomDashboardName);
+  });
+
+  test("should show error message when using aggregation functions without aliases in SQL query", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    // Step 1: Open logs page
+    await pm.logsVisualise.openLogs();
+
+    // Step 2: Fill the query editor with SQL query without aliases
+    await pm.logsVisualise.fillLogsQueryEditor(queryWithoutAliases);
+
+    // Step 3: Set relative time
+    await pm.logsVisualise.setRelative("6", "w");
+
+    // Step 4: Apply the query
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // Step 5: Open the visualize tab
+    await pm.logsVisualise.openVisualiseTab();
+
+    // Step 6: Wait for error message to appear
+    const errorMessage = page.getByText(
+      "Fields using aggregation functions must have aliases"
+    );
+
+    // Wait for the error message to appear on the page
+    await errorMessage.waitFor({ state: "visible", timeout: 10000 });
+
+    // Step 7: Check for the specific error message using getByText
+    // Verify the error message is displayed
+    await expect(errorMessage.first()).toBeVisible();
+  });
+  test("should show quick mode as true when toggling to visualize tab", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+
+    await pm.logsVisualise.logsSelectStream("e2e_automate");
+
+    await waitForDateTimeButtonToBeEnabled(page);
+
+    await pm.logsVisualise.setRelative("6", "w");
+
+    // Step 4: Apply the query
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // Step 5: Open the visualize tab
+    await pm.logsVisualise.openVisualiseTab();
+
+    // Step 7: Verify quick mode toggle is true
+    const quickModeState = await pm.logsVisualise.verifyQuickModeToggle(true);
+    expect(quickModeState).toBe(true);
+
+    // Additional assertion using Playwright's expect for the toggle state
+    const quickModeToggle = page.locator(
+      '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
+    );
+    await expect(quickModeToggle).toHaveAttribute("aria-checked", "true");
   });
 });

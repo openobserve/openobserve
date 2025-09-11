@@ -184,7 +184,7 @@ pub async fn search(
                             .iter()
                             .filter_map(|v| {
                                 (!v.is_null()).then_some(flatten::flatten(v.clone()).map_err(|e| {
-                                    log::error!("Failed to flatten value: {}", e);
+                                    log::error!("Failed to flatten value: {e}");
                                     Error::Message(format!("Failed to flatten value: {e}"))
                                 }))
                             })
@@ -206,7 +206,7 @@ pub async fn search(
                                 );
                                 (!ret_val.is_null()).then_some(flatten::flatten(ret_val).map_err(
                                     |e| {
-                                        log::error!("Failed to flatten value: {}", e);
+                                        log::error!("Failed to flatten value: {e}");
                                         Error::Message(format!("Failed to flatten value: {e}"))
                                     },
                                 ))

@@ -21,6 +21,7 @@ import alerts from "../mockData/alerts";
 import logs from "../mockData/logs";
 import organizations from "../mockData/organizations";
 import home from "../mockData/home";
+import regexPatterns from "../mockData/regexPatterns";
 import store from "./store";
 
 // TODO OK: Move below rest handlers to separate file
@@ -41,7 +42,7 @@ export const restHandlers = [
       const sortBy = url.searchParams.get("sort_by");
       const desc = url.searchParams.get("desc");
       const name = url.searchParams.get("name");
-      
+
       return HttpResponse.json({
         list: [
           {
@@ -68,7 +69,7 @@ export const restHandlers = [
     ({ request }) => {
       const url = new URL(request.url);
       const type = url.searchParams.get("type");
-      
+
       return HttpResponse.json({});
     },
   ),
@@ -183,8 +184,125 @@ export const restHandlers = [
       ],
     });
   }),
+  http.get(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/short/:id`,
+    ({ request }) => {
+      return HttpResponse.json(
+        "http://localhost:5080/web/logs?stream_type=logs&stream=default1&from=1749120770351000&to=1749121670351000&refresh=0&defined_schemas=user_defined_schema&org_identifier=default&quick_mode=false&show_histogram=true",
+      );
+    },
+  ),
+  http.get(
+    `${store.state.API_ENDPOINT}/api/:org_identifier/:stream/traces/latest`,
+    ({ request }) => {
+      return HttpResponse.json({
+        hits: [
+          {
+            trace_id: "test-trace-id",
+            start_time: 1752490492843047200,
+            end_time: 1752490493164419300,
+            service_name: [{ service_name: "test-service", count: 1 }],
+            operation_name: "test-operation",
+            duration: 321372100,
+            spans: [2, 0],
+          },
+        ],
+      });
+    },
+  ),
 
-  http.get(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/short/:id`, ({ request }) => {
-    return HttpResponse.json("http://localhost:5080/web/logs?stream_type=logs&stream=default1&from=1749120770351000&to=1749121670351000&refresh=0&defined_schemas=user_defined_schema&org_identifier=default&quick_mode=false&show_histogram=true");
+  // Regex Pattern handlers
+  http.get(`${store.state.API_ENDPOINT}/api/:org/re_patterns`, ({ request }) => {
+    return HttpResponse.json({
+      data: regexPatterns
+    }, { status: 200 });
+  }),
+
+  http.post(`${store.state.API_ENDPOINT}/api/:org/re_patterns`, async ({ request }) => {
+    const body = await request.json() as any;
+    return HttpResponse.json({
+      id: "test-pattern-id",
+      name: body.name,
+      pattern: body.pattern,
+      description: body.description,
+      created_at: Date.now() / 1000,
+      updated_at: Date.now() / 1000
+    }, { status: 200 });
+  }),
+
+  http.put(`${store.state.API_ENDPOINT}/api/:org/re_patterns/:id`, async ({ request, params }) => {
+    const body = await request.json() as any;
+    return HttpResponse.json({
+      id: params.id,
+      name: body.name,
+      pattern: body.pattern,
+      description: body.description,
+      created_at: Date.now() / 1000 - 3600, // 1 hour ago
+      updated_at: Date.now() / 1000
+    }, { status: 200 });
+  }),
+
+  http.post(`${store.state.API_ENDPOINT}/api/:org/re_patterns/test`, async ({ request }) => {
+    const body = await request.json() as any;
+    const { pattern, test_records } = body;
+    
+    // Simple regex test simulation
+    const results = test_records.map((testStr: string) => {
+      try {
+        const regex = new RegExp(pattern);
+        const match = testStr.match(regex);
+        return match ? match[0] : "";
+      } catch (error) {
+        return "";
+      }
+    });
+
+    return HttpResponse.json({
+      results: results
+    }, { status: 200 });
+  }),
+
+  // Organization Settings handlers
+  http.post(`${store.state.API_ENDPOINT}/api/:org/settings`, async ({ request }) => {
+    const body = await request.json() as any;
+    return HttpResponse.json({
+      message: "Organization settings updated successfully",
+      settings: body
+    }, { status: 200 });
+  }),
+
+  // Settings Service handlers (logo and custom text)
+  http.post(`${store.state.API_ENDPOINT}/api/:org/settings/logo`, async ({ request }) => {
+    // Simulate logo upload
+    return HttpResponse.json({
+      message: "Logo uploaded successfully"
+    }, { status: 200 });
+  }),
+
+  http.delete(`${store.state.API_ENDPOINT}/api/:org/settings/logo`, () => {
+    return HttpResponse.json({
+      message: "Logo deleted successfully"
+    }, { status: 200 });
+  }),
+
+  http.post(`${store.state.API_ENDPOINT}/api/:org/settings/logo/text`, async ({ request }) => {
+    const body = await request.text();
+    return HttpResponse.json({
+      message: "Custom text updated successfully",
+      custom_text: body
+    }, { status: 200 });
+  }),
+
+  // Config Service handler
+  http.get(`${store.state.API_ENDPOINT}/config`, () => {
+    return HttpResponse.json({
+      websocket_enabled: true,
+      streaming_enabled: true,
+      custom_logo_text: "Test Logo Text",
+      custom_logo_img: "base64imagedata",
+      meta_org: "default",
+      version: "v0.10.0",
+      default_fts_keys: ["log", "message", "msg", "content", "data"],
+    }, { status: 200 });
   }),
 ];

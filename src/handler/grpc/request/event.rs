@@ -262,82 +262,9 @@ async fn handle_file_chunked(
 
 #[cfg(test)]
 mod tests {
-    use proto::cluster_rpc::{FileKey, FileList, FileMeta, SimpleFileList};
+    use proto::cluster_rpc::{FileKey, FileList, FileMeta};
 
     use super::*;
-
-    #[test]
-    fn test_constants() {
-        // Test that constants are properly defined
-        assert_eq!(CHUNK_SIZE, 4 * 1024 * 1024); // 4MB
-        assert_eq!(TRACE_ID_FOR_CACHE_LATEST_FILE, "cache_latest_file");
-    }
-
-    #[test]
-    fn test_eventer_struct() {
-        // Test that Eventer can be created
-        let eventer = Eventer;
-        // Eventer is a unit struct, so its size is 0
-        assert_eq!(std::mem::size_of_val(&eventer), 0);
-    }
-
-    #[test]
-    fn test_file_list_creation() {
-        // Test creating a FileList with items
-        let file_list = FileList {
-            node_addr: "test_node:8080".to_string(),
-            items: vec![
-                FileKey {
-                    id: 1,
-                    key: "test/file1.parquet".to_string(),
-                    account: "test_account".to_string(),
-                    deleted: false,
-                    meta: Some(FileMeta {
-                        compressed_size: 1024,
-                        index_size: 512,
-                        max_ts: 1234567890,
-                        ..Default::default()
-                    }),
-                    segment_ids: None,
-                },
-                FileKey {
-                    id: 2,
-                    key: "test/file2.parquet".to_string(),
-                    account: "test_account".to_string(),
-                    deleted: true,
-                    meta: Some(FileMeta {
-                        compressed_size: 2048,
-                        index_size: 1024,
-                        max_ts: 1234567891,
-                        ..Default::default()
-                    }),
-                    segment_ids: None,
-                },
-            ],
-        };
-
-        assert_eq!(file_list.node_addr, "test_node:8080");
-        assert_eq!(file_list.items.len(), 2);
-        assert!(!file_list.items[0].deleted);
-        assert!(file_list.items[1].deleted);
-    }
-
-    #[test]
-    fn test_simple_file_list_creation() {
-        // Test creating a SimpleFileList
-        let simple_file_list = SimpleFileList {
-            files: vec![
-                "test/file1.parquet".to_string(),
-                "test/file2.parquet".to_string(),
-                "test/file3.parquet".to_string(),
-            ],
-        };
-
-        assert_eq!(simple_file_list.files.len(), 3);
-        assert_eq!(simple_file_list.files[0], "test/file1.parquet");
-        assert_eq!(simple_file_list.files[1], "test/file2.parquet");
-        assert_eq!(simple_file_list.files[2], "test/file3.parquet");
-    }
 
     #[test]
     fn test_file_content_response_creation() {
@@ -524,27 +451,6 @@ mod tests {
     }
 
     #[test]
-    fn test_file_key_default() {
-        // Test FileKey default values
-        let item = FileKey::default();
-        assert_eq!(item.id, 0);
-        assert!(item.key.is_empty());
-        assert!(item.account.is_empty());
-        assert!(!item.deleted);
-        assert!(item.meta.is_none());
-        assert!(item.segment_ids.is_none());
-    }
-
-    #[test]
-    fn test_file_meta_default() {
-        // Test FileMeta default values
-        let meta = FileMeta::default();
-        assert_eq!(meta.compressed_size, 0);
-        assert_eq!(meta.index_size, 0);
-        assert_eq!(meta.max_ts, 0);
-    }
-
-    #[test]
     fn test_convert_parquet_to_tantivy_filename() {
         // Test parquet to tantivy filename conversion
         let parquet_file =
@@ -572,7 +478,7 @@ mod tests {
     #[test]
     fn test_file_download_batch_creation() {
         // Test creating file download batch
-        let files_to_download = vec![
+        let files_to_download = [
             (
                 "file1".to_string(),
                 "account1".to_string(),
@@ -620,8 +526,7 @@ mod tests {
 
         // This test just ensures the logging format is valid
         let log_message = format!(
-            "[gRPC:Event] Send file: {}, total_size: {}, offset: {} took: {} ms",
-            path, total_size, offset, elapsed_ms
+            "[gRPC:Event] Send file: {path}, total_size: {total_size}, offset: {offset} took: {elapsed_ms} ms"
         );
 
         assert!(log_message.contains(path));

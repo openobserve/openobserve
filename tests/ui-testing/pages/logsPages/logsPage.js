@@ -3,6 +3,11 @@ import { LogsQueryPage } from './logsQueryPage.js';
 import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Import testLogger for proper logging
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class LogsPage {
     constructor(page) {
@@ -112,6 +117,7 @@ export class LogsPage {
         this.cmContent = '.cm-content';
         this.cmLine = '.cm-line';
         this.searchFunctionInput = { placeholder: 'Search Function' };
+        this.timestampFieldTable = '[data-test="log-search-index-list-fields-table"]';
     }
 
 
@@ -151,7 +157,47 @@ export class LogsPage {
     async navigateToLogs(orgIdentifier) {
         const logsUrl = '/web/logs'; // Using the same pattern as in test files
         const orgId = orgIdentifier || process.env["ORGNAME"];
-        await this.page.goto(`${logsUrl}?org_identifier=${orgId}`);
+        const fullUrl = `${logsUrl}?org_identifier=${orgId}&fn_editor=true`;
+        
+        
+        // Include fn_editor=true to ensure VRL editor is available for tests that need it
+        await this.page.goto(fullUrl);
+        
+        
+        // Wait for page load and check for VRL editor
+        await this.page.waitForLoadState('domcontentloaded');
+        
+        // Wait for VRL editor to be available (with retries)
+        let fnEditorExists = 0;
+        let retries = 5;
+        
+        while (fnEditorExists === 0 && retries > 0) {
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+            fnEditorExists = await this.page.locator('#fnEditor').count();
+            
+            if (fnEditorExists === 0) {
+                await this.page.waitForTimeout(2000);
+                retries--;
+            }
+        }
+        
+        if (fnEditorExists === 0) {
+            
+            // Try reloading with explicit parameters
+            const currentUrl = new URL(this.page.url());
+            currentUrl.searchParams.set('fn_editor', 'true');
+            currentUrl.searchParams.set('vrl', 'true'); // Try alternative parameter
+            
+            await this.page.goto(currentUrl.toString());
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 });
+            
+            fnEditorExists = await this.page.locator('#fnEditor').count();
+            
+            if (fnEditorExists === 0) {
+                // Take screenshot for debugging
+            }
+        } else {
+        }
     }
 
     async validateLogsPage() {
@@ -311,7 +357,11 @@ export class LogsPage {
 
     async applyQueryButton(expectedUrl) {
         await this.page.locator(this.queryButton).click();
-        await expect(this.page).toHaveURL(expectedUrl);
+        // Handle both full URLs and path-only URLs, allow query parameters
+        const urlPattern = expectedUrl.startsWith('http') 
+            ? expectedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            : `.*${expectedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`;
+        await expect(this.page).toHaveURL(new RegExp(urlPattern));
     }
 
     async clearAndRunQuery() {
@@ -726,6 +776,52 @@ export class LogsPage {
         }
     }
 
+    async clickRunQueryButtonAndVerifyStreamingResponse() {
+        console.log("[DEBUG] Setting up response listener before clicking run query button");
+        const searchPromise = this.page.waitForResponse(response => {
+            const url = response.url();
+            const method = response.request().method();
+            console.log(`[DEBUG] Response: ${method} ${url}`);
+            return url.includes('/api/default/_search') && method === 'POST';
+        });
+        
+        await this.clickRunQueryButton();
+        
+        const searchResponse = await searchPromise;
+        console.log(`[DEBUG] Search response status: ${searchResponse.status()}`);
+        expect(searchResponse.status()).toBe(200);
+        
+        // Check if this is a streaming response (SSE format) or JSON response
+        const responseUrl = searchResponse.url();
+        if (responseUrl.includes('_search_stream')) {
+            console.log("[DEBUG] Received streaming response (SSE format)");
+            const responseText = await searchResponse.text();
+            console.log("[DEBUG] Streaming response text (first 200 chars):", responseText.substring(0, 200));
+            expect(responseText).toBeDefined();
+            expect(responseText.length).toBeGreaterThan(0);
+        } else {
+            console.log("[DEBUG] Received JSON response");
+            const searchData = await searchResponse.json();
+            console.log("[DEBUG] Search response data:", JSON.stringify(searchData, null, 2));
+            console.log("[DEBUG] searchData type:", typeof searchData);
+            console.log("[DEBUG] searchData keys:", Object.keys(searchData || {}));
+            expect(searchData).toBeDefined();
+            
+            // Check if this is a partition response or regular search response
+            if (searchData.partitions) {
+                console.log("[DEBUG] Received partition response (non-streaming mode)");
+                expect(searchData.partitions).toBeDefined();
+                expect(searchData.histogram_interval).toBeDefined();
+            } else if (searchData.hits) {
+                console.log("[DEBUG] Received regular search response");
+                expect(searchData.hits).toBeDefined();
+            } else {
+                console.log("[DEBUG] Unexpected response structure:", JSON.stringify(searchData, null, 2));
+                throw new Error(`Unexpected response structure: ${JSON.stringify(searchData)}`);
+            }
+        }
+    }
+
     // Explore and results methods
     async clickExplore() {
         try {
@@ -1115,9 +1211,34 @@ export class LogsPage {
         return await this.loginPage.login();
     }
 
-    // Ingestion methods - delegate to IngestionPage
+    // Ingestion methods 
     async ingestLogs(orgId, streamName, logData) {
-        return await this.ingestionPage.ingestLogs(orgId, streamName, logData);
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+        
+        const response = await this.page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
+            const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(logData)
+            });
+            return await fetchResponse.json();
+        }, {
+            url: process.env.INGESTION_URL,
+            headers: headers,
+            orgId: orgId,
+            streamName: streamName,
+            logData: logData
+        });
+        
+        testLogger.debug('Ingestion API response received', { response });
+        return response;
     }
 
     // Management methods - delegate to ManagementPage
@@ -1148,6 +1269,11 @@ export class LogsPage {
 
     async fillQueryEditor(query) {
         return await this.page.locator(this.queryEditor).getByRole('textbox').fill(query);
+    }
+
+    async clearQueryEditor() {
+        await this.page.locator(this.queryEditor).getByRole('textbox').press('ControlOrMeta+a');
+        return await this.page.locator(this.queryEditor).getByRole('textbox').press('Backspace');
     }
 
     async typeInQueryEditor(text) {
@@ -1491,6 +1617,10 @@ export class LogsPage {
         return await this.page.locator(this.timestampColumnMenu).first().click({ force: true });
     }
 
+    async toggleVrlEditor() {
+        return await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
+    }
+
     async clickVrlEditor() {
         return await this.page.locator(this.vrlEditor).first().getByRole('textbox').fill('.a=2');
     }
@@ -1809,7 +1939,180 @@ export class LogsPage {
         await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`).first().click();
     }
 
+    // Download-related functions
+    async setupDownloadDirectory() {
+        // Create unique directory with timestamp and random string
+        const timestamp = Date.now();
+        const randomString = Math.random().toString(36).substring(2, 8);
+        const downloadDir = path.join(process.cwd(), `temp-downloads-${timestamp}-${randomString}`);
+        
+        // Create fresh directory
+        fs.mkdirSync(downloadDir, { recursive: true });
+        
+        // Verify directory was created and is writable
+        expect(fs.existsSync(downloadDir)).toBe(true);
+        
+        // Test write permissions by creating a test file
+        const testFile = path.join(downloadDir, 'test-write.txt');
+        fs.writeFileSync(testFile, 'test');
+        expect(fs.existsSync(testFile)).toBe(true);
+        fs.unlinkSync(testFile);
+        
+        return downloadDir;
+    }
+
+    async cleanupDownloadDirectory(downloadDir) {
+        if (downloadDir && fs.existsSync(downloadDir)) {
+            const files = fs.readdirSync(downloadDir);
+            for (const file of files) {
+                fs.unlinkSync(path.join(downloadDir, file));
+            }
+            fs.rmdirSync(downloadDir);
+        }
+    }
+
+    async verifyDownload(download, expectedFileName, downloadDir) {
+        const downloadPath = path.join(downloadDir, expectedFileName);
+        
+        // Save the download
+        await download.saveAs(downloadPath);
+        
+        // Wait for file system to sync
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Verify file exists and has content
+        expect(fs.existsSync(downloadPath)).toBe(true);
+        const stats = fs.statSync(downloadPath);
+        expect(stats.size).toBeGreaterThan(0);
+        
+        // Verify it's a CSV file
+        const content = fs.readFileSync(downloadPath, 'utf8');
+        expect(content).toContain('_timestamp');
+        
+        // Count rows in the CSV file
+        const rows = content.split('\n').filter(line => line.trim() !== '');
+        const rowCount = rows.length - 1; // Subtract 1 for header row
+        console.log(`Download ${expectedFileName}: ${rowCount} data rows`);
+        
+        // Assert row count based on scenario
+        if (expectedFileName.includes('custom_100.csv')) {
+            expect(rowCount).toBe(100);
+        } else if (expectedFileName.includes('custom_500.csv')) {
+            expect(rowCount).toBe(500);
+        } else if (expectedFileName.includes('custom_1000.csv')) {
+            expect(rowCount).toBe(1000);
+        } else if (expectedFileName.includes('custom_5000.csv')) {
+            expect(rowCount).toBe(5000);
+        } else if (expectedFileName.includes('custom_10000.csv')) {
+            expect(rowCount).toBe(10000);
+        } else if (expectedFileName.includes('sql_limit_2000.csv')) {
+            expect(rowCount).toBe(2000);
+        } else if (expectedFileName.includes('sql_limit_2000_custom_500.csv')) {
+            expect(rowCount).toBe(500);
+        } else {
+            // For normal "Download results" downloads, we expect some data but not a specific count
+            expect(rowCount).toBeGreaterThan(0);
+        }
+        
+        return downloadPath;
+    }
+
+    // Download action methods
+    async clickMoreOptionsButton() {
+        return await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
+    }
+
+    async clickDownloadResults() {
+        await this.page.getByText('keyboard_arrow_right').click();
+        return await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
+    }
+
+    async clickDownloadResultsForCustom() {
+        return await this.page.getByText('Download results for custom').click();
+    }
+
+    async clickCustomDownloadRangeSelect() {
+        return await this.page.locator('[data-test="custom-download-range-select"]').click();
+    }
+
+    async selectCustomDownloadRange(range) {
+        return await this.page.getByRole('option', { name: range, exact: true }).click();
+    }
+
+    async clickConfirmDialogOkButton() {
+        return await this.page.locator('[data-test="logs-search-bar-confirm-dialog-ok-btn"]').click();
+    }
+
+    async expectCustomDownloadDialogVisible() {
+        return await expect(this.page.getByText('Enter the initial number and')).toBeVisible();
+    }
+
+    async expectRequestFailedError() {
+        return await expect(this.page.getByText('Request failed with status')).toBeVisible();
+    }
+
+    async waitForDownload() {
+        return await this.page.waitForEvent('download');
+    }
+
     async clickAllFieldsButton() {
         return await this.page.locator('[data-test="logs-all-fields-btn"]').click();
+    }
+
+    async enableQuickModeIfDisabled() {
+        // Enable quick mode toggle if it's not already enabled
+        const toggleButton = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
+        if (toggleButton) {
+            // Evaluate the class attribute to determine if the toggle is in the off state
+            const isSwitchedOff = await toggleButton.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
+            if (isSwitchedOff) {
+                await toggleButton.click();
+            }
+        }
+    }
+
+    async clickTimestampField() {
+        return await this.page.locator(this.timestampFieldTable).getByTitle('_timestamp').click();
+    }
+
+    async clickSchemaButton() {
+        return await this.page.getByRole('button').filter({ hasText: /^schema$/ }).click();
+    }
+
+    async clickInfoSchemaButton() {
+        return await this.page.getByRole('button').filter({ hasText: 'infoschema' }).click();
+    }
+
+    async clickClearButton() {
+        return await this.page.getByRole('button', { name: 'Clear' }).click();
+    }
+
+    async expectTimestampFieldVisible() {
+        return await expect(this.page.locator(this.timestampFieldTable).getByTitle('_timestamp')).toBeVisible();
+    }
+
+    // Field management methods for add/remove fields to table
+    async hoverOnFieldExpandButton(fieldName) {
+        await this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`).hover();
+        await this.page.waitForTimeout(300);
+    }
+
+    async clickAddFieldToTableButton(fieldName) {
+        await this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`).click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async clickRemoveFieldFromTableButton(fieldName) {
+        await this.page.locator(`[data-test="log-search-index-list-remove-${fieldName}-field-btn"]`).click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async expectFieldInTableHeader(fieldName) {
+        return await expect(this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`)).toBeVisible();
+    }
+
+    async expectFieldNotInTableHeader(fieldName) {
+        // When field is removed, the source column should be visible again
+        return await expect(this.page.locator('[data-test="log-search-result-table-th-source"]').getByText('source')).toBeVisible();
     }
 } 

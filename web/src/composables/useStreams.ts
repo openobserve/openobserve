@@ -803,7 +803,17 @@ const useStreams = () => {
     getPaginatedStreams,
     isStreamExists,
     isStreamFetched,
-    addNewStreams
+    addNewStreams,
+    // Internal functions exposed for testing
+    updateStreamsInStore,
+    updateStreamIndexMappingInStore,
+    updateStreamsFetchedInStore,
+    getAllStreamsPayload,
+    removeSchemaFields,
+    getStreamPayload,
+    compareArrays,
+    deepEqual,
+    comparePatternAssociations
   };
 };
 

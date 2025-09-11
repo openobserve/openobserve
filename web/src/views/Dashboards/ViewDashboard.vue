@@ -257,6 +257,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :folderId="route.query.folder"
         :reportId="reportId"
         :currentTimeObj="currentTimeObjPerPanel"
+        :dashboardName="currentDashboardData.data?.title"
+        :folderName="folderNameFromFolderId"
         :selectedDateForViewPanel="selectedDate"
         @onDeletePanel="onDeletePanel"
         @onMovePanel="onMovePanel"
@@ -686,6 +688,8 @@ export default defineComponent({
       ) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
+        refreshedVariablesData.isVariablesLoading = false;
+        refreshedVariablesData.values = [];
       }
 
       // check if route has time related query params

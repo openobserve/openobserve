@@ -89,6 +89,7 @@ tls:
       copyHTTPTracesContentPasscode,
       copyGRPCTracesContent,
       getImageURL,
+      ingestionURL,
     };
   },
 });

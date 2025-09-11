@@ -156,6 +156,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { onBeforeRouteLeave } from "vue-router";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
+import { useReo } from "@/services/reodotdev_analytics";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -197,7 +198,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store: any = useStore();
     const router = useRouter();
-
+    const { track } = useReo();
 
     // let beingUpdated: boolean = false;
     const addJSTransformForm: any = ref(null);
@@ -415,6 +416,10 @@ end`;
             function_name: formData.value.name,
             page: "Add/Update Function",
           });
+          track("Button Click", {
+            button: "Save Function",
+            page: "Add Function"
+          });
         });
     };
 
@@ -452,6 +457,10 @@ end`;
       } else {
         emit("cancel:hideform");
       }
+      track("Button Click", {
+        button: "Cancel Function",
+        page: "Add Function"
+      });
     };
 
     const resetConfirmDialog = () => {

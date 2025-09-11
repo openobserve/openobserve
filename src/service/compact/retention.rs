@@ -20,7 +20,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, is_local_disk_storage,
     meta::stream::{FileKey, FileListDeleted, PartitionTimeLevel, StreamType, TimeRange},
-    utils::time::{BASE_TIME, day_micros, hour_micros},
+    utils::time::{BASE_TIME, day_micros, get_ymdh_from_micros, hour_micros},
 };
 use infra::{
     cache, dist_lock, file_list as infra_file_list,
@@ -148,7 +148,7 @@ pub async fn generate_retention_job(
     extended_retentions: &[TimeRange],
 ) -> Result<(), anyhow::Error> {
     // get min date from file_list
-    let min_date = infra::file_list::get_min_date(org_id, stream_type, stream_name).await?;
+    let min_date = infra::file_list::get_min_date(org_id, stream_type, stream_name, None).await?;
     if min_date.is_empty() {
         return Ok(()); // no data, just skip
     }
@@ -198,9 +198,31 @@ pub async fn generate_retention_job(
         ranges
     };
 
+    let created_at_micros = created_at.timestamp_micros();
     for time_range in final_deletion_time_ranges {
+        // check the min_date again in this range because of the extended retention days
+        let mut start = if time_range.start <= created_at_micros {
+            created_at_micros
+        } else {
+            // check the min_date again maybe there is no data in this range
+            let start_date = get_ymdh_from_micros(time_range.start);
+            let end_date = get_ymdh_from_micros(time_range.end);
+            let min_date = infra::file_list::get_min_date(
+                org_id,
+                stream_type,
+                stream_name,
+                Some((start_date.clone(), end_date.clone())),
+            )
+            .await?;
+            if min_date.is_empty() {
+                continue; // no data, just skip
+            }
+            let min_date = format!("{min_date}/00/00+0000");
+            let created_at =
+                DateTime::parse_from_str(&min_date, "%Y/%m/%d/%H/%M/%S%z")?.with_timezone(&Utc);
+            created_at.timestamp_micros()
+        };
         // generate jobs by date
-        let mut start = time_range.start;
         while start < time_range.end {
             let time_range_start = Utc
                 .timestamp_nanos(start * 1000)
@@ -328,7 +350,6 @@ pub async fn delete_by_date(
         return handle_delete_by_date_done(org_id, stream_type, stream_name, date_range).await;
     }
 
-    log::info!("delete_by_date date_range: {date_range:?}");
     let mut date_start = if date_range.0.ends_with("00Z") {
         DateTime::parse_from_rfc3339(date_range.0)?.with_timezone(&Utc)
     } else {
@@ -343,7 +364,6 @@ pub async fn delete_by_date(
     } else {
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.1))?.with_timezone(&Utc)
     };
-    log::info!("delete_by_date date_start: {date_start}, date_end: {date_end}");
     let time_range = {
         (
             date_start.timestamp_micros(),
@@ -367,19 +387,17 @@ pub async fn delete_by_date(
 
     // delete from file list
     log::info!(
-        "[COMPACTOR] delete_by_date: delete_from_file_list {}/{}/{}/{:?}",
+        "[COMPACTOR] delete_by_date: delete_from_file_list {}/{}/{}, date_range: [{}, {}]",
         org_id,
         stream_type,
         stream_name,
-        time_range
+        get_ymdh_from_micros(time_range.0),
+        get_ymdh_from_micros(time_range.1),
     );
     delete_from_file_list(org_id, stream_type, stream_name, time_range)
         .await
         .map_err(|e| {
-            log::error!(
-                "[COMPACTOR] delete_by_date delete_from_file_list failed: {}",
-                e
-            );
+            log::error!("[COMPACTOR] delete_by_date delete_from_file_list failed: {e}");
             e
         })?;
 
@@ -580,7 +598,7 @@ async fn handle_delete_by_date_done(
     db::compact::retention::delete_stream_done(org_id, stream_type, stream_name, Some(date_range))
         .await
         .map_err(|e| {
-            log::error!("[COMPACTOR] delete_by_date mark delete done failed: {}", e);
+            log::error!("[COMPACTOR] delete_by_date mark delete done failed: {e}");
             e
         })?;
 
@@ -604,10 +622,7 @@ async fn handle_delete_by_date_done(
     let _ = db::compact::compactor_manual_jobs::bulk_update_jobs(jobs)
         .await
         .map_err(|e| {
-            log::error!(
-                "[COMPACTOR] delete_by_date bulk update manual job failed: {}",
-                e
-            );
+            log::error!("[COMPACTOR] delete_by_date bulk update manual job failed: {e}");
             e
         });
 

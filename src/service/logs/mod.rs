@@ -66,7 +66,6 @@ pub mod hec;
 pub mod ingest;
 pub mod loki;
 pub mod otlp;
-pub mod syslog;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
@@ -227,7 +226,7 @@ async fn write_logs_by_stream(
             .await
             .is_none()
         {
-            let org = match super::organization::get_org(&org_id).await {
+            let org = match super::organization::get_org(org_id).await {
                 None => {
                     return Err(Error::Message(format!(
                         "org with id {org_id} not found in db"

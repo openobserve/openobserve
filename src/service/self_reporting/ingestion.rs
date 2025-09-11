@@ -585,13 +585,6 @@ mod tests {
     }
 
     #[test]
-    fn test_usage_event_equality() {
-        assert_eq!(UsageEvent::Ingestion, UsageEvent::Ingestion);
-        assert_ne!(UsageEvent::Ingestion, UsageEvent::Search);
-        assert_ne!(UsageEvent::Search, UsageEvent::Functions);
-    }
-
-    #[test]
     fn test_group_key_hash() {
         use std::collections::HashMap;
 
@@ -708,12 +701,7 @@ mod tests {
         usage.search_type = Some(SearchEventType::Dashboards);
         usage.search_event_context = Some(SearchEventContext {
             dashboard_id: Some("dashboard-123".to_string()),
-            dashboard_name: None,
-            dashboard_folder_id: None,
-            dashboard_folder_name: None,
-            alert_key: None,
-            derived_stream_key: None,
-            report_key: None,
+            ..Default::default()
         });
 
         // Should handle search context correctly

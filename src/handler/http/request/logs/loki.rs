@@ -30,6 +30,11 @@ use crate::{
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionLoki",
+    summary = "Ingest logs via Loki API",
+    description = "Ingests log data using Grafana Loki-compatible API format. Supports both JSON and Protocol Buffers \
+                   content types with optional compression (gzip for JSON, snappy for Protobuf). Stream names are \
+                   extracted from the 'stream_name' label in stream metadata. Provides seamless migration path from \
+                   Loki deployments to OpenObserve while maintaining API compatibility.",
     security(("Authorization"= [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = LokiPushRequest, description = "Loki-compatible log push data in JSON format. Stream names are extracted from 'stream_name' label in the stream labels. Also supports Protobuf format (application/x-protobuf) with optional compression (gzip for JSON, snappy for Protobuf)", content_type = "application/json", example = json!({

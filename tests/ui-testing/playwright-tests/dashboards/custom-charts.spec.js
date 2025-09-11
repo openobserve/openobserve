@@ -1,15 +1,19 @@
-import { test, expect } from "../baseFixtures";
+const {
+  test,
+  expect,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
 import path from "path";
 import fs from "fs";
-import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
+const testLogger = require('../utils/test-logger.js');
 
 // Function to read JSON test files
 function readJsonFile(filename) {
   const filePath = path.join(__dirname, `../../../test-data/${filename}`);
   if (!fs.existsSync(filePath)) {
-    console.error(`Error: JSON file does not exist at: ${filePath}`);
+    testLogger.error('JSON file does not exist', { filePath });
     return null;
   }
   return fs.readFileSync(filePath, "utf8");
@@ -24,8 +28,7 @@ test.describe("Custom Charts Tests", () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestion(page);
   });
 
@@ -34,7 +37,7 @@ test.describe("Custom Charts Tests", () => {
     const pm = new PageManager(page);
 
     if (!pictorialJSON) {
-      console.error("Skipping test: pictorial.json not found");
+      testLogger.warn('Skipping test: pictorial.json not found');
       return;
     }
 
@@ -63,7 +66,7 @@ test.describe("Custom Charts Tests", () => {
     //initialize the page manager
     const pm = new PageManager(page);
     if (!lineJSON) {
-      console.error("Skipping test: line.json not found");
+      testLogger.warn('Skipping test: line.json not found');
       return;
     }
 

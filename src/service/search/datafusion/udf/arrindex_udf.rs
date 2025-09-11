@@ -255,10 +255,7 @@ mod tests {
         ];
 
         for (json_input, start, end, _test_name) in edge_cases {
-            let sql = format!(
-                "select arrindex(test_col, {}, {}) as ret from t",
-                start, end
-            );
+            let sql = format!("select arrindex(test_col, {start}, {end}) as ret from t");
             // Empty arrays return [] instead of null, other invalid inputs return null
             let expected = if json_input == r#"[]"# {
                 vec!["+-----+", "| ret |", "+-----+", "| []  |", "+-----+"]
@@ -312,7 +309,7 @@ mod tests {
             .unwrap();
         let data = df.collect().await.unwrap();
         assert_batches_eq!(
-            vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"],
+            ["+-----+", "| ret |", "+-----+", "|     |", "+-----+"],
             &data
         );
     }
@@ -356,7 +353,7 @@ mod tests {
             .unwrap();
         let data = df.collect().await.unwrap();
         assert_batches_eq!(
-            vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"],
+            ["+-----+", "| ret |", "+-----+", "|     |", "+-----+"],
             &data
         );
     }

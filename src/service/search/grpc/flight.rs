@@ -30,17 +30,18 @@ use config::{
     },
     utils::json,
 };
-use datafusion::common::TableReference;
+use datafusion::{common::TableReference, physical_optimizer::PhysicalOptimizerRule};
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
     schema::{
-        get_stream_setting_fts_fields, get_stream_setting_index_updated_at,
-        unwrap_stream_created_at, unwrap_stream_settings,
+        get_stream_setting_fts_fields, get_stream_setting_index_fields,
+        get_stream_setting_index_updated_at, unwrap_stream_created_at, unwrap_stream_settings,
     },
 };
 use itertools::Itertools;
+use parking_lot::Mutex;
 use rayon::slice::ParallelSliceMut;
 
 use crate::service::{
@@ -52,8 +53,10 @@ use crate::service::{
                 rewrite::tantivy_optimize_rewrite,
             },
             exec::{DataFusionContextBuilder, register_udf},
-            table_provider::{enrich_table::NewEnrichTable, uniontable::NewUnionTable},
+            optimizer::physical_optimizer::index::IndexRule,
+            table_provider::{enrich_table::EnrichTable, uniontable::NewUnionTable},
         },
+        grpc::QueryParams,
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         match_file,
@@ -88,7 +91,7 @@ pub async fn search(
 
     // Decode physical plan from bytes
     let proto = get_physical_extension_codec();
-    let mut physical_plan =
+    let physical_plan =
         physical_plan_from_bytes_with_extension_codec(&req.search_info.plan, &ctx, &proto)?;
 
     // replace empty table to real table
@@ -116,17 +119,13 @@ pub async fn search(
     // check if we are allowed to search
     if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
         return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(format!(
-            "stream [{}] is being deleted",
-            &stream_name
+            "stream [{stream_name}] is being deleted"
         ))));
     }
 
     log::info!(
-        "[trace_id {trace_id}] flight->search: part_id: {}, stream: {}/{}/{}",
-        req.query_identifier.partition,
-        org_id,
-        stream_type,
-        stream_name,
+        "[trace_id {trace_id}] flight->search: part_id: {}, stream: {org_id}/{stream_type}/{stream_name}",
+        req.query_identifier.partition
     );
 
     // construct latest schema map
@@ -145,6 +144,7 @@ pub async fn search(
         .into_iter()
         .filter_map(|v| latest_schema_map.contains_key(&v).then_some(v))
         .collect_vec();
+    let index_fields = get_stream_setting_index_fields(&stream_settings);
     let index_updated_at = get_stream_setting_index_updated_at(&stream_settings, stream_created_at);
 
     // construct partition filters
@@ -159,16 +159,6 @@ pub async fn search(
         })
         .collect::<Vec<_>>();
 
-    let query_params = Arc::new(super::QueryParams {
-        trace_id: trace_id.to_string(),
-        org_id: org_id.clone(),
-        stream_type,
-        stream_name: stream_name.to_string(),
-        time_range: Some((req.search_info.start_time, req.search_info.end_time)),
-        work_group: work_group.clone(),
-        use_inverted_index: req.index_info.use_inverted_index,
-    });
-
     // construct tantivy related params
     let index_condition = generate_index_condition(&req.index_info.index_condition)?;
     let idx_optimize_rule: Option<IndexOptimizeMode> =
@@ -178,6 +168,26 @@ pub async fn search(
     let mut tables = Vec::new();
     let mut scan_stats = ScanStats::new();
     let file_stats_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
+
+    // optimize physical plan, current for tantivy index optimize
+    let index_condition_ref = Arc::new(Mutex::new(None));
+    let mut physical_plan = optimizer_physical_plan(
+        physical_plan,
+        &ctx,
+        index_fields,
+        index_condition_ref.clone(),
+    )?;
+    let index_condition = update_index_condition(index_condition, index_condition_ref);
+
+    let query_params = Arc::new(QueryParams {
+        trace_id: trace_id.to_string(),
+        org_id: org_id.clone(),
+        stream_type,
+        stream_name: stream_name.to_string(),
+        time_range: Some((req.search_info.start_time, req.search_info.end_time)),
+        work_group: work_group.clone(),
+        use_inverted_index: index_condition.is_some(),
+    });
 
     // search in object storage
     let mut tantivy_file_list = Vec::new();
@@ -210,6 +220,7 @@ pub async fn search(
             )
         );
 
+        let tantivy_optimize_start = std::time::Instant::now();
         let mut storage_idx_optimize_rule = idx_optimize_rule.clone();
         (tantivy_file_list, file_list) = handle_tantivy_optimize(
             &trace_id,
@@ -219,12 +230,38 @@ pub async fn search(
             index_updated_at,
         )
         .await?;
+        log::info!(
+            "{}",
+            search_inspector_fields(
+                format!("[trace_id {trace_id}] flight->search: handle tantivy optimize"),
+                SearchInspectorFieldsBuilder::new()
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("flight:do_get::search handle tantivy optimize".to_string())
+                    .search_role("follower".to_string())
+                    .duration(tantivy_optimize_start.elapsed().as_millis() as usize)
+                    .build()
+            )
+        );
 
         // sort by max_ts, the latest file should be at the top
+        let sort_start = std::time::Instant::now();
         if empty_exec.sorted_by_time() {
             file_list.par_sort_unstable_by(|a, b| b.meta.max_ts.cmp(&a.meta.max_ts));
         }
+        log::info!(
+            "{}",
+            search_inspector_fields(
+                format!("[trace_id {trace_id}] flight->search: sort file list"),
+                SearchInspectorFieldsBuilder::new()
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("flight:do_get::search sort file list".to_string())
+                    .search_role("follower".to_string())
+                    .duration(sort_start.elapsed().as_millis() as usize)
+                    .build()
+            )
+        );
 
+        let storage_search_start = std::time::Instant::now();
         let (tbls, stats) = match super::storage::search(
             query_params.clone(),
             latest_schema.clone(),
@@ -247,6 +284,21 @@ pub async fn search(
                 return Err(e);
             }
         };
+        log::info!(
+            "{}",
+            search_inspector_fields(
+                format!(
+                    "[trace_id {trace_id}] flight->search: storage search completed, {} files",
+                    file_list.len()
+                ),
+                SearchInspectorFieldsBuilder::new()
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("flight:do_get::search storage search".to_string())
+                    .search_role("follower".to_string())
+                    .duration(storage_search_start.elapsed().as_millis() as usize)
+                    .build()
+            )
+        );
         tables.extend(tbls);
         scan_stats.add(&stats);
     }
@@ -304,8 +356,7 @@ pub async fn search(
     // enrichment data from db to datafusion tables
     if stream_type == StreamType::EnrichmentTables && req.query_identifier.enrich_mode {
         // get the enrichment table from db
-        let enrichment_table =
-            NewEnrichTable::new(&org_id, &stream_name, empty_exec.schema().clone());
+        let enrichment_table = EnrichTable::new(&org_id, &stream_name, empty_exec.schema().clone());
         // add the enrichment table to the tables
         tables.push(Arc::new(enrichment_table) as _);
     }
@@ -313,7 +364,20 @@ pub async fn search(
     // create a Union Plan to merge all tables
     let start = std::time::Instant::now();
     let union_table = Arc::new(NewUnionTable::new(empty_exec.schema().clone(), tables));
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] flight->search: created union table"),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight:do_get::search union table creation".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
 
+    let scan_start = std::time::Instant::now();
     let union_exec = union_table
         .scan(
             &ctx.state(),
@@ -322,10 +386,37 @@ pub async fn search(
             empty_exec.limit(),
         )
         .await?;
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] flight->search: union table scan"),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight:do_get::search union table scan".to_string())
+                .search_role("follower".to_string())
+                .duration(scan_start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
+
+    let rewrite_start = std::time::Instant::now();
     let mut rewriter = ReplaceTableScanExec::new(union_exec);
     physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!("[trace_id {trace_id}] flight->search: physical plan rewrite"),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight:do_get::search physical plan rewrite".to_string())
+                .search_role("follower".to_string())
+                .duration(rewrite_start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
 
     if !tantivy_file_list.is_empty() {
+        let tantivy_start = std::time::Instant::now();
         scan_stats.add(&collect_stats(&tantivy_file_list));
         physical_plan = tantivy_optimize_rewrite(
             query_params.clone(),
@@ -334,6 +425,18 @@ pub async fn search(
             idx_optimize_rule.unwrap(), // guaranteed Some, if tantivy_file_list is not empty
             physical_plan,
         )?;
+        log::info!(
+            "{}",
+            search_inspector_fields(
+                format!("[trace_id {trace_id}] flight->search: tantivy optimize rewrite"),
+                SearchInspectorFieldsBuilder::new()
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("flight:do_get::search tantivy optimize rewrite".to_string())
+                    .search_role("follower".to_string())
+                    .duration(tantivy_start.elapsed().as_millis() as usize)
+                    .build()
+            )
+        );
     }
 
     log::info!(
@@ -353,6 +456,38 @@ pub async fn search(
     );
 
     Ok((ctx, physical_plan, scan_stats))
+}
+
+fn optimizer_physical_plan(
+    plan: Arc<dyn ExecutionPlan>,
+    ctx: &SessionContext,
+    index_fields: Vec<String>,
+    index_condition_ref: Arc<Mutex<Option<IndexCondition>>>,
+) -> Result<Arc<dyn ExecutionPlan>, Error> {
+    let cfg = config::get_config();
+    if !cfg.common.inverted_index_enabled || cfg.common.feature_query_without_index {
+        return Ok(plan);
+    }
+    let index_rule = IndexRule::new(index_fields.iter().cloned().collect(), index_condition_ref);
+    let plan = index_rule.optimize(plan, ctx.state().config_options())?;
+    Ok(plan)
+}
+
+fn update_index_condition(
+    mut index_condition: Option<IndexCondition>,
+    index_condition_ref: Arc<Mutex<Option<IndexCondition>>>,
+) -> Option<IndexCondition> {
+    let index_condition_ref = index_condition_ref.lock().clone();
+    if index_condition.is_none() {
+        return index_condition_ref;
+    }
+    if index_condition_ref.is_none() {
+        return index_condition;
+    }
+    if let Some(index_condition_ref) = index_condition_ref {
+        index_condition.as_mut().unwrap().merge(index_condition_ref);
+    }
+    index_condition
 }
 
 #[allow(clippy::too_many_arguments)]

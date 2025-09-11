@@ -62,6 +62,7 @@ const store = createStore({
       user_defined_schemas_enabled: true,
       super_cluster_enabled: false,
       query_on_stream_selection: false,
+      meta_org: "default",
       default_functions: [
         {
           name: "match_all",
@@ -84,7 +85,9 @@ const store = createStore({
           text: "re_not_match(field, 'pattern')",
         },
       ],
-      timestamp_column: "_timestamp"
+      timestamp_column: "_timestamp",
+      all_fields_name: "_all",
+      default_secondary_index_fields: ["level"]
     },
     organizationData: {
       organizationPasscode: "",
