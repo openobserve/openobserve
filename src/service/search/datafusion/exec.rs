@@ -405,6 +405,10 @@ pub fn create_session_config(
         .options_mut()
         .execution
         .listing_table_ignore_subdirectory = false;
+    // enable_ident_normalization will lower case idents, such as alias name unless they are quoted
+    // TEST->test "TEST"->TEST . We want to keep whatever user has provided, as otherwise
+    // it breaks existing behavior, so we disable it.
+    config.options_mut().sql_parser.enable_ident_normalization = false;
     config.options_mut().sql_parser.dialect = "PostgreSQL".to_string();
 
     // based on data distributing, it only works for the data on a few records
