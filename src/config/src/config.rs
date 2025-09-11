@@ -1714,6 +1714,12 @@ pub struct Nats {
         default = 2048
     )]
     pub queue_max_size: i64,
+    #[env_config(
+        name = "ZO_NATS_V211_SUPPORT",
+        help = "Support NATS v2.11.x",
+        default = false
+    )]
+    pub v211_support: bool,
 }
 
 #[derive(Debug, EnvConfig)]
