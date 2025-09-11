@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </template>
           </div>
+          <div class=" o2-select-input o2-input">
           <q-select
             v-model="selectedSearchField"
             dense
@@ -53,43 +54,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             emit-value
             filled
             :options="searchFieldOptions"
-            class="q-pa-none search-field-select tw-w-[140px]"
+            class="q-pa-none tw-w-[140px] q-mr-md"
             data-test="running-queries-search-fields-select"
             @update:model-value="filterQuery = ''"
           ></q-select>
+          </div>
+ 
           <q-input
             v-if="selectedSearchField == 'all'"
             v-model="filterQuery"
-            borderless
-            filled
             dense
-            class="q-mb-xs no-border search-input q-pa-none search-running-query"
+            borderless
+            class="no-border search-input q-pa-none search-running-query o2-search-input tw-h-[36px]"
+            :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             :placeholder="t('queries.search')"
             data-test="running-queries-search-input"
           >
             <template #prepend>
-              <q-icon name="search" />
+              <q-icon name="search" class="o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
             </template>
           </q-input>
-          <q-select
-            v-else
+          <div v-else class=" o2-select-input o2-input ">
+            <q-select
             v-model="filterQuery"
             borderless
             map-options
             emit-value
             filled
             dense
-            label="Select option"
+
+            :label="filterQuery ? '' : 'Select option'"
             :options="otherFieldOptions"
-            class="q-mb-xs no-border search-input q-pa-none search-running-query"
+            class="no-border search-input"
             :placeholder="t('queries.search')"
             data-test="running-queries-search-input"
           ></q-select>
+          </div>
           <q-btn
             data-test="running-queries-refresh-btn"
-            class="q-ml-md q-mb-xs text-bold no-border"
+            class="q-ml-md text-bold no-border o2-primary-button tw-h-[36px]"
+            :class="store.state.theme == 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             padding="sm lg"
-            color="secondary"
+            flat
             no-caps
             icon="refresh"
             :label="t(`queries.refreshQuery`)"
@@ -887,4 +893,5 @@ export default defineComponent({
     position: relative;
   }
 }
+
 </style>

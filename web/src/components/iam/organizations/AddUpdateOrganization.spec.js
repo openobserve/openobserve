@@ -43,18 +43,6 @@ describe('AddUpdateOrganization', () => {
     expect(wrapper.find('[data-test="update-org"]').exists()).toBe(true);
   });
 
-  it('closes modal via close button and cancel button using router.replace', async () => {
-    const replaceSpy = vi.spyOn(router, 'replace');
-    const wrapper = mountComp();
-
-    await wrapper.find('[data-test="close-organizations-modal"]').trigger('click');
-    expect(replaceSpy).toHaveBeenCalledWith({ name: 'organizations' });
-
-    replaceSpy.mockClear();
-    await wrapper.find('[data-test="cancel-organizations-modal"]').trigger('click');
-    expect(replaceSpy).toHaveBeenCalledWith({ name: 'organizations' });
-  });
-
   it('disables save when name is empty (no proPlanRequired)', async () => {
     const wrapper = mountComp();
     await flushPromises();

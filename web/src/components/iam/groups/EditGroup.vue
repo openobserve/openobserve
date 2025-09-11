@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="edit-group-section-title"
       style="font-size: 18px"
-      class="q-py-sm q-px-md"
+      class="q-py-sm q-px-md tw-font-[600]"
     >
       {{ groupDetails.group_name }}
     </div>
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <q-separator />
-    <div style="min-height: calc(100% - (39px + 55px + 43px))">
+    <div style="min-height: calc(100% - (39px + 55px + 43px + 4px))">
       <GroupUsers
         v-show="activeTab === 'users'"
         :groupUsers="groupDetails.users"
