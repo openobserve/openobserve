@@ -530,10 +530,16 @@ pub fn handle_timestamp(
         .as_object_mut()
         .ok_or_else(|| anyhow::Error::msg("Value is not an object"))?;
     let timestamp = match local_val.get(TIMESTAMP_COL_NAME) {
-        Some(v) => match parse_timestamp_micro_from_value(v) {
-            Ok(t) => t,
-            Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
-        },
+        Some(v) => {
+            if !v.is_null() {
+                match parse_timestamp_micro_from_value(v) {
+                    Ok(t) => t,
+                    Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
+                }
+            } else {
+                Utc::now().timestamp_micros()
+            }
+        }
         None => Utc::now().timestamp_micros(),
     };
     // check ingestion time
