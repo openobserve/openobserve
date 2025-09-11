@@ -46,11 +46,6 @@ mod queues;
 pub mod search;
 
 pub async fn run() {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
-        return;
-    }
-
     // Force initialization usage queue
     let (usage_start_sender, usage_start_receiver) = oneshot::channel();
     if let Err(e) = queues::USAGE_QUEUE.start(usage_start_sender).await {
@@ -95,10 +90,6 @@ pub async fn report_request_usage_stats(
         metrics::INGEST_BYTES
             .with_label_values(&[org_id, stream_type.as_str()])
             .inc_by((stats.size * SIZE_IN_MB) as u64);
-    }
-
-    if !get_config().common.usage_enabled {
-        return;
     }
 
     let now = DateTime::from_timestamp_micros(timestamp).unwrap();
@@ -196,11 +187,6 @@ pub async fn report_request_usage_stats(
 }
 
 async fn publish_usage(usages: Vec<UsageData>) {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
-        return;
-    }
-
     for usage in usages {
         if let Err(e) = queues::USAGE_QUEUE
             .enqueue(ReportingData::Usage(Box::new(usage)))
@@ -214,11 +200,6 @@ async fn publish_usage(usages: Vec<UsageData>) {
 }
 
 pub async fn publish_triggers_usage(trigger: TriggerData) {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
-        return;
-    }
-
     match queues::USAGE_QUEUE
         .enqueue(ReportingData::Trigger(Box::new(trigger)))
         .await
@@ -235,10 +216,6 @@ pub async fn publish_triggers_usage(trigger: TriggerData) {
 }
 
 pub async fn publish_error(error_data: ErrorData) {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
-        return;
-    }
     match queues::ERROR_QUEUE
         .enqueue(ReportingData::Error(Box::new(error_data)))
         .await
@@ -261,12 +238,12 @@ pub async fn flush() {
 
     let cfg = get_config();
     // only ingester and querier nodes report usage
-    if !cfg.common.usage_enabled || (!LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier()) {
+    if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() {
         return;
     }
 
     // shutdown usage_queuer
-    for _ in 0..get_config().limit.usage_reporting_thread_num {
+    for _ in 0..cfg.limit.usage_reporting_thread_num {
         let (res_sender, res_receiver) = oneshot::channel();
         if let Err(e) = queues::USAGE_QUEUE.shutdown(res_sender).await {
             log::error!("[SELF-REPORTING] Error shutting down USAGE_QUEUER: {e}");

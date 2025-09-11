@@ -347,7 +347,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
         user_defined_schema_max_fields: cfg.limit.user_defined_schema_max_fields,
         all_fields_name: cfg.common.column_all.to_string(),
-        usage_enabled: cfg.common.usage_enabled,
+        usage_enabled: true,
         usage_publish_interval: cfg.common.usage_publish_interval,
         ingestion_url: cfg.common.ingestion_url.to_string(),
         #[cfg(feature = "enterprise")]
