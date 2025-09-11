@@ -90,7 +90,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // cache users
     tokio::task::spawn(async move { db::user::watch().await });
-
     db::user::cache().await.expect("user cache failed");
 
     db::organization::cache()
@@ -245,9 +244,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(
         async move { o2_enterprise::enterprise::pipeline::pipeline_job::run().await },
     );
-
-    #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { cipher::run().await });
 
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { cipher::run().await });
