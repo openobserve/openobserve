@@ -745,7 +745,7 @@ export default defineComponent({
         const search_type = row?.search_type;
         var query_source = "-unknown-";
 
-        if(search_type == "dashboards") {
+        if(search_type === "dashboards") {
           query_source = row?.search_event_context?.folder_name + "/" + row?.search_event_context?.dashboard_name;
         } else if(search_type == "alerts"){
           query_source = row?.search_event_context?.alert_name + "(" + row?.search_event_context?.alert_key + ")";
