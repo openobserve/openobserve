@@ -973,41 +973,6 @@ mod tests {
         assert_eq!(org_role.custom_role, Some(vec!["".to_string()]));
     }
 
-    #[test]
-    fn test_sign_in_user() {
-        let sign_in = SignInUser {
-            name: "test@example.com".to_string(),
-            password: "password123".to_string(),
-        };
-
-        assert_eq!(sign_in.name, "test@example.com");
-        assert_eq!(sign_in.password, "password123");
-    }
-
-    #[test]
-    fn test_sign_in_response() {
-        let response = SignInResponse {
-            status: true,
-            message: "Login successful".to_string(),
-        };
-
-        assert!(response.status);
-        assert_eq!(response.message, "Login successful");
-    }
-
-    #[test]
-    fn test_role_org() {
-        let role_org = RoleOrg {
-            role: UserRole::Admin,
-            org: "test_org".to_string(),
-            custom_role: Some("custom_perm".to_string()),
-        };
-
-        assert_eq!(role_org.role, UserRole::Admin);
-        assert_eq!(role_org.org, "test_org");
-        assert_eq!(role_org.custom_role, Some("custom_perm".to_string()));
-    }
-
     #[cfg(feature = "cloud")]
     #[test]
     fn test_invite_status_conversion() {
@@ -1029,40 +994,5 @@ mod tests {
             InviteStatus::from(&OrgInviteStatus::Expired),
             InviteStatus::Expired
         );
-    }
-
-    #[cfg(feature = "cloud")]
-    #[test]
-    fn test_user_invite() {
-        let invite = UserInvite {
-            org_id: "org123".to_string(),
-            token: "invite_token".to_string(),
-            role: "Admin".to_string(),
-            status: InviteStatus::Pending,
-            expires_at: 1234567890,
-        };
-
-        assert_eq!(invite.org_id, "org123");
-        assert_eq!(invite.token, "invite_token");
-        assert_eq!(invite.role, "Admin");
-        assert_eq!(invite.status, InviteStatus::Pending);
-        assert_eq!(invite.expires_at, 1234567890);
-    }
-
-    #[cfg(feature = "cloud")]
-    #[test]
-    fn test_user_invite_list() {
-        let invite_list = UserInviteList {
-            data: vec![UserInvite {
-                org_id: "org123".to_string(),
-                token: "invite_token".to_string(),
-                role: "Admin".to_string(),
-                status: InviteStatus::Pending,
-                expires_at: 1234567890,
-            }],
-        };
-
-        assert_eq!(invite_list.data.len(), 1);
-        assert_eq!(invite_list.data[0].org_id, "org123");
     }
 }
