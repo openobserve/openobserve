@@ -23,9 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
-    <div class="stream-routing-title q-pb-sm q-pl-md">
+    <div class="stream-routing-title q-pb-sm q-pl-md tw-flex tw-items-center tw-justify-between">
       {{ t("pipeline.streamTitle") }}
+      <div>
+          <q-btn v-close-popup="true" round flat icon="cancel" >
+          </q-btn>
+        </div>
     </div>
+    
     <q-separator />
 
     <div   class="stream-routing-container full-width q-py-md">
@@ -514,7 +519,7 @@ defineExpose({
 
 <style >
 .stream-routing-title {
-  font-size: 20px;
+  font-size: 18px;
   padding-top: 16px;
 }
 .pipeline-add-stream {
