@@ -1149,7 +1149,7 @@ async fn handle_derived_stream_triggers(
             false,
             derived_stream.tz_offset,
             false,
-            None,
+            Some(trigger.next_run_at),
         )?;
         trigger_data_stream.status = TriggerDataStatus::Skipped;
         trigger_data_stream.end_time = aligned_end_time;
