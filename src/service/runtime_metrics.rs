@@ -31,7 +31,8 @@ static RUNTIME_HANDLES: Mutex<Vec<(String, Handle)>> = Mutex::new(Vec::new());
 
 // Store previous cumulative values to calculate deltas
 #[cfg(tokio_unstable)]
-static PREV_COUNTERS: RwLock<HashMap<String, u64>> = RwLock::const_new(HashMap::new());
+static PREV_COUNTERS: std::sync::LazyLock<RwLock<HashMap<String, u64>>> =
+    std::sync::LazyLock::new(|| RwLock::new(HashMap::new()));
 
 pub fn register_runtime(name: String, handle: Handle) {
     log::info!("Registered runtime '{}' for metrics collection", &name);
