@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="col-auto">
           <q-icon
-            data-test="add-role-close-dialog-btn"
+            data-test="add-org-close-dialog-btn"
             name="cancel"
             class="cursor-pointer"
             size="20px"

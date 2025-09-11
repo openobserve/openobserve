@@ -58,7 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           data-test="iam-service-accounts-selection-search-input"
           class="o2-input q-mr-md"
-          style="width: 400px"
         >
           <q-input
             data-test="service-accounts-list-search-input"

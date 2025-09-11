@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-toggle
               style="width: 120px;"
               v-model="enableWebsocketSearch"
-              :label="'enabled'"
+              :label="'Enabled'"
               size="lg"
               data-test="general-settings-enable-websocket"
               class=" showLabelOnTop o2-toggle-button-lg"

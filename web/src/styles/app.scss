@@ -580,7 +580,6 @@
   font-weight: 500 !important;
   line-height: 16px !important;
   border-radius: 4px !important;
-  min-width: 72px !important;
   padding: 0px 12px !important;
   min-width: 90px !important;
 }
@@ -681,8 +680,6 @@
     border: 1px solid #D3D5DB !important;
     opacity: 100%;
   }
-  .q-toggle__thumb:after{
-  }
   .q-toggle__inner--truthy{
     color: #ffffff !important;
     .q-toggle__track{
@@ -696,8 +693,6 @@
     background-color: #2f415e;
     border: 1px solid #6F737A !important;
     opacity: 100%;
-  }
-  .q-toggle__thumb:after{
   }
   .q-toggle__inner--truthy{
     color: #ffffff !important;
@@ -755,8 +750,6 @@
     border: 1px solid #D3D5DB !important;
     opacity: 100%;
   }
-  .q-toggle__thumb:after{
-  }
   .q-toggle__inner--truthy{
     color: #ffffff;
     .q-toggle__track{
@@ -770,8 +763,6 @@
     background-color: #2f415e;
     border: 1px solid #6F737A !important;
     opacity: 100%;
-  }
-  .q-toggle__thumb:after{
   }
   .q-toggle__inner--truthy{
     color: #ffffff;

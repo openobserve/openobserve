@@ -130,7 +130,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="no-border q-mr-md o2-search-input tw-h-[36px] tw-w-[200px]"
                   :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                   :placeholder="`Search Permissions`"
-                  style="width: 300px"
                   @update:model-value="onResourceChange"
                 >
                   <template #prepend>

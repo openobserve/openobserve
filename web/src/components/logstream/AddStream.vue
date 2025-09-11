@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-    <q-separator class="" />
+    <q-separator />
     <div class="q-px-md o2-input add-stream-inputs">
       <q-form @submit="saveStream">
         <div data-test="add-stream-name-input">

@@ -48,8 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex justify-end">
       <!-- this is normal secondary button but only icon is there without label -->
         <q-btn
-          class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw-h-[36px] o2-secondary-button"
-          style="min-width: 0px !important;"
+          class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw-h-[36px] o2-secondary-button tw-min-w-0"
           :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           no-caps
           flat

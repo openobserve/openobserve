@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex justify-start">
               <q-btn
                   v-if="pipelineObj.isEditNode && !createNewDestination"
-                  data-test="add-condition-delete-btn"
+                  data-test="add-destination-delete-btn"
                   class="o2-secondary-button tw-h-[36px] q-mr-md"
                   color="negative"
                   flat
@@ -556,24 +556,7 @@ const openDeleteDialog = () => {
   dialog.value.okCallback = deleteRoute;
 };
 const deleteRoute = () => {
-  // emit("delete:node", {
-  //   data: {
-  //     ...props.editingRoute,
-  //     name: props.editingRoute.name,
-  //   },
-  //   type: "streamRoute",
-  // });
-
-  // emit("delete:node", {
-  //   data: {
-  //     ...props.editingRoute,
-  //     name: props.editingRoute.name + ":" + "condition",
-  //   },
-  //   type: "condition",
-  // });
-
   deletePipelineNode(pipelineObj.currentSelectedNodeID);
-
   emit("cancel:hideform");
 };
 

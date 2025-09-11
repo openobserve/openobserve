@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          Folders
          <div>
           <q-btn
-            class="text-bold o2-secondary-button  tw-w-full tw-h-[28px] tw-w-[32px]"
+            class="text-bold o2-secondary-button tw-h-[28px] tw-w-[32px]"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             no-caps
             style="min-width: 0px !important; min-height: 0px !important;"
@@ -124,12 +124,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tab>
     </q-tabs>
     </div>
-    <div
-        class="row full-width  q-pb-xs"
-        style="position: sticky; bottom: 0px"
-    >
-    </div>
-
       <q-dialog
           v-model="showAddFolderDialog"
           position="right"

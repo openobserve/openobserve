@@ -69,6 +69,7 @@
 // Define setup function
 import { defineComponent, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 export default defineComponent({
   name: "FilterCreatorPopup",
   props: [
@@ -82,6 +83,7 @@ export default defineComponent({
     const selectedValues = ref(props.defaultValues);
     const selectedOperator = ref(props.defaultOperator);
     const { t } = useI18n();
+    const store = useStore();
 
     onBeforeMount(() => {});
 
@@ -102,6 +104,7 @@ export default defineComponent({
       selectedValues,
       selectedOperator,
       applyFilter,
+      store,
     };
   },
 });

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("iam.addGroup") }}
           </div>
           <q-icon
-            data-test="add-role-close-dialog-btn"
+            data-test="add-group-close-dialog-btn"
             name="cancel"
             class="cursor-pointer"
             size="20px"

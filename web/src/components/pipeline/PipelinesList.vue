@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-table__title tw-font-[600]" data-test="pipeline-list-title">
             {{ t("pipeline.header") }}
           </div>
-          <div class="tw-flex tw-items-centertabs q-ml-auto">
+          <div class="tw-flex tw-items-center q-ml-auto">
             <div class="app-tabs-container tw-h-[36px] q-mr-md" :class="store.state.theme === 'dark' ? 'app-tabs-container-dark' : 'app-tabs-container-light'">
               <app-tabs
               data-test="pipeline-list-tabs"

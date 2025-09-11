@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               no-caps
               flat
               :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              @click="$emit('cancel:hideform')"
+              @click="emits('cancel:hideform')"
               data-test="add-alert-cancel-btn"
             />
             <q-btn

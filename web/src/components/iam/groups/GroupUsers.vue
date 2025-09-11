@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
     </div>
-    <div data-test="iam-users-selection-table" style="height: calc(100vh - 250px); overflow-y: auto;">
+    <div data-test="iam-users-selection-table">
       <template v-if="rows.length">
         <app-table
           :rows="visibleRows"
