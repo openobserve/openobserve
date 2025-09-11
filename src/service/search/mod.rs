@@ -187,7 +187,6 @@ pub async fn search(
             .await;
     }
 
-    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
 
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
