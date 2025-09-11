@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(tokio_unstable)]
+use std::collections::HashMap;
 use std::{sync::Mutex, time::Duration};
 
 use config::metrics::TOKIO_RUNTIME_TASKS;
@@ -22,8 +24,14 @@ use config::metrics::{
     TOKIO_RUNTIME_WORKER_POLL_TIME_SECONDS,
 };
 use tokio::runtime::Handle;
+#[cfg(tokio_unstable)]
+use tokio::sync::RwLock;
 
 static RUNTIME_HANDLES: Mutex<Vec<(String, Handle)>> = Mutex::new(Vec::new());
+
+// Store previous cumulative values to calculate deltas
+#[cfg(tokio_unstable)]
+static PREV_COUNTERS: RwLock<HashMap<String, u64>> = RwLock::const_new(HashMap::new());
 
 pub fn register_runtime(name: String, handle: Handle) {
     log::info!("Registered runtime '{}' for metrics collection", &name);
@@ -54,9 +62,23 @@ pub async fn collect_runtime_metrics() {
     }
 }
 
+// Helper function to increment counters with delta calculation
+#[cfg(tokio_unstable)]
+async fn inc_counter_delta(key: &str, current: u64, counter: &prometheus::IntCounter) {
+    let mut prev_map = PREV_COUNTERS.write().await;
+    let prev = prev_map.get(key).copied().unwrap_or(0);
+    if current >= prev {
+        counter.inc_by(current - prev);
+    } else {
+        // Counter reset detected (e.g., runtime restart); add full value
+        counter.inc_by(current);
+    }
+    prev_map.insert(key.to_string(), current);
+}
+
 #[cfg(tokio_unstable)]
 async fn update_runtime_metrics(runtime_name: &str, metrics: &tokio::runtime::RuntimeMetrics) {
-    // Basic runtime task metrics using consolidated metrics with labels
+    // Basic runtime task metrics - these are instantaneous values (gauges)
     TOKIO_RUNTIME_TASKS
         .with_label_values(&[runtime_name, "workers"])
         .set(metrics.num_workers() as i64);
@@ -77,51 +99,112 @@ async fn update_runtime_metrics(runtime_name: &str, metrics: &tokio::runtime::Ru
         .with_label_values(&[runtime_name, "io_driver_fd_registered"])
         .set(metrics.io_driver_fd_registered_count() as i64);
 
-    // Total counters using consolidated metrics
-    TOKIO_RUNTIME_TASKS_TOTAL
-        .with_label_values(&[runtime_name, "spawned_tasks"])
-        .inc_by(metrics.spawned_tasks_count() as u64);
+    // Cumulative counters - use delta calculation to avoid double counting
+    let spawned_counter =
+        TOKIO_RUNTIME_TASKS_TOTAL.with_label_values(&[runtime_name, "spawned_tasks"]);
+    inc_counter_delta(
+        &format!("{runtime_name}:spawned_tasks"),
+        metrics.spawned_tasks_count() as u64,
+        &spawned_counter,
+    )
+    .await;
 
-    TOKIO_RUNTIME_TASKS_TOTAL
-        .with_label_values(&[runtime_name, "remote_schedule"])
-        .inc_by(metrics.remote_schedule_count() as u64);
+    let remote_counter =
+        TOKIO_RUNTIME_TASKS_TOTAL.with_label_values(&[runtime_name, "remote_schedule"]);
+    inc_counter_delta(
+        &format!("{runtime_name}:remote_schedule"),
+        metrics.remote_schedule_count() as u64,
+        &remote_counter,
+    )
+    .await;
 
-    TOKIO_RUNTIME_TASKS_TOTAL
-        .with_label_values(&[runtime_name, "io_driver_ready"])
-        .inc_by(metrics.io_driver_ready_count() as u64);
+    let io_counter =
+        TOKIO_RUNTIME_TASKS_TOTAL.with_label_values(&[runtime_name, "io_driver_ready"]);
+    inc_counter_delta(
+        &format!("{runtime_name}:io_driver_ready"),
+        metrics.io_driver_ready_count() as u64,
+        &io_counter,
+    )
+    .await;
 
-    // Worker-specific metrics using consolidated metrics
+    // Worker-specific metrics
     for worker_id in 0..metrics.num_workers() {
         let worker_id_str = worker_id.to_string();
 
-        // Worker counters
-        TOKIO_RUNTIME_WORKER_METRICS
-            .with_label_values(&[runtime_name, &worker_id_str, "poll_count"])
-            .inc_by(metrics.worker_poll_count(worker_id) as u64);
+        // Worker counters - cumulative values need delta calculation
+        let poll_counter = TOKIO_RUNTIME_WORKER_METRICS.with_label_values(&[
+            runtime_name,
+            &worker_id_str,
+            "poll_count",
+        ]);
+        inc_counter_delta(
+            &format!("{runtime_name}:{worker_id}:poll_count"),
+            metrics.worker_poll_count(worker_id) as u64,
+            &poll_counter,
+        )
+        .await;
 
-        TOKIO_RUNTIME_WORKER_METRICS
-            .with_label_values(&[runtime_name, &worker_id_str, "steal_count"])
-            .inc_by(metrics.worker_steal_count(worker_id) as u64);
+        let steal_counter = TOKIO_RUNTIME_WORKER_METRICS.with_label_values(&[
+            runtime_name,
+            &worker_id_str,
+            "steal_count",
+        ]);
+        inc_counter_delta(
+            &format!("{runtime_name}:{worker_id}:steal_count"),
+            metrics.worker_steal_count(worker_id) as u64,
+            &steal_counter,
+        )
+        .await;
 
-        TOKIO_RUNTIME_WORKER_METRICS
-            .with_label_values(&[runtime_name, &worker_id_str, "park_count"])
-            .inc_by(metrics.worker_park_count(worker_id) as u64);
+        let park_counter = TOKIO_RUNTIME_WORKER_METRICS.with_label_values(&[
+            runtime_name,
+            &worker_id_str,
+            "park_count",
+        ]);
+        inc_counter_delta(
+            &format!("{runtime_name}:{worker_id}:park_count"),
+            metrics.worker_park_count(worker_id) as u64,
+            &park_counter,
+        )
+        .await;
 
-        TOKIO_RUNTIME_WORKER_METRICS
-            .with_label_values(&[runtime_name, &worker_id_str, "local_queue_depth"])
-            .inc_by(metrics.worker_local_queue_depth(worker_id) as u64);
+        let local_schedule_counter = TOKIO_RUNTIME_WORKER_METRICS.with_label_values(&[
+            runtime_name,
+            &worker_id_str,
+            "local_schedule_count",
+        ]);
+        inc_counter_delta(
+            &format!("{runtime_name}:{worker_id}:local_schedule_count"),
+            metrics.worker_local_schedule_count(worker_id) as u64,
+            &local_schedule_counter,
+        )
+        .await;
 
-        TOKIO_RUNTIME_WORKER_METRICS
-            .with_label_values(&[runtime_name, &worker_id_str, "local_schedule_count"])
-            .inc_by(metrics.worker_local_schedule_count(worker_id) as u64);
-
-        // Duration metrics (converted from Duration to seconds)
+        // Duration metrics - cumulative, needs delta calculation
         let busy_duration = metrics.worker_total_busy_duration(worker_id);
-        TOKIO_RUNTIME_WORKER_DURATION_SECONDS
-            .with_label_values(&[runtime_name, &worker_id_str])
-            .inc_by(busy_duration.as_secs_f64());
+        let duration_counter = TOKIO_RUNTIME_WORKER_DURATION_SECONDS
+            .with_label_values(&[runtime_name, &worker_id_str]);
 
-        // Poll time as histogram
+        // Convert duration to microseconds for integer storage, then back to seconds
+        let duration_micros = busy_duration.as_micros() as u64;
+        let duration_key = format!("{runtime_name}:{worker_id}:busy_duration_micros");
+
+        // Helper to track duration deltas
+        {
+            let mut prev_map = PREV_COUNTERS.write().await;
+            let prev_micros = prev_map.get(&duration_key).copied().unwrap_or(0);
+            if duration_micros >= prev_micros {
+                let delta_micros = duration_micros - prev_micros;
+                let delta_seconds = delta_micros as f64 / 1_000_000.0;
+                duration_counter.inc_by(delta_seconds);
+            } else {
+                // Reset detected
+                duration_counter.inc_by(busy_duration.as_secs_f64());
+            }
+            prev_map.insert(duration_key, duration_micros);
+        }
+
+        // Poll time as histogram - this is an instantaneous measurement
         let mean_poll_time = metrics.worker_mean_poll_time(worker_id);
         TOKIO_RUNTIME_WORKER_POLL_TIME_SECONDS
             .with_label_values(&[runtime_name, &worker_id_str])
