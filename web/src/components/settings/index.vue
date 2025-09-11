@@ -49,6 +49,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="isMetaOrg"
           />
           <q-route-tab
+            v-if="config.isEnterprise == 'true' && isMetaOrg"
+            data-test="nodes-tab"
+            name="nodes"
+            :to="{
+              name: 'nodes',
+              query: {
+                org_identifier: store.state.selectedOrganization?.identifier,
+              },
+            }"
+            icon="hub"
+            :label="t('settings.nodes')"
+            content-class="tab_content"
+          />
+          <q-route-tab
             name="general"
             :to="`/settings/general?org_identifier=${store.state.selectedOrganization?.identifier}`"
             :icon="outlinedSettings"
@@ -60,6 +74,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :to="`/settings/organization?org_identifier=${store.state.selectedOrganization?.identifier}`"
             icon="business"
             :label="t('settings.orgLabel')"
+            content-class="tab_content"
+          />
+          <q-route-tab
+            v-if="config.isEnterprise == 'true' && isMetaOrg"
+            data-test="domain-management-tab"
+            name="domain_management"
+            :to="{
+              name: 'domainManagement',
+              query: {
+                org_identifier: store.state.selectedOrganization?.identifier,
+              },
+            }"
+            icon="domain"
+            :label="t('settings.ssoDomainRestrictions')"
             content-class="tab_content"
           />
           <q-route-tab
@@ -114,34 +142,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             icon="key"
             :label="t('settings.cipherKeys')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            v-if="config.isEnterprise == 'true' && isMetaOrg"
-            data-test="nodes-tab"
-            name="nodes"
-            :to="{
-              name: 'nodes',
-              query: {
-                org_identifier: store.state.selectedOrganization?.identifier,
-              },
-            }"
-            icon="hub"
-            :label="t('settings.nodes')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            v-if="config.isEnterprise == 'true' && isMetaOrg"
-            data-test="domain-management-tab"
-            name="domain_management"
-            :to="{
-              name: 'domainManagement',
-              query: {
-                org_identifier: store.state.selectedOrganization?.identifier,
-              },
-            }"
-            icon="domain"
-            :label="t('settings.ssoDomainRestrictions')"
             content-class="tab_content"
           />
           <q-route-tab
