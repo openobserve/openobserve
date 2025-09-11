@@ -16,11 +16,9 @@
 use std::sync::Arc;
 
 use config::{meta::dashboards::reports::Report, utils::json};
-use infra::cluster_coordinator::events::{MetaAction, MetaEvent};
 
 use crate::{common::infra::config::DASHBOARD_REPORTS, service::db};
 
-pub const REPORTS_WATCHER_PREFIX: &str = "/reports/";
 pub async fn get(org_id: &str, name: &str) -> Result<Report, anyhow::Error> {
     let report_key = format!("{org_id}/{name}");
     if let Some(v) = DASHBOARD_REPORTS.get(&report_key) {
@@ -128,7 +126,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Report>, anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = REPORTS_WATCHER_PREFIX;
+    let key = "/reports/";
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -143,10 +141,25 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let _ = handle_put(&ev.key).await;
+                let item_key = ev.key.strip_prefix(key).unwrap();
+                let item_value: Report = match db::get(&ev.key).await {
+                    Ok(val) => match json::from_slice(&val) {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error getting value: {}", e);
+                            continue;
+                        }
+                    },
+                    Err(e) => {
+                        log::error!("Error getting value: {}", e);
+                        continue;
+                    }
+                };
+                DASHBOARD_REPORTS.insert(item_key.to_owned(), item_value);
             }
             db::Event::Delete(ev) => {
-                let _ = handle_delete(&ev.key).await;
+                let item_key = ev.key.strip_prefix(key).unwrap();
+                DASHBOARD_REPORTS.remove(item_key);
             }
             db::Event::Empty => {}
         }
@@ -154,46 +167,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn handle_reports_event(event: MetaEvent) -> Result<(), anyhow::Error> {
-    match event.action {
-        MetaAction::Put => handle_put(&event.key).await,
-        MetaAction::Delete => handle_delete(&event.key).await,
-    }
-}
-
-async fn handle_put(event_key: &str) -> Result<(), anyhow::Error> {
-    let item_key = event_key.strip_prefix(REPORTS_WATCHER_PREFIX).unwrap();
-    let item_value: Report = match db::get(event_key).await {
-        Ok(val) => match json::from_slice(&val) {
-            Ok(val) => val,
-            Err(e) => {
-                log::error!("Error getting value for key {event_key}: {}", e);
-                return Err(anyhow::anyhow!(
-                    "Error getting value for key {event_key}: {}",
-                    e
-                ));
-            }
-        },
-        Err(e) => {
-            log::error!("Error getting value for key {event_key}: {}", e);
-            return Err(anyhow::anyhow!(
-                "Error getting value for key {event_key}: {}",
-                e
-            ));
-        }
-    };
-    DASHBOARD_REPORTS.insert(item_key.to_owned(), item_value);
-    Ok(())
-}
-
-async fn handle_delete(event_key: &str) -> Result<(), anyhow::Error> {
-    let item_key = event_key.strip_prefix(REPORTS_WATCHER_PREFIX).unwrap();
-    DASHBOARD_REPORTS.remove(item_key);
-    Ok(())
-}
-
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let key = REPORTS_WATCHER_PREFIX;
+    let key = "/reports/";
     let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let key = item_key.strip_prefix(key).unwrap();
@@ -205,6 +180,6 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn reset() -> Result<(), anyhow::Error> {
-    let key = REPORTS_WATCHER_PREFIX;
+    let key = "/reports/";
     Ok(db::delete(key, true, db::NO_NEED_WATCH, None).await?)
 }

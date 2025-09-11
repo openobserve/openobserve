@@ -16,10 +16,7 @@
 use std::sync::Arc;
 
 use config::meta::destinations::{Module, Template};
-use infra::{
-    cluster_coordinator::events::{MetaAction, MetaEvent},
-    table,
-};
+use infra::table;
 use itertools::Itertools;
 
 use crate::{
@@ -31,7 +28,7 @@ use crate::{
 };
 
 // db cache watcher prefix
-pub const TEMPLATE_WATCHER_PREFIX: &str = "/templates/";
+const TEMPLATE_WATCHER_PREFIX: &str = "/templates/";
 
 #[derive(Debug, thiserror::Error)]
 pub enum TemplateError {
@@ -171,55 +168,34 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let _ = handle_put(&ev.key).await;
+                let (org_id, name) =
+                    match super::destinations::parse_event_key(TEMPLATE_WATCHER_PREFIX, &ev.key) {
+                        Ok(parsed) => parsed,
+                        Err(e) => {
+                            log::error!("{e}");
+                            continue;
+                        }
+                    };
+                let item_value: Template = match table::templates::get(org_id, name).await {
+                    Ok(Some(val)) => val,
+                    Ok(None) => {
+                        log::error!("Template not found in db");
+                        continue;
+                    }
+                    Err(e) => {
+                        log::error!("Error getting from db: {}", e);
+                        continue;
+                    }
+                };
+                ALERTS_TEMPLATES.insert(format!("{org_id}/{name}"), item_value);
             }
             db::Event::Delete(ev) => {
-                let _ = handle_delete(&ev.key).await;
+                let item_key = ev.key.strip_prefix(TEMPLATE_WATCHER_PREFIX).unwrap();
+                ALERTS_TEMPLATES.remove(item_key);
             }
             db::Event::Empty => {}
         }
     }
-    Ok(())
-}
-
-pub async fn handle_template_event(event: MetaEvent) -> Result<(), anyhow::Error> {
-    match event.action {
-        MetaAction::Put => handle_put(&event.key).await,
-        MetaAction::Delete => handle_delete(&event.key).await,
-    }
-}
-
-async fn handle_put(event_key: &str) -> Result<(), anyhow::Error> {
-    let (org_id, name) =
-        match super::destinations::parse_event_key(TEMPLATE_WATCHER_PREFIX, event_key) {
-            Ok(parsed) => parsed,
-            Err(e) => {
-                log::error!("Error parsing event key {event_key}: {e}");
-                return Err(anyhow::anyhow!("Error parsing event key {event_key}: {e}"));
-            }
-        };
-    let item_value: Template = match table::templates::get(org_id, name).await {
-        Ok(Some(val)) => val,
-        Ok(None) => {
-            log::error!("Template not found in db for key {event_key}");
-            return Err(anyhow::anyhow!(
-                "Template not found in db for key {event_key}"
-            ));
-        }
-        Err(e) => {
-            log::error!("Error getting from db for key {event_key}: {e}");
-            return Err(anyhow::anyhow!(
-                "Error getting from db for key {event_key}: {e}"
-            ));
-        }
-    };
-    ALERTS_TEMPLATES.insert(format!("{org_id}/{name}"), item_value);
-    Ok(())
-}
-
-async fn handle_delete(event_key: &str) -> Result<(), anyhow::Error> {
-    let item_key = event_key.strip_prefix(TEMPLATE_WATCHER_PREFIX).unwrap();
-    ALERTS_TEMPLATES.remove(item_key);
     Ok(())
 }
 

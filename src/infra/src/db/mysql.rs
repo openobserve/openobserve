@@ -459,7 +459,6 @@ impl super::Db for MysqlDb {
             } else {
                 start_dt
             };
-
             let cluster_coordinator = super::get_coordinator().await;
             cluster_coordinator
                 .put(key, Bytes::from(""), true, start_dt)

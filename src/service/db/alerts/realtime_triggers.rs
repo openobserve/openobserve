@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use infra::cluster_coordinator::events::{MetaAction, MetaEvent};
+use config::utils::json;
 
 use crate::{common::infra::config::REALTIME_ALERT_TRIGGERS, service::db};
 
@@ -63,17 +63,13 @@ async fn handle_format_conversion(
     Ok((item_key, module_key.to_string()))
 }
 
-fn get_watch_key() -> String {
-    format!(
+// Watches only for realtime alert triggers
+pub async fn watch() -> Result<(), anyhow::Error> {
+    let key = format!(
         "{}{}/",
         db::scheduler::TRIGGERS_KEY,
         db::scheduler::TriggerModule::Alert
-    )
-}
-
-// Watches only for realtime alert triggers
-pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = get_watch_key();
+    );
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(&key).await?;
     let events = Arc::get_mut(&mut events)
@@ -90,80 +86,73 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             // Cluster coordinator sends put events only for realtime alerts
             db::Event::Put(ev) => {
-                let _ = handle_put(&ev.key).await;
+                // Parse the item key and extract components
+                let (mut item_key, org_id, module_key) = parse_item_key(&key, &ev.key);
+
+                // Handle format conversion
+                let (updated_item_key, alert_id) =
+                    match handle_format_conversion(item_key, &org_id, &module_key).await {
+                        Ok(result) => result,
+                        Err(e) => {
+                            log::error!("Error handling format conversion: {}", e);
+                            continue;
+                        }
+                    };
+                item_key = updated_item_key;
+
+                // Get or parse the trigger value
+                let item_value: db::scheduler::Trigger =
+                    if ev.value.is_none() || ev.value.as_ref().unwrap().is_empty() {
+                        match db::scheduler::get(
+                            &org_id,
+                            config::meta::triggers::TriggerModule::Alert,
+                            &alert_id,
+                        )
+                        .await
+                        {
+                            Ok(val) => val,
+                            Err(e) => {
+                                log::error!("Error getting value: {}", e);
+                                continue;
+                            }
+                        }
+                    } else {
+                        match json::from_slice(&ev.value.unwrap()) {
+                            Ok(val) => val,
+                            Err(e) => {
+                                log::error!("Error parsing trigger value: {}", e);
+                                continue;
+                            }
+                        }
+                    };
+
+                REALTIME_ALERT_TRIGGERS
+                    .write()
+                    .await
+                    .insert(item_key, item_value);
             }
             db::Event::Delete(ev) => {
-                let _ = handle_delete(&ev.key).await;
+                // Parse the item key and extract components
+                let (item_key, org_id, module_key) = parse_item_key(&key, &ev.key);
+
+                // Handle format conversion
+                let (updated_item_key, _) =
+                    match handle_format_conversion(item_key, &org_id, &module_key).await {
+                        Ok(result) => result,
+                        Err(e) => {
+                            log::error!("Error handling format conversion: {}", e);
+                            continue;
+                        }
+                    };
+
+                REALTIME_ALERT_TRIGGERS
+                    .write()
+                    .await
+                    .remove(&updated_item_key);
             }
             db::Event::Empty => {}
         }
     }
-    Ok(())
-}
-
-pub async fn handle_realtime_triggers_event(event: MetaEvent) -> Result<(), anyhow::Error> {
-    match event.action {
-        MetaAction::Put => handle_put(&event.key).await,
-        MetaAction::Delete => handle_delete(&event.key).await,
-    }
-}
-
-async fn handle_put(event_key: &str) -> Result<(), anyhow::Error> {
-    let key = get_watch_key();
-    let (mut item_key, org_id, module_key) = parse_item_key(&key, event_key);
-
-    // Handle format conversion
-    let (updated_item_key, alert_id) =
-        match handle_format_conversion(item_key, &org_id, &module_key).await {
-            Ok(result) => result,
-            Err(e) => {
-                log::error!("Error handling format conversion: {}", e);
-                return Err(anyhow::anyhow!("Error handling format conversion: {}", e));
-            }
-        };
-    item_key = updated_item_key;
-
-    // Get or parse the trigger value
-    let item_value: db::scheduler::Trigger = match db::scheduler::get(
-        &org_id,
-        config::meta::triggers::TriggerModule::Alert,
-        &alert_id,
-    )
-    .await
-    {
-        Ok(val) => val,
-        Err(e) => {
-            log::error!("Error getting value: {}", e);
-            return Err(anyhow::anyhow!("Error getting value: {}", e));
-        }
-    };
-
-    REALTIME_ALERT_TRIGGERS
-        .write()
-        .await
-        .insert(item_key, item_value);
-    Ok(())
-}
-
-async fn handle_delete(event_key: &str) -> Result<(), anyhow::Error> {
-    let key = get_watch_key();
-    // Parse the item key and extract components
-    let (item_key, org_id, module_key) = parse_item_key(&key, event_key);
-
-    // Handle format conversion
-    let (updated_item_key, _) = match handle_format_conversion(item_key, &org_id, &module_key).await
-    {
-        Ok(result) => result,
-        Err(e) => {
-            log::error!("Error handling format conversion: {}", e);
-            return Err(anyhow::anyhow!("Error handling format conversion: {}", e));
-        }
-    };
-
-    REALTIME_ALERT_TRIGGERS
-        .write()
-        .await
-        .remove(&updated_item_key);
     Ok(())
 }
 

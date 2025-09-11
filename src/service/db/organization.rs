@@ -16,10 +16,7 @@
 use std::sync::Arc;
 
 use config::utils::json;
-use infra::{
-    cluster_coordinator::events::{MetaAction, MetaEvent},
-    errors::{self, Error},
-};
+use infra::errors::{self, Error};
 
 use crate::{
     common::{
@@ -100,42 +97,27 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
 
         if let db::Event::Put(ev) = ev {
-            let _ = handle_put(&ev.key).await;
+            let item_key = ev.key;
+            let json_val: OrganizationSetting = match db::get(&item_key).await {
+                Ok(val) => match json::from_slice(&val) {
+                    Ok(val) => val,
+                    Err(e) => {
+                        log::error!("Error getting value: {}", e);
+                        continue;
+                    }
+                },
+                Err(e) => {
+                    log::error!("Error getting value: {}", e);
+                    continue;
+                }
+            };
+            ORGANIZATION_SETTING
+                .clone()
+                .write()
+                .await
+                .insert(item_key, json_val);
         }
     }
-}
-
-pub async fn handle_org_settings_event(event: MetaEvent) -> Result<(), anyhow::Error> {
-    match event.action {
-        MetaAction::Put => handle_put(&event.key).await,
-        MetaAction::Delete => Ok(()),
-    }
-}
-
-pub async fn handle_put(event_key: &str) -> Result<(), anyhow::Error> {
-    let json_val: OrganizationSetting = match db::get(event_key).await {
-        Ok(val) => match json::from_slice(&val) {
-            Ok(val) => val,
-            Err(e) => {
-                log::error!("Error getting value for key {event_key}: {e}");
-                return Err(anyhow::anyhow!(
-                    "Error getting value for key {event_key}: {e}"
-                ));
-            }
-        },
-        Err(e) => {
-            log::error!("Error getting value for key {event_key}: {e}");
-            return Err(anyhow::anyhow!(
-                "Error getting value for key {event_key}: {e}"
-            ));
-        }
-    };
-    ORGANIZATION_SETTING
-        .clone()
-        .write()
-        .await
-        .insert(event_key.to_string(), json_val);
-    Ok(())
 }
 
 pub async fn set(org: &Organization) -> Result<(), anyhow::Error> {

@@ -22,30 +22,17 @@ use config::{
         time::{BASE_TIME, now_micros},
     },
 };
-use infra::{
-    cache::stats,
-    cluster_coordinator::{
-        events::{MetaAction, MetaEvent},
-        should_watch_through_queue,
-    },
-    db as infra_db,
-};
+use infra::{cache::stats, db as infra_db};
 use vrl::prelude::NotNan;
 
 use crate::{
     common::infra::config::ENRICHMENT_TABLES,
-    service::{
-        db::{self as db_service},
-        enrichment::StreamTable,
-        search as SearchService,
-    },
+    service::{db as db_service, enrichment::StreamTable, search as SearchService},
 };
 
 /// Will no longer be used as we are using the meta stream stats to store start, end time and size
 pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
 pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
-pub const ENRICHMENT_TABLE_EVENTS_TOPIC: &str = "enrichment_table_events";
-pub const ENRICHMENT_TABLE_WATCH_KEY: &str = "/enrichment_table/";
 
 pub async fn get_enrichment_table_data(
     org_id: &str,
@@ -85,7 +72,6 @@ pub async fn get_enrichment_table_data(
             if !res.hits.is_empty() {
                 Ok(res.hits)
             } else {
-                log::warn!("get enrichment table {}/{} data no hits", org_id, name);
                 Ok(vec![])
             }
         }
@@ -96,9 +82,7 @@ pub async fn get_enrichment_table_data(
                 name,
                 err
             );
-            Err(anyhow::anyhow!(
-                "Failed to get enrichment table {org_id}/{name}: {err}"
-            ))
+            Ok(vec![])
         }
     }
 }
@@ -316,31 +300,25 @@ pub async fn delete_meta_table_stats(org_id: &str, name: &str) -> Result<(), inf
 pub async fn notify_update(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
     let cluster_coordinator = infra_db::get_coordinator().await;
     let key: String = format!(
-        "{ENRICHMENT_TABLE_WATCH_KEY}{org_id}/{}/{name}",
-        StreamType::EnrichmentTables
+        "/enrichment_table/{org_id}/{}/{}",
+        StreamType::EnrichmentTables,
+        name
     );
-    cluster_coordinator.put(&key, "".into(), true, None).await?;
-    Ok(())
+    cluster_coordinator.put(&key, "".into(), true, None).await
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
     let cluster_coordinator = infra_db::get_coordinator().await;
     let key: String = format!(
-        "{ENRICHMENT_TABLE_WATCH_KEY}{org_id}/{}/{name}",
-        StreamType::EnrichmentTables
+        "/enrichment_table/{org_id}/{}/{}",
+        StreamType::EnrichmentTables,
+        name
     );
-    cluster_coordinator.delete(&key, false, true, None).await?;
-    Ok(())
+    cluster_coordinator.delete(&key, false, false, None).await
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    // For non-local mode, we use the nats queue to watch the enrichment table events.
-    // Hence no need to watch the enrichment table events here.
-    if should_watch_through_queue() {
-        return Ok(());
-    }
-
-    let key = ENRICHMENT_TABLE_WATCH_KEY;
+    let key = "/enrichment_table/";
     let cluster_coordinator = infra_db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -355,63 +333,42 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             infra_db::Event::Put(ev) => {
-                let _ = handle_update(&ev.key).await;
+                let item_key = ev.key.strip_prefix(key).unwrap();
+                let keys = item_key.split('/').collect::<Vec<&str>>();
+                let org_id = keys[0];
+                let stream_name = keys[2];
+
+                let data = match super::super::enrichment::get_enrichment_table(org_id, stream_name)
+                    .await
+                {
+                    Ok(data) => data,
+                    Err(e) => {
+                        log::error!("[ENRICHMENT::TABLE watch] get enrichment table error: {e}");
+                        vec![]
+                    }
+                };
+                log::debug!(
+                    "enrichment table: {} cache data length: {}",
+                    item_key,
+                    data.len()
+                );
+                ENRICHMENT_TABLES.insert(
+                    item_key.to_owned(),
+                    StreamTable {
+                        org_id: org_id.to_string(),
+                        stream_name: stream_name.to_string(),
+                        data,
+                    },
+                );
             }
             infra_db::Event::Delete(ev) => {
-                let _ = handle_delete(&ev.key).await;
+                let item_key = ev.key.strip_prefix(key).unwrap();
+                if let Some((key, _)) = ENRICHMENT_TABLES.remove(item_key) {
+                    log::info!("deleted enrichment table: {}", key);
+                }
             }
             infra_db::Event::Empty => {}
         }
     }
-    Ok(())
-}
-
-pub async fn handle_enrichment_table_event(event: MetaEvent) -> Result<(), anyhow::Error> {
-    match event.action {
-        MetaAction::Put => handle_update(&event.key).await,
-        MetaAction::Delete => handle_delete(&event.key).await,
-    }
-}
-
-async fn handle_update(event_key: &str) -> Result<(), anyhow::Error> {
-    let item_key = event_key.strip_prefix(ENRICHMENT_TABLE_WATCH_KEY).unwrap();
-    let keys = item_key.split('/').collect::<Vec<&str>>();
-    let org_id = keys[0];
-    let stream_name = keys[2];
-    let data = match super::super::enrichment::get_enrichment_table(org_id, stream_name).await {
-        Ok(data) => data,
-        Err(e) => {
-            log::error!(
-                "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error: {e}"
-            );
-            return Err(anyhow::anyhow!(
-                "Failed to get enrichment table {org_id}/{stream_name}: {e}"
-            ));
-        }
-    };
-    log::debug!(
-        "enrichment table: {} cache data length: {}",
-        item_key,
-        data.len()
-    );
-    ENRICHMENT_TABLES.insert(
-        item_key.to_owned(),
-        StreamTable {
-            org_id: org_id.to_string(),
-            stream_name: stream_name.to_string(),
-            data,
-        },
-    );
-
-    Ok(())
-}
-
-async fn handle_delete(event_key: &str) -> Result<(), anyhow::Error> {
-    let item_key = event_key.strip_prefix(ENRICHMENT_TABLE_WATCH_KEY).unwrap();
-    ENRICHMENT_TABLES.remove(item_key);
-    log::debug!(
-        "[ENRICHMENT::TABLE watch] Enrichment table deleted: {}",
-        item_key
-    );
     Ok(())
 }

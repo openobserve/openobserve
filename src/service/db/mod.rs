@@ -47,7 +47,6 @@ pub mod short_url;
 pub mod syslog;
 pub mod user;
 
-pub mod internal_coordinator_stream;
 pub(crate) use infra_db::{Event, NEED_WATCH, NO_NEED_WATCH, get_coordinator};
 
 #[inline]

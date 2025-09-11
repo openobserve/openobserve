@@ -20,12 +20,9 @@ use config::{
     meta::stream::StreamType,
     utils::time::{hour_micros, now_micros},
 };
-use infra::cluster_coordinator::events::{MetaAction, MetaEvent};
 use once_cell::sync::Lazy;
 
 use crate::service::db;
-
-pub const RETENTION_KEY: &str = "/compact/delete/";
 
 static CACHE: Lazy<RwHashMap<String, i64>> = Lazy::new(Default::default);
 
@@ -136,7 +133,7 @@ pub async fn get(db_key: &str) -> Result<String, anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = RETENTION_KEY;
+    let key = "/compact/delete/";
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -151,10 +148,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let _ = handle_put(&ev.key).await;
+                let item_key = ev.key.strip_prefix(key).unwrap();
+                CACHE.insert(item_key.to_string(), now_micros());
             }
             db::Event::Delete(ev) => {
-                let _ = handle_delete(&ev.key).await;
+                let item_key = ev.key.strip_prefix(key).unwrap();
+                CACHE.remove(item_key);
             }
             db::Event::Empty => {}
         }
@@ -162,28 +161,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn handle_retention_event(event: MetaEvent) -> Result<(), anyhow::Error> {
-    match event.action {
-        MetaAction::Put => handle_put(&event.key).await,
-        MetaAction::Delete => handle_delete(&event.key).await,
-    }
-}
-
-/// Insert the key into the cache
-async fn handle_put(event_key: &str) -> Result<(), anyhow::Error> {
-    let item_key = event_key.strip_prefix(RETENTION_KEY).unwrap();
-    CACHE.insert(item_key.to_string(), now_micros());
-    Ok(())
-}
-
-async fn handle_delete(event_key: &str) -> Result<(), anyhow::Error> {
-    let item_key = event_key.strip_prefix(RETENTION_KEY).unwrap();
-    CACHE.remove(item_key);
-    Ok(())
-}
-
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let key = RETENTION_KEY;
+    let key = "/compact/delete/";
     let ret = db::list(key).await?;
     for (item_key, _) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();

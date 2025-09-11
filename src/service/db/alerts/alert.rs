@@ -24,10 +24,6 @@ use config::{
     utils::time::now_micros,
 };
 use infra::{
-    cluster_coordinator::{
-        alerts::{self as cluster, parse_alert_key},
-        events::{MetaAction, MetaEvent},
-    },
     db::{ORM_CLIENT, connect_to_orm},
     table::alerts as table,
 };
@@ -73,7 +69,7 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match table::put(client, org_id, "default", alert).await {
         Ok(alert) => {
-            cluster::emit_put_event(org_id, &alert, None).await?;
+            infra::cluster_coordinator::alerts::emit_put_event(org_id, &alert, None).await?;
             #[cfg(feature = "enterprise")]
             if create {
                 super_cluster::emit_create_event(org_id, "default", alert.clone()).await?;
@@ -139,7 +135,7 @@ pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<
     };
     let (_f, _) = get_folder_alert_by_id_db(org_id, alert_id).await?;
     let alert = table::update(client, org_id, None, alert).await?;
-    cluster::emit_put_event(org_id, &alert, None).await?;
+    infra::cluster_coordinator::alerts::emit_put_event(org_id, &alert, None).await?;
     #[cfg(feature = "enterprise")]
     if alert.id.is_some() {
         super_cluster::emit_update_event(org_id, None, alert.clone()).await?;
@@ -158,7 +154,8 @@ pub async fn create<C: TransactionTrait>(
     let alert = table::create(conn, org_id, folder_id, alert, false).await?;
     let schedule_key = scheduler_key(alert.id);
 
-    cluster::emit_put_event(org_id, &alert, Some(folder_id.to_string())).await?;
+    infra::cluster_coordinator::alerts::emit_put_event(org_id, &alert, Some(folder_id.to_string()))
+        .await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_create_event(org_id, folder_id, alert.clone()).await?;
 
@@ -188,7 +185,12 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     let alert = table::update(conn, org_id, folder_id, alert).await?;
     let schedule_key = scheduler_key(alert.id);
 
-    cluster::emit_put_event(org_id, &alert, folder_id.map(|id| id.to_string())).await?;
+    infra::cluster_coordinator::alerts::emit_put_event(
+        org_id,
+        &alert,
+        folder_id.map(|id| id.to_string()),
+    )
+    .await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_update_event(org_id, folder_id, alert.clone()).await?;
 
@@ -230,7 +232,7 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     let alert_id_str = alert_id.to_string();
 
     table::delete_by_id(conn, org_id, alert_id).await?;
-    cluster::emit_delete_event(org_id, &alert_id_str).await?;
+    infra::cluster_coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete_event(
         org_id,
@@ -267,7 +269,7 @@ pub async fn delete_by_name(
     let alert_id_str = alert_id.to_string();
 
     table::delete_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
-    cluster::emit_delete_event(org_id, &alert_id_str).await?;
+    infra::cluster_coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;
 
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete_event(org_id, stream_type, stream_name, name, alert_id).await?;
@@ -309,37 +311,7 @@ pub async fn list_with_folders<C: ConnectionTrait>(
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    cluster::watch_events(put_into_cache, delete_from_cache).await
-}
-
-pub async fn handle_alert_event(event: MetaEvent) -> Result<(), anyhow::Error> {
-    match event.action {
-        MetaAction::Put => handle_put(&event.key).await,
-        MetaAction::Delete => handle_delete(&event.key).await,
-    }
-}
-
-async fn handle_put(event_key: &str) -> Result<(), anyhow::Error> {
-    let Some((org, alert_id)) = parse_alert_key(event_key) else {
-        log::error!("watch_alerts: failed to parse event key {event_key}");
-        return Err(anyhow::anyhow!(
-            "watch_alerts: failed to parse event key {event_key}"
-        ));
-    };
-    // folder id is not needed, it is currently not used in put_into_cache
-    let _ = put_into_cache(org, alert_id, None).await;
-    Ok(())
-}
-
-async fn handle_delete(event_key: &str) -> Result<(), anyhow::Error> {
-    let Some((org, alert_id)) = parse_alert_key(event_key) else {
-        log::error!("watch_alerts: failed to parse event key {event_key}");
-        return Err(anyhow::anyhow!(
-            "watch_alerts: failed to parse event key {event_key}"
-        ));
-    };
-    let _ = delete_from_cache(org, alert_id).await;
-    Ok(())
+    infra::cluster_coordinator::alerts::watch_events(put_into_cache, delete_from_cache).await
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {

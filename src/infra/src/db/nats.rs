@@ -35,17 +35,9 @@ use config::{
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
-use tokio::{
-    sync::{Mutex, OnceCell, mpsc},
-    task::JoinHandle,
-};
+use tokio::sync::{Mutex, OnceCell, mpsc};
 
-use crate::{
-    cluster_coordinator::{coordinator_put_event, meta_delete_event, publish_event},
-    db::{Event, EventData},
-    dist_lock,
-    errors::*,
-};
+use crate::{cluster_coordinator, db::Event, dist_lock, errors::*};
 
 const SUPER_CLUSTER_PREFIX: &str = "super_cluster_kv_";
 
@@ -225,12 +217,7 @@ impl super::Db for NatsDb {
             .await
             .map_err(|e| Error::Message(format!("[NATS:put] bucket.put error: {}", e)))?;
         if need_watch {
-            log::debug!("[INTERNAL_COORDINATOR::PUT] publishing event for key: {local_key}");
-            if let Err(e) =
-                publish_event(coordinator_put_event(&local_key, start_dt, Some(value))).await
-            {
-                log::error!("[INTERNAL_COORDINATOR::PUT] nats send event error: {}", e);
-            }
+            cluster_coordinator::events::put_event(&local_key, start_dt, Some(value)).await?;
         }
         Ok(())
     }
@@ -321,13 +308,7 @@ impl super::Db for NatsDb {
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {}", e)))?;
             if need_watch {
-                log::debug!("[INTERNAL_COORDINATOR::DELETE] publishing event for key: {key}");
-                if let Err(e) = publish_event(meta_delete_event(&key, start_dt)).await {
-                    log::error!(
-                        "[INTERNAL_COORDINATOR::DELETE] nats send event error: {}",
-                        e
-                    );
-                }
+                cluster_coordinator::events::delete_event(key, start_dt).await?;
             }
             return Ok(());
         }
@@ -340,13 +321,7 @@ impl super::Db for NatsDb {
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {}", e)))?;
             if need_watch {
-                log::debug!("[INTERNAL_COORDINATOR::DELETE] publishing event for key: {purge_key}");
-                if let Err(e) = publish_event(meta_delete_event(&purge_key, start_dt)).await {
-                    log::error!(
-                        "[INTERNAL_COORDINATOR::DELETE] nats send event error: {}",
-                        e
-                    );
-                }
+                cluster_coordinator::events::delete_event(&purge_key, start_dt).await?;
             }
         }
         Ok(())
@@ -489,91 +464,7 @@ impl super::Db for NatsDb {
     }
 
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
-        let (tx, rx) = mpsc::channel(65535);
-        let prefix = prefix.to_string();
-        let self_prefix = self.prefix.to_string();
-        let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
-            loop {
-                if cluster::is_offline() {
-                    break;
-                }
-                let (bucket, new_key) = match get_bucket_by_key(&self_prefix, &prefix).await {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!("[NATS:watch] prefix: {}, get bucket error: {}", prefix, e);
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                        continue;
-                    }
-                };
-                let bucket_prefix = "/".to_string() + bucket.name.trim_start_matches(&self_prefix);
-                log::debug!("[NATS:watch] bucket: {}, prefix: {}", bucket.name, prefix);
-                let mut entries = match bucket.watch_all().await {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!(
-                            "[NATS:watch] prefix: {}, bucket.watch_all error: {}",
-                            prefix,
-                            e
-                        );
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                        continue;
-                    }
-                };
-                loop {
-                    match entries.next().await {
-                        None => {
-                            log::error!("[NATS:watch] prefix: {}, get message error", prefix);
-                            break;
-                        }
-                        Some(entry) => {
-                            let entry = match entry {
-                                Ok(entry) => entry,
-                                Err(e) => {
-                                    log::error!(
-                                        "[NATS:watch] prefix: {}, get message error: {}",
-                                        prefix,
-                                        e
-                                    );
-                                    break;
-                                }
-                            };
-                            let item_key = key_decode(&entry.key);
-                            if !item_key.starts_with(new_key) {
-                                continue;
-                            }
-                            let new_key = bucket_prefix.to_string() + &item_key;
-                            let ret = match entry.operation {
-                                jetstream::kv::Operation::Put => {
-                                    tx.try_send(Event::Put(EventData {
-                                        key: new_key.clone(),
-                                        value: Some(entry.value),
-                                        start_dt: None,
-                                    }))
-                                }
-                                jetstream::kv::Operation::Delete
-                                | jetstream::kv::Operation::Purge => {
-                                    tx.try_send(Event::Delete(EventData {
-                                        key: new_key.clone(),
-                                        value: None,
-                                        start_dt: None,
-                                    }))
-                                }
-                            };
-                            if let Err(e) = ret {
-                                log::warn!(
-                                    "[NATS:watch] prefix: {}, key: {}, send error: {}",
-                                    prefix,
-                                    new_key,
-                                    e
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-            Ok(())
-        });
-        Ok(Arc::new(rx))
+        cluster_coordinator::events::watch(prefix).await
     }
 
     async fn close(&self) -> Result<()> {

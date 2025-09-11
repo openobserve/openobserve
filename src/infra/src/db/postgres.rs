@@ -199,7 +199,6 @@ impl super::Db for PostgresDb {
 
         // event watch
         if need_watch {
-            log::debug!("[POSTGRES] event watch for key: {}", key);
             let cluster_coordinator = super::get_coordinator().await;
             cluster_coordinator
                 .put(key, Bytes::from(""), true, start_dt)
@@ -370,7 +369,6 @@ impl super::Db for PostgresDb {
             } else {
                 start_dt
             };
-
             let cluster_coordinator = super::get_coordinator().await;
             cluster_coordinator
                 .put(key, Bytes::from(""), true, start_dt)
