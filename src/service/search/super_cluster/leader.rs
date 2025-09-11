@@ -40,9 +40,12 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::service::search::{
     DATAFUSION_RUNTIME, SearchResult,
     cluster::flight::{generate_context, register_table},
-    datafusion::distributed_plan::{
-        remote_scan::RemoteScanExec,
-        rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+    datafusion::{
+        distributed_plan::{
+            remote_scan::RemoteScanExec,
+            rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+        },
+        optimizer::utils::is_place_holder_or_empty,
     },
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     request::Request,
@@ -271,6 +274,13 @@ async fn run_datafusion(
             )
         })
         .collect::<HashMap<_, _>>();
+
+    if is_place_holder_or_empty(&physical_plan) {
+        let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
+        return ret
+            .map(|data| (data, ScanStats::default(), "".to_string()))
+            .map_err(|e| e.into());
+    };
 
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
     let streaming_output = req.streaming_output;
