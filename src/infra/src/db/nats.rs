@@ -88,7 +88,9 @@ async fn get_bucket_by_key<'a>(
         // CMD: nats kv del -f o2_nodes
         let ttl = Duration::from_secs(cfg.limit.node_heartbeat_ttl as u64);
         bucket.max_age = ttl;
-        bucket.limit_markers = Some(ttl);
+        if cfg.nats.v211_support {
+            bucket.limit_markers = Some(ttl);
+        }
     }
     let kv = jetstream.create_key_value(bucket).await.map_err(|e| {
         Error::Message(format!(
