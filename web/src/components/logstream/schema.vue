@@ -1480,23 +1480,66 @@ export default defineComponent({
       let [field, fieldType] = terms.split("@");
 
       var filtered = [];
+      const searchTerm = field?.toLowerCase() || "";
 
-      field = field.toLowerCase();
-      for (var i = 0; i < rows.length; i++) {
+      // Map labels -> values for index types
+      const labelToValueMap = {};
+      streamIndexType.forEach(({ label, value }) => {
+        labelToValueMap[label.toLowerCase()] = value;
+      });
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        let match = false;
+
         if (fieldType === "schemaFields") {
-          if (indexData.value.defined_schema_fields.includes(rows[i]["name"])) {
-            if (!field) {
-              filtered.push(rows[i]);
+          if (indexData.value.defined_schema_fields.includes(row.name)) {
+            // If no search field given, include directly
+            if (!searchTerm) {
+              match = true;
             } else {
-              if (rows[i]["name"].toLowerCase().includes(field)) {
-                filtered.push(rows[i]);
+              // Match by name
+              if (row.name.toLowerCase().includes(searchTerm)) {
+                match = true;
+              }
+              // Match by index_type (convert search label to value)
+              else if (
+                row.index_type.some((t) => {
+                  // check if search is label
+                  return (
+                    t.toLowerCase().includes(searchTerm) || // direct match with stored value
+                    labelToValueMap[searchTerm] === t // label → value match
+                  );
+                })
+              ) {
+                match = true;
               }
             }
           }
         } else {
-          if (rows[i]["name"].toLowerCase().includes(field)) {
-            filtered.push(rows[i]);
+          if (!searchTerm) {
+            match = true;
+          } else {
+            // Match by name
+            if (row.name.toLowerCase().includes(searchTerm)) {
+              match = true;
+            }
+            // Match by index_type
+            else if (
+              row.index_type.some((t) => {
+                return (
+                  t.toLowerCase().includes(searchTerm) ||
+                  labelToValueMap[searchTerm] === t
+                );
+              })
+            ) {
+              match = true;
+            }
           }
+        }
+
+        if (match) {
+          filtered.push(row);
         }
       }
 
