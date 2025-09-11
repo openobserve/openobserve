@@ -189,6 +189,7 @@ import QueryList from "@/components/queries/QueryList.vue";
 import { durationFormatter } from "@/utils/zincutils";
 import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
+import { getDuration } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "RunningQueries",
@@ -295,8 +296,8 @@ export default defineComponent({
         return Object.values(result).map((user: any, index: number) => ({
           ...user,
           "#": index + 1,
-          duration: durationFormatter(user.duration),
-          queryRange: durationFormatter(user.queryRange),
+          duration: user.duration,
+          queryRange: user.queryRange,
         }));
       } catch (error) {
         console.error("Error in getRunningQueriesSummary", error);
@@ -351,6 +352,7 @@ export default defineComponent({
     const pagination: any = ref({
       rowsPerPage: 20,
     });
+
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
@@ -371,15 +373,6 @@ export default defineComponent({
       var timestampMicroseconds = timestampMilliseconds * 1000;
 
       return timestampMicroseconds;
-    };
-    const getDuration = (createdAt: number) => {
-      const currentTime = localTimeToMicroseconds();
-      const durationInSeconds = Math.floor((currentTime - createdAt) / 1000000);
-
-      return {
-        durationInSeconds,
-        duration: durationFormatter(durationInSeconds),
-      };
     };
 
     //different between start and end time to show in UI as queryRange
@@ -746,9 +739,8 @@ export default defineComponent({
           "#": index < 9 ? `0${index + 1}` : index + 1,
           user_id: row?.user_id,
           org_id: row?.org_id,
-          duration: getDuration(row?.created_at).duration,
-          queryRange: queryRange(row?.query?.start_time, row?.query?.end_time)
-            .duration,
+          duration: getDuration(row.created_at).durationInSeconds,
+          queryRange: queryRange(row?.query?.start_time, row?.query?.end_time).queryRangeInSeconds,
           status: row?.status,
           work_group: row?.work_group,
           stream_type: row?.stream_type,
