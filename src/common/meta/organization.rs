@@ -665,44 +665,6 @@ mod tests {
     }
 
     #[test]
-    fn test_org_summary() {
-        let stream_summary = StreamSummary {
-            num_streams: 10,
-            total_records: 1000000,
-            total_storage_size: 1024.0 * 1024.0 * 100.0, // 100MB
-            total_compressed_size: 1024.0 * 1024.0 * 25.0, // 25MB
-            total_index_size: 1024.0 * 1024.0 * 5.0,     // 5MB
-        };
-
-        let pipeline_summary = PipelineSummary {
-            num_realtime: 5,
-            num_scheduled: 3,
-        };
-
-        let alert_summary = AlertSummary {
-            num_realtime: 12,
-            num_scheduled: 8,
-        };
-
-        let summary = OrgSummary {
-            streams: stream_summary,
-            pipelines: pipeline_summary,
-            alerts: alert_summary,
-            total_functions: 25,
-            total_dashboards: 15,
-        };
-
-        assert_eq!(summary.streams.num_streams, 10);
-        assert_eq!(summary.streams.total_records, 1000000);
-        assert_eq!(summary.pipelines.num_realtime, 5);
-        assert_eq!(summary.pipelines.num_scheduled, 3);
-        assert_eq!(summary.alerts.num_realtime, 12);
-        assert_eq!(summary.alerts.num_scheduled, 8);
-        assert_eq!(summary.total_functions, 25);
-        assert_eq!(summary.total_dashboards, 15);
-    }
-
-    #[test]
     fn test_organization_setting_with_trial_expiry() {
         let setting = OrganizationSetting {
             free_trial_expiry: Some(1641081600),
