@@ -98,6 +98,7 @@ message SearchEventContext {
     optional string dashboard_name = 5;
     optional string dashboard_folder_id = 6;
     optional string dashboard_folder_name = 7;
+    optional string alert_name = 8;
 }
 
 message QueryStatus {
