@@ -161,6 +161,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div class="row flex items-center q-pb-xs q-mt-lg">
+                <div>
+                  <label class="q-pr-sm tw-font-medium"
+                    >{{ t("logStream.flattenLevel") }}</label
+                  >
+                  <span class="tw-text-xs tw-font-normal">
+                    (Global is
+                    {{ store.state.zoConfig.ingest_flatten_level || 3 }})
+                  </span>
+                </div>
+                <q-input
+                  data-test="stream-details-flatten-level-input"
+                  v-model="flattenLevel"
+                  type="number"
+                  dense
+                  filled
+                  min="0"
+                  round
+                  class="q-mr-sm q-ml-sm data-retention-input"
+                  hide-bottom-space
+                  @change="formDirtyFlag = true"
+                  @update:model-value="markFormDirty"
+                />
+                <div></div>
+              </div>
+
+              <div class="row flex items-center q-pb-xs q-mt-lg">
                 <q-toggle
                   data-test="log-stream-use_approx-toggle-btn"
                   v-model="approxPartition"
@@ -416,9 +442,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template v-slot:body-cell-name="props">
-                  <q-td class="q-td--no-hover field-name">{{
-                    props.row.name
-                  }}</q-td>
+                  <q-td class="q-td--no-hover field-name"
+                    >{{ props.row.name }}
+                    <span v-if="isEnvQuickModeField(props.row.name)">
+                      <img
+                        :src="quickModeIcon"
+                        :alt="t('logStream.envQuickModeMsg')"
+                        class="tw-inline-block q-ml-xs tw-w-[20px]"
+                      />
+                      <q-tooltip
+                      class="tw-text-[12px] tw-w-[200px]"
+                    >
+                      {{ t('logStream.envQuickModeMsg') }}
+                    </q-tooltip>
+                  </span>
+                  </q-td>
                 </template>
                 <template v-slot:body-cell-type="props">
                   <q-td>{{ props.row.type }}</q-td>
@@ -767,7 +805,7 @@ export default defineComponent({
     AppTabs,
     QTablePagination,
     DateTime,
-    AssociatedRegexPatterns
+    AssociatedRegexPatterns,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
@@ -786,6 +824,7 @@ export default defineComponent({
     const dataRetentionDays = ref(0);
     const storeOriginalData = ref(false);
     const maxQueryRange = ref(0);
+    const flattenLevel = ref(null);
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDeleteDatesDialog = ref(false);
     const formDirtyFlag = ref(false);
@@ -831,7 +870,7 @@ export default defineComponent({
     const patternAssociationDialog = ref({
       show: false,
       data: [],
-      fieldName: ""
+      fieldName: "",
     });
 
     const selectedFields = ref([]);
@@ -1100,6 +1139,7 @@ export default defineComponent({
       calculateDateRange();
 
       maxQueryRange.value = streamResponse.settings.max_query_range || 0;
+      flattenLevel.value = streamResponse.settings.flatten_level || null;
       storeOriginalData.value =
         streamResponse.settings.store_original_data || false;
       approxPartition.value = streamResponse.settings.approx_partition || false;
@@ -1199,6 +1239,10 @@ export default defineComponent({
 
       settings["store_original_data"] = storeOriginalData.value;
       settings["approx_partition"] = approxPartition.value;
+
+      if (flattenLevel.value !== null) {
+        settings["flatten_level"] = Number(flattenLevel.value);
+      }
 
       const newSchemaFieldSet = new Set(
         newSchemaFields.value.map((field) => {
@@ -1839,6 +1883,18 @@ export default defineComponent({
     return filteredValue;
   };
 
+    // store.state.zoConfig.default_quick_mode_fields: ["field1", "job", "log"]
+    const isEnvQuickModeField = (fieldName: string) => {
+      return (
+        store.state.zoConfig.default_quick_mode_fields.includes(fieldName)
+      );
+    };
+
+    const quickModeIcon = computed(() => {
+      return store.state.theme === "dark"
+        ? getImageURL("images/common/quick_mode_light.svg")
+        : getImageURL("images/common/quick_mode.svg");
+    });
 
     return {
       t,
@@ -1858,6 +1914,7 @@ export default defineComponent({
       storeOriginalData,
       approxPartition,
       maxQueryRange,
+      flattenLevel,
       showDataRetention,
       formatSizeFromMB,
       confirmQueryModeChangeDialog,
@@ -1925,6 +1982,8 @@ export default defineComponent({
       computedIndexType,
       checkIfOptionPresentInDefaultEnv,
       updateIndexType,
+      isEnvQuickModeField,
+      quickModeIcon,
     };
   },
   created() {
