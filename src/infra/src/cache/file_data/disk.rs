@@ -24,7 +24,7 @@ use std::{
 use async_recursion::async_recursion;
 use bytes::Bytes;
 use config::{
-    RwAHashMap, get_config, metrics,
+    RwAHashMap, get_config, metrics, spawn_pausable_job,
     utils::{
         file::*,
         hash::{Sum64, gxhash},
@@ -243,12 +243,13 @@ impl FileData {
     }
 
     async fn gc(&mut self, trace_id: &str, need_release_size: usize) -> Result<(), anyhow::Error> {
+        let start = std::time::Instant::now();
         log::info!(
             "[CacheType:{} trace_id {trace_id}] File disk cache start gc {}/{}, need to release {} bytes",
             self.file_type,
             self.cur_size,
             self.max_size,
-            need_release_size
+            need_release_size,
         );
         let mut release_size = 0;
         let mut remove_result_files = vec![];
@@ -319,9 +320,10 @@ impl FileData {
             drop(r);
         }
         log::info!(
-            "[CacheType:{} trace_id {trace_id}] File disk cache gc done, released {} bytes",
+            "[CacheType:{} trace_id {trace_id}] File disk cache gc done, released {} bytes, took={}",
             self.file_type,
-            release_size
+            release_size,
+            start.elapsed().as_millis()
         );
 
         Ok(())
@@ -415,7 +417,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move {
         log::info!("Loading disk cache start");
         let root_dir = FILES[0].read().await.root_dir.clone();
-        let root_dir = Path::new(&root_dir).canonicalize().unwrap();
+        let root_dir = tokio::fs::canonicalize(&root_dir).await.unwrap();
         if let Err(e) = load(&root_dir, &root_dir).await {
             log::error!("load disk cache error: {}", e);
         }
@@ -426,18 +428,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         LOADING_FROM_DISK_DONE.store(true, Ordering::SeqCst);
     });
 
-    tokio::task::spawn(async move {
-        if cfg.disk_cache.gc_interval == 0 {
-            return;
-        }
-        let mut interval =
-            tokio::time::interval(tokio::time::Duration::from_secs(cfg.disk_cache.gc_interval));
-        interval.tick().await; // the first tick is immediate
-        loop {
-            if let Err(e) = gc().await {
-                log::error!("disk cache gc error: {}", e);
-            }
-            interval.tick().await;
+    spawn_pausable_job!("disk_cache_gc", get_config().disk_cache.gc_interval, {
+        if let Err(e) = gc().await {
+            log::error!("disk cache gc error: {e}");
         }
     });
     Ok(())
@@ -588,7 +581,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
             Err(e) => return Err(e.into()),
             Ok(None) => break,
             Ok(Some(f)) => {
-                let fp = match f.path().canonicalize() {
+                let fp = match tokio::fs::canonicalize(f.path()).await {
                     Ok(p) => p,
                     Err(e) => {
                         log::error!("canonicalize file path error: {}", e);
@@ -857,7 +850,7 @@ async fn write_tmp_file(file: &str, data: Bytes) -> Result<(String, String), any
             e
         ));
     }
-    let tmp_path = Path::new(&tmp_path).canonicalize().unwrap();
+    let tmp_path = tokio::fs::canonicalize(&tmp_path).await.unwrap();
     let tmp_file = tmp_path.join(format!("{}.tmp", config::ider::generate()));
     let tmp_file = tmp_file.to_str().unwrap();
     if let Err(e) = config::utils::async_file::put_file_contents(tmp_file, &data).await {

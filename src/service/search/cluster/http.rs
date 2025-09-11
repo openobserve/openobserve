@@ -182,7 +182,11 @@ pub async fn search(
                             .unwrap()
                             .iter()
                             .filter_map(|v| {
-                                (!v.is_null()).then_some(flatten::flatten(v.clone()).unwrap())
+                                if !v.is_null() && v.is_object() {
+                                    flatten::flatten(v.clone()).ok()
+                                } else {
+                                    None
+                                }
                             })
                             .collect()
                     } else {
@@ -200,7 +204,11 @@ pub async fn search(
                                     &sql.org_id,
                                     &stream_names,
                                 );
-                                (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
+                                if !ret_val.is_null() && ret_val.is_object() {
+                                    flatten::flatten(ret_val).ok()
+                                } else {
+                                    None
+                                }
                             })
                             .collect()
                     }
@@ -248,8 +256,13 @@ pub async fn search(
 
         if use_query_fn {
             for source in sources {
-                result
-                    .add_hit(&flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?);
+                if source.is_object() {
+                    result.add_hit(
+                        &flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?,
+                    );
+                } else {
+                    result.add_hit(&source);
+                }
             }
         } else {
             for source in sources {

@@ -16,6 +16,7 @@
 use std::{path::Path, sync::Arc};
 
 use arrow::array::{ArrayRef, new_null_array};
+use chrono::DateTime;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -24,7 +25,8 @@ use config::{
         stream::{FileKey, StreamParams, StreamPartition},
     },
     utils::{
-        file::{is_exists, scan_files},
+        async_file::{create_wal_dir_datetime_filter, scan_files_filtered},
+        file::is_exists,
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
         record_batch_ext::concat_batches,
         size::bytes_to_human_readable,
@@ -526,7 +528,7 @@ async fn get_file_list_inner(
     wal_dir: &str,
     file_ext: &str,
 ) -> Result<Vec<FileKey>, Error> {
-    let wal_dir = match Path::new(wal_dir).canonicalize() {
+    let wal_dir = match tokio::fs::canonicalize(wal_dir).await {
         Ok(path) => {
             let mut path = path.to_str().unwrap().to_string();
             // Hack for windows
@@ -546,7 +548,21 @@ async fn get_file_list_inner(
         "{}/files/{}/{}/{}/",
         wal_dir, query.org_id, query.stream_type, query.stream_name
     );
-    let files = scan_files(&pattern, file_ext, None).unwrap_or_default();
+    let files = if let Some((start_time, end_time)) = query.time_range.and_then(|(s, e)| {
+        DateTime::from_timestamp_micros(s).zip(DateTime::from_timestamp_micros(e))
+    }) {
+        let skip_count = AsRef::<Path>::as_ref(&pattern).components().count();
+        let extension_pattern = file_ext.to_string();
+        // Skip count is the number of segments in the cannonicalised path before
+        // <YY>/<MM>/<DD>/<HH>/<file> appear
+        let filter =
+            create_wal_dir_datetime_filter(start_time, end_time, extension_pattern, skip_count + 1);
+
+        scan_files_filtered(&pattern, filter, None).await?
+    } else {
+        scan_files_filtered(&pattern, |_| true, None).await?
+    };
+
     let files = files
         .iter()
         .map(|f| {
