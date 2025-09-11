@@ -333,6 +333,8 @@ pub fn load_env_file_if_set() -> Result<(), anyhow::Error> {
         if let Ok(hash) = calculate_env_file_hash(path) {
             ENV_FILE_LAST_HASH.store(Arc::new(Some(hash)));
             log::info!("Environment file loaded and hash calculated");
+        } else {
+            log::error!("Failed to calculate environment file hash");
         }
     } else {
         // Fall back to default .env discovery
@@ -2057,7 +2059,7 @@ pub struct EnrichmentTable {
 }
 
 pub fn init() -> Config {
-    load_env_file_if_set().expect("failed to load env file");
+    load_env_file_if_set().ok();
     let mut cfg = Config::init().expect("config init error");
 
     // set local mode
