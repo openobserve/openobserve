@@ -351,19 +351,14 @@ async fn get_remote_batch(
     let mut stream = match client.do_get(request).await {
         Ok(stream) => stream,
         Err(e) => {
-            let msg = e.message();
-            let msg_json = if let Some(start) = msg.find('{') {
-                    if let Some(end) = msg.rfind('}') {
-                        let json_part = &msg[start..=end];
-                        json_part
-                    } else {
-                        ""
-                    }
-            } else {
-                ""
+            let is_parquet_file_not_found = e.code() == tonic::Code::Internal && {
+                let msg = e.message();
+                msg.find('{')
+                    .and_then(|start| msg.rfind('}').map(|end| &msg[start..=end]))
+                    .and_then(|json_part| infra::errors::ErrorCodes::from_json(json_part).ok())
+                    .map(|err_code| err_code.get_code() == infra::errors::ErrorCodes::SearchParquetFileNotFound.get_code())
+                    .unwrap_or(false)
             };
-            let err_code = infra::errors::ErrorCodes::from_json(msg_json).unwrap();
-            let is_parquet_file_not_found = e.code() == tonic::Code::Internal && infra::errors::ErrorCodes::SearchParquetFileNotFound.get_code() == err_code.get_code();
             if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found {
                 return Ok(get_empty_record_batch_stream(
                     trace_id,
