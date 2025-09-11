@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="filterQuery"
               borderless
               dense
+              data-test="destination-list-search-input"
               class="q-ml-auto no-border o2-search-input"
               :placeholder="t('alert_destinations.search')"
               :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
