@@ -189,7 +189,7 @@ pub async fn search(
                                     None
                                 }
                             })
-                            .collect::<Result<Vec<_>, _>>()?
+                            .collect::<Vec<_>>()
                     } else {
                         json_rows
                             .into_iter()
@@ -211,7 +211,7 @@ pub async fn search(
                                     None
                                 }
                             })
-                            .collect::<Result<Vec<_>, _>>()?
+                            .collect::<Vec<_>>()
                     }
                 }
                 None => json_rows
