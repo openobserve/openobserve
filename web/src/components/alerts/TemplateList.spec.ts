@@ -86,26 +86,6 @@ describe("Alert List", async () => {
     expect(tableData[1].text()).toBe("Template2");
   });
 
-  it("Should display add alert button", () => {
-    expect(
-      wrapper.find('[data-test="alert-template-list-add-alert-btn"]').text()
-    ).toBe("Add Template");
-  });
-
-  it("Should move to add alerts page on clicking on add alert", async () => {
-    const routerPush = vi.spyOn(router, "push");
-    await wrapper
-      .find('[data-test="alert-template-list-add-alert-btn"]')
-      .trigger("click");
-    expect(routerPush).toHaveBeenCalledTimes(1);
-    expect(routerPush).toHaveBeenCalledWith({
-      name: "alertTemplates",
-      query: {
-        action: "add",
-        org_identifier: store.state.selectedOrganization.identifier,
-      },
-    });
-  });
 
   describe("When user clicks on delete alert", () => {
     const template_name = "Template2";

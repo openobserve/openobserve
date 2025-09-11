@@ -21,15 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="height: calc(100vh - 57px)"
     :class="store.state.theme === 'dark' ? 'dark-mode' : ''"
   >
-  <div class="tw-flex tw-justify-between tw-items-center tw-w-full tw-py-3 tw-px-4"
-    :class="store.state.theme === 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+  <div class="tw-flex tw-justify-between tw-items-center tw-w-full tw-py-3 tw-px-4 tw-h-[71px] tw-border-b-[1px]"
+    :class="store.state.theme === 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
     >
-      <div class="q-table__title" data-test="report-list-title">
+      <div class="q-table__title tw-font-[600]" data-test="report-list-title">
         {{ t("reports.header") }}
       </div>
 
       <div class="tw-flex tw-items-center">
-        <div class="app-tabs-container q-mr-md">
+        <div class="app-tabs-container q-mr-md" :class="store.state.theme === 'dark' ? 'app-tabs-container-dark' : 'app-tabs-container-light'">
         <app-tabs
           class="tabs-selection-container"
           :tabs="tabs"
@@ -42,40 +42,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="report-list-search-input"
           v-model="filterQuery"
           borderless
-          filled
           dense
-          class="q-ml-auto no-border"
+          class="q-ml-auto no-border o2-search-input tw-h-[36px] tw-w-[150px]"
+          :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
           :placeholder="t('reports.search')"
         >
           <template #prepend>
-            <q-icon name="search" class="cursor-pointer" />
+            <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
           </template>
         </q-input>
         <q-btn
           data-test="report-list-add-report-btn"
-          class="q-ml-md text-bold no-border"
-          padding="sm lg"
-          color="secondary"
+          class="q-ml-md o2-primary-button tw-h-[36px]"
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           no-caps
           :label="t(`reports.add`)"
           @click="createNewReport"
         />
       </div>
     </div>
-    <div class="full-width o2-quasar-table"
-    style="height: calc(100vh - 112px) ; overflow-y: auto;"
-    :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+    <div class="full-width o2-quasar-table o2-quasar-table-header-sticky"
+    style="height: calc(100vh - 114px) ; overflow-y: auto;"
+    :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
     >
       <q-table
         data-test="report-list-table"
         ref="reportListTableRef"
-        :rows="reportsTableRows"
+        :rows="visibleRows"
         :columns="columns"
         row-key="id"
         :pagination="pagination"
         :filter="filterQuery"
         :filter-method="filterData"
         style="width: 100%"
+        :style="hasVisibleRows
+            ? 'width: 100%; height: calc(100vh - 114px)' 
+            : 'width: 100%'"
       >
         <template #no-data>
           <NoData />
@@ -148,25 +151,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </template>
 
-        <template #top="scope">
-          <QTablePagination
-            :scope="scope"
-            :pageTitle="t('reports.header')"
-            :position="'top'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
-
         <template #bottom="scope">
-          <QTablePagination
+          <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
+                  {{ resultTotal }} {{ t('reports.header') }}
+                </div>
+            <QTablePagination
             :scope="scope"
             :position="'bottom'"
             :resultTotal="resultTotal"
             :perPageOptions="perPageOptions"
             @update:changeRecordPerPage="changePagination"
           />
+          </div>
+
         </template>
 
         <template v-slot:header="props">
@@ -198,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onBeforeMount, reactive } from "vue";
+import { ref, onBeforeMount, reactive, computed } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -249,12 +247,11 @@ const tabs = reactive([
 ]);
 
 const perPageOptions: any = [
-  { label: "5", value: 5 },
-  { label: "10", value: 10 },
   { label: "20", value: 20 },
   { label: "50", value: 50 },
   { label: "100", value: 100 },
-  { label: "All", value: 0 },
+  { label: "250", value: 250 },
+  { label: "500", value: 500 },
 ];
 const resultTotal = ref<number>(0);
 const maxRecordToReturn = ref<number>(100);
@@ -380,6 +377,8 @@ function convertUnixToQuasarFormat(unixMicroseconds: any) {
   const formattedDate = dateToFormat.toISOString();
   return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
 }
+
+
 
 const filterData = (rows: any, terms: any) => {
   var filtered = [];
@@ -532,6 +531,13 @@ const filterReports = () => {
 
   resultTotal.value = reportsTableRows.value.length;
 };
+
+const visibleRows = computed(() => {
+  if (!filterQuery.value) return reportsTableRows.value || [];
+  return filterData(reportsTableRows.value || [], filterQuery.value);
+});
+const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+
 </script>
 
 <style lang="scss" scoped>

@@ -250,7 +250,7 @@ export class AlertsPage {
     async moveAllAlertsToFolder(targetFolderName) {
         // Select all alerts
         await this.page.getByRole('row', { name: '# Name Owner Period Frequency' }).getByRole('checkbox').click();
-        await expect(this.page.getByText(/Showing 1 - [12] of/).nth(1)).toBeVisible();
+        await expect(this.page.getByText(/Showing 1 - [12] of/)).toBeVisible();
 
         // Click move across folders button
         await this.page.locator(this.moveAcrossFoldersButton).click();
@@ -367,12 +367,12 @@ export class AlertsPage {
      */
     async verifySearchResults(expectedCount) {
         const resultText = expectedCount === 1 ? 'Showing 1 - 1 of' : 'Showing 1 - 2 of';
-        await expect(this.page.getByText(resultText).nth(1)).toBeVisible();
+        await expect(this.page.getByText(resultText)).toBeVisible();
     }
 
     async verifySearchResultsUIValidation(expectedCount) {
         const resultText = expectedCount === 1 ? 'Showing 1 - 1 of' : 'Showing 1 - 2 of';
-        await expect(this.page.getByText(resultText).nth(1)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.getByText(resultText)).toBeVisible({ timeout: 10000 });
     }
 
     /**
@@ -579,9 +579,9 @@ export class AlertsPage {
         await this.page.locator('[data-test="tab-scheduled"]').click();
         await expect(this.page.getByText('No data available')).toBeVisible();
         await this.page.locator('[data-test="tab-realTime"]').click();
-        await expect(this.page.getByText('Showing 1 - 1 of').nth(1)).toBeVisible();
+        await expect(this.page.getByText('Showing 1 - 1 of')).toBeVisible();
         await this.page.locator('[data-test="tab-all"]').click();
-        await expect(this.page.getByText('Showing 1 - 1 of').nth(1)).toBeVisible();
+        await expect(this.page.getByText('Showing 1 - 1 of')).toBeVisible();
     }
 
     async verifyFolderSearch(folderName) {

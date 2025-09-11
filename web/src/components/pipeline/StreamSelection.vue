@@ -141,22 +141,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="flex justify-start q-mt-lg q-px-md">
         <q-btn
-          data-test="add-pipeline-cancel-btn"
-          v-close-popup="true"
-          class="q-mb-md text-bold"
+          v-close-popup
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
           :label="t('alerts.cancel')"
-          text-color="light-text"
-          padding="sm md"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          data-test="add-pipeline-cancel-btn"
         />
         <q-btn
-          data-test="add-pipeline-submit-btn"
+          class="o2-primary-button no-border tw-h-[36px]"
           :label="t('alerts.save')"
-          class="q-mb-md text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm xl"
-          no-caps
           type="submit"
+          no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          data-test="add-pipeline-submit-btn"
         />
       </div>
     </q-form>

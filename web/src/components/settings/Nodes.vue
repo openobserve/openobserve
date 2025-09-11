@@ -378,8 +378,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <q-btn 
               :label="t('nodes.applyFilter')" 
-              class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm" 
-              color="secondary"
+              class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm o2-secondary-button tw-h-[36px]" 
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               @click="applyFilter()"
             >
             </q-btn>
@@ -422,8 +423,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-icon name="search" />
                   </template>
                 </q-input>
-                <q-btn :label="t('common.refresh')" class="text-bold text-capitalize no-border"
-                color="secondary" style="height: 40px; width: 90px;" @click="getData(true)"></q-btn>
+                <q-btn :label="t('common.refresh')" class="text-bold text-capitalize no-border o2-primary-button"
+                 style="height: 40px; width: 90px;" 
+                 :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                 @click="getData(true)">
+                </q-btn>
               </div>
 
             </div>

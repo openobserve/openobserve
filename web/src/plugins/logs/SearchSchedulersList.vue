@@ -7,7 +7,7 @@
     "
   >
     <div v-if="!showSearchResults">
-      <div class="flex tw-justify-between tw-items-center">
+      <div class="flex tw-justify-between tw-items-center tw-h-[71px]">
         <div class="flex items-center q-py-sm q-pl-md">
           <div
             data-test="search-scheduler-back-btn"
@@ -23,17 +23,20 @@
           >
             <q-icon name="arrow_back_ios_new" size="14px" />
           </div>
-          <div class="text-h6" data-test="search-scheduler-title">
+          <div class="text-h6 tw-font-[600]" data-test="search-scheduler-title">
             Search Job Scheduler
           </div>
         </div>
         <div class="flex items-center q-py-sm q-pr-md">
           <div>
             <q-btn
-              color="secondary"
               label="Get Jobs"
               @click="fetchSearchHistory"
-              class="q-ml-md"
+              class="q-ml-md o2-primary-button tw-h-[36px]"
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              no-caps
+              flat
+              dense
               :disable="isLoading"
             />
           </div>
@@ -41,7 +44,6 @@
       </div>
 
       <div>
-        <q-page>
           <q-table
             data-test="search-scheduler-table"
             ref="qTableSchedule"
@@ -51,8 +53,9 @@
             :pagination="pagination"
             row-key="trace_id"
             :rows-per-page-options="[]"
-            class="custom-table search-job-list-table"
-            style="width: 100%"
+            class="o2-quasar-table o2-quasar-table-header-sticky"
+            :class="store.state.theme == 'dark' ? ' o2-quasar-table-dark o2-quasar-table-header-sticky-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light'"
+            :style="dataToBeLoaded.length > 0 ? 'width: 100%; height: calc(100vh - 118px)'  : 'width: 100%'"
             :sort-method="sortMethod"
           >
             <template v-slot:body="props">
@@ -278,24 +281,29 @@
               </q-tr>
             </template>
             <template #bottom="scope">
-              <div class="tw-ml-auto tw-mr-2">Max Limit : <b>1000</b></div>
-              <q-separator
-                style="height: 1.5rem; margin: auto 0"
-                vertical
-                inset
-                class="q-mr-md"
-              />
+            <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[150px] tw-mr-md">
+              {{ resultTotal }} Results
+            </div>
+            <div class="tw-ml-auto tw-mr-2">Max Limit : <b>1000</b></div>
+            <q-separator
+              style="height: 1.5rem; margin: auto 0"
+              vertical
+              inset
+              class="q-mr-md"
+            />
 
-              <div class="q-pl-md">
-                <QTablePagination
-                  :scope="scope"
-                  :position="'bottom'"
-                  :resultTotal="resultTotal"
-                  :perPageOptions="perPageOptions"
-                  @update:changeRecordPerPage="changePagination"
-                />
-              </div>
-            </template>
+            <div class="q-pl-md">
+              <QTablePagination
+                :scope="scope"
+                :position="'bottom'"
+                :resultTotal="resultTotal"
+                :perPageOptions="perPageOptions"
+                @update:changeRecordPerPage="changePagination"
+              />
+            </div>
+          </div>
+          </template>
             <template #no-data>
               <div v-if="!isLoading" class="tw-flex tw-mx-auto">
                 <NoData />
@@ -307,8 +315,22 @@
                 <q-spinner-hourglass color="primary" size="lg" />
               </div>
             </template>
+            <template v-slot:header="props">
+            <q-tr :props="props">
+              <!-- Rendering the of the columns -->
+               <!-- here we can add the classes class so that the head will be sticky -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :class="col.classes"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
+          </template>
           </q-table>
-        </q-page>
         <ConfirmDialog
           title="Delete Scheduled Search"
           message="Are you sure you want to delete this scheduled search?"
@@ -469,6 +491,7 @@ export default defineComponent({
 
       return desiredColumns.map(({ key, label }) => {
         let columnWidth = 150;
+        let classes = '';
 
         let align = "center";
         let sortable = true;
@@ -478,9 +501,10 @@ export default defineComponent({
           sortable = true;
         }
         if (key === "Actions") {
-          columnWidth = 200;
+          columnWidth = 150;
           align = "left";
           sortable = false;
+          classes = 'actions-column';
         }
         if (key == "trace_id") {
           columnWidth = 250;
@@ -511,10 +535,11 @@ export default defineComponent({
           sortable = false;
         }
         if (key == "#") {
-          columnWidth = 100;
+          columnWidth = 67;
           sortable = false;
           align = "left";
         }
+
 
         // Custom width for each column
         return {
@@ -523,6 +548,7 @@ export default defineComponent({
           field: key, // Field accessor
           align: align,
           sortable: sortable,
+          classes: classes,
           style: `max-width: ${columnWidth}px; width: ${columnWidth}px;`,
         };
       });
