@@ -315,6 +315,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboard-id="props.dashboardId"
       :folder-id="props.folderId"
       :report-id="props.reportId"
+      :dashboardName="props.dashboardName"
+      :folderName="props.folderName"
       @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
       @limit-number-of-series-warning-message-update="
@@ -415,6 +417,8 @@ export default defineComponent({
     "folderId",
     "reportId",
     "currentVariablesData",
+    "dashboardName",
+    "folderName",
   ],
   components: {
     PanelSchemaRenderer,

@@ -181,10 +181,13 @@ pub async fn search(
                     start_time,
                     end_time,
                     s_event_type,
+                    in_req.search_event_context.clone(),
                 ),
             )
             .await;
     }
+
+    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
 
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
@@ -1075,6 +1078,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
             scan_stats,
             work_group: work_group.to_string(),
             search_type,
+            search_event_context: result.search_event_context.map(Into::into),
         });
     }
 
