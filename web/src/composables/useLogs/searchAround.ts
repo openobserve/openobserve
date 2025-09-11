@@ -19,7 +19,9 @@ import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { logsErrorMessage } from "@/utils/common";
 import useLogs from "@/composables/useLogs";
 import searchService from "@/services/search";
+import useNotifications from "@/composables/useNotifications";
 import useHistogram from "@/composables/useLogs/useHistogram";
+import useStreamFields from "@/composables/useLogs/useStreamFields";
 import {
   SearchAroundParams,
   StreamField,
@@ -29,16 +31,11 @@ import {
 } from "@/ts/interfaces";
 
 export const useSearchAround = () => {
-  const { searchObj } = searchState();
-  const {
-    extractFields,
-    generateHistogramSkeleton,
-    updateGridColumns,
-    filterHitsColumns,
-    notificationMsg,
-    showErrorNotification,
-  } = useLogs();
-  const { generateHistogramData } = useHistogram();
+  const { searchObj, notificationMsg } = searchState();
+  const { showErrorNotification } = useNotifications();
+
+  const { extractFields, updateGridColumns, filterHitsColumns } = useStreamFields();
+  const { generateHistogramData, generateHistogramSkeleton } = useHistogram();
   const {
     fnParsedSQL,
     fnUnparsedSQL,
