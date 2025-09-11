@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, collections::BTreeMap, path::Path, sync::Arc, time::Duration};
+use std::{
+    cmp::max,
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 use aes_siv::{KeyInit, siv::Aes256Siv};
 use arc_swap::ArcSwap;
@@ -31,7 +37,6 @@ use lettre::{
 };
 use once_cell::sync::Lazy;
 use sha256::digest;
-use std::path::PathBuf;
 use tokio::sync::OnceCell;
 
 use crate::{
@@ -272,7 +277,8 @@ static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default
 
 // Environment file management
 static ENV_FILE_PATH: OnceCell<PathBuf> = OnceCell::const_new();
-static ENV_FILE_LAST_HASH: Lazy<ArcSwap<Option<String>>> = Lazy::new(|| ArcSwap::from(Arc::new(None)));
+static ENV_FILE_LAST_HASH: Lazy<ArcSwap<Option<String>>> =
+    Lazy::new(|| ArcSwap::from(Arc::new(None)));
 
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(
@@ -306,7 +312,9 @@ pub fn get_instance_id() -> String {
 
 // Environment file utilities
 pub async fn set_env_file_path(path: PathBuf) -> Result<(), anyhow::Error> {
-    ENV_FILE_PATH.set(path).map_err(|_| anyhow::anyhow!("Env file path already set"))?;
+    ENV_FILE_PATH
+        .set(path)
+        .map_err(|_| anyhow::anyhow!("Env file path already set"))?;
     Ok(())
 }
 
@@ -316,9 +324,11 @@ pub fn get_env_file_path() -> Option<&'static PathBuf> {
 
 pub fn load_env_file_if_set() -> Result<(), anyhow::Error> {
     if let Some(path) = get_env_file_path() {
-        log::info!("Loading environment file from: {:?}", path);
-        dotenvy::from_path_override(path)?;
-        
+        log::info!("Loading environment file from: {path:?}");
+        if let Err(e) = dotenvy::from_path_override(path) {
+            log::error!("Failed to load environment file: {e}");
+        };
+
         // Calculate and store initial hash
         if let Ok(hash) = calculate_env_file_hash(path) {
             ENV_FILE_LAST_HASH.store(Arc::new(Some(hash)));
@@ -326,7 +336,13 @@ pub fn load_env_file_if_set() -> Result<(), anyhow::Error> {
         }
     } else {
         // Fall back to default .env discovery
-        dotenvy::dotenv_override().ok();
+        if let Err(e) = dotenvy::dotenv_override().and_then(|env_path| {
+            ENV_FILE_PATH
+                .set(env_path)
+                .map_err(|_| dotenvy::Error::EnvVar(std::env::VarError::NotPresent))
+        }) {
+            log::debug!("ENV file path not set, trying default discovery: {e}");
+        }
     }
     Ok(())
 }
@@ -1164,6 +1180,12 @@ pub struct Common {
         help = "Enable to use large partition for index. This will apply for all streams"
     )]
     pub align_partitions_for_index: bool,
+    #[env_config(
+        name = "ZO_ENV_WATCHER_INTERVAL",
+        default = 30,
+        help = "Environment file watcher interval in seconds. Set to 0 to disable (default: disabled)"
+    )]
+    pub env_watcher_interval: u64,
 }
 
 #[derive(EnvConfig)]

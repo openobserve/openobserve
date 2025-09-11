@@ -226,7 +226,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
-    tokio::task::spawn(async move { env_watcher::run().await });
+    env_watcher::run();
     tokio::task::spawn(async move { files::run().await });
     tokio::task::spawn(async move { stats::run().await });
     tokio::task::spawn(async move { compactor::run().await });
