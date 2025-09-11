@@ -194,7 +194,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="details-container" style="margin-bottom: 16px;">
               <div class="row justify-between items-center">
-                <span class="text-title">{{ t("home.alertTitle") }}</span>
+                <span class="text-title tw-flex tw-items-center tw-gap-2">
+                  <div style="opacity: 0.8;" class="tw-bg-[#F5EB93] tw-flex tw-items-center tw-justify-center tw-rounded-[9px] tw-h-[33px] tw-w-[33px]">
+                      <img :src="alertsIcon" class="tw-h-[18px] tw-w-[18px] tw-mx-[7px] tw-my-[7px] tw-text-[#ea580b]" />
+                  </div>
+                  {{ t("home.alertTitle") }}
+                </span>
                 <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
                   <router-link
                     exact
@@ -228,7 +233,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="details-container" style="margin-bottom: 16px;">
               <div class="row justify-between items-center">
-                <span class="text-title">{{ t("home.pipelineTitle") }}</span>
+                <span class="text-title tw-flex tw-items-center tw-gap-2">
+                  <div style="opacity: 0.8;" class="tw-bg-[#F2DCF5] tw-flex tw-items-center tw-justify-center tw-rounded-[9px] tw-h-[33px] tw-w-[33px]">
+                      <img :src="pipelinesIcon" class="tw-h-[18px] tw-w-[18px] tw-mx-[7px] tw-my-[7px]" />
+                  </div>
+                  {{ t("home.pipelineTitle") }}
+                </span>
                 <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
                   <router-link
                     exact
@@ -624,6 +634,15 @@ export default defineComponent({
   });
 
 
+  const alertsIcon = computed(() => {
+    return getImageURL('images/home/alerts.svg');
+  });
+
+  const pipelinesIcon = computed(() => {
+    return getImageURL('images/home/pipeline.svg');
+  });
+
+
 
 
 
@@ -649,6 +668,8 @@ export default defineComponent({
       functionsIcon,
       dashboardsIcon,
       isLoadingSummary,
+      pipelinesIcon,
+      alertsIcon,
     };
   },
   computed: {
