@@ -416,9 +416,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template v-slot:body-cell-name="props">
-                  <q-td class="q-td--no-hover field-name">{{
-                    props.row.name
-                  }}</q-td>
+                  <q-td class="q-td--no-hover field-name"
+                    >{{ props.row.name }}
+                    <span v-if="isEnvQuickModeField(props.row.name)">
+                      <img
+                        :src="quickModeIcon"
+                        :alt="t('logStream.envQuickModeMsg')"
+                        class="tw-inline-block q-ml-xs tw-w-[20px]"
+                      />
+                      <q-tooltip
+                      class="tw-text-[12px] tw-w-[200px]"
+                    >
+                      {{ t('logStream.envQuickModeMsg') }}
+                    </q-tooltip>
+                  </span>
+                  </q-td>
                 </template>
                 <template v-slot:body-cell-type="props">
                   <q-td>{{ props.row.type }}</q-td>
@@ -767,7 +779,7 @@ export default defineComponent({
     AppTabs,
     QTablePagination,
     DateTime,
-    AssociatedRegexPatterns
+    AssociatedRegexPatterns,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
@@ -831,7 +843,7 @@ export default defineComponent({
     const patternAssociationDialog = ref({
       show: false,
       data: [],
-      fieldName: ""
+      fieldName: "",
     });
 
     const selectedFields = ref([]);
@@ -1839,6 +1851,18 @@ export default defineComponent({
     return filteredValue;
   };
 
+    // store.state.zoConfig.default_quick_mode_fields: ["field1", "job", "log"]
+    const isEnvQuickModeField = (fieldName: string) => {
+      return (
+        store.state.zoConfig.default_quick_mode_fields.includes(fieldName)
+      );
+    };
+
+    const quickModeIcon = computed(() => {
+      return store.state.theme === "dark"
+        ? getImageURL("images/common/quick_mode_light.svg")
+        : getImageURL("images/common/quick_mode.svg");
+    });
 
     return {
       t,
@@ -1925,6 +1949,8 @@ export default defineComponent({
       computedIndexType,
       checkIfOptionPresentInDefaultEnv,
       updateIndexType,
+      isEnvQuickModeField,
+      quickModeIcon,
     };
   },
   created() {
