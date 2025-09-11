@@ -499,7 +499,8 @@
     "indexSize": "Index Size",
     "extendedStartDate": "Start Date",
     "extendedEndDate": "End Date",
-    "regexPatterns": "Regex Patterns"
+    "regexPatterns": "Regex Patterns",
+    "envQuickModeMsg": "Environment quick mode field"
   },
   "pipeline": {
     "header": "Pipelines",
