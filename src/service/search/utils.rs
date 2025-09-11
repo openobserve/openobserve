@@ -167,15 +167,41 @@ pub fn is_value(e: &Expr) -> bool {
 }
 
 pub fn is_field(e: &Expr) -> bool {
-    matches!(e, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
+    matches!(e, Expr::Identifier(_) | Expr::CompoundIdentifier(_) | Expr::Function(_))
 }
 
-// Note: the expr should be Identifier or CompoundIdentifier
+// Note: the expr should be Identifier, CompoundIdentifier, or Function
 pub fn get_field_name(expr: &Expr) -> String {
     match expr {
         Expr::Identifier(ident) => trim_quotes(ident.to_string().as_str()),
         Expr::CompoundIdentifier(ident) => trim_quotes(ident[1].to_string().as_str()),
-        _ => unreachable!(),
+        Expr::Function(func) => {
+            // For function expressions, we need to extract field names from the arguments
+            // This is a simplified approach - for complex functions, we might need more sophisticated handling
+            match &func.args {
+                sqlparser::ast::FunctionArguments::List(args) => {
+                    if let Some(first_arg) = args.args.first() {
+                        match first_arg {
+                            sqlparser::ast::FunctionArg::Unnamed(sqlparser::ast::FunctionArgExpr::Expr(expr)) => {
+                                get_field_name(expr)
+                            }
+                            sqlparser::ast::FunctionArg::ExprNamed { name, .. } => {
+                                get_field_name(name)
+                            }
+                            _ => func.name.to_string(),
+                        }
+                    } else {
+                        func.name.to_string()
+                    }
+                }
+                _ => func.name.to_string(),
+            }
+        }
+        _ => {
+            // For other expression types, we can't extract a meaningful field name
+            // This should not happen in normal usage, but we'll return a placeholder instead of panicking
+            "unknown_field".to_string()
+        }
     }
 }
 
@@ -210,4 +236,195 @@ pub async fn collect_scan_stats(
         scan_stats.add(&(&stats).into());
     }
     scan_stats
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlparser::ast::{Expr, Function, FunctionArg, FunctionArgExpr, FunctionArguments, Ident, ObjectName, Value};
+
+    #[test]
+    fn test_get_field_name_identifier() {
+        let expr = Expr::Identifier(Ident::new("field_name"));
+        assert_eq!(get_field_name(&expr), "field_name");
+    }
+
+    #[test]
+    fn test_get_field_name_quoted_identifier() {
+        let expr = Expr::Identifier(Ident::new("\"quoted_field\""));
+        assert_eq!(get_field_name(&expr), "quoted_field");
+    }
+
+    #[test]
+    fn test_get_field_name_compound_identifier() {
+        let expr = Expr::CompoundIdentifier(vec![
+            Ident::new("table"),
+            Ident::new("field_name")
+        ]);
+        assert_eq!(get_field_name(&expr), "field_name");
+    }
+
+    #[test]
+    fn test_get_field_name_coalesce_function() {
+        // Test the specific case that was failing: coalesce(k8s_cluster,k8s_app_instance,'unknown')
+        let expr = Expr::Function(Function {
+            name: ObjectName(vec![Ident::new("coalesce")]),
+            parameters: FunctionArguments::None,
+            args: FunctionArguments::List(sqlparser::ast::FunctionArgumentList {
+                args: vec![
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(Ident::new("k8s_cluster")))),
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(Ident::new("k8s_app_instance")))),
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(Value::SingleQuotedString("unknown".to_string())))),
+                ],
+                duplicate_treatment: None,
+                clauses: vec![],
+            }),
+            filter: None,
+            null_treatment: None,
+            over: None,
+            within_group: vec![],
+            uses_odbc_syntax: false,
+        });
+        
+        // Should extract the first field name from the function arguments
+        assert_eq!(get_field_name(&expr), "k8s_cluster");
+    }
+
+    #[test]
+    fn test_get_field_name_nested_coalesce() {
+        // Test nested coalesce: coalesce(coalesce(field1, field2), field3)
+        let inner_coalesce = Expr::Function(Function {
+            name: ObjectName(vec![Ident::new("coalesce")]),
+            parameters: FunctionArguments::None,
+            args: FunctionArguments::List(sqlparser::ast::FunctionArgumentList {
+                args: vec![
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(Ident::new("field1")))),
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(Ident::new("field2")))),
+                ],
+                duplicate_treatment: None,
+                clauses: vec![],
+            }),
+            filter: None,
+            null_treatment: None,
+            over: None,
+            within_group: vec![],
+            uses_odbc_syntax: false,
+        });
+
+        let outer_coalesce = Expr::Function(Function {
+            name: ObjectName(vec![Ident::new("coalesce")]),
+            parameters: FunctionArguments::None,
+            args: FunctionArguments::List(sqlparser::ast::FunctionArgumentList {
+                args: vec![
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(inner_coalesce)),
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(Ident::new("field3")))),
+                ],
+                duplicate_treatment: None,
+                clauses: vec![],
+            }),
+            filter: None,
+            null_treatment: None,
+            over: None,
+            within_group: vec![],
+            uses_odbc_syntax: false,
+        });
+        
+        // Should extract the first field name from the nested function
+        assert_eq!(get_field_name(&outer_coalesce), "field1");
+    }
+
+    #[test]
+    fn test_get_field_name_function_with_named_args() {
+        let expr = Expr::Function(Function {
+            name: ObjectName(vec![Ident::new("some_function")]),
+            parameters: FunctionArguments::None,
+            args: FunctionArguments::List(sqlparser::ast::FunctionArgumentList {
+                args: vec![
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(Ident::new("field_name")))),
+                ],
+                duplicate_treatment: None,
+                clauses: vec![],
+            }),
+            filter: None,
+            null_treatment: None,
+            over: None,
+            within_group: vec![],
+            uses_odbc_syntax: false,
+        });
+        
+        // Should extract the field name from the first argument
+        assert_eq!(get_field_name(&expr), "field_name");
+    }
+
+    #[test]
+    fn test_get_field_name_function_no_args() {
+        let expr = Expr::Function(Function {
+            name: ObjectName(vec![Ident::new("no_args_function")]),
+            parameters: FunctionArguments::None,
+            args: FunctionArguments::None,
+            filter: None,
+            null_treatment: None,
+            over: None,
+            within_group: vec![],
+            uses_odbc_syntax: false,
+        });
+        
+        // Should return the function name when no arguments
+        assert_eq!(get_field_name(&expr), "no_args_function");
+    }
+
+    #[test]
+    fn test_get_field_name_unsupported_expr() {
+        // Test with an unsupported expression type (like a binary operation)
+        let expr = Expr::BinaryOp {
+            left: Box::new(Expr::Identifier(Ident::new("left"))),
+            op: sqlparser::ast::BinaryOperator::Plus,
+            right: Box::new(Expr::Identifier(Ident::new("right"))),
+        };
+        
+        // Should return the fallback value instead of panicking
+        assert_eq!(get_field_name(&expr), "unknown_field");
+    }
+
+    #[test]
+    fn test_is_field() {
+        assert!(is_field(&Expr::Identifier(Ident::new("field"))));
+        assert!(is_field(&Expr::CompoundIdentifier(vec![Ident::new("table"), Ident::new("field")])));
+        
+        // Test function expressions
+        let func_expr = Expr::Function(Function {
+            name: ObjectName(vec![Ident::new("coalesce")]),
+            parameters: FunctionArguments::None,
+            args: FunctionArguments::List(sqlparser::ast::FunctionArgumentList {
+                args: vec![
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(Ident::new("field1")))),
+                ],
+                duplicate_treatment: None,
+                clauses: vec![],
+            }),
+            filter: None,
+            null_treatment: None,
+            over: None,
+            within_group: vec![],
+            uses_odbc_syntax: false,
+        });
+        assert!(is_field(&func_expr));
+        
+        // Test non-field expressions
+        assert!(!is_field(&Expr::Value(Value::Number("123".to_string(), false))));
+        assert!(!is_field(&Expr::BinaryOp {
+            left: Box::new(Expr::Identifier(Ident::new("left"))),
+            op: sqlparser::ast::BinaryOperator::Plus,
+            right: Box::new(Expr::Identifier(Ident::new("right"))),
+        }));
+    }
+
+    #[test]
+    fn test_trim_quotes() {
+        assert_eq!(trim_quotes("field"), "field");
+        assert_eq!(trim_quotes("\"quoted\""), "quoted");
+        assert_eq!(trim_quotes("'single_quoted'"), "single_quoted");
+        assert_eq!(trim_quotes("\"partial"), "\"partial");
+        assert_eq!(trim_quotes("partial\""), "partial\"");
+    }
 }

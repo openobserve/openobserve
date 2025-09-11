@@ -3256,6 +3256,8 @@ mod tests {
                 file_download_enable_priority_queue: bool::default(),
                 calculate_stats_step_limit: i64::default(),
                 histogram_enabled: bool::default(),
+                inverted_index_min_token_length: usize::default(),
+                inverted_index_max_token_length: usize::default(),
             },
             compact: config::Compact {
                 enabled: bool::default(),
@@ -3273,12 +3275,13 @@ mod tests {
                 old_data_min_files: i64::default(),
                 delete_files_delay_hours: i64::default(),
                 blocked_orgs: String::default(),
-                data_retention_history: bool::default(),
+                //data_retention_history: bool::default(),
                 batch_size: i64::default(),
                 job_run_timeout: i64::default(),
                 job_clean_wait_time: i64::default(),
                 pending_jobs_metric_interval: u64::default(),
                 max_group_files: usize::default(),
+                file_list_deleted_mode: String::default(),
             },
             cache_latest_files: config::CacheLatestFiles {
                 enabled: bool::default(),
@@ -3350,6 +3353,8 @@ mod tests {
                 lock_wait_timeout: u64::default(),
                 subscription_capacity: usize::default(),
                 queue_max_age: u64::default(),
+                queue_max_size: i64::default(),
+                v211_support: bool::default(),
             },
             s3: config::S3 {
                 provider: String::default(),
@@ -3457,6 +3462,8 @@ mod tests {
                 max_retry_time_in_hours: u64::default(),
                 pipeline_max_file_retention_time_seconds: u64::default(),
                 pipeline_max_file_size_on_disk_mb: usize::default(),
+                pipeline_file_push_back_interval: u64::default(),
+                pipeline_sink_task_spawn_interval_ms: u64::default(),
             },
             encryption: config::Encryption {
                 algorithm: String::default(),
