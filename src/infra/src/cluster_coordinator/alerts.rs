@@ -104,7 +104,7 @@ fn alert_key(org: &str, alert_id: &str) -> String {
     format!("/alerts/{org}/{alert_id}")
 }
 
-/// Tries to parse the key used to identify an individual alert in avents
+/// Tries to parse the key used to identify an individual alert in events
 /// sent to cluster cache watchers. Returns the organization, stream type,
 /// stream name, and alert name from the key.
 pub fn parse_alert_key(key: &str) -> Option<(String, String)> {
