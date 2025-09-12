@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { getDataValue } from "./aliasUtils";
+
 /**
  * Converts Map data into a format suitable for rendering a chart.
  *
@@ -39,8 +41,8 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
   const filteredMapData = panelSchema.queries.map((query: any, index: any) => {
     return mapData?.[index]?.filter((item: any) => {
       if (
-        item[query.fields.latitude.alias] != null &&
-        item[query.fields.longitude.alias] != null
+        getDataValue(item, query.fields.latitude.alias) != null &&
+        getDataValue(item, query.fields.longitude.alias) != null
       ) {
         return true;
       }
@@ -53,13 +55,16 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
     const queryResult = filteredMapData[index];
 
     const queryField = queryResult?.forEach((item: any) => {
-      if (isNaN(item[query.fields.latitude.alias])) {
+      if (isNaN(getDataValue(item, query.fields.latitude.alias))) {
         throw new Error("All latitude values should be numeric value.");
       }
-      if (isNaN(item[query.fields.longitude.alias])) {
+      if (isNaN(getDataValue(item, query.fields.longitude.alias))) {
         throw new Error("All longitude values should be numeric value.");
       }
-      if (query.fields.weight && isNaN(item[query.fields.weight.alias])) {
+      if (
+        query.fields.weight &&
+        isNaN(getDataValue(item, query.fields.weight.alias))
+      ) {
         throw new Error("All weight values should be numeric value.");
       }
     });
@@ -172,11 +177,11 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
         if (query.customQuery) {
           // For custom queries
           return [
-            item[query.fields.longitude.alias],
-            item[query.fields.latitude.alias],
-            item[query.fields.weight.alias] == null
+            getDataValue(item, query.fields.longitude.alias),
+            getDataValue(item, query.fields.latitude.alias),
+            getDataValue(item, query.fields.weight.alias) == null
               ? query.config.weight_fixed
-              : item[query.fields.weight.alias],
+              : getDataValue(item, query.fields.weight.alias),
           ];
         } else {
           // For auto queries
