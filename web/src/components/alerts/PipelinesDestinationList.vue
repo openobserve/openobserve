@@ -42,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             no-caps
             flat
-            :disable="!templates.length"
             :label="t(`alert_destinations.add`)"
             @click="editDestination(null)"
           />
