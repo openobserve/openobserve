@@ -1344,3 +1344,79 @@ def test_e2e_group_by_where_container_name_validation(create_session, base_url):
     total_hits = response_data.get("total", 0)
     took_time = response_data.get("took", 0)
     print(f"GROUP BY WHERE kubernetes_container_name query executed in {took_time}ms and found {total_hits} total matching records")
+
+
+def test_e2e_str_match_ignore_case_with_coalesce_validation(create_session, base_url):
+    """Test str_match_ignore_case function with coalesce and validate all returned hits contain expected data.
+    
+    This test validates the str_match_ignore_case function works correctly with coalesce
+    for handling null values and case-insensitive string matching.
+    Based on the working query: SELECT * FROM stream_pytest_data WHERE str_match_ignore_case(coalesce(kubernetes_container_name, kubernetes_namespace_name, 'monitoring'), 'prometheus')
+    """
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    
+    json_data = {
+        "query": {
+            "sql": "SELECT * FROM \"stream_pytest_data\" WHERE str_match_ignore_case(coalesce(kubernetes_container_name, kubernetes_namespace_name, 'monitoring'), 'prometheus')",
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 100,
+            "quick_mode": False
+        }
+    }
+
+    resp_get_str_match_query = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_str_match_query.status_code == 200
+    ), f"str_match_ignore_case with coalesce query failed with status {resp_get_str_match_query.status_code} {resp_get_str_match_query.content}"
+    
+    response_data = resp_get_str_match_query.json()
+    assert "hits" in response_data, "Response should contain 'hits' field"
+    
+    hits = response_data["hits"]
+    
+    if len(hits) > 0:
+        print(f"Found {len(hits)} hits for str_match_ignore_case with coalesce query")
+        
+        # Validate that ALL hits contain 'prometheus' in the expected fields
+        for i, hit in enumerate(hits):
+            # Extract the field values that were used in the coalesce function
+            kubernetes_container_name = hit.get("kubernetes_container_name", "")
+            kubernetes_namespace_name = hit.get("kubernetes_namespace_name", "")
+            
+            # The coalesce function should return the first non-null value:
+            # coalesce(kubernetes_container_name, kubernetes_namespace_name, 'monitoring')
+            coalesce_result = ""
+            if kubernetes_container_name:
+                coalesce_result = kubernetes_container_name
+            elif kubernetes_namespace_name:
+                coalesce_result = kubernetes_namespace_name
+            else:
+                coalesce_result = "monitoring"
+            
+            # str_match_ignore_case should match 'prometheus' in the coalesce result (case insensitive)
+            assert "prometheus" in coalesce_result.lower(), (
+                f"Hit {i}: str_match_ignore_case should match 'prometheus' in coalesce result '{coalesce_result}' "
+                f"(kubernetes_container_name='{kubernetes_container_name}', kubernetes_namespace_name='{kubernetes_namespace_name}')"
+            )
+            
+            print(f"Hit {i}: ✅ 'prometheus' found in coalesce result: '{coalesce_result}'")
+        
+        print(f"✅ All {len(hits)} hits contain 'prometheus' in the coalesce fields as expected")
+        print(f"✅ str_match_ignore_case with coalesce validation PASSED")
+        
+    else:
+        print("ℹ️  No hits found for str_match_ignore_case with coalesce query (this may indicate no matching data in the time window)")
+        # This is acceptable - the test validates the query syntax works correctly
+        # The important thing is that it returns 200 status and doesn't throw SQL parser errors
+    
+    total_hits = response_data.get("total", 0)
+    took_time = response_data.get("took", 0)
+    print(f"str_match_ignore_case with coalesce query executed in {took_time}ms and found {total_hits} total matching records")
