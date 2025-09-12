@@ -340,7 +340,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 init_common_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
             };
             if let Err(e) = ret {
-                og::error!("grpc_runtime gRPC server init failed: {:?}", e);
+                log::error!("grpc_runtime gRPC server init failed: {:?}", e);
                 std::process::exit(1);
             }
         });
