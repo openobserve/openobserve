@@ -248,11 +248,11 @@ test.describe("Logs Queries testcases", () => {
     const functionName = 'e2efunction_' + randomString;
     await pm.logsPage.fillSavedFunctionNameInput(functionName);
     await pm.logsPage.clickSavedViewDialogSave();
+    await pm.logsPage.waitForTimeout(2000);
     await pm.logsPage.clickMenuLinkPipelineItem();
     // Strategic 2000ms wait for navigation to pipeline page - this is functionally necessary
-    await pm.logsPage.waitForTimeout(2000);
     // Wait for the realtime tab to be available
-    await page.locator('[data-test="tab-realtime"]').waitFor({ timeout: 30000 });
+    await page.waitForSelector('[data-test="tab-realtime"]');
     await pm.logsPage.clickTabRealtime();
     // Strategic 1000ms wait for realtime tab activation - this is functionally necessary
     await pm.logsPage.waitForTimeout(1000);
