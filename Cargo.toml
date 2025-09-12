@@ -235,7 +235,7 @@ actix-tls = { version = "3.4", features = [
 anyhow = "1.0"
 arc-swap = "1.7.1"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
-async-nats = "0.39"
+async-nats = "0.42"
 async-stream = "0.3.6"
 async-trait = "0.1"
 async-recursion = "1.0"

@@ -126,15 +126,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="filter.value"
                   borderless
                   :debounce="500"
-                  filled
                   dense
-                  class="q-mb-xs no-border q-mr-md"
+                  class="no-border q-mr-md o2-search-input tw-h-[36px] tw-w-[200px]"
+                  :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                   :placeholder="`Search Permissions`"
-                  style="width: 300px"
                   @update:model-value="onResourceChange"
                 >
                   <template #prepend>
-                    <q-icon name="search" class="cursor-pointer" />
+                    <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
                   </template>
                 </q-input>
               </div>

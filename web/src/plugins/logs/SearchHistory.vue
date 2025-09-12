@@ -6,11 +6,11 @@
         : 'light-theme-history-page'
     "
   >
-    <div class="flex tw-justify-between tw-items-center">
+    <div class="flex tw-justify-between tw-items-center tw-h-[71px]">
       <div class="flex items-center q-py-sm q-pl-md">
         <div
           data-test="search-history-alert-back-btn"
-          class="flex justify-center items-center q-mr-md cursor-pointer"
+          class="flex justify-center items-center q-mr-md cursor-pointer tw-font-[600]"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -22,31 +22,38 @@
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
-        <div class="text-h6" data-test="add-alert-title">Search History</div>
+        <div class="text-h6 tw-font-[600]" data-test="add-alert-title">Search History</div>
       </div>
-      <div class="flex items-center q-py-sm q-pr-md">
+      <div class="tw-flex tw-items-center q-pr-md">
         <div>
-          <q-toggle v-model="wrapText" label="Wrap Text" class="q-mr-md" />
+          <q-toggle size="sm" v-model="wrapText" label="Wrap Text" class="q-mr-md" />
         </div>
-        <div class="warning-text flex items-center q-py-xs q-px-sm q-mr-md">
+        <div class="warning-text flex items-center q-px-sm q-mr-md tw-h-[36px]">
           <q-icon name="info" class="q-mr-xs" size="16px" />
           <div>
             Search History might be delayed by <b> {{ delayMessage }}</b>
           </div>
         </div>
-        <date-time
-          data-test-name="search-history-date-time"
-          ref="searchDateTimeRef"
-          auto-apply
-          :default-type="searchObj.data.datetime.type"
-          @on:date-change="updateDateTime"
-        />
+        <div style="height: 36px;"
+        >
+          <date-time
+            data-test-name="search-history-date-time"
+            ref="searchDateTimeRef"
+            auto-apply
+            style="height: 36px"
+            :default-type="searchObj.data.datetime.type"
+            @on:date-change="updateDateTime"
+          />
+        </div>
+
         <div>
           <q-btn
-            color="secondary"
             label="Get History"
+            flat
             @click="fetchSearchHistory"
-            class="q-ml-md"
+            class="q-ml-md o2-primary-button tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            no-caps
             :disable="isLoading"
           />
         </div>
@@ -54,7 +61,6 @@
     </div>
 
     <div class="">
-      <q-page>
         <q-table
           ref="qTable"
           dense
@@ -63,9 +69,11 @@
           :pagination.sync="pagination"
           row-key="trace_id"
           :rows-per-page-options="[]"
-          class="custom-table"
+          class="custom-table o2-quasar-table-header-sticky"
+          :class="store.state.theme == 'dark' ? ' o2-quasar-table-header-sticky-dark' : 'o2-quasar-table-header-sticky-light'"
           :sort-method="sortMethod"
           :wrap-cells="wrapText"
+          :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh - 118px); overflow-y: auto;' : ''"
         >
           <template v-slot:body="props">
             <q-tr
@@ -193,6 +201,10 @@
             </q-tr>
           </template>
           <template #bottom="scope">
+            <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[150px] tw-mr-md">
+              {{ resultTotal }} Results
+            </div>
             <div class="tw-ml-auto tw-mr-2">Max Limit : <b>1000</b></div>
             <q-separator
               style="height: 1.5rem; margin: auto 0"
@@ -210,6 +222,7 @@
                 @update:changeRecordPerPage="changePagination"
               />
             </div>
+          </div>
           </template>
           <template #no-data>
             <div v-if="!isLoading" class="tw-flex tw-mx-auto">
@@ -224,7 +237,6 @@
         >
           <q-spinner-hourglass color="primary" size="lg" />
         </div>
-      </q-page>
     </div>
   </div>
 
