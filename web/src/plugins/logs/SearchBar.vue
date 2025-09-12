@@ -898,7 +898,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-
     <div class="row query-editor-container">
       <div
         class="col"
@@ -1865,6 +1864,7 @@ export default defineComponent({
     );
 
     onBeforeUnmount(() => {
+      console.log("onBeforeUnmount");
       queryEditorRef.value = null;
       fnEditorRef.value = null;
     });
@@ -1952,6 +1952,7 @@ export default defineComponent({
       //   searchObj.meta.jobId = "";
       //   getQueryData(false);
       // }
+      console.log("value", value);
       searchObj.data.editorValue = value;
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
@@ -4189,25 +4190,16 @@ export default defineComponent({
     height: 100%; /* or any other height you want to set */
   }
 
-  .empty-query .cm-scroller {
+  .empty-query .monaco-editor-background {
     background-image: url("../../assets/images/common/query-editor.png");
     background-repeat: no-repeat;
     background-size: 115px;
-    background-position: 5px 5px;
-  }
-  .empty-query .cm-gutters {
-    display: none;
   }
 
-  .empty-function .cm-scroller {
+  .empty-function .monaco-editor-background {
     background-image: url("../../assets/images/common/vrl-function.png");
     background-repeat: no-repeat;
     background-size: 170px;
-    background-position: 5px 5px;
-  }
-
-  .empty-function .cm-gutters {
-    display: none;
   }
 
   .function-dropdown {
