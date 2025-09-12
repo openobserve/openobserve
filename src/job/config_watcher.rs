@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::PathBuf;
+use config::spawn_pausable_job;
 
 pub fn run() -> Option<tokio::task::JoinHandle<()>> {
     // Only start if config file path is set

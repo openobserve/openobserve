@@ -90,7 +90,7 @@ pub struct HealthzResponse {
 }
 
 #[cfg( feature = "enterprise")]
-pub fn reload_enterprise_config() {
+pub fn reload_enterprise_config() -> Result<(), anyhow::Error> {
     refresh_o2_config()
         .and_then(|_| refresh_dex_config())
         .and_then(|_| refresh_openfga_config())
