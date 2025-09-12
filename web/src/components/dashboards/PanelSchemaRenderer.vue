@@ -388,6 +388,14 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
+    dashboardName: {
+      type: String,
+      default: null,
+    },
+    folderName: {
+      type: String,
+      default: null,
+    },
     searchResponse: {
       required: false,
       type: Object,
@@ -465,6 +473,8 @@ export default defineComponent({
       runId,
       tabId,
       tabName,
+      dashboardName,
+      folderName,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -494,6 +504,8 @@ export default defineComponent({
       runId,
       tabId,
       tabName,
+      dashboardName,
+      folderName,
     );
 
     const {

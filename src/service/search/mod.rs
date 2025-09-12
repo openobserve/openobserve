@@ -201,6 +201,7 @@ pub async fn search(
                     start_time,
                     end_time,
                     s_event_type,
+                    in_req.search_event_context.clone(),
                 ),
             )
             .await;
@@ -1214,6 +1215,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
             scan_stats,
             work_group: work_group.to_string(),
             search_type,
+            search_event_context: result.search_event_context.map(Into::into),
         });
     }
 
