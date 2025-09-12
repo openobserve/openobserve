@@ -110,16 +110,19 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
         match existing_pipeline.source {
             // realtime: remove prev. src. stream_params from cache
             PipelineSource::Realtime(stream_params) => Some(stream_params),
-            // scheduled: delete prev. trigger
+            // scheduled: delete prev. trigger if source has changed
             PipelineSource::Scheduled(derived_stream) => {
-                if let Err(error) = super::alerts::derived_streams::delete(
-                    &derived_stream,
-                    &existing_pipeline.name,
-                    &existing_pipeline.id,
-                )
-                .await
-                {
-                    return Err(PipelineError::DeleteDerivedStream(error.to_string()));
+                if pipeline.source.is_realtime() {
+                    // source changed, delete prev. trigger
+                    if let Err(error) = super::alerts::derived_streams::delete(
+                        &derived_stream,
+                        &existing_pipeline.name,
+                        &existing_pipeline.id,
+                    )
+                    .await
+                    {
+                        return Err(PipelineError::DeleteDerivedStream(error.to_string()));
+                    }
                 }
                 None
             }

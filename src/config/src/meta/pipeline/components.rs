@@ -38,6 +38,16 @@ impl Default for PipelineSource {
     }
 }
 
+impl PipelineSource {
+    pub fn is_scheduled(&self) -> bool {
+        matches!(self, Self::Scheduled(_))
+    }
+
+    pub fn is_realtime(&self) -> bool {
+        matches!(self, Self::Realtime(_))
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default, ToSchema)]
 #[serde(rename_all = "snake_case")]
 #[serde(default)]
