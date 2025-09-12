@@ -116,7 +116,11 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
 
     // trigger watch event to update in-memory cache
     // in-cluster
-    infra::cluster_coordinator::destinations::emit_delete_event(&event_key).await?;
+    if let Err(e) =
+        infra::cluster_coordinator::destinations::emit_delete_event(TEMPLATE_WATCHER_PREFIX).await
+    {
+        log::error!("[Template] error triggering event to remove template from cache: {e}");
+    }
     // super cluster
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::infra::config::get_config()
@@ -168,6 +172,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
+                log::debug!("watch_alert_templates: put event: {ev:?}");
                 let (org_id, name) =
                     match super::destinations::parse_event_key(TEMPLATE_WATCHER_PREFIX, &ev.key) {
                         Ok(parsed) => parsed,
@@ -190,6 +195,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 ALERTS_TEMPLATES.insert(format!("{org_id}/{name}"), item_value);
             }
             db::Event::Delete(ev) => {
+                log::debug!("watch_alert_templates: delete event: {ev:?}");
                 let item_key = ev.key.strip_prefix(TEMPLATE_WATCHER_PREFIX).unwrap();
                 ALERTS_TEMPLATES.remove(item_key);
             }

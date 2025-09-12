@@ -316,10 +316,13 @@ impl super::Db for NatsDb {
             .await
             .map_err(|e| Error::Message(format!("[NATS:delete] bucket.keys error: {}", e)))?;
         for purge_key in keys {
-            bucket
-                .purge(purge_key.clone())
-                .await
-                .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {}", e)))?;
+            log::debug!("NATS:delete purge_key: {purge_key}");
+            bucket.purge(purge_key.clone()).await.map_err(|e| {
+                Error::Message(format!(
+                    "[NATS:delete] bucket.purge error {purge_key}: {}",
+                    e
+                ))
+            })?;
             if need_watch {
                 cluster_coordinator::events::delete_event(&purge_key, start_dt).await?;
             }

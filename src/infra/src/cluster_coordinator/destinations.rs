@@ -30,6 +30,6 @@ pub async fn emit_put_event(event_key: &str) -> Result<(), Error> {
 pub async fn emit_delete_event(event_key: &str) -> Result<(), Error> {
     let cluster_coordinator = super::get_coordinator().await;
     cluster_coordinator
-        .delete(event_key, false, true, None)
+        .delete(event_key, true, true, None)
         .await
 }
