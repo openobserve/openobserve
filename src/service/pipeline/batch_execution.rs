@@ -255,6 +255,34 @@ impl ExecutablePipeline {
             return Ok(HashMap::default());
         }
 
+        // Report pipeline ingestion
+        let source_stream_params = self.get_source_stream_params();
+        let source_size: f64 = records
+            .iter()
+            .map(|record| record.to_string().len() as f64)
+            .sum::<f64>()
+            / config::SIZE_IN_MB;
+
+        if source_size > 0.0 {
+            let req_stats = config::meta::self_reporting::usage::RequestStats {
+                size: source_size,
+                records: batch_size as i64,
+                response_time: 0.0,
+                ..config::meta::self_reporting::usage::RequestStats::default()
+            };
+
+            crate::service::self_reporting::report_request_usage_stats(
+                req_stats,
+                org_id,
+                &self.id,
+                source_stream_params.stream_type,
+                config::meta::self_reporting::usage::UsageType::Pipeline,
+                0, // No functions for source stream ingestion
+                chrono::Utc::now().timestamp_micros(),
+            )
+            .await;
+        }
+
         // result_channel
         let (result_sender, mut result_receiver) =
             channel::<(usize, StreamParams, Value)>(batch_size);
@@ -267,7 +295,7 @@ impl ExecutablePipeline {
         let mut node_receivers = HashMap::new();
 
         for node_id in &self.sorted_nodes {
-            let (sender, receiver) = channel::<(usize, Value, bool)>(batch_size);
+            let (sender, receiver) = channel::<PipelineItem>(batch_size);
             node_senders.insert(node_id.to_string(), sender);
             node_receivers.insert(node_id.to_string(), receiver);
         }
@@ -348,7 +376,12 @@ impl ExecutablePipeline {
         };
         let source_sender = node_senders.remove(&self.source_node_id).unwrap();
         for (idx, record) in records.into_iter().enumerate() {
-            if let Err(send_err) = source_sender.send((idx, record, flattened)).await {
+            let pipeline_item = PipelineItem {
+                idx,
+                record,
+                flattened,
+            };
+            if let Err(send_err) = source_sender.send(pipeline_item).await {
                 log::error!(
                     "[Pipeline]: Error sending original records into source Node for {send_err}"
                 );
@@ -539,14 +572,21 @@ impl Default for ExecutablePipelineTraceInputs {
     }
 }
 
+#[derive(Debug, Clone)]
+struct PipelineItem {
+    idx: usize,
+    record: Value,
+    flattened: bool,
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn process_node(
     pipeline_id: String,
     node_idx: usize,
     org_id: String,
     node: ExecutableNode,
-    mut receiver: Receiver<(usize, Value, bool)>,
-    mut child_senders: Vec<Sender<(usize, Value, bool)>>,
+    mut receiver: Receiver<PipelineItem>,
+    mut child_senders: Vec<Sender<PipelineItem>>,
     vrl_runtime: Option<(VRLResultResolver, bool)>,
     result_sender: Option<Sender<(usize, StreamParams, Value)>>,
     error_sender: Sender<(String, String, String, Option<String>)>,
@@ -562,7 +602,12 @@ async fn process_node(
                 // leaf node: `result_sender` guaranteed to be Some()
                 // send received results directly via `result_sender` for collection
                 let result_sender = result_sender.unwrap();
-                while let Some((idx, mut record, flattened)) = receiver.recv().await {
+                while let Some(pipeline_item) = receiver.recv().await {
+                    let PipelineItem {
+                        idx,
+                        mut record,
+                        flattened,
+                    } = pipeline_item;
                     if !flattened && !record.is_null() && record.is_object() {
                         record = match flatten::flatten_with_level(
                             record,
@@ -645,7 +690,12 @@ async fn process_node(
         }
         NodeData::Condition(condition_params) => {
             log::debug!("[Pipeline]: cond node {node_idx} starts processing");
-            while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
+            while let Some(pipeline_item) = receiver.recv().await {
+                let PipelineItem {
+                    idx,
+                    mut record,
+                    mut flattened,
+                } = pipeline_item;
                 // value must be flattened before condition params can take effect
                 if !flattened && !record.is_null() && record.is_object() {
                     record = match flatten::flatten_with_level(
@@ -677,7 +727,11 @@ async fn process_node(
                 {
                     send_to_children(
                         &mut child_senders,
-                        (idx, record, flattened),
+                        PipelineItem {
+                            idx,
+                            record,
+                            flattened,
+                        },
                         "ConditionNode",
                     )
                     .await;
@@ -691,7 +745,12 @@ async fn process_node(
             let mut runtime = crate::service::ingestion::init_functions_runtime();
             let stream_name = stream_name.unwrap_or("pipeline".to_string());
             let mut result_array_records = Vec::new();
-            while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
+            while let Some(pipeline_item) = receiver.recv().await {
+                let PipelineItem {
+                    idx,
+                    mut record,
+                    mut flattened,
+                } = pipeline_item;
                 if let Some((vrl_runtime, is_result_array_vrl)) = &vrl_runtime {
                     if func_params.after_flatten
                         && !flattened
@@ -758,7 +817,11 @@ async fn process_node(
                         flattened = false; // since apply_vrl_fn can produce unflattened data
                         send_to_children(
                             &mut child_senders,
-                            (idx, record, flattened),
+                            PipelineItem {
+                                idx,
+                                record,
+                                flattened,
+                            },
                             "FunctionNode",
                         )
                         .await;
@@ -806,7 +869,11 @@ async fn process_node(
                     // use usize::MAX as a flag to disregard original_value
                     send_to_children(
                         &mut child_senders,
-                        (usize::MAX, record.clone(), false),
+                        PipelineItem {
+                            idx: usize::MAX,
+                            record: record.clone(),
+                            flattened: false,
+                        },
                         "FunctionNode",
                     )
                     .await;
@@ -835,7 +902,12 @@ async fn process_node(
             let max_ts = (Utc::now()
                 + chrono::Duration::try_hours(cfg.limit.ingest_allowed_in_future).unwrap())
             .timestamp_micros();
-            while let Some((_, mut record, flattened)) = receiver.recv().await {
+            while let Some(pipeline_item) = receiver.recv().await {
+                let PipelineItem {
+                    mut record,
+                    flattened,
+                    ..
+                } = pipeline_item;
                 // handle timestamp before sending to remote_write service
                 if !flattened && !record.is_null() && record.is_object() {
                     record = match flatten::flatten_with_level(
@@ -951,19 +1023,46 @@ async fn process_node(
                         let mut remote_stream_for_batch = remote_stream.clone();
                         remote_stream_for_batch.org_id = org_id.clone().into();
 
+                        let records_len = records_to_write.len() as i64;
+
                         let writer =
                             get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
-                        if let Err(e) = writer.write_wal(records_to_write).await {
-                            let err_msg = format!(
-                                "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
-                            );
-                            if let Err(send_err) = error_sender
-                                .send((node.id.to_string(), node.node_type(), err_msg, None))
-                                .await
-                            {
-                                log::error!(
-                                    "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                        match writer.write_wal(records_to_write).await {
+                            Err(e) => {
+                                let err_msg = format!(
+                                    "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
                                 );
+                                if let Err(send_err) = error_sender
+                                    .send((node.id.to_string(), node.node_type(), err_msg, None))
+                                    .await
+                                {
+                                    log::error!(
+                                        "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                                    );
+                                }
+                            }
+                            Ok(data_size) => {
+                                let data_size_mb = data_size as f64 / config::SIZE_IN_MB;
+                                // Report remote destination usage after successful WAL write
+                                if data_size_mb > 0.0 {
+                                    let req_stats = config::meta::self_reporting::usage::RequestStats {
+                                        size: data_size_mb,
+                                        records: records_len,
+                                        response_time: 0.0,
+                                        ..config::meta::self_reporting::usage::RequestStats::default()
+                                    };
+
+                                    crate::service::self_reporting::report_request_usage_stats(
+                                        req_stats,
+                                        &org_id,
+                                        &remote_stream.destination_name,
+                                        config::meta::stream::StreamType::Logs, // Default to Logs for remote destinations
+                                        config::meta::self_reporting::usage::UsageType::RemotePipeline,
+                                        0, // No additional functions for remote destination
+                                        chrono::Utc::now().timestamp_micros(),
+                                    )
+                                    .await;
+                                }
                             }
                         }
                     } else {
@@ -1013,7 +1112,7 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
 
         let remote_stream = config::meta::stream::RemoteStreamParams {
             org_id: org_id.clone().into(),
-            destination_name: destination_name.into(),
+            destination_name: destination_name.clone().into(),
         };
 
         let mut remote_stream_for_batch = remote_stream.clone();
@@ -1032,12 +1131,41 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
             let mut remote_stream_for_batch = remote_stream.clone();
             remote_stream_for_batch.org_id = org_id.clone().into();
 
+            let records_len = records_to_write.len();
+
             let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
-            if let Err(e) = writer.write_wal(records_to_write).await {
-                let err_msg = format!(
-                    "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
-                );
-                log::error!("{err_msg}");
+            match writer.write_wal(records_to_write).await {
+                Err(e) => {
+                    let err_msg = format!(
+                        "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
+                    );
+                    log::error!("{err_msg}");
+                }
+                Ok(data_size) => {
+                    let data_size_mb = data_size as f64 / config::SIZE_IN_MB;
+
+                    // Report remote destination usage after successful WAL write
+                    if data_size_mb > 0.0 {
+                        let req_stats = config::meta::self_reporting::usage::RequestStats {
+                            size: data_size_mb,
+                            records: records_len as i64,
+                            response_time: 0.0,
+                            ..config::meta::self_reporting::usage::RequestStats::default()
+                        };
+
+                        crate::service::self_reporting::report_request_usage_stats(
+                            req_stats,
+                            &org_id,
+                            &destination_name,
+                            config::meta::stream::StreamType::Logs, /* Default to Logs for
+                                                                     * remote destination */
+                            config::meta::self_reporting::usage::UsageType::RemotePipeline,
+                            0, // No additional functions for remote destination
+                            chrono::Utc::now().timestamp_micros(),
+                        )
+                        .await;
+                    }
+                }
             }
         }
     }
@@ -1047,8 +1175,8 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
 }
 
 async fn send_to_children(
-    child_senders: &mut [Sender<(usize, Value, bool)>],
-    item: (usize, Value, bool),
+    child_senders: &mut [Sender<PipelineItem>],
+    item: PipelineItem,
     node_type: &str,
 ) {
     if child_senders.len() == 1 {
