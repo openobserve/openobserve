@@ -740,7 +740,7 @@ export default defineComponent({
 
         if(search_type === "dashboards") {
           query_source = row?.search_event_context?.folder_name + "/" + row?.search_event_context?.dashboard_name;
-        } else if(search_type == "alerts"){
+        } else if(search_type === "alerts"){
           query_source = row?.search_event_context?.alert_name + "(" + row?.search_event_context?.alert_key + ")";
         }
 
