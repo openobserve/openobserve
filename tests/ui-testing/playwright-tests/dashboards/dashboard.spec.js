@@ -794,7 +794,9 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.removeField("breakdown1");
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
-    await pm.chartTypeSelector.searchAndAddField("breakdown1", "b");
+
+    // Switch to table chart
+    await pm.chartTypeSelector.selectChartType("table");
 
     // Apply and save the panel
     await pm.dashboardPanelActions.applyDashboardBtn();
