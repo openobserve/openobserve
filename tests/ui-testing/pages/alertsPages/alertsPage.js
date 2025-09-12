@@ -561,8 +561,8 @@ export class AlertsPage {
     }
 
     async verifyAlertCounts() {
-        const scheduledAlertsCount = await this.page.locator('div:nth-child(3) > .q-w-sm > .row > div > .text-h6').first().textContent();
-        const realTimeAlertsCount = await this.page.locator('div:nth-child(3) > .q-w-sm > .row > div:nth-child(3) > .text-h6').textContent();
+        const scheduledAlertsCount = await this.page.locator('div:has-text("Alerts") >> text=Scheduled').locator('xpath=following::*[1]').first().textContent();
+        const realTimeAlertsCount = await this.page.locator('div:has-text("Alerts") >> text="Real time"').locator('xpath=following::*[1]').first().textContent();
         return { scheduledAlertsCount, realTimeAlertsCount };
     }
 
