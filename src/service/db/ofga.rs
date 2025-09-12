@@ -16,7 +16,6 @@
 use std::sync::Arc;
 
 use config::utils::json;
-use infra::cluster_coordinator::events::{MetaAction, MetaEvent};
 use o2_openfga::{
     config::OFGA_STORE_ID,
     meta::mapping::OFGAModel,
@@ -112,13 +111,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         }
     }
     Ok(())
-}
-
-pub async fn handle_ofga_event(event: MetaEvent) -> Result<(), anyhow::Error> {
-    match event.action {
-        MetaAction::Put => handle_put(&event.key).await,
-        MetaAction::Delete => handle_delete(),
-    }
 }
 
 async fn handle_put(event_key: &str) -> Result<(), anyhow::Error> {

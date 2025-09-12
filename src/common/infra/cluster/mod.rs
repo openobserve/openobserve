@@ -36,7 +36,6 @@ use config::{
     },
 };
 use infra::{
-    cluster_coordinator::events::{MetaAction, MetaEvent},
     db::{Event, get_coordinator},
     errors::Result,
 };
@@ -339,13 +338,6 @@ async fn watch_node_list() -> Result<()> {
     }
 
     Ok(())
-}
-
-pub async fn handle_node_list_event(event: MetaEvent) -> std::result::Result<(), anyhow::Error> {
-    match event.action {
-        MetaAction::Put => handle_node_list_put(&event.key, event.value).await,
-        MetaAction::Delete => handle_node_list_delete(&event.key).await,
-    }
 }
 
 async fn handle_node_list_put(
