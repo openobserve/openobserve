@@ -791,7 +791,6 @@ test.describe("dashboard UI testcases", () => {
 
     // Map query results to chart axes
     await pm.chartTypeSelector.removeField("xAxis1");
-    await pm.chartTypeSelector.removeField("yAxis1");
     await pm.chartTypeSelector.removeField("breakdown1");
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
