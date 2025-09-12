@@ -795,21 +795,9 @@ fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, a
 pub(crate) fn get_arg_name(args: &FunctionArg) -> String {
     match args {
         FunctionArg::Named { name, .. } => name.to_string(),
-        FunctionArg::ExprNamed { name, .. } => {
-            if is_field(name) {
-                get_field_name(name)
-            } else {
-                UNKNOWN_NAME.to_string()
-            }
-        }
+        FunctionArg::ExprNamed { name, .. } => get_field_name(name),
         FunctionArg::Unnamed(arg) => match arg {
-            FunctionArgExpr::Expr(expr) => {
-                if is_field(expr) {
-                    get_field_name(expr)
-                } else {
-                    UNKNOWN_NAME.to_string()
-                }
-            }
+            FunctionArgExpr::Expr(expr) => get_field_name(expr),
             _ => UNKNOWN_NAME.to_string(),
         },
     }
