@@ -522,7 +522,10 @@ export const usePanelDataLoader = (
           }
 
           if (res?.data?.streaming_aggs) {
-            state.data[currentQueryIndex] = [...searchRes.data.hits];
+            // handle empty hits case
+            if (searchRes?.data?.hits?.length > 0) {
+              state.data[currentQueryIndex] = [...searchRes.data.hits];
+            }
           }
           // if order by is desc, append new partition response at end
           else if (order_by.toLowerCase() === "desc") {
@@ -626,9 +629,12 @@ export const usePanelDataLoader = (
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
-      state.data[payload?.meta?.currentQueryIndex] = [
-        ...(searchRes?.content?.results?.hits ?? {}),
-      ];
+      // handle empty hits case
+      if (searchRes?.content?.results?.hits?.length > 0) {
+        state.data[payload?.meta?.currentQueryIndex] = [
+          ...(searchRes?.content?.results?.hits ?? {}),
+        ];
+      }
     }
     // if order by is desc, append new partition response at end
     else if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
@@ -671,9 +677,12 @@ export const usePanelDataLoader = (
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
-      state.data[payload?.meta?.currentQueryIndex] = [
-        ...(searchRes?.content?.results?.hits ?? {}),
-      ];
+      // handle empty hits case
+      if (searchRes?.content?.results?.hits?.length > 0) {
+        state.data[payload?.meta?.currentQueryIndex] = [
+          ...(searchRes?.content?.results?.hits ?? {}),
+        ];
+      }
     }
     // if order by is desc, append new partition response at end
     else if (
