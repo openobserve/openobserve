@@ -91,6 +91,18 @@ async fn register() -> Result<()> {
             e
         })?;
 
+    // create the coordinator stream if not exists
+    log::info!("[COORDINATOR] initializing coordinator");
+    if let Err(e) = infra::cluster_coordinator::events::init().await {
+        dist_lock::unlock(&locker).await.map_err(|e| {
+            log::error!("[CLUSTER] nats unlock failed: {}", e);
+            e
+        })?;
+        return Err(Error::Message(format!(
+            "[COORDINATOR] Failed to init coordinator events: {e}",
+        )));
+    }
+
     // 2. watch node list
     task::spawn(async move { super::watch_node_list().await });
 
