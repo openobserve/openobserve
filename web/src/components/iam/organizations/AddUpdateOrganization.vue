@@ -76,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ]"
           data-test="org-name"
           maxlength="100"
+          hide-bottom-space
         >
         <template v-slot:hint>
                 Use alphanumeric characters, space and underscore only.
