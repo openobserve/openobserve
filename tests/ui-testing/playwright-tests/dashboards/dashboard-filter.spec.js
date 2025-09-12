@@ -733,6 +733,16 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
 
+    // Select stream and add fields
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "y"
+    );
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+
     await waitForDateTimeButtonToBeEnabled(page);
 
     await pm.dashboardTimeRefresh.setRelative("6", "w");
@@ -798,6 +808,20 @@ test.describe("dashboard filter testcases", () => {
     console.log(`❌ Failed calls: ${failedCalls.length}`);
     console.log(`✅ All _values API calls returned 200 status code!`);
     console.log("=".repeat(50));
+
+    // Add filter field and set value
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "filter"
+    );
+
+    await pm.dashboardFilter.addFilterCondition(
+      0,
+      "kubernetes_container_name",
+      "",
+      "IN",
+      "$variablename"
+    );
 
     // Save panel and cleanup
     await pm.dashboardPanelActions.savePanel();
