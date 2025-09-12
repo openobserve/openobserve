@@ -15,6 +15,8 @@
 
 use proto::cluster_rpc;
 
+pub const UNKNOWN_NAME: &str = "__o2__unknown__field__";
+
 /// Supported inverted index formats:
 ///  - Parquet (v2): Index is stored in parquet format
 ///  - Tantivy (v3): Index is stored in custom puffin format files
