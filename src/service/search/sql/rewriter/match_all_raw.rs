@@ -53,8 +53,8 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        let mut track_total_hits_visitor = MatchAllRawVisitor::new();
-        let _ = statement.visit(&mut track_total_hits_visitor);
+        let mut visitor = MatchAllRawVisitor::new();
+        let _ = statement.visit(&mut visitor);
         let expected_sql = "SELECT * FROM t WHERE match_all('test')";
         assert_eq!(statement.to_string(), expected_sql);
     }
@@ -67,8 +67,8 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        let mut track_total_hits_visitor = MatchAllRawVisitor::new();
-        let _ = statement.visit(&mut track_total_hits_visitor);
+        let mut visitor = MatchAllRawVisitor::new();
+        let _ = statement.visit(&mut visitor);
         let expected_sql = "SELECT * FROM t WHERE match_all('test') GROUP BY name ORDER BY name";
         assert_eq!(statement.to_string(), expected_sql);
     }
@@ -80,8 +80,8 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        let mut track_total_hits_visitor = MatchAllRawVisitor::new();
-        let _ = statement.visit(&mut track_total_hits_visitor);
+        let mut visitor = MatchAllRawVisitor::new();
+        let _ = statement.visit(&mut visitor);
         let expected_sql = "SELECT t1.name, t2.name FROM t1 JOIN t2 ON t1.name = t2.name WHERE match_all('capture') GROUP BY t1.name, t2.name ORDER BY t1.name, t2.name";
         assert_eq!(statement.to_string(), expected_sql);
     }
@@ -93,8 +93,8 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        let mut track_total_hits_visitor = MatchAllRawVisitor::new();
-        let _ = statement.visit(&mut track_total_hits_visitor);
+        let mut visitor = MatchAllRawVisitor::new();
+        let _ = statement.visit(&mut visitor);
         let expected_sql = "SELECT match_all('fine') FROM t1";
         assert_eq!(statement.to_string(), expected_sql);
     }
@@ -106,8 +106,8 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        let mut track_total_hits_visitor = MatchAllRawVisitor::new();
-        let _ = statement.visit(&mut track_total_hits_visitor);
+        let mut visitor = MatchAllRawVisitor::new();
+        let _ = statement.visit(&mut visitor);
         let expected_sql = "SELECT match_all('fine') FROM t1";
         assert_eq!(statement.to_string(), expected_sql);
     }
