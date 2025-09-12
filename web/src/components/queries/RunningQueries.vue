@@ -735,6 +735,15 @@ export default defineComponent({
       rows.sort((a: any, b: any) => b.created_at - a.created_at);
 
       return rows.map((row: any, index) => {
+        const search_type = row?.search_type;
+        var query_source = "-unknown-";
+
+        if(search_type === "dashboards") {
+          query_source = row?.search_event_context?.folder_name + "/" + row?.search_event_context?.dashboard_name;
+        } else if(search_type == "alerts"){
+          query_source = row?.search_event_context?.alert_name + "(" + row?.search_event_context?.alert_key + ")";
+        }
+        
         return {
           "#": index < 9 ? `0${index + 1}` : index + 1,
           user_id: row?.user_id,
@@ -757,6 +766,7 @@ export default defineComponent({
           compressed_size: row?.scan_stats?.compressed_size,
           search_type: row?.search_type,
           search_type_label: row?.search_type_label,
+          query_source: query_source,
         };
       });
     });

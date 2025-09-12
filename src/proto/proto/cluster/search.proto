@@ -101,7 +101,16 @@ message SearchQuery {
     int64 histogram_interval = 16;
 }
 
-
+message SearchEventContext {
+    optional string alert_key = 1;
+    optional string derived_stream_key = 2;
+    optional string report_key = 3;
+    optional string dashboard_id = 4;
+    optional string dashboard_name = 5;
+    optional string dashboard_folder_id = 6;
+    optional string dashboard_folder_name = 7;
+    optional string alert_name = 8;
+}
 
 message QueryStatus {
     string                trace_id = 1;
@@ -115,6 +124,7 @@ message QueryStatus {
     optional ScanStats  scan_stats = 9;
     optional WorkGroup work_group = 10;
     optional string   search_type = 11;
+    optional SearchEventContext search_event_context = 12;
 }
 
 enum WorkGroup {

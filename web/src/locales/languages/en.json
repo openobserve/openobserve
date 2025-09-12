@@ -1142,7 +1142,8 @@
     "numOfQueries": "Number of Queries",
     "totalDuration": "Total Exec. Duration",
     "totalTimeRange": "Total Query Range",
-    "searchType": "Search Type"
+    "searchType": "Search Type",
+    "querySource": "Query Source"
   },
   "traces": {
     "viewLogs": "View Logs",
