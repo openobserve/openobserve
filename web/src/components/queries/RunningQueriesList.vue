@@ -222,6 +222,13 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "query_source",
+        field: "query_source",
+        label: t("queries.querySource"),
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "duration",
         label: t("queries.duration"),
         align: "left",

@@ -857,10 +857,12 @@ impl AlertExt for Alert {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else {
-            let search_event_ctx = SearchEventContext::with_alert(Some(format!(
+            let mut search_event_ctx = SearchEventContext::with_alert(Some(format!(
                 "/alerts/{}/{}/{}/{}",
                 self.org_id, self.stream_type, self.stream_name, self.name
             )));
+            search_event_ctx.alert_name = Some(self.name.clone());
+
             self.query_condition
                 .evaluate_scheduled(
                     &self.org_id,

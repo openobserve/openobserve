@@ -385,6 +385,14 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
+        dashboardName: {
+      type: String,
+      default: null,
+    },
+    folderName: {
+      type: String,
+      default: null,
+    },
     searchResponse: {
       required: false,
       type: Object,
@@ -445,6 +453,8 @@ export default defineComponent({
       folderId,
       reportId,
       allowAnnotationsAdd,
+      dashboardName,
+      folderName,
       searchResponse,
       is_ui_histogram,
     } = toRefs(props);
@@ -472,6 +482,8 @@ export default defineComponent({
       reportId,
       searchResponse,
       is_ui_histogram,
+      dashboardName,
+      folderName,
     );
 
     const {
