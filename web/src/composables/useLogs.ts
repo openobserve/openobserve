@@ -6295,8 +6295,14 @@ const useLogs = () => {
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
   ) => {
+    // Streaming aggs and hits -> replace
+    // streaming aggs and empty hits -> append
+    // If first partition then replace else it depends on streaming aggs and hits length
     if(payload.type === "search" && response?.type === "search_response_hits") {
-      handleStreamingHits(payload, response, payload.isPagination, !(response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs) && searchPartitionMap[payload.traceId] > 1);
+      const isStreamingAggs = response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs;
+      const shouldAppendStreamingResults = isStreamingAggs ? !response.content?.results?.hits?.length : true;
+
+      handleStreamingHits(payload, response, payload.isPagination, (shouldAppendStreamingResults && searchPartitionMap[payload.traceId] > 1));
       return;
     }
 
