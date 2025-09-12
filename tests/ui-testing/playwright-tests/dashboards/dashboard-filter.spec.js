@@ -684,4 +684,127 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardCreate.searchDashboard(randomDashboardName);
     await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
+  test("should verify the custom value search from variable dropdown", async ({
+    page,
+  }) => {
+    const valuesResponses = [];
+
+    // Listen for all responses to capture _values API calls
+    page.on("response", async (response) => {
+      const url = response.url();
+      if (url.includes("/_values")) {
+        valuesResponses.push({
+          url,
+          status: response.status(),
+        });
+        console.log(
+          `Captured _values API: ${url} => Status: ${response.status()}`
+        );
+      }
+    });
+
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+
+    // Navigate to dashboards
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await page
+      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
+      .waitFor({
+        state: "visible",
+      });
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardVariables.addDashboardVariable(
+      "variablename",
+      "logs",
+      "e2e_automate",
+      "kubernetes_container_name",
+      true
+    );
+
+    await page.waitForTimeout(3000);
+
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+
+    await waitForDateTimeButtonToBeEnabled(page);
+
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
+
+    // Perform custom value search in variable dropdown to trigger _values API calls
+    const variableInput = page.getByLabel("variablename", { exact: true });
+    await variableInput.waitFor({ state: "visible", timeout: 10000 });
+    await variableInput.click();
+
+    // Type partial search terms to trigger multiple _values API calls
+    const searchTerms = ["zi", "zio", "ziox"];
+    for (const term of searchTerms) {
+      await variableInput.fill(term);
+      await page.waitForTimeout(1000); // Allow API calls to complete
+    }
+
+    // Wait for final dropdown options to load
+    await page.waitForTimeout(2000);
+
+    // Select the final value
+    const option = page.getByRole("option", { name: "ziox" });
+    await option.waitFor({ state: "visible", timeout: 10000 });
+    await option.click();
+
+    // Wait for any remaining network activity to settle
+    await page.waitForTimeout(3000);
+
+    // Verify all _values API calls returned 200 status code
+    console.log(`\n📊 API MONITORING RESULTS:`);
+    console.log(`Total _values API calls captured: ${valuesResponses.length}`);
+
+    // Assert that we captured at least one _values API call
+    expect(valuesResponses.length).toBeGreaterThan(0);
+
+    // Print summary of all captured APIs
+    console.log(`\n📋 CAPTURED API CALLS SUMMARY:`);
+    console.log("=".repeat(50));
+    valuesResponses.forEach((res, index) => {
+      const statusEmoji = res.status === 200 ? "✅" : "❌";
+      console.log(`${index + 1}. ${statusEmoji} Status: ${res.status}`);
+      console.log(`   URL: ${res.url}`);
+      console.log(`   ${"-".repeat(80)}`);
+    });
+
+    // Assert all collected responses have 200 status
+    let failedCalls = [];
+    for (const res of valuesResponses) {
+      console.log(`🔍 Verifying API: ${res.url} => Status: ${res.status}`);
+      if (res.status !== 200) {
+        failedCalls.push(res);
+      }
+      expect(res.status).toBe(200);
+    }
+
+    console.log(`\n🎯 FINAL RESULTS:`);
+    console.log("=".repeat(50));
+    console.log(`✅ Total API calls: ${valuesResponses.length}`);
+    console.log(
+      `✅ Successful calls (200): ${
+        valuesResponses.filter((r) => r.status === 200).length
+      }`
+    );
+    console.log(`❌ Failed calls: ${failedCalls.length}`);
+    console.log(`✅ All _values API calls returned 200 status code!`);
+    console.log("=".repeat(50));
+
+    // Save panel and cleanup
+    await pm.dashboardPanelActions.savePanel();
+
+    // Delete the dashboard
+    await pm.dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.searchDashboard(randomDashboardName);
+    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+  });
 });
