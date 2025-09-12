@@ -387,6 +387,9 @@ async fn main() -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("set node schedulable failed"));
     }
 
+    // init grpc health check
+    job::grpc::health_check().await;
+
     // init http server
     if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         if let Err(e) = init_http_server_without_tracing().await {
