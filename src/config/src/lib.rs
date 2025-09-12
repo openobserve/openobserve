@@ -20,6 +20,7 @@ pub mod meta;
 pub mod metrics;
 pub mod router;
 pub mod utils;
+pub mod config_path_manager;
 
 pub use config::*;
 
