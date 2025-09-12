@@ -706,11 +706,36 @@ export default defineComponent({
               return;
             }
             searchObj.data.traceDetails.selectedTrace = trace;
+
+            let startTime = Number(router.currentRoute.value.query.from);
+            let endTime = Number(router.currentRoute.value.query.to);
+            if (
+              res.data.hits.length === 1 &&
+              res.data.hits[0].start_time &&
+              res.data.hits[0].end_time
+            ) {
+              startTime = Math.floor(res.data.hits[0].start_time / 1000);
+              endTime = Math.ceil(res.data.hits[0].end_time / 1000);
+
+              // If the trace is not in the current time range, update the time range
+              if (
+                !(
+                  startTime >= Number(router.currentRoute.value.query.from) &&
+                  endTime <= Number(router.currentRoute.value.query.to)
+                )
+              ) {
+                updateUrlQueryParams({
+                  from: startTime,
+                  to: endTime,
+                });
+              }
+            }
+
             getTraceDetails({
               stream: streamName,
               trace_id: trace.trace_id,
-              from: Number(router.currentRoute.value.query.from),
-              to: Number(router.currentRoute.value.query.to),
+              from: startTime,
+              to: endTime,
             });
           })
           .catch(() => {
@@ -724,6 +749,19 @@ export default defineComponent({
         searchObj.data.traceDetails.isLoadingTraceMeta = false;
         showTraceDetailsError();
       }
+    };
+
+    /**
+     * Update the query parameters in the URL
+     * @param newParams - object containing new parameters
+     */
+    const updateUrlQueryParams = (newParams: any) => {
+      router.replace({
+        query: {
+          ...router.currentRoute.value.query, // keep existing params
+          ...newParams, // overwrite with new ones
+        },
+      });
     };
 
     const getDefaultRequest = () => {
