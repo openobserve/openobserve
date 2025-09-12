@@ -148,9 +148,13 @@ impl Sql {
             let mut trace_total_hits_visitor = TrackTotalHitsVisitor::new();
             let _ = statement.visit(&mut trace_total_hits_visitor);
         }
+
+        // 3. rewrite match_all_raw and match_all_raw_ignore_case to match_all
+        let mut match_all_raw_visitor = MatchAllRawVisitor::new();
+        let _ = statement.visit(&mut match_all_raw_visitor);
         //********************Change the sql end*********************************//
 
-        // 3. get column name, alias, group by, order by
+        // 4. get column name, alias, group by, order by
         let mut column_visitor = ColumnVisitor::new(&total_schemas);
         let _ = statement.visit(&mut column_visitor);
 
@@ -184,12 +188,12 @@ impl Sql {
             }
         }
 
-        // 4. get match_all() value
+        // 5. get match_all() value
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
         let need_fst_fields = match_visitor.match_items.is_some();
 
-        // 5. check if have full text search filed in stream
+        // 6. check if have full text search filed in stream
         if stream_names.len() == 1 && need_fst_fields {
             let schema = total_schemas.values().next().unwrap();
             let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
@@ -206,7 +210,7 @@ impl Sql {
             }
         }
 
-        // 6. generate used schema
+        // 7. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         if column_visitor.is_wildcard {
             let has_original_column = has_original_column(&column_visitor.columns);
@@ -229,15 +233,15 @@ impl Sql {
             }
         }
 
-        // 7. get partition column value
+        // 8. get partition column value
         let mut partition_column_visitor = PartitionColumnVisitor::new(&used_schemas);
         let _ = statement.visit(&mut partition_column_visitor);
 
-        // 8. get prefix column value
+        // 9. get prefix column value
         let mut prefix_column_visitor = PrefixColumnVisitor::new(&used_schemas);
         let _ = statement.visit(&mut prefix_column_visitor);
 
-        // 9. pick up histogram interval
+        // 10. pick up histogram interval
         let mut histogram_interval_visitor =
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
         statement.visit(&mut histogram_interval_visitor);
@@ -1911,6 +1915,29 @@ impl VisitorMut for TrackTotalHitsVisitor {
             _ => {}
         }
         ControlFlow::Break(())
+    }
+}
+
+pub struct MatchAllRawVisitor {}
+
+impl MatchAllRawVisitor {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl VisitorMut for MatchAllRawVisitor {
+    type Break = ();
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        if let Expr::Function(f) = expr {
+            let fname = f.name.to_string().to_lowercase();
+            // for backward compatibility, we re-write these functions as match all
+            if fname == "match_all_raw" || fname == "match_all_raw_ignore_case" {
+                f.name = ObjectName(vec![Ident::new("match_all")])
+            }
+        }
+        ControlFlow::Continue(())
     }
 }
 
@@ -3828,5 +3855,71 @@ mod tests {
         let sql = "SELECT * FROM public.logs WHERE level = 'error'";
         let result = pickup_where(sql).unwrap();
         assert_eq!(result, Some("level = 'error'".to_string()));
+    }
+
+    #[test]
+    fn test_match_all_raw1() {
+        let sql = "SELECT * FROM t WHERE match_all_raw('test')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut visitor = MatchAllRawVisitor::new();
+        let _ = statement.visit(&mut visitor);
+        let expected_sql = "SELECT * FROM t WHERE match_all('test')";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_match_all_raw2() {
+        let sql =
+            "SELECT * FROM t WHERE match_all_raw_ignore_case('test') group by name order by name";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut visitor = MatchAllRawVisitor::new();
+        let _ = statement.visit(&mut visitor);
+        let expected_sql = "SELECT * FROM t WHERE match_all('test') GROUP BY name ORDER BY name";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_match_all_raw3() {
+        let sql = "SELECT t1.name, t2.name from t1 join t2 on t1.name = t2.name where match_all_raw('capture') group by t1.name, t2.name order by t1.name, t2.name";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut visitor = MatchAllRawVisitor::new();
+        let _ = statement.visit(&mut visitor);
+        let expected_sql = "SELECT t1.name, t2.name FROM t1 JOIN t2 ON t1.name = t2.name WHERE match_all('capture') GROUP BY t1.name, t2.name ORDER BY t1.name, t2.name";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_match_all_raw4() {
+        let sql = "SELECT match_all_raw_ignore_case('fine') from t1";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut visitor = MatchAllRawVisitor::new();
+        let _ = statement.visit(&mut visitor);
+        let expected_sql = "SELECT match_all('fine') FROM t1";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_match_all_raw5() {
+        let sql = "SELECT match_all_raw('fine') from t1";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut visitor = MatchAllRawVisitor::new();
+        let _ = statement.visit(&mut visitor);
+        let expected_sql = "SELECT match_all('fine') FROM t1";
+        assert_eq!(statement.to_string(), expected_sql);
     }
 }
