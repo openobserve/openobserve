@@ -43,19 +43,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-btn
           data-test="alert-variables-add-btn"
-          label="Add Variable"
           size="sm"
-          class="text-bold add-variable no-border q-py-sm"
-          icon="add"
-          color="primary"
-          style="
-            border-radius: 4px;
-            text-transform: capitalize;
-            color: #fff !important;
-            font-size: 12px;
-          "
+          class="text-bold no-border o2-secondary-button tw-h-[36px]"
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          flat
+          no-caps
           @click="addVariable"
-        />
+        >
+        <q-icon name="add" />
+        <span>Add Variable</span>
+      </q-btn>
       </div>
     </template>
     <template v-else>

@@ -545,13 +545,18 @@ pub async fn search_multi(
                                     .unwrap()
                                     .iter()
                                     .map(|item| {
-                                        config::utils::flatten::flatten(item.clone()).unwrap()
+                                        if !item.is_null() && item.is_object() {
+                                            config::utils::flatten::flatten(item.clone()).unwrap()
+                                        } else {
+                                            item.clone()
+                                        }
                                     })
                                     .collect::<Vec<_>>();
                                 Some(serde_json::Value::Array(flattened_array))
+                            } else if !v.is_null() && v.is_object() {
+                                config::utils::flatten::flatten(v.clone()).ok()
                             } else {
-                                (!v.is_null())
-                                    .then_some(config::utils::flatten::flatten(v.clone()).unwrap())
+                                None
                             }
                         })
                         .collect()
@@ -570,8 +575,11 @@ pub async fn search_multi(
                                 &org_id,
                                 &[vrl_stream_name.clone()],
                             );
-                            (!ret_val.is_null())
-                                .then_some(config::utils::flatten::flatten(ret_val).unwrap())
+                            if !ret_val.is_null() && ret_val.is_object() {
+                                config::utils::flatten::flatten(ret_val.clone()).ok()
+                            } else {
+                                None
+                            }
                         })
                         .collect()
                 }

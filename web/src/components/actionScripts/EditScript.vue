@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-separator />
-    <div class="flex" style="height: calc(100vh - 162px); overflow: auto">
+    <div class="flex" style="height: calc(100vh - 160px); overflow: auto">
       <div ref="addAlertFormRef" class="q-px-lg q-my-md" style="width: 1024px">
         <q-form
           class="create-report-form"
@@ -212,10 +212,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   data-test="add-action-script-step1-continue-btn"
                   @click="step = 2"
-                  color="secondary"
-                  label="Continue"
+                  class="o2-primary-button tw-h-[36px] q-mt-sm"
+                  :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                  flat
+                  :label="'Continue'"
                   no-caps
-                  class="q-mt-sm"
                 />
               </q-stepper-navigation>
             </q-step>
@@ -371,20 +372,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-stepper-navigation>
                 <div>
                   <q-btn
-                    data-test="add-action-script-step2-continue-btn"
-                    @click="step = 3"
-                    color="secondary"
-                    label="Continue"
-                    class="q-ml-sm"
-                    no-caps
-                  />
-                  <q-btn
                     data-test="add-action-script-step2-back-btn"
                     @click="step = 1"
                     flat
-                    color="primary"
-                    label="Back"
-                    class="q-ml-sm"
+                    class="o2-secondary-button tw-h-[36px] q-ml-sm"
+                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                    :label="'Back'"
+                    no-caps
+                  />
+                  <q-btn
+                    data-test="add-action-script-step2-continue-btn"
+                    @click="step = 3"
+                    class="o2-primary-button tw-h-[36px] q-ml-md "
+                    :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                    flat
+                    :label="'Continue'"
                     no-caps
                   />
                 </div>
@@ -450,20 +452,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <q-stepper-navigation>
                 <q-btn
-                  data-test="add-action-script-step3-continue-btn"
-                  @click="step = 4"
-                  color="secondary"
-                  label="Continue"
-                  no-caps
-                  class="q-mt-sm"
-                />
-                <q-btn
                   data-test="add-action-script-step3-back-btn"
                   @click="step = formData.type === 'scheduled' ? 2 : 1"
                   flat
-                  color="primary"
-                  label="Back"
-                  class="q-ml-sm"
+                  class="o2-secondary-button tw-h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  :label="'Back'"
+                  no-caps
+                />
+                <q-btn
+                  data-test="add-action-script-step3-continue-btn"
+                  @click="step = 4"
+                  class="o2-primary-button tw-h-[36px] q-ml-md"
+                  :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                  flat
+                  :label="'Continue'"
                   no-caps
                 />
               </q-stepper-navigation>
@@ -544,9 +547,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-action-script-step4-back-btn"
                   flat
                   @click="step = 3"
-                  color="primary"
-                  label="Back"
-                  class="q-ml-sm"
+                  class="o2-secondary-button tw-h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  :label="'Back'"
                   no-caps
                 />
               </q-stepper-navigation>
@@ -556,7 +559,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="flex justify-end q-px-md q-py-sm full-width"
+      class="flex justify-end q-px-md q-py-md full-width "
       style="position: sticky; bottom: 0px; z-index: 2"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
       :style="{
@@ -568,19 +571,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <q-btn
         data-test="add-action-script-cancel-btn"
-        class="text-bold"
+        class="o2-secondary-button tw-h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        flat
         :label="t('alerts.cancel')"
-        text-color="light-text"
-        padding="sm md"
         no-caps
         @click="openCancelDialog"
       />
       <q-btn
         data-test="add-action-script-save-btn"
         :label="t('alerts.save')"
-        class="text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
+        class="o2-primary-button tw-h-[36px] q-ml-md"
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+        flat
         no-caps
         @click="saveActionScript"
       />

@@ -34,7 +34,10 @@ use config::{
     },
 };
 use flate2::read::GzDecoder;
-use infra::errors::{Error, Result};
+use infra::{
+    errors::{Error, Result},
+    schema::get_flatten_level,
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use opentelemetry_proto::tonic::{
@@ -238,8 +241,9 @@ pub async fn ingest(
             pipeline_inputs.push(item);
             original_options.push(original_data);
         } else {
-            // JSON Flattening
-            let mut res = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
+            // JSON Flattening - use per-stream flatten level
+            let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+            let mut res = flatten::flatten_with_level(item, flatten_level)?;
 
             // handle timestamp
             let timestamp = match handle_timestamp(&mut res, min_ts, max_ts) {
@@ -571,10 +575,16 @@ pub fn handle_timestamp(
         .as_object_mut()
         .ok_or_else(|| anyhow::Error::msg("Value is not an object"))?;
     let timestamp = match local_val.get(TIMESTAMP_COL_NAME) {
-        Some(v) => match parse_timestamp_micro_from_value(v) {
-            Ok(t) => t,
-            Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
-        },
+        Some(v) => {
+            if !v.is_null() {
+                match parse_timestamp_micro_from_value(v) {
+                    Ok(t) => t,
+                    Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
+                }
+            } else {
+                Utc::now().timestamp_micros()
+            }
+        }
         None => Utc::now().timestamp_micros(),
     };
     // check ingestion time
