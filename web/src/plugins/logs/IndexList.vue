@@ -803,6 +803,11 @@ import { cloneDeep } from "lodash-es";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import searchService from "@/services/search";
 import useHttpStreaming from "@/composables/useStreamingSearch";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { useSearchBar } from "@/composables/useLogs/useSearchBar";
+import { useSearchStream } from "@/composables/useLogs/useSearchStream";
+import { searchState } from "@/composables/useLogs/searchState";
+import { useStreamFields } from "@/composables/useLogs/useStreamFields";
 
 interface Filter {
   fieldName: string;
@@ -851,20 +856,19 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const {
-      searchObj,
-      updatedLocalLogFilterField,
-      handleQueryData,
-      onStreamChange,
-      filterHitsColumns,
-      extractFields,
-      validateFilterForMultiStream,
       reorderSelectedFields,
       getFilterExpressionByFieldType,
       extractValueQuery,
-      fnParsedSQL,
-      fnUnparsedSQL,
-      streamSchemaFieldsIndexMapping,
     } = useLogs();
+
+    const { filterHitsColumns, extractFields } = useStreamFields();
+
+    const { searchObj, streamSchemaFieldsIndexMapping } = searchState();
+
+    const { onStreamChange, handleQueryData } = useSearchBar();
+    const { validateFilterForMultiStream } = useSearchStream();
+
+    const {fnParsedSQL, fnUnparsedSQL, updatedLocalLogFilterField} = logsUtils();
 
     const {
       fetchQueryDataWithWebSocket,
