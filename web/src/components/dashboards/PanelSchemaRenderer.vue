@@ -1362,6 +1362,9 @@ export default defineComponent({
                       drilldownParams[0].value.length - 1
                     ]
                   : drilldownParams[0].value,
+                __axisValue:
+                  drilldownParams?.[0]?.value?.[0] ??
+                  drilldownParams?.[0]?.name,
               };
             }
 
@@ -1909,7 +1912,7 @@ export default defineComponent({
       downloadDataAsCSV,
       downloadDataAsJSON,
       loadingProgressPercentage,
-    };
+        };
   },
 });
 </script>
