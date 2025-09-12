@@ -128,7 +128,7 @@ test.describe("dashboard Import testcases", () => {
       );
 
     await expect(
-      page.locator(".cm-content").filter({ hasText: '"dashboardId": "' })
+      page.locator(".view-lines").locator(".view-line").filter({ hasText: '"dashboardId": "' })
     ).toBeVisible();
 
     await pm.dashboardImport.clickImportButton();
@@ -376,11 +376,11 @@ test.describe("dashboard Import testcases", () => {
 
     await page.waitForTimeout(2000);
 
-    await page.waitForSelector(".cm-content");
+    await page.waitForSelector(".view-lines");
     await expect(
       page
-        .locator(".cm-content")
-        .locator(".cm-line")
+        .locator(".view-lines")
+        .locator(".view-line")
         .filter({ hasText: '"dashboardId": "' })
         .nth(0)
     ).toBeVisible();

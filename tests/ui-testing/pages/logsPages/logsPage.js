@@ -114,8 +114,8 @@ export class LogsPage {
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
         this.qNotifyWarning = '#q-notify div';
         this.qPageContainer = '.q-page-container';
-        this.cmContent = '.cm-content';
-        this.cmLine = '.cm-line';
+        this.cmContent = '.view-lines';
+        this.cmLine = '.view-line';
         this.searchFunctionInput = { placeholder: 'Search Function' };
         this.timestampFieldTable = '[data-test="log-search-index-list-fields-table"]';
     }
@@ -401,7 +401,7 @@ export class LogsPage {
     async typeQuery(query) {
         await this.page.locator(this.queryEditor).click();
         await this.page.locator(this.queryEditor).press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await this.page.keyboard.type(query);
+        await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
     }
 
     async executeQueryWithKeyboardShortcut() {
@@ -1020,42 +1020,42 @@ export class LogsPage {
 
     async kubernetesContainerNameJoin() {
         await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
+            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
             .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.page.waitForTimeout(5000);
     }
 
     async kubernetesContainerNameJoinLimit() {
         await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
+            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
             .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
         await this.page.waitForTimeout(5000);
     }
 
     async kubernetesContainerNameJoinLike() {
         await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
+            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
             .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE "%ziox%"');
         await this.page.waitForTimeout(5000);
     }
 
     async kubernetesContainerNameLeftJoin() {
         await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
+            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
             .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.page.waitForTimeout(5000);
     }
 
     async kubernetesContainerNameRightJoin() {
         await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
+            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
             .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.page.waitForTimeout(5000);
     }
 
     async kubernetesContainerNameFullJoin() {
         await this.page
-            .locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox')
+            .locator('[data-test="logs-search-bar-query-editor"]').locator('.inputarea')
             .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.page.waitForTimeout(5000);
     }
@@ -1264,11 +1264,11 @@ export class LogsPage {
     }
 
     async clickQueryEditorTextbox() {
-        return await this.page.locator(this.queryEditor).getByRole('textbox').click();
+        return await this.page.locator(this.queryEditor).locator('.monaco-editor').click();
     }
 
     async fillQueryEditor(query) {
-        return await this.page.locator(this.queryEditor).getByRole('textbox').fill(query);
+        return await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
     }
 
     async clearQueryEditor() {
@@ -1398,12 +1398,12 @@ export class LogsPage {
     }
 
     async waitForQueryEditorTextbox() {
-        return await this.page.locator(this.queryEditor).getByRole('textbox').waitFor({ state: "visible" });
+        return await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: "visible" });
     }
 
     async getQueryEditorText() {
         return await this.page.evaluate((selector) => {
-            const editor = document.querySelector(selector).querySelector('.cm-content');
+            const editor = document.querySelector(selector).querySelector('.monaco-editor').querySelector('.view-lines');
             return editor ? editor.textContent : null;
         }, this.queryEditor);
     }
@@ -1622,7 +1622,7 @@ export class LogsPage {
     }
 
     async clickVrlEditor() {
-        return await this.page.locator(this.vrlEditor).first().getByRole('textbox').fill('.a=2');
+        return await this.page.locator(this.vrlEditor).locator('.inputarea').fill('.a=2');
     }
 
     async waitForTimeout(milliseconds) {
@@ -1658,7 +1658,7 @@ export class LogsPage {
     }
 
     async expectFnEditorNotVisible() {
-        return await expect(this.page.locator('#fnEditor').getByRole('textbox').locator('div')).not.toBeVisible();
+        return await expect(this.page.locator('#fnEditor').locator('.inputarea')).not.toBeVisible();
     }
 
     async clickPast6DaysButton() {
@@ -1725,7 +1725,7 @@ export class LogsPage {
     }
 
     async expectQueryEditorContainsText(text) {
-        return await expect(this.page.locator(this.queryEditor).locator('.cm-content')).toContainText(text);
+        return await expect(this.page.locator(this.queryEditor).locator('.monaco-editor')).toContainText(text);
     }
 
     async expectQueryEditorEmpty() {
@@ -1897,7 +1897,7 @@ export class LogsPage {
 
     async expectQueryEditorContainsExpectedQuery(expectedQuery) {
         const text = await this.page.evaluate((queryEditorSelector) => {
-            const editor = document.querySelector(queryEditorSelector).querySelector('.cm-content');
+            const editor = document.querySelector(queryEditorSelector).querySelector('.monaco-editor');
             return editor ? editor.textContent.trim() : null;
         }, this.queryEditor);
         console.log(text);
@@ -1906,8 +1906,8 @@ export class LogsPage {
 
     async expectQueryEditorContainsSelectFrom() {
         return await this.page.locator(this.queryEditor)
-            .locator(this.cmContent)
-            .locator(this.cmLine)
+            .locator('.view-lines')
+            .locator('.view-line')
             .filter({ hasText: 'SELECT * FROM "e2e_automate"' })
             .nth(0);
     }

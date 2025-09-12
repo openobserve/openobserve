@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,12 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod add_new_filter;
-pub mod add_o2_id;
-pub mod add_ordering_term;
-pub mod add_timestamp;
-pub mod approx_percentile;
-pub mod index;
-pub mod match_all_raw;
-pub mod remove_dashboard_placeholder;
-pub mod track_total_hits;
+export const getDataValue = (obj: any, alias: string): any => {
+  return obj?.[alias] || obj?.[alias?.toLowerCase()];
+};
