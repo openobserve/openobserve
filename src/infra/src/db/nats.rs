@@ -317,8 +317,9 @@ impl super::Db for NatsDb {
             .await
             .map_err(|e| Error::Message(format!("[NATS:delete] bucket.keys error: {e}")))?;
         for purge_key in keys {
+            let encode_key = key_encode(&purge_key);
             bucket
-                .purge(purge_key.clone())
+                .purge(encode_key)
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {e}")))?;
             if need_watch {
