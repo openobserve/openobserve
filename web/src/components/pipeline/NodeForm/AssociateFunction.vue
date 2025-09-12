@@ -45,7 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw-flex tw-items-center">
         <q-toggle
           data-test="create-function-toggle"
-          class="q-mb-sm tw-inline-block"
+          class="q-mb-sm tw-inline-block tw-h-[36px] o2-toggle-button-lg"
+          size="lg"
+          :class="[store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light', !createNewFunction ? '-tw-ml-4' : '']"
           :label="isUpdating ? 'Edit function' : 'Create new function'"
           v-model="createNewFunction"
         />
@@ -111,7 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-toggle
             data-test="associate-function-after-flattening-toggle"
-            class="q-mb-sm"
+            class="q-mb-sm tw-h-[36px] o2-toggle-button-lg tw-mr-3 -tw-ml-4"
+            size="lg"
+            :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
             :label="t('pipeline.flatteningLbl')"
             v-model="afterFlattening"
           />
@@ -121,13 +125,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex justify-start full-width"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
+        <q-btn
+            v-if="pipelineObj.isEditNode"
+            data-test="associate-function-delete-btn"
+            class="o2-secondary-button tw-h-[36px] q-mr-md"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            no-caps
+            @click="openDeleteDialog"
+          >
+          <q-icon name="delete" class="q-mr-xs" />
+          {{ t('pipeline.deleteNode') }}
+        </q-btn>
           <q-btn
             v-if="!createNewFunction"
             data-test="associate-function-cancel-btn"
-            class="text-bold"
+            class="o2-secondary-button tw-h-[36px]"
             :label="t('alerts.cancel')"
-            text-color="light-text"
-            padding="sm md"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             no-caps
             @click="openCancelDialog"
           />
@@ -137,21 +153,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="
               createNewFunction ? t('alerts.createFunction') : t('alerts.save')
             "
-            class="text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
+            class="no-border q-ml-md o2-primary-button tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            flat
             no-caps
             type="submit"
-          />
-          <q-btn
-            v-if="pipelineObj.isEditNode"
-            data-test="associate-function-delete-btn"
-            :label="t('pipeline.deleteNode')"
-            class="text-bold no-border q-ml-md"
-            color="negative"
-            padding="sm xl"
-            no-caps
-            @click="openDeleteDialog"
           />
         </div>
       </q-form>

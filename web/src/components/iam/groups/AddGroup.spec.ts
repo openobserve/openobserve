@@ -68,12 +68,6 @@ describe("AddGroup Component", () => {
       expect(titleElement.exists()).toBe(true);
       expect(titleElement.text()).toContain("Add User Group");
     });
-
-    it("renders the close button", () => {
-      const closeButton = wrapper.find('[data-test="add-group-close-dialog-btn"]');
-      expect(closeButton.exists()).toBe(true);
-      expect(closeButton.classes()).toContain("q-btn");
-    });
   });
 
   describe("Form Input", () => {

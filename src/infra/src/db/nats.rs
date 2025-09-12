@@ -86,7 +86,11 @@ async fn get_bucket_by_key<'a>(
     if bucket_name == "nodes" || bucket_name == "clusters" {
         // if changed ttl need recreate the bucket
         // CMD: nats kv del -f o2_nodes
-        bucket.max_age = Duration::from_secs(cfg.limit.node_heartbeat_ttl as u64);
+        let ttl = Duration::from_secs(cfg.limit.node_heartbeat_ttl as u64);
+        bucket.max_age = ttl;
+        if cfg.nats.v211_support {
+            bucket.limit_markers = Some(ttl);
+        }
     }
     let kv = jetstream.create_key_value(bucket).await.map_err(|e| {
         Error::Message(format!(

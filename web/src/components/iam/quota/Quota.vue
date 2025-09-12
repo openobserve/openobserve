@@ -83,7 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!editTable"
               data-test="edit-table-btn"
               label="Edit Quota"
-              class="border title-height"
+              flat
+              class="border title-height o2-secondary-button tw-h-[36px]"
+              :class="store.state.theme == 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               no-caps
               :disable="activeTab == 'role-limits' && !expandedRow"
               @click="editTableWithInput"
@@ -105,18 +107,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-list-search-input"
               v-model="searchQuery"
               borderless
-              filled
-              dense
-              class="no-border input-width"
+              flat
+              class="no-border input-width o2-search-input"
+              :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
               :placeholder="
                 {
                   'api-limits': t('quota.api-search'),
                   'role-limits': t('quota.role-search'),
                 }[activeTab]
               "
+
             >
               <template #prepend>
-                <q-icon name="search" class="cursor-pointer" />
+                <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
               </template>
             </q-input>
             <q-select
@@ -171,15 +174,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-
+      <!-- this table for api limits -->
       <q-table
         :rows="apiLimitsRows"
         :columns="generateColumns()"
         row-key="name"
+        :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark' : 'o2-last-row-border-light'"
         :pagination="pagination"
         :filter="searchQuery"
         :filter-method="filteredData"
-        v-if="activeTab == 'api-limits' && activeType == 'table'"
+        v-if="activeTab == 'api-limits' && activeType == 'table' && !isApiLimitsLoading"
+        style="height: calc(100vh - 198px);"
         dense
         class="q-mx-md"
       >
@@ -195,7 +200,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-th>
           </q-tr>
         </template>
-        <template #no-data></template>
+        <template #no-data>
+        </template>
 
         <template #bottom="scope">
           <q-table-pagination
@@ -272,6 +278,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </template>
       </q-table>
+      <div v-if="isApiLimitsLoading && activeTab == 'api-limits' && activeType == 'table'" class="tw-h-[50vh] tw-flex tw-justify-center tw-items-center">
+        <q-spinner-hourglass color="primary" size="lg" />
+      </div>
       <div
         class="q-mt-md"
         v-if="activeTab == 'api-limits' && activeType == 'json'"
@@ -289,6 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :read-only="!editTable"
         />
       </div>
+      <!-- this table for role limits -->
       <q-table
         :rows="rolesLimitRows"
         :columns="roleLimitsColumns"
@@ -297,8 +307,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter="searchQuery"
         :filter-method="filteredData"
         dense
-        v-if="activeTab == 'role-limits' && activeType == 'table'"
+        v-if="activeTab == 'role-limits' && activeType == 'table' && !isRolesLoading"
         class="q-mx-md"
+        style="height: calc(100vh - 200px);"
       >
         <template v-slot:header="props">
           <q-tr :props="props" class="thead-sticky">
@@ -352,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-td>
           </q-tr>
           <q-tr
-            v-if="!editTable && !roleLevelLoading"
+            v-if="!editTable && !isRoleLimitsLoading"
             v-for="(row, index) in filteredRoleLevelModuleRows"
             data-test="scheduled-pipeline-row-expand"
             v-show="expandedRow === props.row.uuid"
@@ -372,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-td>
           </q-tr>
           <q-tr
-            v-if="editTable && !roleLevelLoading"
+            v-if="editTable && !roleLevelLoading && !isRoleLimitsLoading"
             v-for="(row, index) in filteredRoleLevelModuleRows"
             data-test="scheduled-pipeline-row-expand"
             v-show="expandedRow === props.row.uuid"
@@ -426,8 +437,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-td>
           </q-tr>
+          <q-tr v-if="isRoleLimitsLoading && props.row.uuid == expandedRow">
+            <q-td v-for="col in props.cols" :key="col.name">
+              <div v-if="col.name == 'create'" class="tw-h-[50vh] tw-w-full tw-flex tw-justify-center tw-items-center">
+              <q-spinner-hourglass color="primary" size="lg" />
+            </div>
+            </q-td>
+          </q-tr>
         </template>
       </q-table>
+      <div v-if="isRolesLoading && activeTab == 'role-limits' && activeType == 'table'" class="tw-h-[70vh] tw-flex tw-justify-center tw-items-center">
+        <q-spinner-hourglass color="primary" size="lg" />
+      </div>
       <div
         class="q-mt-md"
         v-if="activeTab == 'role-limits' && activeType == 'json'"
@@ -471,35 +492,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else-if="
-          activeTab == 'api-limits' && !loading && !apiLimitsRows.length
+          activeTab == 'api-limits' && !loading && !apiLimitsRows.length && !isApiLimitsLoading
         "
       >
         <NoData />
       </div>
       <div
         v-else-if="
-          activeTab == 'role-limits' && !loading && !rolesLimitRows.length
+          activeTab == 'role-limits' && !loading && !rolesLimitRows.length && !isRolesLoading
         "
       >
         <NoData />
       </div>
       <div
-        class="flex justify-end w-full tw-ml-auto floating-buttons q-pr-md"
+        class="flex justify-end w-full tw-ml-auto floating-buttons q-pr-md tw-py-2"
         v-if="editTable && activeType == 'table'"
       >
         <q-btn
           label="Cancel"
-          class="border q-ml-md title-height"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="cancelChanges"
         />
         <q-btn
           label="Save Changes"
-          class="text-bold no-border q-ml-md"
-          :color="Object.keys(changedValues).length > 0 ? 'secondary' : 'grey'"
+          class="o2-primary-button no-border tw-h-[36px]"
           :disable="Object.keys(changedValues).length === 0"
-          padding="sm md"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           @click="saveChanges"
         />
       </div>
@@ -509,17 +532,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-btn
           label="Cancel"
-          class="border q-ml-md title-height"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="cancelJsonChanges"
           :disable="isSavingJson"
         />
         <q-btn
           :label="isSavingJson ? 'Saving Changes...' : 'Save Changes'"
-          class="text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm md"
+          class="o2-primary-button no-border tw-h-[36px]"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           @click="saveJsonChanges"
           :disable="isSavingJson"
         />
@@ -604,11 +629,13 @@ export default defineComponent({
     const organizations = ref<any[]>([]);
     const isOrgLoading = ref<boolean>(false);
     const resultTotal = ref<number>(0);
-    const perPageOptions = ref<number[]>([10, 20, 50, 100]);
+    const perPageOptions = ref<number[]>([20, 50, 100, 250, 500]);
     const {
       getApiLimitsByOrganization,
       getRoleLimitsByOrganization,
       getModulesToDisplay,
+      isRoleLimitsLoading,
+      isApiLimitsLoading,
     } = useRateLimiter();
     const pagination: any = ref({
       rowsPerPage: 20,
@@ -761,6 +788,7 @@ export default defineComponent({
 
     const selectedPerPage = ref<number>(20);
     const qTable = ref<any>(null);
+    const isRolesLoading = ref<boolean>(false);
 
     onMounted(async () => {
       await getOrganizations();
@@ -978,6 +1006,7 @@ export default defineComponent({
       //as we are not storing the roles in the store
       //so we need to get the roles from the api
       try {
+        isRolesLoading.value = true;
         const response = await getRoles(selectedOrganization.value?.value);
         rolesLimitRows.value = response.data.map((role: any) => ({
           role_name: role,
@@ -989,8 +1018,10 @@ export default defineComponent({
           delete: 10,
         }));
         resultTotal.value = rolesLimitRows.value.length;
+        isRolesLoading.value = false;
       } catch (error) {
         console.log(error);
+        isRolesLoading.value = false;
       }
     };
     const restrictToNumbers = (event: any) => {
@@ -1322,6 +1353,8 @@ export default defineComponent({
         openedRole.value = null;
       } else {
         openedRole.value = props.row.role_name;
+        //expand the row at first only because we need to show the loading state for the user 
+        expandedRow.value = props.row.uuid;
         let roleLimits: any;
         if (
           !store.state.allRoleLimitsByOrgIdByRole[
@@ -1340,7 +1373,6 @@ export default defineComponent({
         }
         filterModulesBasedOnCategory();
         // Otherwise, expand the clicked row and collapse any other row
-        expandedRow.value = props.row.uuid;
       }
     };
 
@@ -1617,6 +1649,9 @@ export default defineComponent({
       transformData,
       convertUploadRulesToJson,
       jsonDiff,
+      isRoleLimitsLoading,
+      isApiLimitsLoading,
+      isRolesLoading,
     };
   },
 });

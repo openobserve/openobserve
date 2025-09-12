@@ -17,33 +17,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none">
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
-      :class="store.state.theme =='dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 57px);">
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
+      :class="store.state.theme =='dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
       style="position: sticky; top: 0; z-index: 1000 ;"
       >
-          <div  class="q-table__title full-width" data-test="organizations-title-text">{{ t("organization.header") }}</div>
+          <div  class="q-table__title full-width tw-font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
           <div class="full-width tw-flex tw-justify-end">
 
             <q-input
               v-model="filterQuery"
-              filled
+              borderless
               dense
-             class="col-6"
+              class="q-ml-auto no-border o2-search-input tw-h-[36px]"
               :placeholder="t('organization.search')"
+              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             >
               <template #prepend>
-                <q-icon name="search" />
+                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
               </template>
             </q-input>
           
             <q-btn
-              class="q-ml-md text-bold no-border"
-              padding="sm lg"
-              color="secondary"
-              style="float: right; cursor: pointer !important"
+              class="q-ml-md o2-primary-button tw-h-[36px]"
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               no-caps
-              dense
               :label="t(`organization.add`)"
               @click="addOrganization"
               data-test="Add Organization"
@@ -53,15 +52,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <q-table
       ref="qTable"
-      :rows="organizations"
+      :rows="visibleRows"
       :columns="columns"
       row-key="id"
       :pagination="pagination"
-      :filter="filterQuery"
-      :filter-method="filterData"
       :loading="loading"
-      class="o2-quasar-table"
-      :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+      class="o2-quasar-table o2-quasar-table-header-sticky"
+      style="overflow-y: auto;"
+      :style="hasVisibleRows
+            ? 'height: calc(100vh - 114px); overflow-y: auto;' 
+            : ''"
+      :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
     >
       <template #no-data><NoData /></template>
 
@@ -81,27 +82,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-td>
       </template> -->
 
-      <template #top="scope">
-        <QTablePagination
-          :scope="scope"
-          :pageTitle="t('organization.header')"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="top"
-          @update:changeRecordPerPage="changePagination"
-        />
-      </template>
 
       <template #bottom="scope">
-        <QTablePagination
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="bottom"
-          @update:changeRecordPerPage="changePagination"
-        />
-        <!-- :maxRecordToReturn="maxRecordToReturn" -->
-        <!-- @update:maxRecordToReturn="changeMaxRecordToReturn" -->
+        <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+          <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+            {{ resultTotal }} {{ t('organization.header') }}
+          </div>
+            <QTablePagination
+              :scope="scope"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              position="bottom"
+              @update:changeRecordPerPage="changePagination"
+            />
+        </div>
       </template>
 
       <template #body-cell-actions="props">
@@ -130,14 +124,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
       @before-hide="hideAddOrgDialog"
     >
-      <add-update-organization @updated="updateOrganizationList" :model-value="toBeUpdatedOrganization" />
+      <add-update-organization @updated="updateOrganizationList" :model-value="toBeUpdatedOrganization" @cancel:hideform="hideAddOrgDialog" />
     </q-dialog>
   </q-page>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, onBeforeMount, onUpdated } from "vue";
+import { defineComponent, ref, watch, onMounted, onBeforeMount, onUpdated, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, date, copyToClipboard } from "quasar";
@@ -171,6 +165,7 @@ export default defineComponent({
     const showOrgAPIKeyDialog = ref(false);
     const organizationAPIKey = ref("");
     const qTable: any = ref(null);
+    const filterQuery = ref("");
     const toBeUpdatedOrganization = ref({
       id: "",
       name: "",
@@ -231,7 +226,7 @@ export default defineComponent({
     )
 
     const perPageOptions = [
-      { label: "25", value: 25 },
+      { label: "20", value: 20 },
       { label: "50", value: 50 },
       { label: "100", value: 100 },
       { label: "250", value: 250 },
@@ -239,9 +234,9 @@ export default defineComponent({
     ];
     const resultTotal = ref<number>(0);
     // const maxRecordToReturn = ref<number>(500);
-    const selectedPerPage = ref<number>(25);
+    const selectedPerPage = ref<number>(20);
     const pagination: any = ref({
-      rowsPerPage: 25,
+      rowsPerPage: 20,
     });
 
     watch(
@@ -441,6 +436,23 @@ export default defineComponent({
       });
     };
 
+    const filterData = (rows: string | any[], terms: string) => {
+        const filtered = [];
+        terms = terms.toLowerCase();
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i]["name"].toLowerCase().includes(terms.trim()) || rows[i]["identifier"].toLowerCase().includes(terms.trim())) {
+            filtered.push(rows[i]);
+          }
+        }
+        return filtered;
+      };
+
+    const visibleRows = computed(() => {
+      if (!filterQuery.value) return organizations.value || []
+      return filterData(organizations.value || [], filterQuery.value)
+    });
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+
     const renameOrganization = (props: any) => {
       router.push({
         query: {
@@ -480,18 +492,12 @@ export default defineComponent({
       perPageOptions,
       selectedPerPage,
       changePagination,
-      filterQuery: ref(""),
-      filterData(rows: string | any[], terms: string) {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms.trim()) || rows[i]["identifier"].toLowerCase().includes(terms.trim())) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
+      filterQuery,
+      filterData,
       hideAddOrgDialog,
+      visibleRows,
+      hasVisibleRows,
+
       renameOrganization,
       toBeUpdatedOrganization,
     };

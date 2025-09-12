@@ -64,6 +64,8 @@ describe("QueryList", () => {
       files: 5,
       original_size: 1048576, // 1MB in bytes
       compressed_size: 524288, // 512KB in bytes
+      search_type: "dashboards",
+      query_source: "MyDashboard"
     },
     {
       trace_id: "test-trace-456",
@@ -79,6 +81,8 @@ describe("QueryList", () => {
       files: 2,
       original_size: undefined,
       compressed_size: undefined,
+      search_type: "alerts",
+      query_source: "MyAlert"
     }
   ];
 
@@ -160,13 +164,15 @@ describe("QueryList", () => {
       const query = mockQueryData[0];
       const rows = wrapper.vm.getRows(query);
 
-      expect(rows).toHaveLength(14);
+      expect(rows).toHaveLength(16);
       expect(rows[0]).toEqual(["Trace ID", "test-trace-123"]);
       expect(rows[1]).toEqual(["Status", "success"]);
       expect(rows[2]).toEqual(["User ID", "user-123"]);
       expect(rows[3]).toEqual(["Org ID", "org-123"]);
       expect(rows[4]).toEqual(["Stream Type", "logs"]);
-      expect(rows[5]).toEqual(["SQL", "SELECT * FROM logs"]);
+      expect(rows[5]).toEqual(["Search Type", "dashboards"]);
+      expect(rows[6]).toEqual(["Query Source", "MyDashboard"]);
+      expect(rows[7]).toEqual(["SQL", "SELECT * FROM logs"]);
     });
 
     it("should format start time correctly", () => {
@@ -195,38 +201,38 @@ describe("QueryList", () => {
       const query = mockQueryData[0];
       const rows = wrapper.vm.getRows(query);
 
-      expect(rows[6][1]).toContain("UTC");
-      expect(rows[6][1]).toContain("1640995200000000");
-      expect(rows[7][1]).toContain("UTC");
-      expect(rows[7][1]).toContain("1640995260000000");
+      expect(rows[8][1]).toContain("UTC");
+      expect(rows[8][1]).toContain("1640995200000000");
+      expect(rows[9][1]).toContain("UTC");
+      expect(rows[9][1]).toContain("1640995260000000");
     });
 
     it("should calculate execution duration", () => {
       const query = mockQueryData[0];
       const rows = wrapper.vm.getRows(query);
 
-      expect(rows[8]).toEqual(["Exec. Duration", "10 minutes"]);
+      expect(rows[10]).toEqual(["Exec. Duration", "10 minutes"]);
     });
 
     it("should calculate query range", () => {
       const query = mockQueryData[0];
       const rows = wrapper.vm.getRows(query);
 
-      expect(rows[9]).toEqual(["Query Range", "1 minute"]);
+      expect(rows[11]).toEqual(["Query Range", "1 minute"]);
     });
 
     it("should include scan records", () => {
       const query = mockQueryData[0];
       const rows = wrapper.vm.getRows(query);
 
-      expect(rows[10]).toEqual(["Scan Records", 1000]);
+      expect(rows[12]).toEqual(["Scan Records", 1000]);
     });
 
     it("should include files count", () => {
       const query = mockQueryData[0];
       const rows = wrapper.vm.getRows(query);
 
-      expect(rows[11]).toEqual(["Files", 5]);
+      expect(rows[13]).toEqual(["Files", 5]);
     });
 
     it("should format original size with unit value", () => {
@@ -234,7 +240,7 @@ describe("QueryList", () => {
       const rows = wrapper.vm.getRows(query);
 
       expect(getUnitValue).toHaveBeenCalledWith(1048576, "megabytes", "", 2);
-      expect(rows[12]).toEqual(["Original Size", "1.0 MB"]);
+      expect(rows[14]).toEqual(["Original Size", "1.0 MB"]);
     });
 
     it("should format compressed size with unit value", () => {
@@ -242,7 +248,7 @@ describe("QueryList", () => {
       const rows = wrapper.vm.getRows(query);
 
       expect(getUnitValue).toHaveBeenCalledWith(524288, "megabytes", "", 2);
-      expect(rows[13]).toEqual(["Compressed Size", "512 KB"]);
+      expect(rows[15]).toEqual(["Compressed Size", "512 KB"]);
     });
 
     it("should handle undefined original_size", () => {
@@ -250,7 +256,7 @@ describe("QueryList", () => {
       const query = mockQueryData[1]; // has undefined original_size
       const rows = wrapper.vm.getRows(query);
 
-      expect(rows[12]).toEqual(["Original Size", ""]);
+      expect(rows[14]).toEqual(["Original Size", ""]);
     });
 
     it("should handle undefined compressed_size", () => {
@@ -258,7 +264,7 @@ describe("QueryList", () => {
       const query = mockQueryData[1]; // has undefined compressed_size
       const rows = wrapper.vm.getRows(query);
 
-      expect(rows[13]).toEqual(["Compressed Size", ""]);
+      expect(rows[15]).toEqual(["Compressed Size", ""]);
     });
 
     it("should handle size formatting logic correctly", () => {
@@ -267,12 +273,12 @@ describe("QueryList", () => {
       const rows = wrapper.vm.getRows(query);
       
       // Check that the Original Size row exists and has content
-      expect(rows[12][0]).toBe("Original Size");
-      expect(typeof rows[12][1]).toBe("string");
+      expect(rows[14][0]).toBe("Original Size");
+      expect(typeof rows[14][1]).toBe("string");
       
       // Check that the Compressed Size row exists and has content  
-      expect(rows[13][0]).toBe("Compressed Size");
-      expect(typeof rows[13][1]).toBe("string");
+      expect(rows[15][0]).toBe("Compressed Size");
+      expect(typeof rows[15][1]).toBe("string");
     });
 
     it("should properly structure all row data", () => {
@@ -292,7 +298,7 @@ describe("QueryList", () => {
     const emptyQuery = {};
     const rows = wrapper.vm.getRows(emptyQuery);
 
-    expect(rows).toHaveLength(14);
+    expect(rows).toHaveLength(16);
     expect(rows[0]).toEqual(["Trace ID", undefined]);
     expect(rows[1]).toEqual(["Status", undefined]);
   });
@@ -300,7 +306,7 @@ describe("QueryList", () => {
   it("should handle null query object", () => {
     const rows = wrapper.vm.getRows(null);
 
-    expect(rows).toHaveLength(14);
+    expect(rows).toHaveLength(16);
     expect(rows[0]).toEqual(["Trace ID", undefined]);
   });
 

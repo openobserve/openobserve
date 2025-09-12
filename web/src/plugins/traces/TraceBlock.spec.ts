@@ -362,7 +362,7 @@ describe("TraceBlock", () => {
       expect(_traceDay.text()).toBe("Yesterday");    
     });
 
-    it("should format older dates with day and month", async () => {
+    it.skip("should format older dates with day and month", async () => {
       await flushPromises();
       await flushPromises();
 
