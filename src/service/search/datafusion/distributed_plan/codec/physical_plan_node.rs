@@ -29,9 +29,9 @@ use o2_enterprise::enterprise::search::datafusion::distributed_plan::{
 use prost::Message;
 use proto::cluster_rpc;
 
-use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyExec;
-#[cfg(not(feature = "enterprise"))]
-use crate::service::search::datafusion::distributed_plan::tmp_exec::TmpExec;
+use crate::service::search::datafusion::distributed_plan::{
+    empty_exec::NewEmptyExec, tmp_exec::TmpExec,
+};
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
 #[derive(Debug)]
@@ -82,6 +82,8 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             super::aggregate_topk_exec::try_encode(node, buf)
         } else if node.as_any().downcast_ref::<StreamingAggsExec>().is_some() {
             super::streaming_aggs_exec::try_encode(node, buf)
+        } else if node.as_any().downcast_ref::<TmpExec>().is_some() {
+            super::tmp_exec::try_encode(node, buf)
         } else {
             internal_err!("Not supported")
         }
