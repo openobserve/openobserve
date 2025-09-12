@@ -25,7 +25,9 @@ const search = {
       page_type = "logs",
       traceparent,
       dashboard_id,
+      dashboard_name,
       folder_id,
+      folder_name,
       is_ui_histogram,
     }: {
       org_identifier: string;
@@ -33,7 +35,9 @@ const search = {
       page_type: string;
       traceparent?: string;
       dashboard_id?: string;
+      dashboard_name?: string;
       folder_id?: string;
+      folder_name?: string;
       is_ui_histogram?: boolean;
     },
     search_type: string = "ui",
@@ -46,10 +50,16 @@ const search = {
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
+    if (dashboard_name)
+      url += `&dashboard_name=${encodeURIComponent(dashboard_name)}`;
     if (folder_id) url += `&folder_id=${folder_id}`;
+    if (folder_name) url += `&folder_name=${encodeURIComponent(folder_name)}`;
     if (is_ui_histogram) url += `&is_ui_histogram=${is_ui_histogram}`;
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
+      if (dashboard_name)
+        url += `&dashboard_name=${encodeURIComponent(dashboard_name)}`;
+      if (folder_name) url += `&folder_name=${encodeURIComponent(folder_name)}`;
       if (query.hasOwnProperty("aggs")) {
         return http({ headers: { traceparent } }).post(url, {
           ...query.query,
@@ -164,16 +174,23 @@ const search = {
     start_time,
     end_time,
     step,
+    dashboard_name,
+    folder_name,
   }: {
     org_identifier: string;
     query: string;
     start_time: number;
     end_time: number;
     step: string;
+    dashboard_name?: string;
+    folder_name?: string;
   }) => {
-    const url = `/api/${org_identifier}/prometheus/api/v1/query_range?start=${start_time}&end=${end_time}&step=${step}&query=${encodeURIComponent(
+    let url = `/api/${org_identifier}/prometheus/api/v1/query_range?start=${start_time}&end=${end_time}&step=${step}&query=${encodeURIComponent(
       query,
     )}`;
+    if (dashboard_name)
+      url += `&dashboard_name=${encodeURIComponent(dashboard_name)}`;
+    if (folder_name) url += `&folder_name=${encodeURIComponent(folder_name)}`;
     return http().get(url);
   },
   metrics_query: ({

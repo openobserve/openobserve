@@ -13,14 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::Path, time::Duration};
+use std::time::Duration;
 
 use config::{
     get_config,
     meta::{cluster::Role, stream::StreamType},
     metrics,
     metrics::{NAMESPACE, SPAN_METRICS_BUCKET},
-    utils::file::scan_files,
+    utils::async_file::scan_files,
 };
 use hashbrown::HashMap;
 use infra::{cache, db::get_db};
@@ -115,16 +115,18 @@ async fn load_query_cache_limit_bytes() -> Result<(), anyhow::Error> {
 
 async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    let data_dir = match Path::new(&cfg.common.data_wal_dir).canonicalize() {
+    let data_dir = match tokio::fs::canonicalize(&cfg.common.data_wal_dir).await {
         Ok(path) => path,
         Err(_) => return Ok(()),
     };
     let pattern = format!("{}files/", &cfg.common.data_wal_dir);
-    let files = scan_files(pattern, "parquet", None).unwrap_or_default();
+    let files = scan_files(pattern, "parquet", None)
+        .await
+        .unwrap_or_default();
     let mut sizes = HashMap::new();
     for file in files {
         let local_file = file.to_owned();
-        let Ok(local_path) = Path::new(&file).canonicalize() else {
+        let Ok(local_path) = tokio::fs::canonicalize(&file).await else {
             continue;
         };
         let file_path = local_path
@@ -138,7 +140,7 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
         let org_id = columns[1].to_string();
         let stream_type = columns[2].to_string();
         let entry = sizes.entry((org_id, stream_type)).or_insert(0);
-        *entry += match std::fs::metadata(local_file) {
+        *entry += match tokio::fs::metadata(local_file).await {
             Ok(metadata) => metadata.len(),
             Err(_) => 0,
         };

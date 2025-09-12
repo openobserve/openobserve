@@ -69,6 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :forceLoad="forceLoad"
           :searchType="searchType"
+          :dashboardName="dashboardName"
+          :folderName="folderName"
           @updated:data-zoom="$emit('updated:data-zoom', $event)"
           @onMovePanel="onMovePanel"
           @refreshPanelRequest="refreshPanelRequest"
@@ -130,6 +132,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :height="getPanelLayout(item, 'h')"
               :forceLoad="forceLoad"
               :searchType="searchType"
+              :dashboardName="dashboardName"
+              :folderName="folderName"
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
               @onMovePanel="onMovePanel"
               @refreshPanelRequest="refreshPanelRequest"
@@ -239,6 +243,14 @@ export default defineComponent({
     searchType: {
       default: null,
       type: String || null,
+    },
+    dashboardName: {
+      type: String,
+      default: "",
+    },
+    folderName: {
+      type: String,
+      default: "",
     },
   },
 
