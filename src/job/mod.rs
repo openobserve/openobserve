@@ -31,10 +31,10 @@ mod alert_manager;
 #[cfg(feature = "enterprise")]
 mod cipher;
 mod compactor;
-mod grpc;
 mod file_downloader;
 pub(crate) mod files;
 mod flatten_compactor;
+pub mod grpc;
 pub mod metrics;
 mod mmdb_downloader;
 #[cfg(feature = "enterprise")]
