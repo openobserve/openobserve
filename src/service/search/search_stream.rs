@@ -581,6 +581,7 @@ pub async fn do_partitioned_search(
         &partitions
     );
 
+    let partition_num = partitions.len();
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         let mut req = req.clone();
         req.query.start_time = start_time;
@@ -595,7 +596,14 @@ pub async fn do_partitioned_search(
         // partition
         req.query.size += *hits_to_skip;
         req.query.from = 0;
-        let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, false).await?;
+
+        let trace_id = if partition_num == 1 {
+            trace_id.to_string()
+        } else {
+            format!("{trace_id}-{idx}")
+        };
+        let mut search_res =
+            do_search(&trace_id, org_id, stream_type, &req, user_id, false).await?;
 
         let mut total_hits = search_res.total as i64;
 
