@@ -20,6 +20,7 @@ use std::{
 
 use config::{
     INDEX_FIELD_NAME_FOR_ALL,
+    meta::inverted_index::UNKNOWN_NAME,
     utils::tantivy::{query::contains_query::ContainsQuery, tokenizer::o2_collect_tokens},
 };
 use datafusion::{
@@ -794,10 +795,22 @@ fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, a
 pub(crate) fn get_arg_name(args: &FunctionArg) -> String {
     match args {
         FunctionArg::Named { name, .. } => name.to_string(),
-        FunctionArg::ExprNamed { name, .. } => get_field_name(name),
+        FunctionArg::ExprNamed { name, .. } => {
+            if is_field(name) {
+                get_field_name(name)
+            } else {
+                UNKNOWN_NAME.to_string()
+            }
+        }
         FunctionArg::Unnamed(arg) => match arg {
-            FunctionArgExpr::Expr(expr) => get_field_name(expr),
-            _ => unimplemented!("str_match not support filed type: {:?}", arg),
+            FunctionArgExpr::Expr(expr) => {
+                if is_field(expr) {
+                    get_field_name(expr)
+                } else {
+                    UNKNOWN_NAME.to_string()
+                }
+            }
+            _ => UNKNOWN_NAME.to_string(),
         },
     }
 }
