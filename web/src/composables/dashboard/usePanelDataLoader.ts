@@ -72,8 +72,9 @@ export const usePanelDataLoader = (
   runId?: any,
   tabId?: any,
   tabName?: any,
-  searchResponse: any,
-  is_ui_histogram: any,
+  searchResponse?: any,
+  is_ui_histogram?: any,
+  shouldRefreshWithoutCache?: any,
   dashboardName?: any,
   folderName?: any,
 ) => {
@@ -550,6 +551,7 @@ export const usePanelDataLoader = (
                   tab_id: tabId?.value,
                   tab_name: tabName?.value,
                   is_ui_histogram: is_ui_histogram.value,
+                  is_refresh_cache: shouldRefreshWithoutCache?.value || false,
                 },
                 searchType.value ?? "dashboards",
               ),
@@ -1061,6 +1063,7 @@ export const usePanelDataLoader = (
         pageType: string;
         searchType: string;
         meta: any;
+        is_refresh_cache: boolean;
       } = {
         queryReq: {
           query: {
@@ -1093,6 +1096,7 @@ export const usePanelDataLoader = (
           fallback_order_by_col: getFallbackOrderByCol(),
           is_ui_histogram: is_ui_histogram.value,
         },
+        is_refresh_cache: shouldRefreshWithoutCache?.value || false,
       };
 
       // type: "search",
@@ -1465,6 +1469,8 @@ export const usePanelDataLoader = (
                           tab_id: tabId?.value,
                           tab_name: tabName?.value,
                           is_ui_histogram: is_ui_histogram.value,
+                          is_refresh_cache:
+                            shouldRefreshWithoutCache?.value || false,
                         },
                         searchType.value ?? "dashboards",
                       ),

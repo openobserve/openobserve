@@ -101,12 +101,14 @@ const stream = {
       page_type = "logs",
       search_type = "ui",
       traceId,
+      is_refresh_cache = false,
     }: {
       org_identifier: string;
       query: any;
       page_type: string;
       search_type?: string;
       traceId?: string;
+      is_refresh_cache?: boolean;
     }
   ) => {
     if (!traceId) {
@@ -118,7 +120,7 @@ const stream = {
         ? (window as any).use_cache
         : true;
         
-    const url = `/api/${org_identifier}/_search_stream?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&trace_id=${traceId}`;
+    const url = `/api/${org_identifier}/_search_stream?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&trace_id=${traceId}&is_refresh_cache=${is_refresh_cache}`;
     return http().post(url, query);
   },
   

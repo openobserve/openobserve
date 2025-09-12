@@ -417,6 +417,11 @@ export default defineComponent({
       required: false,
       default: false,
     },
+    shouldRefreshWithoutCache: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -475,6 +480,7 @@ export default defineComponent({
       folderName,
       searchResponse,
       is_ui_histogram,
+      shouldRefreshWithoutCache,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -506,6 +512,7 @@ export default defineComponent({
       is_ui_histogram,
       dashboardName,
       folderName,
+      shouldRefreshWithoutCache,
     );
 
     const {

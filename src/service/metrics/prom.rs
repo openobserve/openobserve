@@ -744,6 +744,7 @@ pub(crate) async fn get_series(
         search_event_context: None,
         use_cache: default_use_cache(),
         local_mode: None,
+        is_refresh_cache: false,
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
         Err(err) => {
@@ -887,6 +888,7 @@ pub(crate) async fn get_label_values(
         search_type: None,
         search_event_context: None,
         use_cache: default_use_cache(),
+        is_refresh_cache: false,
         local_mode: None,
     };
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {

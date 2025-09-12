@@ -276,6 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :errorData="visualizeErrorData"
               :searchResponse="searchResponseForVisualization"
               :is_ui_histogram="shouldUseHistogramQuery"
+              :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
             ></VisualizeLogsQuery>
           </div>
         </template>
@@ -1451,6 +1452,7 @@ export default defineComponent({
     const searchResponseForVisualization = ref({});
 
     const shouldUseHistogramQuery = ref(false);
+    const shouldRefreshWithoutCache = ref(false);
     
     // Flag to prevent unnecessary chart type changes during URL restoration
     const isRestoringFromUrl = ref(false);
@@ -1760,8 +1762,10 @@ export default defineComponent({
       { deep: true },
     );
 
-    const handleRunQueryFn = async () => {
+    const handleRunQueryFn = async (result_cache = false) => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
+        // Set the shouldRefreshWithoutCache flag
+        shouldRefreshWithoutCache.value = result_cache;
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
           const success = await updateVisualization(false);
@@ -2272,6 +2276,7 @@ export default defineComponent({
       processHttpHistogramResults,
       searchResponseForVisualization,
       shouldUseHistogramQuery,
+      shouldRefreshWithoutCache,
       processHttpHistogramResults,
       clearSchemaCache,
     };

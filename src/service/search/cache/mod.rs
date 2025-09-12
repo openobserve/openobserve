@@ -160,6 +160,7 @@ pub async fn search(
         )
         .await
     } else {
+        // For refresh cache mode, we still need the metadata without using cache
         let query: SearchQuery = req.query.clone().into();
         match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
             Ok(v) => {
@@ -169,12 +170,26 @@ pub async fn search(
 
                 let order_by = v.order_by;
 
-                MultiCachedQueryResponse {
+                // Handle histogram interval and file path modifications like check_cache does
+                let mut discard_interval = -1;
+                if let Some(interval) = v.histogram_interval {
+                    file_path = format!("{file_path}_{interval}_{ts_column}");
+                    discard_interval = interval * 1000 * 1000; // in microseconds
+                }
+
+                let mut multi_resp = MultiCachedQueryResponse {
                     ts_column,
                     is_descending,
                     order_by,
+                    file_path: file_path.clone(),
                     ..Default::default()
+                };
+
+                if discard_interval > -1 {
+                    multi_resp.histogram_interval = discard_interval / 1000 / 1000;
                 }
+
+                multi_resp
             }
             Err(e) => {
                 log::error!("Error parsing sql: {e}");
@@ -265,6 +280,7 @@ pub async fn search(
             req.query.end_time
         );
 
+        // do search
         let mut tasks = Vec::new();
         let partition_num = c_resp.deltas.len();
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
@@ -337,7 +353,6 @@ pub async fn search(
         }
     };
 
-    // do search
     let took_time = start.elapsed().as_secs_f64();
     log::info!(
         "{}",
@@ -463,6 +478,18 @@ pub async fn search(
 
     let write_res = deep_copy_response(&res);
     let mut local_res = deep_copy_response(&res);
+
+    // Clean cache before writing new cache
+    if in_req.is_refresh_cache {
+        let _is_deleted =
+            crate::service::search::cluster::cacher::delete_cached_results_by_time_range(
+                file_path.to_owned(),
+                req.query.start_time,
+                req.query.end_time,
+            )
+            .await;
+        c_resp.cache_query_response = true;
+    }
 
     // There are 3 types of partial responses:
     // 1. VRL error
@@ -1126,12 +1153,28 @@ pub async fn check_cache_v2(
                     cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
 
-                MultiCachedQueryResponse {
+                let order_by = v.order_by;
+
+                // Handle histogram interval and file path modifications like check_cache does
+                let mut discard_interval = -1;
+                if let Some(interval) = v.histogram_interval {
+                    file_path = format!("{file_path}_{interval}_{ts_column}");
+                    discard_interval = interval * 1000 * 1000; // in microseconds
+                }
+
+                let mut multi_resp = MultiCachedQueryResponse {
                     ts_column,
                     is_descending,
-                    file_path,
+                    order_by,
+                    file_path: file_path.clone(),
                     ..Default::default()
+                };
+
+                if discard_interval > -1 {
+                    multi_resp.histogram_interval = discard_interval / 1000 / 1000;
                 }
+
+                multi_resp
             }
             Err(e) => {
                 log::error!("[trace_id {trace_id}]: Error parsing sql: {e:?}");
