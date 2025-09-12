@@ -37,7 +37,6 @@ use lettre::{
 };
 use once_cell::sync::Lazy;
 use sha256::digest;
-use tokio::sync::OnceCell;
 
 use crate::{
     meta::cluster,
@@ -275,11 +274,6 @@ pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
 pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
-// Environment file management
-static ENV_FILE_PATH: OnceCell<PathBuf> = OnceCell::const_new();
-static ENV_FILE_LAST_HASH: Lazy<ArcSwap<Option<String>>> =
-    Lazy::new(|| ArcSwap::from(Arc::new(None)));
-
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(
         reqwest::Client::builder()
@@ -310,56 +304,34 @@ pub fn get_instance_id() -> String {
     }
 }
 
-// Environment file utilities
-pub async fn set_env_file_path(path: PathBuf) -> Result<(), anyhow::Error> {
-    ENV_FILE_PATH
-        .set(path)
-        .map_err(|_| anyhow::anyhow!("Env file path already set"))?;
-    Ok(())
-}
-
-pub fn get_env_file_path() -> Option<&'static PathBuf> {
-    ENV_FILE_PATH.get()
-}
-
-pub fn load_env_file_if_set() -> Result<(), anyhow::Error> {
-    if let Some(path) = get_env_file_path() {
-        log::info!("Loading environment file from: {path:?}");
-        if let Err(e) = dotenvy::from_path_override(path) {
-            log::error!("Failed to load environment file: {e}");
-        };
-
-        // Calculate and store initial hash
-        if let Ok(hash) = calculate_env_file_hash(path) {
-            ENV_FILE_LAST_HASH.store(Arc::new(Some(hash)));
-            log::info!("Environment file loaded and hash calculated");
-        } else {
-            log::error!("Failed to calculate environment file hash");
-        }
-    } else {
-        // Fall back to default .env discovery
-        if let Err(e) = dotenvy::dotenv_override().and_then(|env_path| {
-            ENV_FILE_PATH
-                .set(env_path)
-                .map_err(|_| dotenvy::Error::EnvVar(std::env::VarError::NotPresent))
-        }) {
-            log::debug!("ENV file path not set, trying default discovery: {e}");
-        }
-    }
-    Ok(())
-}
-
-pub fn calculate_env_file_hash(path: &PathBuf) -> Result<String, anyhow::Error> {
+pub fn calculate_config_file_hash(path: &PathBuf) -> Result<String, anyhow::Error> {
     let content = std::fs::read_to_string(path)?;
     Ok(digest(content))
 }
 
-pub fn get_env_file_last_hash() -> Option<String> {
-    ENV_FILE_LAST_HASH.load().as_ref().clone()
-}
-
-pub fn update_env_file_last_hash(hash: String) {
-    ENV_FILE_LAST_HASH.store(Arc::new(Some(hash)));
+pub fn load_config() -> Result<(), anyhow::Error> {
+    match crate::config_path_manager::get_config_file_path() {
+        Some(path) => {
+            log::info!("Loading config file from path: {:?}", path);
+            if dotenvy::from_path_override(path).is_ok() {
+                log::info!("Config loaded successfully from file");
+            } else {
+                log::error!("Config loading from file failed");
+            }
+        }
+        None => {
+            // Perform default .env discovery and set it in the config manager
+            if let Ok(env_path) = dotenvy::dotenv_override() {
+                log::debug!("Config init: Found .env file at {:?} during boot", env_path);
+                // Set the default path in config manager
+                crate::config_path_manager::set_config_file_path(env_path)?;
+            } else {
+                log::debug!("Config init: No .env file found during default discovery");
+            }
+        }
+    }
+    
+    Ok(())
 }
 static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =
     tokio::sync::OnceCell::const_new();
@@ -2059,7 +2031,7 @@ pub struct EnrichmentTable {
 }
 
 pub fn init() -> Config {
-    load_env_file_if_set().ok();
+    let _ = load_config();
     let mut cfg = Config::init().expect("config init error");
 
     // set local mode

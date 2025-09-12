@@ -15,70 +15,65 @@
 
 use std::path::PathBuf;
 
-use config::{
-    calculate_env_file_hash, get_config, get_env_file_last_hash, get_env_file_path,
-    spawn_pausable_job, update_env_file_last_hash,
-};
-
 pub fn run() -> Option<tokio::task::JoinHandle<()>> {
-    // Only start if env file path is set
-    if get_env_file_path().is_none() {
-        log::debug!("[ENV_WATCHER] No env file specified, watcher not started");
+    // Only start if config file path is set
+    if config::config_path_manager::get_config_file_path().is_none() {
+        log::debug!("[CONFIG_WATCHER] No config file specified, watcher not started");
         return None;
     }
 
-    Some(spawn_pausable_job!(
-        "env_watcher",
-        get_config().common.env_watcher_interval,
+    Some(config::spawn_pausable_job!(
+        "config_watcher",
+        config::get_config().common.env_watcher_interval,
         {
-            if let Err(e) = check_and_reload_env_file() {
-                log::error!("[ENV_WATCHER] Error checking env file: {}", e);
+            if let Err(e) = check_and_reload_config_file() {
+                log::error!("[CONFIG_WATCHER] Error checking config file: {}", e);
             }
         }
     ))
 }
 
-fn check_and_reload_env_file() -> Result<(), anyhow::Error> {
-    let path = match get_env_file_path() {
+fn check_and_reload_config_file() -> Result<(), anyhow::Error> {
+    let path = match config::config_path_manager::get_config_file_path() {
         Some(path) => path,
-        None => return Ok(()), // No env file to watch
+        None => return Ok(()), // No config file to watch
     };
 
     // Check if file exists
     if !path.exists() {
-        log::warn!("[ENV_WATCHER] Environment file does not exists: {path:?}");
+        log::warn!("[CONFIG_WATCHER] Config file does not exist: {path:?}");
         return Ok(());
     }
 
     // Calculate current hash
-    let current_hash = calculate_env_file_hash(path)?;
-    let last_hash = get_env_file_last_hash();
+    let current_hash = config::calculate_config_file_hash(&path)?;
+    let last_hash = config::config_path_manager::get_config_file_last_hash();
 
     // Compare hashes
     if Some(&current_hash) != last_hash.as_ref() {
         if last_hash.is_none() {
-            log::info!("[ENV_WATCHER] Initial environment file hash stored");
+            log::info!("[CONFIG_WATCHER] Initial config file hash stored");
         } else {
-            log::info!("[ENV_WATCHER] Environment file hash changed, reloading config...");
+            log::info!("[CONFIG_WATCHER] Config file hash changed, reloading config...");
         }
 
-        if let Err(e) = reload_env_and_config(path) {
-            log::error!("[ENV_WATCHER] Failed to reload environment file: {}", e);
+        if let Err(e) = reload_config(&path) {
+            log::error!("[CONFIG_WATCHER] Failed to reload config file: {}", e);
         } else {
             // Update stored hash only on successful reload
-            update_env_file_last_hash(current_hash);
-            log::info!("[ENV_WATCHER] Environment file and config reloaded successfully");
+            config::config_path_manager::update_config_file_last_hash(current_hash);
+            log::info!("[CONFIG_WATCHER] Config file and config reloaded successfully");
         }
     }
 
     Ok(())
 }
 
-pub fn reload_env_and_config(path: &PathBuf) -> Result<(), anyhow::Error> {
-    log::info!("[ENV_WATCHER] Reloading environment file: {:?}", path);
+pub fn reload_config(path: &PathBuf) -> Result<(), anyhow::Error> {
+    log::info!("[CONFIG_WATCHER] Reloading config file: {:?}", path);
 
-    // Refresh config - this will read from the updated environment
-    config::refresh_config()?;
+    // Refresh config - this will read from the updated config file
+    config::config::refresh_config()?;
 
     #[cfg(feature = "enterprise")]
     {
@@ -91,6 +86,6 @@ pub fn reload_env_and_config(path: &PathBuf) -> Result<(), anyhow::Error> {
             .and_then(|_| refresh_openfga_config())?;
     }
 
-    log::info!("Environment and config reloaded successfully");
+    log::info!("Config file and config reloaded successfully");
     Ok(())
 }
