@@ -266,6 +266,7 @@
 import { defineComponent, ref, onMounted, computed } from "vue";
 import { useQuasar } from "quasar";
 import licenseServer from "@/services/license_server";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "License",
@@ -277,6 +278,7 @@ export default defineComponent({
     const licenseKey = ref("");
     const showUpdateForm = ref(false);
     const showLicenseKeyModal = ref(false);
+    const store = useStore();
 
     const loadLicenseData = async () => {
       try {
@@ -382,17 +384,17 @@ export default defineComponent({
     };
 
     const showLicenseExpiryWarning = computed(() => {
-      if (!licenseData.value.license?.expires_at) return false;
+      if (!store.state.zoConfig.license_expiry) return false;
       const now = Date.now();
-      const expiryDate = licenseData.value.license.expires_at;
+      const expiryDate = store.state.zoConfig.license_expiry;
       const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-      return daysUntilExpiry < 7;
+      return daysUntilExpiry < 14;
     });
 
     const getLicenseExpiryMessage = () => {
-      if (!licenseData.value.license?.expires_at) return '';
+      if (!store.state.zoConfig.license_expiry) return '';
       const now = Date.now();
-      const expiryDate = licenseData.value.license.expires_at;
+      const expiryDate = store.state.zoConfig.license_expiry;
       const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
       
       if (daysUntilExpiry > 1) {
