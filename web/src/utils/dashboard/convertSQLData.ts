@@ -48,6 +48,7 @@ import {
 } from "./colorPalette";
 import { deepCopy } from "@/utils/zincutils";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
+import { getDataValue } from "./aliasUtils";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 
 export const convertMultiSQLData = async (
@@ -252,7 +253,7 @@ export const convertSQLData = async (
 
     // Step 1: Aggregate y_axis values by breakdown, ensuring missing values are set to empty string
     const breakdown = innerDataArray.reduce((acc, item) => {
-      let breakdownValue = item[breakdownKey];
+      let breakdownValue = getDataValue(item, breakdownKey);
 
       // Convert null, undefined, and empty string to a default empty string
       if (
@@ -263,7 +264,7 @@ export const convertSQLData = async (
         breakdownValue = "";
       }
 
-      const yAxisValue = item[yAxisKey];
+      const yAxisValue = getDataValue(item, yAxisKey);
 
       acc[breakdownValue] = (acc[breakdownValue] || 0) + (+yAxisValue || 0);
       return acc;
@@ -294,7 +295,7 @@ export const convertSQLData = async (
     const othersObj: any = {};
 
     innerDataArray.forEach((item) => {
-      let breakdownValue = item[breakdownKey];
+      let breakdownValue = getDataValue(item, breakdownKey);
 
       // Ensure missing breakdown values are treated as empty strings
       if (
@@ -308,9 +309,9 @@ export const convertSQLData = async (
       if (topKeys.includes(breakdownValue.toString())) {
         resultArray.push({ ...item, [breakdownKey]: breakdownValue });
       } else if (top_results_others) {
-        const xAxisValue = String(item[xAxisKey]);
+        const xAxisValue = String(getDataValue(item, xAxisKey));
         othersObj[xAxisValue] =
-          (othersObj[xAxisValue] || 0) + (+item[yAxisKey] || 0);
+          (othersObj[xAxisValue] || 0) + (+getDataValue(item, yAxisKey) || 0);
       }
     });
 
@@ -386,7 +387,7 @@ export const convertSQLData = async (
       ...getBreakDownKeys(),
     ];
     const timeBasedKey = keys?.find((key) =>
-      isTimeSeries([searchQueryDataFirstEntry?.[key]]),
+      isTimeSeries([getDataValue(searchQueryDataFirstEntry, key)]),
     );
 
     if (!timeBasedKey) {
@@ -412,7 +413,7 @@ export const convertSQLData = async (
 
     // Create a set of unique xAxis values
     const uniqueXAxisValues = new Set(
-      processedData.map((d: any) => d[uniqueKey]),
+      processedData.map((d: any) => getDataValue(d, uniqueKey)),
     );
 
     const filledData: any = [];
@@ -423,8 +424,8 @@ export const convertSQLData = async (
       const key =
         xAxisKeysWithoutTimeStamp.length > 0 ||
         breakdownAxisKeysWithoutTimeStamp.length > 0
-          ? `${d[timeKey]}-${d[uniqueKey]}`
-          : `${d[timeKey]}`;
+          ? `${getDataValue(d, timeKey)}-${getDataValue(d, uniqueKey)}`
+          : `${getDataValue(d, timeKey)}`;
 
       searchDataMap.set(key, d);
     });
@@ -490,9 +491,9 @@ export const convertSQLData = async (
     const data =
       missingValueData?.filter((item: any) => {
         return (
-          xAxisKeys.every((key: any) => item[key] != null) &&
-          yAxisKeys.every((key: any) => item[key] != null) &&
-          breakDownKeys.every((key: any) => item[key] != null)
+          xAxisKeys.every((key: any) => getDataValue(item, key) != null) &&
+          yAxisKeys.every((key: any) => getDataValue(item, key) != null) &&
+          breakDownKeys.every((key: any) => getDataValue(item, key) != null)
         );
       }) || [];
 
@@ -502,10 +503,10 @@ export const convertSQLData = async (
     const keyArrays: any = {};
 
     for (const key of keys) {
-      keyArrays[key] = data.map((obj: any) => obj[key]);
+      keyArrays[key] = data.map((obj: any) => getDataValue(obj, key));
     }
 
-    const result = keyArrays[key] || [];
+    const result = getDataValue(keyArrays, key) || [];
 
     return result;
   };
@@ -536,22 +537,25 @@ export const convertSQLData = async (
     const data =
       missingValueData?.filter((item: any) => {
         return (
-          xAxisKeys.every((key: any) => item[key] != null) &&
-          yAxisKeys.every((key: any) => item[key] != null) &&
-          breakDownKeys.every((key: any) => item[key] != null)
+          xAxisKeys.every((key: any) => getDataValue(item, key) != null) &&
+          yAxisKeys.every((key: any) => getDataValue(item, key) != null) &&
+          breakDownKeys.every((key: any) => getDataValue(item, key) != null)
         );
       }) || [];
 
     const maxValues: any = {};
 
     data.forEach((obj: any) => {
-      if (maxValues[obj[breakDownkey]]) {
-        if (obj[axisKey] > maxValues[obj[breakDownkey]]) {
-          maxValues[obj[breakDownkey]] = obj[axisKey];
+      const breakDownValue = getDataValue(obj, breakDownkey);
+      const axisValue = getDataValue(obj, axisKey);
+
+      if (maxValues[breakDownValue]) {
+        if (axisValue > maxValues[breakDownValue]) {
+          maxValues[breakDownValue] = axisValue;
         }
       } else {
-        maxValues[obj[breakDownkey]] =
-          typeof obj[axisKey] === "number" ? obj[axisKey] : 0;
+        maxValues[breakDownValue] =
+          typeof axisValue === "number" ? axisValue : 0;
       }
     });
 
@@ -1291,7 +1295,9 @@ export const convertSQLData = async (
     // Extract unique values for the second x-axis key
     // NOTE: while filter, we can't compare type as well because set will have string values
     const uniqueValues = [
-      ...new Set(missingValueData.map((obj: any) => obj[breakDownKey])),
+      ...new Set(
+        missingValueData.map((obj: any) => getDataValue(obj, breakDownKey)),
+      ),
     ].filter((value: any) => value != null || value != undefined);
 
     return uniqueValues;
@@ -1346,12 +1352,15 @@ export const convertSQLData = async (
       return [];
 
     const data = missingValueData.filter(
-      (it: any) => it[breakdownKey] == xAxisKey,
+      (it: any) => getDataValue(it, breakdownKey) == xAxisKey,
     );
 
     const seriesData = options.xAxis[0].data.map(
       (it: any) =>
-        data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[yAxisKey] ?? null,
+        getDataValue(
+          data.find((it2: any) => getDataValue(it2, xAxisKeys[0]) == it),
+          yAxisKey,
+        ) ?? null,
     );
 
     return seriesData;
@@ -1393,7 +1402,7 @@ export const convertSQLData = async (
   const getYAxisLabel = (yAxisKey: string, xAXisKey: string = "") => {
     const label = panelSchema?.queries[0]?.fields?.y.find(
       (it: any) => it.alias == yAxisKey,
-    ).label;
+    )?.label;
 
     if (
       panelSchema.type == "area-stacked" ||
@@ -1874,23 +1883,34 @@ export const convertSQLData = async (
       const key0 = xAxisKeys[0];
       // get the unique value of the first xAxis's key
       let xAxisZerothPositionUniqueValue = [
-        ...new Set(searchQueryData[0].map((obj: any) => obj[key0])),
+        ...new Set(
+          searchQueryData[0].map((obj: any) => getDataValue(obj, key0)),
+        ),
       ].filter((it) => it);
 
       // get second x axis key
       const key1 = yAxisKeys[0];
       // get the unique value of the second xAxis's key
       const xAxisFirstPositionUniqueValue = [
-        ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
+        ...new Set(
+          searchQueryData[0].map((obj: any) => getDataValue(obj, key1)),
+        ),
       ].filter((it) => it);
 
       const yAxisKey0 = zAxisKeys[0];
       const zValues: any = xAxisFirstPositionUniqueValue.map((first: any) => {
         // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
-        const data = searchQueryData[0].filter((it: any) => it[key1] == first);
+        const data = searchQueryData[0].filter(
+          (it: any) => getDataValue(it, key1) == first,
+        );
 
         return xAxisZerothPositionUniqueValue.map((zero: any) => {
-          return data.find((it: any) => it[key0] == zero)?.[yAxisKey0] || "-";
+          return (
+            getDataValue(
+              data.find((it: any) => getDataValue(it, key0) == zero),
+              yAxisKey0,
+            ) || "-"
+          );
         });
       });
 
