@@ -837,6 +837,77 @@ mod tests {
     }
 
     #[test]
+    fn test_get_arg_name() {
+        use sqlparser::ast::{
+            Expr, FunctionArg, FunctionArgExpr, FunctionArgOperator, Ident, ObjectName,
+        };
+
+        // Test FunctionArg::Named
+        let named_arg = FunctionArg::Named {
+            name: Ident::new("field_name"),
+            arg: FunctionArgExpr::Expr(Expr::Identifier(Ident::new("value"))),
+            operator: FunctionArgOperator::Equals,
+        };
+        assert_eq!(get_arg_name(&named_arg), "field_name");
+
+        // Test FunctionArg::ExprNamed with field expression
+        let expr_named_field = FunctionArg::ExprNamed {
+            name: Expr::Identifier(Ident::new("field_name")),
+            arg: FunctionArgExpr::Expr(Expr::Identifier(Ident::new("value"))),
+            operator: FunctionArgOperator::Equals,
+        };
+        assert_eq!(get_arg_name(&expr_named_field), "field_name");
+
+        // Test FunctionArg::ExprNamed with compound identifier
+        let expr_named_compound = FunctionArg::ExprNamed {
+            name: Expr::CompoundIdentifier(vec![Ident::new("table"), Ident::new("field_name")]),
+            arg: FunctionArgExpr::Expr(Expr::Identifier(Ident::new("value"))),
+            operator: FunctionArgOperator::Equals,
+        };
+        assert_eq!(get_arg_name(&expr_named_compound), "field_name");
+
+        // Test FunctionArg::ExprNamed with non-field expression (should return UNKNOWN_NAME)
+        let expr_named_non_field = FunctionArg::ExprNamed {
+            name: Expr::Value(sqlparser::ast::Value::Number("123".to_string(), false)),
+            arg: FunctionArgExpr::Expr(Expr::Identifier(Ident::new("value"))),
+            operator: FunctionArgOperator::Equals,
+        };
+        assert_eq!(get_arg_name(&expr_named_non_field), UNKNOWN_NAME);
+
+        // Test FunctionArg::Unnamed with field expression
+        let unnamed_field = FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(
+            Ident::new("field_name"),
+        )));
+        assert_eq!(get_arg_name(&unnamed_field), "field_name");
+
+        // Test FunctionArg::Unnamed with compound identifier
+        let unnamed_compound =
+            FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::CompoundIdentifier(vec![
+                Ident::new("table"),
+                Ident::new("field_name"),
+            ])));
+        assert_eq!(get_arg_name(&unnamed_compound), "field_name");
+
+        // Test FunctionArg::Unnamed with non-field expression (should return UNKNOWN_NAME)
+        let unnamed_non_field = FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
+            sqlparser::ast::Value::Number("123".to_string(), false),
+        )));
+        assert_eq!(get_arg_name(&unnamed_non_field), UNKNOWN_NAME);
+
+        // Test FunctionArg::Unnamed with Wildcard (should return UNKNOWN_NAME)
+        let unnamed_wildcard = FunctionArg::Unnamed(FunctionArgExpr::Wildcard);
+        assert_eq!(get_arg_name(&unnamed_wildcard), UNKNOWN_NAME);
+
+        // Test FunctionArg::Unnamed with other FunctionArgExpr variants (should return
+        // UNKNOWN_NAME)
+        let unnamed_other =
+            FunctionArg::Unnamed(FunctionArgExpr::QualifiedWildcard(ObjectName(vec![
+                Ident::new("table"),
+            ])));
+        assert_eq!(get_arg_name(&unnamed_other), UNKNOWN_NAME);
+    }
+
+    #[test]
     fn test_condition_get_tantivy_fields_in() {
         let condition = Condition::In(
             "field2".to_string(),
