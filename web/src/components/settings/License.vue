@@ -1,23 +1,6 @@
 <template>
   <div class="q-pa-md">
-    <div class="full-width license-expiry-container q-pa-md gradient-banner q-mb-md" v-if="showLicenseExpiryWarning">
-      <div class="row">
-        <div class="col">
-          <span class="o2-license-message">{{ getLicenseExpiryMessage() }}</span>
-          <br />
-          <span class="o2-license-subtitle">Please update your license by contacting your administrator.</span>
-        </div>
-        <div class="col-2 q-mt-sm">
-          <q-btn 
-            @click="showUpdateFormAndFocus" 
-            class="cursor-pointer text-capitalize bg-primary text-white q-px-md q-py-sm rounded-md float-right"
-            dense
-            no-caps
-          >Update License Key</q-btn>
-        </div>
-      </div>
-    </div>
-    
+    <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>    
     <div class="text-h6 q-mb-md">License Management</div>
     
     <div v-if="loading" class="q-pa-md text-center">
@@ -267,9 +250,13 @@ import { defineComponent, ref, onMounted, computed } from "vue";
 import { useQuasar } from "quasar";
 import licenseServer from "@/services/license_server";
 import { useStore } from "vuex";
+import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 
 export default defineComponent({
   name: "License",
+  components: {
+    LicensePeriod,
+  },
   setup() {
     const $q = useQuasar();
     const loading = ref(false);

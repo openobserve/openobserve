@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          <div>
           <TrialPeriod></TrialPeriod>
          </div>
+          <LicensePeriod @update-license="goToLicensePage"></LicensePeriod>
         <div class="streams-container q-px-lg q-py-md "
         :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
          >
@@ -373,6 +374,8 @@ import useStreams from "@/composables/useStreams";
 import pipelines from "@/services/pipelines";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
+import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
+import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "PageHome",
@@ -388,6 +391,7 @@ export default defineComponent({
     const alertsPanelDataKey = ref(0);
     const pipelinesPanelDataKey = ref(0);
     const isLoadingSummary = ref(false);
+    const router = useRouter();
 
 
     const getSummary = (org_id: any) => {
@@ -642,7 +646,9 @@ export default defineComponent({
     return getImageURL('images/home/pipeline.svg');
   });
 
-
+  const goToLicensePage = () => {
+    router.push({ name: 'license' });
+  };
 
 
 
@@ -670,6 +676,7 @@ export default defineComponent({
       isLoadingSummary,
       pipelinesIcon,
       alertsIcon,
+      goToLicensePage
     };
   },
   computed: {
@@ -688,6 +695,7 @@ export default defineComponent({
   components: {
     CustomChartRenderer,
     TrialPeriod,
+    LicensePeriod,
   },
 });
 </script>
