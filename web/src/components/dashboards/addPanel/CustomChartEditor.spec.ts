@@ -24,27 +24,40 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
-// Mock the store
-const mockStore = {
-  state: {
-    theme: 'light'
-  }
-};
+// Use vi.hoisted to define mock data that can be used in vi.mock
+const { globalMockStore, globalMockDashboardPanelData } = vi.hoisted(() => {
+  return {
+    globalMockStore: {
+      state: {
+        theme: 'light'
+      }
+    },
+    globalMockDashboardPanelData: {
+      dashboardPanelData: {
+        value: {}
+      }
+    }
+  };
+});
 
-// Mock useDashboardPanelData composable
-const mockDashboardPanelData = {
-  dashboardPanelData: {
-    value: {}
-  }
-};
+// Mock vuex with reference to hoisted mock objects
+vi.mock("vuex", async () => {
+  const actual = await vi.importActual("vuex");
+  return {
+    ...actual,
+    useStore: () => globalMockStore,
+    createStore: vi.fn(() => globalMockStore)
+  };
+});
 
-vi.mock("vuex", () => ({
-  useStore: () => mockStore
-}));
-
+// Mock useDashboardPanelData composable 
 vi.mock("@/composables/useDashboardPanel", () => ({
-  default: () => mockDashboardPanelData
+  default: () => globalMockDashboardPanelData
 }));
+
+// Create test-scoped references
+let mockStore: any;
+let mockDashboardPanelData: any;
 
 describe("CustomChartEditor", () => {
   let wrapper: any;
@@ -53,6 +66,13 @@ describe("CustomChartEditor", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset global mock objects to default state
+    globalMockStore.state = { theme: 'light' };
+    globalMockDashboardPanelData.dashboardPanelData = { value: {} };
+    
+    // Create test-scoped references that point to the same objects
+    mockStore = globalMockStore;
+    mockDashboardPanelData = globalMockDashboardPanelData;
   });
 
   afterEach(() => {

@@ -22,6 +22,7 @@ import {
   isTimeSeries,
   isTimeStamp,
 } from "./convertDataIntoUnitValue";
+import { getDataValue } from "./aliasUtils";
 
 const applyValueMapping = (value: any, mappings: any) => {
   // Find the first valid mapping with a valid text
@@ -128,7 +129,7 @@ export const convertTableData = (
       } else {
         const sample = tableRows
           ?.slice(0, Math.min(20, tableRows.length))
-          ?.map((it: any) => it[field.alias]);
+          ?.map((it: any) => getDataValue(it, field.alias));
         const isTimeSeriesData = isTimeSeries(sample);
         const isTimeStampData = isTimeStamp(sample, field.treatAsNonTimestamp);
 
@@ -145,7 +146,7 @@ export const convertTableData = (
       } else {
         const sample = tableRows
           ?.slice(0, Math.min(20, tableRows.length))
-          ?.map((it: any) => it[field.alias]);
+          ?.map((it: any) => getDataValue(it, field.alias));
         const isTimeSeriesData = isTimeSeries(sample);
         const isTimeStampData = isTimeStamp(sample, field.treatAsNonTimestamp);
 
@@ -165,13 +166,25 @@ export const convertTableData = (
     columns = columnData.map((it: any) => {
       let obj: any = {};
       const isNumber = isSampleValuesNumbers(tableRows, it.alias, 20);
+      // Use case-insensitive field name that matches the actual data keys
+      const actualField =
+        tableRows.length > 0
+          ? Object.keys(tableRows[0]).find(
+              (key) => key.toLowerCase() === it.alias.toLowerCase(),
+            ) || it.alias
+          : it.alias;
       obj["name"] = it.label;
-      obj["field"] = it.alias;
+      obj["field"] = actualField;
       obj["label"] = it.label;
       obj["align"] = !isNumber ? "left" : "right";
       obj["sortable"] = true;
       // pass color mode info for renderer
-      if (colorConfigMap?.[it.alias]?.autoColor) {
+      // Use case-insensitive lookup for colorConfigMap
+      const colorConfigKey =
+        Object.keys(colorConfigMap).find(
+          (key) => key.toLowerCase() === it.alias.toLowerCase(),
+        ) || it.alias;
+      if (colorConfigMap?.[colorConfigKey]?.autoColor) {
         obj["colorMode"] = "auto";
       }
 
@@ -206,9 +219,14 @@ export const convertTableData = (
           let customUnitToUse = null;
 
           // Check unit config map first
-          if (unitConfigMap[it.alias]) {
-            unitToUse = unitConfigMap[it.alias].unit;
-            customUnitToUse = unitConfigMap[it.alias].customUnit;
+          // Use case-insensitive lookup for unitConfigMap
+          const unitConfigKey =
+            Object.keys(unitConfigMap).find(
+              (key) => key.toLowerCase() === it.alias.toLowerCase(),
+            ) || it.alias;
+          if (unitConfigMap[unitConfigKey]) {
+            unitToUse = unitConfigMap[unitConfigKey].unit;
+            customUnitToUse = unitConfigMap[unitConfigKey].customUnit;
           }
 
           if (!unitToUse) {
@@ -266,7 +284,7 @@ export const convertTableData = (
   } else {
     // lets get all columns from a particular field
     const transposeColumns = searchQueryData[0].map(
-      (it: any) => it[transposeColumn] ?? "",
+      (it: any) => getDataValue(it, transposeColumn) ?? "",
     );
 
     let uniqueTransposeColumns: any = [];
@@ -429,7 +447,8 @@ export const convertTableData = (
     tableRows = columnData.map((it: any) => {
       let obj = uniqueTransposeColumns.reduce(
         (acc: any, curr: any, reduceIndex: any) => {
-          const value = searchQueryData[0][reduceIndex][it.alias] ?? "";
+          const value =
+            getDataValue(searchQueryData[0][reduceIndex], it.alias) ?? "";
           acc[curr] = histogramFields.includes(it.alias)
             ? (() => {
                 // Handle 16-digit microsecond timestamps
@@ -477,7 +496,7 @@ const isSampleValuesNumbers = (arr: any, key: string, sampleSize: number) => {
   }
   const sample = arr.slice(0, Math.min(sampleSize, arr.length));
   return sample.every((obj) => {
-    const value = obj[key];
+    const value = getDataValue(obj, key);
     return (
       value === undefined ||
       value === null ||
