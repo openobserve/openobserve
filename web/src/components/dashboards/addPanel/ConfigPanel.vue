@@ -316,7 +316,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
+      <q-select
+        v-if="
+          dashboardPanelData.data.type != 'table' &&
+          dashboardPanelData.data.type != 'heatmap' &&
+          dashboardPanelData.data.type != 'metric' &&
+          dashboardPanelData.data.type != 'gauge' &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.config.show_legends &&
+          dashboardPanelData.data.type != 'sankey' &&
+          dashboardPanelData.data.type != 'maps'
+        "
+        outlined
+        v-model="dashboardPanelData.data.config.legends_type"
+        :options="legendTypeOptions"
+        dense
+        label="Legends Type"
+        class="showLabelOnTop"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.legends_type ?? 'Auto'
+        }`"
+        data-test="dashboard-config-legends-scrollable"
+      >
+      </q-select>
+
+      <div class="space"></div>
+
       <div class="input-container">
+            <!-- dashboardPanelData.data.config.legends_type != 'scroll' -->
         <q-input
           v-if="
             dashboardPanelData.data.type != 'table' &&
@@ -342,6 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder="Auto"
           data-test="dashboard-config-legend-width"
         ></q-input>
+            <!-- dashboardPanelData.data.config.legends_type != 'scroll' -->
         <div
           class="unit-container"
           v-if="
@@ -388,6 +418,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
         </div>
       </div>
+
+      <div class="space"></div>
+
+      <q-select
+        v-if="
+          (dashboardPanelData.data.type === 'pie' ||
+          dashboardPanelData.data.type === 'donut') &&
+          dashboardPanelData.data.config.show_legends &&
+          dashboardPanelData.data.config.legends_position === 'right' &&
+          (dashboardPanelData.data.config.legends_type === 'plain' ||
+          dashboardPanelData.data.config.legends_type === 'scroll' ||
+          dashboardPanelData.data.config.legends_type === null)
+        "
+        outlined
+        v-model="dashboardPanelData.data.config.chart_align"
+        :options="chartAlignOptions"
+        dense
+        label="Chart Align"
+        class="showLabelOnTop"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.chart_align === null ? 'Auto' :
+          dashboardPanelData.data.config.chart_align === 'left' ? 'Left' :
+          dashboardPanelData.data.config.chart_align === 'center' ? 'Center' : 'Auto'
+        }`"
+        data-test="dashboard-config-chart-align"
+      >
+      </q-select>
 
       <div class="space"></div>
 
@@ -1271,6 +1330,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
+      <div class="space"></div>
+
+      <q-toggle
+        v-if="
+          dashboardPanelData.data.type != 'table' &&
+          dashboardPanelData.data.type != 'heatmap' &&
+          dashboardPanelData.data.type != 'metric' &&
+          dashboardPanelData.data.type != 'gauge' &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.type != 'pie' &&
+          dashboardPanelData.data.type != 'donut' &&
+          dashboardPanelData.data.type != 'sankey' &&
+          dashboardPanelData.data.type != 'maps'
+        "
+        v-model="dashboardPanelData.data.config.show_gridlines"
+        label="Show Gridlines"
+        data-test="dashboard-config-show-gridlines"
+      />
+
+      <div class="space"></div>
+
       <q-input
         v-if="
           [
@@ -1552,7 +1632,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount, onMounted, ref } from "vue";
+import {
+  computed,
+  defineComponent,
+  inject,
+  onBeforeMount,
+  onMounted,
+  ref,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
@@ -1571,7 +1658,7 @@ import StepAfter from "@/components/icons/dashboards/StepAfter.vue";
 import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
 import { useStore } from "vuex";
 
-import { markRaw } from "vue";
+import { markRaw, watchEffect } from "vue";
 
 export default defineComponent({
   components: {
@@ -1687,12 +1774,19 @@ export default defineComponent({
         };
       }
 
+      // by default, use chart_align as null (auto)
+      if (dashboardPanelData.data.config.chart_align === undefined) {
+        dashboardPanelData.data.config.chart_align = null;
+      }
+
       // by default, set show_symbol as false
       if (dashboardPanelData.data.config.show_symbol === undefined) {
         const isNewPanel = !dashboardPanelData.data.id;
         // if new panel, use config env
         // else always false
-        dashboardPanelData.data.config.show_symbol = isNewPanel ? store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false : false;
+        dashboardPanelData.data.config.show_symbol = isNewPanel
+          ? (store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false)
+          : false;
       }
 
       // by default, set line interpolation as smooth
@@ -1802,6 +1896,36 @@ export default defineComponent({
       {
         label: t("dashboard.bottom"),
         value: "bottom",
+      },
+    ];
+
+    const legendTypeOptions = [
+      {
+        label: "Auto",
+        value: null,
+      },
+      {
+        label: "Plain",
+        value: "plain",
+      },
+      {
+        label: "Scroll",
+        value: "scroll",
+      },
+    ];
+
+    const chartAlignOptions = [
+      {
+        label: "Auto",
+        value: null,
+      },
+      {
+        label: "Left",
+        value: "left",
+      },
+      {
+        label: "Center",
+        value: "center",
       },
     ];
     const unitOptions = [
@@ -2110,6 +2234,16 @@ export default defineComponent({
       );
     });
 
+    // Clear legend width when switching to scroll type since scroll legends ignore custom width
+    watchEffect(() => {
+      if (dashboardPanelData.data.config.legends_type === "scroll") {
+        // Clear the legend width value when switching to scroll type
+        if (dashboardPanelData.data.config.legend_width) {
+          dashboardPanelData.data.config.legend_width.value = null;
+        }
+      }
+    });
+
     return {
       t,
       dashboardPanelData,
@@ -2119,6 +2253,8 @@ export default defineComponent({
       layerTypeOptions,
       symbolOptions,
       legendsPositionOptions,
+      legendTypeOptions,
+      chartAlignOptions,
       unitOptions,
       labelPositionOptions,
       showSymbol,
