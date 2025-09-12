@@ -82,7 +82,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     std::fs::create_dir_all(&cfg.common.data_db_dir)?;
     cache::init().await?;
     file_list::LOCAL_CACHE.create_table().await?;
-    if !config::cluster::LOCAL_NODE.is_ingester() || !config::cluster::LOCAL_NODE.is_querier() {
+    if config::cluster::LOCAL_NODE.is_ingester() || config::cluster::LOCAL_NODE.is_querier() {
         file_list::LOCAL_CACHE.create_table_index().await?;
     }
     file_list::local_cache_gc().await?;
