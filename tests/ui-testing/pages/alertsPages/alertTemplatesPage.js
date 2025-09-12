@@ -11,14 +11,14 @@ export class AlertTemplatesPage {
         this.templatesTab = '[data-test="alert-templates-tab"]';
         
         // Template creation locators
-        this.addTemplateButton = '[data-test="alert-template-list-add-alert-btn"]';
+        this.addTemplateButton = '[data-test="template-list-add-btn"]';
         this.templateNameInput = '[data-test="add-template-name-input"]';
         this.templateEditor = '[data-test="add-template-editor"]';
         this.templateSubmitButton = '[data-test="add-template-submit-btn"]';
         this.templateSuccessMessage = 'Template Saved Successfully.';
         
         // Template management locators
-        this.templateSearchInput = '[data-test="template-list-search-input"]';
+        this.templateSearchInput = 'Search Template';
         this.templateDeleteButton = '[data-test="alert-template-list-{templateName}-delete-template"]';
         this.templateUpdateButton = '[data-test="alert-template-list-{templateName}-update-template"]';
         this.deleteConfirmText = 'Delete Template';
@@ -116,8 +116,8 @@ export class AlertTemplatesPage {
                 await this.page.locator('table').waitFor({ state: 'visible', timeout: 10000 });
                 
                 // Use search to find the template
-                await this.page.locator(this.templateSearchInput).click();
-                await this.page.locator(this.templateSearchInput).fill(templateName);
+                await this.page.getByPlaceholder(this.templateSearchInput).click();
+                await this.page.getByPlaceholder(this.templateSearchInput).fill(templateName);
                 await this.page.waitForTimeout(1000);
 
                 // Verify the template exists in search results using waitFor
@@ -150,8 +150,8 @@ export class AlertTemplatesPage {
     }
 
     async searchAndVerifyTemplate(templateName) {
-        await this.page.locator(this.templateSearchInput).click();
-        await this.page.locator(this.templateSearchInput).fill(templateName);
+        await this.page.getByPlaceholder(this.templateSearchInput).click();
+        await this.page.getByPlaceholder(this.templateSearchInput).fill(templateName);
         await expect(this.page.getByText('1-1 of')).toBeVisible();
         await expect(this.page.getByRole('cell', { name: templateName })).toBeVisible();
     }
@@ -182,9 +182,9 @@ export class AlertTemplatesPage {
 
     async deleteTemplateAndVerify(templateName) {
         // First search for the template
-        await this.page.locator(this.templateSearchInput).click();
-        await this.page.locator(this.templateSearchInput).fill('');  // Clear the input first
-        await this.page.locator(this.templateSearchInput).fill(templateName.toLowerCase());
+        await this.page.getByPlaceholder(this.templateSearchInput).click();
+        await this.page.getByPlaceholder(this.templateSearchInput).fill('');  // Clear the input first
+        await this.page.getByPlaceholder(this.templateSearchInput).fill(templateName.toLowerCase());
         await this.page.waitForTimeout(2000); // Wait for search to complete
         
         // Wait for either search results or no data message
@@ -206,9 +206,9 @@ export class AlertTemplatesPage {
         await this.page.waitForTimeout(2000);
 
         // Verify template is deleted
-        await this.page.locator(this.templateSearchInput).click();
-        await this.page.locator(this.templateSearchInput).fill('');  // Clear the input first
-        await this.page.locator(this.templateSearchInput).fill(templateName.toLowerCase());
+        await this.page.getByPlaceholder(this.templateSearchInput).click();
+        await this.page.getByPlaceholder(this.templateSearchInput).fill('');  // Clear the input first
+        await this.page.getByPlaceholder(this.templateSearchInput).fill(templateName.toLowerCase());
         await this.page.waitForTimeout(2000); // Wait for search to complete
         
         // Verify no results found
@@ -243,9 +243,9 @@ export class AlertTemplatesPage {
 
         try {
             // Search for the template first
-            await this.page.locator(this.templateSearchInput).click();
-            await this.page.locator(this.templateSearchInput).fill('');  // Clear the input first
-            await this.page.locator(this.templateSearchInput).fill(templateName.toLowerCase());
+            await this.page.getByPlaceholder(this.templateSearchInput).click();
+            await this.page.getByPlaceholder(this.templateSearchInput).fill('');  // Clear the input first
+            await this.page.getByPlaceholder(this.templateSearchInput).fill(templateName.toLowerCase());
             await this.page.waitForTimeout(2000); // Wait for search to complete
             
             // Wait for either search results or no data message
@@ -297,8 +297,8 @@ export class AlertTemplatesPage {
      * @param {string} templateName - Name of the imported template
      */
     async verifyImportedTemplateExists(templateName) {
-        await this.page.locator(this.templateSearchInput).click();
-        await this.page.locator(this.templateSearchInput).fill(templateName);
+        await this.page.getByPlaceholder(this.templateSearchInput).click();
+        await this.page.getByPlaceholder(this.templateSearchInput).fill(templateName);
         await expect(this.page.getByRole('cell', { name: templateName })).toBeVisible();
     }
 

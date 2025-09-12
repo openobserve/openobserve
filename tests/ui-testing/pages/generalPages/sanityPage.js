@@ -78,7 +78,7 @@ export class SanityPage {
         // Settings locators (sanity2 specific)
         this.settingsMenuItem = '[data-test="menu-link-settings-item"]';
         this.generalSettingsTab = { role: 'tab', name: 'General Settings' };
-        this.scrapeIntervalInput = { label: 'Scrape Interval (In Seconds) *' };
+        this.scrapeIntervalInput = '[data-test="general-settings-scrape-interval"]';
         this.dashboardSubmitButton = '[data-test="dashboard-add-submit"]';
         
         // Stream Stats locators (sanity2 specific)
@@ -523,9 +523,8 @@ export class SanityPage {
         await waitUtils.smartWait(this.page, 2000, 'pre-settings navigation wait');
         await this.page.locator(this.settingsMenuItem).click();
         await waitUtils.smartWait(this.page, 2000, 'settings page load');
-        await this.page.getByText("General SettingsScrape").click();
         await this.page.getByRole(this.generalSettingsTab.role, { name: this.generalSettingsTab.name }).click();
-        await this.page.getByLabel(this.scrapeIntervalInput.label).fill("16");
+        await this.page.locator(this.scrapeIntervalInput).fill("16");
         await this.page.locator(this.dashboardSubmitButton).click();
         await this.page.getByText("Organization settings updated").click();
     }

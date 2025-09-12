@@ -82,10 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
-                dense
                 flat
+                no-caps
                 :title="t('search.runQuery')"
-                class="q-pa-none q-mr-sm search-button-pipeline"
+                class="q-pa-none q-mr-sm o2-primary-button tw-h-[36px]"
+                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                 @click="{
                   expandState.output = true;
                   expandState.query = false;
@@ -1085,36 +1086,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
             <div class="flex justify-end q-mt-md">
+              <q-btn
+                  v-if="pipelineObj.isEditNode"
+                  data-test="stream-routing-query-delete-btn"
+                  class="o2-secondary-button tw-h-[36px]"
+                  flat
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  no-caps
+                  @click="$emit('delete:node')"
+                >
+                <q-icon name="delete" class="q-mr-xs" />
+                {{ t('pipeline.deleteNode') }}
+              </q-btn>
 
-          <q-btn
+              <q-btn
                   data-test="stream-routing-query-cancel-btn"
-                  class="text-bold q-ml-md no border"
+                  class="o2-secondary-button tw-h-[36px] q-ml-md"
                   :label="t('alerts.cancel')"
-                  text-color="light-text"
-                  padding="sm md"
+                  flat
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   no-caps
                   @click="$emit('cancel:form')"
                 />
                 <q-btn
                   data-test="stream-routing-query-save-btn"
                   :label="validatingSqlQuery ? 'Validating...' : 'Validate and Close'"
-                  class="text-bold no-border q-ml-md"
-                  color="secondary"
-                  padding="sm xl"
+                  class="no-border q-ml-md o2-primary-button tw-h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                   no-caps
                   type="submit"
                   @click="$emit('submit:form')"
                   :disable="validatingSqlQuery"
-                />
-                <q-btn
-                  v-if="pipelineObj.isEditNode"
-                  data-test="stream-routing-query-delete-btn"
-                  :label="t('pipeline.deleteNode')"
-                  class="text-bold no-border q-ml-md"
-                  color="negative"
-                  padding="sm xl"
-                  no-caps
-                  @click="$emit('delete:node')"
                 />
           </div>   
 

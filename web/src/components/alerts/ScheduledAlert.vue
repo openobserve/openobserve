@@ -88,9 +88,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-toggle
             data-test="scheduled-alert-aggregation-toggle"
             v-model="_isAggregationEnabled"
-            size="sm"
+            size="md"
             color="primary"
-            class="text-bold q-pl-0"
+            class="text-bold q-pl-0 o2-toggle-button-sm tw-h-[36px] tw-ml-1"
+            :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
             :disable="tab === 'sql' || tab === 'promql'"
             @update:model-value="updateAggregation"
           />
@@ -495,10 +496,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="scheduled-alert-cron-toggle-btn"
                   v-model="triggerData.frequency_type"
                   :true-value="'cron'"
-                  class="q-mt-sm"
+                  class="q-mt-sm o2-toggle-button-sm tw-h-[36px] tw-ml-1"
+                  :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
                   :false-value="'minutes'"
                   @update:model-value="updateTrigger"
-                  size="sm"
+                  size="md"
                 />
               </div>
             </div>

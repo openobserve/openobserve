@@ -984,6 +984,8 @@ pub struct SearchEventContext {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub alert_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub alert_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub derived_stream_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "report_id")]
     pub report_key: Option<String>,
@@ -1050,6 +1052,7 @@ impl From<proto::cluster_rpc::SearchEventContext> for SearchEventContext {
     fn from(proto_sec: proto::cluster_rpc::SearchEventContext) -> Self {
         Self {
             alert_key: proto_sec.alert_key,
+            alert_name: proto_sec.alert_name,
             derived_stream_key: proto_sec.derived_stream_key,
             report_key: proto_sec.report_key,
             dashboard_id: proto_sec.dashboard_id,
@@ -1064,6 +1067,7 @@ impl From<SearchEventContext> for proto::cluster_rpc::SearchEventContext {
     fn from(sec: SearchEventContext) -> Self {
         Self {
             alert_key: sec.alert_key,
+            alert_name: sec.alert_name,
             derived_stream_key: sec.derived_stream_key,
             report_key: sec.report_key,
             dashboard_id: sec.dashboard_id,

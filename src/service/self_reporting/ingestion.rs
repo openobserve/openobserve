@@ -670,12 +670,7 @@ mod tests {
         usage.search_type = Some(SearchEventType::Dashboards);
         usage.search_event_context = Some(SearchEventContext {
             dashboard_id: Some("dashboard-123".to_string()),
-            dashboard_name: None,
-            dashboard_folder_id: None,
-            dashboard_folder_name: None,
-            alert_key: None,
-            derived_stream_key: None,
-            report_key: None,
+            ..Default::default()
         });
 
         // Should handle search context correctly
