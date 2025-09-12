@@ -1478,7 +1478,12 @@ export default defineComponent({
 
       // rest will be vrl function fields
       fieldList = fieldList
-        .filter((field: any) => aliasList.indexOf(field) < 0)
+        .filter(
+          (field: any) =>
+            !aliasList.some(
+              (alias: string) => alias.toLowerCase() === field.toLowerCase(),
+            ),
+        )
         .map((field: any) => ({ name: field, type: "Utf8" }));
 
       dashboardPanelData.meta.stream.vrlFunctionFieldList = fieldList;
