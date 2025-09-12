@@ -754,4 +754,56 @@ test.describe("dashboard UI testcases", () => {
 
     // await page.getByRole("button", { name: "Cancel" }).click();
   });
+  test("should update the chart correctly when used camel case in custom sql query", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    // Generate unique panel name
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+
+    // Navigate to Dashboards page
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard and add a panel
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+
+    // Open Custom SQL editor
+    await page.locator('[data-test="dashboard-customSql"]').click();
+    // await page.locator(".cm-line").first().click();
+
+    // Focus on the first line of the editor
+    await page.locator(".cm-line").first().click();
+    await page
+      .locator('[data-test="dashboard-panel-query-editor"]')
+      .getByRole("textbox")
+      .click();
+    await page
+      .locator('[data-test="dashboard-panel-query-editor"]')
+      .locator(".cm-content")
+      .fill(
+        'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
+      );
+
+    // Map query results to chart axes
+    await pm.chartTypeSelector.removeField("xAxis1");
+    await pm.chartTypeSelector.removeField("yAxis1");
+    await pm.chartTypeSelector.removeField("breakdown1");
+    await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
+    await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
+    await pm.chartTypeSelector.searchAndAddField("breakdown1", "b");
+
+    // Apply and save the panel
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
+
+    // Return to dashboard list and clean up
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
+  });
 });
