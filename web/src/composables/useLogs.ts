@@ -5981,10 +5981,6 @@ const useLogs = () => {
   };
 
 
-  // Get metadata
-  // Update metadata
-  // Update results
-
   const handleStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
     // Scan-size and took time in histogram title
     // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
@@ -6311,7 +6307,11 @@ const useLogs = () => {
       ? searchPartitionMap[payload.traceId]
       : 0;
       searchPartitionMap[payload.traceId]++;
-      handleStreamingMetadata(payload, response, payload.isPagination, !response.content?.streaming_aggs && searchPartitionMap[payload.traceId] > 1);
+
+      const isStreamingAggs = response.content?.streaming_aggs;
+      const shouldAppendStreamingResults = isStreamingAggs ? !response.content?.results?.hits?.length : true;
+
+      handleStreamingMetadata(payload, response, payload.isPagination, (shouldAppendStreamingResults && searchPartitionMap[payload.traceId] > 1));
       return;
     }
 
