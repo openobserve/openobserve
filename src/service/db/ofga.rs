@@ -24,6 +24,8 @@ use o2_openfga::{
 
 use crate::service::db;
 
+pub const OFGA_KEY_PREFIX: &str = "/ofga/model";
+
 pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, anyhow::Error> {
     let meta = read_ofga_model().await;
     if let Some(existing_model) = existing_meta {
@@ -61,7 +63,7 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
 }
 
 pub async fn set_ofga_model_to_db(mut meta: OFGAModel) -> Result<String, anyhow::Error> {
-    let key = "/ofga/model";
+    let key = OFGA_KEY_PREFIX;
     meta.model = None;
     match db::put(
         key,
@@ -77,7 +79,7 @@ pub async fn set_ofga_model_to_db(mut meta: OFGAModel) -> Result<String, anyhow:
 }
 
 pub async fn get_ofga_model() -> Result<Option<OFGAModel>, anyhow::Error> {
-    let key = "/ofga/model";
+    let key = OFGA_KEY_PREFIX;
     let ret = db::get(key).await?;
     let mut loc_value: OFGAModel = json::from_slice(&ret).unwrap();
     loc_value.version = loc_value.version.trim_matches('"').to_string();
@@ -85,7 +87,7 @@ pub async fn get_ofga_model() -> Result<Option<OFGAModel>, anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = "/ofga/model";
+    let key = OFGA_KEY_PREFIX;
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -100,24 +102,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let item_value: OFGAModel = match db::get(&ev.key).await {
-                    Ok(val) => match json::from_slice(&val) {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("Error getting value: {}", e);
-                            continue;
-                        }
-                    },
-                    Err(e) => {
-                        log::error!("Error getting value: {}", e);
-                        continue;
-                    }
-                };
-                log::info!("[WATCH] Got store id {}", &item_value.store_id);
-                OFGA_STORE_ID.insert("store_id".to_owned(), item_value.store_id);
+                let _ = handle_put(&ev.key).await;
             }
             db::Event::Delete(_) => {
-                OFGA_STORE_ID.remove("store_id");
+                let _ = handle_delete();
             }
             db::Event::Empty => {}
         }
@@ -125,8 +113,36 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn handle_put(event_key: &str) -> Result<(), anyhow::Error> {
+    let item_value: OFGAModel = match db::get(event_key).await {
+        Ok(val) => match json::from_slice(&val) {
+            Ok(val) => val,
+            Err(e) => {
+                log::error!("Error getting value for key {event_key}: {e}");
+                return Err(anyhow::anyhow!(
+                    "Error getting value for key {event_key}: {e}"
+                ));
+            }
+        },
+        Err(e) => {
+            log::error!("Error getting value for key {event_key}: {e}");
+            return Err(anyhow::anyhow!(
+                "Error getting value for key {event_key}: {e}"
+            ));
+        }
+    };
+    log::info!("[WATCH] Got store id {}", &item_value.store_id);
+    OFGA_STORE_ID.insert("store_id".to_owned(), item_value.store_id);
+    Ok(())
+}
+
+fn handle_delete() -> Result<(), anyhow::Error> {
+    OFGA_STORE_ID.remove("store_id");
+    Ok(())
+}
+
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let key = "/ofga/model";
+    let key = OFGA_KEY_PREFIX;
     let ret = db::list(key).await?;
     for (_, item_value) in ret {
         let json_val: OFGAModel = json::from_slice(&item_value).unwrap();

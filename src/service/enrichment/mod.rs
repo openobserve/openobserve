@@ -196,6 +196,7 @@ pub async fn get_enrichment_table_json(
     org_id: &str,
     table_name: &str,
 ) -> Result<Vec<serde_json::Value>, anyhow::Error> {
+    log::debug!("get_enrichment_table_json: {org_id}/{table_name}");
     let mut records = vec![];
     let db_stats = crate::service::db::enrichment_table::get_meta_table_stats(org_id, table_name)
         .await
@@ -205,12 +206,14 @@ pub async fn get_enrichment_table_json(
         .unwrap_or_default();
 
     if (db_stats.end_time > local_stats_last_updated) || local_stats_last_updated == 0 {
+        log::debug!("get_enrichment_table_json: fetching from remote: {org_id}/{table_name}");
         let data =
             crate::service::db::enrichment_table::get_enrichment_table_data(org_id, table_name)
                 .await?;
         records.extend(data);
     } else {
         // fetch from local cache and put into records
+        log::debug!("get_enrichment_table_json: fetching from local: {org_id}/{table_name}");
         let data = storage::local::retrieve(org_id, table_name).await?;
         records.extend(data);
     }
@@ -234,6 +237,8 @@ pub async fn get_enrichment_table_json(
         .unwrap();
     storage::local::store_data_if_needed_background(org_id, table_name, &records, last_updated_at)
         .await?;
+
+    log::debug!("get_enrichment_table_json: fetched from {org_id}/{table_name}");
 
     Ok(records)
 }

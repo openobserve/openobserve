@@ -19,6 +19,7 @@ use config::meta::alerts::alert::Alert;
 use itertools::Itertools;
 
 use crate::{db::Event, errors::Error};
+pub const ALERT_WATCHER_PREFIX: &str = "/alerts/";
 
 /// Sends event to the cluster coordinator indicating that an alert has been put
 /// into the database.
@@ -61,7 +62,7 @@ where
     OnDeleteFut: Future<Output = Result<(), anyhow::Error>>,
 {
     let cluster_coordinator = super::get_coordinator().await;
-    let mut events = cluster_coordinator.watch("/alerts/").await?;
+    let mut events = cluster_coordinator.watch(ALERT_WATCHER_PREFIX).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching alerts");
     loop {
@@ -105,7 +106,7 @@ fn alert_key(org: &str, alert_id: &str) -> String {
 /// Tries to parse the key used to identify an individual alert in avents
 /// sent to cluster cache watchers. Returns the organization, stream type,
 /// stream name, and alert name from the key.
-fn parse_alert_key(key: &str) -> Option<(String, String)> {
+pub fn parse_alert_key(key: &str) -> Option<(String, String)> {
     let parts = key.trim_start_matches("/").split('/').collect_vec();
     if parts.len() < 3 || parts[0] != "alerts" {
         return None;
