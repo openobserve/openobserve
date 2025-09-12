@@ -1912,7 +1912,7 @@ export default defineComponent({
       downloadDataAsCSV,
       downloadDataAsJSON,
       loadingProgressPercentage,
-        };
+    };
   },
 });
 </script>
