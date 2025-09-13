@@ -121,22 +121,5 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
     #[cfg(feature = "cloud")]
     o2_enterprise::enterprise::cloud::migrate().await?;
 
-    log::info!("Shutting down DDL connection pool");
-    // Shutdown DDL connection pool after all migrations are complete
-    let cfg = config::get_config();
-    match cfg.common.meta_store.as_str() {
-        "postgres" => {
-            if let Err(e) = infra::db::postgres::shutdown_ddl_pool().await {
-                log::warn!("Failed to shutdown PostgreSQL DDL connection pool: {}", e);
-            }
-        }
-        "mysql" => {
-            if let Err(e) = infra::db::mysql::shutdown_ddl_pool().await {
-                log::warn!("Failed to shutdown MySQL DDL connection pool: {}", e);
-            }
-        }
-        _ => {} // SQLite doesn't have separate DDL pool
-    }
-
     Ok(())
 }
