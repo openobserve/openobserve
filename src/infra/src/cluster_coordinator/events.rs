@@ -70,6 +70,13 @@ static COORDINATOR_WATCHER_PREFIXES: Lazy<RwLock<Vec<WatcherPrefix>>> =
     Lazy::new(|| RwLock::new(Vec::new()));
 
 pub async fn init() -> Result<()> {
+    // if local node is single node or meta store is not nats, return ok
+    let cfg = config::get_config();
+    let meta_store: config::meta::meta_store::MetaStore = cfg.common.queue_store.as_str().into();
+    if cfg.common.local_mode || meta_store != config::meta::meta_store::MetaStore::Nats {
+        return Ok(());
+    }
+
     // create the coordinator stream if not exists
     create_stream().await?;
 

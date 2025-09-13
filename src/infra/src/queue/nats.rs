@@ -86,7 +86,7 @@ impl super::Queue for NatsQueue {
         retention_policy: RetentionPolicy,
     ) -> Result<()> {
         let cfg = config::get_config();
-        let client = get_nats_client().await?;
+        let client = get_nats_client().await.clone();
         let jetstream = jetstream::new(client);
         let topic_name = format!("{}{}", self.prefix, topic);
         let config = jetstream::stream::Config {
@@ -109,7 +109,7 @@ impl super::Queue for NatsQueue {
 
     /// you can pub message with the topic or topic.* to match the topic
     async fn publish(&self, topic: &str, value: Bytes) -> Result<()> {
-        let client = get_nats_client().await?;
+        let client = get_nats_client().await.clone();
         let jetstream = jetstream::new(client);
         // Publish a message to the stream
         let topic_name = format!("{}{}", self.prefix, topic);
@@ -124,7 +124,7 @@ impl super::Queue for NatsQueue {
         let consumer_name = self.consumer_name.clone();
         let is_durable = self.is_durable;
         let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
-            let client = get_nats_client().await?;
+            let client = get_nats_client().await.clone();
             let jetstream = jetstream::new(client);
             let stream = jetstream.get_stream(&stream_name).await.map_err(|e| {
                 log::error!("Failed to get nats stream {stream_name}: {e}");

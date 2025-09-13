@@ -22,24 +22,20 @@ use config::{
     utils::json,
 };
 use infra::{
-    db::{NEED_WATCH, get_coordinator, nats},
+    db::{NEED_WATCH, get_coordinator},
     dist_lock,
     errors::{Error, Result},
 };
-use tokio::{sync::mpsc, task};
-
-use crate::common::infra::config::update_cache;
+use tokio::task;
 
 /// Register and keep alive the node to cluster
 pub(crate) async fn register_and_keep_alive() -> Result<()> {
-    // first, init NATs client with channel communicating NATs events
-    let (nats_event_tx, nats_event_rx) = mpsc::channel::<nats::NatsEvent>(10);
-    if let Err(e) = nats::init_nats_client(nats_event_tx).await {
-        log::error!("[CLUSTER] NATs client init failed: {e}");
-        return Err(e);
+    // if local node is single node or meta store is not nats, return ok
+    let cfg = get_config();
+    let meta_store: config::meta::meta_store::MetaStore = cfg.common.queue_store.as_str().into();
+    if cfg.common.local_mode || meta_store != config::meta::meta_store::MetaStore::Nats {
+        return Ok(());
     }
-    // a child task to handle NATs event
-    task::spawn(async move { update_cache(nats_event_rx).await });
 
     if let Err(e) = register().await {
         log::error!("[CLUSTER] register failed: {e}");
@@ -332,15 +328,18 @@ mod tests {
         let _ = leave().await.is_err();
     }
 
-    // #[tokio::test]
-    // async fn test_nats_register_and_keep_alive() {
-    //     config::cache_instance_id("instance");
-    //     let _ = register_and_keep_alive().await.is_err();
-    // }
+    #[tokio::test]
+    async fn test_nats_register_and_keep_alive() {
+        config::cache_instance_id("instance");
+        assert!(register_and_keep_alive().await.is_ok());
+    }
 
     #[tokio::test]
     async fn test_nats_register() {
         config::cache_instance_id("instance");
-        let _ = register().await.is_err();
+        infra::db::nats::init().await;
+        let ret = register().await;
+        println!("[CLUSTER] test_nats_register: {ret:?}");
+        assert!(register().await.is_ok());
     }
 }
