@@ -54,6 +54,8 @@ type StreamSettingsCache = hashbrown::HashMap<String, StreamSettings>;
 static STREAM_SETTINGS_ATOMIC: Lazy<ArcSwap<StreamSettingsCache>> =
     Lazy::new(|| ArcSwap::from(Arc::new(hashbrown::HashMap::new())));
 
+pub const SCHEMA_KEY: &str = "/schema/";
+
 pub async fn init() -> Result<()> {
     history::init().await?;
     Ok(())
@@ -73,7 +75,7 @@ pub async fn get_stream_schema_from_cache(
     stream_type: StreamType,
 ) -> Option<Schema> {
     let key = mk_key(org_id, stream_type, stream_name);
-    let cache_key = key.strip_prefix("/schema/").unwrap();
+    let cache_key = key.strip_prefix(SCHEMA_KEY).unwrap();
     STREAM_SCHEMAS_LATEST
         .read()
         .await
@@ -82,7 +84,7 @@ pub async fn get_stream_schema_from_cache(
 }
 
 pub fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
-    format!("/schema/{org_id}/{stream_type}/{stream_name}")
+    format!("{SCHEMA_KEY}{org_id}/{stream_type}/{stream_name}")
 }
 
 pub async fn get(org_id: &str, stream_name: &str, stream_type: StreamType) -> Result<Schema> {
@@ -96,7 +98,7 @@ pub async fn get_cache(
     stream_type: StreamType,
 ) -> Result<SchemaCache> {
     let key = mk_key(org_id, stream_type, stream_name);
-    let cache_key = key.strip_prefix("/schema/").unwrap();
+    let cache_key = key.strip_prefix(SCHEMA_KEY).unwrap();
     if let Some(schema) = STREAM_SCHEMAS_LATEST.read().await.get(cache_key).cloned() {
         return Ok(schema);
     }
@@ -158,7 +160,7 @@ pub async fn get_versions(
     time_range: Option<(i64, i64)>,
 ) -> Result<Vec<Schema>> {
     let key = mk_key(org_id, stream_type, stream_name);
-    let cache_key = key.strip_prefix("/schema/").unwrap();
+    let cache_key = key.strip_prefix(SCHEMA_KEY).unwrap();
 
     let (min_ts, max_ts) = time_range.unwrap_or((0, 0));
     let mut last_schema_index = None;
@@ -637,7 +639,7 @@ pub async fn delete(
     stream_name: &str,
     start_dt: Option<i64>,
 ) -> Result<()> {
-    let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
+    let key = format!("{SCHEMA_KEY}{org_id}/{stream_type}/{stream_name}");
     let db = infra_db::get_db().await;
     match db.delete(&key, false, infra_db::NEED_WATCH, start_dt).await {
         Ok(_) => {}
