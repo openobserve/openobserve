@@ -11,11 +11,51 @@ test.describe("Alerts E2E Flow", () => {
   let sharedRandomValue;
 
   /**
-   * Setup for each test
-   * - Logs in
-   * - Generates shared random value
-   * - Ingests test data (except for scheduled alert test)
-   * - Navigates to alerts page
+   * @setup Test Setup and Initialization
+   * @description Performs common setup operations required before each test execution
+   * @author Automation Team
+   * 
+   * @setup_steps
+   * 1. **Page Manager Initialization**: Creates new PageManager instance for test
+   * 2. **Random Value Generation**: Generates shared random string for unique test data (once per test run)
+   * 3. **Data Ingestion Control**: Conditionally skips data ingestion for scheduled alert tests
+   * 4. **Navigation**: Navigates to alerts page with organization context
+   * 
+   * @dependencies
+   * - PageManager: Core page object management
+   * - testLogger: Logging and debug information
+   * - logData.alertUrl: Base alert URL from fixtures
+   * - process.env.ORGNAME: Organization identifier from environment
+   * 
+   * @shared_variables
+   * - pm: PageManager instance (available to all tests)
+   * - sharedRandomValue: Unique string for test data isolation
+   * - createdTemplateName: Alert template name (set during test execution)
+   * - createdDestinationName: Alert destination name (set during test execution)
+   * 
+   * @preconditions
+   * - OpenObserve instance must be running and accessible
+   * - User authentication state must be valid
+   * - Environment variables (ORGNAME) must be configured
+   * - Test fixtures (logData) must be available
+   * 
+   * @postconditions
+   * - Page is navigated to alerts interface
+   * - PageManager is initialized and ready for test operations
+   * - Unique random value is generated and logged
+   * - Test data ingestion is handled based on test type
+   * 
+   * @error_handling
+   * - Navigation failures will cause test to fail early
+   * - Missing environment variables will cause URL construction issues
+   * - PageManager initialization failures will prevent test execution
+   * 
+   * @performance
+   * - Random value generation: ~1ms (cached for subsequent tests)
+   * - Page navigation: ~2-3 seconds (depends on server response)
+   * - Data ingestion skip: ~100ms (conditional logic)
+   * 
+   * @logging Generates debug log entry with shared random value for traceability
    */
   test.beforeEach(async ({ page }, testInfo) => {
     pm = new PageManager(page);
@@ -35,8 +75,67 @@ test.describe("Alerts E2E Flow", () => {
   });
 
   /**
-   * Test: Complete E2E flow for alerts
-   * Tests all major alert operations in sequence
+   * @testcase ALERT-E2E-001
+   * @title Complete Alert Lifecycle Management E2E Test
+   * @description Comprehensive end-to-end test that validates all major alert operations including creation, management, and cleanup
+   * @priority Critical
+   * @category Alert Management
+   * @type End-to-End
+   * @tags @e2eAlerts @all @alerts @smoke @regression
+   * @author Automation Team
+   * @created 2025-09-10
+   * 
+   * @preconditions
+   * - User has admin privileges and is authenticated
+   * - OpenObserve instance is running and accessible
+   * - Test stream 'auto_playwright_stream' exists with test data
+   * - Alert templates and destinations can be created
+   * 
+   * @testdata
+   * - Stream: auto_playwright_stream
+   * - Column: job
+   * - Value: test
+   * - Template: auto_playwright_template_{random}
+   * - Destination: auto_playwright_destination_{random}
+   * 
+   * @steps
+   * 1. **Setup Phase**: Create alert template and destination prerequisites
+   * 2. **Folder Creation**: Create alert folder 'auto_{random}' and verify creation
+   * 3. **Alert Creation**: Navigate to folder and create initial alert with stream configuration
+   * 4. **First Clone & Delete**: Clone the alert and delete all instances to test bulk operations
+   * 5. **Second Alert Creation**: Create new alert in the same folder
+   * 6. **Alert Update**: Modify alert operator settings and verify changes
+   * 7. **Second Clone**: Clone the updated alert to test cloning functionality
+   * 8. **Pause/Resume Operations**: Test alert pause and resume functionality
+   * 9. **Folder Movement**: Move all alerts to target folder 'testfoldermove'
+   * 10. **Cleanup**: Delete original folder and verify alerts in target location
+   * 11. **Final Verification**: Search for alerts and verify expected count (2 instances)
+   * 12. **Final Cleanup**: Delete alert by row to complete test cleanup
+   * 
+   * @expected
+   * - All alert operations complete successfully without errors
+   * - Alert templates and destinations are created and reusable
+   * - Folder operations (create, move, delete) work correctly
+   * - Alert cloning creates exact copies with proper naming
+   * - Pause/Resume functionality works without data loss
+   * - Bulk operations (move, delete) handle multiple alerts correctly
+   * - Search functionality returns accurate results (2 alert instances)
+   * - Final cleanup removes all test artifacts
+   * 
+   * @risks
+   * - Test creates multiple alerts that need cleanup on failure
+   * - Folder operations may leave orphaned alerts if test fails mid-execution
+   * - Random values may conflict if tests run in parallel
+   * 
+   * @duration ~85 seconds (based on historical runs)
+   * @browser Chrome/Chromium
+   * @viewport 1500x1024
+   * 
+   * @automation_mapping
+   * - File: tests/ui-testing/playwright-tests/Alerts/alerts-e2e-flow.spec.js
+   * - Test Method: Alerts E2E Flow - Create, Update, Move, Clone, Delete, Pause, Resume
+   * - Framework: Playwright
+   * - Page Objects: AlertsPage, AlertTemplatesPage, AlertDestinationsPage, DashboardFolder
    */
   test('Alerts E2E Flow - Create, Update, Move, Clone, Delete, Pause, Resume', {
     tag: ['@e2eAlerts', '@all', '@alerts']
