@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="full-height full-width scheduled-pipeline-container">
     <div class="flex items-center justify-between q-pb-sm">
         <div class="flex items-center">
-          <q-btn icon="close" size="12px" class="q-pt-sm" flat dense   @click="$emit('cancel:form')"/>
+          <q-btn icon="cancel" size="14px" class="q-pt-sm" flat dense   @click="$emit('cancel:form')"/>
                 <div class=" q-pb-sm stream-routing-title  q-pl-xs">
                   {{ t("pipeline.query") }}
                 </div>
@@ -2313,7 +2313,7 @@ defineExpose({
       font-size: 12px !important;
     }
     .stream-routing-title {
-  font-size: 20px;
+  font-size: 18px;
   padding-top: 12px;
 }
 }

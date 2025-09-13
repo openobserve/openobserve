@@ -24,7 +24,7 @@ class UnflattenedPage {
     }
 
     get closeButton() {
-        return this.page.locator('button').filter({ hasText: 'close' });
+        return this.page.getByRole('button').filter({ hasText: /^cancel$/ })
     }
 
     get exploreButton() {

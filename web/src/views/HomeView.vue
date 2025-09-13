@@ -47,6 +47,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="column justify-between">
                 <!-- Title row -->
                 <div class="row justify-between">
+                  <div class="tile-title">   {{ t("home.streams") }}</div>
+                  <div>
+                    <img height="32px" :src="streamsIcon" />
+                  </div>
+                </div>
+
+                <!-- Performance text -->
+                <div v-if="false" class="performance-text"
+                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
+                >
+                  <q-icon name="arrow_upward" size="14px"  /> 2.89% from last week
+                </div>
+              </div>
+
+            <!-- Bottom Section (40%) -->
+            <div class="data-to-display row items-end ">
+              {{ summary.streams_count }} 
+            </div>
+            </div>
+            </div>
+
+            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
+              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+               style="height: 100%; gap: 12px">
+              <!-- Top Section (60%) -->
+              <div class="column justify-between" >
+                <!-- Title row -->
+                <div class="row justify-between">
+                  <div class="tile-title">   {{ t("home.docsCountLbl") }}</div>
+                  <div>
+                    <img :src="recordsIcon" />
+                  </div>
+                </div>
+
+                <!-- Performance text -->
+                <div v-if="false" class="performance-text "
+                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
+                >
+                  <q-icon name="arrow_upward" size="14px" /> 2.89% from last week
+                </div>
+              </div>
+
+            <!-- Bottom Section (40%) -->
+            <div class="data-to-display row items-end ">
+              {{ summary.doc_count }}
+            </div>
+            </div>
+            </div>
+            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
+              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+               style="height: 100%; gap: 12px">
+              <!-- Top Section (60%) -->
+              <div class="column justify-between">
+                <!-- Title row -->
+                <div class="row justify-between">
                   <div class="tile-title"> {{ t("home.totalDataCompressed") }}</div>
                   <div style="opacity: 0.8;">
                     <img :src="compressedSizeIcon" />
@@ -126,63 +183,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
 
-            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               style="height: 100%; gap: 12px">
-              <!-- Top Section (60%) -->
-              <div class="column justify-between" >
-                <!-- Title row -->
-                <div class="row justify-between">
-                  <div class="tile-title">   {{ t("home.docsCountLbl") }}</div>
-                  <div>
-                    <img :src="recordsIcon" />
-                  </div>
-                </div>
-
-                <!-- Performance text -->
-                <div v-if="false" class="performance-text "
-                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
-                >
-                  <q-icon name="arrow_upward" size="14px" /> 2.89% from last week
-                </div>
-              </div>
-
-            <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end ">
-              {{ summary.doc_count }}
-            </div>
-            </div>
-            </div>
-
-            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               style="height: 100%; gap: 12px">
-              <!-- Top Section (60%) -->
-              <div class="column justify-between">
-                <!-- Title row -->
-                <div class="row justify-between">
-                  <div class="tile-title">   {{ t("home.streams") }}</div>
-                  <div>
-                    <img height="32px" :src="streamsIcon" />
-                  </div>
-                </div>
-
-                <!-- Performance text -->
-                <div v-if="false" class="performance-text"
-                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
-                >
-                  <q-icon name="arrow_upward" size="14px"  /> 2.89% from last week
-                </div>
-              </div>
-
-            <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end ">
-              {{ summary.streams_count }} 
-            </div>
-            </div>
-            </div>
         </div>
 
         </div>
@@ -422,7 +422,7 @@ export default defineComponent({
             compressed_data: formatSizeFromMB(
               res.data.streams?.total_compressed_size,
             ),
-            doc_count: addCommasToNumber(res.data.streams?.total_records ?? 0),
+            doc_count: formatEventCount(res.data.streams?.total_records ?? 0),
             index_size: formatSizeFromMB(
               res.data.streams?.total_index_size ?? 0,
             ),
@@ -642,8 +642,18 @@ export default defineComponent({
     return getImageURL('images/home/pipeline.svg');
   });
 
+  const formatEventCount = (num: number): string => {
+  if (num < 100000) return num.toString();
 
+  const units = ["", "K", "M", "B", "T"];
+  let tier = Math.floor(Math.log10(num) / 3);
 
+  // clamp to max unit (T)
+  if (tier >= units.length) tier = units.length - 1;
+
+  const scaled = num / Math.pow(10, tier * 3);
+  return scaled.toFixed(1).replace(/\.0$/, "") + units[tier];
+};
 
 
 
@@ -670,6 +680,7 @@ export default defineComponent({
       isLoadingSummary,
       pipelinesIcon,
       alertsIcon,
+      formatEventCount
     };
   },
   computed: {
