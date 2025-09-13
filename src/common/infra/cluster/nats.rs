@@ -22,24 +22,20 @@ use config::{
     utils::json,
 };
 use infra::{
-    db::{NEED_WATCH, get_coordinator, nats},
+    db::{NEED_WATCH, get_coordinator},
     dist_lock,
     errors::{Error, Result},
 };
-use tokio::{sync::mpsc, task};
-
-use crate::common::infra::config::update_cache;
+use tokio::task;
 
 /// Register and keep alive the node to cluster
 pub(crate) async fn register_and_keep_alive() -> Result<()> {
-    // first, init NATs client with channel communicating NATs events
-    let (nats_event_tx, nats_event_rx) = mpsc::channel::<nats::NatsEvent>(10);
-    if let Err(e) = nats::init_nats_client(nats_event_tx).await {
-        log::error!("[CLUSTER] NATs client init failed: {}", e);
-        return Err(e);
+    // if local node is single node or meta store is not nats, return ok
+    let cfg = get_config();
+    let meta_store: config::meta::meta_store::MetaStore = cfg.common.queue_store.as_str().into();
+    if cfg.common.local_mode || meta_store != config::meta::meta_store::MetaStore::Nats {
+        return Ok(());
     }
-    // a child task to handle NATs event
-    task::spawn(async move { update_cache(nats_event_rx).await });
 
     if let Err(e) = register().await {
         log::error!("[CLUSTER] register failed: {}", e);
@@ -90,6 +86,18 @@ async fn register() -> Result<()> {
             log::error!("[CLUSTER] nats register failed: {}", e);
             e
         })?;
+
+    // create the coordinator stream if not exists
+    log::info!("[COORDINATOR] initializing coordinator");
+    if let Err(e) = infra::cluster_coordinator::events::init().await {
+        dist_lock::unlock(&locker).await.map_err(|e| {
+            log::error!("[CLUSTER] nats unlock failed: {}", e);
+            e
+        })?;
+        return Err(Error::Message(format!(
+            "[COORDINATOR] Failed to init coordinator events: {e}",
+        )));
+    }
 
     // 2. watch node list
     task::spawn(async move { super::watch_node_list().await });
@@ -296,4 +304,48 @@ pub(crate) async fn update_local_node(node: &Node) -> Result<()> {
         return Err(Error::Message(format!("update node error: {e}")));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_nats_update_local_node() {
+        let node = Node::default();
+        let _ = update_local_node(&node).await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_nats_set_status() {
+        let _ = set_status(NodeStatus::Online).await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_nats_set_offline() {
+        let _ = set_offline().await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_nats_leave() {
+        let _ = leave().await.is_err();
+    }
+
+    #[tokio::test]
+    async fn test_nats_register_and_keep_alive() {
+        config::cache_instance_id("instance");
+        infra::db_init().await.unwrap();
+        let ret = register_and_keep_alive().await;
+        println!("[CLUSTER::TEST] test_nats_register_and_keep_alive: {ret:?}");
+        assert!(ret.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_nats_register() {
+        config::cache_instance_id("instance");
+        infra::db_init().await.unwrap();
+        let ret = register().await;
+        println!("[CLUSTER::TEST] test_nats_register: {ret:?}");
+        assert!(ret.is_ok());
+    }
 }
