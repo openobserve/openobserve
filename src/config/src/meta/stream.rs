@@ -492,22 +492,20 @@ impl std::ops::Sub<&StreamStats> for &StreamStats {
     type Output = StreamStats;
 
     fn sub(self, rhs: &StreamStats) -> Self::Output {
-        StreamStats {
+        let mut ret = StreamStats {
             created_at: self.created_at,
             file_num: self.file_num - rhs.file_num,
             doc_num: self.doc_num - rhs.doc_num,
-            doc_time_min: if self.doc_time_min == 0 {
-                rhs.doc_time_min
-            } else if rhs.doc_time_min == 0 {
-                self.doc_time_min
-            } else {
-                self.doc_time_min.min(rhs.doc_time_min)
-            },
+            doc_time_min: self.doc_time_min.min(rhs.doc_time_min),
             doc_time_max: self.doc_time_max.max(rhs.doc_time_max),
             storage_size: self.storage_size - rhs.storage_size,
             compressed_size: self.compressed_size - rhs.compressed_size,
             index_size: self.index_size - rhs.index_size,
+        };
+        if ret.doc_time_min == 0 {
+            ret.doc_time_min = rhs.doc_time_min;
         }
+        ret
     }
 }
 
@@ -515,22 +513,20 @@ impl std::ops::Add<&StreamStats> for &StreamStats {
     type Output = StreamStats;
 
     fn add(self, rhs: &StreamStats) -> Self::Output {
-        StreamStats {
+        let mut ret = StreamStats {
             created_at: self.created_at,
             file_num: self.file_num + rhs.file_num,
             doc_num: self.doc_num + rhs.doc_num,
-            doc_time_min: if self.doc_time_min == 0 {
-                rhs.doc_time_min
-            } else if rhs.doc_time_min == 0 {
-                self.doc_time_min
-            } else {
-                self.doc_time_min.min(rhs.doc_time_min)
-            },
+            doc_time_min: self.doc_time_min.min(rhs.doc_time_min),
             doc_time_max: self.doc_time_max.max(rhs.doc_time_max),
             storage_size: self.storage_size + rhs.storage_size,
             compressed_size: self.compressed_size + rhs.compressed_size,
             index_size: self.index_size + rhs.index_size,
+        };
+        if ret.doc_time_min == 0 {
+            ret.doc_time_min = rhs.doc_time_min;
         }
+        ret
     }
 }
 
