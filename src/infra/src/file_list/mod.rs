@@ -626,7 +626,7 @@ impl From<&FileRecord> for FileMeta {
 pub struct StatsRecord {
     pub stream: String,
     pub file_num: i64,
-    pub min_ts: i64,
+    pub min_ts: Option<i64>,
     pub max_ts: i64,
     pub records: i64,
     pub original_size: i64,
@@ -638,7 +638,7 @@ impl From<&StatsRecord> for StreamStats {
     fn from(record: &StatsRecord) -> Self {
         Self {
             created_at: 0,
-            doc_time_min: record.min_ts,
+            doc_time_min: record.min_ts.unwrap_or_default(),
             doc_time_max: record.max_ts,
             doc_num: record.records,
             file_num: record.file_num,
