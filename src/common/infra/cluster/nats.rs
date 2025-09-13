@@ -330,7 +330,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_nats_register_and_keep_alive() {
-        config::cache_instance_id("instance"); 
+        config::cache_instance_id("instance");
         infra::db_init().await.unwrap();
         let ret = register_and_keep_alive().await;
         println!("[CLUSTER::TEST] test_nats_register_and_keep_alive: {ret:?}");
