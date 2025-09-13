@@ -78,7 +78,9 @@ async fn get_bucket_by_key<'a>(
     Ok((kv, key.trim_start_matches(bucket_name)))
 }
 
-pub async fn init() {}
+pub async fn init() {
+    _ = get_nats_client().await;
+}
 
 pub struct NatsDb {
     prefix: String,

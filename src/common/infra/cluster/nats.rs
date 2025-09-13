@@ -331,15 +331,16 @@ mod tests {
     #[tokio::test]
     async fn test_nats_register_and_keep_alive() {
         config::cache_instance_id("instance");
-        assert!(register_and_keep_alive().await.is_ok());
+        let ret = register_and_keep_alive().await;
+        println!("[CLUSTER::TEST] test_nats_register_and_keep_alive: {ret:?}");
+        assert!(ret.is_ok());
     }
 
     #[tokio::test]
     async fn test_nats_register() {
         config::cache_instance_id("instance");
-        infra::db::nats::init().await;
         let ret = register().await;
-        println!("[CLUSTER] test_nats_register: {ret:?}");
-        assert!(register().await.is_ok());
+        println!("[CLUSTER::TEST] test_nats_register: {ret:?}");
+        assert!(ret.is_ok());
     }
 }
