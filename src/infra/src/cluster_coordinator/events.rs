@@ -187,7 +187,7 @@ async fn subscribe(tx: mpsc::Sender<CoordinatorEvent>) -> Result<()> {
 /// `event` should be a json string. The message will be published to the coordinator stream.
 async fn publish(event: CoordinatorEvent) -> Result<()> {
     let payload = json::to_vec(&event)
-        .map_err(|e| Error::Message(format!("Failed to serialize coordinator event: {}", e)))?;
+        .map_err(|e| Error::Message(format!("Failed to serialize coordinator event: {e}")))?;
     let queue = queue::get_queue().await;
     if let Err(e) = queue
         .publish(COORDINATOR_STREAM, Bytes::from(payload))
