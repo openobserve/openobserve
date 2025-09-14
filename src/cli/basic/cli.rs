@@ -223,6 +223,19 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     db::functions::reset().await?;
                 }
                 "stream-stats" => {
+                    if cfg.limit.calculate_stats_step_limit_secs < 3600 {
+                        println!(
+                            r#"
+------------------------------------------------------------------------------
+Warning: !!! 
+calculate_stats_step_limit_secs good to be at least 3600 for stats reset,
+suggested to run again with:
+
+ZO_CALCULATE_STATS_STEP_LIMIT_SECS=3600 ./openobserve reset -c stream-stats
+------------------------------------------------------------------------------
+"#
+                        );
+                    }
                     // reset stream stats update offset
                     db::compact::stats::set_offset(0, None).await?;
                     // reset stream stats table data
