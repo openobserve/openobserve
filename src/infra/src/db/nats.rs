@@ -21,7 +21,6 @@ use std::{
     time::Duration,
 };
 
-pub use async_nats::Event as NatsEvent;
 use async_nats::{Client, ServerAddr, jetstream};
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -35,37 +34,16 @@ use config::{
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
-use tokio::{
-    sync::{Mutex, OnceCell, mpsc},
-    task::JoinHandle,
-};
+use tokio::sync::{Mutex, OnceCell, mpsc};
 
-use crate::{
-    db::{Event, EventData},
-    dist_lock,
-    errors::*,
-};
+use crate::{cluster_coordinator, db::Event, dist_lock, errors::*};
 
 const SUPER_CLUSTER_PREFIX: &str = "super_cluster_kv_";
 
 static NATS_CLIENT: OnceCell<Client> = OnceCell::const_new();
 
-/// Initialize a global NATS client with a mpsc channel sender for sending NATs events.
-pub async fn init_nats_client(nats_event_sender: mpsc::Sender<async_nats::Event>) -> Result<()> {
-    let client = connect(nats_event_sender).await;
-
-    NATS_CLIENT
-        .set(client)
-        .map_err(|e| Error::Message(format!("[NATS:init] failed to set global client: {e}")))
-}
-
-pub async fn get_nats_client() -> Result<Client> {
-    NATS_CLIENT
-        .get()
-        .ok_or(Error::Message(
-            "[NATS:get_nats_client] NATs client not initialized".to_string(),
-        ))
-        .cloned()
+pub async fn get_nats_client() -> &'static Client {
+    NATS_CLIENT.get_or_init(connect).await
 }
 
 async fn get_bucket_by_key<'a>(
@@ -73,7 +51,7 @@ async fn get_bucket_by_key<'a>(
     key: &'a str,
 ) -> Result<(jetstream::kv::Store, &'a str)> {
     let cfg = get_config();
-    let client = get_nats_client().await?;
+    let client = get_nats_client().await.clone();
     let jetstream = jetstream::new(client);
     let key = key.trim_start_matches('/');
     let bucket_name = key.split('/').next().unwrap();
@@ -100,7 +78,9 @@ async fn get_bucket_by_key<'a>(
     Ok((kv, key.trim_start_matches(bucket_name)))
 }
 
-pub async fn init() {}
+pub async fn init() {
+    _ = get_nats_client().await;
+}
 
 pub struct NatsDb {
     prefix: String,
@@ -165,7 +145,7 @@ impl super::Db for NatsDb {
     }
 
     async fn stats(&self) -> Result<super::Stats> {
-        let client = get_nats_client().await?;
+        let client = get_nats_client().await.clone();
         let jetstream = async_nats::jetstream::new(client);
         let mut keys_count = 0;
         let mut bytes_len = 0;
@@ -211,20 +191,24 @@ impl super::Db for NatsDb {
         &self,
         key: &str,
         value: Bytes,
-        _need_watch: bool,
+        need_watch: bool,
         start_dt: Option<i64>,
     ) -> Result<()> {
+        let local_key = key.to_string();
         let key = if start_dt.is_some() {
             format!("{}/{}", key, start_dt.unwrap())
         } else {
             key.to_string()
         };
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, &key).await?;
-        let key = key_encode(new_key);
+        let encode_key = key_encode(new_key);
         _ = bucket
-            .put(&key, value)
+            .put(&encode_key, value.clone())
             .await
             .map_err(|e| Error::Message(format!("[NATS:put] bucket.put error: {e}")))?;
+        if need_watch {
+            cluster_coordinator::events::put_event(&local_key, start_dt, Some(value)).await?;
+        }
         Ok(())
     }
 
@@ -291,7 +275,7 @@ impl super::Db for NatsDb {
         &self,
         key: &str,
         with_prefix: bool,
-        _need_watch: bool,
+        need_watch: bool,
         start_dt: Option<i64>,
     ) -> Result<()> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
@@ -306,21 +290,28 @@ impl super::Db for NatsDb {
             new_key.to_string()
         };
         if !with_prefix {
-            let key = key_encode(&new_key);
+            let purge_key = key_encode(&new_key);
             bucket
-                .purge(key)
+                .purge(purge_key)
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {e}")))?;
+            if need_watch {
+                cluster_coordinator::events::delete_event(key, start_dt).await?;
+            }
             return Ok(());
         }
         let keys = keys(&bucket, &new_key)
             .await
             .map_err(|e| Error::Message(format!("[NATS:delete] bucket.keys error: {e}")))?;
-        for key in keys {
+        for purge_key in keys {
+            let encode_key = key_encode(&purge_key);
             bucket
-                .purge(key)
+                .purge(encode_key)
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {e}")))?;
+            if need_watch {
+                cluster_coordinator::events::delete_event(&purge_key, start_dt).await?;
+            }
         }
         Ok(())
     }
@@ -460,82 +451,7 @@ impl super::Db for NatsDb {
     }
 
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
-        let (tx, rx) = mpsc::channel(65535);
-        let prefix = prefix.to_string();
-        let self_prefix = self.prefix.to_string();
-        let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
-            loop {
-                if cluster::is_offline() {
-                    break;
-                }
-                let (bucket, new_key) = match get_bucket_by_key(&self_prefix, &prefix).await {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!("[NATS:watch] prefix: {prefix}, get bucket error: {e}");
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                        continue;
-                    }
-                };
-                let bucket_prefix = "/".to_string() + bucket.name.trim_start_matches(&self_prefix);
-                log::debug!("[NATS:watch] bucket: {}, prefix: {}", bucket.name, prefix);
-                let mut entries = match bucket.watch_all().await {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!("[NATS:watch] prefix: {prefix}, bucket.watch_all error: {e}");
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                        continue;
-                    }
-                };
-                loop {
-                    match entries.next().await {
-                        None => {
-                            log::error!("[NATS:watch] prefix: {prefix}, get message error");
-                            break;
-                        }
-                        Some(entry) => {
-                            let entry = match entry {
-                                Ok(entry) => entry,
-                                Err(e) => {
-                                    log::error!(
-                                        "[NATS:watch] prefix: {prefix}, get message error: {e}"
-                                    );
-                                    break;
-                                }
-                            };
-                            let item_key = key_decode(&entry.key);
-                            if !item_key.starts_with(new_key) {
-                                continue;
-                            }
-                            let new_key = bucket_prefix.to_string() + &item_key;
-                            let ret = match entry.operation {
-                                jetstream::kv::Operation::Put => {
-                                    tx.try_send(Event::Put(EventData {
-                                        key: new_key.clone(),
-                                        value: Some(entry.value),
-                                        start_dt: None,
-                                    }))
-                                }
-                                jetstream::kv::Operation::Delete
-                                | jetstream::kv::Operation::Purge => {
-                                    tx.try_send(Event::Delete(EventData {
-                                        key: new_key.clone(),
-                                        value: None,
-                                        start_dt: None,
-                                    }))
-                                }
-                            };
-                            if let Err(e) = ret {
-                                log::warn!(
-                                    "[NATS:watch] prefix: {prefix}, key: {new_key}, send error: {e}"
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-            Ok(())
-        });
-        Ok(Arc::new(rx))
+        cluster_coordinator::events::watch(prefix).await
     }
 
     async fn close(&self) -> Result<()> {
@@ -550,7 +466,7 @@ pub async fn create_table() -> Result<()> {
     Ok(())
 }
 
-pub async fn connect(nats_event_sender: mpsc::Sender<async_nats::Event>) -> async_nats::Client {
+pub async fn connect() -> async_nats::Client {
     let cfg = get_config();
     if cfg.common.print_key_config {
         log::info!("Nats init get_config(): {:?}", cfg.nats);
@@ -564,14 +480,6 @@ pub async fn connect(nats_event_sender: mpsc::Sender<async_nats::Event>) -> asyn
     if !cfg.nats.user.is_empty() {
         opts = opts.user_and_password(cfg.nats.user.to_string(), cfg.nats.password.to_string());
     }
-    opts = opts.event_callback(move |event| {
-        let sender = nats_event_sender.clone();
-        async move {
-            if let Err(e) = sender.send(event).await {
-                log::error!("NATs client event callback channel failed to send event: {e}");
-            }
-        }
-    });
     let addrs = cfg
         .nats
         .addr

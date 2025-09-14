@@ -58,6 +58,7 @@ pub async fn db_init() -> Result<(), anyhow::Error> {
     std::fs::create_dir_all(&config::get_config().common.data_db_dir)?;
     db::init().await?;
     file_list::create_table().await?;
+    file_list::create_table_index().await?;
     pipeline::init().await?;
     queue::init().await?;
     scheduler::init().await?;
@@ -74,16 +75,38 @@ pub async fn init() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
+    let cfg = config::get_config();
+
     // if we have skipped db migrations (because version is up-to-date),
     // for non-stateful set components this dir will be absent, so we create it anyways
-    std::fs::create_dir_all(&config::get_config().common.data_db_dir)?;
+    std::fs::create_dir_all(&cfg.common.data_db_dir)?;
     cache::init().await?;
     file_list::LOCAL_CACHE.create_table().await?;
+    if config::cluster::LOCAL_NODE.is_ingester() || config::cluster::LOCAL_NODE.is_querier() {
+        file_list::LOCAL_CACHE.create_table_index().await?;
+    }
     file_list::local_cache_gc().await?;
     if !config::is_local_disk_storage() {
         storage::test_remote_config().await?;
     }
     // because of asynchronous, we need to wait for a while
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+    log::info!("Shutting down DDL connection pool");
+    // Shutdown DDL connection pool after all migrations are complete
+    match cfg.common.meta_store.as_str() {
+        "postgres" => {
+            if let Err(e) = crate::db::postgres::shutdown_ddl_pool().await {
+                log::warn!("Failed to shutdown PostgreSQL DDL connection pool: {}", e);
+            }
+        }
+        "mysql" => {
+            if let Err(e) = crate::db::mysql::shutdown_ddl_pool().await {
+                log::warn!("Failed to shutdown MySQL DDL connection pool: {}", e);
+            }
+        }
+        _ => {} // SQLite doesn't have separate DDL pool
+    }
+
     Ok(())
 }
