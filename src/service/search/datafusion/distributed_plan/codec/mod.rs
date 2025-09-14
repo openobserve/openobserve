@@ -33,7 +33,9 @@ pub fn get_physical_extension_codec() -> ComposedPhysicalExtensionCodec {
     ComposedPhysicalExtensionCodec {
         codecs: vec![
             Arc::new(physical_plan_node::PhysicalPlanNodePhysicalExtensionCodec {}),
-            Arc::new(histogram_sort_merge_join_exec::HistogramSortMergeJoinExecPhysicalExtensionCodec {}),
+            Arc::new(
+                histogram_sort_merge_join_exec::HistogramSortMergeJoinExecPhysicalExtensionCodec {},
+            ),
         ],
     }
 }

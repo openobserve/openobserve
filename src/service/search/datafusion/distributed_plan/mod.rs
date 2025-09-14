@@ -33,10 +33,10 @@ pub mod distribute_analyze;
 pub mod distributed_histogram_join;
 pub mod empty_exec;
 pub mod enrich_exec;
+pub mod histogram_sort_merge_join_exec;
 pub mod node;
 pub mod remote_scan;
 pub mod rewrite;
-pub mod histogram_sort_merge_join_exec;
 mod utils;
 
 pub struct NewEmptyExecVisitor {

@@ -30,8 +30,7 @@ use prost::Message;
 use proto::cluster_rpc;
 
 use crate::service::search::datafusion::distributed_plan::{
-    empty_exec::NewEmptyExec,
-    histogram_sort_merge_join_exec::HistogramSortMergeJoinExec,
+    empty_exec::NewEmptyExec, histogram_sort_merge_join_exec::HistogramSortMergeJoinExec,
 };
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
@@ -83,7 +82,11 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             super::aggregate_topk_exec::try_encode(node, buf)
         } else if node.as_any().downcast_ref::<StreamingAggsExec>().is_some() {
             super::streaming_aggs_exec::try_encode(node, buf)
-        } else if node.as_any().downcast_ref::<HistogramSortMergeJoinExec>().is_some() {
+        } else if node
+            .as_any()
+            .downcast_ref::<HistogramSortMergeJoinExec>()
+            .is_some()
+        {
             super::histogram_sort_merge_join_exec::try_encode(node, buf)
         } else {
             internal_err!("Not supported")
@@ -91,7 +94,11 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
         #[cfg(not(feature = "enterprise"))]
         if node.as_any().downcast_ref::<NewEmptyExec>().is_some() {
             super::empty_exec::try_encode(node, buf)
-        } else if node.as_any().downcast_ref::<HistogramSortMergeJoinExec>().is_some() {
+        } else if node
+            .as_any()
+            .downcast_ref::<HistogramSortMergeJoinExec>()
+            .is_some()
+        {
             super::histogram_sort_merge_join_exec::try_encode(node, buf)
         } else {
             internal_err!("Not supported")
