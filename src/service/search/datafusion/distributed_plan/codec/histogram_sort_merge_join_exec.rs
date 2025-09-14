@@ -14,14 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::sync::Arc;
-use datafusion::{
-    common::Result,
-    execution::FunctionRegistry,
-    physical_plan::ExecutionPlan,
-};
+
+use datafusion::{common::Result, execution::FunctionRegistry, physical_plan::ExecutionPlan};
 use datafusion_proto::physical_plan::PhysicalExtensionCodec;
 use prost::Message;
 use proto::cluster_rpc;
+
 use crate::service::search::datafusion::distributed_plan::histogram_sort_merge_join_exec::HistogramSortMergeJoinExec;
 
 #[derive(Debug)]
@@ -101,15 +99,25 @@ impl PhysicalExtensionCodec for HistogramSortMergeJoinExecPhysicalExtensionCodec
         Ok(())
     }
 
-    fn try_decode_udf(&self, _name: &str, _buf: &[u8]) -> Result<Arc<datafusion::logical_expr::ScalarUDF>> {
+    fn try_decode_udf(
+        &self,
+        _name: &str,
+        _buf: &[u8],
+    ) -> Result<Arc<datafusion::logical_expr::ScalarUDF>> {
         Err(datafusion::common::DataFusionError::Internal(
-            "HistogramSortMergeJoinExecPhysicalExtensionCodec does not support UDF decoding".to_string()
+            "HistogramSortMergeJoinExecPhysicalExtensionCodec does not support UDF decoding"
+                .to_string(),
         ))
     }
 
-    fn try_encode_udf(&self, _node: &datafusion::logical_expr::ScalarUDF, _buf: &mut Vec<u8>) -> Result<()> {
+    fn try_encode_udf(
+        &self,
+        _node: &datafusion::logical_expr::ScalarUDF,
+        _buf: &mut Vec<u8>,
+    ) -> Result<()> {
         Err(datafusion::common::DataFusionError::Internal(
-            "HistogramSortMergeJoinExecPhysicalExtensionCodec does not support UDF encoding".to_string()
+            "HistogramSortMergeJoinExecPhysicalExtensionCodec does not support UDF encoding"
+                .to_string(),
         ))
     }
 }
@@ -150,7 +158,7 @@ pub fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()>
         .downcast_ref::<HistogramSortMergeJoinExec>()
         .ok_or_else(|| {
             datafusion::common::DataFusionError::Internal(
-                "try_encode can only encode HistogramSortMergeJoinExec".to_string()
+                "try_encode can only encode HistogramSortMergeJoinExec".to_string(),
             )
         })?;
 

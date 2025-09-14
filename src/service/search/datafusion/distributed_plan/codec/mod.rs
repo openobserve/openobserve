@@ -34,8 +34,8 @@ mod tmp_exec;
 pub fn get_physical_extension_codec(org_id: String) -> ComposedPhysicalExtensionCodec {
     ComposedPhysicalExtensionCodec {
         codecs: vec![
-            Arc::new(physical_plan_node::PhysicalPlanNodePhysicalExtensionCodec { org_id }),
-            Arc::new(histogram_sort_merge_join_exec::HistogramSortMergeJoinExecPhysicalExtensionCodec {}),
+Arc::new(physical_plan_node::PhysicalPlanNodePhysicalExtensionCodec { org_id }),
+Arc::new(histogram_sort_merge_join_exec::HistogramSortMergeJoinExecPhysicalExtensionCodec {}),
         ],
     }
 }

@@ -142,16 +142,16 @@ pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Erro
 }
 
 /// Convert seconds to a human-readable interval string
-/// 
+///
 /// This function converts a number of seconds to a human-readable string format
 /// that can be used in SQL queries and other contexts where interval strings
 /// are expected.
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// use crate::service::search::sql::visitor::histogram_interval::convert_seconds_to_interval_string;
-/// 
+///
 /// assert_eq!(convert_seconds_to_interval_string(60), "1 minute");
 /// assert_eq!(convert_seconds_to_interval_string(300), "5 minutes");
 /// assert_eq!(convert_seconds_to_interval_string(3600), "1 hour");
@@ -169,7 +169,7 @@ pub fn convert_seconds_to_interval_string(seconds: i64) -> String {
         if days == 1 {
             "1 day".to_string()
         } else {
-            format!("{} days", days)
+            format!("{days} days")
         }
     } else if seconds >= 3600 {
         // Hours
@@ -177,7 +177,7 @@ pub fn convert_seconds_to_interval_string(seconds: i64) -> String {
         if hours == 1 {
             "1 hour".to_string()
         } else {
-            format!("{} hours", hours)
+            format!("{hours} hours")
         }
     } else if seconds >= 60 {
         // Minutes
@@ -185,14 +185,14 @@ pub fn convert_seconds_to_interval_string(seconds: i64) -> String {
         if minutes == 1 {
             "1 minute".to_string()
         } else {
-            format!("{} minutes", minutes)
+            format!("{minutes} minutes")
         }
     } else {
         // Seconds
         if seconds == 1 {
             "1 second".to_string()
         } else {
-            format!("{} seconds", seconds)
+            format!("{seconds} seconds")
         }
     }
 }
@@ -482,7 +482,7 @@ mod tests {
         assert_eq!(convert_seconds_to_interval_string(7200), "2 hours");
         assert_eq!(convert_seconds_to_interval_string(86400), "1 day");
         assert_eq!(convert_seconds_to_interval_string(172800), "2 days");
-        
+
         // Test edge cases
         assert_eq!(convert_seconds_to_interval_string(0), "1 hour");
         assert_eq!(convert_seconds_to_interval_string(-1), "1 hour");

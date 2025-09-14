@@ -26,9 +26,7 @@ use datafusion::{
 };
 
 use crate::service::search::datafusion::{
-    plan::{
-        deduplication::DeduplicationLogicalNode, deduplication_exec::DeduplicationExec,
-    },
+    plan::{deduplication::DeduplicationLogicalNode, deduplication_exec::DeduplicationExec},
     planner::histogram_join_planner::HistogramJoinPlanner,
 };
 
@@ -49,11 +47,10 @@ impl QueryPlanner for OpenobserveQueryPlanner {
         logical_plan: &LogicalPlan,
         session_state: &SessionState,
     ) -> DataFusionResult<Arc<dyn ExecutionPlan>> {
-        let planners: Vec<Arc<dyn ExtensionPlanner + Send + Sync>> =
-            vec![
-                Arc::new(DeduplicationExecPlanner::new()),
-                Arc::new(HistogramJoinPlanner::new()),
-            ];
+        let planners: Vec<Arc<dyn ExtensionPlanner + Send + Sync>> = vec![
+            Arc::new(DeduplicationExecPlanner::new()),
+            Arc::new(HistogramJoinPlanner::new()),
+        ];
 
         DefaultPhysicalPlanner::with_extension_planners(planners)
             .create_physical_plan(logical_plan, session_state)
