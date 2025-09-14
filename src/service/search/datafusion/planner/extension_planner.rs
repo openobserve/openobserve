@@ -25,8 +25,11 @@ use datafusion::{
     physical_planner::{DefaultPhysicalPlanner, ExtensionPlanner, PhysicalPlanner},
 };
 
-use crate::service::search::datafusion::plan::{
-    deduplication::DeduplicationLogicalNode, deduplication_exec::DeduplicationExec,
+use crate::service::search::datafusion::{
+    plan::{
+        deduplication::DeduplicationLogicalNode, deduplication_exec::DeduplicationExec,
+    },
+    planner::histogram_join_planner::HistogramJoinPlanner,
 };
 
 // A query planner that wrap datafusion's default planner with extension planner
@@ -47,7 +50,10 @@ impl QueryPlanner for OpenobserveQueryPlanner {
         session_state: &SessionState,
     ) -> DataFusionResult<Arc<dyn ExecutionPlan>> {
         let planners: Vec<Arc<dyn ExtensionPlanner + Send + Sync>> =
-            vec![Arc::new(DeduplicationExecPlanner::new())];
+            vec![
+                Arc::new(DeduplicationExecPlanner::new()),
+                Arc::new(HistogramJoinPlanner::new()),
+            ];
 
         DefaultPhysicalPlanner::with_extension_planners(planners)
             .create_physical_plan(logical_plan, session_state)

@@ -55,6 +55,7 @@ use crate::service::search::{
         logical_optimizer::{
             add_sort_and_limit::AddSortAndLimitRule, add_timestamp::AddTimestampRule,
             limit_join_right_side::LimitJoinRightSide, rewrite_histogram::RewriteHistogram,
+            rewrite_match::RewriteMatch, histogram_sort_merge_join::HistogramSortMergeJoinRule,
         },
         physical_optimizer::{
             distribute_analyze::optimize_distribute_analyze,
@@ -122,6 +123,8 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     rules.push(Arc::new(EliminateOuterJoin::new()));
 
     // *********** custom rules ***********
+    // Add time-bin sort-merge join rule before histogram rewrite
+    rules.push(Arc::new(HistogramSortMergeJoinRule::new(sql.histogram_interval)));
     rules.push(Arc::new(RewriteHistogram::new(
         start_time,
         end_time,

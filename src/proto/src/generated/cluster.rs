@@ -2803,7 +2803,7 @@ pub mod query_cache_server {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PhysicalPlanNode {
-    #[prost(oneof = "physical_plan_node::Plan", tags = "1, 2, 3")]
+    #[prost(oneof = "physical_plan_node::Plan", tags = "1, 2, 3, 4")]
     pub plan: ::core::option::Option<physical_plan_node::Plan>,
 }
 /// Nested message and enum types in `PhysicalPlanNode`.
@@ -2818,6 +2818,8 @@ pub mod physical_plan_node {
         AggregateTopk(super::AggregateTopkExecNode),
         #[prost(message, tag = "3")]
         StreamingAggs(super::StreamingAggsExecNode),
+        #[prost(message, tag = "4")]
+        HistogramSortMergeJoin(super::HistogramSortMergeJoinExecNode),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2867,6 +2869,34 @@ pub struct StreamingAggsExecNode {
     pub aggregate_plan: ::core::option::Option<
         ::datafusion_proto::protobuf::PhysicalPlanNode,
     >,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct HistogramSortMergeJoinExecNode {
+    #[prost(string, tag = "1")]
+    pub left_time_column: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub right_time_column: ::prost::alloc::string::String,
+    #[prost(message, repeated, tag = "3")]
+    pub join_columns: ::prost::alloc::vec::Vec<JoinColumnPair>,
+    #[prost(string, tag = "4")]
+    pub time_bin_interval: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "5")]
+    pub left_plan: ::core::option::Option<
+        ::datafusion_proto::protobuf::PhysicalPlanNode,
+    >,
+    #[prost(message, optional, tag = "6")]
+    pub right_plan: ::core::option::Option<
+        ::datafusion_proto::protobuf::PhysicalPlanNode,
+    >,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct JoinColumnPair {
+    #[prost(string, tag = "1")]
+    pub left_column: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub right_column: ::prost::alloc::string::String,
 }
 /// Search request
 #[allow(clippy::derive_partial_eq_without_eq)]
