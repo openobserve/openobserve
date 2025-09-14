@@ -16,6 +16,8 @@ message PhysicalPlanNode {
     AggregateTopkExecNode aggregate_topk = 2;
     StreamingAggsExecNode streaming_aggs = 3;
     TmpExecNode                 tmp_exec = 4;
+    HistogramSortMergeJoinExecNode histogram_sort_merge_join = 4;
+
   }
 }
 
@@ -51,6 +53,20 @@ message StreamingAggsExecNode {
   bool                 is_complete_cache_hit = 5;
   repeated string               cached_files = 6;
   datafusion.PhysicalPlanNode aggregate_plan = 7;
+}
+
+message HistogramSortMergeJoinExecNode {
+  string                    left_time_column = 1;
+  string                   right_time_column = 2;
+  repeated JoinColumnPair    join_columns = 3;
+  string                time_bin_interval = 4;
+  datafusion.PhysicalPlanNode left_plan = 5;
+  datafusion.PhysicalPlanNode right_plan = 6;
+}
+
+message JoinColumnPair {
+  string left_column = 1;
+  string right_column = 2;
 }
 
 // Search request

@@ -24,6 +24,7 @@ use datafusion_proto::physical_plan::PhysicalExtensionCodec;
 #[cfg(feature = "enterprise")]
 mod aggregate_topk_exec;
 mod empty_exec;
+mod histogram_sort_merge_join_exec;
 mod physical_plan_node;
 #[cfg(feature = "enterprise")]
 mod streaming_aggs_exec;
@@ -32,9 +33,10 @@ mod tmp_exec;
 
 pub fn get_physical_extension_codec(org_id: String) -> ComposedPhysicalExtensionCodec {
     ComposedPhysicalExtensionCodec {
-        codecs: vec![Arc::new(
-            physical_plan_node::PhysicalPlanNodePhysicalExtensionCodec { org_id },
-        )],
+        codecs: vec![
+            Arc::new(physical_plan_node::PhysicalPlanNodePhysicalExtensionCodec { org_id }),
+            Arc::new(histogram_sort_merge_join_exec::HistogramSortMergeJoinExecPhysicalExtensionCodec {}),
+        ],
     }
 }
 

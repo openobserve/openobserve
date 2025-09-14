@@ -196,7 +196,7 @@ pub fn is_eligible_for_histogram(
             } else if has_distinct(statement)
                 || has_limit(query)
                 || has_cte(query)
-                || has_join(query)
+                //|| has_join(query)
                 || has_union(query)
             {
                 return Ok((false, false));
@@ -1135,6 +1135,58 @@ mod tests {
 
         assert_eq!(is_not_union_all, false);
         assert_eq!(is_union_all, true);
+    }
+
+    #[test]
+    fn test_histogram_query_with_join_and_group_by() {
+        // Test the specific query provided by the user
+        let query = r#"SELECT histogram(a._timestamp, '2 minutes') AS time_bucket, a.k8s_cluster AS value_a, b.k8s_cluster AS value_b FROM percentile a INNER JOIN percentile b ON a.k8s_cluster = b.k8s_cluster group by time_bucket, a.k8s_cluster, b.k8s_cluster"#;
+        
+        // Test histogram eligibility
+        let (is_eligible, is_sub_query) = is_eligible_for_histogram(query, false).unwrap();
+        
+        // Currently JOIN queries are eligible for histogram (has_join is commented out)
+        assert_eq!(is_eligible, true);
+        assert_eq!(is_sub_query, false);
+        
+        // Test that the query contains histogram function with time interval
+        assert!(query.contains("histogram(a._timestamp, '2 minutes')"));
+        assert!(query.contains("INNER JOIN"));
+        assert!(query.contains("group by"));
+    }
+
+    #[test]
+    fn test_histogram_function_with_time_interval() {
+        // Test various histogram function calls with time intervals
+        let queries = [
+            r#"SELECT histogram(_timestamp, '1 minute') FROM logs"#,
+            r#"SELECT histogram(_timestamp, '5 minutes') FROM logs"#,
+            r#"SELECT histogram(_timestamp, '1 hour') FROM logs"#,
+            r#"SELECT histogram(a._timestamp, '2 minutes') AS time_bucket FROM percentile a"#,
+        ];
+        
+        for query in queries.iter() {
+            let (is_eligible, is_sub_query) = is_eligible_for_histogram(query, false).unwrap();
+            assert_eq!(is_eligible, true);
+            assert_eq!(is_sub_query, false);
+        }
+    }
+
+    #[test]
+    fn test_histogram_join_query_eligibility() {
+        // Test different types of JOIN queries for histogram eligibility
+        let join_queries = [
+            r#"SELECT histogram(a._timestamp, '1 minute') FROM table1 a INNER JOIN table2 b ON a.id = b.id"#,
+            r#"SELECT histogram(a._timestamp, '5 minutes') FROM table1 a LEFT JOIN table2 b ON a.id = b.id GROUP BY histogram(a._timestamp, '5 minutes')"#,
+            r#"SELECT histogram(a._timestamp, '1 hour') AS time_bucket, COUNT(*) FROM table1 a RIGHT JOIN table2 b ON a.id = b.id GROUP BY time_bucket"#,
+        ];
+        
+        for query in join_queries.iter() {
+            let (is_eligible, is_sub_query) = is_eligible_for_histogram(query, false).unwrap();
+            // Currently JOIN queries are eligible since has_join check is commented out
+            assert_eq!(is_eligible, true);
+            assert_eq!(is_sub_query, false);
+        }
     }
 
     #[test]

@@ -563,9 +563,8 @@ impl<'a> DataFusionContextBuilder<'a> {
         for rule in self.physical_optimizer_rules {
             builder = builder.with_physical_optimizer_rule(rule);
         }
-        if cfg.common.feature_join_match_one_enabled {
-            builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
-        }
+        // Always register the query planner to handle custom nodes (histogram joins and join match one)
+        builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
         Ok(SessionContext::new_with_state(builder.build()))
     }
 }
