@@ -772,34 +772,110 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
 
+    // Remove x_axis_1 field
+    await pm.chartTypeSelector.removeField("_timestamp", "x");
+
+    // await pm.chartTypeSelector.selectChartType("table");
+    await pm.chartTypeSelector.selectChartType("table");
+
     // Open Custom SQL editor
     await page.locator('[data-test="dashboard-customSql"]').click();
     // await page.locator(".cm-line").first().click();
 
     // Focus on the first line of the editor
-    await page.locator(".cm-line").first().click();
+    // await page.locator(".cm-line").first().click();
+    // await page
+    //   .locator('[data-test="dashboard-panel-query-editor"]')
+    //   .getByRole("textbox")
+    //   .click();
+    // await page
+    //   .locator('[data-test="dashboard-panel-query-editor"]')
+    //   .locator(".cm-content")
+    //   .fill(
+    //     'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
+    //   );
+    // Focus on the first line of the editor
+    await page.locator(".view-line").first().click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
-      .getByRole("textbox")
+      .locator(".monaco-editor")
       .click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".cm-content")
+      .locator(".inputarea")
       .fill(
         'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
       );
 
     // Map query results to chart axes
-    await pm.chartTypeSelector.removeField("xAxis1");
-    await pm.chartTypeSelector.removeField("breakdown1");
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
 
-    // Switch to table chart
-    await pm.chartTypeSelector.selectChartType("table");
+    // // Switch to table chart
+    // await pm.chartTypeSelector.selectChartType("table");
 
     // Apply and save the panel
     await pm.dashboardPanelActions.applyDashboardBtn();
+
+    // Assert that data is loaded in the table chart
+    console.log("🔍 Waiting for table to appear...");
+    await page.waitForSelector('[data-test="dashboard-panel-table"]', {
+      state: "visible",
+      timeout: 10000,
+    });
+    console.log("✅ Table container is visible");
+
+    // Wait for data rows to appear in the table
+    console.log("🔍 Waiting for data rows to appear...");
+    await page.waitForSelector(
+      '[data-test="dashboard-panel-table"] tbody.q-virtual-scroll__content tr.cursor-pointer',
+      {
+        state: "visible",
+        timeout: 15000,
+      }
+    );
+    console.log("✅ Data rows are visible");
+
+    // Verify that data rows are present (at least one row with data)
+    const dataRowsLocator = page.locator(
+      '[data-test="dashboard-panel-table"] tbody.q-virtual-scroll__content tr.cursor-pointer'
+    );
+    const rowCount = await dataRowsLocator.count();
+    console.log(`📊 Found ${rowCount} data rows in the table`);
+    expect(rowCount).toBeGreaterThan(0);
+
+    // Verify that the first data row contains actual values (not empty)
+    const firstDataRow = page
+      .locator(
+        '[data-test="dashboard-panel-table"] tbody.q-virtual-scroll__content tr.cursor-pointer'
+      )
+      .first();
+
+    // Get actual cell values for debugging
+    const firstCellText = await firstDataRow
+      .locator("td.q-td")
+      .first()
+      .textContent();
+    const secondCellText = await firstDataRow
+      .locator("td.q-td")
+      .nth(1)
+      .textContent();
+    console.log(
+      `📋 First row data: Column 1: "${firstCellText}", Column 2: "${secondCellText}"`
+    );
+
+    await expect(firstDataRow.locator("td.q-td").first()).not.toHaveText("");
+    await expect(firstDataRow.locator("td.q-td").nth(1)).not.toHaveText("");
+
+    // Ensure no-data element is not visible when data is present
+    const noDataVisible = await page
+      .locator('[data-test="no-data"]')
+      .isVisible();
+    console.log(`🚫 No-data element visible: ${noDataVisible}`);
+    await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
+
+    console.log("🎉 All data assertions passed successfully!");
+
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
 
