@@ -20,7 +20,7 @@ use config::meta::{
     stream::StreamParams,
 };
 use infra::{
-    cluster_coordinator::pipelines::PIPELINES_WATCH_PREFIX,
+    coordinator::pipelines::PIPELINES_WATCH_PREFIX,
     db,
     pipeline::{self as infra_pipeline},
 };
@@ -188,9 +188,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 async fn update_cache(event: PipelineTableEvent<'_>) {
     match event {
         PipelineTableEvent::Remove(pipeline_id) => {
-            if let Err(e) =
-                infra::cluster_coordinator::pipelines::emit_delete_event(pipeline_id).await
-            {
+            if let Err(e) = infra::coordinator::pipelines::emit_delete_event(pipeline_id).await {
                 log::error!("[Pipeline] error triggering event to remove pipeline from cache: {e}");
             }
 
@@ -210,9 +208,7 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
             }
         }
         PipelineTableEvent::Add(pipeline) => {
-            if let Err(e) =
-                infra::cluster_coordinator::pipelines::emit_put_event(&pipeline.id).await
-            {
+            if let Err(e) = infra::coordinator::pipelines::emit_put_event(&pipeline.id).await {
                 log::error!("[Pipeline] error triggering event to add pipeline to cache: {e}");
             }
 

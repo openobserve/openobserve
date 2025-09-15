@@ -89,7 +89,7 @@ async fn register() -> Result<()> {
 
     // create the coordinator stream if not exists
     log::info!("[COORDINATOR] initializing coordinator");
-    if let Err(e) = infra::cluster_coordinator::events::init().await {
+    if let Err(e) = infra::coordinator::events::init().await {
         dist_lock::unlock(&locker).await.map_err(|e| {
             log::error!("[CLUSTER] nats unlock failed: {}", e);
             e
