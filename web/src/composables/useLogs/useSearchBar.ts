@@ -1345,6 +1345,7 @@ export const useSearchBar = () => {
     cancelQuery,
     getPageCount,
     handleQueryData,
+    setDateTime,
   };
 };
 

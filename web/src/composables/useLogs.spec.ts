@@ -32,6 +32,9 @@ import { useHistogram } from "../composables/useLogs/useHistogram";
 import useStreamFields from "../composables/useLogs/useStreamFields";
 import useSearchBar from "../composables/useLogs/useSearchBar";
 import { usePagination } from "../composables/useLogs/usePagination";
+import { useSearchStream } from "../composables/useLogs/useSearchStream";
+import { searchState } from "../composables/useLogs/searchState";
+import useNotifications from "../composables/useNotifications";
 
 import store from "../test/unit/helpers/store";
 
@@ -113,7 +116,24 @@ vi.mock("vue-router", () => ({
 const TestComponent = defineComponent({
   template: '<div></div>',
   setup() {
-    return useLogs();
+    const logsComposable = useLogs();
+    const { setDateTime } = useSearchBar();
+    const { buildSearch } = useSearchStream();
+    const { searchObj, notificationMsg, fieldValues } = searchState();
+    const { showErrorNotification } = useNotifications();
+    const { updateGridColumns, updateFieldValues } = useStreamFields();
+    const { $q, ...restProps } = logsComposable;
+    return {
+      ...restProps,
+      setDateTime,
+      buildSearch,
+      searchObj,
+      notificationMsg,
+      fieldValues,
+      showErrorNotification,
+      updateGridColumns,
+      updateFieldValues
+    };
   },
 });
 
@@ -155,8 +175,10 @@ describe("Use Logs Composable", () => {
 
   afterEach(() => {
     // Cleanup
-    wrapper.vm.searchObj = undefined
-    wrapper.unmount();
+    if (wrapper && wrapper.vm) {
+      wrapper.vm.searchObj = undefined;
+      wrapper.unmount();
+    }
     document.body.innerHTML = "";
   });
 
@@ -448,8 +470,10 @@ describe("Use Logs Composable", () => {
     });
   
     afterEach(() => {
-      wrapper.vm.searchObj = undefined;
-      wrapper.vm.router.currentRoute.value.query = {};
+      if (wrapper && wrapper.vm) {
+        wrapper.vm.searchObj = undefined;
+        wrapper.vm.router.currentRoute.value.query = {};
+      }
     });
   
     it("should handle empty query params", async () => {
