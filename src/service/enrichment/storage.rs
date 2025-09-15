@@ -15,12 +15,16 @@
 
 use anyhow::{Result, anyhow};
 use bytes::Bytes;
-use config::utils::{
-    enrichment_local_cache::{
-        get_key, get_metadata_content, get_metadata_path, get_table_dir, get_table_path,
+use config::{
+    spawn_pausable_job,
+    utils::{
+        enrichment_local_cache::{
+            get_key, get_metadata_content, get_metadata_path, get_table_dir, get_table_path,
+        },
+        json::Value,
     },
-    json::Value,
 };
+use tokio::task::JoinHandle;
 
 pub mod remote {
     use std::sync::Arc;
@@ -247,38 +251,44 @@ pub mod remote {
         Ok(merge_threshold_mb as i64)
     }
 
-    pub async fn run_merge_job() -> Result<()> {
+    pub async fn run_merge_job() -> JoinHandle<()> {
         log::info!("[ENRICHMENT::STORAGE] Running enrichment table merge job");
-        let cfg = config::get_config();
-        // let merge_threshold_mb = cfg.enrichment_table.merge_threshold_mb;
-        let merge_interval = cfg.enrichment_table.merge_interval;
 
-        loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(merge_interval)).await;
-            let org_table_pairs = database::list().await?;
-            log::info!(
-                "[ENRICHMENT::STORAGE] Found {} enrichment tables, {:?}",
-                org_table_pairs.len(),
-                org_table_pairs
-            );
-            for (org_id, table_name) in org_table_pairs {
-                match merge_and_upload_to_remote(&org_id, &table_name).await {
-                    Ok(_) => {
-                        log::debug!(
-                            "Merged and uploaded enrichment table {} to remote",
-                            table_name
-                        );
-                    }
-                    Err(e) => {
-                        log::error!(
-                            "Failed to merge and upload enrichment table {}: {}",
-                            table_name,
-                            e
-                        );
+        config::spawn_pausable_job!(
+            "enrichment_table_merge_job",
+            config::get_config().enrichment_table.merge_interval,
+            {
+                let Ok(org_table_pairs) = database::list().await else {
+                    log::error!("[ENRICHMENT::STORAGE] Failed to list enrichment tables");
+                    return;
+                };
+                if org_table_pairs.is_empty() {
+                    continue;
+                }
+                log::info!(
+                    "[ENRICHMENT::STORAGE] Found {} enrichment tables, {:?}",
+                    org_table_pairs.len(),
+                    org_table_pairs
+                );
+                for (org_id, table_name) in org_table_pairs {
+                    match merge_and_upload_to_remote(&org_id, &table_name).await {
+                        Ok(_) => {
+                            log::debug!(
+                                "Merged and uploaded enrichment table {} to remote",
+                                table_name
+                            );
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "Failed to merge and upload enrichment table {}: {}",
+                                table_name,
+                                e
+                            );
+                        }
                     }
                 }
             }
-        }
+        )
     }
 }
 

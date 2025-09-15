@@ -15,6 +15,7 @@
 
 pub mod cluster;
 pub mod config;
+pub mod config_path_manager;
 pub mod ider;
 pub mod meta;
 pub mod metrics;
