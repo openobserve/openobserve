@@ -44,6 +44,7 @@ import {
   b64EncodeUnicode,
   getFunctionErrorMessage,
   generateTraceContext,
+  addSpacesToOperators,
 } from "@/utils/zincutils";
 
 export const useSearchStream = () => {
