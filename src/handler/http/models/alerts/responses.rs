@@ -107,3 +107,15 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
         })
     }
 }
+
+#[derive(Deserialize)]
+pub struct AlertBulkEnableRequest {
+    pub ids: Vec<Ksuid>,
+}
+
+#[derive(Default, Serialize)]
+pub struct AlertBulkEnableResponse {
+    pub successful: Vec<Ksuid>,
+    pub unsuccessful: Vec<Ksuid>,
+    pub err: Option<String>,
+}

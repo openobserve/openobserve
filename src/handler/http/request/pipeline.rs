@@ -21,7 +21,10 @@ use config::{ider, meta::pipeline::Pipeline};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::models::pipelines::PipelineList,
+    handler::http::{
+        models::pipelines::{PipelineBulkEnableRequest, PipelineBulkEnableResponse, PipelineList},
+        request::search::utils::check_resource_permissions,
+    },
     service::{db::pipeline::PipelineError, pipeline},
 };
 
@@ -303,4 +306,89 @@ pub async fn enable_pipeline(
         }
         Err(e) => Ok(e.into()),
     }
+}
+
+/// EnablePipelineBulk
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "enablePipelineBulk",
+    summary = "Enable or disable pipeline in bulk",
+    description = "Enables or disables data processing pipelines in bulk. Disabled pipelines will not process incoming data until re-enabled",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("value" = bool, Query, description = "Enable or disable pipeline"),
+    ),
+    request_body(content = Object, description = "Pipeline id list", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
+    )
+)]
+#[post("/{org_id}/pipelines/bulk/enable")]
+pub async fn enable_pipeline_bulk(
+    path: web::Path<String>,
+    body: web::Bytes,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    let enable = match query.get("value") {
+        Some(v) => v.parse::<bool>().unwrap_or_default(),
+        None => false,
+    };
+    let starts_from_now = match query.get("from_now") {
+        Some(v) => v.parse::<bool>().unwrap_or_default(),
+        None => false,
+    };
+    let req: PipelineBulkEnableRequest = match serde_json::from_slice(&body) {
+        Ok(v) => v,
+        Err(_) => return Ok(MetaHttpResponse::bad_request("invalid body")),
+    };
+
+    #[cfg(feature = "enterprise")]
+    {
+        let user_id = in_req
+            .headers()
+            .get("user_id")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+
+        for id in &req.ids {
+            if let Some(res) =
+                check_resource_permissions(&org_id, &user_id, "pipelines", id, "PUT").await
+            {
+                return Ok(res);
+            }
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for id in req.ids {
+        match pipeline::enable_pipeline(&org_id, &id, enable, starts_from_now).await {
+            Ok(()) => {
+                successful.push(id);
+            }
+            Err(e) => {
+                err = Some(e.to_string());
+                unsuccessful.push(id);
+            }
+        }
+    }
+    return Ok(MetaHttpResponse::json(PipelineBulkEnableResponse {
+        successful,
+        unsuccessful,
+        err,
+    }));
 }

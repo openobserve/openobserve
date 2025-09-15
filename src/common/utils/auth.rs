@@ -724,6 +724,7 @@ impl FromRequest for AuthExtractor {
                 || path.contains("/short")
                 || path.contains("/ws")
                 || path.contains("/_values_stream")
+                || path.contains("/bulk/enable") // bulk enable of pipelines and alerts
             {
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
