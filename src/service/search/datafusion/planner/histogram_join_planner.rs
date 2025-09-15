@@ -234,7 +234,7 @@ impl HistogramJoinPlanner {
             left_time_column: histogram_join.left_time_column.clone(),
             right_time_column: histogram_join.right_time_column.clone(),
             join_columns: histogram_join.join_columns.clone(),
-            time_bin_interval: histogram_join.time_bin_interval.clone(),
+            histogram_interval: histogram_join.time_bin_interval.clone(),
             remote_scan_nodes: None, // No remote scan nodes for now
             schema: arrow_schema,
         };
