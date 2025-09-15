@@ -1155,9 +1155,9 @@ pub struct Common {
     )]
     pub align_partitions_for_index: bool,
     #[env_config(
-        name = "ZO_ENV_WATCHER_INTERVAL",
+        name = "ZO_CONFIG_WATCHER_INTERVAL",
         default = 30,
-        help = "Environment file watcher interval in seconds. Set to 0 to disable (default: disabled)"
+        help = "Config file watcher interval in seconds. Set to 0 to disable"
     )]
     pub env_watcher_interval: u64,
 }

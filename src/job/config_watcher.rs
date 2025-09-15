@@ -16,6 +16,8 @@
 use std::path::PathBuf;
 use config::spawn_pausable_job;
 
+/// This function will start the config file watcher and load the global config
+/// this is because it uses the interval from config to determine the frequency
 pub fn run() -> Option<tokio::task::JoinHandle<()>> {
     // Only start if config file path is set
     if config::config_path_manager::get_config_file_path().is_none() {
