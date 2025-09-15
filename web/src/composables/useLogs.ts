@@ -62,7 +62,7 @@ const useLogs = () => {
 
   const { refreshPartitionPagination, getPaginatedData } = usePagination();
 
-  const { buildSearch, isHistogramDataMissing } = useSearchStream();
+  const { buildSearch } = useSearchStream();
 
   const { getFunctions, getActions, getQueryData } = useSearchBar();
 
