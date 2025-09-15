@@ -48,6 +48,7 @@ pub use scheduler::select_best_node;
 
 const CONSISTENT_HASH_PRIME: u32 = 16777619;
 
+pub const NODES_KEY: &str = "/nodes/";
 static NODES: Lazy<RwAHashMap<String, Node>> = Lazy::new(Default::default);
 static QUERIER_INTERACTIVE_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
     Lazy::new(Default::default);
@@ -293,7 +294,7 @@ pub async fn leave() -> Result<()> {
 pub async fn list_nodes() -> Result<Vec<Node>> {
     let mut nodes = Vec::new();
     let client = get_coordinator().await;
-    let items = client.list_values("/nodes/").await.map_err(|e| {
+    let items = client.list_values(NODES_KEY).await.map_err(|e| {
         log::error!("[CLUSTER] error getting nodes: {e}");
         e
     })?;
@@ -310,7 +311,7 @@ pub async fn list_nodes() -> Result<Vec<Node>> {
 }
 
 async fn watch_node_list() -> Result<()> {
-    let key = "/nodes/";
+    let key = NODES_KEY;
     let client = get_coordinator().await;
     let mut events = client.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -696,6 +697,39 @@ async fn update_node_status_metrics() -> NodeMetrics {
     }
 
     node_status
+}
+
+pub async fn cache_node_list() -> Result<Vec<i32>> {
+    let cfg = get_config();
+    if cfg.common.local_mode {
+        return Ok(vec![]);
+    }
+    let node_list = match list_nodes().await {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(e);
+        }
+    };
+    let mut node_ids = Vec::new();
+    let mut w = NODES.write().await;
+    for node in node_list {
+        if node.is_interactive_querier() {
+            add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
+        }
+        if node.is_background_querier() {
+            add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background)).await;
+        }
+        if node.is_compactor() {
+            add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
+        }
+        if node.is_flatten_compactor() {
+            add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
+        }
+        node_ids.push(node.id);
+        w.insert(node.uuid.clone(), node);
+    }
+    drop(w);
+    Ok(node_ids)
 }
 
 #[cfg(test)]

@@ -968,6 +968,26 @@ async fn consistent_hash(body: web::Json<HashFileRequest>) -> Result<HttpRespons
     Ok(MetaHttpResponse::json(ret))
 }
 
+#[get("/refresh_nodes_list")]
+async fn refresh_nodes_list() -> Result<HttpResponse, Error> {
+    match cluster::cache_node_list().await {
+        Ok(node_ids) => Ok(MetaHttpResponse::json(node_ids)),
+        Err(e) => {
+            log::error!("[CLUSTER] refresh_node_list failed: {}", e);
+            Ok(MetaHttpResponse::internal_error(e.to_string()))
+        }
+    }
+}
+
+#[get("/refresh_user_sessions")]
+async fn refresh_user_sessions() -> Result<HttpResponse, Error> {
+    let _ = db::session::cache().await.map_err(|e| {
+        log::error!("[CLUSTER] refresh_user_sessions failed: {}", e);
+        e
+    });
+    Ok(MetaHttpResponse::json("user sessions refreshed"))
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json;

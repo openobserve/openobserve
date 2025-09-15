@@ -14,8 +14,7 @@ export default class LogsVisualise {
     );
     this.queryEditor = page
       .locator("#fnEditor")
-      .getByRole("textbox")
-      .locator("div");
+      .locator(".inputarea");
 
     // Dashboard locators
     this.addToDashboardBtn = page.getByRole("button", {
@@ -37,8 +36,7 @@ export default class LogsVisualise {
 
     // Query editor locators
     this.logsQueryEditor = page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole("textbox");
+      .locator('[data-test="logs-search-bar-query-editor"]');
     //Functions
   }
   async openLogs() {
@@ -208,22 +206,22 @@ export default class LogsVisualise {
 
   //open query editor
   async openQueryEditor() {
-    await this.page.locator(".cm-line").first().click();
+    await this.page.locator('[data-test="logs-search-bar-query-editor"]').locator('.monaco-editor').click();
   }
 
   //fill query editor
   async fillQueryEditor(sqlQuery) {
-    const queryEditor = this.page.locator(".cm-line").first();
+    const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
     await queryEditor.waitFor({ state: "visible", timeout: 5000 });
-    await queryEditor.click();
-    await queryEditor.type(sqlQuery);
+    await queryEditor.locator('.monaco-editor').click();
+    await queryEditor.locator('.inputarea').fill(sqlQuery);
   }
 
   //fill logs query editor with SQL query
   async fillLogsQueryEditor(sqlQuery) {
     await this.logsQueryEditor.waitFor({ state: "visible", timeout: 5000 });
-    await this.logsQueryEditor.click();
-    await this.logsQueryEditor.fill(sqlQuery);
+    await this.logsQueryEditor.locator('.monaco-editor').click();
+    await this.logsQueryEditor.locator('.inputarea').fill(sqlQuery);
   }
 
   // Open the first VRL Function Editor

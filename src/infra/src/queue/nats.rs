@@ -22,7 +22,7 @@ use config::{get_cluster_name, get_config};
 use futures::TryStreamExt;
 use tokio::{sync::mpsc, task::JoinHandle};
 
-use crate::{db::nats::get_nats_client, errors::*};
+use crate::{db::nats::get_nats_client, errors::*, queue::RetentionPolicy};
 
 pub async fn init() -> Result<()> {
     Ok(())
@@ -37,10 +37,9 @@ pub struct NatsQueue {
 impl NatsQueue {
     pub fn new(prefix: &str) -> Self {
         let prefix = prefix.trim_end_matches('/');
-        let consumer_name = get_config().common.instance_name.to_string();
         Self {
             prefix: prefix.to_string(),
-            consumer_name,
+            consumer_name: format_key(&get_config().common.instance_name),
             is_durable: false,
         }
     }
@@ -52,7 +51,7 @@ impl NatsQueue {
     pub fn with_consumer_name(&self, consumer_name: String, is_durable: bool) -> Self {
         Self {
             prefix: self.prefix.clone(),
-            consumer_name,
+            consumer_name: format_key(&consumer_name),
             is_durable,
         }
     }
@@ -64,17 +63,35 @@ impl Default for NatsQueue {
     }
 }
 
+impl From<RetentionPolicy> for jetstream::stream::RetentionPolicy {
+    fn from(retention_policy: RetentionPolicy) -> Self {
+        match retention_policy {
+            RetentionPolicy::Interest => jetstream::stream::RetentionPolicy::Interest,
+            RetentionPolicy::Limits => jetstream::stream::RetentionPolicy::Limits,
+        }
+    }
+}
+
 #[async_trait]
 impl super::Queue for NatsQueue {
     async fn create(&self, topic: &str) -> Result<()> {
+        self.create_with_retention_policy(topic, RetentionPolicy::Limits)
+            .await
+    }
+
+    async fn create_with_retention_policy(
+        &self,
+        topic: &str,
+        retention_policy: RetentionPolicy,
+    ) -> Result<()> {
         let cfg = config::get_config();
-        let client = get_nats_client().await?;
+        let client = get_nats_client().await.clone();
         let jetstream = jetstream::new(client);
-        let topic_name = format!("{}{}", self.prefix, topic);
+        let topic_name = format!("{}{}", self.prefix, format_key(topic));
         let config = jetstream::stream::Config {
             name: topic_name.to_string(),
             subjects: vec![topic_name.to_string(), format!("{}.*", topic_name)],
-            retention: jetstream::stream::RetentionPolicy::Limits,
+            retention: retention_policy.into(),
             max_age: Duration::from_secs(60 * 60 * 24 * max(1, cfg.nats.queue_max_age)),
             num_replicas: cfg.nats.replicas,
             max_bytes: cfg.nats.queue_max_size,
@@ -91,10 +108,10 @@ impl super::Queue for NatsQueue {
 
     /// you can pub message with the topic or topic.* to match the topic
     async fn publish(&self, topic: &str, value: Bytes) -> Result<()> {
-        let client = get_nats_client().await?;
+        let client = get_nats_client().await.clone();
         let jetstream = jetstream::new(client);
         // Publish a message to the stream
-        let topic_name = format!("{}{}", self.prefix, topic);
+        let topic_name = format!("{}{}", self.prefix, format_key(topic));
         let ack = jetstream.publish(topic_name, value).await?;
         ack.await?;
         Ok(())
@@ -102,11 +119,11 @@ impl super::Queue for NatsQueue {
 
     async fn consume(&self, topic: &str) -> Result<Arc<mpsc::Receiver<super::Message>>> {
         let (tx, rx) = mpsc::channel(1024);
-        let stream_name = format!("{}{}", self.prefix, topic);
+        let stream_name = format!("{}{}", self.prefix, format_key(topic));
         let consumer_name = self.consumer_name.clone();
         let is_durable = self.is_durable;
         let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
-            let client = get_nats_client().await?;
+            let client = get_nats_client().await.clone();
             let jetstream = jetstream::new(client);
             let stream = jetstream.get_stream(&stream_name).await.map_err(|e| {
                 log::error!("Failed to get nats stream {stream_name}: {e}");
@@ -140,7 +157,25 @@ impl super::Queue for NatsQueue {
                     "Failed to get nats consumer messages for stream {stream_name}: {e}"
                 ))
             })?;
-            while let Ok(Some(message)) = messages.try_next().await {
+            loop {
+                let message = match messages.try_next().await {
+                    Ok(Some(message)) => message,
+                    Ok(None) => {
+                        log::warn!(
+                            "Nats consumer messages for stream {} is closed",
+                            stream_name
+                        );
+                        break;
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "Failed to get nats consumer messages for stream {}: {}",
+                            stream_name,
+                            e
+                        );
+                        continue;
+                    }
+                };
                 let message = super::Message::Nats(message);
                 tx.send(message).await.map_err(|e| {
                     log::error!("Failed to send nats message for stream {stream_name}: {e}");
@@ -165,5 +200,54 @@ fn get_deliver_policy() -> DeliverPolicy {
         "last" | "deliverlast" | "deliver_last" => DeliverPolicy::Last,
         "new" | "delivernew" | "deliver_new" => DeliverPolicy::New,
         _ => DeliverPolicy::All,
+    }
+}
+
+// format the key to be a valid nats key
+// refer to: https://docs.nats.io/nats-concepts/subjects#characters-allowed-and-recommended-for-subject-names
+fn format_key(key: &str) -> String {
+    let mut result = String::new();
+
+    for ch in key.chars() {
+        match ch {
+            // Keep recommended characters as-is
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' => result.push(ch),
+            // Replace other characters with underscore for safety
+            _ => result.push('_'),
+        }
+    }
+
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_key;
+
+    #[test]
+    fn test_queue_nats_format_key() {
+        // Test basic functionality
+        assert_eq!(format_key("test"), "test");
+        assert_eq!(format_key("test123"), "test123");
+        assert_eq!(format_key("test-key"), "test-key");
+        assert_eq!(format_key("test_key"), "test_key");
+
+        // Test forbidden characters
+        assert_eq!(format_key("test.key"), "test_key");
+        assert_eq!(format_key("test*key"), "test_key");
+        assert_eq!(format_key("test>key"), "test_key");
+        assert_eq!(format_key("test key"), "test_key");
+        assert_eq!(format_key("test\0key"), "test_key");
+
+        // Test empty string
+        assert_eq!(format_key(""), "");
+
+        // Test mixed characters
+        assert_eq!(format_key("test@#$%^&*()key"), "test_________key");
+        assert_eq!(format_key("test.key*value>data"), "test_key_value_data");
+
+        // Test unicode characters (should be replaced with _)
+        assert_eq!(format_key("test中文key"), "test__key");
+        assert_eq!(format_key("test🚀key"), "test_key");
     }
 }

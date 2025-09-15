@@ -56,7 +56,7 @@ export class PipelinesPage {
         this.pipelineSearchInput = page.locator('[data-test="pipeline-list-search-input"]');
         this.deletionSuccessMessage = page.getByText('Pipeline deleted successfully')
         this.sqlEditor = page.locator('[data-test="scheduled-pipeline-sql-editor"]');
-        this.sqlQueryInput = page.locator('.cm-lines');
+        this.sqlQueryInput = page.locator('.monaco-editor').locator('.inputarea');
         this.frequencyUnit = page.locator('[data-test="scheduled-pipeline-frequency-unit"]');
         this.saveQueryButton = page.locator('[data-test="stream-routing-query-save-btn"]');
         this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
@@ -267,7 +267,7 @@ export class PipelinesPage {
     // Method to type the SQL query
     async typeSqlQuery(query) {
         await this.sqlQueryInput.click();
-        await this.page.keyboard.type(query);
+        await this.sqlQueryInput.fill(query);
     }
 
     // Method to select the frequency unit dropdown
