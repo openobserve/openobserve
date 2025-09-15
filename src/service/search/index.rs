@@ -912,7 +912,7 @@ fn get_physical_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
     } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
         get_physical_column_name(expr.expr())
     } else {
-        "__o2_unknown_column__"
+        UNKNOWN_NAME
     }
 }
 
