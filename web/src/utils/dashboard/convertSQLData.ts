@@ -36,7 +36,10 @@ import {
   isTimeStamp,
   calculateBottomLegendHeight,
   calculateRightLegendWidth,
-  calculateChartContainerWidth,
+  calculateChartDimensions,
+  generateChartAlignmentProperties,
+  calculatePieChartRadius,
+  shouldApplyChartAlignment,
 } from "./convertDataIntoUnitValue";
 import {
   calculateGridPositions,
@@ -68,112 +71,34 @@ const calculatePieChartContainer = (
   chartHeight: number,
   seriesData: any[] = [],
 ) => {
-  const chartAlign = panelSchema.config?.chart_align; // 'left', 'center', or null (auto)
+  const chartAlign = panelSchema.config?.chart_align;
   const legendPosition = panelSchema.config?.legends_position;
-  const showLegends = panelSchema.config?.show_legends;
-  const legendsType = panelSchema.config?.legends_type;
-  const hasExplicitLegendWidth =
-    panelSchema.config.legend_width &&
-    !isNaN(parseFloat(panelSchema.config.legend_width.value));
 
-  // Default - no special alignment needed
-  let gridProperties = {};
-  let availableWidth = chartWidth;
-  let availableHeight = chartHeight;
+  // Calculate available space using our centralized helper function
+  const dimensions = calculateChartDimensions(
+    panelSchema,
+    chartWidth,
+    chartHeight,
+    seriesData,
+  );
 
-  // Chart alignment should only work when legend position is right with plain or scroll legends
-  const shouldApplyAlignment =
-    showLegends &&
-    legendPosition === "right" &&
-    (legendsType === "plain" ||
-      legendsType === "scroll" ||
-      legendsType == null);
+  // Determine if chart alignment should be applied
+  const shouldApplyAlignment = shouldApplyChartAlignment(
+    panelSchema,
+    seriesData,
+  );
 
-  if (shouldApplyAlignment) {
-    const legendCount = seriesData?.length || 0;
-    
-    // Handle different legend positions
-    if (legendPosition === "right") {
-      // Calculate legend width to determine available chart space
-      let legendWidth = 0;
-
-      if (legendsType === "plain" || hasExplicitLegendWidth) {
-        if (hasExplicitLegendWidth) {
-          legendWidth =
-            panelSchema.config.legend_width.unit === "%"
-              ? chartWidth * (panelSchema.config.legend_width.value / 100)
-              : panelSchema.config.legend_width.value;
-        } else {
-          legendWidth = calculateRightLegendWidth(
-            legendCount,
-            chartWidth,
-            chartHeight,
-            seriesData,
-            false, // plain legends are not scrollable
-          );
-        }
-      } else {
-        // Scroll legends - reserve minimum space
-        const minScrollLegendWidth = Math.min(chartWidth * 0.22, 170);
-        legendWidth = Math.max(minScrollLegendWidth, 120);
-      }
-
-      // Calculate available width for chart container
-      availableWidth = calculateChartContainerWidth(
-        chartWidth,
-        legendWidth,
-        "right",
-      );
-    } else if (legendPosition === "bottom" || legendPosition === null) {
-      // For bottom/auto legends, calculate available height
-      const legendHeight = calculateBottomLegendHeight(
-        legendCount,
-        chartWidth,
-        seriesData,
-        chartHeight,
-      );
-      availableHeight = chartHeight - legendHeight;
-    }
-
-    // Apply chart alignment using CSS grid properties - ONLY for right legend position
-    if (legendPosition === "right") {
-      switch (chartAlign) {
-        case "left":
-          gridProperties = {
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr) auto",
-            gridTemplateRows: "1fr",
-            justifyItems: "start",
-            alignItems: "center",
-            paddingLeft: "5%", // Small padding to prevent edge clipping
-          };
-          break;
-        case "center":
-          gridProperties = {
-            display: "grid",
-            gridTemplateColumns: "1fr",
-            gridTemplateRows: "1fr",
-            justifyItems: "center",
-            alignItems: "center",
-          };
-          break;
-        default: // auto - default to center
-          gridProperties = {
-            display: "grid",
-            gridTemplateColumns: "1fr",
-            gridTemplateRows: "1fr",
-            justifyItems: "center",
-            alignItems: "center",
-          };
-          break;
-      }
-    }
-  }
+  // Generate CSS grid properties for chart alignment
+  const gridProperties = generateChartAlignmentProperties(
+    chartAlign,
+    legendPosition,
+    shouldApplyAlignment,
+  );
 
   return {
     gridProperties,
-    availableWidth,
-    availableHeight,
+    availableWidth: dimensions.availableWidth,
+    availableHeight: dimensions.availableHeight,
     shouldUseGridAlignment: shouldApplyAlignment,
   };
 };
@@ -700,112 +625,24 @@ export const convertSQLData = async (
    * @returns {number} - the radius percentage
    */
   const getPieChartRadius = (seriesData: any[] = []) => {
-    if (!panelSchema.layout) {
-      return 85; // Increased default radius
-    }
-
     // Get chart dimensions from chartPanelRef
     const chartWidth = chartPanelRef.value?.offsetWidth || 800;
     const chartHeight = chartPanelRef.value?.offsetHeight || 400;
-    
-    let availableWidth = chartWidth;
-    let availableHeight = chartHeight;
-    
-    // Adjust available space based on legend position and type for pie/donut charts
-    if (
-      panelSchema.config?.show_legends &&
-      (panelSchema.config?.legends_type === "plain" ||
-        (panelSchema.config.legend_width &&
-          !isNaN(parseFloat(panelSchema.config.legend_width.value))))
-    ) {
-      const legendCount = seriesData?.length || 0;
-      
-      if (panelSchema.config?.legends_position === "right") {
-        // Calculate legend width and reduce available width
-        // Prefer explicit legend width if provided in config
-        let legendWidth;
-        if (
-          panelSchema.config.legend_width &&
-          !isNaN(parseFloat(panelSchema.config.legend_width.value))
-        ) {
-          legendWidth =
-            panelSchema.config.legend_width.unit === "%"
-              ? chartWidth * (panelSchema.config.legend_width.value / 100)
-              : panelSchema.config.legend_width.value;
-        } else {
-          // Dynamically compute width to ensure legends do not overlap the chart
-          legendWidth = calculateRightLegendWidth(
-            legendCount,
-            chartWidth,
-            chartHeight,
-            seriesData,
-            false, // plain legends are not scrollable
-          );
-        }
-        availableWidth = chartWidth - legendWidth;
-      } else if (
-        panelSchema.config?.legends_position === "bottom" ||
-        panelSchema.config?.legends_position === null
-      ) {
-        // Calculate legend height and reduce available height
-        const legendHeight = calculateBottomLegendHeight(
-          legendCount,
-          chartWidth,
-          seriesData,
-          chartHeight, // Apply 80% constraint
-        );
-        availableHeight = chartHeight - legendHeight;
-      }
-    }
 
-    // Handle scroll legends - reserve minimum space to prevent overlap
-    if (
-      panelSchema.config?.show_legends &&
-      (panelSchema.config?.legends_type === "scroll" ||
-        panelSchema.config?.legends_type == null) && // null means auto, which can be scroll
-      !(
-        panelSchema.config.legend_width &&
-        !isNaN(parseFloat(panelSchema.config.legend_width.value))
-      ) // Don't apply if explicit width is set
-    ) {
-      if (panelSchema.config?.legends_position === "right") {
-        // Reserve minimum space for scroll legends to prevent chart overlap
-        const minScrollLegendWidth = Math.min(chartWidth * 0.22, 170); // 22% of chart width or 170px max
-        const reservedWidth = Math.max(minScrollLegendWidth, 120); // At least 120px for scroll legends (extra space for scroll indicators)
-        availableWidth = chartWidth - reservedWidth;
-      }
-    }
-
-    const minRadius = Math.min(
-      panelSchema.layout.w * 30,
-      panelSchema.layout.h * 30,
+    // Calculate available dimensions using our centralized helper function
+    const dimensions = calculateChartDimensions(
+      panelSchema,
+      chartWidth,
+      chartHeight,
+      seriesData,
     );
 
-    if (minRadius === 0) {
-      return 0;
-    }
-
-    // Calculate radius based on available space
-    const maxRadius = Math.min(availableWidth, availableHeight) / 2;
-    const baseRadius = minRadius / 2;
-
-    // Use more space when we have it available - more generous when no plain legends
-    const spaceUsage =
-      availableWidth === chartWidth && availableHeight === chartHeight
-        ? 0.95
-        : 0.9;
-    const effectiveRadius = Math.min(baseRadius, maxRadius * spaceUsage);
-
-    let multiplier = 100; // Increased base multiplier
-    if (effectiveRadius > 90) multiplier = 120; // Increased multiplier
-    if (effectiveRadius > 150) multiplier = 140; // Increased multiplier
-
-    // Return percentage based on available space - increased maximum limit
-    const maxLimit =
-      availableWidth === chartWidth && availableHeight === chartHeight
-        ? 95
-        : 90;
-    return Math.min((effectiveRadius / minRadius) * multiplier, maxLimit);
+    // Use the optimized pie chart radius calculation
+    return calculatePieChartRadius(
+      panelSchema,
+      dimensions.availableWidth,
+      dimensions.availableHeight,
+    );
   };
 
   const legendPosition = getLegendPosition(
@@ -2027,7 +1864,6 @@ export const convertSQLData = async (
             // Calculate center position for alignment within ONLY the chart area (excluding legend)
             const chartAlign = panelSchema.config?.chart_align;
             const chartAreaWidth = containerProps.availableWidth;
-            const chartAreaHeight = containerProps.availableHeight;
 
             let centerX = 50; // Default center
             let centerY = 50; // Default center
@@ -2104,12 +1940,33 @@ export const convertSQLData = async (
             ) {
               // Calculate legend height and move chart center up
               const legendCount = options.series[0].data?.length || 0;
-              const legendHeight = calculateBottomLegendHeight(
-                legendCount,
-                chartWidth,
-                options.series[0].data || [],
-                chartHeight,
-              );
+              // Prefer explicit legend height if provided in config, but not for scroll legends when position is auto/bottom
+              let legendHeight;
+              if (
+                panelSchema.config.legend_height &&
+                !isNaN(parseFloat(panelSchema.config.legend_height.value)) &&
+                // Don't apply legend height config when legend type is auto/scroll and position is auto/bottom
+                !(
+                  (panelSchema.config?.legends_position === "bottom" ||
+                    panelSchema.config?.legends_position === null) &&
+                  (panelSchema.config?.legends_type === "scroll" ||
+                    panelSchema.config?.legends_type === null)
+                )
+              ) {
+                legendHeight =
+                  panelSchema.config.legend_height.unit === "%"
+                    ? chartHeight *
+                      (panelSchema.config.legend_height.value / 100)
+                    : panelSchema.config.legend_height.value;
+              } else {
+                // Dynamically compute height to ensure legends do not overlap the chart
+                legendHeight = calculateBottomLegendHeight(
+                  legendCount,
+                  chartWidth,
+                  options.series[0].data || [],
+                  chartHeight,
+                );
+              }
               const availableHeight = chartHeight - legendHeight;
               const centerY = (availableHeight / 2 / chartHeight) * 100; // Convert to percentage
               options.series[0].center = ["50%", `${centerY}%`];
@@ -2322,12 +2179,33 @@ export const convertSQLData = async (
             ) {
               // Calculate legend height and move chart center up
               const legendCount = options.series[0].data?.length || 0;
-              const legendHeight = calculateBottomLegendHeight(
-                legendCount,
-                chartWidth,
-                options.series[0].data || [],
-                chartHeight,
-              );
+              // Prefer explicit legend height if provided in config, but not for scroll legends when position is auto/bottom
+              let legendHeight;
+              if (
+                panelSchema.config.legend_height &&
+                !isNaN(parseFloat(panelSchema.config.legend_height.value)) &&
+                // Don't apply legend height config when legend type is auto/scroll and position is auto/bottom
+                !(
+                  (panelSchema.config?.legends_position === "bottom" ||
+                    panelSchema.config?.legends_position === null) &&
+                  (panelSchema.config?.legends_type === "scroll" ||
+                    panelSchema.config?.legends_type === null)
+                )
+              ) {
+                legendHeight =
+                  panelSchema.config.legend_height.unit === "%"
+                    ? chartHeight *
+                      (panelSchema.config.legend_height.value / 100)
+                    : panelSchema.config.legend_height.value;
+              } else {
+                // Dynamically compute height to ensure legends do not overlap the chart
+                legendHeight = calculateBottomLegendHeight(
+                  legendCount,
+                  chartWidth,
+                  options.series[0].data || [],
+                  chartHeight,
+                );
+              }
               const availableHeight = chartHeight - legendHeight;
               const centerY = (availableHeight / 2 / chartHeight) * 100; // Convert to percentage
               options.series[0].center = ["50%", `${centerY}%`];
@@ -3331,13 +3209,22 @@ export const convertSQLData = async (
     }
   }
 
-  // Apply legend positioning for pie and donut charts - only for plain legends or when explicit width is set
+  // Apply legend positioning for pie and donut charts - for plain legends or when explicit width/height is set
   if (
     ["pie", "donut"].includes(panelSchema.type) &&
     panelSchema?.config?.show_legends &&
     (panelSchema.config?.legends_type === "plain" ||
       (panelSchema.config.legend_width &&
-        !isNaN(parseFloat(panelSchema.config.legend_width.value))))
+        !isNaN(parseFloat(panelSchema.config.legend_width.value))) ||
+      (panelSchema.config.legend_height &&
+        !isNaN(parseFloat(panelSchema.config.legend_height.value)) &&
+        // Don't apply legend height config when legend type is auto/scroll and position is auto/bottom
+        !(
+          (panelSchema.config?.legends_position === "bottom" ||
+            panelSchema.config?.legends_position === null) &&
+          (panelSchema.config?.legends_type === "scroll" ||
+            panelSchema.config?.legends_type === null)
+        )))
   ) {
     // Get chart dimensions from chartPanelRef
     const chartWidth = chartPanelRef.value?.offsetWidth || 800;
@@ -3379,34 +3266,60 @@ export const convertSQLData = async (
       panelSchema?.config?.legends_position === null
     ) {
       // Calculate and apply legend height for bottom position
-      const legendHeight = calculateBottomLegendHeight(
-        legendCount,
-        chartWidth,
-        options.series?.[0]?.data || [],
-        chartHeight, // Apply 80% constraint
-        options.legend,
-        {}, // No grid config needed for pie/donut
-        chartHeight,
-      );
+      // Prefer explicit legend height if provided in config, but not for scroll legends when position is auto/bottom
+      if (
+        panelSchema.config.legend_height &&
+        !isNaN(parseFloat(panelSchema.config.legend_height.value)) &&
+        // Don't apply legend height config when legend type is auto/scroll and position is auto/bottom
+        !(
+          (panelSchema.config?.legends_position === "bottom" ||
+            panelSchema.config?.legends_position === null) &&
+          (panelSchema.config?.legends_type === "scroll" ||
+            panelSchema.config?.legends_type === null)
+        )
+      ) {
+        const legendHeight =
+          panelSchema.config.legend_height.unit === "%"
+            ? chartHeight * (panelSchema.config.legend_height.value / 100)
+            : panelSchema.config.legend_height.value;
+        
+        // Apply the configured height using the same approach as calculateBottomLegendHeight
+        const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
+        options.legend.top = legendTopPosition;
+        options.legend.height = legendHeight - 20; // Constrain height within allocated space
+      } else {
+        // Dynamically compute height to ensure legends do not overlap the chart
+        calculateBottomLegendHeight(
+          legendCount,
+          chartWidth,
+          options.series?.[0]?.data || [],
+          chartHeight, // Apply 80% constraint
+          options.legend,
+          {}, // No grid config needed for pie/donut
+          chartHeight,
+        );
+      }
     }
   }
 
-  // Handle scroll legends for pie and donut charts - reserve minimum space to prevent overlap
+  // Handle scroll legends for pie and donut charts - reserve minimum space to prevent overlap or apply explicit size
   if (
     ["pie", "donut"].includes(panelSchema.type) &&
     panelSchema?.config?.show_legends &&
     (panelSchema?.config?.legends_type === "scroll" ||
-      panelSchema?.config?.legends_type == null) && // null means auto, which can be scroll
-    !(
-      panelSchema.config.legend_width &&
-      !isNaN(parseFloat(panelSchema.config.legend_width.value))
-    ) // Don't apply if explicit width is set
+      panelSchema?.config?.legends_type == null) // null means auto, which can be scroll
   ) {
     // Get chart dimensions from chartPanelRef
     const chartWidth = chartPanelRef.value?.offsetWidth || 800;
     const chartHeight = chartPanelRef.value?.offsetHeight || 400;
 
-    if (panelSchema?.config?.legends_position === "right") {
+    if (
+      panelSchema?.config?.legends_position === "right" &&
+      !(
+        panelSchema.config.legend_width &&
+        !isNaN(parseFloat(panelSchema.config.legend_width.value))
+      ) // Don't apply if explicit width is set
+    ) {
       // Reserve minimum space for scroll legends to prevent chart overlap
       const minScrollLegendWidth = Math.min(chartWidth * 0.22, 170); // 22% of chart width or 170px max
       const reservedWidth = Math.max(minScrollLegendWidth, 120); // At least 120px for scroll legends (extra space for scroll indicators)
@@ -3417,6 +3330,40 @@ export const convertSQLData = async (
       options.legend.left = legendLeftPx;
       options.legend.right = 0;
       // Don't constrain legend text width for scroll legends - let them scroll naturally
+    } else if (
+      (panelSchema?.config?.legends_position === "bottom" ||
+        panelSchema?.config?.legends_position === null) &&
+      panelSchema.config.legend_height &&
+      !isNaN(parseFloat(panelSchema.config.legend_height.value)) &&
+      // Don't apply legend height config when legend type is auto/scroll and position is auto/bottom
+      !(
+        (panelSchema.config?.legends_position === "bottom" ||
+          panelSchema.config?.legends_position === null) &&
+        (panelSchema.config?.legends_type === "scroll" ||
+          panelSchema.config?.legends_type === null)
+      )
+    ) {
+      // Apply explicit legend height for scroll/auto legends at bottom/auto position
+      const legendHeight =
+        panelSchema.config.legend_height.unit === "%"
+          ? chartHeight * (panelSchema.config.legend_height.value / 100)
+          : panelSchema.config.legend_height.value;
+      
+      // Apply the configured height using the same approach as calculateBottomLegendHeight
+      const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
+      options.legend.top = legendTopPosition;
+      options.legend.height = legendHeight - 20; // Constrain height within allocated space
+      
+      // Adjust pie/donut chart center position to account for legend height
+      if (
+        options.series &&
+        options.series[0] &&
+        options.series[0].type === "pie"
+      ) {
+        const availableHeight = chartHeight - legendHeight;
+        const centerY = (availableHeight / 2 / chartHeight) * 100; // Convert to percentage
+        options.series[0].center = ["50%", `${centerY}%`];
+      }
     }
   }
 
@@ -3424,7 +3371,9 @@ export const convertSQLData = async (
   if (
     !["pie", "donut"].includes(panelSchema.type) &&
     panelSchema?.config?.show_legends &&
-    panelSchema?.config?.legends_type === "plain" &&
+    (panelSchema?.config?.legends_type === "plain" ||
+      (panelSchema.config.legend_height &&
+        !isNaN(parseFloat(panelSchema.config.legend_height.value)))) &&
     (panelSchema?.config?.legends_position === "bottom" ||
       panelSchema?.config?.legends_position === null) // Handle null/undefined as auto
   ) {
@@ -3442,16 +3391,68 @@ export const convertSQLData = async (
         : undefined;
 
     // Calculate and configure bottom legend positioning to prevent overflow to top
-    calculateBottomLegendHeight(
-      legendCount,
-      chartWidth,
-      options.series || [],
-      maxHeight,
-      options.legend,
-      options.grid,
-      chartHeight,
-    );
+    // Prefer explicit legend height if provided in config
+    if (
+      panelSchema.config.legend_height &&
+      !isNaN(parseFloat(panelSchema.config.legend_height.value))
+    ) {
+      const legendHeight =
+        panelSchema.config.legend_height.unit === "%"
+          ? chartHeight * (panelSchema.config.legend_height.value / 100)
+          : panelSchema.config.legend_height.value;
+      
+      // Apply the configured height using the same approach as calculateBottomLegendHeight
+      if (options.grid) {
+        options.grid.bottom = legendHeight;
+      }
+      
+      const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
+      options.legend.top = legendTopPosition;
+      options.legend.height = legendHeight - 20; // Constrain height within allocated space
+    } else {
+      // Dynamically compute height to ensure legends do not overlap the chart
+      calculateBottomLegendHeight(
+        legendCount,
+        chartWidth,
+        options.series || [],
+        maxHeight,
+        options.legend,
+        options.grid,
+        chartHeight,
+      );
+    }
   }
+
+  // Apply legend height for scroll/auto legends at bottom position (other chart types)
+  if (
+    !["pie", "donut"].includes(panelSchema.type) &&
+    panelSchema?.config?.show_legends &&
+    (panelSchema?.config?.legends_type === "scroll" ||
+      panelSchema?.config?.legends_type == null) && // null means auto, which can be scroll
+    (panelSchema?.config?.legends_position === "bottom" ||
+      panelSchema?.config?.legends_position === null) &&
+    panelSchema.config.legend_height &&
+    !isNaN(parseFloat(panelSchema.config.legend_height.value))
+  ) {
+    // Get chart dimensions from chartPanelRef
+    const chartHeight = chartPanelRef.value?.offsetHeight || 400;
+
+    // Apply explicit legend height for scroll/auto legends
+    const legendHeight =
+      panelSchema.config.legend_height.unit === "%"
+        ? chartHeight * (panelSchema.config.legend_height.value / 100)
+        : panelSchema.config.legend_height.value;
+    
+    // Apply the configured height using the same approach as calculateBottomLegendHeight
+    if (options.grid) {
+      options.grid.bottom = legendHeight;
+    }
+    
+    const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
+    options.legend.top = legendTopPosition;
+    options.legend.height = legendHeight - 20; // Constrain height within allocated space
+  }
+
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 
