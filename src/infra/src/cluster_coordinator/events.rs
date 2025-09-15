@@ -188,6 +188,7 @@ async fn subscribe(tx: mpsc::Sender<CoordinatorEvent>) -> Result<()> {
                 },
                 None => {
                     log::error!("[COORDINATOR::EVENTS] coordinator topic closed");
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     reconnect = true;
                     break;
                 }
