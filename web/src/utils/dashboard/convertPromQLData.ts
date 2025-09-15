@@ -903,7 +903,9 @@ export const convertPromQLData = async (
   // Apply dynamic legend height for bottom legends if conditions are met
   if (
     panelSchema?.config?.show_legends &&
-    panelSchema?.config?.legends_type === "plain" &&
+    (panelSchema?.config?.legends_type === "plain" ||
+      (panelSchema.config.legend_height &&
+        !isNaN(parseFloat(panelSchema.config.legend_height.value)))) &&
     (panelSchema?.config?.legends_position === "bottom" ||
       panelSchema?.config?.legends_position === null) // Handle null/undefined as auto
   ) {
@@ -921,16 +923,67 @@ export const convertPromQLData = async (
         : undefined;
 
     // Calculate and configure bottom legend positioning to prevent overflow to top
-    calculateBottomLegendHeight(
-      legendCount,
-      chartWidth,
-      options.series || [],
-      maxHeight,
-      options.legend,
-      options.grid,
-      chartHeight,
-    );
+    // Prefer explicit legend height if provided in config
+    if (
+      panelSchema.config.legend_height &&
+      !isNaN(parseFloat(panelSchema.config.legend_height.value))
+    ) {
+      const legendHeight =
+        panelSchema.config.legend_height.unit === "%"
+          ? chartHeight * (panelSchema.config.legend_height.value / 100)
+          : panelSchema.config.legend_height.value;
+      
+      // Apply the configured height using the same approach as calculateBottomLegendHeight
+      if (options.grid) {
+        options.grid.bottom = legendHeight;
+      }
+      
+      const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
+      options.legend.top = legendTopPosition;
+      options.legend.height = legendHeight - 20; // Constrain height within allocated space
+    } else {
+      // Dynamically compute height to ensure legends do not overlap the chart
+      calculateBottomLegendHeight(
+        legendCount,
+        chartWidth,
+        options.series || [],
+        maxHeight,
+        options.legend,
+        options.grid,
+        chartHeight,
+      );
+    }
   }
+
+  // Apply legend height for scroll/auto legends at bottom position
+  if (
+    panelSchema?.config?.show_legends &&
+    (panelSchema?.config?.legends_type === "scroll" ||
+      panelSchema?.config?.legends_type == null) && // null means auto, which can be scroll
+    (panelSchema?.config?.legends_position === "bottom" ||
+      panelSchema?.config?.legends_position === null) &&
+    panelSchema.config.legend_height &&
+    !isNaN(parseFloat(panelSchema.config.legend_height.value))
+  ) {
+    // Get chart dimensions from chartPanelRef
+    const chartHeight = chartPanelRef.value?.offsetHeight || 400;
+
+    // Apply explicit legend height for scroll/auto legends
+    const legendHeight =
+      panelSchema.config.legend_height.unit === "%"
+        ? chartHeight * (panelSchema.config.legend_height.value / 100)
+        : panelSchema.config.legend_height.value;
+    
+    // Apply the configured height using the same approach as calculateBottomLegendHeight
+    if (options.grid) {
+      options.grid.bottom = legendHeight;
+    }
+    
+    const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
+    options.legend.top = legendTopPosition;
+    options.legend.height = legendHeight - 20; // Constrain height within allocated space
+  }
+
   // promql query will be always timeseries except gauge and metric text chart.
   // console.timeEnd("convertPromQLData");
   return {
