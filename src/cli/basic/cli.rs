@@ -20,6 +20,7 @@ use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     file_list as infra_file_list, table,
 };
+use std::path::PathBuf;
 
 use crate::{
     cli::data::{
@@ -45,11 +46,12 @@ fn create_cli_app() -> Command {
     Command::new("openobserve")
         .version(config::VERSION)
         .about(clap::crate_description!())
+        .arg(arg!("config", 'c', "config", "Path to config file"))
         .subcommands(&[
             Command::new("reset")
                 .about("reset openobserve data")
-                .arg(arg!("component", 'c', "component", "reset data of the component: root, user, alert, dashboard, function, stream-stats", true)),
-            Command::new("import")
+                .arg(arg!("component", 'c', "componenet", "reset data of the component: root, user, alert, dashboard, function, stream-stats")),
+            clap::Command::new("import")
                 .about("import openobserve data").args(dataArgs()),
             Command::new("export")
                 .about("export openobserve data").args(dataArgs()),
@@ -149,6 +151,18 @@ fn create_cli_app() -> Command {
 
 pub async fn cli() -> Result<bool, anyhow::Error> {
     let mut app = create_cli_app().get_matches();
+
+    // Handle config file argument
+    if let Some(config_file_path) = app.get_one::<String>("config") {
+        let path = PathBuf::from(config_file_path);
+        config::config_path_manager::set_config_file_path(path.clone())
+            .and_then(|_| crate::job::config_watcher::reload_config(&path))
+            .map_err(|e|
+                anyhow::anyhow!(
+                    "set config from file path {config_file_path} failed with {e}, stopping boot up... ",
+                )
+            )?;
+    }
 
     if app.subcommand().is_none() {
         return Ok(false);
