@@ -485,9 +485,17 @@ import { convertDateToTimestamp } from "@/utils/date";
 import {
   generateSqlQuery,
 } from "@/utils/alertQueryBuilder";
+import {
+  validateInputs as validateInputsUtil,
+  validateSqlQuery as validateSqlQueryUtil,
+  type ValidationContext,
+} from "@/utils/alertValidation";
+import {
+  getAlertPayload as getAlertPayloadUtil,
+  type PayloadContext,
+} from "@/utils/alertPayload";
 
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
-import cronParser from "cron-parser";
 import AlertsContainer from "./AlertsContainer.vue";
 import JsonEditor from "../common/JsonEditor.vue";
 import { validateAlert } from "@/utils/validateAlerts";
@@ -922,226 +930,41 @@ export default defineComponent({
     };
 
     const getAlertPayload = () => {
-      const payload = cloneDeep(formData.value);
-
-      // Deleting uuid from payload as it was added for reference of frontend
-      if (payload.uuid) delete payload.uuid;
-
-      payload.is_real_time = payload.is_real_time === "true";
-
-      payload.context_attributes = {};
-
-      payload.query_condition.type = payload.is_real_time
-        ? "custom"
-        : formData.value.query_condition.type;
-
-      formData.value.context_attributes.forEach((attr: any) => {
-        if (attr.key?.trim() && attr.value?.trim())
-          payload.context_attributes[attr.key] = attr.value;
-      });
-
-      payload.trigger_condition.threshold = parseInt(
-        formData.value.trigger_condition.threshold,
-      );
-
-      payload.trigger_condition.period = parseInt(
-        formData.value.trigger_condition.period,
-      );
-
-      payload.trigger_condition.frequency = parseInt(
-        formData.value.trigger_condition.frequency,
-      );
-
-      payload.trigger_condition.silence = parseInt(
-        formData.value.trigger_condition.silence,
-      );
-
-      payload.description = formData.value.description.trim();
-
-      if (!isAggregationEnabled.value || getSelectedTab.value !== "custom") {
-        payload.query_condition.aggregation = null;
-      }
-
-      if (getSelectedTab.value === "sql" || getSelectedTab.value === "promql")
-        payload.query_condition.conditions = [];
-
-      if (getSelectedTab.value === "sql" || getSelectedTab.value === "custom") {
-        payload.query_condition.promql_condition = null;
-      }
-
-      if (getSelectedTab.value === "promql") {
-        payload.query_condition.sql = "";
-      }
-
-      if (formData.value.query_condition.vrl_function) {
-        payload.query_condition.vrl_function = b64EncodeUnicode(
-          formData.value.query_condition.vrl_function.trim(),
-        );
-      }
-
-      if (beingUpdated) {
-        payload.updatedAt = new Date().toISOString();
-        payload.lastEditedBy = store.state.userInfo.email;
-      } else {
-        payload.createdAt = new Date().toISOString();
-        payload.owner = store.state.userInfo.email;
-        payload.lastTriggeredAt = new Date().getTime();
-        payload.lastEditedBy = store.state.userInfo.email;
-        formData.value.updatedAt = new Date().toISOString();
-      }
-
-      return payload;
+      const payloadContext: PayloadContext = {
+        store,
+        isAggregationEnabled,
+        getSelectedTab,
+        beingUpdated,
+      };
+      return getAlertPayloadUtil(formData.value, payloadContext);
     };
 
     const validateInputs = (input: any, notify: boolean = true) => {
-      if (isNaN(Number(input.trigger_condition.silence))) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Silence Notification should not be empty",
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      if (input.is_real_time) return true;
-
-      if (
-        Number(input.trigger_condition.period) < 1 ||
-        isNaN(Number(input.trigger_condition.period))
-      ) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Period should be greater than 0",
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      if (input.query_condition.aggregation) {
-        if (
-          isNaN(input.trigger_condition.threshold) ||
-          !input.query_condition.aggregation.having.value.toString().trim()
-            .length ||
-          !input.query_condition.aggregation.having.column ||
-          !input.query_condition.aggregation.having.operator
-        ) {
-          notify &&
-            q.notify({
-              type: "negative",
-              message: "Threshold should not be empty",
-              timeout: 1500,
-            });
-          return false;
-        }
-
-        return true;
-      }
-
-      if (
-        isNaN(input.trigger_condition.threshold) ||
-        input.trigger_condition.threshold < 1 ||
-        !input.trigger_condition.operator
-      ) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Threshold should not be empty",
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      if (input.trigger_condition.frequency_type === "cron") {
-        try {
-          cronParser.parseExpression(input.trigger_condition.cron);
-        } catch (err) {
-          console.log(err);
-          scheduledAlertRef.value.cronJobError = "Invalid cron expression!";
-          return;
-        }
-      }
-
-      scheduledAlertRef.value?.validateFrequency(input.trigger_condition);
-
-      if (scheduledAlertRef.value.cronJobError) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: scheduledAlertRef.value.cronJobError,
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      return true;
+      const validationContext: ValidationContext = {
+        q,
+        store,
+        scheduledAlertRef,
+        validateSqlQueryPromise,
+        sqlQueryErrorMsg,
+        vrlFunctionError,
+        buildQueryPayload,
+        getParser,
+      };
+      return validateInputsUtil(input, validationContext, notify);
     };
 
     const validateSqlQuery = async () => {
-      // Delaying the validation by 300ms, as editor has debounce of 300ms. Else old value will be used for validation
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      if (!getParser(formData.value.query_condition.sql)) {
-        return;
-      }
-
-      const query = buildQueryPayload({
-        sqlMode: true,
-        streamName: formData.value.stream_name,
-      });
-
-      delete query.aggs;
-
-      // We get 15 minutes time range for the query, so reducing it by 13 minutes to get 2 minute data
-      query.query.start_time = query.query.start_time + 780000000;
-
-      query.query.sql = formData.value.query_condition.sql;
-
-      if (formData.value.query_condition.vrl_function)
-        query.query.query_fn = b64EncodeUnicode(
-          formData.value.query_condition.vrl_function,
-        );
-
-      validateSqlQueryPromise.value = new Promise((resolve, reject) => {
-        searchService
-          .search({
-            org_identifier: store.state.selectedOrganization.identifier,
-            query,
-            page_type: formData.value.stream_type,
-          })
-          .then((res: any) => {
-            sqlQueryErrorMsg.value = "";
-
-            if (res.data?.function_error) {
-              vrlFunctionError.value = res.data.function_error;
-              q.notify({
-                type: "negative",
-                message: "Invalid VRL Function",
-                timeout: 3000,
-              });
-              reject("function_error");
-            } else vrlFunctionError.value = "";
-
-            resolve("");
-          })
-          .catch((err: any) => {
-            sqlQueryErrorMsg.value = err.response?.data?.message
-              ? err.response?.data?.message
-              : "Invalid SQL Query";
-
-            // Show error only if it is not real time alert
-            // This case happens when user enters invalid query and then switches to real time alert
-            if (formData.value.query_condition.type === "sql")
-              q.notify({
-                type: "negative",
-                message: "Invalid SQL Query : " + err.response?.data?.message,
-                timeout: 3000,
-              });
-
-            reject("sql_error");
-          });
-      });
+      const validationContext: ValidationContext = {
+        q,
+        store,
+        scheduledAlertRef,
+        validateSqlQueryPromise,
+        sqlQueryErrorMsg,
+        vrlFunctionError,
+        buildQueryPayload,
+        getParser,
+      };
+      return validateSqlQueryUtil(formData.value, validationContext);
     };
 
     const updateFunctionVisibility = () => {
