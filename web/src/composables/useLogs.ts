@@ -74,6 +74,7 @@ const useLogs = () => {
     initialQueryPayload,
     resetFunctions,
     notificationMsg,
+    fieldValues,
   } = searchState();
 
   const {
@@ -2033,6 +2034,8 @@ const useLogs = () => {
     enableRefreshInterval,
     routeToSearchSchedule,
     updateFieldValues,
+    updateGridColumns,
+    buildSearch,
     getHistogramTitle,
     processPostPaginationData,
     router,
@@ -2043,6 +2046,8 @@ const useLogs = () => {
     notificationMsg,
     showErrorNotification,
     setDateTime,
+    searchObj,
+    fieldValues,
   };
 };
 
