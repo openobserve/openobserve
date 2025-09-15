@@ -277,7 +277,7 @@ export default defineComponent({
 
     customText.value = store.state.zoConfig.custom_logo_text;
 
-    onActivated(() => {
+    const updateFromStore = () => {
       scrapeIntereval.value =
         store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15;
@@ -289,7 +289,21 @@ export default defineComponent({
       enableStreamingSearch.value =
         store.state?.organizationData?.organizationSettings
           ?.enable_streaming_search ?? false;
+    };
+    //this is when the page is activated
+    onActivated(() => {
+      updateFromStore();
     });
+
+    //we will update the settings from store when the store is updated
+    //so that UI will be always in sync with the store whenever the store is updated
+    watch(
+      () => store.state.organizationData?.organizationSettings,
+      () => {
+        updateFromStore();
+      },
+      { deep: true, immediate: true }
+    );
 
     watch(
       () => editingText.value,
