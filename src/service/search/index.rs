@@ -514,16 +514,13 @@ impl Condition {
                 })?;
                 if value.is_empty() || value == "*" {
                     Box::new(AllQuery {})
-                } else if value.starts_with("*") && value.ends_with("*") {
-                    let value = format!(".*{}.*", value.trim_matches('*'));
-                    Box::new(RegexQuery::from_pattern(&value, default_field)?)
                 } else {
-                    if value.is_empty() {
-                        return Err(anyhow::anyhow!(
-                            "The value of match_all() function can't be empty"
-                        ));
-                    }
                     let mut tokens = o2_collect_tokens(value);
+                    let first_prefix = if value.starts_with("*") && !tokens.is_empty() {
+                        Some(tokens.remove(0))
+                    } else {
+                        None
+                    };
                     let last_prefix = if value.ends_with("*") {
                         tokens.pop()
                     } else {
@@ -536,6 +533,12 @@ impl Condition {
                             Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _
                         })
                         .collect();
+                    if let Some(value) = first_prefix {
+                        terms.push(Box::new(PhrasePrefixQuery::new_with_offset(vec![(
+                            0,
+                            Term::from_field_text(default_field, &value),
+                        )])));
+                    }
                     if let Some(value) = last_prefix {
                         terms.push(Box::new(PhrasePrefixQuery::new_with_offset(vec![(
                             0,
