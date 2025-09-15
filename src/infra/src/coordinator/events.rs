@@ -122,28 +122,40 @@ pub async fn watch(prefix: &str) -> Result<Arc<mpsc::Receiver<crate::db::Event>>
 
 async fn create_stream() -> Result<()> {
     log::info!("[COORDINATOR::EVENTS] creating coordinator stream");
+    let max_age = config::get_config().nats.event_max_age; // seconds
+    let max_age_secs = std::time::Duration::from_secs(std::cmp::max(1, max_age));
     let queue = queue::get_queue().await;
     queue
-        .create_with_retention_policy(COORDINATOR_STREAM, queue::RetentionPolicy::Interest)
+        .create_with_max_age(COORDINATOR_STREAM, max_age_secs)
         .await
 }
 
 async fn subscribe(tx: mpsc::Sender<CoordinatorEvent>) -> Result<()> {
-    log::info!("[COORDINATOR::EVENTS] subscribing to coordinator topic");
     let queue = queue::get_queue().await;
+    let mut reconnect = false;
     loop {
         if config::cluster::is_offline() {
             break;
         }
 
+        let deliver_policy = if reconnect {
+            queue::DeliverPolicy::All
+        } else {
+            queue::DeliverPolicy::New
+        };
+        log::info!(
+            "[COORDINATOR::EVENTS] subscribing to coordinator topic with deliver policy: {:?}",
+            deliver_policy
+        );
         let mut receiver: Arc<mpsc::Receiver<queue::Message>> = match queue
-            .consume(COORDINATOR_STREAM)
+            .consume(COORDINATOR_STREAM, Some(deliver_policy))
             .await
         {
             Ok(receiver) => receiver,
             Err(e) => {
                 log::error!("[COORDINATOR::EVENTS] failed to subscribe to coordinator topic: {e}");
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                reconnect = true;
                 continue;
             }
         };
@@ -183,6 +195,8 @@ async fn subscribe(tx: mpsc::Sender<CoordinatorEvent>) -> Result<()> {
                 },
                 None => {
                     log::error!("[COORDINATOR::EVENTS] coordinator topic closed");
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    reconnect = true;
                     break;
                 }
             }
@@ -200,10 +214,7 @@ async fn publish(event: CoordinatorEvent) -> Result<()> {
         .publish(COORDINATOR_STREAM, Bytes::from(payload))
         .await
     {
-        log::error!(
-            "[COORDINATOR::EVENTS] failed to publish coordinator event: {}",
-            e
-        );
+        log::error!("[COORDINATOR::EVENTS] failed to publish coordinator event: {e}");
         return Err(e);
     }
     Ok(())
