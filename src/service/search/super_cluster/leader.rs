@@ -201,9 +201,11 @@ pub async fn search(
         }
     };
 
-    let main_trace_id = trace_id.split("-").next().unwrap();
-    let stats = super::super::utils::collect_scan_stats(&nodes, main_trace_id, true).await;
-    scan_stats.add(&stats);
+    if cfg.common.feature_query_skip_collect_stats {
+        let main_trace_id = trace_id.split("-").next().unwrap();
+        let stats = super::super::utils::collect_scan_stats(&nodes, main_trace_id, true).await;
+        scan_stats.add(&stats);
+    }
 
     log::info!("[trace_id {trace_id}] super cluster leader: search finished");
 
