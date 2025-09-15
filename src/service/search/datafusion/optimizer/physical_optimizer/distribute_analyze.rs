@@ -62,3 +62,46 @@ impl TreeNodeRewriter for AnalyzeRewrite {
         Ok(Transformed::no(node))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use arrow_schema::{DataType, Field, Schema, SchemaRef};
+    use datafusion::physical_plan::empty::EmptyExec;
+
+    use super::*;
+    use crate::service::search::datafusion::distributed_plan::node::RemoteScanNode;
+
+    fn get_schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int32, false),
+            Field::new("b", DataType::Int32, false),
+        ]))
+    }
+
+    #[test]
+    fn test_optimize_distribute_analyze() {
+        let plan = Arc::new(AnalyzeExec::new(
+            false,
+            false,
+            Arc::new(EmptyExec::new(get_schema())),
+            get_schema(),
+        ));
+        let optimized_plan = optimize_distribute_analyze(plan).unwrap();
+        assert_eq!(optimized_plan.name(), "DistributeAnalyzeExec");
+    }
+
+    #[test]
+    fn test_analyze_rewrite() {
+        let plan = Arc::new(
+            RemoteScanExec::new(
+                Arc::new(EmptyExec::new(get_schema())),
+                RemoteScanNode::default(),
+            )
+            .unwrap(),
+        ) as Arc<dyn ExecutionPlan>;
+        let mut rewriter = AnalyzeRewrite::new();
+        let plan = plan.rewrite(&mut rewriter).unwrap().data;
+        let remote_scan = plan.as_any().downcast_ref::<RemoteScanExec>().unwrap();
+        assert_eq!(remote_scan.analyze(), true);
+    }
+}
