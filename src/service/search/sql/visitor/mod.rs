@@ -19,7 +19,6 @@ pub mod column;
 #[cfg(feature = "enterprise")]
 pub mod group_by;
 pub mod histogram_interval;
-pub mod index_optimize;
 pub mod match_all;
 pub mod partition_column;
 pub mod pickup_where;
