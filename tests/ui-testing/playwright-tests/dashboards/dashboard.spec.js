@@ -754,4 +754,140 @@ test.describe("dashboard UI testcases", () => {
 
     // await page.getByRole("button", { name: "Cancel" }).click();
   });
+  test("should update the chart correctly when used camel case in custom sql query", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+
+    // Navigate to dashboards and create new dashboard
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+
+    // Configure table chart with custom SQL using camelCase aliases
+    await pm.chartTypeSelector.removeField("_timestamp", "x");
+    await pm.chartTypeSelector.selectChartType("table");
+
+    await page.locator('[data-test="dashboard-customSql"]').click();
+    await page.locator(".view-line").first().click();
+    await page
+      .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
+      .fill(
+        'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
+      );
+
+    await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
+    await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
+    await pm.dashboardPanelActions.applyDashboardBtn();
+
+    // Verify table data is loaded correctly
+    await page.waitForSelector('[data-test="dashboard-panel-table"]', {
+      state: "visible",
+      timeout: 10000,
+    });
+
+    const dataRows = page.locator(
+      '[data-test="dashboard-panel-table"] tbody.q-virtual-scroll__content tr.cursor-pointer'
+    );
+    await dataRows.first().waitFor({ state: "visible", timeout: 15000 });
+
+    expect(await dataRows.count()).toBeGreaterThan(0);
+    await expect(dataRows.first().locator("td.q-td").first()).not.toHaveText(
+      ""
+    );
+    await expect(dataRows.first().locator("td.q-td").nth(1)).not.toHaveText("");
+    await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
+
+    // Save panel and cleanup
+    await pm.dashboardPanelActions.savePanel();
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
+  });
+  test("should update the line chart correctly when used camel case in custom sql query", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("line-panel-test");
+
+    // Navigate to dashboards and create new dashboard
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+
+    // Configure line chart with custom SQL using camelCase aliases
+    await pm.chartTypeSelector.removeField("_timestamp", "x");
+    await pm.chartTypeSelector.selectChartType("line");
+
+    await page.locator('[data-test="dashboard-customSql"]').click();
+    await page.locator(".view-line").first().click();
+    await page
+      .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
+      .fill(
+        'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
+      );
+
+    await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
+    await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
+    await pm.dashboardPanelActions.applyDashboardBtn();
+
+    // Verify line chart data is rendered correctly
+    await page.waitForSelector('[data-test="chart-renderer"]', {
+      state: "visible",
+      timeout: 10000,
+    });
+
+    await page.waitForFunction(
+      () => {
+        const chartElement = document.querySelector(
+          '[data-test="chart-renderer"]'
+        );
+        return chartElement && chartElement.hasAttribute("_echarts_instance_");
+      },
+      { timeout: 15000 }
+    );
+
+    // await page.waitForTimeout(2000);
+
+    // Validate chart is properly rendered
+    const chartContainer = page.locator('[data-test="chart-renderer"]');
+    const boundingBox = await chartContainer.boundingBox();
+    const canvasCount = await page
+      .locator('[data-test="chart-renderer"] canvas')
+      .count();
+
+    expect(canvasCount).toBeGreaterThan(0);
+    expect(boundingBox.width).toBeGreaterThan(0);
+    expect(boundingBox.height).toBeGreaterThan(0);
+    await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
+
+    // Verify canvas has visual content
+    const canvasHasContent = await page.evaluate(() => {
+      const canvas = document.querySelector(
+        '[data-test="chart-renderer"] canvas'
+      );
+      if (!canvas) return false;
+
+      const ctx = canvas.getContext("2d");
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      for (let i = 3; i < imageData.data.length; i += 4) {
+        if (imageData.data[i] > 0) return true;
+      }
+      return false;
+    });
+
+    expect(canvasHasContent).toBe(true);
+
+    // Save panel and cleanup
+    await pm.dashboardPanelActions.savePanel();
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
+  });
 });
