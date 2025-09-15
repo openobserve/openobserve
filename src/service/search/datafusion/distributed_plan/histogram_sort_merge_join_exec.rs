@@ -48,7 +48,7 @@ impl Default for HistogramJoinConfig {
             default_interval_seconds: 300, // 5 minutes
             default_minutes: 5,
             default_seconds: 60,
-            enable_one_to_one_join: get_config().common.feature_join_match_one_enabled,
+            enable_one_to_one_join: false, //get_config().common.feature_join_match_one_enabled,
             max_polls_without_progress: 100,
             max_rows_per_time_bin: 5000,
             batch_size_limit: 5000,
@@ -86,7 +86,7 @@ pub struct HistogramJoinExecConfig {
     pub left_time_column: String,
     pub right_time_column: String,
     pub join_columns: Vec<(String, String)>,
-    pub time_bin_interval: String,
+    pub histogram_interval: String,
     pub remote_scan_nodes: Option<Vec<RemoteScanNode>>,
     pub schema: SchemaRef,
 }
@@ -97,7 +97,7 @@ pub struct HistogramStreamConfig {
     pub left_time_column: String,
     pub right_time_column: String,
     pub join_columns: Vec<(String, String)>,
-    pub time_bin_interval: String,
+    pub histogram_interval: String,
     pub schema: SchemaRef,
     pub enable_streaming: bool,
 }
@@ -110,7 +110,7 @@ pub struct HistogramSortMergeJoinExec {
     left_time_column: String,
     right_time_column: String,
     join_columns: Vec<(String, String)>,
-    time_bin_interval: String,
+    histogram_interval: String,
     schema: SchemaRef,
     cache: PlanProperties,
     remote_scan_nodes: Option<Vec<RemoteScanNode>>,
@@ -125,7 +125,7 @@ impl HistogramSortMergeJoinExec {
         left_time_column: String,
         right_time_column: String,
         join_columns: Vec<(String, String)>,
-        time_bin_interval: String,
+        histogram_interval: String,
         remote_scan_nodes: Option<Vec<RemoteScanNode>>,
     ) -> Result<Self> {
         let schema = Self::create_joined_schema(left.schema(), right.schema())?;
@@ -138,7 +138,7 @@ impl HistogramSortMergeJoinExec {
             left_time_column,
             right_time_column,
             join_columns,
-            time_bin_interval,
+            histogram_interval,
             schema,
             cache,
             remote_scan_nodes,
@@ -163,7 +163,7 @@ impl HistogramSortMergeJoinExec {
             left_time_column: config.left_time_column,
             right_time_column: config.right_time_column,
             join_columns: config.join_columns,
-            time_bin_interval: config.time_bin_interval,
+            histogram_interval: config.histogram_interval,
             schema: config.schema,
             cache,
             remote_scan_nodes: config.remote_scan_nodes,
@@ -218,7 +218,7 @@ impl HistogramSortMergeJoinExec {
     }
 
     pub fn time_bin_interval(&self) -> &str {
-        &self.time_bin_interval
+        &self.histogram_interval
     }
 
     /// Check if this is a self-join scenario by comparing the execution plans
@@ -347,7 +347,7 @@ impl DisplayAs for HistogramSortMergeJoinExec {
                     "HistogramSortMergeJoinExec: left_time={}, right_time={}, interval={}, join_cols={:?}",
                     self.left_time_column,
                     self.right_time_column,
-                    self.time_bin_interval,
+                    self.histogram_interval,
                     self.join_columns
                 )
             }
@@ -392,7 +392,7 @@ impl ExecutionPlan for HistogramSortMergeJoinExec {
             self.left_time_column.clone(),
             self.right_time_column.clone(),
             self.join_columns.clone(),
-            self.time_bin_interval.clone(),
+            self.histogram_interval.clone(),
             self.remote_scan_nodes.clone(),
         )?))
     }
@@ -436,7 +436,7 @@ impl ExecutionPlan for HistogramSortMergeJoinExec {
                         left_time_column: self.left_time_column.clone(),
                         right_time_column: self.right_time_column.clone(),
                         join_columns: self.join_columns.clone(),
-                        time_bin_interval: self.time_bin_interval.clone(),
+                        histogram_interval: self.histogram_interval.clone(),
                         schema: self.schema(),
                         enable_streaming: false, // Disable streaming - accumulate all results first
                     };
@@ -462,7 +462,7 @@ impl ExecutionPlan for HistogramSortMergeJoinExec {
             left_time_column: self.left_time_column.clone(),
             right_time_column: self.right_time_column.clone(),
             join_columns: self.join_columns.clone(),
-            time_bin_interval: self.time_bin_interval.clone(),
+            histogram_interval: self.histogram_interval.clone(),
             schema: self.schema(),
             enable_streaming: false, // Disable streaming - accumulate all results first
         };
@@ -490,7 +490,7 @@ struct HistogramSortMergeJoinStream {
     left_time_column: String,
     right_time_column: String,
     join_columns: Vec<(String, String)>,
-    time_bin_interval: String,
+    histogram_interval: String,
     schema: SchemaRef,
     left_buffer: Vec<HistogramBatch>,
     right_buffer: Vec<HistogramBatch>,
@@ -518,7 +518,7 @@ impl HistogramSortMergeJoinStream {
             left_time_column,
             right_time_column,
             join_columns,
-            time_bin_interval,
+            histogram_interval: time_bin_interval,
             schema,
             enable_streaming: true, // Default to streaming enabled
         };
@@ -536,7 +536,7 @@ impl HistogramSortMergeJoinStream {
             left_time_column: config.left_time_column,
             right_time_column: config.right_time_column,
             join_columns: config.join_columns,
-            time_bin_interval: config.time_bin_interval,
+            histogram_interval: config.histogram_interval,
             schema: config.schema,
             left_buffer: Vec::new(),
             right_buffer: Vec::new(),
@@ -552,17 +552,17 @@ impl HistogramSortMergeJoinStream {
 
     fn parse_interval_seconds(&self) -> Result<i64> {
         // Simple interval parsing - in production would use proper interval parsing
-        if self.time_bin_interval.contains("minute") {
+        if self.histogram_interval.contains("minute") {
             let minutes: i64 = self
-                .time_bin_interval
+                .histogram_interval
                 .split_whitespace()
                 .next()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(self.config.default_minutes);
             Ok(minutes * 60)
-        } else if self.time_bin_interval.contains("second") {
+        } else if self.histogram_interval.contains("second") {
             let seconds: i64 = self
-                .time_bin_interval
+                .histogram_interval
                 .split_whitespace()
                 .next()
                 .and_then(|s| s.parse().ok())
@@ -573,7 +573,7 @@ impl HistogramSortMergeJoinStream {
         }
     }
 
-    fn time_bin_for_timestamp(&self, timestamp_micros: i64) -> Result<i64> {
+    fn histogram_for_timestamp(&self, timestamp_micros: i64) -> Result<i64> {
         let interval_seconds = self.parse_interval_seconds()?;
         let timestamp_seconds = timestamp_micros / MICROSECONDS_PER_SECOND;
 
@@ -601,8 +601,8 @@ impl HistogramSortMergeJoinStream {
 
         for left_batch in &self.left_buffer {
             for right_batch in &self.right_buffer {
-                for (&left_time_bin, left_rows) in &left_batch.time_bins {
-                    if let Some(right_rows) = right_batch.time_bins.get(&left_time_bin) {
+                for (&left_time_bin, left_rows) in &left_batch.histograms {
+                    if let Some(right_rows) = right_batch.histograms.get(&left_time_bin) {
                         log::debug!(
                             "HistogramSortMergeJoinStream: Found matching time bin {} with {} left rows and {} right rows",
                             left_time_bin,
@@ -677,16 +677,16 @@ impl HistogramSortMergeJoinStream {
             );
             // Clear all time bins from all batches to prevent reprocessing
             for left_batch in &mut self.left_buffer {
-                left_batch.time_bins.clear();
+                left_batch.histograms.clear();
             }
             for right_batch in &mut self.right_buffer {
-                right_batch.time_bins.clear();
+                right_batch.histograms.clear();
             }
 
             // Remove empty batches to free memory and prevent accumulation
-            self.left_buffer.retain(|batch| !batch.time_bins.is_empty());
+            self.left_buffer.retain(|batch| !batch.histograms.is_empty());
             self.right_buffer
-                .retain(|batch| !batch.time_bins.is_empty());
+                .retain(|batch| !batch.histograms.is_empty());
 
             log::debug!(
                 "HistogramSortMergeJoinStream: After cleanup - left batches: {}, right batches: {}",
@@ -696,7 +696,7 @@ impl HistogramSortMergeJoinStream {
         }
     }
 
-    fn create_time_binned_batch(
+    fn create_histogram_batch(
         &self,
         batch: RecordBatch,
         time_column: &str,
@@ -715,18 +715,18 @@ impl HistogramSortMergeJoinStream {
         })?;
 
         // Group rows by time bin - use schema-driven approach for any numeric/timestamp type
-        let mut time_bins: HashMap<i64, Vec<usize>> = HashMap::new();
+        let mut histograms: HashMap<i64, Vec<usize>> = HashMap::new();
 
         // Extract timestamps using schema-driven approach
         for row_idx in 0..time_array.len() {
             if !time_array.is_null(row_idx) {
                 let timestamp_micros = self.extract_timestamp_as_micros(time_array, row_idx)?;
-                let time_bin = self.time_bin_for_timestamp(timestamp_micros)?;
-                time_bins.entry(time_bin).or_default().push(row_idx);
+                let time_bin = self.histogram_for_timestamp(timestamp_micros)?;
+                histograms.entry(time_bin).or_default().push(row_idx);
             }
         }
 
-        Ok(HistogramBatch { batch, time_bins })
+        Ok(HistogramBatch { batch, histograms })
     }
 
     fn join_time_bin_rows(
@@ -1335,7 +1335,7 @@ impl Stream for HistogramSortMergeJoinStream {
                 while !self.left_exhausted {
                     match self.left_stream.poll_next_unpin(cx) {
                         Poll::Ready(Some(Ok(batch))) => {
-                            match self.create_time_binned_batch(batch, &self.left_time_column) {
+                            match self.create_histogram_batch(batch, &self.left_time_column) {
                                 Ok(time_binned) => {
                                     log::debug!(
                                         "HistogramSortMergeJoinStream: NON-STREAMING - Buffering left batch with {} rows",
@@ -1363,7 +1363,7 @@ impl Stream for HistogramSortMergeJoinStream {
                 while !self.right_exhausted {
                     match self.right_stream.poll_next_unpin(cx) {
                         Poll::Ready(Some(Ok(batch))) => {
-                            match self.create_time_binned_batch(batch, &self.right_time_column) {
+                            match self.create_histogram_batch(batch, &self.right_time_column) {
                                 Ok(time_binned) => {
                                     log::debug!(
                                         "HistogramSortMergeJoinStream: NON-STREAMING - Buffering right batch with {} rows",
@@ -1453,7 +1453,7 @@ impl Stream for HistogramSortMergeJoinStream {
                 Poll::Ready(Some(Ok(batch))) => {
                     has_data = true;
                     // Memory tracking removed
-                    match self.create_time_binned_batch(batch, &self.left_time_column) {
+                    match self.create_histogram_batch(batch, &self.left_time_column) {
                         Ok(time_binned) => {
                             self.left_buffer.push(time_binned);
                             immediate_processing = true;
@@ -1478,7 +1478,7 @@ impl Stream for HistogramSortMergeJoinStream {
                 Poll::Ready(Some(Ok(batch))) => {
                     has_data = true;
                     // Memory tracking removed
-                    match self.create_time_binned_batch(batch, &self.right_time_column) {
+                    match self.create_histogram_batch(batch, &self.right_time_column) {
                         Ok(time_binned) => {
                             self.right_buffer.push(time_binned);
                             immediate_processing = true;
@@ -1541,7 +1541,7 @@ impl RecordBatchStream for HistogramSortMergeJoinStream {
 #[derive(Debug)]
 struct HistogramBatch {
     batch: RecordBatch,
-    time_bins: HashMap<i64, Vec<usize>>, // time_bin -> row_indices
+    histograms: HashMap<i64, Vec<usize>>, // time_bin -> row_indices
 }
 
 /// Represents a row with its join key values for sorting and merging
@@ -1692,7 +1692,7 @@ mod tests {
             left_time_column: "_timestamp".to_string(),
             right_time_column: "_timestamp".to_string(),
             join_columns: vec![],
-            time_bin_interval: "5 minutes".to_string(),
+            histogram_interval: "5 minutes".to_string(),
             schema: Arc::new(Schema::empty()),
             left_buffer: Vec::new(),
             right_buffer: Vec::new(),
@@ -1727,7 +1727,7 @@ mod tests {
             left_time_column: "_timestamp".to_string(),
             right_time_column: "_timestamp".to_string(),
             join_columns: vec![],
-            time_bin_interval: "5 minutes".to_string(),
+            histogram_interval: "5 minutes".to_string(),
             schema: Arc::new(Schema::empty()),
             left_buffer: Vec::new(),
             right_buffer: Vec::new(),
@@ -1743,7 +1743,7 @@ mod tests {
         // Test time bin calculation
         let timestamp_micros = 1000000 * 650; // 650 seconds
         let time_bin = join_stream
-            .time_bin_for_timestamp(timestamp_micros)
+            .histogram_for_timestamp(timestamp_micros)
             .unwrap();
         assert_eq!(time_bin, 600); // Should be in the 600-second bin
     }
@@ -1860,7 +1860,7 @@ mod tests {
             left_time_column: "_timestamp".to_string(),
             right_time_column: "_timestamp".to_string(),
             join_columns: vec![("service_name".to_string(), "service_name".to_string())],
-            time_bin_interval: "5 minutes".to_string(),
+            histogram_interval: "5 minutes".to_string(),
             schema: Arc::new(Schema::empty()),
             left_buffer: Vec::new(),
             right_buffer: Vec::new(),
