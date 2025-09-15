@@ -393,6 +393,11 @@ impl Condition {
                 })?;
                 if value.is_empty() || value == "*" {
                     Box::new(AllQuery {})
+                } else if value.starts_with("*") && value.ends_with("*") {
+                    Box::new(ContainsQuery::new_case_insensitive(
+                        value.trim_matches('*'),
+                        default_field,
+                    )?)
                 } else {
                     let mut tokens = o2_collect_tokens(value);
                     let first_prefix = if value.starts_with("*") && !tokens.is_empty() {
@@ -413,10 +418,8 @@ impl Condition {
                         })
                         .collect();
                     if let Some(value) = first_prefix {
-                        terms.push(Box::new(PhrasePrefixQuery::new_with_offset(vec![(
-                            0,
-                            Term::from_field_text(default_field, &value),
-                        )])));
+                        let value = format!(".*{value}");
+                        terms.push(Box::new(RegexQuery::from_pattern(&value, default_field)?));
                     }
                     if let Some(value) = last_prefix {
                         terms.push(Box::new(PhrasePrefixQuery::new_with_offset(vec![(

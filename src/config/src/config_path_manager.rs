@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{path::PathBuf, sync::RwLock};
+
 use once_cell::sync::Lazy;
 
 // Config file path management
@@ -23,28 +24,30 @@ pub struct ConfigManager {
     last_hash: Option<String>,
 }
 
-static CONFIG_MANAGER: Lazy<RwLock<ConfigManager>> = Lazy::new(|| {
-    RwLock::new(ConfigManager::default())
-});
+static CONFIG_MANAGER: Lazy<RwLock<ConfigManager>> =
+    Lazy::new(|| RwLock::new(ConfigManager::default()));
 
 // Config manager interface functions
 pub fn set_config_file_path(path: PathBuf) -> Result<(), anyhow::Error> {
     // CLI validation: file MUST exist when provided via CLI
     if !path.exists() {
-        return Err(anyhow::anyhow!("Config file does not exist: {}", path.display()));
+        return Err(anyhow::anyhow!(
+            "Config file does not exist: {}",
+            path.display()
+        ));
     }
-    
+
     let hash = super::calculate_config_file_hash(&path)?;
-    
+
     // Update the config manager
     {
         let mut manager = CONFIG_MANAGER.write().unwrap();
         manager.file_path = Some(path.clone());
         manager.last_hash = Some(hash); // Reset hash when path changes
     }
-    
+
     log::info!("Config manager: Set CLI config file path to {:?}", path);
-    
+
     Ok(())
 }
 
