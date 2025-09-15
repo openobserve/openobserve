@@ -80,7 +80,7 @@ fn create_enrichment_tables_statement() -> TableCreateStatement {
 }
 
 fn create_enrichment_tables_index_statement() -> IndexCreateStatement {
-    Index::create()
+    Index::create().if_not_exists()
         .name(ENRICHMENT_TABLES_ORG_NAME_IDX)
         .table(EnrichmentTables::Table)
         .col(EnrichmentTables::Org)
@@ -89,7 +89,7 @@ fn create_enrichment_tables_index_statement() -> IndexCreateStatement {
 }
 
 fn create_enrichment_tables_index_statement_created_at() -> IndexCreateStatement {
-    Index::create()
+    Index::create().if_not_exists()
         .name(ENRICHMENT_TABLES_CREATED_AT_IDX)
         .table(EnrichmentTables::Table)
         .col(EnrichmentTables::CreatedAt)
