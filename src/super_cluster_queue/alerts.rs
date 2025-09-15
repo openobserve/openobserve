@@ -52,8 +52,7 @@ pub(crate) async fn process_msg(msg: AlertMessage) -> Result<()> {
                 return Ok(());
             }
             table::alerts::create(conn, &org_id, &folder_id, alert.clone(), true).await?;
-            infra::cluster_coordinator::alerts::emit_put_event(&org_id, &alert, Some(folder_id))
-                .await?;
+            infra::coordinator::alerts::emit_put_event(&org_id, &alert, Some(folder_id)).await?;
         }
         AlertMessage::Update {
             org_id,
@@ -61,7 +60,7 @@ pub(crate) async fn process_msg(msg: AlertMessage) -> Result<()> {
             alert,
         } => {
             let alert = table::alerts::update(conn, &org_id, folder_id.as_deref(), alert).await?;
-            infra::cluster_coordinator::alerts::emit_put_event(&org_id, &alert, folder_id).await?;
+            infra::coordinator::alerts::emit_put_event(&org_id, &alert, folder_id).await?;
         }
         AlertMessage::Delete { org_id, alert_id } => {
             if table::alerts::get_by_id(conn, &org_id, alert_id)
@@ -69,11 +68,8 @@ pub(crate) async fn process_msg(msg: AlertMessage) -> Result<()> {
                 .is_some()
             {
                 table::alerts::delete_by_id(conn, &org_id, alert_id).await?;
-                infra::cluster_coordinator::alerts::emit_delete_event(
-                    &org_id,
-                    &alert_id.to_string(),
-                )
-                .await?;
+                infra::coordinator::alerts::emit_delete_event(&org_id, &alert_id.to_string())
+                    .await?;
             }
         }
     };
