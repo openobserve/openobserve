@@ -494,6 +494,10 @@ import {
   getAlertPayload as getAlertPayloadUtil,
   type PayloadContext,
 } from "@/utils/alertPayload";
+import {
+  getParser as getParserUtil,
+  type SqlUtilsContext,
+} from "@/utils/alertSqlUtils";
 
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import AlertsContainer from "./AlertsContainer.vue";
@@ -701,31 +705,6 @@ export default defineComponent({
       return formData.value.stream_type && formData.value.stream_name;
     });
 
-    const updateConditions = (e: any) => {
-      try {
-        const ast = parser.astify(e.target.value);
-        if (ast) sqlAST.value = ast;
-        else return;
-
-        // If sqlAST.value.columns is not type of array then return
-        if (!sqlAST.value) return;
-        if (!Array.isArray(sqlAST.value?.columns)) return;
-
-        sqlAST.value.columns.forEach(function (item: any) {
-          let val;
-          if (item["as"] === undefined || item["as"] === null) {
-            val = item["expr"]["column"];
-          } else {
-            val = item["as"];
-          }
-          if (!triggerCols.value.includes(val)) {
-            triggerCols.value.push(val);
-          }
-        });
-      } catch (e) {
-        console.log("Alerts: Error while parsing SQL query");
-      }
-    };
     const editorData = ref("");
     const prefixCode = ref("");
     const suffixCode = ref("");
@@ -914,26 +893,11 @@ export default defineComponent({
       }
     };
     const getParser = (sqlQuery: string) => {
-      try {
-        // As default is a reserved keyword in sql-parser, we are replacing it with default1
-        const regex = /\bdefault\b/g;
-        const columns = parser.astify(
-          sqlQuery.replace(regex, "default1"),
-        ).columns;
-        for (const column of columns) {
-          if (column.expr.column === "*") {
-            sqlQueryErrorMsg.value = "Selecting all columns is not allowed";
-            return false;
-          }
-        }
-        return true;
-      } catch (error) {
-        // In catch block we are returning true, as we just wanted to validate if user have added * in the query to select all columns
-        // select field from default // here default is not wrapped in "" so node sql parser will throw error as default is a reserved keyword. But our Backend supports this query without quotes
-        // Query will be validated in the backend
-        console.log(error);
-        return true;
-      }
+      const sqlUtilsContext: SqlUtilsContext = {
+        parser,
+        sqlQueryErrorMsg,
+      };
+      return getParserUtil(sqlQuery, sqlUtilsContext);
     };
 
     const getAlertPayload = () => {
@@ -1266,7 +1230,6 @@ export default defineComponent({
       selectedRelativePeriod,
       relativePeriods,
       editorUpdate,
-      updateConditions,
       updateStreamFields,
       updateEditorContent,
       triggerCols,
