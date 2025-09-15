@@ -500,6 +500,13 @@ import AlertsContainer from "./AlertsContainer.vue";
 import JsonEditor from "../common/JsonEditor.vue";
 import { validateAlert } from "@/utils/validateAlerts";
 import { useReo } from "@/services/reodotdev_analytics";
+import {
+  updateGroup as updateGroupUtil,
+  removeConditionGroup as removeConditionGroupUtil,
+  transformFEToBE as transformFEToBEUtil,
+  retransformBEToFE as retransformBEToFEUtil,
+  type TransformContext,
+} from "@/utils/alertDataTransforms";
 
 const defaultValue: any = () => {
   return {
@@ -1020,41 +1027,13 @@ export default defineComponent({
 
 
 // Method to handle the emitted changes and update the structure
-//this method is used to update the group
-//we need to update the group if it is changed 
-  function updateGroup(updatedGroup:any) {
-    formData.value.query_condition.conditions.items.forEach((element:any) => {
-      if(element.groupId === updatedGroup.groupId){
-        element.items = updatedGroup.items;
-      }
-    });
-  }
-//this method is used to remove the condition group
-//we need to remove the condition group if it is empty because we cannot simply show empty group in the UI
-  const removeConditionGroup = (targetGroupId: string, currentGroup: any = formData.value.query_condition.conditions) => {
-    if (!currentGroup?.items || !Array.isArray(currentGroup.items)) return;
-
-    // Recursive function to filter empty groups
-    const filterEmptyGroups = (items: any[]): any[] => {
-      return items.filter((item: any) => {
-        // If this is the target group to remove, filter it out
-        if (item.groupId === targetGroupId) {
-          return false;
-        }
-
-        // If it's a group, recursively filter its items
-        if (item.items && Array.isArray(item.items)) {
-          item.items = filterEmptyGroups(item.items);
-          // Remove groups that are empty after filtering
-          return item.items.length > 0;
-        }
-
-        return true;
-      });
-    };
-
-    // Apply the filtering to the root group
-    currentGroup.items = filterEmptyGroups(currentGroup.items);
+  const updateGroup = (updatedGroup: any) => {
+    const transformContext: TransformContext = { formData: formData.value };
+    updateGroupUtil(updatedGroup, transformContext);
+  };
+  const removeConditionGroup = (targetGroupId: string, currentGroup?: any) => {
+    const transformContext: TransformContext = { formData: formData.value };
+    removeConditionGroupUtil(targetGroupId, currentGroup, transformContext);
   };
 
 
@@ -1070,33 +1049,9 @@ export default defineComponent({
   // {
   //   and: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
   // }
-    const transformFEToBE = (node:any) => {
-    if (!node || !node.items || !Array.isArray(node.items)) return {};
-
-    const groupLabel = node.label?.toLowerCase(); // 'or' or 'and'
-    if (!groupLabel || (groupLabel !== 'or' && groupLabel !== 'and')) return {};
-
-    const transformedItems = node.items.map((item:any) => {
-      // If the item has its own groupId and items, it's a nested group
-      //that means the item is a group and we need to iterate over that group to get further conditions
-      if (item.groupId && item.items) {
-        return transformFEToBE(item);
-      }
-
-      //if not its a condition so we can simply return the condition
-      return {
-        column: item.column,
-        operator: item.operator,
-        value: item.value,
-        ignore_case: !!item.ignore_case
-      };
-    });
-
-    //return the transformed items in the format of the backend
-    return {
-      [groupLabel]: transformedItems
-    };
-  }
+  const transformFEToBE = (node: any) => {
+    return transformFEToBEUtil(node);
+  };
 
   // Method to transform the backend data to the frontend format
   //when we get response from the BE we need to transform it to the frontend format
@@ -1110,43 +1065,9 @@ export default defineComponent({
   //   label: 'and',
   //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
   // }
-  const retransformBEToFE = (data:any) => {
-    if(!data) return null;
-    const keys = Object.keys(data);
-    if (keys.length !== 1) return null;
-
-    const label = keys[0]; // 'and' or 'or'
-    const itemsArray = data[label];
-
-    const items = itemsArray.map((item: any) => {
-      if (item.and || item.or) {
-          // Nested group
-          //so we need to iterate over the item and get the conditions and map that to one group
-        return retransformBEToFE(item);
-      } else {
-        //if not its a condition so we can simply return the condition
-        return {
-          column: item.column,
-          operator: item.operator,
-          value: item.value,
-          ignore_case: item.ignore_case,
-          id: getUUID()
-        };
-      }
-    });
-    //here we will return the group with the conditions
-    //the foramt looks like 
-    //{
-    //   groupId: '123',
-    //   label: 'and',
-    //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
-    // }
-    return {
-      groupId:  getUUID(),
-      label,
-      items
-    };
-  }
+  const retransformBEToFE = (data: any) => {
+    return retransformBEToFEUtil(data);
+  };
   const validateFormAndNavigateToErrorField = async (formRef: any) => {
       const isValid = await formRef.validate().then(async (valid: any) => {
         return valid;
