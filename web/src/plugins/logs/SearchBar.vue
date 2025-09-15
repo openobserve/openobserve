@@ -1669,23 +1669,6 @@ export default defineComponent({
     const { loadStreamLists, extractFields } = useStreamFields();
 
     const {
-      fnParsedSQL,
-      fnUnparsedSQL,
-      updatedLocalLogFilterField,
-      updateUrlQueryParams,
-      generateURLQuery,
-      isActionsEnabled,
-    } = logsUtils();
-    const {
-      getSavedViews,
-      setSelectedStreams,
-      onStreamChange,
-      getQueryData,
-      cancelQuery,
-    } = useSearchBar();
-    const { loadStreamLists, extractFields } = useStreamFields();
-
-    const {
       refreshData,
       handleRunQuery,
       getJobData,
@@ -3981,7 +3964,6 @@ export default defineComponent({
       updateAutoComplete,
       handleEscKey,
       applyAction,
-      showSavedViewConfirmDialog,
       getFieldList,
       buildStreamQuery,
       updateActionSelection,
