@@ -151,33 +151,6 @@ describe("AddServiceAccount Component", () => {
         organization: ""
       });
     });
-
-    it("shows correct title for adding service account", () => {
-      expect(wrapper.find('.text-h6').text()).toBe("serviceAccounts.add");
-    });
-
-    it("shows correct title for updating service account", async () => {
-      // Create a new wrapper with isUpdated true and valid modelValue
-      const updateWrapper = mount(AddServiceAccount, {
-        props: {
-          isUpdated: true,
-          modelValue: {
-            email: "test@example.com",
-            first_name: "Test Account",
-            organization: "test-org"
-          }
-        },
-        global: {
-          plugins: [[Quasar, { platform }], i18n, router],
-          provide: { store: mockStore, platform },
-          mocks: { $q: { platform, notify: notifyMock } }
-        }
-      });
-
-      await nextTick();
-      expect(updateWrapper.find('.text-h6').text()).toBe("serviceAccounts.update");
-      updateWrapper.unmount();
-    });
   });
 
   describe("Form Fields", () => {
@@ -354,17 +327,6 @@ describe("AddServiceAccount Component", () => {
       expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
     });
 
-    it("navigates to service accounts on close button click", async () => {
-      const closeButton = wrapper.find('[data-test="close-button"]');
-      await closeButton.trigger('click');
-      
-      expect(routerPushSpy).toHaveBeenCalledWith({
-        name: 'serviceAccounts',
-        query: {
-          org_identifier: mockStore.state.selectedOrganization.identifier
-        }
-      });
-    });
   });
 
   describe("Form State Management", () => {

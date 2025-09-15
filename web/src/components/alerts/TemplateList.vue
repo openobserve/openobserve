@@ -15,43 +15,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
-    <div v-if="!showImportTemplate && !showTemplateEditor" style="height: calc(100vh - 112px); overflow-y: auto;">
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
-      :class="store.state.theme == 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+  <q-page class="q-pa-none" style="height: calc(100vh - 88px); min-height: inherit">
+    <div v-if="!showImportTemplate && !showTemplateEditor" >
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
+      :class="store.state.theme == 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
       >
-        <div class="q-table__title" data-test="alert-templates-list-title">
+        <div class="q-table__title tw-font-[600]" data-test="alert-templates-list-title">
             {{ t("alert_templates.header") }}
           </div>
           <div class="tw-flex tw-justify-end">
-          <q-input
-            data-test="template-list-search-input"
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('alert_templates.search')"
-          >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
+            <q-input
+              v-model="filterQuery"
+              borderless
+              dense
+              class="q-ml-auto no-border o2-search-input"
+              :placeholder="t('template.search')"
+              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+              </template>
+            </q-input>
           <q-btn
-            class="q-ml-md text-bold"
-            padding="sm lg"
-            outline
+            class="o2-secondary-button q-ml-md tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             no-caps
+            flat
             :label="t(`dashboard.import`)"
             @click="importTemplate"
             data-test="template-import"
           />
           <q-btn
-            data-test="alert-template-list-add-alert-btn"
-            class="q-ml-md q-mb-xs text-bold no-border"
-            padding="sm lg"
-            color="secondary"
+            data-test="template-list-add-btn"
+            class="o2-primary-button q-ml-md tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             no-caps
+            flat
             :label="t(`alert_templates.add`)"
             @click="editTemplate(null)"
           />
@@ -60,16 +59,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-table
         data-test="alert-templates-list-table"
         ref="qTableRef"
-        :rows="templates"
+        :rows="visibleRows"
         :columns="columns"
         row-key="id"
         style="width: 100%"
         :rows-per-page-options="[0]"
         :pagination="pagination"
-        :filter="filterQuery"
-        :filter-method="filterData"
-        class="o2-quasar-table"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+        class="o2-quasar-table o2-quasar-table-header-sticky"
+        :style="hasVisibleRows
+            ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;' 
+            : 'width: 100%'"
+        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
       >
         <template #no-data>
           <NoData />
@@ -114,24 +114,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></q-btn>
           </q-td>
         </template>
-        <template #top="scope">
-          <QTablePagination
-            :scope="scope"
-            :pageTitle="t('alert_templates.header')"
-            :position="'top'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
         <template #bottom="scope">
-          <q-table-pagination
+          <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
+            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+                  {{ resultTotal }} {{ t('alert_templates.header') }}
+                </div>
+          <QTablePagination
             :scope="scope"
             :position="'bottom'"
             :resultTotal="resultTotal"
             :perPageOptions="perPageOptions"
             @update:changeRecordPerPage="changePagination"
           />
+          </div>
         </template>
         <template v-slot:header="props">
             <q-tr :props="props">
@@ -170,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref, onActivated, onMounted, watch, defineAsyncComponent } from "vue";
+import { ref, onActivated, onMounted, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar, type QTableProps } from "quasar";
@@ -412,7 +407,6 @@ const filterData = (rows: any, terms: any) => {
       filtered.push(rows[i]);
     }
   }
-  resultTotal.value = filtered.length;
   return filtered;
 };
 const exportTemplate = (row: any) => {
@@ -435,5 +429,11 @@ const exportTemplate = (row: any) => {
   // Clean up the URL object after download
   URL.revokeObjectURL(url);
 };
+
+const visibleRows = computed(() => {
+  if (!filterQuery.value) return templates.value || [];
+  return filterData(templates.value || [], filterQuery.value);
+});
+const hasVisibleRows = computed(() => visibleRows.value.length > 0)
 </script>
 <style lang=""></style>

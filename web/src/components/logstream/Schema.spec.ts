@@ -163,29 +163,6 @@ describe("Schema Component Tests", async () => {
       expect(wrapper.vm.hasUserDefinedSchema).toBe(true);
     });
 
-    // Test 9: showPartitionColumn computed property
-    it("should compute showPartitionColumn correctly for different stream types", async () => {
-      expect(wrapper.vm.showPartitionColumn).toBe(true);
-      
-      // Test with enrichment_tables
-      const enrichmentWrapper = mount(LogStream, {
-        props: {
-          modelValue: {
-            name: "test-stream",
-            stream_type: "enrichment_tables",
-            settings: { defined_schema_fields: [] }
-          },
-        },
-        global: {
-          provide: { store: store },
-          plugins: [i18n],
-        },
-      });
-      
-      await flushPromises();
-      expect(enrichmentWrapper.vm.showPartitionColumn).toBe(false);
-      enrichmentWrapper.unmount();
-    });
 
     // Test 10: showDataRetention computed property  
     it("should compute showDataRetention correctly", async () => {

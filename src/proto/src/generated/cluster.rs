@@ -1017,6 +1017,8 @@ pub struct SearchEventContext {
     pub dashboard_folder_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "7")]
     pub dashboard_folder_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "8")]
+    pub alert_name: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

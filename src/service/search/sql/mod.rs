@@ -40,8 +40,8 @@ use super::request::Request;
 use crate::service::search::sql::{
     rewriter::{
         add_o2_id::AddO2IdVisitor, add_timestamp::AddTimestampVisitor,
-        approx_percentile::ReplaceApproxPercentiletVisitor,
-        remove_dashboard_placeholder::RemoveDashboardAllVisitor,
+        approx_percentile::ReplaceApproxPercentiletVisitor, 
+        match_all_raw::MatchAllRawVisitor, remove_dashboard_placeholder::RemoveDashboardAllVisitor,
         track_total_hits::TrackTotalHitsVisitor,
     },
     schema::{generate_schema_fields, generate_select_star_schema, has_original_column},
@@ -136,9 +136,14 @@ impl Sql {
         // 3. rewrite all filter that include DASHBOARD_ALL with true
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
         let _ = statement.visit(&mut remove_dashboard_all_visitor);
+
+        // 4. rewrite match_all_raw and match_all_raw_ignore_case to match_all
+        let mut match_all_raw_visitor = MatchAllRawVisitor::new();
+        let _ = statement.visit(&mut match_all_raw_visitor);
+
         //********************Change the sql end*********************************//
 
-        // 4. get column name, alias, group by, order by
+        // 5. get column name, alias, group by, order by
         let mut column_visitor = ColumnVisitor::new(&total_schemas);
         let _ = statement.visit(&mut column_visitor);
 
@@ -172,11 +177,11 @@ impl Sql {
             limit = n;
         }
 
-        // 5. get match_all() value
+        // 6. get match_all() value
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
 
-        // 6. check if have full text search filed in stream
+        // 7. check if have full text search filed in stream
         if match_visitor.has_match_all {
             if match_visitor.is_multi_stream {
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
@@ -198,7 +203,7 @@ impl Sql {
             }
         }
 
-        // 7. generate used schema
+        // 8. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         if column_visitor.is_wildcard {
             let has_original_column = has_original_column(&column_visitor.columns);
@@ -220,11 +225,11 @@ impl Sql {
             }
         }
 
-        // 8. get partition column value
+        // 9. get partition column value
         let mut partition_column_visitor = PartitionColumnVisitor::new(&used_schemas);
         let _ = statement.visit(&mut partition_column_visitor);
 
-        // 9. pick up histogram interval
+        // 10. pick up histogram interval
         let mut histogram_interval_visitor =
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
         let _ = statement.visit(&mut histogram_interval_visitor);
@@ -238,11 +243,11 @@ impl Sql {
         };
 
         //********************Change the sql start*********************************//
-        // 10. replace approx_percentile_cont to new format
+        // 11. replace approx_percentile_cont to new format
         let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
         let _ = statement.visit(&mut replace_approx_percentilet_visitor);
 
-        // 11. add _timestamp and _o2_id if need
+        // 12. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);

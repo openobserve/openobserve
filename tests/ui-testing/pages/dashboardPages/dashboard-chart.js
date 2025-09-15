@@ -54,6 +54,8 @@ export default class ChartTypeSelector {
     await searchInput.click();
     await searchInput.fill(fieldName);
 
+    await this.page.waitForTimeout(1000);
+
     const buttonSelectors = {
       x: "dashboard-add-x-data",
       y: "dashboard-add-y-data",
@@ -84,6 +86,7 @@ export default class ChartTypeSelector {
     const button = fieldItem.locator(`[data-test="${buttonTestId}"]`);
 
     // Click the button
+    await button.waitFor({ state: "visible", timeout: 5000 });
     await button.click();
     await searchInput.fill(""); // Clear the search input
   }

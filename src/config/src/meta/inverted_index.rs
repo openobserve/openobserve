@@ -15,6 +15,8 @@
 
 use proto::cluster_rpc;
 
+pub const UNKNOWN_NAME: &str = "__o2__unknown__field__";
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum IndexOptimizeMode {
     SimpleSelect(usize, bool),

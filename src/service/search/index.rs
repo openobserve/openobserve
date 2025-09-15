@@ -20,6 +20,7 @@ use std::{
 
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, get_config,
+    meta::inverted_index::UNKNOWN_NAME,
     utils::tantivy::{query::contains_query::ContainsQuery, tokenizer::o2_collect_tokens},
 };
 use datafusion::{
@@ -991,7 +992,7 @@ pub(crate) fn get_arg_name(args: &FunctionArg) -> String {
         FunctionArg::ExprNamed { name, .. } => get_field_name(name),
         FunctionArg::Unnamed(arg) => match arg {
             FunctionArgExpr::Expr(expr) => get_field_name(expr),
-            _ => unimplemented!("str_match not support filed type: {:?}", arg),
+            _ => UNKNOWN_NAME.to_string(),
         },
     }
 }
@@ -2041,5 +2042,76 @@ mod tests {
             "field1",
         ))));
         assert_eq!(get_arg_name(&arg), "field1");
+    }
+
+    #[test]
+    fn test_get_arg_name() {
+        use sqlparser::ast::{
+            Expr, FunctionArg, FunctionArgExpr, FunctionArgOperator, Ident, ObjectName,
+        };
+
+        // Test FunctionArg::Named
+        let named_arg = FunctionArg::Named {
+            name: Ident::new("field_name"),
+            arg: FunctionArgExpr::Expr(Expr::Identifier(Ident::new("value"))),
+            operator: FunctionArgOperator::Equals,
+        };
+        assert_eq!(get_arg_name(&named_arg), "field_name");
+
+        // Test FunctionArg::ExprNamed with field expression
+        let expr_named_field = FunctionArg::ExprNamed {
+            name: Expr::Identifier(Ident::new("field_name")),
+            arg: FunctionArgExpr::Expr(Expr::Identifier(Ident::new("value"))),
+            operator: FunctionArgOperator::Equals,
+        };
+        assert_eq!(get_arg_name(&expr_named_field), "field_name");
+
+        // Test FunctionArg::ExprNamed with compound identifier
+        let expr_named_compound = FunctionArg::ExprNamed {
+            name: Expr::CompoundIdentifier(vec![Ident::new("table"), Ident::new("field_name")]),
+            arg: FunctionArgExpr::Expr(Expr::Identifier(Ident::new("value"))),
+            operator: FunctionArgOperator::Equals,
+        };
+        assert_eq!(get_arg_name(&expr_named_compound), "field_name");
+
+        // Test FunctionArg::ExprNamed with non-field expression (should return UNKNOWN_NAME)
+        let expr_named_non_field = FunctionArg::ExprNamed {
+            name: Expr::Value(sqlparser::ast::Value::Number("123".to_string(), false).into()),
+            arg: FunctionArgExpr::Expr(Expr::Identifier(Ident::new("value"))),
+            operator: FunctionArgOperator::Equals,
+        };
+        assert_eq!(get_arg_name(&expr_named_non_field), UNKNOWN_NAME);
+
+        // Test FunctionArg::Unnamed with field expression
+        let unnamed_field = FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(
+            Ident::new("field_name"),
+        )));
+        assert_eq!(get_arg_name(&unnamed_field), "field_name");
+
+        // Test FunctionArg::Unnamed with compound identifier
+        let unnamed_compound =
+            FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::CompoundIdentifier(vec![
+                Ident::new("table"),
+                Ident::new("field_name"),
+            ])));
+        assert_eq!(get_arg_name(&unnamed_compound), "field_name");
+
+        // Test FunctionArg::Unnamed with non-field expression (should return UNKNOWN_NAME)
+        let unnamed_non_field = FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
+            sqlparser::ast::Value::Number("123".to_string(), false).into(),
+        )));
+        assert_eq!(get_arg_name(&unnamed_non_field), UNKNOWN_NAME);
+
+        // Test FunctionArg::Unnamed with Wildcard (should return UNKNOWN_NAME)
+        let unnamed_wildcard = FunctionArg::Unnamed(FunctionArgExpr::Wildcard);
+        assert_eq!(get_arg_name(&unnamed_wildcard), UNKNOWN_NAME);
+
+        // Test FunctionArg::Unnamed with other FunctionArgExpr variants (should return
+        // UNKNOWN_NAME)
+        let unnamed_other =
+            FunctionArg::Unnamed(FunctionArgExpr::QualifiedWildcard(ObjectName(vec![
+                sqlparser::ast::ObjectNamePart::Identifier(Ident::new("table")),
+            ])));
+        assert_eq!(get_arg_name(&unnamed_other), UNKNOWN_NAME);
     }
 }

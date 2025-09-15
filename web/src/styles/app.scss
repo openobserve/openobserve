@@ -1,3 +1,6 @@
+@import 'variables';
+
+
 .q-w-sm {
   width: 360px;
 }
@@ -193,7 +196,7 @@
     right: 0;
     z-index: 1;
     background: #ffffff;
-    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
+    box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1);
   }
 }
 //here we have dark theme styling for the table
@@ -202,7 +205,7 @@
   th:last-child.actions-column,
   td:last-child.actions-column {
     background: var(--q-dark);
-    box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1);
+    box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1);
     width: 150px;
   }
 }
@@ -212,7 +215,7 @@
   td:last-child.actions-column {
     background: #ffffff;
     width: 150px;
-    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
+    box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1);
   }
 }
 //this is for in some of pages we are having a header for eg: pipelines ,functions ,enrichments listing pages
@@ -230,6 +233,52 @@
   position: sticky;
   top: 0;
   z-index: 1000;
+}
+
+//this is used to target the header and footer of the table to make it sticky all the time
+//we have added the class o2-table-footer-title to the footer title
+.o2-table-footer-title{
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 16px;
+}
+.o2-quasar-table-header-sticky{
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+}
+
+.o2-quasar-table-header-sticky-dark{
+  thead {
+    background-color: #181A1B;
+  }
+}
+
+.o2-quasar-table-header-sticky-light{
+  thead {
+    background-color: #ffffff;
+  }
+}
+
+
+//some times if there are less records or if user tries to search anything the last row of the table is not having border at the bottom
+
+.o2-last-row-border-light{
+  tr:last-child{
+    td{
+      border-bottom: 1px solid #E4E7EC !important;
+    }
+  }
+}
+
+.o2-last-row-border-dark{
+  tr:last-child{
+    td{
+      border-bottom: 1px solid #575A5A !important;
+    }
+  }
 }
 
 
@@ -267,7 +316,7 @@
   .q-virtual-scroll__content{
     td:last-child.actions-column {
       background: #ffffff !important;
-      box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1) !important;
+      box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1) !important;
       width: 150px !important;
     }
   }
@@ -275,7 +324,7 @@
     thead{
       th:last-child.actions-column{
         background: #ffffff !important;
-        box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1) !important;
+        box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1) !important;
         width: 150px !important;
       }
     }
@@ -286,7 +335,7 @@
   .q-virtual-scroll__content{
     td:last-child.actions-column {
       background: var(--q-dark) !important;
-      box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1) !important;
+      box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1) !important;
       width: 150px !important;
     }
   }
@@ -294,7 +343,7 @@
     thead{
       th:last-child.actions-column{
         background: var(--q-dark) !important;
-        box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1) !important;
+        box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1) !important;
         width: 150px !important;
       }
     }
@@ -305,7 +354,7 @@
 //and then add the class tabs-selection-container-dark or tabs-selection-container-light to the app-tabs component
 .app-tabs-container{
   border: 1px solid #cacaca;
-  padding: 4px;
+  padding: 2px;
   border-radius: 2px;
 }
 
@@ -359,3 +408,427 @@
     background-color: $primary !important;
   }
 }
+
+
+//this is used to target the checkbox in the table
+//we need to add the class o2-table-checkbox-light or o2-table-checkbox-dark to the checkbox directly 
+//and don't add the color to the checkbox directly
+//any non theme related styling should be done here inside the o2-table-checkbox class
+.o2-table-checkbox{
+  .q-checkbox__bg{
+    width: 16px !important;
+    height: 16px !important;
+  }
+}
+.o2-table-checkbox-light{
+  .q-checkbox__inner--truthy .q-checkbox__bg, .q-checkbox__inner--indet .q-checkbox__bg {
+    background: #575FC5 !important;
+    border: 2px solid #575FC5 !important;
+  }
+}
+
+
+.o2-table-checkbox-dark{
+  .q-checkbox__inner--truthy .q-checkbox__bg, .q-checkbox__inner--indet .q-checkbox__bg {
+    background: #575FC5 !important;
+    border: 2px solid #575FC5 !important;
+  }
+}
+
+//this is used to target the radio button in the app
+//we need to add the class o2-radio-button-light or o2-radio-button-dark to the radio button directly
+//and don't add the color to the radio button directly
+//any non theme related styling should be done here inside the o2-radio-button class
+
+.o2-radio-button{
+  .q-radio{
+    display: flex;
+  }
+  .q-radio__bg{
+    width: 16px !important;
+    height: 16px !important;
+  }
+  .q-radio__label{
+    font-size: 13px !important;
+  }
+  .q-radio__inner{
+    height: 16px !important;
+  }
+}
+
+.o2-radio-button-light{
+  .q-radio__inner--truthy{
+    color: #575FC5 !important;
+  }
+}
+
+.o2-radio-button-dark{
+  .q-radio__inner--truthy{
+    color: #575FC5 !important;
+  }
+}
+
+
+//this is used to target the numeric input in the whole app and if we want to apply any styling to the numeric input we need to add the class o2-numeric-input-light or o2-numeric-input-dark to the numeric input
+//and don't add the color to the numeric input directly
+//any non theme related styling should be done here inside the o2-numeric-input class
+.o2-numeric-input{
+  .q-field__inner{
+    border-radius: 2px !important;
+  }
+}
+
+.o2-numeric-input-light{
+  .q-field__inner{
+    border: 1px solid #C4C4C4 !important;
+  }
+  .q-field__control{
+    background-color: #ffffff !important;
+  }
+}
+//TODO O2: after getting the dark theme work on it
+.o2-numeric-input-dark{
+  .q-field__inner{
+    border: 1px solid #454F5B !important;
+  }
+  .q-field__control{
+    background-color: #212121 !important;
+  }
+}
+
+
+//here we have implemented the search input in the whole app that will be used at the top of the table
+//we have added the class o2-search-input-light or o2-search-input-dark to the search input
+//any non theme related styling should be done here inside the o2-search-input class
+
+.o2-search-input{
+  height: 36px !important;
+  .q-field__control{
+  height: 36px !important;
+  border-radius: 4px !important;
+  display: flex;
+  align-items: end;
+  font-size: 13px;
+  padding: 0px 6px !important;
+  font-weight: 500 !important;
+  color: transparent !important;
+}
+  .q-field__prepend{
+    height: 36px !important;
+    padding-bottom: 4px !important;
+  }
+  .q-field--highlighted{
+    .q-field__control{
+      background-color: red !important;
+    }
+  }
+  .q-field__append{
+    padding-top: 8px !important;
+  }
+}
+
+.o2-search-input-light{
+  .q-field__control{
+    background-color: #ffffff !important;
+    outline: 1px solid #C9CCD6 !important;
+
+  }
+}
+.o2-search-input-dark{
+  .q-field__control{
+    background-color: #2B2D30 !important;
+    border: 1px solid #4E5157 !important;
+  }
+}
+//this is done because we need to select the search input when it is focused
+.o2-search-input-light.q-field--focused .q-field__control {
+  outline: 2px solid #575FC5 !important;
+  box-shadow: none !important;
+  background-color: #FFFFFF !important;
+  border-radius: 4px !important;
+}
+
+.o2-search-input-dark.q-field--focused .q-field__control {
+  outline: 2px solid #575FC5 !important;
+  box-shadow: none !important;
+  background-color: #2B2D30 !important;
+  border-radius: 4px !important;
+}
+
+//this is for search input icon
+//we have added the class o2-search-input-icon-light or o2-search-input-icon-dark to the search input icon
+//any non theme related styling should be done here inside the o2-search-input-icon class
+
+.o2-search-input-icon{
+  height: 16px !important;
+  width: 16px !important;
+  margin-right: 10px;
+}
+.o2-search-input-icon-light{
+  color: #818594;
+}
+.o2-search-input-icon-dark{
+  color: #6F737A;
+}
+
+//this is for o2 secondary button
+//in a page we can have multiple secondary buttons so we need to add the class o2-secondary-button-light or o2-secondary-button-dark to the button
+//any non theme related styling should be done here inside the o2-secondary-button class
+
+.o2-secondary-button{
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  border-radius: 4px !important;
+  padding: 0px 12px !important;
+  min-width: 90px !important;
+}
+
+
+.o2-secondary-button-small{
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  border-radius: 4px !important;
+  min-width: 72px !important;
+  padding: 0px 12px !important;
+  min-width: 90px !important;
+  height: 28px !important;
+}
+
+.o2-secondary-button-light{
+  color: #19191E !important;
+  border: 1px solid #D3D5DB !important;
+  background-color: #F7F8FA;
+}
+.o2-secondary-button-dark{
+  color: #DFE1E5 !important;
+  border: 1px solid #6F737A !important;
+}
+
+
+
+.o2-primary-button{
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  padding: 0px 12px !important;
+  border-radius: 4px !important;
+  min-width: 90px !important;
+}
+.o2-primary-button-small{
+  height: 28px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  padding: 0px 12px !important;
+  border-radius: 4px !important;
+  min-width: 90px !important;
+}
+
+.o2-primary-button-light{
+  background-color: #575FC5 !important;
+  color: #ffffff !important;
+  border: 1px solid #575FC5 !important;
+  &:hover{
+    background-color: #6B76E3 !important;
+    border: 1px solid #6B76E3 !important;
+  }
+}
+//TODO o2: after getting the dark theme work on it
+.o2-primary-button-dark{
+  background-color: #575FC5 !important;
+  color: #ffffff !important;
+  border: 1px solid #575FC5 !important;
+  &:hover{
+    background-color: #6B76E3 !important;
+    border: 1px solid #6B76E3 !important;
+  }
+}
+
+//q-toggle in small size
+.o2-toggle-button-sm{
+  .q-toggle__track{
+    height: 20px;
+    border-radius: 16px;
+    width: 36px;
+    background-color: #EBECF0;
+    opacity: 100%;
+  }
+  .q-toggle__thumb:after{
+    top: 4.8px;
+    left: 4px;
+    height: 16px;
+    width: 16px;
+  }
+  .q-toggle__label{
+    margin-top: 6px;
+  }
+  .q-toggle__inner--truthy{
+    .q-toggle__thumb:after{
+      position: relative;
+      top: 3.2px !important;
+      left: 2px !important;
+    }
+  }
+
+}
+
+.o2-toggle-button-sm-light{
+  .q-toggle__track{
+    background-color: #acbbf3;
+    border: 1px solid #D3D5DB !important;
+    opacity: 100%;
+  }
+  .q-toggle__inner--truthy{
+    color: #ffffff !important;
+    .q-toggle__track{
+      background-color: #575FC5;
+    }
+    }
+}
+
+.o2-toggle-button-sm-dark{
+  .q-toggle__track{
+    background-color: #2f415e;
+    border: 1px solid #6F737A !important;
+    opacity: 100%;
+  }
+  .q-toggle__inner--truthy{
+    color: #ffffff !important;
+    .q-toggle__track{
+      background-color: #6B76E3;
+    }
+    } 
+}
+
+//q-toggle in large size
+.o2-toggle-button-lg{
+  .q-toggle__track{
+    height: 24px;
+    border-radius: 16px;
+    width: 44px;
+    background-color: #EBECF0;
+    opacity: 100%;
+  }
+  .q-toggle__thumb:after{
+    top: 5.8px;
+    left: 4.8px;
+    height: 20px;
+    width: 20px;
+  }
+  .q-toggle__thumb{
+    &:before {
+      display: none !important;
+    }
+    &:hover:before {
+      display: none !important;
+    }
+  }
+  .q-toggle__label{
+    margin-top: 6px;
+  }
+  .q-toggle__inner--truthy{
+    .q-toggle__thumb:after{
+      top: 5.8px;
+      left: 3.8px;
+    }
+    .q-toggle__thumb{
+      &:before {
+        display: none !important;
+      }
+      &:hover:before {
+        display: none !important;
+      }
+    }
+  }
+}
+
+.o2-toggle-button-lg-light{
+  .q-toggle__track{
+    background-color: #acbbf3;
+    border: 1px solid #D3D5DB !important;
+    opacity: 100%;
+  }
+  .q-toggle__inner--truthy{
+    color: #ffffff;
+    .q-toggle__track{
+      background-color: #575FC5;
+    }
+    }
+}
+
+.o2-toggle-button-lg-dark{
+  .q-toggle__track{
+    background-color: #2f415e;
+    border: 1px solid #6F737A !important;
+    opacity: 100%;
+  }
+  .q-toggle__inner--truthy{
+    color: #ffffff;
+    .q-toggle__track{
+      background-color: #6B76E3;
+    }
+    }
+}
+
+
+.o2-input-text-box-light{
+  .q-field__control{
+    height: 36px !important;
+  }
+  .q-field__label{
+    padding-bottom: 6px;
+    font-size: 14px;
+  }
+}
+
+
+//this is used to target the numeric input in the whole app and if we want to apply any styling to the numeric input we need to add the class o2-numeric-input-light or o2-numeric-input-dark to the numeric input
+//and don't add the color to the numeric input directly
+//any non theme related styling should be done here inside the o2-numeric-input class
+.o2-text-input{
+  .q-field__inner{
+    border-radius: 2px !important;
+  }
+}
+
+.o2-text-input-light{
+  .q-field__inner{
+    border: 1px solid #C4C4C4 !important;
+  } 
+  .q-field__control{
+    background-color: #ffffff !important;
+  }
+}
+//TODO O2: after getting the dark theme work on it
+.o2-text-input-dark{
+  .q-field__inner{
+    border: 1px solid #454F5B !important;
+  }
+  .q-field__control{
+    background-color: #212121 !important;
+  }
+}
+
+
+
+.o2-dropdown-select{
+  .q-field{
+    .q-field__control{
+      min-height: 36px !important;
+      max-height: 36px !important;
+      border-radius: 4px !important;
+
+    }
+  }
+}
+
+.o2-select-input{
+  .q-field__control{
+    border-radius: 4px !important;
+  }
+}
+
+
+

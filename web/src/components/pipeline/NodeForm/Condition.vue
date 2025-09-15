@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
       <q-form ref="routeFormRef" @submit="saveCondition">
         <div
-          class="q-py-sm showLabelOnTop text-bold text-h7"
+          class="q-pt-sm showLabelOnTop text-bold text-h7"
           data-test="add-condition-query-input-title"
         >
         <div>
@@ -76,33 +76,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex justify-start full-width"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
+        <q-btn
+          v-if="pipelineObj.isEditNode"
+            data-test="add-condition-delete-btn"
+            class="o2-secondary-button tw-h-[36px] q-mr-md"
+            color="negative"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            no-caps
+            @click="openDeleteDialog"
+          >
+          <q-icon name="delete" class="q-mr-xs" />
+          {{ t('pipeline.deleteNode') }}
+        </q-btn>
           <q-btn
             data-test="add-condition-cancel-btn"
-            class="text-bold"
+            class="o2-secondary-button tw-h-[36px]"
             :label="t('alerts.cancel')"
-            text-color="light-text"
-            padding="sm md"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             no-caps
             @click="openCancelDialog"
           />
           <q-btn
             data-test="add-condition-save-btn"
             :label="t('alerts.save')"
-            class="text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
+            class="no-border q-ml-md o2-primary-button tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            flat
             no-caps
             type="submit"
-          />
-          <q-btn
-          v-if="pipelineObj.isEditNode"
-            data-test="add-condition-delete-btn"
-            :label="t('pipeline.deleteNode')"
-            class="text-bold no-border q-ml-md"
-            color="negative"
-            padding="sm xl"
-            no-caps
-            @click="openDeleteDialog"
           />
         </div>
       </q-form>

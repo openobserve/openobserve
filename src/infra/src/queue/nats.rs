@@ -22,7 +22,7 @@ use config::{get_cluster_name, get_config};
 use futures::TryStreamExt;
 use tokio::{sync::mpsc, task::JoinHandle};
 
-use crate::{db::nats::get_nats_client, errors::*};
+use crate::{db::nats::get_nats_client, errors::*, queue::RetentionPolicy};
 
 pub async fn init() -> Result<()> {
     Ok(())
@@ -64,17 +64,35 @@ impl Default for NatsQueue {
     }
 }
 
+impl From<RetentionPolicy> for jetstream::stream::RetentionPolicy {
+    fn from(retention_policy: RetentionPolicy) -> Self {
+        match retention_policy {
+            RetentionPolicy::Interest => jetstream::stream::RetentionPolicy::Interest,
+            RetentionPolicy::Limits => jetstream::stream::RetentionPolicy::Limits,
+        }
+    }
+}
+
 #[async_trait]
 impl super::Queue for NatsQueue {
     async fn create(&self, topic: &str) -> Result<()> {
+        self.create_with_retention_policy(topic, RetentionPolicy::Limits)
+            .await
+    }
+
+    async fn create_with_retention_policy(
+        &self,
+        topic: &str,
+        retention_policy: RetentionPolicy,
+    ) -> Result<()> {
         let cfg = config::get_config();
-        let client = get_nats_client().await?;
+        let client = get_nats_client().await.clone();
         let jetstream = jetstream::new(client);
         let topic_name = format!("{}{}", self.prefix, topic);
         let config = jetstream::stream::Config {
             name: topic_name.to_string(),
             subjects: vec![topic_name.to_string(), format!("{}.*", topic_name)],
-            retention: jetstream::stream::RetentionPolicy::Limits,
+            retention: retention_policy.into(),
             max_age: Duration::from_secs(60 * 60 * 24 * max(1, cfg.nats.queue_max_age)),
             num_replicas: cfg.nats.replicas,
             max_bytes: cfg.nats.queue_max_size,
@@ -91,7 +109,7 @@ impl super::Queue for NatsQueue {
 
     /// you can pub message with the topic or topic.* to match the topic
     async fn publish(&self, topic: &str, value: Bytes) -> Result<()> {
-        let client = get_nats_client().await?;
+        let client = get_nats_client().await.clone();
         let jetstream = jetstream::new(client);
         // Publish a message to the stream
         let topic_name = format!("{}{}", self.prefix, topic);
@@ -106,7 +124,7 @@ impl super::Queue for NatsQueue {
         let consumer_name = self.consumer_name.clone();
         let is_durable = self.is_durable;
         let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
-            let client = get_nats_client().await?;
+            let client = get_nats_client().await.clone();
             let jetstream = jetstream::new(client);
             let stream = jetstream.get_stream(&stream_name).await.map_err(|e| {
                 log::error!("Failed to get nats stream {stream_name}: {e}");
@@ -140,7 +158,25 @@ impl super::Queue for NatsQueue {
                     "Failed to get nats consumer messages for stream {stream_name}: {e}"
                 ))
             })?;
-            while let Ok(Some(message)) = messages.try_next().await {
+            loop {
+                let message = match messages.try_next().await {
+                    Ok(Some(message)) => message,
+                    Ok(None) => {
+                        log::warn!(
+                            "Nats consumer messages for stream {} is closed",
+                            stream_name
+                        );
+                        break;
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "Failed to get nats consumer messages for stream {}: {}",
+                            stream_name,
+                            e
+                        );
+                        continue;
+                    }
+                };
                 let message = super::Message::Nats(message);
                 tx.send(message).await.map_err(|e| {
                     log::error!("Failed to send nats message for stream {stream_name}: {e}");

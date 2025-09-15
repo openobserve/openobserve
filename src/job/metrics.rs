@@ -18,9 +18,8 @@ use std::{path::Path, time::Duration};
 use config::{
     get_config,
     meta::{cluster::Role, stream::StreamType},
-    metrics,
-    metrics::{NAMESPACE, SPAN_METRICS_BUCKET},
-    utils::file::scan_files,
+    metrics::{self, NAMESPACE, SPAN_METRICS_BUCKET},
+    utils::async_file::scan_files,
 };
 use hashbrown::HashMap;
 use infra::{cache, db::get_db};
@@ -129,7 +128,9 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
         Err(_) => return Ok(()),
     };
     let pattern = format!("{}files/", &cfg.common.data_wal_dir);
-    let files = scan_files(pattern, "parquet", None).unwrap_or_default();
+    let files = scan_files(pattern, "parquet", None)
+        .await
+        .unwrap_or_default();
     let mut sizes = HashMap::new();
     for file in files {
         let local_file = file.to_owned();
