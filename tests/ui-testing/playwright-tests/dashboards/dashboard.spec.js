@@ -853,7 +853,7 @@ test.describe("dashboard UI testcases", () => {
       { timeout: 15000 }
     );
 
-    await page.waitForTimeout(2000);
+    // await page.waitForTimeout(2000);
 
     // Validate chart is properly rendered
     const chartContainer = page.locator('[data-test="chart-renderer"]');
