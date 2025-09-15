@@ -147,16 +147,20 @@ vi.mock("lodash-es", () => ({
 }));
 
 // Mock sqlUtils with isSimpleSelectAllQuery function
-vi.mock("@/utils/query/sqlUtils", async (importOriginal) => {
-  const actual: any = await importOriginal();
+vi.mock("@/utils/query/sqlUtils", () => {
   return {
-    ...actual,
-    isSimpleSelectAllQuery: vi.fn((query) => {
+    isSimpleSelectAllQuery: vi.fn((query: string) => {
       if (!query || typeof query !== 'string') return false;
       const normalizedQuery = query.trim().replace(/\s+/g, ' ');
       const selectAllPattern = /^select\s+\*\s+from\s+/i;
       return selectAllPattern.test(normalizedQuery);
-    })
+    }),
+    // Add other functions that might be needed
+    buildSqlQuery: vi.fn(),
+    getFieldsFromQuery: vi.fn(),
+    extractFields: vi.fn(),
+    addLabelsToSQlQuery: vi.fn(),
+    getStreamFromQuery: vi.fn(),
   };
 });
 
