@@ -115,9 +115,11 @@ pub async fn watch(prefix: &str) -> Result<Arc<mpsc::Receiver<crate::db::Event>>
 
 async fn create_stream() -> Result<()> {
     log::info!("[COORDINATOR::EVENTS] creating coordinator stream");
+    let max_age = config::get_config().nats.event_max_age; // seconds
+    let max_age_secs = std::time::Duration::from_secs(std::cmp::max(1, max_age));
     let queue = queue::get_queue().await;
     queue
-        .create_with_retention_policy(COORDINATOR_STREAM, queue::RetentionPolicy::Interest)
+        .create_with_max_age(COORDINATOR_STREAM, max_age_secs)
         .await
 }
 

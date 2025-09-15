@@ -75,6 +75,13 @@ pub trait Queue: Sync + Send + 'static {
         topic: &str,
         retention_policy: RetentionPolicy,
     ) -> Result<()>;
+    async fn create_with_max_age(&self, topic: &str, max_age: std::time::Duration) -> Result<()>;
+    async fn create_with_retention_policy_and_max_age(
+        &self,
+        topic: &str,
+        retention_policy: RetentionPolicy,
+        max_age: std::time::Duration,
+    ) -> Result<()>;
     async fn publish(&self, topic: &str, value: Bytes) -> Result<()>;
     async fn consume(
         &self,

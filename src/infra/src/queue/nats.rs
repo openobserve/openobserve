@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, sync::Arc, time::Duration};
+use std::{cmp::max, sync::Arc};
 
 use async_nats::jetstream::{self, consumer::DeliverPolicy};
 use async_trait::async_trait;
@@ -84,6 +84,27 @@ impl super::Queue for NatsQueue {
         topic: &str,
         retention_policy: queue::RetentionPolicy,
     ) -> Result<()> {
+        let max_age = config::get_config().nats.queue_max_age; // days
+        let max_age_secs = std::time::Duration::from_secs(max(1, max_age) * 24 * 60 * 60);
+        self.create_with_retention_policy_and_max_age(topic, retention_policy, max_age_secs)
+            .await
+    }
+
+    async fn create_with_max_age(&self, topic: &str, max_age: std::time::Duration) -> Result<()> {
+        self.create_with_retention_policy_and_max_age(
+            topic,
+            queue::RetentionPolicy::Limits,
+            max_age,
+        )
+        .await
+    }
+
+    async fn create_with_retention_policy_and_max_age(
+        &self,
+        topic: &str,
+        retention_policy: queue::RetentionPolicy,
+        max_age: std::time::Duration,
+    ) -> Result<()> {
         let cfg = config::get_config();
         let client = get_nats_client().await?;
         let jetstream = jetstream::new(client);
@@ -92,7 +113,7 @@ impl super::Queue for NatsQueue {
             name: topic_name.to_string(),
             subjects: vec![topic_name.to_string(), format!("{}.*", topic_name)],
             retention: retention_policy.into(),
-            max_age: Duration::from_secs(60 * 60 * 24 * max(1, cfg.nats.queue_max_age)),
+            max_age,
             num_replicas: cfg.nats.replicas,
             max_bytes: cfg.nats.queue_max_size,
             ..Default::default()
