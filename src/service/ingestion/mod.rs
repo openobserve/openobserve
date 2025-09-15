@@ -142,7 +142,7 @@ pub fn apply_vrl_fn(
                     "{}/{:?} vrl failed at processing result {:?} on record {:?}. Returning original row.",
                     org_id, stream_name, err, row
                 );
-                log::warn!("{err_msg}");
+                log::warn!("{}", err_msg.get(0..250).unwrap_or(&err_msg));
                 (row, Some(err_msg))
             }
         },
@@ -159,7 +159,7 @@ pub fn apply_vrl_fn(
                 "{}/{:?} vrl runtime failed at getting result {:?} on record {:?}. Returning original row.",
                 org_id, stream_name, err, row
             );
-            log::warn!("{err_msg}");
+            log::warn!("{}", err_msg.get(0..250).unwrap_or(&err_msg));
             (row, Some(err_msg))
         }
     }
