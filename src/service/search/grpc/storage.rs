@@ -1086,6 +1086,10 @@ async fn search_tantivy_index(
             let row_ids_percent = row_ids.len() as f64 / parquet_file.meta.records as f64 * 100.0;
             if skip_threshold > 0 && row_ids_percent > skip_threshold as f64 {
                 // return empty file name means we need to add filter back and skip tantivy search
+                log::info!(
+                    "search->tantivy: file: {}, result percent {row_ids_percent}% is too large, back to datafusion",
+                    parquet_file.key
+                );
                 return Ok((
                     "".to_string(),
                     TantivyResult::RowIdsBitVec(row_ids_percent as usize, BitVec::EMPTY),
