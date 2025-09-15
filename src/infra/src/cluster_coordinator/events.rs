@@ -122,21 +122,31 @@ async fn create_stream() -> Result<()> {
 }
 
 async fn subscribe(tx: mpsc::Sender<CoordinatorEvent>) -> Result<()> {
-    log::info!("[COORDINATOR::EVENTS] subscribing to coordinator topic");
     let queue = queue::get_queue().await;
+    let mut reconnect = false;
     loop {
         if config::cluster::is_offline() {
             break;
         }
 
+        let deliver_policy = if reconnect {
+            queue::DeliverPolicy::All
+        } else {
+            queue::DeliverPolicy::New
+        };
+        log::info!(
+            "[COORDINATOR::EVENTS] subscribing to coordinator topic with deliver policy: {:?}",
+            deliver_policy
+        );
         let mut receiver: Arc<mpsc::Receiver<queue::Message>> = match queue
-            .consume(COORDINATOR_STREAM)
+            .consume(COORDINATOR_STREAM, Some(deliver_policy))
             .await
         {
             Ok(receiver) => receiver,
             Err(e) => {
                 log::error!("[COORDINATOR::EVENTS] failed to subscribe to coordinator topic: {e}");
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                reconnect = true;
                 continue;
             }
         };
@@ -176,6 +186,7 @@ async fn subscribe(tx: mpsc::Sender<CoordinatorEvent>) -> Result<()> {
                 },
                 None => {
                     log::error!("[COORDINATOR::EVENTS] coordinator topic closed");
+                    reconnect = true;
                     break;
                 }
             }

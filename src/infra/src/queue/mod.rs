@@ -25,9 +25,17 @@ use crate::errors::{Error, Result};
 pub mod nats;
 pub mod nop;
 
+#[derive(Debug)]
 pub enum RetentionPolicy {
     Interest,
     Limits,
+}
+
+#[derive(Debug)]
+pub enum DeliverPolicy {
+    All,
+    Last,
+    New,
 }
 
 static DEFAULT: OnceCell<Box<dyn Queue>> = OnceCell::const_new();
@@ -68,7 +76,11 @@ pub trait Queue: Sync + Send + 'static {
         retention_policy: RetentionPolicy,
     ) -> Result<()>;
     async fn publish(&self, topic: &str, value: Bytes) -> Result<()>;
-    async fn consume(&self, topic: &str) -> Result<Arc<mpsc::Receiver<Message>>>;
+    async fn consume(
+        &self,
+        topic: &str,
+        deliver_policy: Option<DeliverPolicy>,
+    ) -> Result<Arc<mpsc::Receiver<Message>>>;
     async fn purge(&self, topic: &str, sequence: usize) -> Result<()>;
 }
 

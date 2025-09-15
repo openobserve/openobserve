@@ -22,7 +22,7 @@ use config::{get_cluster_name, get_config};
 use futures::TryStreamExt;
 use tokio::{sync::mpsc, task::JoinHandle};
 
-use crate::{db::nats::get_nats_client, errors::*, queue::RetentionPolicy};
+use crate::{db::nats::get_nats_client, errors::*, queue};
 
 pub async fn init() -> Result<()> {
     Ok(())
@@ -63,11 +63,11 @@ impl Default for NatsQueue {
     }
 }
 
-impl From<RetentionPolicy> for jetstream::stream::RetentionPolicy {
-    fn from(retention_policy: RetentionPolicy) -> Self {
+impl From<queue::RetentionPolicy> for jetstream::stream::RetentionPolicy {
+    fn from(retention_policy: queue::RetentionPolicy) -> Self {
         match retention_policy {
-            RetentionPolicy::Interest => jetstream::stream::RetentionPolicy::Interest,
-            RetentionPolicy::Limits => jetstream::stream::RetentionPolicy::Limits,
+            queue::RetentionPolicy::Interest => jetstream::stream::RetentionPolicy::Interest,
+            queue::RetentionPolicy::Limits => jetstream::stream::RetentionPolicy::Limits,
         }
     }
 }
@@ -75,14 +75,14 @@ impl From<RetentionPolicy> for jetstream::stream::RetentionPolicy {
 #[async_trait]
 impl super::Queue for NatsQueue {
     async fn create(&self, topic: &str) -> Result<()> {
-        self.create_with_retention_policy(topic, RetentionPolicy::Limits)
+        self.create_with_retention_policy(topic, queue::RetentionPolicy::Limits)
             .await
     }
 
     async fn create_with_retention_policy(
         &self,
         topic: &str,
-        retention_policy: RetentionPolicy,
+        retention_policy: queue::RetentionPolicy,
     ) -> Result<()> {
         let cfg = config::get_config();
         let client = get_nats_client().await?;
@@ -112,7 +112,11 @@ impl super::Queue for NatsQueue {
         Ok(())
     }
 
-    async fn consume(&self, topic: &str) -> Result<Arc<mpsc::Receiver<super::Message>>> {
+    async fn consume(
+        &self,
+        topic: &str,
+        deliver_policy: Option<queue::DeliverPolicy>,
+    ) -> Result<Arc<mpsc::Receiver<super::Message>>> {
         let (tx, rx) = mpsc::channel(1024);
         let stream_name = format!("{}{}", self.prefix, format_key(topic));
         let consumer_name = self.consumer_name.clone();
@@ -131,7 +135,7 @@ impl super::Queue for NatsQueue {
                 } else {
                     None
                 },
-                deliver_policy: get_deliver_policy(),
+                deliver_policy: get_deliver_policy(deliver_policy),
                 ..Default::default()
             };
             let consumer = stream
@@ -168,7 +172,7 @@ impl super::Queue for NatsQueue {
                             stream_name,
                             e
                         );
-                        continue;
+                        break;
                     }
                 };
                 let message = super::Message::Nats(message);
@@ -189,7 +193,14 @@ impl super::Queue for NatsQueue {
     }
 }
 
-fn get_deliver_policy() -> DeliverPolicy {
+fn get_deliver_policy(deliver_policy: Option<queue::DeliverPolicy>) -> DeliverPolicy {
+    if let Some(deliver_policy) = deliver_policy {
+        return match deliver_policy {
+            queue::DeliverPolicy::All => DeliverPolicy::All,
+            queue::DeliverPolicy::Last => DeliverPolicy::Last,
+            queue::DeliverPolicy::New => DeliverPolicy::New,
+        };
+    }
     match get_config().nats.deliver_policy.to_lowercase().as_str() {
         "all" | "deliverall" | "deliver_all" => DeliverPolicy::All,
         "last" | "deliverlast" | "deliver_last" => DeliverPolicy::Last,

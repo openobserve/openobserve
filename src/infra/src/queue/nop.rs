@@ -19,7 +19,10 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use tokio::sync::mpsc;
 
-use crate::{errors::*, queue::RetentionPolicy};
+use crate::{
+    errors::*,
+    queue::{DeliverPolicy, RetentionPolicy},
+};
 
 pub async fn init() -> Result<()> {
     Ok(())
@@ -61,7 +64,11 @@ impl super::Queue for NopQueue {
         todo!()
     }
 
-    async fn consume(&self, _topic: &str) -> Result<Arc<mpsc::Receiver<super::Message>>> {
+    async fn consume(
+        &self,
+        _topic: &str,
+        _deliver_policy: Option<DeliverPolicy>,
+    ) -> Result<Arc<mpsc::Receiver<super::Message>>> {
         todo!()
     }
 
