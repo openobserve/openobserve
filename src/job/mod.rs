@@ -86,6 +86,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // Try to download the mmdb files, if its not disabled.
         tokio::task::spawn(async move { mmdb_downloader::run().await });
     }
+
     // cache users
     tokio::task::spawn(async move { db::user::watch().await });
     db::user::cache().await.expect("user cache failed");
