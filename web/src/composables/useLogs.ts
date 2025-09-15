@@ -328,7 +328,13 @@ const {
   fetchQueryDataWithHttpStream,
 } = useStreamingSearch();
 
-const searchPartitionMap = reactive<{ [key: string]: number }>({});
+
+type SearchPartition = {
+  partition: number;
+  chunks: Record<number, number>;
+};
+
+const searchPartitionMap = reactive<Record<string, SearchPartition>>({});
 
 const useLogs = () => {
   const store = useStore();
@@ -6011,7 +6017,7 @@ const useLogs = () => {
     // Scan-size and took time in histogram title
     // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
     // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
-    if((isPagination && searchPartitionMap[payload.traceId] === 1) || !appendResult){
+    if((isPagination && searchPartitionMap[payload.traceId].partition === 1) || !appendResult){
       searchObj.data.queryResults.hits = response.content.results.hits;
     } else if (appendResult) {
       searchObj.data.queryResults.hits.push(
@@ -6319,25 +6325,33 @@ const useLogs = () => {
     if(payload.type === "search" && response?.type === "search_response_hits") {
       const isStreamingAggs = response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs;
       const shouldAppendStreamingResults = isStreamingAggs ? !response.content?.results?.hits?.length : true;
+      searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition]++;
+      // If single partition has more than 1 chunk, then we need to append the results
+      const isChunkedHits = searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition] > 1;
 
-      handleStreamingHits(payload, response, payload.isPagination, (shouldAppendStreamingResults && searchPartitionMap[payload.traceId] > 1));
+      handleStreamingHits(payload, response, payload.isPagination, (shouldAppendStreamingResults && (searchPartitionMap[payload.traceId].partition > 1 || isChunkedHits)));
       return;
     }
 
     if(payload.type === "search" && response?.type === "search_response_metadata") {
       searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
       ? searchPartitionMap[payload.traceId]
-      : 0;
-      searchPartitionMap[payload.traceId]++;
+      : {
+        partition: 0,
+        chunks: {},
+      };
 
       const isStreamingAggs = response.content?.streaming_aggs;
       const shouldAppendStreamingResults = isStreamingAggs ? !response.content?.results?.hits?.length : true;
 
-      handleStreamingMetadata(payload, response, payload.isPagination, (shouldAppendStreamingResults && searchPartitionMap[payload.traceId] > 1));
+      searchPartitionMap[payload.traceId].partition++;
+      searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition] = 0;
+
+      handleStreamingMetadata(payload, response, payload.isPagination, (shouldAppendStreamingResults && searchPartitionMap[payload.traceId].partition > 1));
       return;
     }
 
-    if(payload.type === "histogram" && response?.type === "search_response_hits") {
+    if(payload.type === "histogram" && response?.type === "search_response_hits") {      
       handleHistogramStreamingHits(payload, response, payload.isPagination);
       return;
     }
@@ -6361,8 +6375,11 @@ const useLogs = () => {
     if (response.type === "search_response") {
       searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
       ? searchPartitionMap[payload.traceId]
-      : 0;
-      searchPartitionMap[payload.traceId]++;
+      : {
+        partition: 0,
+        chunks: {},
+      };
+      searchPartitionMap[payload.traceId].partition++;
 
       if (payload.type === "search") {
         handleLogsResponse(
@@ -6371,7 +6388,7 @@ const useLogs = () => {
           payload.traceId,
           response,
           !response.content?.streaming_aggs &&
-            searchPartitionMap[payload.traceId] > 1, // In aggregation query, we need to replace the results instead of appending
+            searchPartitionMap[payload.traceId].partition > 1, // In aggregation query, we need to replace the results instead of appending
         );
       }
 
