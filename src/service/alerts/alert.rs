@@ -862,7 +862,7 @@ impl AlertExt for Alert {
                 self.org_id, self.stream_type, self.stream_name, self.name
             )));
             search_event_ctx.alert_name = Some(self.name.clone());
-            
+
             self.query_condition
                 .evaluate_scheduled(
                     &self.org_id,
