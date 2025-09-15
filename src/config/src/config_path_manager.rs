@@ -34,11 +34,13 @@ pub fn set_config_file_path(path: PathBuf) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("Config file does not exist: {}", path.display()));
     }
     
+    let hash = super::calculate_config_file_hash(&path)?;
+    
     // Update the config manager
     {
         let mut manager = CONFIG_MANAGER.write().unwrap();
         manager.file_path = Some(path.clone());
-        manager.last_hash = None; // Reset hash when path changes
+        manager.last_hash = Some(hash); // Reset hash when path changes
     }
     
     log::info!("Config manager: Set CLI config file path to {:?}", path);
