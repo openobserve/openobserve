@@ -22,23 +22,22 @@ use hashbrown::HashMap;
 use infra::db::{ORM_CLIENT, connect_to_orm};
 use svix_ksuid::Ksuid;
 
+#[cfg(feature = "enterprise")]
+use crate::handler::request::search::utils::check_resource_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
         models::alerts::{
             requests::{
-                CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery, MoveAlertsRequestBody,
-                UpdateAlertRequestBody,
+                AlertBulkEnableRequest, CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery,
+                MoveAlertsRequestBody, UpdateAlertRequestBody,
             },
             responses::{
-                AlertBulkEnableRequest, AlertBulkEnableResponse, EnableAlertResponseBody,
-                GetAlertResponseBody, ListAlertsResponseBody,
+                AlertBulkEnableResponse, EnableAlertResponseBody, GetAlertResponseBody,
+                ListAlertsResponseBody,
             },
         },
-        request::{
-            dashboards::{get_folder, is_overwrite},
-            search::utils::check_resource_permissions,
-        },
+        request::dashboards::{get_folder, is_overwrite},
     },
     service::{
         alerts::alert::{self, AlertError},
@@ -423,7 +422,7 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
         ("org_id" = String, Path, description = "Organization name"),
         EnableAlertQuery,
     ),
-    request_body(content = Object, description = "Alert id list", content_type = "application/json"),
+    request_body(content = AlertBulkEnableRequest, description = "Alert id list", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
@@ -480,16 +479,17 @@ async fn enable_alert_bulk(
                 successful.push(id);
             }
             Err(e) => {
+                log::error!("error in enabling alert {id} : {e}");
                 unsuccessful.push(id);
                 err = Some(e.to_string());
             }
         }
     }
-    return MetaHttpResponse::json(AlertBulkEnableResponse {
+    MetaHttpResponse::json(AlertBulkEnableResponse {
         successful,
         unsuccessful,
         err,
-    });
+    })
 }
 
 /// TriggerAlert

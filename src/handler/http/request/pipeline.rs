@@ -19,11 +19,12 @@ use actix_web::{HttpRequest, HttpResponse, delete, get, http, post, put, web};
 use ahash::HashMap;
 use config::{ider, meta::pipeline::Pipeline};
 
+#[cfg(feature = "enterprise")]
+use crate::handler::request::search::utils::check_resource_permissions;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::{
-        models::pipelines::{PipelineBulkEnableRequest, PipelineBulkEnableResponse, PipelineList},
-        request::search::utils::check_resource_permissions,
+    handler::http::models::pipelines::{
+        PipelineBulkEnableRequest, PipelineBulkEnableResponse, PipelineList,
     },
     service::{db::pipeline::PipelineError, pipeline},
 };
@@ -381,14 +382,15 @@ pub async fn enable_pipeline_bulk(
                 successful.push(id);
             }
             Err(e) => {
+                log::error!("error in enabling pipeline {id} : {e}");
                 err = Some(e.to_string());
                 unsuccessful.push(id);
             }
         }
     }
-    return Ok(MetaHttpResponse::json(PipelineBulkEnableResponse {
+    Ok(MetaHttpResponse::json(PipelineBulkEnableResponse {
         successful,
         unsuccessful,
         err,
-    }));
+    }))
 }
