@@ -62,7 +62,7 @@ const useLogs = () => {
 
   const { refreshPartitionPagination, getPaginatedData } = usePagination();
 
-  const { buildSearch, isHistogramDataMissing } = useSearchStream();
+  const { buildSearch } = useSearchStream();
 
   const { getFunctions, getActions, getQueryData } = useSearchBar();
 
@@ -808,29 +808,18 @@ const useLogs = () => {
     restoreUrlQueryParams,
     updateStreams,
     handleRunQuery,
-    fnParsedSQL,
     reorderSelectedFields,
     getFilterExpressionByFieldType,
     extractValueQuery,
-    initialQueryPayload,
     loadJobData,
     enableRefreshInterval,
     routeToSearchSchedule,
-    updateFieldValues,
-    updateGridColumns,
-    buildSearch,
-    getHistogramTitle,
     processPostPaginationData,
     router,
     $q,
     clearSearchObj,
     loadVisualizeData,
     processHttpHistogramResults,
-    notificationMsg,
-    showErrorNotification,
-    setDateTime,
-    searchObj,
-    fieldValues,
   };
 };
 
