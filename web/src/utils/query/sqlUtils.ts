@@ -114,7 +114,7 @@ export const addLabelToSQlQuery = async (
 
   if (operator === "match_all") {
     condition = `match_all(${formatValue(value)})`;
-  } else if (operator === "str_match") {
+  } else if (operator === "str_match" || operator === "Contains") {
     condition = `str_match(${label}, ${formatValue(value)})`;
   } else if (operator === "str_match_ignore_case") {
     condition = `str_match_ignore_case(${label}, ${formatValue(value)})`;
