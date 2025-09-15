@@ -490,8 +490,8 @@ impl Condition {
                     Box::new(AllQuery {})
                 } else {
                     let mut tokens = o2_collect_tokens(value);
-                    let first_prefix = if value.starts_with("*") {
-                        tokens.remove(0)
+                    let first_prefix = if value.starts_with("*") && !tokens.is_empty() {
+                        Some(tokens.remove(0))
                     } else {
                         None
                     };
