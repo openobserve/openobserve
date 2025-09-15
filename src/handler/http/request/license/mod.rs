@@ -1,6 +1,7 @@
 use actix_web::{HttpResponse, get, post, web};
 use o2_enterprise::enterprise::license::{
-    LICENSE_DB_KEY, License, get_license, ingestion_used, license_expired, search_used,
+    LICENSE_DB_KEY, License, check_license, get_license, ingestion_used, license_expired,
+    search_used,
 };
 use serde::{Deserialize, Serialize};
 
@@ -47,12 +48,19 @@ pub async fn store_license(body: web::Bytes) -> HttpResponse {
         }
     };
 
-    match License::load_from_str(&req.key) {
-        Ok(_) => {}
+    let license = match License::load_from_str(&req.key) {
+        Ok(l) => l,
         Err(e) => {
             return HttpResponse::BadRequest().json(serde_json::json!({"message":e.to_string()}));
         }
-    }
+    };
+
+    let (k, license) = match check_license(&req.key, &license).await {
+        Ok(v) => v,
+        Err(e) => {
+            return HttpResponse::BadRequest().json(serde_json::json!({"message":e.to_string()}));
+        }
+    };
 
     let db = infra::db::get_db().await;
     db.put(LICENSE_DB_KEY, req.key.into(), false, None)
