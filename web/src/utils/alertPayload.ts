@@ -28,6 +28,11 @@ export interface PayloadFormData {
   stream_name: string;
   stream_type: string;
   uuid?: string;
+  updatedAt?: string;
+  createdAt?: string;
+  owner?: string;
+  lastTriggeredAt?: number;
+  lastEditedBy?: string;
 }
 
 export interface PayloadContext {
@@ -49,7 +54,7 @@ export const getAlertPayload = (
 
   payload.is_real_time = payload.is_real_time === "true";
 
-  payload.context_attributes = {};
+  payload.context_attributes = {} as any;
 
   payload.query_condition.type = payload.is_real_time
     ? "custom"
@@ -60,13 +65,13 @@ export const getAlertPayload = (
       payload.context_attributes[attr.key] = attr.value;
   });
 
-  payload.trigger_condition.threshold = parseInt(formData.trigger_condition.threshold);
+  payload.trigger_condition.threshold = parseInt(formData.trigger_condition.threshold as any);
 
-  payload.trigger_condition.period = parseInt(formData.trigger_condition.period);
+  payload.trigger_condition.period = parseInt(formData.trigger_condition.period as any);
 
-  payload.trigger_condition.frequency = parseInt(formData.trigger_condition.frequency);
+  payload.trigger_condition.frequency = parseInt(formData.trigger_condition.frequency as any);
 
-  payload.trigger_condition.silence = parseInt(formData.trigger_condition.silence);
+  payload.trigger_condition.silence = parseInt(formData.trigger_condition.silence as any);
 
   payload.description = formData.description.trim();
 
