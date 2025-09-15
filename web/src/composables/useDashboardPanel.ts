@@ -2490,7 +2490,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     return "";
   };
 
-  const sqlchart = () => {
+ const sqlchart = async () => {
     // STEP 1: first check if there is at least 1 field selected
     if (
       dashboardPanelData.data.queries[
@@ -2510,8 +2510,18 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
 
     // STEP 2: Now, continue if we have at least 1 field selected
-    // merge the fields list
+
+    // To build the SQL query
+    // 1. SELECT
+    // 2. FROM & Join query
+    // 3. Filter
+    // 4. Group by
+    // 5. Order by
+    // 6. Limit
+
     let query = "SELECT ";
+    // 1. SELECT
+    // merge the fields list
     const fields = [
       ...dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -2541,60 +2551,54 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       .flat()
       .filter((fieldObj: any) => !fieldObj.isDerived);
 
-    const filter = [
-      ...dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields?.filter.conditions,
-    ];
-    const array = fields.map((field, i) => {
-      let selector = "";
+    const array = fields
+      .map((field, i) => {
+        let selector = "";
 
-      // TODO: add aggregator
-      if (field?.functionName) {
-        switch (field?.functionName) {
-          case "count-distinct":
-            selector += `count(distinct(${field?.column}))`;
-            break;
-          case "p50":
-            selector += `approx_percentile_cont(${field?.column}, 0.5)`;
-            break;
-          case "p90":
-            selector += `approx_percentile_cont(${field?.column}, 0.9)`;
-            break;
-          case "p95":
-            selector += `approx_percentile_cont(${field?.column}, 0.95)`;
-            break;
-          case "p99":
-            selector += `approx_percentile_cont(${field?.column}, 0.99)`;
-            break;
-          case "histogram": {
-            // if interval is not null, then use it
-            if (field?.args && field?.args?.length && field?.args[0].value) {
-              selector += `${field?.functionName}(${field?.column}, '${field?.args[0]?.value}')`;
-            } else {
-              selector += `${field?.functionName}(${field?.column})`;
-            }
-            break;
-          }
-          default:
-            selector += `${field?.functionName}(${field?.column})`;
-            break;
+        const fieldExpression = buildSQLQueryFromInput(
+          field,
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.joins?.length
+            ? dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.stream
+            : "",
+        );
+
+        // Skip fields that return empty expressions
+        if (!fieldExpression) {
+          return null;
         }
-      } else {
-        selector += `${field?.column}`;
-      }
-      selector += ` as "${field?.alias}"${i == fields.length - 1 ? " " : ", "}`;
-      return selector;
-    });
+
+        selector += fieldExpression;
+        selector += ` as "${field?.alias}"${i == fields.length - 1 ? " " : ", "}`;
+        return selector;
+      })
+      .filter(Boolean); // Remove null entries
+
     query += array?.join("");
 
+    // 2. Stream, Join query
     // now add from stream name
     query += ` FROM "${
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields?.stream
-    }" `;
+    }" ${buildSQLJoinsFromInput(
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].joins,
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ]?.joins?.length
+        ? dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields?.stream
+        : "",
+    )}`;
 
+    // 3. Filter
     // Add the AND/OR condition logic
     const filterData =
       dashboardPanelData.data.queries[
@@ -2604,6 +2608,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const whereClause = buildWhereClause(filterData);
     query += whereClause;
 
+    // 4. Group by
     // add group by statement
     const xAxisAlias = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
@@ -2714,6 +2719,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     // append with query by joining array with comma
     query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : "";
 
+    // 6. Limit
     // append limit
     // if limit is less than or equal to 0 then don't add
     const queryLimit =
