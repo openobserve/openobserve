@@ -255,7 +255,7 @@ pub mod remote {
         log::info!("[ENRICHMENT::STORAGE] Running enrichment table merge job");
 
         config::spawn_pausable_job!(
-            "enchrichment_table_merge_job",
+            "enrichment_table_merge_job",
             config::get_config().enrichment_table.merge_interval,
             {
                 let Ok(org_table_pairs) = database::list().await else {

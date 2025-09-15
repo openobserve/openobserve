@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::path::PathBuf;
+
 use config::spawn_pausable_job;
 
 /// This function will start the config file watcher and load the global config
