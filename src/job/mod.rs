@@ -31,6 +31,7 @@ mod alert_manager;
 #[cfg(feature = "enterprise")]
 mod cipher;
 mod compactor;
+pub mod config_watcher;
 mod file_downloader;
 pub(crate) mod files;
 mod flatten_compactor;
@@ -225,6 +226,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
+    config_watcher::run();
     tokio::task::spawn(async move { files::run().await });
     tokio::task::spawn(async move { stats::run().await });
     tokio::task::spawn(async move { compactor::run().await });
