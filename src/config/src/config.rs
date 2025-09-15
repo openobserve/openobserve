@@ -769,8 +769,6 @@ pub struct Common {
     pub feature_query_infer_schema: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
     pub feature_query_exclude_all: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_WITHOUT_INDEX", default = false)]
-    pub feature_query_without_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
     pub feature_query_remove_filter_with_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
@@ -898,7 +896,7 @@ pub struct Common {
     // MMDB
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
-    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = false)]
+    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = true)]
     pub mmdb_disable_download: bool,
     #[env_config(name = "ZO_MMDB_UPDATE_DURATION_DAYS", default = 30)] // default 30 days
     pub mmdb_update_duration_days: u64,
@@ -1726,6 +1724,8 @@ pub struct Nats {
     pub subscription_capacity: usize,
     #[env_config(name = "ZO_NATS_QUEUE_MAX_AGE", default = 60)] // days
     pub queue_max_age: u64,
+    #[env_config(name = "ZO_NATS_EVENT_MAX_AGE", default = 3600)] // seconds
+    pub event_max_age: u64,
     #[env_config(
         name = "ZO_NATS_QUEUE_MAX_SIZE",
         help = "The maximum size of the queue in MB, default is 2048MB",

@@ -19,4 +19,3 @@ pub mod add_timestamp;
 pub mod cipher;
 pub mod limit_join_right_side;
 pub mod rewrite_histogram;
-pub mod rewrite_match;
