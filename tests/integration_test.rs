@@ -137,11 +137,11 @@ mod tests {
         config::init().await.unwrap();
         // init infra
         migration::init_db().await.unwrap();
-        infra::init().await.unwrap();
         // ensure database tables are created
         infra::db::create_table().await.unwrap();
         // db migration steps, since it's separated out
         infra::table::migrate().await.unwrap();
+        infra::init().await.unwrap();
         openobserve::common::infra::init().await.unwrap();
         // ingester init
         ingester::init().await.unwrap();

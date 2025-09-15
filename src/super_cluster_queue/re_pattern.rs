@@ -15,7 +15,7 @@
 
 use config::meta::stream::{PatternAssociation, UpdateSettingsWrapper};
 use infra::{
-    cluster_coordinator::get_coordinator,
+    coordinator::get_coordinator,
     errors::{DbError, Error, Result},
     table::re_pattern_stream_map::{ApplyPolicy, PatternAssociationEntry, PatternPolicy},
 };

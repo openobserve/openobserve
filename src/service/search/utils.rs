@@ -15,7 +15,7 @@
 
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use config::meta::search::ScanStats;
+use config::meta::{inverted_index::UNKNOWN_NAME, search::ScanStats};
 use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
 use sqlparser::ast::{BinaryOperator, Expr};
 use tokio::sync::Mutex;
@@ -173,7 +173,7 @@ pub fn get_field_name(expr: &Expr) -> String {
     match expr {
         Expr::Identifier(ident) => trim_quotes(ident.to_string().as_str()),
         Expr::CompoundIdentifier(ident) => trim_quotes(ident[1].to_string().as_str()),
-        _ => unreachable!(),
+        _ => UNKNOWN_NAME.to_string(),
     }
 }
 

@@ -1085,13 +1085,55 @@ async fn handle_derived_stream_triggers(
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
             log::info!(
-                "skipping pipeline {} id {} in org {} because free trial expiry",
+                "[Scheduler trace_id {scheduler_trace_id}] Skipping pipeline {} id {} in org {} because free trial expiry",
                 pipeline.name,
                 pipeline_id,
                 trigger.org
             );
+            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
+            db::scheduler::update_trigger(new_trigger).await?;
             return Ok(());
         }
+    }
+
+    if !pipeline.enabled {
+        // Pipeline not enabled, check again in 5 mins
+        let msg = format!(
+            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
+        );
+        new_trigger.next_run_at += Duration::try_minutes(5)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+        let trigger_data_stream = TriggerData {
+            _timestamp: now_micros(),
+            org: new_trigger.org.clone(),
+            module: TriggerDataType::DerivedStream,
+            key: new_trigger.module_key.clone(),
+            next_run_at: new_trigger.next_run_at,
+            is_realtime: new_trigger.is_realtime,
+            is_silenced: new_trigger.is_silenced,
+            status: TriggerDataStatus::Failed,
+            start_time: 0,
+            end_time: 0,
+            retries: new_trigger.retries,
+            error: Some(msg.clone()),
+            success_response: None,
+            is_partial: None,
+            delay_in_secs: None,
+            evaluation_took_in_secs: None,
+            source_node: Some(LOCAL_NODE.name.clone()),
+            query_took: None,
+            scheduler_trace_id: Some(scheduler_trace_id.clone()),
+            time_in_queue_ms: Some(time_in_queue),
+            skipped_alerts_count: None,
+        };
+        log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
+        new_trigger_data.reset();
+        new_trigger.data = new_trigger_data.to_json_string();
+        db::scheduler::update_trigger(new_trigger).await?;
+        publish_triggers_usage(trigger_data_stream).await;
+        return Ok(());
     }
 
     let Some(derived_stream) = pipeline.get_derived_stream() else {
@@ -1156,6 +1198,17 @@ async fn handle_derived_stream_triggers(
         .unwrap()
         .num_microseconds()
         .unwrap();
+    let aligned_supposed_to_be_run_at = if !is_cron_frequency {
+        TriggerCondition::align_time(
+            supposed_to_be_run_at,
+            derived_stream.tz_offset,
+            Some(derived_stream.trigger_condition.period * 60),
+        )
+    } else {
+        // For cron frequency, we don't need to align the end time as it is already aligned (the
+        // cron crate takes care of it)
+        TriggerCondition::align_time(supposed_to_be_run_at, derived_stream.tz_offset, None)
+    };
 
     let (mut start, mut end) = if derived_stream.start_at.is_some() && trigger.data.is_empty() {
         (derived_stream.start_at, supposed_to_be_run_at)
@@ -1170,7 +1223,8 @@ async fn handle_derived_stream_triggers(
         // data for the period from 5:05pm to 5:15pm. Which is to cover the skipped
         // period from 5:05pm to 5:15pm.
         log::debug!(
-            "supposed_to_be_run_at: {}, t0 + supposed_to_be_run_at: {}, supposed_to_be_run_smaller: {}",
+            "[SCHEDULER trace_id {scheduler_trace_id}] module key: {}, supposed_to_be_run_at: {}, t0 + supposed_to_be_run_at: {}, supposed_to_be_run_smaller: {}",
+            new_trigger.module_key,
             chrono::DateTime::from_timestamp_micros(supposed_to_be_run_at)
                 .unwrap()
                 .time(),
@@ -1202,7 +1256,7 @@ async fn handle_derived_stream_triggers(
         (None, supposed_to_be_run_at)
     };
     // For derived stream, period is in minutes, so we need to convert it to seconds for align_time
-    let aligned_curr_time = if !is_cron_frequency {
+    let aligned_end_time = if !is_cron_frequency {
         // For non-cron frequency, we need to align the current time so that the end_time is
         // divisible by the period For example, if the current time is 5:19pm, period is 5
         // mins, and delay is 4mins (supposed to be run at 5:15pm), we need to ingest data
@@ -1220,81 +1274,6 @@ async fn handle_derived_stream_triggers(
         // cron crate takes care of it)
         TriggerCondition::align_time(end, derived_stream.tz_offset, None)
     };
-    // conditionally modify supposed_to_be_run_at
-    if start.is_none_or(|t0| t0 < aligned_curr_time) {
-        end = aligned_curr_time;
-    }
-
-    if !pipeline.enabled {
-        // Pipeline not enabled, check again in 5 mins
-        let msg = format!(
-            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
-        );
-        new_trigger.next_run_at += Duration::try_minutes(5)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
-        let trigger_data_stream = TriggerData {
-            _timestamp: now_micros(),
-            org: new_trigger.org.clone(),
-            module: TriggerDataType::DerivedStream,
-            key: new_trigger.module_key.clone(),
-            next_run_at: new_trigger.next_run_at,
-            is_realtime: new_trigger.is_realtime,
-            is_silenced: new_trigger.is_silenced,
-            status: TriggerDataStatus::Skipped,
-            start_time: 0,
-            end_time: 0,
-            retries: new_trigger.retries,
-            error: Some(msg.clone()),
-            success_response: None,
-            is_partial: None,
-            delay_in_secs: None,
-            evaluation_took_in_secs: None,
-            source_node: Some(LOCAL_NODE.name.clone()),
-            query_took: None,
-            scheduler_trace_id: Some(scheduler_trace_id.clone()),
-            time_in_queue_ms: Some(time_in_queue),
-            skipped_alerts_count: None,
-        };
-        log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
-        // new_trigger_data.reset();
-        // new_trigger.data = new_trigger_data.to_json_string();
-        db::scheduler::update_trigger(new_trigger).await?;
-        publish_triggers_usage(trigger_data_stream).await;
-        return Ok(());
-    }
-
-    // In case the scheduler background job (watch_timeout) updates the trigger retries
-    // (not through this handler), we need to skip to the next run at but with the same
-    // trigger start time. If we don't handle here, in that case, the `clean_complete`
-    // background job will clear this job as it has reached max retries.
-    if trigger.retries >= max_retries {
-        log::info!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream trigger: {}/{} has reached maximum possible retries. Skipping to next run",
-            new_trigger.org,
-            new_trigger.module_key
-        );
-        // Go to the next nun at, but use the same trigger start time
-        new_trigger.next_run_at = derived_stream
-            .trigger_condition
-            .get_next_trigger_time_non_aligned(
-                false,
-                derived_stream.tz_offset,
-                false,
-                Some(trigger.next_run_at),
-            )?;
-        // Start over next time
-        new_trigger.retries = 0;
-        db::scheduler::update_trigger(new_trigger).await?;
-        return Ok(());
-    }
-
-    log::debug!(
-        "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream: querying for time range: start_time {}, end_time {}.",
-        start.unwrap_or_default(),
-        end,
-    );
 
     let mut trigger_data_stream = TriggerData {
         _timestamp: now_micros(),
@@ -1323,6 +1302,76 @@ async fn handle_derived_stream_triggers(
         time_in_queue_ms: Some(time_in_queue),
         skipped_alerts_count: None,
     };
+
+    // conditionally modify supposed_to_be_run_at
+    if start.is_none_or(|t0| t0 < aligned_end_time) {
+        end = aligned_end_time;
+    } else {
+        // either t0 = aligned_end_time or t0 > aligned_end_time
+        // in both cases, we need to skip to next run because, we should always use
+        // aligned_curr_time as the end time
+        // Invalid timerange, most probably due to non-zero delay
+        // Don't do any further processing, just skip to next run
+        let start_time = start.unwrap();
+        log::warn!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] module key: {}, Invalid timerange. Skipping to next run. start: {}, end: {}",
+            new_trigger.module_key,
+            start_time,
+            end,
+        );
+        new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
+            false,
+            derived_stream.tz_offset,
+            false,
+            Some(trigger.next_run_at),
+        )?;
+        trigger_data_stream.status = TriggerDataStatus::Skipped;
+        trigger_data_stream.end_time = aligned_end_time;
+        trigger_data_stream.next_run_at = new_trigger.next_run_at;
+        trigger_data_stream.start_time = start_time;
+        trigger_data_stream.error = Some(format!(
+            "Invalid timerange - start: {start_time}, end: {end}, should be fixed in the next run"
+        ));
+        db::scheduler::update_trigger(new_trigger).await?;
+        publish_triggers_usage(trigger_data_stream).await;
+        return Ok(());
+    }
+
+    // In case the scheduler background job (watch_timeout) updates the trigger retries
+    // (not through this handler), we need to skip to the next run at but with the same
+    // trigger start time. If we don't handle here, in that case, the `clean_complete`
+    // background job will clear this job as it has reached max retries.
+    if trigger.retries >= max_retries {
+        log::info!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream trigger: {}/{} has reached maximum possible retries. Skipping to next run",
+            new_trigger.org,
+            new_trigger.module_key
+        );
+        // Go to the next nun at, but use the same trigger start time
+        new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
+            false,
+            derived_stream.tz_offset,
+            false,
+            Some(trigger.next_run_at),
+        )?;
+        // Start over next time
+        new_trigger.retries = 0;
+        db::scheduler::update_trigger(new_trigger).await?;
+        return Ok(());
+    }
+
+    log::debug!(
+        "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream: {} querying for time range: start_time {}, end_time {}.",
+        new_trigger.module_key,
+        start.unwrap_or_default(),
+        end,
+    );
+
+    // end can change due to delay feature, so we need to update the start and end time
+    if start.is_none() {
+        trigger_data_stream.start_time = end - period_num_microseconds;
+    }
+    trigger_data_stream.end_time = end;
 
     // evaluate trigger and configure trigger next run time
     match derived_stream
@@ -1551,7 +1600,7 @@ async fn handle_derived_stream_triggers(
     if !(trigger_data_stream.status == TriggerDataStatus::Failed
         && new_trigger.retries < max_retries)
     {
-        let need_to_catch_up = end < supposed_to_be_run_at;
+        let need_to_catch_up = end < aligned_supposed_to_be_run_at;
         // If the trigger didn't fail, we need to reset the `retries` count.
         // Only cumulative failures should be used to check with `max_retries`
         if trigger_data_stream.status != TriggerDataStatus::Failed {

@@ -1197,7 +1197,10 @@ const validateStreamFields = (
   const customQueryXFieldError = panelData?.data?.queries?.[
     queryIndex
   ]?.fields?.x?.filter(
-    (it: any) => !allStreamFields.find((i: any) => i.name == it.column),
+    (it: any) =>
+      !allStreamFields.find(
+        (i: any) => i.name.toLowerCase() == it.column.toLowerCase(),
+      ),
   );
 
   if (customQueryXFieldError.length) {
@@ -1212,7 +1215,10 @@ const validateStreamFields = (
   const customQueryYFieldError = panelData?.data?.queries?.[
     queryIndex
   ]?.fields?.y?.filter(
-    (it: any) => !allStreamFields.find((i: any) => i.name == it.column),
+    (it: any) =>
+      !allStreamFields.find(
+        (i: any) => i.name.toLowerCase() == it.column.toLowerCase(),
+      ),
   );
 
   if (customQueryYFieldError.length) {

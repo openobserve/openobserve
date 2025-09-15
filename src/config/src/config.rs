@@ -769,8 +769,6 @@ pub struct Common {
     pub feature_query_infer_schema: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
     pub feature_query_exclude_all: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_WITHOUT_INDEX", default = false)]
-    pub feature_query_without_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
     pub feature_query_remove_filter_with_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
@@ -898,7 +896,7 @@ pub struct Common {
     // MMDB
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
-    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = false)]
+    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = true)]
     pub mmdb_disable_download: bool,
     #[env_config(name = "ZO_MMDB_UPDATE_DURATION_DAYS", default = 30)] // default 30 days
     pub mmdb_update_duration_days: u64,
@@ -1226,8 +1224,6 @@ pub struct Limit {
     pub ingest_allowed_in_future: i64,
     #[env_config(name = "ZO_INGEST_FLATTEN_LEVEL", default = 3)] // default flatten level
     pub ingest_flatten_level: u32,
-    #[env_config(name = "ZO_IGNORE_FILE_RETENTION_BY_STREAM", default = false)]
-    pub ignore_file_retention_by_stream: bool,
     #[env_config(name = "ZO_LOGS_FILE_RETENTION", default = "hourly")]
     pub logs_file_retention: String,
     #[env_config(name = "ZO_TRACES_FILE_RETENTION", default = "hourly")]
@@ -1515,8 +1511,9 @@ pub struct Compact {
     pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
     pub blocked_orgs: String,
-    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_HISTORY", default = false)]
-    pub data_retention_history: bool,
+    #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_MODE", default = "deleted")]
+    // "history" "deleted" "none"
+    pub file_list_deleted_mode: String,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
         default = 0,
@@ -1727,12 +1724,20 @@ pub struct Nats {
     pub subscription_capacity: usize,
     #[env_config(name = "ZO_NATS_QUEUE_MAX_AGE", default = 60)] // days
     pub queue_max_age: u64,
+    #[env_config(name = "ZO_NATS_EVENT_MAX_AGE", default = 3600)] // seconds
+    pub event_max_age: u64,
     #[env_config(
         name = "ZO_NATS_QUEUE_MAX_SIZE",
         help = "The maximum size of the queue in MB, default is 2048MB",
         default = 2048
     )]
     pub queue_max_size: i64,
+    #[env_config(
+        name = "ZO_NATS_V211_SUPPORT",
+        help = "Support NATS v2.11.x",
+        default = false
+    )]
+    pub v211_support: bool,
 }
 
 #[derive(Debug, Default, EnvConfig)]

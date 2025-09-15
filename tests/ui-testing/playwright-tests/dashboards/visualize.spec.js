@@ -138,7 +138,7 @@ test.describe("logs testcases", () => {
     // Reload the page
     await page.reload();
     // Verify the field is empty
-    await expect(page.locator(".cm-line").first()).toBeEmpty();
+    await expect(page.locator(".view-line").first()).toBeEmpty();
   });
 
   test.skip("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
@@ -197,7 +197,7 @@ test.describe("logs testcases", () => {
 
     const queryEditor = page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole("textbox");
+      .locator(".monaco-editor");
     await expect(queryEditor).toBeVisible();
 
     // Step 2: Fill and apply the initial query
@@ -575,13 +575,13 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.openVisualiseTab();
 
     // Step 7: Verify quick mode toggle is true
-    const quickModeState = await pm.logsVisualise.verifyQuickModeToggle(true);
-    expect(quickModeState).toBe(true);
+    const quickModeState = await pm.logsVisualise.verifyQuickModeToggle(false);
+    expect(quickModeState).toBe(false);
 
     // Additional assertion using Playwright's expect for the toggle state
     const quickModeToggle = page.locator(
       '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
     );
-    await expect(quickModeToggle).toHaveAttribute("aria-checked", "true");
+    await expect(quickModeToggle).toHaveAttribute("aria-checked", "false");
   });
 });
