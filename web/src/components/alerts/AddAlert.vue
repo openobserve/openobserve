@@ -482,6 +482,9 @@ import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
+import {
+  generateSqlQuery,
+} from "@/utils/alertQueryBuilder";
 
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import cronParser from "cron-parser";
@@ -858,7 +861,7 @@ export default defineComponent({
 
     const previewAlert = async () => {
       if (getSelectedTab.value === "custom"){
-        previewQuery.value = generateSqlQuery();
+        previewQuery.value = generateSqlQueryLocal();
 
       }
       else if (getSelectedTab.value === "sql")
@@ -867,7 +870,7 @@ export default defineComponent({
         previewQuery.value = formData.value.query_condition.promql.trim();
 
       if (formData.value.is_real_time === "true") {
-        previewQuery.value = generateSqlQuery();
+        previewQuery.value = generateSqlQueryLocal();
       }
 
       await nextTick();
@@ -876,174 +879,16 @@ export default defineComponent({
       }
     };
 
-    const getFormattedCondition = (
-      column: string,
-      operator: string,
-      value: number | string,
-    ) => {
-      let condition = "";
-      switch (operator) {
-        case "=":
-        case "<>":
-        case "<":
-        case ">":
-        case "<=":
-        case ">=":
-          condition = column + ` ${operator} ${value}`;
-          break;
-          //this is done because when we get from BE the response includes the operator in lowercase
-          //so we need to handle it separately
-        case "contains":
-          condition = column + ` LIKE '%${value}%'`;
-          break;
-        //this is done because when we get from BE the response includes the operator in lowercase and converted NotContains to not_contains
-        //so we need to handle it separately
-        case "not_contains":
-          condition = column + ` NOT LIKE '%${value}%'`;
-          break;
-          //this is done because in the FE we are not converting the operator to lowercase
-          //so we need to handle it separately
-        case 'Contains':
-          condition = column + ` LIKE '%${value}%'`;
-          break;
-          //this is done because in the FE we are not converting the operator to lowercase
-        case 'NotContains':
-          condition = column + ` NOT LIKE '%${value}%'`;
-          break;
-        default:
-          condition = column + ` ${operator} ${value}`;
-          break;
-      }
-
-      return condition;
-    };
-
-    //this method is used to generate the where clause
-    //for new format of conditions we need to iterate over the items and get the conditions
-    //and then we need to format the conditions
-    // then we need to return the where clause
-
-    function generateWhereClause(group: any, streamFieldsMap: any) {
-      //this method is used to format the value
-      //if the value is a number or a string and the operator is contains or not contains then we need to return the value as it is
-      //else we need to return the value as a string and add single quotes to it
-      function formatValue(column: any, operator: any, value: any) {
-        return streamFieldsMap[column]?.type === "Int64" ||
-          operator === "contains" ||
-          operator === "not_contains" ||
-          operator === "Contains" ||
-          operator === "NotContains"
-          ? value
-          : `'${value}'`;
-      }
-
-      //this method is used to format the condition
-      //if the column and operator and value are present then we need to return the condition
-      //else we need to return an empty string
-      function formatCondition(column: any, operator: any, value: any) {
-        return `${column} ${operator} ${value}`;
-      }
-
-      //this method is used to parse the group
-      //if the group is not present or the items are not present then we need to return an empty string
-      //else we need to iterate over the items and get the conditions
-      //and then we need to return the where clause
-      function parseGroup(groupNode: any) {
-        if (!groupNode || !Array.isArray(groupNode.items)) return "";
-
-        const parts = groupNode.items.map((item: any) => {
-          // Nested group
-          if (item.items && Array.isArray(item.items)) {
-            return `(${parseGroup(item)})`;
-          }
-
-          // Single condition
-          if (item.column && item.operator && item.value !== undefined) {
-            const formattedValue = formatValue(item.column, item.operator, item.value);
-              return getFormattedCondition(item.column, item.operator, formattedValue);
-          }
-
-          return "";
-        }).filter(Boolean);
-
-        return parts.join(` ${groupNode.label.toUpperCase()} `);
-      }
-
-      //this method is used to generate the where clause
-
-      const clause = parseGroup(group);
-      return clause.trim().length ? "WHERE " + clause : "";
-  }
 
 
-    const generateSqlQuery = () => {
-      // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, COUNT(*) as zo_sql_val FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC
 
-      // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, avg(action_error_count) as zo_sql_val, geo_info_city FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key,geo_info_city ORDER BY zo_sql_key ASC;
-      let query = `SELECT histogram(${
+    const generateSqlQueryLocal = () => {
+      return generateSqlQuery(
+        formData.value,
+        streamFieldsMap.value,
+        isAggregationEnabled.value,
         store.state.zoConfig.timestamp_column || "_timestamp"
-      }) AS zo_sql_key,`;
-      //this method is used to generate the where clause
-      //previously it was just iterating over the conditions and getting the where clause
-      //now we are using the new format of conditions and getting the where clause using generateWhereClause method
-      let whereClause = generateWhereClause(formData.value.query_condition.conditions, streamFieldsMap);
-
-      if (!isAggregationEnabled.value) {
-        query +=
-          ` COUNT(*) as zo_sql_val FROM \"${formData.value.stream_name}\" ` +
-          whereClause +
-          " GROUP BY zo_sql_key ORDER BY zo_sql_key ASC";
-      } else {
-        const aggFn = formData.value.query_condition.aggregation.function;
-        const column = formData.value.query_condition.aggregation.having.column;
-
-        const isAggValid = aggFn?.trim()?.length && column?.trim()?.length;
-
-        let groupByAlias = "";
-        let groupByCols: string[] = [];
-        formData.value.query_condition.aggregation.group_by.forEach(
-          (column: any) => {
-            if (column.trim().length) groupByCols.push(column);
-          },
-        );
-
-        let concatGroupBy = "";
-        if (groupByCols.length) {
-          groupByAlias = ", x_axis_2";
-          concatGroupBy = `, concat(${groupByCols.join(
-            ",' : ',",
-          )}) as x_axis_2`;
-        }
-
-        const percentileFunctions: any = {
-          p50: 0.5,
-          p75: 0.75,
-          p90: 0.9,
-          p95: 0.95,
-          p99: 0.99,
-        };
-
-        if (isAggValid) {
-          if (percentileFunctions[aggFn]) {
-            query +=
-              ` approx_percentile_cont(${column}, ${percentileFunctions[aggFn]}) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
-              whereClause +
-              ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
-          } else {
-            query +=
-              ` ${aggFn}(${column}) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
-              whereClause +
-              ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
-          }
-        } else {
-          query +=
-            ` COUNT(*) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
-            whereClause +
-            ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
-        }
-      }
-
-      return query;
+      );
     };
 
     const debouncedPreviewAlert = debounce(previewAlert, 500);
@@ -1743,8 +1588,7 @@ export default defineComponent({
       saveAlertJson,
       validationErrors,
       originalStreamFields,
-      generateSqlQuery,
-      generateWhereClause,
+      generateSqlQuery: generateSqlQueryLocal,
       track,
     };
   },
