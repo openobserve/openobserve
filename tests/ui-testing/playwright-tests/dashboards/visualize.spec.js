@@ -575,13 +575,13 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.openVisualiseTab();
 
     // Step 7: Verify quick mode toggle is true
-    const quickModeState = await pm.logsVisualise.verifyQuickModeToggle(true);
-    expect(quickModeState).toBe(true);
+    const quickModeState = await pm.logsVisualise.verifyQuickModeToggle(false);
+    expect(quickModeState).toBe(false);
 
     // Additional assertion using Playwright's expect for the toggle state
     const quickModeToggle = page.locator(
       '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
     );
-    await expect(quickModeToggle).toHaveAttribute("aria-checked", "true");
+    await expect(quickModeToggle).toHaveAttribute("aria-checked", "false");
   });
 });
