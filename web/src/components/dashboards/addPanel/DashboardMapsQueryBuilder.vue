@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.layout.currentQueryIndex
                           ].customQuery
                         "
+                        :chartType="dashboardPanelData.data.type"
                       />
                     </div>
                   </div>
@@ -206,6 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.layout.currentQueryIndex
                           ].customQuery
                         "
+                        :chartType="dashboardPanelData.data.type"
                       />
                     </div>
                   </div>

@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :modelValue="modelValue"
           @update:modelValue="(newValue) => emit('update:modelValue', newValue)"
           :allowAggregation="false"
+          :chartType="chartType"
         />
       </div>
     </div>
@@ -62,6 +63,10 @@ export default defineComponent({
     customQuery: {
       type: Boolean,
       default: false,
+    },
+    chartType: {
+      type: String,
+      default: "bar",
     },
   },
   setup(props, { emit }) {
