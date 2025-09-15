@@ -82,29 +82,9 @@ const useLogs = () => {
     generateHistogramData,
     generateHistogramSkeleton,
     getHistogramQueryData,
+    isHistogramEnabled,
   } = useHistogram();
 
-  const { refreshPartitionPagination, getPaginatedData } = usePagination();
-
-  const { buildSearch } = useSearchStream();
-
-  const { getFunctions, getActions, getQueryData } = useSearchBar();
-
-  const {
-    fnParsedSQL,
-    fnUnparsedSQL,
-    extractTimestamps,
-    addTransformToQuery,
-    isActionsEnabled,
-    showCancelSearchNotification,
-    isTimestampASC,
-  } = logsUtils();
-
-  const {getHistogramTitle,
-  generateHistogramData,
-  generateHistogramSkeleton,
-  getHistogramQueryData,
-  isHistogramEnabled,} = useHistogram();
   const { refreshPartitionPagination, getPaginatedData } = usePagination();
 
   const { buildSearch } = useSearchStream();

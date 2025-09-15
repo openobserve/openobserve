@@ -44,11 +44,6 @@ export const useSearchAround = () => {
     shouldAddFunctionToSearch,
   } = logsUtils();
 
-  const { fnParsedSQL,
-  fnUnparsedSQL,
-  addTraceId,
-  removeTraceId, } = logsUtils();
-
   /**
    * Performs a search around operation to fetch logs data around a specific timestamp or log entry.
    *

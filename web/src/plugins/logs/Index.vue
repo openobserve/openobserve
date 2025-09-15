@@ -596,8 +596,6 @@ export default defineComponent({
 
     const { getStream } = useStreams();
 
-    const { getStream } = useStreams();
-
     const {
       fnParsedSQL,
       fnUnparsedSQL,
@@ -2333,7 +2331,6 @@ export default defineComponent({
       processHttpHistogramResults,
       searchResponseForVisualization,
       shouldUseHistogramQuery,
-      processHttpHistogramResults,
       clearSchemaCache,
     };
   },
