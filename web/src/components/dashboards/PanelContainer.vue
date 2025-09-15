@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
           size="sm"
           padding="1px"
-          @click="onRefreshPanel"
+          @click="() => onRefreshPanel(false)"
           title="Refresh Panel"
           data-test="dashboard-panel-refresh-panel-btn"
           :color="variablesDataUpdated ? 'warning' : ''"
@@ -304,6 +304,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item-section>
             </q-item>
             <q-item
+              v-if="config.isEnterprise === 'true'"
+              clickable
+              v-close-popup="true"
+              @click="onPanelModifyClick('Refresh')"
+            >
+              <q-item-section>
+                <q-item-label
+                  data-test="dashboard-refresh-without-cache"
+                  class="q-pa-sm"
+                  >Refresh Cache & Reload</q-item-label
+                >
+              </q-item-section>
+            </q-item>
+            <q-item
               clickable
               v-close-popup="true"
               @click="onPanelModifyClick('MovePanel')"
@@ -336,6 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :tabName="props.tabName"
       :dashboardName="props.dashboardName"
       :folderName="props.folderName"
+      :shouldRefreshWithoutCache="props.shouldRefreshWithoutCache"
       @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
       @limit-number-of-series-warning-message-update="
@@ -409,6 +424,7 @@ import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
+import config from "@/aws-exports";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -446,6 +462,7 @@ export default defineComponent({
     "tabName",
     "dashboardName",
     "folderName",
+    "shouldRefreshWithoutCache",
   ],
   components: {
     PanelSchemaRenderer,
@@ -772,7 +789,7 @@ export default defineComponent({
       return newRunId;
     };
 
-    const onRefreshPanel = async () => {
+    const onRefreshPanel = async (shouldRefreshWithoutCache=false) => {
       // Need to generate a new run id when refreshing the panel
       generateNewDashboardRunId();
 
@@ -780,7 +797,7 @@ export default defineComponent({
 
       isPanelLoading.value = true;
       try {
-        await emit("refreshPanelRequest", props.data.id);
+        await emit("refreshPanelRequest", props.data.id, shouldRefreshWithoutCache);
       } finally {
         isPanelLoading.value = false;
       }
@@ -904,6 +921,7 @@ export default defineComponent({
       handleLimitNumberOfSeriesWarningMessageUpdate,
       isPartialData,
       handleIsPartialDataUpdate,
+      config,
     };
   },
   methods: {
@@ -920,6 +938,8 @@ export default defineComponent({
         this.confirmMovePanelDialog = true;
       } else if (evt == "EditLayout") {
         this.$emit("onEditLayout", this.props.data.id);
+      } else if (evt == "Refresh") {
+        this.onRefreshPanel(true);
       } else {
       }
     },

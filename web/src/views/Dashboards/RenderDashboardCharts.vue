@@ -64,6 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             currentTimeObj['__global'] ||
             {}
           "
+          :shouldRefreshWithoutCache="
+            (panels[0]?.id ? shouldRefreshWithoutCacheObj[panels[0].id] : undefined) || false
+          "
           :variablesData="
             currentVariablesDataRef[panels[0].id] ||
             currentVariablesDataRef['__global']
@@ -116,6 +119,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :reportId="reportId"
               :selectedTimeDate="
                 currentTimeObj[item.id] || currentTimeObj['__global'] || {}
+              "
+              :shouldRefreshWithoutCache="
+                shouldRefreshWithoutCacheObj[item.id] || false
               "
               :variablesData="
                 currentVariablesDataRef[item.id] ||
@@ -236,6 +242,7 @@ export default defineComponent({
     folderId: {},
     reportId: {},
     currentTimeObj: {},
+    shouldRefreshWithoutCacheObj: {},
     initialVariableValues: { value: {} },
     selectedDateForViewPanel: {},
     showTabs: {
@@ -783,8 +790,8 @@ export default defineComponent({
       };
     };
 
-    const refreshPanelRequest = (panelId) => {
-      emit("refreshPanelRequest", panelId);
+    const refreshPanelRequest = (panelId, shouldRefreshWithoutCache=false) => {
+      emit("refreshPanelRequest", panelId, shouldRefreshWithoutCache);
 
       currentVariablesDataRef.value = {
         ...currentVariablesDataRef.value,

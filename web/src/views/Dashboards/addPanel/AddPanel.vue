@@ -99,25 +99,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
         >
           <q-btn
-            v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
-            class="q-ml-md text-bold no-border"
-            data-test="dashboard-cancel"
-            padding="sm lg"
-            color="negative"
-            no-caps
-            :label="t('panel.cancel')"
-            @click="cancelAddPanelQuery"
-          />
-          <q-btn
-            v-else
-            class="q-ml-md text-bold no-border"
+            v-if="config.isEnterprise === 'false'"
+            class="q-ml-md text-bold"
             data-test="dashboard-apply"
             padding="sm lg"
             color="secondary"
             no-caps
             :label="t('panel.apply')"
-            @click="runQuery"
+            @click="() => runQuery(false)"
           />
+          <q-btn-group
+            v-if="config.isEnterprise === 'true'"
+            class="q-ml-md"
+          >
+            <q-btn
+              class="text-bold no-border"
+              :data-test="searchRequestTraceIds.length > 0 ? 'dashboard-cancel' : 'dashboard-apply'"
+              padding="sm lg"
+              :color="searchRequestTraceIds.length > 0 ? 'negative' : 'secondary'"
+              text-color="white"
+              no-caps
+              :label="searchRequestTraceIds.length > 0 ? t('panel.cancel') : t('panel.apply')"
+              @click="onApplyBtnClick"
+              style="width: 92px;"
+            />
+            
+            <q-btn-dropdown
+              class="text-bold no-border"
+              padding="xs"
+              :color="searchRequestTraceIds.length > 0 ? 'negative' : 'secondary'"
+              text-color="white"
+              no-caps
+              auto-close
+              dropdown-icon="keyboard_arrow_down"
+              :disable="searchRequestTraceIds.length > 0"
+            >
+              <q-list>
+                <q-item clickable @click="runQuery(true)" :disable="searchRequestTraceIds.length > 0">
+                  <q-item-section avatar>
+                    <q-icon size="xs" name="refresh" style="align-items: baseline; padding: 0px;" />
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label style="font-size: 12px; align-items: baseline; padding: 0px;">Refresh Cache & Apply</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-btn-dropdown>
+          </q-btn-group>
         </template>
       </div>
     </div>
@@ -251,6 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :variablesData="updatedVariablesData"
                       :allowAnnotationsAdd="editMode"
                       :width="6"
+                      :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
                       @error="handleChartApiError"
                       @updated:data-zoom="onDataZoom"
                       @updated:vrlFunctionFieldList="updateVrlFunctionFieldList"
@@ -433,6 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :selectedTimeObj="dashboardPanelData.meta.dateTime"
                         :variablesData="updatedVariablesData"
                         :width="6"
+                        :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
                         @error="handleChartApiError"
                         @updated:data-zoom="onDataZoom"
                         @updated:vrlFunctionFieldList="
@@ -596,6 +626,7 @@ export default defineComponent({
     const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
     const { getStream } = useStreams();
     const seriesData = ref([]);
+    const shouldRefreshWithoutCache = ref(false);
 
     const seriesDataUpdate = (data: any) => {
       seriesData.value = data;
@@ -976,7 +1007,7 @@ export default defineComponent({
       },
     );
 
-    const runQuery = () => {
+    const runQuery = (withoutCache = false) => {
       try {
         // console.time("runQuery");
         if (!isValid(true, true)) {
@@ -987,6 +1018,9 @@ export default defineComponent({
         // if (dashboardPanelData.data.type === "custom_chart") {
         //   runJavaScriptCode();
         // }
+
+        // should use cache flag
+        shouldRefreshWithoutCache.value = withoutCache;
 
         // Also update variables data
         Object.assign(
@@ -1563,6 +1597,14 @@ export default defineComponent({
       }
     };
 
+    const onApplyBtnClick = () => {
+      if (searchRequestTraceIds.value.length > 0) {
+        cancelAddPanelQuery();
+      } else {
+        runQuery();
+      }
+    };
+
     // [END] cancel running queries
 
     const inputStyle = computed(() => {
@@ -1702,6 +1744,8 @@ export default defineComponent({
       dateTimeForVariables,
       seriesDataUpdate,
       seriesData,
+      onApplyBtnClick,
+      shouldRefreshWithoutCache,
     };
   },
   methods: {
