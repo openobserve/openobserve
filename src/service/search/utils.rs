@@ -186,10 +186,7 @@ pub async fn collect_scan_stats(
     is_leader: bool,
 ) -> ScanStats {
     let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id {trace_id}] collecting scan stats start: {}",
-        start.elapsed().as_millis()
-    );
+    log::info!("[trace_id {trace_id}] collecting scan stats start",);
 
     let mut scan_stats = ScanStats::default();
     for node in nodes {
@@ -217,7 +214,7 @@ pub async fn collect_scan_stats(
     }
 
     log::info!(
-        "[trace_id {trace_id}] collecting scan stats end: {}",
+        "[trace_id {trace_id}] collecting scan stats end: took {} ms",
         start.elapsed().as_millis()
     );
     scan_stats
