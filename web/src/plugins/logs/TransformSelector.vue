@@ -19,8 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="logs-search-bar-show-query-toggle-btn"
     v-model="searchObj.meta.showTransformEditor"
     :icon="transformIcon"
-    class="float-left tw-cursor-pointer"
-    size="32px"
+    class="float-left tw-cursor-pointer o2-toggle-button-xs tw-flex tw-items-center tw-justify-center "
+    size="xs"
+    flat
+    :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
     :disable="!searchObj.data.transformType || searchObj.meta.logsVisualizeToggle === 'visualize'"
   >
     <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">
@@ -127,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <q-btn
       data-test="logs-search-bar-save-transform-btn"
-      class="q-mr-xs save-transform-btn q-px-sm"
+      class=" save-transform-btn q-px-sm"
       size="sm"
       icon="save"
       :disable="searchObj.data.transformType !== 'function' || searchObj.meta.logsVisualizeToggle === 'visualize'"
