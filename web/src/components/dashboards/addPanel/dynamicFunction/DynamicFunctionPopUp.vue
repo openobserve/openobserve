@@ -127,6 +127,13 @@
           <q-btn dense flat icon="close" @click="cancelHavingFilter" />
         </div>
       </div>
+      <div v-if="chartType === 'table'" class="q-mt-sm q-mb-sm">
+        <q-checkbox
+          v-model="fields.treatAsNonTimestamp"
+          :label="'Mark this field as non-timestamp'"
+          dense
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -155,6 +162,11 @@ export default {
       type: Boolean,
       required: false,
       default: false,
+    },
+    chartType: {
+      type: String,
+      required: true,
+      default: "bar",
     },
   },
   emits: ["update:modelValue"],
