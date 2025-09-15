@@ -6,6 +6,8 @@
 import searchService from "@/services/search";
 import cronParser from "cron-parser";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { validateAlert } from "@/utils/validateAlerts";
+import useStreams from "@/composables/useStreams";
 
 export interface ValidationContext {
   q: any;
@@ -42,6 +44,15 @@ export interface AlertFormData {
   };
   stream_name: string;
   stream_type: string;
+}
+
+export interface JsonValidationContext {
+  q: any;
+  store: any;
+  streams: any;
+  getParser: (sql: string) => boolean;
+  buildQueryPayload: (options: any) => any;
+  prepareAndSaveAlert: (data: any) => Promise<void>;
 }
 
 export const validateInputs = (
@@ -212,4 +223,114 @@ export const validateSqlQuery = async (
         reject("sql_error");
       });
   });
+};
+
+export const saveAlertJson = async (
+  json: any,
+  props: any,
+  validationErrors: any,
+  showJsonEditorDialog: any,
+  formData: any,
+  context: JsonValidationContext,
+): Promise<void> => {
+  const {
+    q,
+    store,
+    streams,
+    getParser,
+    buildQueryPayload,
+    prepareAndSaveAlert,
+  } = context;
+
+  const { getStreams } = useStreams();
+
+  let jsonPayload = JSON.parse(json);
+  let destinationsList = [];
+  props.destinations.forEach((destination: any) => {
+    destinationsList.push(destination.name);
+  });
+  let streamList = [];
+
+  if (!streams.value[jsonPayload.stream_type]) {
+    try {
+      const response: any = await getStreams(jsonPayload.stream_type, false);
+      streams.value[jsonPayload.stream_type] = response.list;
+    } catch (err: any) {
+      if (err.response.status !== 403) {
+        q.notify({
+          type: "negative",
+          message: err.response?.data?.message || "Error fetching streams",
+          timeout: 3000,
+        });
+      }
+    }
+  }
+  streams.value[jsonPayload.stream_type].forEach((stream: any) => {
+    streamList.push(stream.name);
+  });
+
+  const validationResult = validateAlert(jsonPayload, {
+    streamList: streamList,
+    selectedOrgId: store.state.selectedOrganization.identifier,
+    destinationsList: destinationsList,
+  });
+
+  if (!validationResult.isValid) {
+    validationErrors.value = validationResult.errors;
+    return;
+  }
+
+  // Validate SQL query if type is sql and not real-time
+  if (
+    jsonPayload.is_real_time === false &&
+    jsonPayload.query_condition.type === "sql"
+  ) {
+    try {
+      // First check if query has SELECT *
+      if (!getParser(jsonPayload.query_condition.sql)) {
+        validationErrors.value = [
+          "Selecting all columns is not allowed. Please specify the columns explicitly",
+        ];
+        return;
+      }
+
+      // Set up query for validation
+      const query = buildQueryPayload({
+        sqlMode: true,
+        streamName: jsonPayload.stream_name,
+      });
+
+      delete query.aggs;
+      query.query.start_time = query.query.start_time + 780000000;
+      query.query.sql = jsonPayload.query_condition.sql;
+
+      if (jsonPayload.query_condition.vrl_function) {
+        query.query.query_fn = b64EncodeUnicode(
+          jsonPayload.query_condition.vrl_function,
+        );
+      }
+
+      // Validate SQL query
+      await searchService.search({
+        org_identifier: store.state.selectedOrganization.identifier,
+        query,
+        page_type: jsonPayload.stream_type,
+      });
+
+      // If we get here, SQL is valid
+      showJsonEditorDialog.value = false;
+      formData.value = jsonPayload;
+      await prepareAndSaveAlert(jsonPayload);
+    } catch (err: any) {
+      // Handle SQL validation errors
+      const errorMessage = err.response?.data?.message || "Invalid SQL Query";
+      validationErrors.value = [`SQL validation error: ${errorMessage}`];
+      return;
+    }
+  } else {
+    // If not SQL or is real-time, just close and update
+    showJsonEditorDialog.value = false;
+    formData.value = jsonPayload;
+    await prepareAndSaveAlert(jsonPayload);
+  }
 };

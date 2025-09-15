@@ -5,6 +5,8 @@
 
 import { cloneDeep } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import alertsService from "@/services/alerts";
+import { transformFEToBE } from "./alertDataTransforms";
 
 export interface PayloadFormData {
   name: string;
@@ -40,6 +42,17 @@ export interface PayloadContext {
   isAggregationEnabled: { value: boolean };
   getSelectedTab: { value: string };
   beingUpdated: boolean;
+}
+
+export interface SaveAlertContext {
+  q: any;
+  store: any;
+  props: any;
+  emit: any;
+  router: any;
+  isAggregationEnabled: { value: boolean };
+  activeFolderId: { value: string };
+  handleAlertError: (err: any) => void;
 }
 
 export const getAlertPayload = (
@@ -108,4 +121,91 @@ export const getAlertPayload = (
   }
 
   return payload;
+};
+
+export const prepareAndSaveAlert = async (
+  data: any,
+  context: SaveAlertContext,
+): Promise<void> => {
+  const {
+    q,
+    store,
+    props,
+    emit,
+    router,
+    isAggregationEnabled,
+    activeFolderId,
+    handleAlertError,
+  } = context;
+
+  const payload = cloneDeep(data);
+  
+  if (!isAggregationEnabled.value) {
+    payload.query_condition.aggregation = null;
+  }
+  
+  if (Array.isArray(payload.context_attributes) && payload.context_attributes.length === 0) {
+    payload.context_attributes = {};
+  }
+
+  // Transform conditions to backend format
+  payload.query_condition.conditions = transformFEToBE(payload.query_condition.conditions);
+
+  // Convert string boolean to actual boolean
+  payload.is_real_time = payload.is_real_time === "true" || payload.is_real_time === true;
+
+  // Handle VRL function encoding if present
+  if (payload.query_condition.vrl_function) {
+    payload.query_condition.vrl_function = b64EncodeUnicode(
+      payload.query_condition.vrl_function.trim(),
+    );
+  }
+
+  // Set timestamps and metadata
+  if (props.isUpdated) {
+    payload.updatedAt = new Date().toISOString();
+    payload.lastEditedBy = store.state.userInfo.email;
+    payload.folder_id = router.currentRoute.value.query.folder || "default";
+  } else {
+    payload.createdAt = new Date().toISOString();
+    payload.owner = store.state.userInfo.email;
+    payload.lastTriggeredAt = new Date().getTime();
+    payload.lastEditedBy = store.state.userInfo.email;
+    payload.folder_id = activeFolderId.value;
+  }
+
+  try {
+    const dismiss = q.notify({
+      spinner: true,
+      message: "Please wait...",
+      timeout: 2000,
+    });
+
+    if (props.isUpdated) {
+      await alertsService.update_by_alert_id(
+        store.state.selectedOrganization.identifier,
+        payload,
+        activeFolderId.value,
+      );
+      emit("update:list", activeFolderId.value);
+      q.notify({
+        type: "positive",
+        message: "Alert updated successfully.",
+      });
+    } else {
+      await alertsService.create_by_alert_id(
+        store.state.selectedOrganization.identifier,
+        payload,
+        activeFolderId.value,
+      );
+      emit("update:list", activeFolderId.value);
+      q.notify({
+        type: "positive",
+        message: "Alert saved successfully.",
+      });
+    }
+    dismiss();
+  } catch (err: any) {
+    handleAlertError(err);
+  }
 };
