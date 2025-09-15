@@ -1597,3 +1597,278 @@ export const calculateChartContainerWidth = (
   }
   return totalWidth;
 };
+
+/**
+ * Calculates available space dimensions for charts based on legend configuration
+ * @param {any} panelSchema - Panel configuration schema
+ * @param {number} chartWidth - Original chart width
+ * @param {number} chartHeight - Original chart height
+ * @param {any[]} seriesData - Series data for legend calculations
+ * @returns {object} Available dimensions and legend space info
+ */
+export const calculateChartDimensions = (
+  panelSchema: any,
+  chartWidth: number,
+  chartHeight: number,
+  seriesData: any[] = [],
+) => {
+  const config = panelSchema.config || {};
+  const legendPosition = config.legends_position;
+  const showLegends = config.show_legends;
+  const legendCount = seriesData?.length || 0;
+
+  let availableWidth = chartWidth;
+  let availableHeight = chartHeight;
+  let legendWidth = 0;
+  let legendHeight = 0;
+
+  // Early return if no legends to display
+  if (!showLegends || legendCount === 0) {
+    return {
+      availableWidth,
+      availableHeight,
+      legendWidth,
+      legendHeight,
+      hasLegends: false,
+    };
+  }
+
+  const hasExplicitWidth =
+    config.legend_width && !isNaN(parseFloat(config.legend_width.value));
+  const hasExplicitHeight =
+    config.legend_height && !isNaN(parseFloat(config.legend_height.value));
+
+  // Calculate legend dimensions based on position and type
+  if (legendPosition === "right") {
+    legendWidth = calculateLegendWidth(
+      panelSchema,
+      chartWidth,
+      chartHeight,
+      seriesData,
+      hasExplicitWidth,
+    );
+    availableWidth = chartWidth - legendWidth;
+  } else if (legendPosition === "bottom" || legendPosition === null) {
+    legendHeight = calculateLegendHeight(
+      panelSchema,
+      chartWidth,
+      chartHeight,
+      seriesData,
+      hasExplicitHeight,
+    );
+    availableHeight = chartHeight - legendHeight;
+  }
+
+  return {
+    availableWidth,
+    availableHeight,
+    legendWidth,
+    legendHeight,
+    hasLegends: true,
+  };
+};
+
+/**
+ * Calculates legend width for right-positioned legends with proper fallbacks
+ * @param {any} panelSchema - Panel configuration
+ * @param {number} chartWidth - Chart container width
+ * @param {number} chartHeight - Chart container height
+ * @param {any[]} seriesData - Series data
+ * @param {boolean} hasExplicitWidth - Whether explicit width is configured
+ * @returns {number} Legend width in pixels
+ */
+const calculateLegendWidth = (
+  panelSchema: any,
+  chartWidth: number,
+  chartHeight: number,
+  seriesData: any[],
+  hasExplicitWidth: boolean,
+): number => {
+  const config = panelSchema.config;
+  const legendsType = config.legends_type;
+  const legendCount = seriesData?.length || 0;
+
+  // Use explicit width if provided
+  if (hasExplicitWidth) {
+    return config.legend_width.unit === "%"
+      ? chartWidth * (config.legend_width.value / 100)
+      : config.legend_width.value;
+  }
+
+  // Handle different legend types
+  if (legendsType === "plain") {
+    return calculateRightLegendWidth(
+      legendCount,
+      chartWidth,
+      chartHeight,
+      seriesData,
+      false,
+    );
+  }
+
+  // Scroll legends - reserve minimum space
+  const minScrollLegendWidth = Math.min(chartWidth * 0.22, 170);
+  return Math.max(minScrollLegendWidth, 120);
+};
+
+/**
+ * Calculates legend height for bottom-positioned legends with proper fallbacks
+ * @param {any} panelSchema - Panel configuration
+ * @param {number} chartWidth - Chart container width
+ * @param {number} chartHeight - Chart container height
+ * @param {any[]} seriesData - Series data
+ * @param {boolean} hasExplicitHeight - Whether explicit height is configured
+ * @returns {number} Legend height in pixels
+ */
+const calculateLegendHeight = (
+  panelSchema: any,
+  chartWidth: number,
+  chartHeight: number,
+  seriesData: any[],
+  hasExplicitHeight: boolean,
+): number => {
+  const config = panelSchema.config;
+  const legendsType = config.legends_type;
+  const legendCount = seriesData?.length || 0;
+
+  // Use explicit height if provided
+  if (hasExplicitHeight) {
+    return config.legend_height.unit === "%"
+      ? chartHeight * (config.legend_height.value / 100)
+      : config.legend_height.value;
+  }
+
+  // Handle different legend types
+  if (legendsType === "plain") {
+    return calculateBottomLegendHeight(
+      legendCount,
+      chartWidth,
+      seriesData,
+      chartHeight,
+    );
+  }
+
+  // Scroll legends - reserve minimum space
+  const minScrollLegendHeight = Math.min(chartHeight * 0.25, 100);
+  return Math.max(minScrollLegendHeight, 60);
+};
+
+/**
+ * Generates CSS grid properties for chart alignment
+ * @param {string} chartAlign - Chart alignment ('left', 'center', or null)
+ * @param {string} legendPosition - Legend position
+ * @param {boolean} shouldApplyAlignment - Whether alignment should be applied
+ * @returns {object} CSS grid properties
+ */
+export const generateChartAlignmentProperties = (
+  chartAlign: string | null,
+  legendPosition: string | null,
+  shouldApplyAlignment: boolean,
+): object => {
+  if (!shouldApplyAlignment || legendPosition !== "right") {
+    return {};
+  }
+
+  const baseProperties = {
+    display: "grid",
+    gridTemplateRows: "1fr",
+  };
+
+  switch (chartAlign) {
+    case "left":
+      return {
+        ...baseProperties,
+        gridTemplateColumns: "minmax(0, 1fr) auto",
+        justifyItems: "start",
+        alignItems: "center",
+        paddingLeft: "5%",
+      };
+
+    case "center":
+      return {
+        ...baseProperties,
+        gridTemplateColumns: "1fr",
+        justifyItems: "center",
+        alignItems: "center",
+      };
+
+    default: // auto - default to center
+      return {
+        ...baseProperties,
+        gridTemplateColumns: "1fr",
+        justifyItems: "center",
+        alignItems: "center",
+      };
+  }
+};
+
+/**
+ * Calculates optimal pie chart radius based on available space and configuration
+ * @param {any} panelSchema - Panel configuration schema
+ * @param {number} availableWidth - Available width for chart
+ * @param {number} availableHeight - Available height for chart
+ * @returns {number} Optimal radius percentage (0-100)
+ */
+export const calculatePieChartRadius = (
+  panelSchema: any,
+  availableWidth: number,
+  availableHeight: number,
+): number => {
+  if (!panelSchema.layout) {
+    return 85; // Default radius for charts without layout
+  }
+
+  const minRadius = Math.min(
+    panelSchema.layout.w * 30,
+    panelSchema.layout.h * 30,
+  );
+
+  if (minRadius === 0) {
+    return 0;
+  }
+
+  // Calculate radius based on available space
+  const maxRadius = Math.min(availableWidth, availableHeight) / 2;
+  const baseRadius = minRadius / 2;
+
+  // Determine space usage efficiency
+  const isFullSpace =
+    availableWidth === panelSchema.layout.w * 30 &&
+    availableHeight === panelSchema.layout.h * 30;
+  const spaceUsage = isFullSpace ? 0.95 : 0.9;
+
+  const effectiveRadius = Math.min(baseRadius, maxRadius * spaceUsage);
+
+  // Calculate multiplier based on effective radius
+  let multiplier = 100;
+  if (effectiveRadius > 90) multiplier = 120;
+  if (effectiveRadius > 150) multiplier = 140;
+
+  // Calculate final percentage with appropriate limits
+  const maxLimit = isFullSpace ? 95 : 90;
+  return Math.min((effectiveRadius / minRadius) * multiplier, maxLimit);
+};
+
+/**
+ * Determines if chart alignment should be applied based on configuration
+ * @param {any} panelSchema - Panel configuration schema
+ * @param {any[]} seriesData - Series data
+ * @returns {boolean} Whether alignment should be applied
+ */
+export const shouldApplyChartAlignment = (
+  panelSchema: any,
+  seriesData: any[] = [],
+): boolean => {
+  const config = panelSchema.config || {};
+  const showLegends = config.show_legends;
+  const legendPosition = config.legends_position;
+  const legendsType = config.legends_type;
+  const legendCount = seriesData?.length || 0;
+
+  return (
+    showLegends &&
+    legendCount > 0 &&
+    legendPosition === "right" &&
+    (legendsType === "plain" || legendsType === "scroll" || legendsType == null)
+  );
+};
