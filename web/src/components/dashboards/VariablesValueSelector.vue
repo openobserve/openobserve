@@ -1453,7 +1453,7 @@ export default defineComponent({
       let dummyQuery: string;
 
       if (searchText) {
-        dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}' WHERE CAST(${variableObject.query_data.field} AS TEXT) LIKE '%${escapeSingleQuotes(searchText.trim())}%'`;
+        dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}' WHERE str_match(${variableObject.query_data.field}, '${escapeSingleQuotes(searchText.trim())}')`;
       } else {
         dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}'`;
       }
