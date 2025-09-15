@@ -1716,8 +1716,6 @@ const functionEditorPlaceholderFlag = ref(true);
 
 const queryEditorPlaceholderFlag = ref(true);
 
-const isFunctionErrorExpanded = ref(false);
-
 const { sqlParser } = useParser();
 
 const tempTestFunction = ref(false);
@@ -1736,9 +1734,6 @@ const _isAggregationEnabled = ref(
 );
 
 const promqlCondition = ref(props.promql_condition);
-
-const silence = ref(props.silence);
-
 
 const aggregationData = ref(props.aggregation);
 
@@ -1814,14 +1809,6 @@ const getNumericColumns = computed(() => {
 
 const filteredNumericColumns = ref(getNumericColumns.value);
 
-const addField = (groupId: string) => {
-  emits("field:add", groupId);
-};
-
-const addConditionGroup = (groupId: string) => {
-  emits("field:addConditionGroup", groupId);
-};
-
 const updateDateTimePicker = (data: any) => {
   emits("update:multi_time_range", dateTimePicker.value);
 };
@@ -1831,15 +1818,6 @@ const removeTimeShift = (index: any) => {
 };
 
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
-let relativePeriods = [
-      { label: "Seconds", value: "s" },
-      { label: "Minutes", value: "m" },
-      { label: "Hours", value: "h" },
-      { label: "Days", value: "d" },
-      { label: "Weeks", value: "w" },
-      { label: "Months", value: "M" },
-    ];
-
 
 const selectedFunction = ref("");
 
@@ -1864,10 +1842,6 @@ timezoneOptions.unshift(browserTime);
 
 const timezoneFilterFn = (val: string, update: Function) => {
   filteredTimezone.value = filterColumns(timezoneOptions, val, update);
-};
-
-const removeField = (field: any) => {
-  emits("field:remove", field);
 };
 
 const updateQueryValue = (value: string) => {
@@ -1901,48 +1875,6 @@ const getDefaultPromqlCondition = () => {
     value: 0,
   };
 };
-
-const testFields  = ref(
- [
-    {
-      uuid: "1",
-      parent_id: "1",
-      column: "temperature",
-      operator: ">",
-      value: "30",
-      condition: "AND"
-
-    },
-    {
-      uuid: "3",
-      column: "temperature",
-      operator: ">",
-      value: "40",
-      condition: "AND"
-    },
-    {
-      uuid: "4",
-      column: "temperature",
-      operator: ">",
-      value: "40",
-      condition: "AND"
-    },
-    {
-      children: [
-        {
-          uuid: "5",
-          column: "temperature",
-          operator: ">",
-          value: "40",
-          condition: "AND"
-        }
-      ]
-    }
-  ]
-);
-
-
-
 
 const onFunctionSelect = (_function: any) => {
   if(!_function){
@@ -1983,23 +1915,6 @@ const vrlFunctionContent = computed({
     emits("update:vrl_function", value);
   },
 });
-
-const isVrlFunctionEnabled = computed({
-  get() {
-    return props.showVrlFunction;
-  },
-  set(value) {
-    emits("update:showVrlFunction", value);
-    updateFunctionVisibility(value);
-  },
-});
-
-const updateFunctionVisibility = (isEnabled: boolean) => {
-  if (!isEnabled) {
-    vrlFunctionContent.value = null;
-    selectedFunction.value = "";
-  }
-};
 
 const updateQuery = () => {
   if (tab.value === "promql") {
@@ -2192,9 +2107,6 @@ const onBlurFunctionEditor = debounce(() => {
   emits("validate-sql");
 }, 10);
 
-const toggleExpandFunctionError = () => {
-  isFunctionErrorExpanded.value = !isFunctionErrorExpanded.value;
-};
 
 const validateFrequency = (frequency: {
   frequency_type: string;
@@ -2270,43 +2182,26 @@ const routeToCreateDestination = () => {
   return `${numberPart} ${relativePeriod.label}`;
 };
 
-  const handleExpandSqlOutput = () => {
-    expandSqlOutput.value = !expandSqlOutput.value;
-    if (expandSqlOutput.value) {
-      expandCombinedOutput.value = false;
-    }
-  };
 
-  const handleExpandCombinedOutput = () => {
-    expandCombinedOutput.value = !expandCombinedOutput.value;
-    if (expandCombinedOutput.value) {
-      expandSqlOutput.value = false;
-    }
-  };
+const handleMultiWindowOffsetClick = (uuid: string) => {
+  if (selectedMultiWindowOffset.value && !selectedMultiWindowOffset.value.includes(uuid)) {
+    selectedMultiWindowOffset.value.push(uuid);
+  }
+};
 
-  const handleMultiWindowOffsetClick = (uuid: string) => {
-    if (selectedMultiWindowOffset.value && !selectedMultiWindowOffset.value.includes(uuid)) {
-      selectedMultiWindowOffset.value.push(uuid);
-    }
-  };
+const handleRemoveMultiWindowOffset = (uuid: string) => {
+  selectedMultiWindowOffset.value = selectedMultiWindowOffset.value.filter((offset: string) => offset !== uuid);
+};
 
-  const handleRemoveMultiWindowOffset = (uuid: string) => {
-    selectedMultiWindowOffset.value = selectedMultiWindowOffset.value.filter((offset: string) => offset !== uuid);
-  };
+const checkIfMultiWindowOffsetIsSelected = (uuid: string) => {
+  return selectedMultiWindowOffset.value && selectedMultiWindowOffset.value.includes(uuid);
+};
 
-  const checkIfMultiWindowOffsetIsSelected = (uuid: string) => {
-    return selectedMultiWindowOffset.value && selectedMultiWindowOffset.value.includes(uuid);
-  };
-
-  const onColumnSelect = () => {
-    if(selectedColumn.value.value){
-      query.value += ` ${selectedColumn.value.value} `
-    }
-    // selectedColumn.value = {
-    //   label: "",
-    //   value: ""
-    // }
-  };
+const onColumnSelect = () => {
+  if(selectedColumn.value.value){
+    query.value += ` ${selectedColumn.value.value} `
+  }
+};
   const buildMulitWindowQuery = (sql: any, fn: boolean = false, periodInMicroseconds: number) => {
   const queryToSend: any = [
 
@@ -2363,43 +2258,7 @@ const routeToCreateDestination = () => {
       const periodInMicroseconds = triggerData.value.period * 60 * 1000000;
       const endTime = new Date().getTime() * 1000; // ← Use 1000 to get microseconds
       const startTime = endTime - periodInMicroseconds;
-      queryReq.query.query_fn = null;
-      // //this is for single window query but we will deprecate this in future
-      //as we show any ways array in array so we will call multi search call always
-      // if(selectedMultiWindowOffset.value.length == 0){
-      //   queryReq.query.start_time = startTime;
-      //   queryReq.query.end_time = endTime;
-      //   runQueryLoading.value = true;
-      //   if(fn){
-      //     queryReq.query.query_fn = b64EncodeUnicode(vrlFunctionContent.value);
-      //     outputFnEvents.value = "";
-      //   }
-      //   else{
-      //     outputEvents.value = "";
-      //   }
-      //   if(queryReq.aggs){
-      //     delete queryReq.aggs;
-      //   }
-      //   try {
-      //     const res = await searchService.search({
-      //       org_identifier: store.state.selectedOrganization.identifier,
-      //       query: queryReq,
-      //       page_type: selectedStreamType.value,
-      //     })
-      //     if(res.data.hits.length > 0){
-      //       if(fn){
-      //         outputFnEvents.value = JSON.stringify(res.data.hits,null,2);
-      //       }
-      //       else{
-      //         outputEvents.value = JSON.stringify(res.data.hits,null,2);
-      //       }
-      //     }
-      //     runQueryLoading.value = false;
-      //   } catch (err) {
-      //     console.log(err,"err")
-      //     runQueryLoading.value = false;
-      //   }
-      // }
+        queryReq.query.query_fn = null;
         queryReq.query.sql_mode = true;
         queryReq.query.per_query_response = true;
         //initial query to send like with period for suppose we have 10minutes of period then we will send 10 minutes of data
@@ -2478,8 +2337,6 @@ const routeToCreateDestination = () => {
 
   const removeConditionGroup = (targetGroupId: string, currentGroup: any = inputData.value) => {
     emits('remove:group', targetGroupId)
-
-    // No emit here — you're handling data directly in parent
   };
   const multiWindowImage = computed(() => {
   if(store.state.theme === 'dark'){
@@ -2674,7 +2531,6 @@ defineExpose({
   validateInputs,
   cronJobError,
   validateFrequency,
-  testFields,
   isFullScreen,
   viewSqlEditor,
   viewVrlFunction,
