@@ -40,8 +40,8 @@ use super::request::Request;
 use crate::service::search::sql::{
     rewriter::{
         add_o2_id::AddO2IdVisitor, add_timestamp::AddTimestampVisitor,
-        approx_percentile::ReplaceApproxPercentiletVisitor, 
-        match_all_raw::MatchAllRawVisitor, remove_dashboard_placeholder::RemoveDashboardAllVisitor,
+        approx_percentile::ReplaceApproxPercentiletVisitor, match_all_raw::MatchAllRawVisitor,
+        remove_dashboard_placeholder::RemoveDashboardAllVisitor,
         track_total_hits::TrackTotalHitsVisitor,
     },
     schema::{generate_schema_fields, generate_select_star_schema, has_original_column},
