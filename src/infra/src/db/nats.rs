@@ -36,7 +36,7 @@ use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use tokio::sync::{Mutex, OnceCell, mpsc};
 
-use crate::{cluster_coordinator, db::Event, dist_lock, errors::*};
+use crate::{coordinator, db::Event, dist_lock, errors::*};
 
 const SUPER_CLUSTER_PREFIX: &str = "super_cluster_kv_";
 
@@ -207,7 +207,7 @@ impl super::Db for NatsDb {
             .await
             .map_err(|e| Error::Message(format!("[NATS:put] bucket.put error: {e}")))?;
         if need_watch {
-            cluster_coordinator::events::put_event(&local_key, start_dt, Some(value)).await?;
+            coordinator::events::put_event(&local_key, start_dt, Some(value)).await?;
         }
         Ok(())
     }
@@ -296,7 +296,7 @@ impl super::Db for NatsDb {
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {e}")))?;
             if need_watch {
-                cluster_coordinator::events::delete_event(key, start_dt).await?;
+                coordinator::events::delete_event(key, start_dt).await?;
             }
             return Ok(());
         }
@@ -310,7 +310,7 @@ impl super::Db for NatsDb {
                 .await
                 .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {e}")))?;
             if need_watch {
-                cluster_coordinator::events::delete_event(&purge_key, start_dt).await?;
+                coordinator::events::delete_event(&purge_key, start_dt).await?;
             }
         }
         Ok(())
@@ -451,7 +451,7 @@ impl super::Db for NatsDb {
     }
 
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
-        cluster_coordinator::events::watch(prefix).await
+        coordinator::events::watch(prefix).await
     }
 
     async fn close(&self) -> Result<()> {

@@ -17,7 +17,7 @@
 use std::sync::Arc;
 
 #[cfg(feature = "enterprise")]
-use infra::cluster_coordinator::ai_prompts::AI_PROMPTS_WATCH_PREFIX;
+use infra::coordinator::ai_prompts::AI_PROMPTS_WATCH_PREFIX;
 
 #[cfg(feature = "enterprise")]
 use crate::service::db;

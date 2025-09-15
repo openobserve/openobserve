@@ -26,7 +26,6 @@ pub struct Request {
     pub work_group: Option<String>,
     pub time_range: Option<(i64, i64)>,
     pub search_event_type: Option<String>, // node rule
-    pub use_inverted_index: bool,
     pub streaming_output: bool,
     pub streaming_id: Option<String>,
     pub local_mode: Option<bool>,
@@ -45,7 +44,6 @@ impl Default for Request {
             work_group: None,
             time_range: None,
             search_event_type: None,
-            use_inverted_index: false,
             streaming_output: false,
             streaming_id: None,
             local_mode: None,
@@ -76,7 +74,6 @@ impl Request {
             work_group: None,
             time_range,
             search_event_type,
-            use_inverted_index: false,
             streaming_output: false,
             streaming_id: None,
             local_mode: None,
@@ -85,24 +82,8 @@ impl Request {
         }
     }
 
-    pub fn add_user_id(&mut self, user_id: Option<String>) {
-        self.user_id = user_id;
-    }
-
     pub fn add_work_group(&mut self, work_group: Option<String>) {
         self.work_group = work_group;
-    }
-
-    pub fn add_time_range(&mut self, time_range: Option<(i64, i64)>) {
-        self.time_range = time_range;
-    }
-
-    pub fn add_search_event_type(&mut self, search_event_type: Option<String>) {
-        self.search_event_type = search_event_type;
-    }
-
-    pub fn set_use_inverted_index(&mut self, use_inverted_index: bool) {
-        self.use_inverted_index = use_inverted_index;
     }
 
     pub fn set_streaming_output(&mut self, streaming_output: bool, streaming_id: Option<String>) {
@@ -130,7 +111,6 @@ impl From<FlightSearchRequest> for Request {
             work_group: req.super_cluster_info.work_group,
             time_range: Some((req.search_info.start_time, req.search_info.end_time)),
             search_event_type: req.super_cluster_info.search_event_type,
-            use_inverted_index: req.index_info.use_inverted_index,
             streaming_output: false,
             streaming_id: None,
             local_mode: req.super_cluster_info.local_mode,
