@@ -1038,7 +1038,6 @@ impl SearchEventContext {
     }
 }
 
-
 impl From<proto::cluster_rpc::SearchEventContext> for SearchEventContext {
     fn from(proto_sec: proto::cluster_rpc::SearchEventContext) -> Self {
         Self {

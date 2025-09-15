@@ -786,6 +786,12 @@ pub struct Common {
         help = "Skip WAL for query"
     )]
     pub feature_query_skip_wal: bool,
+    #[env_config(
+        name = "ZO_FEATURE_QUERY_SKIP_COLLECT_STATS",
+        default = false,
+        help = "Skip collect stats for query"
+    )]
+    pub feature_query_skip_collect_stats: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
