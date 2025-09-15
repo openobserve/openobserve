@@ -883,4 +883,225 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
+  test("should update the line chart correctly when used camel case in custom sql query", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    // Generate unique panel name
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("line-panel-test");
+
+    // Navigate to Dashboards page
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard and add a panel
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+
+    // Remove x_axis_1 field
+    await pm.chartTypeSelector.removeField("_timestamp", "x");
+
+    // Select line chart type
+    await pm.chartTypeSelector.selectChartType("line");
+
+    // Open Custom SQL editor
+    await page.locator('[data-test="dashboard-customSql"]').click();
+
+    // Focus on the first line of the editor
+    await page.locator(".view-line").first().click();
+    await page
+      .locator('[data-test="dashboard-panel-query-editor"]')
+      .locator(".monaco-editor")
+      .click();
+    await page
+      .locator('[data-test="dashboard-panel-query-editor"]')
+      .locator(".inputarea")
+      .fill(
+        'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
+      );
+
+    // Map query results to chart axes
+    await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
+    await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
+
+    // Apply the panel
+    await pm.dashboardPanelActions.applyDashboardBtn();
+
+    // Assert that line chart data is rendered correctly
+    console.log("🔍 Waiting for chart renderer to appear...");
+    await page.waitForSelector('[data-test="chart-renderer"]', {
+      state: "visible",
+      timeout: 10000,
+    });
+    console.log("✅ Chart renderer is visible");
+
+    // Wait for ECharts instance to be initialized
+    console.log("🔍 Waiting for ECharts instance to initialize...");
+    await page.waitForFunction(
+      () => {
+        const chartElement = document.querySelector(
+          '[data-test="chart-renderer"]'
+        );
+        return chartElement && chartElement.hasAttribute("_echarts_instance_");
+      },
+      { timeout: 15000 }
+    );
+    console.log("✅ ECharts instance initialized");
+
+    // Wait a bit more for data to load into the chart
+    console.log("⏳ Waiting for chart data to load...");
+    await page.waitForTimeout(2000);
+
+    // Check if canvas elements are present and have proper dimensions
+    const canvasElements = await page
+      .locator('[data-test="chart-renderer"] canvas')
+      .count();
+    console.log(
+      `🎨 Found ${canvasElements} canvas elements for chart rendering`
+    );
+    expect(canvasElements).toBeGreaterThan(0);
+
+    // Verify chart container has proper dimensions (indicates chart is rendered)
+    const chartContainer = page.locator('[data-test="chart-renderer"]');
+    const boundingBox = await chartContainer.boundingBox();
+    console.log(
+      `📐 Chart dimensions: ${boundingBox.width}x${boundingBox.height}`
+    );
+    expect(boundingBox.width).toBeGreaterThan(0);
+    expect(boundingBox.height).toBeGreaterThan(0);
+
+    // Ensure no-data element is not visible when chart has data
+    const noDataVisible = await page
+      .locator('[data-test="no-data"]')
+      .isVisible();
+    console.log(`🚫 No-data element visible: ${noDataVisible}`);
+    await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
+
+    // Check if ECharts instance has data using JavaScript evaluation
+    const chartDataInfo = await page.evaluate(() => {
+      const chartElement = document.querySelector(
+        '[data-test="chart-renderer"]'
+      );
+      if (!chartElement)
+        return { hasData: false, error: "Chart element not found" };
+
+      const echartsInstanceId = chartElement.getAttribute("_echarts_instance_");
+      if (!echartsInstanceId)
+        return { hasData: false, error: "No echarts instance ID" };
+
+      // Try multiple ways to access ECharts instance
+      let echartsInstance = null;
+
+      // Method 1: Try window.echarts
+      if (window.echarts && window.echarts.getInstanceById) {
+        echartsInstance = window.echarts.getInstanceById(echartsInstanceId);
+      }
+
+      // Method 2: Try accessing from the element directly
+      if (!echartsInstance && chartElement._echartsInstance) {
+        echartsInstance = chartElement._echartsInstance;
+      }
+
+      // Method 3: Try accessing from global echarts instances
+      if (!echartsInstance && window.echartsInstances) {
+        echartsInstance = window.echartsInstances[echartsInstanceId];
+      }
+
+      if (!echartsInstance) {
+        return {
+          hasData: false,
+          error: "ECharts instance not accessible",
+          instanceId: echartsInstanceId,
+          windowEcharts: !!window.echarts,
+          elementInstance: !!chartElement._echartsInstance,
+        };
+      }
+
+      // Get the option/data from the chart
+      const option = echartsInstance.getOption();
+      if (!option) return { hasData: false, error: "No chart options" };
+      if (!option.series)
+        return { hasData: false, error: "No series in options" };
+      if (!Array.isArray(option.series))
+        return { hasData: false, error: "Series is not an array" };
+
+      // Check if any series has data
+      const seriesWithData = option.series.filter(
+        (series) =>
+          series.data && Array.isArray(series.data) && series.data.length > 0
+      );
+
+      return {
+        hasData: seriesWithData.length > 0,
+        seriesCount: option.series.length,
+        seriesWithDataCount: seriesWithData.length,
+        firstSeriesDataLength: option.series[0]?.data?.length || 0,
+      };
+    });
+
+    console.log(`📊 Chart data info:`, chartDataInfo);
+
+    // If we can't access ECharts data, fall back to checking canvas content and no-data visibility
+    if (chartDataInfo.hasData) {
+      console.log("✅ ECharts instance has data");
+    } else {
+      console.log(
+        "⚠️ Could not verify data via ECharts instance, using fallback checks"
+      );
+      console.log("❌ ECharts error:", chartDataInfo.error);
+
+      // Fallback: Check that no-data is hidden and canvas has content
+      const noDataHidden = !(await page
+        .locator('[data-test="no-data"]')
+        .isVisible());
+      console.log(`📋 No-data element hidden: ${noDataHidden}`);
+
+      if (noDataHidden) {
+        console.log(
+          "✅ Fallback validation: No-data is hidden, assuming chart has data"
+        );
+      } else {
+        throw new Error(
+          "Chart appears to have no data - no-data element is visible"
+        );
+      }
+    }
+
+    // Additional check: Verify chart canvas has been drawn on (non-zero pixel data)
+    const canvasHasContent = await page.evaluate(() => {
+      const canvases = document.querySelectorAll(
+        '[data-test="chart-renderer"] canvas'
+      );
+      if (canvases.length === 0) return false;
+
+      // Check the first canvas for any drawn content
+      const canvas = canvases[0];
+      const ctx = canvas.getContext("2d");
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      // Check if there are any non-transparent pixels
+      for (let i = 3; i < imageData.data.length; i += 4) {
+        if (imageData.data[i] > 0) {
+          // Alpha channel > 0 means visible content
+          return true;
+        }
+      }
+      return false;
+    });
+
+    console.log(`🎨 Canvas has visual content: ${canvasHasContent}`);
+    expect(canvasHasContent).toBe(true);
+
+    console.log("🎉 All line chart data assertions passed successfully!");
+
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
+
+    // Return to dashboard list and clean up
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
+  });
 });
