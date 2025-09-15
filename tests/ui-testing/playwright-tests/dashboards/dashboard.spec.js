@@ -758,128 +758,52 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
-
-    // Generate unique panel name
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
-    // Navigate to Dashboards page
+    // Navigate to dashboards and create new dashboard
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
-
-    // Create a new dashboard and add a panel
     await pm.dashboardCreate.createDashboard(randomDashboardName);
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
 
-    // Remove x_axis_1 field
+    // Configure table chart with custom SQL using camelCase aliases
     await pm.chartTypeSelector.removeField("_timestamp", "x");
-
-    // await pm.chartTypeSelector.selectChartType("table");
     await pm.chartTypeSelector.selectChartType("table");
 
-    // Open Custom SQL editor
     await page.locator('[data-test="dashboard-customSql"]').click();
-    // await page.locator(".cm-line").first().click();
-
-    // Focus on the first line of the editor
-    // await page.locator(".cm-line").first().click();
-    // await page
-    //   .locator('[data-test="dashboard-panel-query-editor"]')
-    //   .getByRole("textbox")
-    //   .click();
-    // await page
-    //   .locator('[data-test="dashboard-panel-query-editor"]')
-    //   .locator(".cm-content")
-    //   .fill(
-    //     'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
-    //   );
-    // Focus on the first line of the editor
     await page.locator(".view-line").first().click();
     await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".monaco-editor")
-      .click();
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".inputarea")
+      .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
       .fill(
         'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
       );
 
-    // Map query results to chart axes
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
-
-    // // Switch to table chart
-    // await pm.chartTypeSelector.selectChartType("table");
-
-    // Apply and save the panel
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    // Assert that data is loaded in the table chart
-    console.log("🔍 Waiting for table to appear...");
+    // Verify table data is loaded correctly
     await page.waitForSelector('[data-test="dashboard-panel-table"]', {
       state: "visible",
       timeout: 10000,
     });
-    console.log("✅ Table container is visible");
 
-    // Wait for data rows to appear in the table
-    console.log("🔍 Waiting for data rows to appear...");
-    await page.waitForSelector(
-      '[data-test="dashboard-panel-table"] tbody.q-virtual-scroll__content tr.cursor-pointer',
-      {
-        state: "visible",
-        timeout: 15000,
-      }
-    );
-    console.log("✅ Data rows are visible");
-
-    // Verify that data rows are present (at least one row with data)
-    const dataRowsLocator = page.locator(
+    const dataRows = page.locator(
       '[data-test="dashboard-panel-table"] tbody.q-virtual-scroll__content tr.cursor-pointer'
     );
-    const rowCount = await dataRowsLocator.count();
-    console.log(`📊 Found ${rowCount} data rows in the table`);
-    expect(rowCount).toBeGreaterThan(0);
+    await dataRows.first().waitFor({ state: "visible", timeout: 15000 });
 
-    // Verify that the first data row contains actual values (not empty)
-    const firstDataRow = page
-      .locator(
-        '[data-test="dashboard-panel-table"] tbody.q-virtual-scroll__content tr.cursor-pointer'
-      )
-      .first();
-
-    // Get actual cell values for debugging
-    const firstCellText = await firstDataRow
-      .locator("td.q-td")
-      .first()
-      .textContent();
-    const secondCellText = await firstDataRow
-      .locator("td.q-td")
-      .nth(1)
-      .textContent();
-    console.log(
-      `📋 First row data: Column 1: "${firstCellText}", Column 2: "${secondCellText}"`
+    expect(await dataRows.count()).toBeGreaterThan(0);
+    await expect(dataRows.first().locator("td.q-td").first()).not.toHaveText(
+      ""
     );
-
-    await expect(firstDataRow.locator("td.q-td").first()).not.toHaveText("");
-    await expect(firstDataRow.locator("td.q-td").nth(1)).not.toHaveText("");
-
-    // Ensure no-data element is not visible when data is present
-    const noDataVisible = await page
-      .locator('[data-test="no-data"]')
-      .isVisible();
-    console.log(`🚫 No-data element visible: ${noDataVisible}`);
+    await expect(dataRows.first().locator("td.q-td").nth(1)).not.toHaveText("");
     await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
 
-    console.log("🎉 All data assertions passed successfully!");
-
-    await pm.dashboardPanelActions.addPanelName(panelName);
+    // Save panel and cleanup
     await pm.dashboardPanelActions.savePanel();
-
-    // Return to dashboard list and clean up
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
@@ -887,59 +811,38 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
-
-    // Generate unique panel name
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("line-panel-test");
 
-    // Navigate to Dashboards page
+    // Navigate to dashboards and create new dashboard
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
-
-    // Create a new dashboard and add a panel
     await pm.dashboardCreate.createDashboard(randomDashboardName);
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
 
-    // Remove x_axis_1 field
+    // Configure line chart with custom SQL using camelCase aliases
     await pm.chartTypeSelector.removeField("_timestamp", "x");
-
-    // Select line chart type
     await pm.chartTypeSelector.selectChartType("line");
 
-    // Open Custom SQL editor
     await page.locator('[data-test="dashboard-customSql"]').click();
-
-    // Focus on the first line of the editor
     await page.locator(".view-line").first().click();
     await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".monaco-editor")
-      .click();
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".inputarea")
+      .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
       .fill(
         'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
       );
 
-    // Map query results to chart axes
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
-
-    // Apply the panel
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    // Assert that line chart data is rendered correctly
-    console.log("🔍 Waiting for chart renderer to appear...");
+    // Verify line chart data is rendered correctly
     await page.waitForSelector('[data-test="chart-renderer"]', {
       state: "visible",
       timeout: 10000,
     });
-    console.log("✅ Chart renderer is visible");
 
-    // Wait for ECharts instance to be initialized
-    console.log("🔍 Waiting for ECharts instance to initialize...");
     await page.waitForFunction(
       () => {
         const chartElement = document.querySelector(
@@ -949,158 +852,41 @@ test.describe("dashboard UI testcases", () => {
       },
       { timeout: 15000 }
     );
-    console.log("✅ ECharts instance initialized");
 
-    // Wait a bit more for data to load into the chart
-    console.log("⏳ Waiting for chart data to load...");
     await page.waitForTimeout(2000);
 
-    // Check if canvas elements are present and have proper dimensions
-    const canvasElements = await page
-      .locator('[data-test="chart-renderer"] canvas')
-      .count();
-    console.log(
-      `🎨 Found ${canvasElements} canvas elements for chart rendering`
-    );
-    expect(canvasElements).toBeGreaterThan(0);
-
-    // Verify chart container has proper dimensions (indicates chart is rendered)
+    // Validate chart is properly rendered
     const chartContainer = page.locator('[data-test="chart-renderer"]');
     const boundingBox = await chartContainer.boundingBox();
-    console.log(
-      `📐 Chart dimensions: ${boundingBox.width}x${boundingBox.height}`
-    );
+    const canvasCount = await page
+      .locator('[data-test="chart-renderer"] canvas')
+      .count();
+
+    expect(canvasCount).toBeGreaterThan(0);
     expect(boundingBox.width).toBeGreaterThan(0);
     expect(boundingBox.height).toBeGreaterThan(0);
-
-    // Ensure no-data element is not visible when chart has data
-    const noDataVisible = await page
-      .locator('[data-test="no-data"]')
-      .isVisible();
-    console.log(`🚫 No-data element visible: ${noDataVisible}`);
     await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
 
-    // Check if ECharts instance has data using JavaScript evaluation
-    const chartDataInfo = await page.evaluate(() => {
-      const chartElement = document.querySelector(
-        '[data-test="chart-renderer"]'
-      );
-      if (!chartElement)
-        return { hasData: false, error: "Chart element not found" };
-
-      const echartsInstanceId = chartElement.getAttribute("_echarts_instance_");
-      if (!echartsInstanceId)
-        return { hasData: false, error: "No echarts instance ID" };
-
-      // Try multiple ways to access ECharts instance
-      let echartsInstance = null;
-
-      // Method 1: Try window.echarts
-      if (window.echarts && window.echarts.getInstanceById) {
-        echartsInstance = window.echarts.getInstanceById(echartsInstanceId);
-      }
-
-      // Method 2: Try accessing from the element directly
-      if (!echartsInstance && chartElement._echartsInstance) {
-        echartsInstance = chartElement._echartsInstance;
-      }
-
-      // Method 3: Try accessing from global echarts instances
-      if (!echartsInstance && window.echartsInstances) {
-        echartsInstance = window.echartsInstances[echartsInstanceId];
-      }
-
-      if (!echartsInstance) {
-        return {
-          hasData: false,
-          error: "ECharts instance not accessible",
-          instanceId: echartsInstanceId,
-          windowEcharts: !!window.echarts,
-          elementInstance: !!chartElement._echartsInstance,
-        };
-      }
-
-      // Get the option/data from the chart
-      const option = echartsInstance.getOption();
-      if (!option) return { hasData: false, error: "No chart options" };
-      if (!option.series)
-        return { hasData: false, error: "No series in options" };
-      if (!Array.isArray(option.series))
-        return { hasData: false, error: "Series is not an array" };
-
-      // Check if any series has data
-      const seriesWithData = option.series.filter(
-        (series) =>
-          series.data && Array.isArray(series.data) && series.data.length > 0
-      );
-
-      return {
-        hasData: seriesWithData.length > 0,
-        seriesCount: option.series.length,
-        seriesWithDataCount: seriesWithData.length,
-        firstSeriesDataLength: option.series[0]?.data?.length || 0,
-      };
-    });
-
-    console.log(`📊 Chart data info:`, chartDataInfo);
-
-    // If we can't access ECharts data, fall back to checking canvas content and no-data visibility
-    if (chartDataInfo.hasData) {
-      console.log("✅ ECharts instance has data");
-    } else {
-      console.log(
-        "⚠️ Could not verify data via ECharts instance, using fallback checks"
-      );
-      console.log("❌ ECharts error:", chartDataInfo.error);
-
-      // Fallback: Check that no-data is hidden and canvas has content
-      const noDataHidden = !(await page
-        .locator('[data-test="no-data"]')
-        .isVisible());
-      console.log(`📋 No-data element hidden: ${noDataHidden}`);
-
-      if (noDataHidden) {
-        console.log(
-          "✅ Fallback validation: No-data is hidden, assuming chart has data"
-        );
-      } else {
-        throw new Error(
-          "Chart appears to have no data - no-data element is visible"
-        );
-      }
-    }
-
-    // Additional check: Verify chart canvas has been drawn on (non-zero pixel data)
+    // Verify canvas has visual content
     const canvasHasContent = await page.evaluate(() => {
-      const canvases = document.querySelectorAll(
+      const canvas = document.querySelector(
         '[data-test="chart-renderer"] canvas'
       );
-      if (canvases.length === 0) return false;
+      if (!canvas) return false;
 
-      // Check the first canvas for any drawn content
-      const canvas = canvases[0];
       const ctx = canvas.getContext("2d");
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-      // Check if there are any non-transparent pixels
       for (let i = 3; i < imageData.data.length; i += 4) {
-        if (imageData.data[i] > 0) {
-          // Alpha channel > 0 means visible content
-          return true;
-        }
+        if (imageData.data[i] > 0) return true;
       }
       return false;
     });
 
-    console.log(`🎨 Canvas has visual content: ${canvasHasContent}`);
     expect(canvasHasContent).toBe(true);
 
-    console.log("🎉 All line chart data assertions passed successfully!");
-
-    await pm.dashboardPanelActions.addPanelName(panelName);
+    // Save panel and cleanup
     await pm.dashboardPanelActions.savePanel();
-
-    // Return to dashboard list and clean up
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
