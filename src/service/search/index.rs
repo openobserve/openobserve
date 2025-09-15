@@ -534,10 +534,10 @@ impl Condition {
                         })
                         .collect();
                     if let Some(value) = first_prefix {
-                        terms.push(Box::new(PhrasePrefixQuery::new_with_offset(vec![(
-                            0,
-                            Term::from_field_text(default_field, &value),
-                        )])));
+                        terms.push(Box::new(ContainsQuery::new_case_insensitive(
+                            &value,
+                            default_field,
+                        )?));
                     }
                     if let Some(value) = last_prefix {
                         terms.push(Box::new(PhrasePrefixQuery::new_with_offset(vec![(
