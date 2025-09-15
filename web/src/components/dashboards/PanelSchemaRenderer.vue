@@ -819,8 +819,8 @@ export default defineComponent({
           return (
             data.value[0]?.length > 1 ||
             (data.value[0]?.length == 1 &&
-              xAlias.some((x: any) => data.value[0][0][x] != null) ||
-            yAlias.some((y: any) => data.value[0][0][y] != null))
+              (xAlias.some((x: any) => data.value[0][0][x] != null) ||
+                yAlias.some((y: any) => data.value[0][0][y] != null)))
           );
         }
         case "metric": {
