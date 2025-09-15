@@ -129,18 +129,9 @@ pub async fn search(
         files.len(),
     );
 
-    let use_inverted_index = query.use_inverted_index
-        && index_condition.is_some()
-        && !index_condition.as_ref().unwrap().is_condition_all();
-    log::info!(
-        "[trace_id {}] flight->search: use_inverted_index {use_inverted_index}, index_condition {:?}",
-        query.trace_id,
-        index_condition,
-    );
-
     let mut idx_took = 0;
     let mut is_add_filter_back = false;
-    if use_inverted_index {
+    if query.use_inverted_index {
         (idx_took, is_add_filter_back, ..) = tantivy_search(
             query.clone(),
             &mut files,
