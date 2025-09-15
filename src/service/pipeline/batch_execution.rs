@@ -862,7 +862,7 @@ async fn process_node(
                     if let Err(e) =
                         crate::service::logs::ingest::handle_timestamp(&mut record, min_ts, max_ts)
                     {
-                        let err_msg = format!("DestinationNode error handling timestamp: {}", e);
+                        let err_msg = format!("DestinationNode error handling timestamp: {e}");
                         if let Err(send_err) = error_sender
                             .send((node.id.to_string(), node.node_type(), err_msg, None))
                             .await
