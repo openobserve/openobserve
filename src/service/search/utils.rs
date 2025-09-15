@@ -185,6 +185,9 @@ pub async fn collect_scan_stats(
     trace_id: &str,
     is_leader: bool,
 ) -> ScanStats {
+    let start = std::time::Instant::now();
+    log::info!("[trace_id {trace_id}] collecting scan stats start");
+
     let mut scan_stats = ScanStats::default();
     for node in nodes {
         let mut scan_stats_request = tonic::Request::new(proto::cluster_rpc::GetScanStatsRequest {
@@ -209,5 +212,10 @@ pub async fn collect_scan_stats(
         let stats = stats.into_inner().stats.unwrap_or_default();
         scan_stats.add(&(&stats).into());
     }
+
+    log::info!(
+        "[trace_id {trace_id}] collecting scan stats end: took {} ms",
+        start.elapsed().as_millis()
+    );
     scan_stats
 }
