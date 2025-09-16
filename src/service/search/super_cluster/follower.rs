@@ -35,9 +35,7 @@ use infra::{
     file_list::FileId,
     schema::get_stream_setting_index_fields,
 };
-use prometheus::register;
 use proto::cluster_rpc::{KvItem, SearchQuery};
-use sea_orm::sea_query::prepare;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::{
