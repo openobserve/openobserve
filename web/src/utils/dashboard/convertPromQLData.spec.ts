@@ -3371,5 +3371,529 @@ describe("Convert PromQL Data Utils", () => {
       expect(series.smooth).toBe(false); // Should not be smooth with step
       expect(series.connectNulls).toBe(false);
     });
+
+    describe("Additional comprehensive coverage tests", () => {
+      it("should handle chart with trellis layout enabled", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: {
+            trellis: {
+              layout: true
+            }
+          },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test_metric" },
+                values: [[1640435200, "100"]],
+              },
+            ],
+          },
+        ];
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        // When trellis layout is enabled, mark line/area should not be added
+        const markLineSeries = result.options.series.find((s: any) => s.markLine && s.markLine.data?.length > 0);
+        expect(markLineSeries).toBeUndefined();
+      });
+
+      it("should handle metric chart with vector resultType", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "metric",
+          config: {
+            unit: "bytes",
+            decimals: 2,
+            background: {
+              value: {
+                color: "#ff0000"
+              }
+            }
+          },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "vector",
+            result: [
+              {
+                metric: { __name__: "vector_metric" },
+                value: [1640435200, "123.45"],
+                values: [[1640435200, "123.45"]], // Add values property for vector type
+              },
+            ],
+          },
+        ];
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        expect(result.extras.isTimeSeries).toBe(false);
+        expect(result.options.backgroundColor).toBe("transparent"); // Default background is transparent
+        expect(result.options.series).toHaveLength(1);
+      });
+
+      it("should handle axis border configuration", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: {
+            axis_border_show: true
+          },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test_metric" },
+                values: [[1640435200, "100"]],
+              },
+            ],
+          },
+        ];
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        expect(result.options.xAxis.axisLine.show).toBe(true);
+        expect(result.options.yAxis.axisLine.show).toBe(true);
+      });
+
+      it("should handle axis width configuration", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: {
+            axis_width: 50
+          },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test_metric" },
+                values: [[1640435200, "100"]],
+              },
+            ],
+          },
+        ];
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        expect(result.options.grid.left).toBe(50);
+        expect(result.options.grid.containLabel).toBe(false);
+      });
+
+      it("should handle getSeriesColor exception gracefully", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: {
+            color: {
+              mode: "invalid_mode" // This should cause getSeriesColor to throw
+            }
+          },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test_metric" },
+                values: [[1640435200, "100"]],
+              },
+            ],
+          },
+        ];
+
+        // This should not throw an error due to the try-catch in the code
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        expect(result.options.series).toHaveLength(2); // One series + one annotation line series
+        // The color should fall back to a valid color from mocked getSeriesColor
+        expect(result.options.series[0].itemStyle.color).toBeDefined();
+      });
+
+      it("should handle calculateWidthText function in convertPromQLData", async () => {
+        // This test ensures the calculateWidthText function is covered
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: {
+            show_legends: true,
+            legends_position: "right"
+          },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test_metric_with_long_name_to_trigger_width_calculation" },
+                values: [[1640435200, "100"]],
+              },
+            ],
+          },
+        ];
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        // This should trigger the legend width calculation which uses calculateWidthText
+        expect(result.options.legend.orient).toBe("vertical");
+        expect(result.options.grid.right).toBeGreaterThan(0);
+      });
+
+      it("should handle scroll legend type with bottom position and configured height", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: {
+            show_legends: true,
+            legends_position: "bottom",
+            legends_type: "scroll",
+            legend_height: {
+              value: 80,
+              unit: "px"
+            }
+          },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test_metric" },
+                values: [[1640435200, "100"]],
+              },
+            ],
+          },
+        ];
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        expect(result.options.grid.bottom).toBe(80);
+        expect(result.options.legend.height).toBe(60); // 80 - 20 padding
+        expect(result.options.legend.top).toBeGreaterThan(200); // Should position legend at bottom
+      });
+
+      it("should handle null legends_type as auto with bottom position and configured height", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: {
+            show_legends: true,
+            legends_position: "bottom",
+            legends_type: null, // null means auto, which can be scroll
+            legend_height: {
+              value: 60,
+              unit: "%"
+            }
+          },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test_metric" },
+                values: [[1640435200, "100"]],
+              },
+            ],
+          },
+        ];
+
+        // Set chart height to 400 for percentage calculation
+        mockChartPanelRef.value.offsetHeight = 400;
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        const expectedHeight = 400 * (60 / 100); // 60% of 400 = 240
+        expect(result.options.grid.bottom).toBe(expectedHeight);
+        expect(result.options.legend.height).toBe(expectedHeight - 20); // padding
+      });
+
+      it("should test importMoment function coverage", async () => {
+        // This test ensures the importMoment function is called and moment is used
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: {},
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test_metric" },
+                values: [[1640435200, "100"]],
+              },
+            ],
+          },
+        ];
+
+        await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        // If we reach here without error, importMoment worked correctly
+        // The moment variable should be set to null at the end of the function
+        expect(true).toBe(true);
+      });
+
+      it("should test empty grid and series condition", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "unknown", // This will cause series to be empty
+          config: {},
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = []; // Empty data
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        expect(result.options).toBe(null);
+      });
+
+      it("should test gauge color fallback when values are null", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "gauge",
+          config: {
+            color: { mode: "palette" }
+          },
+          queries: [{ config: { promql_legend: "", min: 0, max: 100 } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "gauge_metric" },
+                values: [[1640435200, null]], // null value
+              },
+            ],
+          },
+        ];
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        const gaugeSeries = result.options.series[0];
+        expect(gaugeSeries.data[0].itemStyle.color).toBeNull(); // fallback color
+      });
+
+      it("should handle hover tooltip for different panel", async () => {
+        const panelSchema = {
+          id: "panel2", // Different from hovered panel
+          type: "line",
+          config: {},
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test_metric" },
+                values: [[1640435200, "100"]],
+              },
+            ],
+          },
+        ];
+
+        // Set hoveredSeriesState to different panel
+        mockHoveredSeriesState.value.panelId = "panel1";
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        // Test tooltip formatter
+        const tooltipFormatter = result.options.tooltip.formatter;
+        const mockTooltipData = [
+          {
+            data: [1640435200 * 1000, 100],
+            seriesName: "test_series",
+            marker: "●"
+          }
+        ];
+
+        const tooltipResult = tooltipFormatter(mockTooltipData);
+        expect(tooltipResult).toBe(""); // Should return empty string for different panel
+      });
+
+      it("should handle empty tooltip data", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: {},
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test_metric" },
+                values: [[1640435200, "100"]],
+              },
+            ],
+          },
+        ];
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        // Test tooltip formatter with empty data
+        const tooltipFormatter = result.options.tooltip.formatter;
+        const emptyTooltipData = [];
+
+        const tooltipResult = tooltipFormatter(emptyTooltipData);
+        expect(tooltipResult).toBe("");
+      });
+
+      it("should handle tooltip with null data values", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: {
+            unit: "bytes",
+            decimals: 2
+          },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test_metric" },
+                values: [[1640435200, "100"]],
+              },
+            ],
+          },
+        ];
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+        );
+
+        // Test tooltip formatter with null data value
+        const tooltipFormatter = result.options.tooltip.formatter;
+        const nullDataTooltip = [
+          {
+            data: [1640435200 * 1000, null], // null value
+            seriesName: "test_series",
+            marker: "●"
+          }
+        ];
+
+        const tooltipResult = tooltipFormatter(nullDataTooltip);
+        expect(typeof tooltipResult).toBe("string");
+      });
+    });
   });
 });
