@@ -52,7 +52,7 @@ fn create_cli_app() -> Command {
             Command::new("reset")
                 .about("reset openobserve data")
                 .arg(arg!("component", 'c', "component", "reset data of the component: root, user, alert, dashboard, function, stream-stats", true)),
-            clap::Command::new("import")
+            Command::new("import")
                 .about("import openobserve data").args(dataArgs()),
             Command::new("export")
                 .about("export openobserve data").args(dataArgs()),
