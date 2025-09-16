@@ -262,10 +262,7 @@ impl Search for Searcher {
         req: Request<GetResultRequest>,
     ) -> Result<Response<GetResultResponse>, Status> {
         let path = req.into_inner().path;
-        let res = infra::storage::get(&path)
-            .await
-            .map_err(|e| Status::internal(format!("failed to get result: {e}")))?
-            .bytes()
+        let res = infra::storage::get_bytes("", &path)
             .await
             .map_err(|e| Status::internal(format!("failed to get result: {e}")))?;
         Ok(Response::new(GetResultResponse {
@@ -287,8 +284,11 @@ impl Search for Searcher {
         req: Request<DeleteResultRequest>,
     ) -> Result<Response<DeleteResultResponse>, Status> {
         let paths = req.into_inner().paths;
-        let paths = paths.iter().map(|path| path.as_str()).collect::<Vec<_>>();
-        let _ = infra::storage::del(&paths)
+        let paths = paths
+            .iter()
+            .map(|path| ("", path.as_str()))
+            .collect::<Vec<_>>();
+        let _ = infra::storage::del(paths)
             .await
             .map_err(|e| Status::internal(format!("failed to delete result: {e}")))?;
         Ok(Response::new(DeleteResultResponse {}))
