@@ -24,14 +24,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="row items-center no-wrap">
         <div class="col">
           <div
-            class="text-body1 tw-font-semibold tw-text-xl"
+            class="tw-text-[18px]"
             data-test="schema-title-text"
           >
             {{ t("logStream.schemaHeader") }}
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="close" />
+          <q-btn v-close-popup="true" round flat icon="cancel" >
+          </q-btn>
         </div>
       </div>
     </q-card-section>
@@ -645,9 +646,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
                   data-test="schema-add-field-button"
-                  class="q-my-sm no-border text-bold q-mr-md"
-                  padding="sm md"
-                  color="primary"
+                  class=" no-border q-mr-md o2-secondary-button tw-h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   no-caps
                   v-bind:disable="!selectedFields.length"
                   @click="updateDefinedSchemaFields"
@@ -667,13 +667,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     !selectedFields.length && !selectedDateFields.length
                   "
                   data-test="schema-delete-button"
-                  class="q-my-sm text-bold btn-delete"
-                  text-color="red"
-                  padding="sm md"
+                  class="q-my-sm text-bold btn-delete o2-secondary-button tw-h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   no-caps
-                  dense
                   flat
-                  style="border: 1px red solid"
                   @click="
                     activeMainTab == 'schemaSettings'
                       ? (confirmQueryModeChangeDialog = true)
@@ -690,24 +687,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-close-popup="true"
                   data-test="schema-cancel-button"
-                  class="q-my-sm text-bold q-ml-md btn-delete"
+                  class="q-ml-md o2-secondary-button tw-h-[36px]"
                   :label="t('logStream.cancel')"
-                  text-color="red"
-                  padding="sm md"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   no-caps
-                  dense
                   flat
-                  style="border: 1px red solid"
                 />
                 <q-btn
                   v-bind:disable="!formDirtyFlag"
                   data-test="schema-update-settings-button"
                   :label="t('logStream.updateSettings')"
-                  class="q-my-sm text-bold no-border q-ml-md"
-                  color="secondary"
-                  padding="sm xl"
+                  class=" no-border q-ml-md o2-primary-button tw-h-[36px"
+                  :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                   type="submit"
                   no-caps
+                  flat
                 />
               </div>
             </div>
@@ -2326,12 +2320,10 @@ export default defineComponent({
   width: 100%;
 }
 .dark-theme-floating-buttons {
-  background-color: var(--q-light);
-  backdrop-filter: blur(10px);
+  background-color: #181a1b;
 }
 .light-theme-floating-buttons {
-  background-color: var(--q-light);
-  backdrop-filter: blur(10px);
+  background-color: #ffffff
 }
 
 .warning-text {

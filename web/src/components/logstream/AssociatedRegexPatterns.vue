@@ -3,7 +3,6 @@
         <div class="tw-flex tw-items-center no-wrap tw-justify-between tw-px-4 tw-py-2">
         <div class="tw-flex tw-items-center">
             <div class="col-auto">
-            <q-btn data-test="associated-regex-patterns-back-btn" v-close-popup="true" round flat icon="arrow_back" />
         </div>
           <div
             class="tw-flex tw-items-center"
@@ -17,7 +16,9 @@
           </div>
         </div>
         <div class="col-auto">
-          <q-btn data-test="associated-regex-patterns-close-btn" v-close-popup="true" round flat icon="close" />
+          <q-btn data-test="associated-regex-patterns-close-btn" v-close-popup="true" round flat>
+            <q-icon name="cancel" />
+          </q-btn>
         </div>
       </div>
       <q-separator />
