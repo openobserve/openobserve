@@ -61,6 +61,7 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
       show_legends: true,
       legends_position: null,
       legends_type: null,
+      chart_align: null,
       unit: null,
       unit_custom: null,
       decimals: 2,
@@ -80,6 +81,10 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
         store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false,
       line_interpolation: "smooth",
       legend_width: {
+        value: null,
+        unit: "px",
+      },
+      legend_height: {
         value: null,
         unit: "px",
       },
