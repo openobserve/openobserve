@@ -83,13 +83,13 @@ pub async fn search(
     let mut ctx =
         prepare_datafusion_context(work_group.clone(), vec![], vec![], false, cfg.limit.cpu_num)
             .await?;
-    
+
     log::info!("[trace_id {trace_id}] flight->search: prepared datafusion context");
 
     // register udf
     register_udf(&ctx, &org_id)?;
     datafusion_functions_json::register_all(&mut ctx)?;
-    
+
     log::info!("[trace_id {trace_id}] flight->search: registered udf and ctx");
 
     // Decode physical plan from bytes
@@ -98,7 +98,7 @@ pub async fn search(
     };
     let mut physical_plan =
         physical_plan_from_bytes_with_extension_codec(&req.search_info.plan, &ctx, &proto)?;
-    
+
     log::info!("[trace_id {trace_id}] flight->search: decoded physical plan");
 
     // replace empty table to real table
