@@ -691,7 +691,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     let idx = get_bucket_idx(&file_key);
                     let total = LOADING_FROM_DISK_NUM.fetch_add(1, Ordering::Relaxed);
                     // print progress
-                    if total % 1000 == 0 {
+                    if total.is_multiple_of(1000) {
                         log::info!("Loading disk cache {total}");
                     }
                     if file_key.starts_with("files") {

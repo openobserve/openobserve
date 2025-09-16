@@ -20,7 +20,6 @@ use arrow_schema::{DataType, Field};
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
-        inverted_index::IndexOptimizeMode,
         search::SearchEventType,
         sql::{OrderBy, TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
@@ -37,22 +36,18 @@ use proto::cluster_rpc::SearchQuery;
 use regex::Regex;
 use sqlparser::{ast::VisitMut, dialect::PostgreSqlDialect, parser::Parser};
 
-use super::{
-    index::{Condition, IndexCondition},
-    request::Request,
-};
+use super::request::Request;
 use crate::service::search::sql::{
     rewriter::{
         add_o2_id::AddO2IdVisitor, add_timestamp::AddTimestampVisitor,
-        approx_percentile::ReplaceApproxPercentiletVisitor, index::IndexVisitor,
-        match_all_raw::MatchAllRawVisitor, remove_dashboard_placeholder::RemoveDashboardAllVisitor,
+        approx_percentile::ReplaceApproxPercentiletVisitor, match_all_raw::MatchAllRawVisitor,
+        remove_dashboard_placeholder::RemoveDashboardAllVisitor,
         track_total_hits::TrackTotalHitsVisitor,
     },
     schema::{generate_schema_fields, generate_select_star_schema, has_original_column},
     visitor::{
         column::ColumnVisitor,
         histogram_interval::{HistogramIntervalVisitor, validate_and_adjust_histogram_interval},
-        index_optimize::IndexOptimizeModeVisitor,
         match_all::MatchVisitor,
         partition_column::PartitionColumnVisitor,
         utils::is_complex_query,
@@ -89,8 +84,6 @@ pub struct Sql {
     pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
     pub sorted_by_time: bool, // if only order by _timestamp
-    pub index_condition: Option<IndexCondition>, // use for tantivy index
-    pub index_optimize_mode: Option<IndexOptimizeMode>,
 }
 
 impl Sql {
@@ -264,74 +257,7 @@ impl Sql {
             }
         }
 
-        // 13. generate tantivy query
-        // TODO: merge IndexVisitor and IndexOptimizeModeVisitor
-        let mut index_condition = None;
-        let mut can_optimize = false;
-        if stream_names.len() == 1 && cfg.common.inverted_index_enabled {
-            let mut index_visitor = IndexVisitor::new(
-                &used_schemas,
-                cfg.common.feature_query_remove_filter_with_index,
-                cfg.common.inverted_index_count_optimizer_enabled,
-            );
-            let _ = statement.visit(&mut index_visitor);
-            index_condition = index_visitor.index_condition;
-            can_optimize = index_visitor.can_optimize;
-        }
-        //********************Change the sql end*********************************//
-
-        // use all condition for histogram without filter
-        if can_optimize && index_condition.is_none() {
-            index_condition = Some(IndexCondition {
-                conditions: vec![Condition::All()],
-            });
-        }
-
-        // 14. check `select * from table where match_all()` optimizer
-        let mut index_optimize_mode = None;
-        if !is_complex_query(&mut statement)
-            && order_by.len() == 1
-            && order_by[0].0 == TIMESTAMP_COL_NAME
-            && can_optimize
-        {
-            index_optimize_mode = Some(IndexOptimizeMode::SimpleSelect(
-                (offset + limit) as usize,
-                order_by[0].1 == OrderBy::Asc,
-            ));
-        }
-
-        // 15. check other inverted index optimize modes
-        // `select count(*) from table where match_all` -> SimpleCount
-        // or `select histogram(..), count(*) from table where match_all` -> SimpleHistogram
-        // or `select id, count(*) from t group by id order by cnt desc limit 10` -> SimpleTopN
-        // or `select id from t where str_match(id, 'value') group by id order by id asc limit 10`
-        // -> SimpleDistinct
-        if can_optimize && index_optimize_mode.is_none() {
-            let mut visitor = IndexOptimizeModeVisitor::new(&used_schemas);
-            let _ = statement.visit(&mut visitor);
-            if visitor.is_simple_count {
-                index_optimize_mode = Some(IndexOptimizeMode::SimpleCount);
-            } else if visitor.is_simple_histogram && histogram_interval_visitor.interval.is_some() {
-                let bucket_width = histogram_interval.unwrap() as u64 * 1_000_000;
-                // round the bucket edges to even start
-                let rounding_by = bucket_width as i64;
-                let min_value = query.start_time - query.start_time % rounding_by;
-                let max_value = query.end_time;
-                let num_buckets =
-                    ((max_value - min_value) as f64 / bucket_width as f64).ceil() as usize;
-                index_optimize_mode = Some(IndexOptimizeMode::SimpleHistogram(
-                    min_value,
-                    bucket_width,
-                    num_buckets,
-                ));
-            } else if let Some((field, limit, asc)) = visitor.simple_topn {
-                index_optimize_mode = Some(IndexOptimizeMode::SimpleTopN(field, limit, asc));
-            } else if let Some((field, limit, asc)) = visitor.simple_distinct {
-                index_optimize_mode = Some(IndexOptimizeMode::SimpleDistinct(field, limit, asc));
-            }
-        }
-
-        // 16. replace the Utf8 to Utf8View type
+        // 12. replace the Utf8 to Utf8View type
         let final_schemas = if cfg.common.utf8_view_enabled {
             let mut final_schemas = HashMap::with_capacity(used_schemas.len());
             for (stream, schema) in used_schemas.iter() {
@@ -387,8 +313,6 @@ impl Sql {
             order_by,
             histogram_interval,
             sorted_by_time: need_sort_by_time,
-            index_condition,
-            index_optimize_mode,
         })
     }
 }
@@ -397,7 +321,7 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, has_match_all: {}, equal_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, index_condition: {:?}, index_optimize_mode: {:?}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, has_match_all: {}, equal_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, is_complex: {}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -412,8 +336,7 @@ impl std::fmt::Display for Sql {
             self.order_by,
             self.histogram_interval,
             self.sorted_by_time,
-            self.index_condition,
-            self.index_optimize_mode,
+            self.is_complex,
         )
     }
 }

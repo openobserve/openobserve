@@ -59,9 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
           :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           no-caps
-          :label="t(`logStream.refreshStats`)"
           @click="getLogStream(true)"
-        />
+        >
+          <q-icon name="refresh" size="18px" />
+          <span class="tw-ml-2">{{ t(`logStream.refreshStats`) }}</span>
+      </q-btn>
         <q-btn
           v-if="isSchemaUDSEnabled"
           data-test="log-stream-add-stream-btn"
