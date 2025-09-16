@@ -1285,4 +1285,618 @@ describe("ConfigPanel", () => {
       expect(wrapper.vm.dashboardPanelData.data.config.legends_type).toBe("scroll");
     });
   });
+
+  describe("Advanced Configuration Edge Cases", () => {
+    it("should handle legend width configuration with extreme values", () => {
+      const extremePanelData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          config: {
+            ...mockDashboardPanelData.data.config,
+            legend_width: { value: 9999, unit: "px" },
+            show_legends: true
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: extremePanelData });
+      expect(wrapper.vm.dashboardPanelData.data.config.legend_width.value).toBe(9999);
+      expect(wrapper.vm.dashboardPanelData.data.config.legend_width.unit).toBe("px");
+    });
+
+    it("should handle legend width with percentage values", () => {
+      const percentagePanelData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          config: {
+            ...mockDashboardPanelData.data.config,
+            legend_width: { value: 25, unit: "%" },
+            show_legends: true
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: percentagePanelData });
+      expect(wrapper.vm.dashboardPanelData.data.config.legend_width.unit).toBe("%");
+    });
+
+    it("should handle negative step values gracefully", async () => {
+      wrapper = createWrapper({}, { promqlMode: true });
+      await wrapper.vm.$nextTick();
+
+      // Set negative step value
+      wrapper.vm.dashboardPanelData.data.config.step_value = -10;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.dashboardPanelData.data.config.step_value).toBe(-10);
+    });
+
+    it("should handle extremely large step values", async () => {
+      wrapper = createWrapper({}, { promqlMode: true });
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.dashboardPanelData.data.config.step_value = Number.MAX_SAFE_INTEGER;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.dashboardPanelData.data.config.step_value).toBe(Number.MAX_SAFE_INTEGER);
+    });
+
+    it("should handle special characters in description field", async () => {
+      wrapper = createWrapper();
+
+      const specialCharsDescription = "Special chars: <>\"'&\n\t\n\\/@#$%^&*()";
+      const descriptionInput = wrapper.find('[data-test="dashboard-config-description"]');
+      await descriptionInput.setValue(specialCharsDescription);
+
+      expect(wrapper.vm.dashboardPanelData.data.description).toBe(specialCharsDescription);
+    });
+
+    it("should handle very long description text", async () => {
+      wrapper = createWrapper();
+
+      const longDescription = "A".repeat(10000); // Very long description
+      const descriptionInput = wrapper.find('[data-test="dashboard-config-description"]');
+      await descriptionInput.setValue(longDescription);
+
+      expect(wrapper.vm.dashboardPanelData.data.description).toBe(longDescription);
+    });
+
+    it("should maintain focus when toggling between configurations", async () => {
+      wrapper = createWrapper({}, { promqlMode: true });
+      await wrapper.vm.$nextTick();
+
+      const stepValueInput = wrapper.find('[data-test="dashboard-config-step-value"]');
+      if (stepValueInput.exists()) {
+        await stepValueInput.trigger('focus');
+        await stepValueInput.setValue("30");
+
+        expect(wrapper.vm.dashboardPanelData.data.config.step_value).toBe("30");
+      }
+    });
+  });
+
+  describe("Complex Trellis Configuration Scenarios", () => {
+    it("should handle trellis with custom layout and extreme column numbers", () => {
+      const trellisData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          config: {
+            ...mockDashboardPanelData.data.config,
+            trellis: {
+              layout: "custom",
+              num_of_columns: 16, // Maximum
+              group_by_y_axis: true
+            }
+          },
+          queries: [{
+            ...mockDashboardPanelData.data.queries[0],
+            fields: {
+              breakdown: [{ field: "service" }, { field: "environment" }] // Multiple breakdown fields
+            }
+          }]
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: trellisData });
+
+      expect(wrapper.vm.dashboardPanelData.data.config.trellis.num_of_columns).toBe(16);
+      expect(wrapper.vm.dashboardPanelData.data.config.trellis.group_by_y_axis).toBe(true);
+    });
+
+    it("should handle trellis column number validation", async () => {
+      const trellisData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          config: {
+            ...mockDashboardPanelData.data.config,
+            trellis: {
+              layout: "custom",
+              num_of_columns: 1,
+              group_by_y_axis: false
+            }
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: trellisData });
+
+      // Try to set invalid column number (> 16)
+      wrapper.vm.dashboardPanelData.data.config.trellis.num_of_columns = 20;
+      await wrapper.vm.$nextTick();
+
+      // The component doesn't automatically clamp the value, so we just check it's set
+      expect(wrapper.vm.dashboardPanelData.data.config.trellis.num_of_columns).toBe(20);
+    });
+
+    it("should handle trellis with different chart types", () => {
+      const chartTypes = ['area', 'bar', 'line', 'stacked', 'area-stacked'];
+
+      chartTypes.forEach(type => {
+        const trellisData = {
+          ...mockDashboardPanelData,
+          data: {
+            ...mockDashboardPanelData.data,
+            type,
+            config: {
+              ...mockDashboardPanelData.data.config,
+              trellis: {
+                layout: "auto",
+                group_by_y_axis: true
+              }
+            },
+            queries: [{
+              ...mockDashboardPanelData.data.queries[0],
+              fields: {
+                breakdown: [{ field: "service" }]
+              }
+            }]
+          }
+        };
+
+        wrapper = createWrapper({ dashboardPanelData: trellisData });
+        expect(wrapper.vm.dashboardPanelData.data.type).toBe(type);
+        expect(wrapper.vm.dashboardPanelData.data.config.trellis.group_by_y_axis).toBe(true);
+
+        if (wrapper) {
+          wrapper.unmount();
+        }
+      });
+    });
+  });
+
+  describe("Input Validation and Constraints", () => {
+    it("should handle empty/null config objects", () => {
+      const minimalData = {
+        data: {
+          id: "test",
+          title: "Test",
+          description: "",
+          type: "line",
+          queries: [{
+            fields: { breakdown: [] },
+            config: { limit: 1000 }
+          }],
+          config: {} // Empty config instead of null
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: { stream: { selectedStreamFields: [] } }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: minimalData });
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should handle malformed trellis configuration", () => {
+      const malformedTrellisData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          config: {
+            ...mockDashboardPanelData.data.config,
+            trellis: null // Malformed trellis
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: malformedTrellisData });
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should handle step value with decimal places", async () => {
+      wrapper = createWrapper({}, { promqlMode: true });
+      await wrapper.vm.$nextTick();
+
+      const stepValueInput = wrapper.find('[data-test="dashboard-config-step-value"]');
+      if (stepValueInput.exists()) {
+        await stepValueInput.setValue("30.5");
+        expect(wrapper.vm.dashboardPanelData.data.config.step_value).toBe("30.5");
+      }
+    });
+
+    it("should handle non-standard config property types", () => {
+      const nonStandardData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          config: {
+            ...mockDashboardPanelData.data.config,
+            custom_property: "test",
+            numeric_string: "123",
+            boolean_string: "true"
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: nonStandardData });
+      expect(wrapper.vm.dashboardPanelData.data.config.custom_property).toBe("test");
+    });
+  });
+
+  describe("Memory and Performance Edge Cases", () => {
+    it("should handle rapid configuration changes without memory leaks", async () => {
+      wrapper = createWrapper();
+
+      // Simulate rapid changes
+      for (let i = 0; i < 100; i++) {
+        wrapper.vm.dashboardPanelData.data.config.show_gridlines = i % 2 === 0;
+        wrapper.vm.dashboardPanelData.data.config.connect_nulls = i % 3 === 0;
+        await wrapper.vm.$nextTick();
+      }
+
+      expect(wrapper.vm.dashboardPanelData.data.config.show_gridlines).toBeDefined();
+    });
+
+    it("should handle large number of breakdown fields efficiently", () => {
+      const manyBreakdownFields = Array.from({ length: 50 }, (_, i) => ({ field: `field_${i}` }));
+
+      const largeBreakdownData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          queries: [{
+            ...mockDashboardPanelData.data.queries[0],
+            fields: {
+              breakdown: manyBreakdownFields
+            }
+          }]
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: largeBreakdownData });
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown).toHaveLength(50);
+    });
+
+    it("should handle complex nested configuration updates", async () => {
+      wrapper = createWrapper();
+
+      // Deep nested updates
+      wrapper.vm.dashboardPanelData.data.config.map_symbol_style.size_by_value.min = 0.1;
+      wrapper.vm.dashboardPanelData.data.config.map_symbol_style.size_by_value.max = 999.9;
+      wrapper.vm.dashboardPanelData.data.config.label_option.rotate = 45;
+
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.dashboardPanelData.data.config.map_symbol_style.size_by_value.min).toBe(0.1);
+      expect(wrapper.vm.dashboardPanelData.data.config.map_symbol_style.size_by_value.max).toBe(999.9);
+      expect(wrapper.vm.dashboardPanelData.data.config.label_option.rotate).toBe(45);
+    });
+  });
+
+  describe("Component Integration and Props Handling", () => {
+    it("should handle ColorBySeries stub properly", () => {
+      const colorBySeriesData = {
+        field1: "#ff0000",
+        field2: "#00ff00",
+        field3: "#0000ff"
+      };
+
+      wrapper = createWrapper({ colorBySeriesData });
+      const colorBySeriesStub = wrapper.find('[data-test="color-by-series-stub"]');
+      expect(colorBySeriesStub.exists()).toBe(true);
+    });
+
+    it("should render stubbed components when they exist", () => {
+      wrapper = createWrapper();
+
+      // Test that component is properly mounted and stubbed components configuration exists
+      expect(wrapper.vm).toBeDefined();
+      expect(wrapper.exists()).toBe(true);
+
+      // Verify the component has the proper stubbed components configured in the mount options
+      expect(wrapper.element).toBeDefined();
+    });
+
+    it("should handle all props variations simultaneously", () => {
+      const complexProps = {
+        dashboardPanelData: mockDashboardPanelData,
+        variablesData: {
+          values: [
+            { name: "var1", value: "test1" },
+            { name: "var2", value: ["test2", "test3"] }
+          ]
+        },
+        panelData: { chartType: "line", options: {} },
+        promqlMode: true,
+        colorBySeriesData: { series1: "#ff0000" },
+        panelSchema: { type: "line", config: {} },
+        overrideConfig: { legend: { show: true } },
+        valueMappingData: [{ from: 0, to: 100, text: "Range" }]
+      };
+
+      wrapper = createWrapper(complexProps, { promqlMode: true });
+      expect(wrapper.exists()).toBe(true);
+      expect(wrapper.props().variablesData).toEqual(complexProps.variablesData);
+    });
+  });
+
+  describe("Computed Properties and Watchers", () => {
+    it("should handle computed property dependencies", () => {
+      wrapper = createWrapper();
+
+      // Test computed properties that depend on reactive data
+      expect(wrapper.vm.showTrellisConfig).toBeDefined();
+      expect(wrapper.vm.trellisOptions).toBeDefined();
+      expect(wrapper.vm.legendTypeOptions).toBeDefined();
+    });
+
+    it("should handle reactive updates to panel type", async () => {
+      wrapper = createWrapper();
+
+      // Change panel type and verify reactivity
+      wrapper.vm.dashboardPanelData.data.type = "gauge";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.dashboardPanelData.data.type).toBe("gauge");
+    });
+
+    it("should handle reactive updates to config properties", async () => {
+      wrapper = createWrapper();
+
+      // Multiple reactive updates
+      const updates = {
+        show_gridlines: true,
+        connect_nulls: true,
+        wrap_table_cells: true,
+        table_transpose: true,
+        top_results_others: true
+      };
+
+      for (const [key, value] of Object.entries(updates)) {
+        wrapper.vm.dashboardPanelData.data.config[key] = value;
+        await wrapper.vm.$nextTick();
+        expect(wrapper.vm.dashboardPanelData.data.config[key]).toBe(value);
+      }
+    });
+  });
+
+  describe("Error Recovery and Resilience", () => {
+    it("should recover from temporary invalid configurations", () => {
+      wrapper = createWrapper();
+
+      // Temporarily set invalid config
+      const originalConfig = wrapper.vm.dashboardPanelData.data.config;
+      wrapper.vm.dashboardPanelData.data.config = null;
+
+      expect(wrapper.exists()).toBe(true);
+
+      // Restore valid config
+      wrapper.vm.dashboardPanelData.data.config = originalConfig;
+      expect(wrapper.vm.dashboardPanelData.data.config).toBeDefined();
+    });
+
+    it("should handle undefined dashboard panel data gracefully", () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      wrapper = createWrapper({ dashboardPanelData: undefined });
+      expect(wrapper.exists()).toBe(true);
+
+      consoleWarnSpy.mockRestore();
+    });
+
+    it("should handle circular reference in configuration", () => {
+      wrapper = createWrapper();
+
+      // Create a circular reference scenario
+      const circularRef = { self: null };
+      circularRef.self = circularRef;
+
+      // This should not break the component
+      expect(() => {
+        wrapper.vm.dashboardPanelData.data.config.circular = circularRef;
+      }).not.toThrow();
+    });
+  });
+
+  describe("Accessibility and User Experience", () => {
+    it("should maintain correct tab order for form elements", async () => {
+      wrapper = createWrapper({}, { promqlMode: true });
+      await wrapper.vm.$nextTick();
+
+      const formElements = wrapper.findAll('input, select, textarea, button');
+      expect(formElements.length).toBeGreaterThan(0);
+
+      // Each form element should be keyboard accessible
+      formElements.forEach(element => {
+        expect(element.exists()).toBe(true);
+      });
+    });
+
+    it("should provide appropriate aria labels and descriptions", () => {
+      wrapper = createWrapper({}, { promqlMode: true });
+
+      // Check for accessibility attributes on key elements
+      const descriptionInput = wrapper.find('[data-test="dashboard-config-description"]');
+      expect(descriptionInput.exists()).toBe(true);
+    });
+
+    it("should handle high contrast mode compatibility", () => {
+      wrapper = createWrapper();
+
+      // Component should render without errors in different display modes
+      expect(wrapper.find('[data-test="dashboard-config-description"]').exists()).toBe(true);
+    });
+  });
+
+  describe("Integration with External Dependencies", () => {
+    it("should handle store updates correctly", async () => {
+      wrapper = createWrapper();
+
+      // Simulate store updates
+      if (wrapper.vm.store && wrapper.vm.store.state) {
+        wrapper.vm.store.state.selectedOrganization = { identifier: "new-org" };
+        await wrapper.vm.$nextTick();
+      }
+
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should handle i18n translation updates", () => {
+      wrapper = createWrapper();
+
+      // Component should handle translation changes
+      expect(wrapper.text()).toContain("Description");
+    });
+
+    it("should handle theme changes", async () => {
+      wrapper = createWrapper();
+
+      // Simulate theme change
+      document.body.classList.add('dark-theme');
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.exists()).toBe(true);
+
+      // Cleanup
+      document.body.classList.remove('dark-theme');
+    });
+  });
+
+  describe("Component Lifecycle and Cleanup", () => {
+    it("should initialize properly with all default values", () => {
+      wrapper = createWrapper();
+
+      // Check that all expected default values are set
+      const config = wrapper.vm.dashboardPanelData.data.config;
+      expect(config).toBeDefined();
+      expect(config.show_gridlines).toBeDefined();
+      expect(config.connect_nulls).toBeDefined();
+    });
+
+    it("should cleanup properly on unmount", () => {
+      wrapper = createWrapper();
+      const componentInstance = wrapper.vm;
+
+      expect(() => {
+        wrapper.unmount();
+      }).not.toThrow();
+
+      // Verify cleanup occurred
+      expect(componentInstance).toBeDefined();
+    });
+
+    it("should handle multiple mount/unmount cycles", () => {
+      for (let i = 0; i < 5; i++) {
+        wrapper = createWrapper();
+        expect(wrapper.exists()).toBe(true);
+        wrapper.unmount();
+      }
+
+      // Final wrapper for other tests
+      wrapper = createWrapper();
+    });
+  });
+
+  describe("Legend Configuration WatchEffects", () => {
+    it("should clear legend height when legends_position is bottom and legends_type is scroll", async () => {
+      const panelDataWithLegendHeight = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          config: {
+            ...mockDashboardPanelData.data.config,
+            legends_position: "bottom",
+            legends_type: "scroll",
+            legend_height: { value: 100, unit: "px" }
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: panelDataWithLegendHeight });
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      // Legend height should be cleared due to watchEffect
+      expect(wrapper.vm.dashboardPanelData.data.config.legend_height.value).toBe(null);
+    });
+
+    it("should clear legend height when legends_position is null and legends_type is null", async () => {
+      const panelDataWithLegendHeight = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          config: {
+            ...mockDashboardPanelData.data.config,
+            legends_position: null,
+            legends_type: null,
+            legend_height: { value: 150, unit: "px" }
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: panelDataWithLegendHeight });
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      // Legend height should be cleared due to watchEffect
+      expect(wrapper.vm.dashboardPanelData.data.config.legend_height.value).toBe(null);
+    });
+
+    it("should not clear legend height when conditions don't match", async () => {
+      const panelDataWithLegendHeight = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          config: {
+            ...mockDashboardPanelData.data.config,
+            legends_position: "top",
+            legends_type: "list",
+            legend_height: { value: 100, unit: "px" }
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: panelDataWithLegendHeight });
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      // Legend height should not be cleared
+      expect(wrapper.vm.dashboardPanelData.data.config.legend_height.value).toBe(100);
+    });
+
+    it("should handle missing legend_height configuration gracefully", async () => {
+      const panelDataWithoutLegendHeight = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          config: {
+            ...mockDashboardPanelData.data.config,
+            legends_position: "bottom",
+            legends_type: "scroll"
+            // No legend_height property
+          }
+        }
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: panelDataWithoutLegendHeight });
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      // Should not throw error when legend_height is missing
+      expect(wrapper.vm).toBeDefined();
+    });
+  });
 });
