@@ -27,7 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="name"
         :pagination="pagination"
         :filter="filterQuery"
+        selection="multiple"
         :filter-method="filterData"
+        v-model:selected="selectedPipelines"
         style="width: 100%"
         dense
       >
@@ -38,6 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="cursor: pointer"
           @click="triggerExpand(props)"
         >
+          <q-td auto-width>
+              <q-checkbox
+                color="secondary"
+                v-model="props.selected"
+                size="sm"
+                @click.stop
+              />
+            </q-td>
           <q-td v-if="activeTab == 'scheduled' "  >
             
             <q-btn
@@ -152,6 +162,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #no-data>
           <no-data />
         </template>
+        <template v-slot:body-selection="scope">
+          <q-checkbox color="secondary" v-model="scope.selected" size="sm" />
+        </template>
  
         <template v-slot:body-cell-function="props">
           <q-td :props="props">
@@ -218,6 +231,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #bottom="scope">
+          <div class="bottom-btn">
+            <q-btn
+                  v-if="selectedPipelines.length > 0"
+                  data-test="pipeline-list-export-pipelines-btn"
+                  class="flex items-center q-mr-md export-btn no-border"
+                  color="secondary"
+                  icon="download"
+                  no-caps
+                  :label="'Export'"
+                  @click="exportBulkPipelines"
+                />
+            <q-btn
+              v-if="selectedPipelines.length > 0"
+              data-test="pipeline-list-pause-pipelines-btn"
+              class="flex items-center q-mr-md pause-btn no-border"
+              color="secondary"
+              icon="pause"
+              :label="'Pause'"
+              no-caps
+              @click="bulkPausePipelines"
+            />
+            <q-btn
+              v-if="selectedPipelines.length > 0"
+              data-test="pipeline-list-resume-pipelines-btn"
+              class="flex items-center resume-btn no-border"
+              color="secondary"
+              icon="play_arrow"
+              :label="'Resume'"
+              no-caps
+              @click="bulkResumePipelines"
+            />
           <q-table-pagination
             :scope="scope"
             :position="'bottom'"
@@ -225,7 +269,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :perPageOptions="perPageOptions"
             @update:changeRecordPerPage="changePagination"
           />
+        </div>
         </template>
+
+        <template v-slot:header="props">
+            <q-tr :props="props">
+              <!-- Adding this block to render the select-all checkbox -->
+              <q-th auto-width>
+                <q-checkbox
+                  color="secondary"
+                  v-model="props.selected"
+                  size="sm"
+                  @update:model-value="props.select"
+                />
+              </q-th>
+
+              <!-- Rendering the rest of the columns -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
+          </template>
       </q-table>
     </div>
   </div>
@@ -294,6 +363,8 @@ const store = useStore();
 const isEnabled = ref(false);
 
 const { pipelineObj } = useDragAndDrop();
+
+const selectedPipelines = ref<any[]>([]);
 
 watch(
   () => router.currentRoute.value,
@@ -626,6 +697,7 @@ const deletePipeline = async () => {
       }
     })
     .finally(async () => {
+      selectedPipelines.value = [];
       await getPipelines();
       updateActiveTab();
          dismiss();
@@ -693,6 +765,126 @@ const routeToImportPipeline = () =>{
     },
   });
 }
+const exportBulkPipelines = () => {
+  // Create an array of selected pipelines without modifying their structure
+  const pipelinesToExport = selectedPipelines.value;
+
+  const exportJson = JSON.stringify(pipelinesToExport, null, 2);
+  const blob = new Blob([exportJson], { type: "application/json" });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  const date = new Date().toISOString().split("T")[0];
+  link.download = `pipelines_export_${date}.json`;
+
+  link.click();
+
+  URL.revokeObjectURL(url);
+
+  selectedPipelines.value = [];
+  q.notify({
+    message: `${pipelinesToExport.length} pipelines exported successfully`,
+    color: "positive",
+    position: "bottom",
+    timeout: 3000,
+  });
+};
+
+//here we need to bulk pause the pipelines
+//so before sending the request in the payload we need to send additional field called names which is an array of pipeline names
+//those are corresponding to the selectedIds
+//and also before sending the request we need to filter out the pipelines which are already paused
+const bulkPausePipelines = async () => {
+      try{
+        //here we will filter out the alerts which are already paused
+        const toBePausedPipelines = selectedPipelines.value.filter((pipeline: any) => pipeline.enabled);
+        if(toBePausedPipelines.length === 0){
+          q.notify({
+            type: "negative",
+            message: "No pipelines to pause",
+            timeout: 2000,
+          });
+          return;
+        }
+        const dismiss = q.notify({
+          spinner: true,
+          message: "Pausing pipelines...",
+          timeout: 0,
+        });
+        //make sure that ids and names are in the same order
+        const pipelineIds = toBePausedPipelines.map((pipeline: any) => pipeline.pipeline_id);
+        const pipelineNames = toBePausedPipelines.map((pipeline: any) => pipeline.name);
+        const payload = {
+          names: pipelineNames,
+          ids: pipelineIds,
+        };
+        const response = await pipelineService.bulkToggleState(store.state.selectedOrganization.identifier, false, payload);
+        if (response) {
+          dismiss();
+          q.notify({
+            type: "positive",
+            message: "Pipelines paused successfully",
+            timeout: 2000,
+          });
+        }
+        selectedPipelines.value = [];
+        await getPipelines();
+        updateActiveTab();
+      } catch (error) {
+        console.error("Error pausing pipelines:", error);
+        q.notify({
+          type: "negative",
+          message: "Error pausing pipelines. Please try again.",
+          timeout: 2000,
+        });
+      }
+  };
+const bulkResumePipelines = async () => {
+    try{
+      //here we will filter out the pipelines which are already paused
+      const toBeResumedPipelines = selectedPipelines.value.filter((pipeline: any) => !pipeline.enabled);
+      if(toBeResumedPipelines.length === 0){
+        q.notify({
+          type: "negative",
+          message: "No pipelines to resume",
+          timeout: 2000,
+        });
+        return;
+      }
+      const dismiss =  q.notify({
+        spinner: true,
+        message: "Resuming pipelines...",
+        timeout: 0,
+      });
+      //make sure that ids and names are in the same order
+      const pipelineIds = toBeResumedPipelines.map((pipeline: any) => pipeline.pipeline_id);
+      const pipelineNames = toBeResumedPipelines.map((pipeline: any) => pipeline.name);
+      const payload = {
+        names: pipelineNames,
+        ids: pipelineIds,
+      };
+      const response = await pipelineService.bulkToggleState(store.state.selectedOrganization.identifier, true, payload);
+      if (response) {
+        dismiss();
+        q.notify({
+          type: "positive",
+          message: "Pipelines resumed successfully",
+          timeout: 2000,
+        });
+      }
+      selectedPipelines.value = [];
+      await getPipelines();
+      updateActiveTab();
+    } catch (error) {
+      console.error("Error resuming pipelines:", error);
+      q.notify({
+        type: "negative",
+        message: "Error resuming pipelines. Please try again.",
+        timeout: 2000,
+      });
+    }
+  };
 </script>
 <style lang="scss" scoped>
 .pipeline-list-table {
@@ -813,7 +1005,22 @@ const routeToImportPipeline = () =>{
   background: #ffffff;
 }
 
+.bottom-btn {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+}
+.pause-btn {
+  width: calc(14vw);
+}
 
+.resume-btn {
+  width: calc(14vw);
+}
 
+.export-btn {
+  width: calc(14vw);
+}
 
 </style>

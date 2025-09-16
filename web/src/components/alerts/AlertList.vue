@@ -473,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="selectedAlerts.length > 0"
                   data-test="alert-list-pause-alerts-btn"
-                  class="flex items-center q-mr-md export-btn no-border"
+                  class="flex items-center q-mr-md pause-btn no-border"
                   color="secondary"
                   icon="pause"
                   :label="'Pause'"
@@ -483,7 +483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="selectedAlerts.length > 0"
                   data-test="alert-list-resume-alerts-btn"
-                  class="flex items-center export-btn no-border"
+                  class="flex items-center resume-btn no-border"
                   color="secondary"
                   icon="play_arrow"
                   :label="'Resume'"
@@ -2049,6 +2049,14 @@ export default defineComponent({
 }
 
 .export-btn {
+  width: calc(14vw);
+}
+
+.pause-btn {
+  width: calc(14vw);
+}
+
+.resume-btn {
   width: calc(14vw);
 }
 
