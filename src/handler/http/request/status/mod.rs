@@ -142,6 +142,7 @@ struct ConfigResponse<'a> {
     dashboard_placeholder: String,
     ai_enabled: bool,
     dashboard_show_symbol_enabled: bool,
+    skip_collect_stats: bool,
 }
 
 #[derive(Serialize)]
@@ -349,6 +350,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         ai_enabled,
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
+        skip_collect_stats: cfg.common.feature_query_skip_collect_stats,
     }))
 }
 
