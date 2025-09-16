@@ -37,7 +37,7 @@ use datafusion::{
     physical_plan::ExecutionPlan,
     prelude::SessionContext,
 };
-use infra::schema::get_stream_setting_fts_fields;
+use infra::schema::get_stream_setting_index_fields;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::search::datafusion::optimizer::context::generate_streaming_agg_rules,
@@ -55,10 +55,10 @@ use crate::service::search::{
         logical_optimizer::{
             add_sort_and_limit::AddSortAndLimitRule, add_timestamp::AddTimestampRule,
             limit_join_right_side::LimitJoinRightSide, rewrite_histogram::RewriteHistogram,
-            rewrite_match::RewriteMatch,
         },
         physical_optimizer::{
-            distribute_analyze::optimize_distribute_analyze, join_reorder::JoinReorderRule,
+            distribute_analyze::optimize_distribute_analyze,
+            index_optimizer::LeaderIndexOptimizerRule, join_reorder::JoinReorderRule,
             remote_scan::generate_remote_scan_rules,
         },
     },
@@ -98,24 +98,6 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     let (start_time, end_time) = sql.time_range.unwrap();
 
     let mut rules: Vec<Arc<dyn OptimizerRule + Send + Sync>> = Vec::with_capacity(64);
-
-    // get full text search fields
-    if sql.has_match_all {
-        let mut fields = Vec::new();
-        let stream_name = &sql.stream_names[0];
-        let schema = sql.schemas.get(stream_name).unwrap();
-        let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
-        let fts_fields = get_stream_setting_fts_fields(&stream_settings);
-        for fts_field in fts_fields {
-            let Some(field) = schema.field_with_name(&fts_field) else {
-                continue;
-            };
-            fields.push((fts_field, field.data_type().clone()));
-        }
-        // *********** custom rules ***********
-        rules.push(Arc::new(RewriteMatch::new(fields)));
-        // ************************************
-    }
 
     rules.push(Arc::new(EliminateNestedUnion::new()));
     rules.push(Arc::new(SimplifyExpressions::new()));
@@ -187,6 +169,7 @@ pub fn generate_physical_optimizer_rules(
     contexts: Vec<PhysicalOptimizerContext>,
 ) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
     let mut rules = vec![Arc::new(JoinReorderRule::new()) as _];
+
     for context in contexts.into_iter() {
         match context {
             PhysicalOptimizerContext::RemoteScan(context) => {
@@ -210,6 +193,26 @@ pub fn generate_physical_optimizer_rules(
             }
         }
     }
+
+    // should after remote scan
+    if sql.stream_names.len() == 1 {
+        let stream_name = &sql.stream_names[0];
+        let schema = sql.schemas.get(stream_name).unwrap();
+        let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
+        let index_fields = get_stream_setting_index_fields(&stream_settings);
+        let index_fields = index_fields
+            .into_iter()
+            .filter_map(|index_field| {
+                if schema.contains_field(&index_field) {
+                    Some(index_field)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        rules.push(Arc::new(LeaderIndexOptimizerRule::new(index_fields)) as _);
+    }
+
     rules
 }
 

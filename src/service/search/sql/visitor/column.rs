@@ -153,19 +153,26 @@ impl VisitorMut for ColumnVisitor<'_> {
         {
             self.is_wildcard = true;
         }
+        let mut has_limit = false;
         if let Some(limit) = query.limit.as_ref()
             && let Expr::Value(ValueWithSpan { value, span: _ }) = limit
             && let Value::Number(n, _) = value
             && let Ok(num) = n.to_string().parse::<i64>()
+            && self.limit.is_none()
         {
+            has_limit = true;
             self.limit = Some(num);
         }
         if let Some(offset) = query.offset.as_ref()
             && let Expr::Value(ValueWithSpan { value, span: _ }) = &offset.value
             && let Value::Number(n, _) = value
             && let Ok(num) = n.to_string().parse::<i64>()
+            && self.offset.is_none()
         {
             self.offset = Some(num);
+        }
+        if has_limit && self.offset.is_none() {
+            self.offset = Some(0);
         }
         ControlFlow::Continue(())
     }
@@ -222,6 +229,32 @@ mod tests {
             column_visitor.order_by,
             vec![("name".to_string(), OrderBy::Asc)]
         );
+    }
+
+    #[test]
+    fn test_column_visitor_with_limit() {
+        let sql = "SELECT name, age, COUNT(*) FROM users WHERE status in (select distinct status from users order by status limit 10) GROUP BY name, age ORDER BY name limit 1000";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut schemas = HashMap::new();
+        let schema = Schema::new(vec![
+            Arc::new(Field::new("name", DataType::Utf8, false)),
+            Arc::new(Field::new("age", DataType::Int32, false)),
+            Arc::new(Field::new("status", DataType::Utf8, false)),
+        ]);
+        schemas.insert(
+            TableReference::from("users"),
+            Arc::new(SchemaCache::new(schema)),
+        );
+
+        let mut column_visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut column_visitor);
+
+        // Should extract limit
+        assert_eq!(column_visitor.limit, Some(1000));
     }
 
     #[test]

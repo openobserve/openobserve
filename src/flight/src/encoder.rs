@@ -102,8 +102,9 @@ fn split_batch_for_grpc_response(
         .map(|col| col.get_buffer_memory_size())
         .sum::<usize>();
 
-    let n_batches =
-        (size / max_flight_data_size + usize::from(size % max_flight_data_size != 0)).max(1);
+    let n_batches = (size / max_flight_data_size
+        + usize::from(!size.is_multiple_of(max_flight_data_size)))
+    .max(1);
     let rows_per_batch = (batch.num_rows() / n_batches).max(1);
     let mut out = Vec::with_capacity(n_batches + 1);
 
