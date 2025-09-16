@@ -2067,7 +2067,7 @@ pub async fn create_table_index() -> Result<()> {
                 .bind(date)
                 .bind(file)
                 .execute(&pool).await?;
-            if i % 1000 == 0 {
+            if i.is_multiple_of(1000) {
                 log::warn!("[POSTGRES] delete duplicate records: {}/{}", i, ret.len());
             }
         }

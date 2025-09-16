@@ -56,7 +56,7 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-08-20
+          toolchain: nightly-2025-07-20
           targets: x86_64-unknown-linux-gnu
       - uses: taiki-e/install-action@v2
         with:
