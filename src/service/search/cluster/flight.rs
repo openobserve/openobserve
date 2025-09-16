@@ -725,13 +725,13 @@ pub async fn partition_file_lists(
 ) -> Result<HashMap<TableReference, Vec<Vec<i64>>>> {
     let mut file_partitions = HashMap::with_capacity(file_id_lists.len());
     for (stream_name, file_id_list) in file_id_lists {
-        let partitions = partition_filt_list(file_id_list, nodes, group).await?;
+        let partitions = partition_file_list(file_id_list, nodes, group).await?;
         file_partitions.insert(stream_name, partitions);
     }
     Ok(file_partitions)
 }
 
-pub async fn partition_filt_list(
+pub async fn partition_file_list(
     file_id_list: Vec<FileId>,
     nodes: &[Node],
     group: Option<RoleGroup>,

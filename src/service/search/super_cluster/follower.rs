@@ -43,7 +43,7 @@ use crate::service::{
     search::{
         cluster::flight::{
             check_work_group, get_inverted_index_file_list, get_online_querier_nodes,
-            partition_filt_list,
+            partition_file_list,
         },
         datafusion::{
             distributed_plan::{
@@ -93,12 +93,40 @@ pub async fn search(
         cfg.limit.cpu_num,
     )
     .await?;
-    log::info!("[trace_id {trace_id}] flight->follower_leader: prepared datafusion context");
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->follower_leader: prepared datafusion context took: {} ms",
+                start.elapsed().as_millis(),
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("search::super_cluster::follower prepare_datafusion_context".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
 
     // register udf
     register_udf(&ctx, &req.org_id)?;
     datafusion_functions_json::register_all(&mut ctx)?;
-    log::info!("[trace_id {trace_id}] flight->follower_leader: registered udf and ctx");
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->follower_leader: registered udf and ctx took: {} ms",
+                start.elapsed().as_millis(),
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("search::super_cluster::follower register udf and ctx".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
 
     // Decode physical plan from bytes
     let proto = ComposedPhysicalExtensionCodec {
@@ -110,6 +138,21 @@ pub async fn search(
         &proto,
     )?;
     log::info!("[trace_id {trace_id}] flight->follower_leader: decoded physical plan");
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->follower_leader: decoded physical plan took: {} ms",
+                start.elapsed().as_millis(),
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("search::super_cluster::follower register udf and ctx".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .build()
+        )
+    );
 
     // replace empty table to real table
     let mut visitor = NewEmptyExecVisitor::default();
@@ -146,7 +189,7 @@ pub async fn search(
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
-                .component("super:leader get file id".to_string())
+                .component("search::super_cluster::follower get file id".to_string())
                 .search_role("leader".to_string())
                 .duration(file_id_list_took)
                 .desc(format!("get files {} ids", file_id_list_num))
@@ -216,7 +259,7 @@ pub async fn search(
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
-                .component("super:leader get nodes".to_string())
+                .component("search::super_cluster::follower get nodes".to_string())
                 .search_role("leader".to_string())
                 .duration(get_node_start.elapsed().as_millis() as usize)
                 .desc(format!(
@@ -263,7 +306,7 @@ pub async fn search(
     });
 
     // partition file list
-    let partition_file_lists = partition_filt_list(file_id_list, &nodes, role_group).await?;
+    let partition_file_lists = partition_file_list(file_id_list, &nodes, role_group).await?;
     let mut need_ingesters = 0;
     let mut need_queriers = 0;
     for (i, node) in nodes.iter().enumerate() {
