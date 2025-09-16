@@ -41,14 +41,12 @@ async fn migrate_meta(from: &str, to: &str) -> Result<(), anyhow::Error> {
     println!("load meta from {from}");
     let src: Box<dyn infra_db::Db> = match from.to_lowercase().as_str().trim() {
         "sqlite" => Box::<infra_db::sqlite::SqliteDb>::default(),
-        "etcd" => Box::<infra_db::etcd::Etcd>::default(),
         "mysql" => Box::<infra_db::mysql::MysqlDb>::default(),
         "postgres" | "postgresql" => Box::<infra_db::postgres::PostgresDb>::default(),
         _ => panic!("invalid meta source"),
     };
     let dest: Box<dyn infra_db::Db> = match to.to_lowercase().as_str().trim() {
         "sqlite" => Box::<infra_db::sqlite::SqliteDb>::default(),
-        "etcd" => Box::<infra_db::etcd::Etcd>::default(),
         "mysql" => Box::<infra_db::mysql::MysqlDb>::default(),
         "postgres" | "postgresql" => Box::<infra_db::postgres::PostgresDb>::default(),
         _ => panic!("invalid meta destination"),

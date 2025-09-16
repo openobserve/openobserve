@@ -378,6 +378,7 @@ import {
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
+import useStreamFields from "@/composables/useLogs/useStreamFields";
 import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
@@ -394,6 +395,17 @@ import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import useAiChat from "@/composables/useAiChat";
 import queryService from "@/services/search";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { searchState } from "@/composables/useLogs/searchState";
+import { useSearchStream } from "@/composables/useLogs/useSearchStream";
+import {
+  getVisualizationConfig,
+  encodeVisualizationConfig,
+  decodeVisualizationConfig,
+} from "@/composables/useLogs/logsVisualization";
+import useSearchBar from "@/composables/useLogs/useSearchBar";
+import { useHistogram } from "@/composables/useLogs/useHistogram";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "PageSearch",
@@ -545,51 +557,56 @@ export default defineComponent({
     const $q = useQuasar();
     const disableMoreErrorDetails: boolean = ref(false);
     const searchHistoryRef = ref(null);
-    let {
+    const {
       searchObj,
-      getQueryData,
-      getJobData,
+      resetSearchObj,
+      initialLogsState,
+      resetStreamData,
       fieldValues,
-      updateGridColumns,
+    } = searchState();
+    const { getStreamList, updateGridColumns, extractFields } =
+      useStreamFields();
+    const {
+      getFunctions,
+      getQueryData,
+      cancelQuery,
+      getRegionInfo,
+      sendCancelSearchMessage,
+      setCommunicationMethod,
+    } = useSearchBar();
+    let {
+      getJobData,
       refreshData,
-      updateUrlQueryParams,
       loadLogsData,
       updateStreams,
-      loadJobData,
       restoreUrlQueryParams,
       handleRunQuery,
-      generateHistogramData,
-      resetSearchObj,
-      resetStreamData,
-      getHistogramQueryData,
-      generateHistogramSkeleton,
-      fnParsedSQL,
-      getRegionInfo,
-      getStreamList,
-      getFunctions,
-      extractFields,
-      resetHistogramWithError,
-      isLimitQuery,
       enableRefreshInterval,
-      buildWebSocketPayload,
-      initializeSearchConnection,
-      addTraceId,
-      sendCancelSearchMessage,
+      clearSearchObj,
+      processHttpHistogramResults,
+      loadVisualizeData,
+    } = useLogs();
+
+    const {
+      getHistogramQueryData,
+      resetHistogramWithError,
+      generateHistogramData,
+      generateHistogramSkeleton,
+    } = useHistogram();
+
+    const { getStream } = useStreams();
+
+    const {
+      fnParsedSQL,
+      fnUnparsedSQL,
       isDistinctQuery,
       isWithQuery,
-      getStream,
-      fnUnparsedSQL,
-      initialLogsState,
-      clearSearchObj,
-      setCommunicationMethod,
-      cancelQuery,
-      processHttpHistogramResults,
-      buildSearch,
-      loadVisualizeData,
-      getVisualizationConfig,
-      encodeVisualizationConfig,
-      decodeVisualizationConfig,
-    } = useLogs();
+      isLimitQuery,
+      updateUrlQueryParams,
+      addTraceId,
+    } = logsUtils();
+    const { buildWebSocketPayload, buildSearch, initializeSearchConnection } =
+      useSearchStream();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const showSearchHistory = ref(false);
@@ -784,7 +801,6 @@ export default defineComponent({
           //instead of loadLogsData so I have used all the functions that are used in that and removed getQuerydata from the list
           //of functions of loadLogsData to stop run query whenever this gets redirecited
           await getStreamList();
-          // await getSavedViews();
           await getFunctions();
           await extractFields();
           refreshData();
@@ -885,7 +901,8 @@ export default defineComponent({
 
           searchObj.meta.pageType = "logs";
           searchObj.meta.refreshHistogram = true;
-          searchObj.loading = true;
+          // Bhargav Todo: remove this comment
+          // searchObj.loading = true;
 
           resetSearchObj();
 
@@ -911,10 +928,11 @@ export default defineComponent({
           store.dispatch("logs/setIsInitialized", true);
         } else {
           await initialLogsState();
-        }
-
-        if (isCloudEnvironment()) {
-          setupCloudSpecificThreshold();
+          await nextTick();
+          await getStreamList(false);
+          await nextTick();
+          await updateGridColumns();
+          await nextTick();
         }
 
         isLogsMounted.value = true;
@@ -1439,10 +1457,10 @@ export default defineComponent({
     const searchResponseForVisualization = ref({});
 
     const shouldUseHistogramQuery = ref(false);
-    
+
     // Flag to prevent unnecessary chart type changes during URL restoration
     const isRestoringFromUrl = ref(false);
-    
+
     // Flag to track if this is the first time switching to visualization mode
     const isFirstVisualizationToggle = ref(true);
 
@@ -1486,19 +1504,38 @@ export default defineComponent({
             let shouldAutoSelectChartType = true;
             // Always try to restore config from URL if present
             const visualizationDataParam = queryParams.visualization_data;
-            if (visualizationDataParam && typeof visualizationDataParam === 'string') {
+            if (
+              visualizationDataParam &&
+              typeof visualizationDataParam === "string"
+            ) {
               try {
-                const restoredData = decodeVisualizationConfig(visualizationDataParam);
+                const restoredData = decodeVisualizationConfig(
+                  visualizationDataParam,
+                );
 
-                if (restoredData && typeof restoredData === 'object') {
+                if (restoredData && typeof restoredData === "object") {
                   // Always restore config from URL on every toggle
-                  if (restoredData.config && typeof restoredData.config === 'object') {
+                  if (
+                    restoredData.config &&
+                    typeof restoredData.config === "object"
+                  ) {
                     preservedConfig = { ...restoredData.config };
                   }
 
                   // Only check for chart type from URL on first visualization toggle
-                  if (isFirstVisualizationToggle.value && restoredData.type && typeof restoredData.type === 'string') {
-                    const validLogsChartTypes = ['area', 'bar', 'h-bar', 'line', 'scatter', 'table'];
+                  if (
+                    isFirstVisualizationToggle.value &&
+                    restoredData.type &&
+                    typeof restoredData.type === "string"
+                  ) {
+                    const validLogsChartTypes = [
+                      "area",
+                      "bar",
+                      "h-bar",
+                      "line",
+                      "scatter",
+                      "table",
+                    ];
                     if (validLogsChartTypes.includes(restoredData.type)) {
                       // Valid chart type found in URL - set it and disable auto-selection
                       dashboardPanelData.data.type = restoredData.type;
@@ -1507,7 +1544,10 @@ export default defineComponent({
                   }
                 }
               } catch (error) {
-                console.warn('Failed to restore visualization config from URL:', error);
+                console.warn(
+                  "Failed to restore visualization config from URL:",
+                  error,
+                );
               }
             }
 
@@ -1518,7 +1558,9 @@ export default defineComponent({
 
             // Use conditional auto-selection based on first toggle and URL chart type
             isRestoringFromUrl.value = true;
-            shouldUseHistogramQuery.value = await extractVisualizationFields(shouldAutoSelectChartType);
+            shouldUseHistogramQuery.value = await extractVisualizationFields(
+              shouldAutoSelectChartType,
+            );
 
             // if not able to parse query, do not do anything
             if (shouldUseHistogramQuery.value === null) {
@@ -1527,11 +1569,12 @@ export default defineComponent({
 
             // set logs page data to searchResponseForVisualization
             if (shouldUseHistogramQuery.value === true) {
-
               // only do it if is_histogram_eligible is true on logs page
               // and showHistogram is true on logs page
-              if (searchObj?.data?.queryResults?.is_histogram_eligible === true && searchObj?.meta?.showHistogram === true) {
-
+              if (
+                searchObj?.data?.queryResults?.is_histogram_eligible === true &&
+                searchObj?.meta?.showHistogram === true
+              ) {
                 // replace hits with histogram query data
                 searchResponseForVisualization.value = {
                   ...searchObj.data.queryResults,
@@ -1545,13 +1588,14 @@ export default defineComponent({
                 if (searchObj.data.queryResults.converted_histogram_query) {
                   dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
-                  ].query = searchObj.data.queryResults.converted_histogram_query;
+                  ].query =
+                    searchObj.data.queryResults.converted_histogram_query;
 
                   // assign to visualizeChartData as well
-                  visualizeChartData.value.queries[0].query = dashboardPanelData.data.queries[0].query
+                  visualizeChartData.value.queries[0].query =
+                    dashboardPanelData.data.queries[0].query;
                 }
               }
-
             } else {
               searchResponseForVisualization.value = {
                 ...searchObj.data.queryResults,
@@ -1573,7 +1617,10 @@ export default defineComponent({
             // reset old rendered chart
             visualizeChartData.value = {};
 
-            if (searchObj?.data?.customDownloadQueryObj?.query?.start_time && searchObj?.data?.customDownloadQueryObj?.query?.end_time) {
+            if (
+              searchObj?.data?.customDownloadQueryObj?.query?.start_time &&
+              searchObj?.data?.customDownloadQueryObj?.query?.end_time
+            ) {
               dashboardPanelData.meta.dateTime = {
                 start_time: new Date(
                   searchObj.data.customDownloadQueryObj.query.start_time,
@@ -1625,7 +1672,6 @@ export default defineComponent({
             if (searchObj.meta.logsVisualizeToggle === "visualize") {
               updateUrlQueryParams(dashboardPanelData);
             }
-
           } else {
             // reset dashboard panel data as we will rebuild when user came back to visualize
             // this fixes blank chart issue when user came back to visualize
@@ -1685,7 +1731,7 @@ export default defineComponent({
         if (isRestoringFromUrl.value) {
           return;
         }
-        
+
         const currentQuery =
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
@@ -1721,8 +1767,7 @@ export default defineComponent({
     // Auto-apply config changes that don't require API calls (similar to dashboard)
     const debouncedUpdateChartConfig = debounce((newVal) => {
       if (searchObj.meta.logsVisualizeToggle === "visualize") {
-
-          let configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
+        let configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
           visualizeChartData.value,
           newVal,
         );
@@ -2255,8 +2300,6 @@ export default defineComponent({
       redirectBackToLogs,
       handleRunQuery,
       refreshTimezone,
-      resetSearchObj,
-      resetStreamData,
       getHistogramQueryData,
       generateHistogramSkeleton,
       setInterestingFieldInSQLQuery,
@@ -2288,7 +2331,6 @@ export default defineComponent({
       processHttpHistogramResults,
       searchResponseForVisualization,
       shouldUseHistogramQuery,
-      processHttpHistogramResults,
       clearSchemaCache,
     };
   },

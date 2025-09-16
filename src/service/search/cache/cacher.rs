@@ -765,7 +765,7 @@ pub fn handle_histogram(
         Some(v) => v
             .as_str()
             .split(',')
-            .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
+            .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
             .collect::<Vec<&str>>(),
         None => return,
     };
