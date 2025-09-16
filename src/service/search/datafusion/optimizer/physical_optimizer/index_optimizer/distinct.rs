@@ -131,13 +131,14 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
         } else if let Some(filter) = node.as_any().downcast_ref::<FilterExec>() {
             let predicate = filter.predicate();
             let exprs = split_conjunction(predicate);
+            if exprs.len() == 2 && is_only_timestamp_filter(&exprs) {
+                return Ok(TreeNodeRecursion::Continue);
+            }
             if exprs.len() == 3
                 && is_only_timestamp_filter(&exprs[1..])
                 && let Some(column_name) = is_simple_str_match(exprs[0])
                 && self.index_fields.contains(&column_name)
             {
-                return Ok(TreeNodeRecursion::Continue);
-            } else if exprs.len() == 2 && is_only_timestamp_filter(&exprs) {
                 return Ok(TreeNodeRecursion::Continue);
             }
             // If projection doesn't have exactly 2 expressions, stop visiting
