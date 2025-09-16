@@ -174,10 +174,12 @@ export function convertDashboardSchemaVersion(data: any) {
     }
     case 5: {
       // layout width migration from 48 col number to 192 col number
+      // layout height migration from 34px per row to 17px per row -> height will be doubled
       data.tabs.forEach((tabItem: any) => {
         tabItem.panels.forEach((panelItem: any) => {
           panelItem.layout.w = panelItem.layout.w * 4;
           panelItem.layout.x = panelItem.layout.x * 4;
+          panelItem.layout.h = panelItem.layout.h * 2;
         });
       });
 
