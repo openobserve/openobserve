@@ -20,7 +20,7 @@ use ahash::HashMap;
 use config::{ider, meta::pipeline::Pipeline};
 
 #[cfg(feature = "enterprise")]
-use crate::handler::request::search::utils::check_resource_permissions;
+use crate::handler::http::request::search::utils::check_resource_permissions;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::models::pipelines::{

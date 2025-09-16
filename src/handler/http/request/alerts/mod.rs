@@ -23,7 +23,7 @@ use infra::db::{ORM_CLIENT, connect_to_orm};
 use svix_ksuid::Ksuid;
 
 #[cfg(feature = "enterprise")]
-use crate::handler::request::search::utils::check_resource_permissions;
+use crate::handler::http::request::search::utils::check_resource_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
