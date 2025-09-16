@@ -4317,7 +4317,14 @@ const useLogs = () => {
           ? "Delta Scan Size"
           : "Scan Size";
 
-      const title =
+      const scanSizeTitle = " (" +
+          scanSizeLabel +
+          ": " +
+          formatSizeFromMB(searchObj.data.queryResults.scan_size) +
+          plusSign +
+          ")";
+
+      let title =
         "Showing " +
         startCount +
         " to " +
@@ -4327,12 +4334,12 @@ const useLogs = () => {
         plusSign +
         " events in " +
         searchObj.data.queryResults.took +
-        " ms. (" +
-        scanSizeLabel +
-        ": " +
-        formatSizeFromMB(searchObj.data.queryResults.scan_size) +
-        plusSign +
-        ")";
+        " ms.";
+
+        if(!store.state.zoConfig.skip_collect_stats) {
+          title += scanSizeTitle;
+        } 
+
       return title;
     } catch (e: any) {
       console.log("Error while generating histogram title", e);
