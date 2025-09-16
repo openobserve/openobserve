@@ -52,7 +52,7 @@ const useStreams = () => {
     _streamName: string = "",
     schema: boolean,
     notify: boolean = true,
-    force: boolean = false, 
+    force: boolean = false,
   ) => {
     return new Promise(async (resolve, reject) => {
       const streamName = _streamName || "all";
@@ -87,7 +87,7 @@ const useStreams = () => {
             ];
 
             const streamsToFetch = streamList.filter(
-              (_streamType) => !!!streamsCache[_streamType]?.value,
+              (_streamType) => !streamsCache[_streamType]?.value,
             );
 
             getStreamsPromise.value = Promise.allSettled(
@@ -103,8 +103,15 @@ const useStreams = () => {
             getStreamsPromise.value
               .then((results: any) => {
                 results.forEach((result: any, index: number) => {
-                  if (result.status === "fulfilled" && Object.hasOwn(result, "value") && result?.value?.data?.list.length > 0) {
-                    setStreams(streamsToFetch[index], result?.value?.data?.list);
+                  if (
+                    result.status === "fulfilled" &&
+                    Object.hasOwn(result, "value") &&
+                    result?.value?.data?.list.length > 0
+                  ) {
+                    setStreams(
+                      streamsToFetch[index],
+                      result?.value?.data?.list,
+                    );
                   }
                 });
 
@@ -287,7 +294,7 @@ const useStreams = () => {
             }
           }
           return resolve(
-            (streamsCache[streamType].value?.list[streamIndex] || {}),
+            streamsCache[streamType].value?.list[streamIndex] || {},
           );
         } else {
           // await StreamService.schema(
@@ -357,9 +364,7 @@ const useStreams = () => {
           // Return the stream object (with or without updated schema).
           const streamIndex =
             store.state.streams.streamsIndexMapping[streamType][streamName];
-          return (
-            streamsCache[streamType].value?.list[streamIndex] || {}
-          );
+          return streamsCache[streamType].value?.list[streamIndex] || {};
         } catch (e: any) {
           // Use reject in Promise.all to catch errors specifically.
           throw new Error(e.message);
@@ -393,7 +398,11 @@ const useStreams = () => {
     return isStreamFetched;
   };
 
-  const setStreams = (streamName: string = "all", streamList: any[] = [], force: boolean = false) => {
+  const setStreams = (
+    streamName: string = "all",
+    streamList: any[] = [],
+    force: boolean = false,
+  ) => {
     if (isStreamFetched(streamName || "all") && !force) return;
 
     if (!store.state.organizationData.isDataIngested && !!streamList.length)
@@ -411,7 +420,7 @@ const useStreams = () => {
       });
 
       streamList.forEach((stream: any) => {
-        if (!!streamsCache[stream.stream_type].value) {
+        if (streamsCache[stream.stream_type].value) {
           const streamList = deepCopy(
             streamsCache[stream.stream_type].value || {},
           );
@@ -626,7 +635,7 @@ const useStreams = () => {
       "bloom_filter_fields",
       "defined_schema_fields",
       "extended_retention_days",
-      "pattern_associations"
+      "pattern_associations",
     ];
 
     let updatedSettings: any = {};
@@ -678,13 +687,14 @@ const useStreams = () => {
                 JSON.stringify(previousItem) === JSON.stringify(currentItem),
             ),
         );
-      } 
-      else if (attribute === "pattern_associations") {
-        const result: any = comparePatternAssociations(previousArray, currentArray);
+      } else if (attribute === "pattern_associations") {
+        const result: any = comparePatternAssociations(
+          previousArray,
+          currentArray,
+        );
         add = result.add;
         remove = result.remove;
-      }
-      else {
+      } else {
         // For other attributes, do a simple array comparison
         add = currentArray.filter((item: any) => !previousArray.includes(item));
         remove = previousArray.filter(
@@ -719,7 +729,7 @@ const useStreams = () => {
     pattern: string;
     description?: string;
   };
-  
+
   //this function is used to compare the pattern associations
   //so we compare array of objects and check if the pattern_id and field are same why both -> sometimes we are getting same pattern_id but different field
   //if they are same then we consider them as same
@@ -728,32 +738,33 @@ const useStreams = () => {
   const comparePatternAssociations = (prev: Pattern[], curr: Pattern[]) => {
     const isSame = (a: Pattern, b: Pattern) => {
       // If apply_at is undefined/null in either object, consider them the same
-      //because some times user might not select the apply_at value while updating the already applied pattern 
-        //so instead of sending undefined/null we dont consider them as different
+      //because some times user might not select the apply_at value while updating the already applied pattern
+      //so instead of sending undefined/null we dont consider them as different
       if (!a.apply_at || !b.apply_at) {
-        return a.pattern_id === b.pattern_id && 
-               a.field === b.field && 
-               a.policy === b.policy;
+        return (
+          a.pattern_id === b.pattern_id &&
+          a.field === b.field &&
+          a.policy === b.policy
+        );
       }
-      return a.pattern_id === b.pattern_id && 
-             a.field === b.field && 
-             a.policy === b.policy && 
-             a.apply_at === b.apply_at;
+      return (
+        a.pattern_id === b.pattern_id &&
+        a.field === b.field &&
+        a.policy === b.policy &&
+        a.apply_at === b.apply_at
+      );
     };
-  
+
     const add = curr.filter(
-      (currItem) =>
-        !prev.some((prevItem) => isSame(currItem, prevItem))
+      (currItem) => !prev.some((prevItem) => isSame(currItem, prevItem)),
     );
-  
+
     const remove = prev.filter(
-      (prevItem) =>
-        !curr.some((currItem) => isSame(currItem, prevItem))
+      (prevItem) => !curr.some((currItem) => isSame(currItem, prevItem)),
     );
-  
+
     return { add, remove };
   };
-  
 
   const isStreamExists = (streamName: string, streamType: string) => {
     try {
@@ -767,16 +778,14 @@ const useStreams = () => {
         streamName,
       );
     } catch (error) {
-      console.warn('Error checking if stream exists:', error);
+      console.warn("Error checking if stream exists:", error);
       return false;
     }
-  }
+  };
 
   const addNewStreams = (streamType: string, streamList: any[]) => {
-    
     // Check if stream exist in store, if not then add it
-    const streamsToAdd = [...streamsCache[streamType].value?.list || []];
-
+    const streamsToAdd = [...(streamsCache[streamType].value?.list || [])];
 
     streamList.forEach((stream) => {
       if (!isStreamExists(stream.name, streamType)) {
@@ -784,11 +793,10 @@ const useStreams = () => {
       }
     });
 
-
     if (streamsToAdd.length > 0) {
       setStreams(streamType, streamsToAdd, true);
     }
-  }
+  };
 
   return {
     getStreams,
@@ -813,7 +821,7 @@ const useStreams = () => {
     getStreamPayload,
     compareArrays,
     deepEqual,
-    comparePatternAssociations
+    comparePatternAssociations,
   };
 };
 

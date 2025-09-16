@@ -25,8 +25,8 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
 // Mock dependencies
-vi.mock("@/composables/useLogs", () => ({
-  default: () => ({
+vi.mock("@/composables/useLogs/searchState", () => ({
+  searchState: () => ({
     searchObj: {
       data: {
         stream: {
@@ -39,7 +39,12 @@ vi.mock("@/composables/useLogs", () => ({
           selectedFields: ["_timestamp"]
         }
       }
-    },
+    }
+  })
+}));
+
+vi.mock("@/composables/useLogs/logsUtils", () => ({
+  logsUtils: () => ({
     fnParsedSQL: () => ({ columns: [] }),
     hasAggregation: () => false
   })
