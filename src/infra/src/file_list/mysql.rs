@@ -2176,7 +2176,7 @@ pub async fn create_table_index() -> Result<()> {
             .bind(file)
             .execute(&pool)
             .await?;
-            if i % 1000 == 0 {
+            if i.is_multiple_of(1000) {
                 log::warn!("[MYSQL] delete duplicate records: {}/{}", i, ret.len());
             }
         }

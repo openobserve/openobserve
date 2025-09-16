@@ -546,7 +546,7 @@ fn repartition_sorted_groups(
         let mut even_group = Vec::with_capacity(group_cap);
 
         for (idx, file) in max_group.into_inner().into_iter().enumerate() {
-            if idx % 2 == 0 {
+            if idx.is_multiple_of(2) {
                 even_group.push(file);
             } else {
                 odd_group.push(file);

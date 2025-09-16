@@ -1826,7 +1826,7 @@ pub async fn create_table_index() -> Result<()> {
             sqlx::query(
                     r#"DELETE FROM file_list WHERE id != $1 AND stream = $2 AND date = $3 AND file = $4;"#,
                 ).bind(id).bind(stream).bind(date).bind(file).execute(&*client).await?;
-            if i % 1000 == 0 {
+            if i.is_multiple_of(1000) {
                 log::warn!("[SQLITE] delete duplicate records: {}/{}", i, ret.len());
             }
         }
