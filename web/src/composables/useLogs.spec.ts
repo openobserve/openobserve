@@ -156,6 +156,32 @@ describe("Use Logs Composable", () => {
       }
     });
 
+    // Initialize searchObj with proper structure if it's undefined
+    if (!wrapper.vm.searchObj || !wrapper.vm.searchObj.data) {
+      wrapper.vm.searchObj = {
+        organizationIdentifier: "",
+        shouldIgnoreWatcher: false,
+        data: {
+          stream: {
+            selectedStream: [],
+            streamType: "logs"
+          },
+          datetime: {
+            startTime: Date.now() - 3600000,
+            endTime: Date.now(),
+            type: "relative",
+            relativeTimePeriod: "15m"
+          },
+          queryResults: {
+            hits: []
+          }
+        },
+        meta: {
+          sqlMode: false,
+          refreshInterval: 0
+        }
+      };
+    }
 
     // Reset mocks
     vi.clearAllMocks();
