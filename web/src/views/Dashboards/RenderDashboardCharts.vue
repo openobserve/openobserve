@@ -666,9 +666,9 @@ export default defineComponent({
       } else if (position == "y") {
         return panelData?.layout?.y || 0;
       } else if (position == "w") {
-        return panelData?.layout?.w || 12;
+        return panelData?.layout?.w || 96;
       } else if (position == "h") {
-        return panelData?.layout?.h || 8;
+        return panelData?.layout?.h || 9;
       } else if (position == "i") {
         return panelData?.layout?.i || panelData.id;
       }
@@ -702,7 +702,7 @@ export default defineComponent({
         case "pie":
         case "scatter":
         case "table":
-          return 3; // 3 grid units minimum width
+          return 12; // 12 grid units minimum width
 
         default:
           break;
