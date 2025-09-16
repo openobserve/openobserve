@@ -277,7 +277,7 @@ impl Writer {
                     },
                 }
                 total += 1;
-                if total % 1000 == 0 {
+                if total.is_multiple_of(1000) {
                     log::info!(
                         "[INGESTER:MEM:{idx}] writer queue consuming, total: {}, in queue: {}",
                         total,

@@ -36,6 +36,7 @@ vi.mock("@/composables/useLogs", () => ({
 // Mock zincutils
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path: string) => `http://localhost:8080/${path}`),
+  useLocalWrapContent: vi.fn(() => false),
 }));
 
 installQuasar();
