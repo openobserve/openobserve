@@ -561,7 +561,7 @@ pub fn generate_record_id(org_id: &str, stream_name: &str, stream_type: &StreamT
 pub fn create_log_ingestion_req(
     ingestion_type: i32,
     data: &bytes::Bytes,
-) -> Result<IngestionRequest> {
+) -> Result<IngestionRequest<'_>> {
     match IngestionType::try_from(ingestion_type) {
         Ok(IngestionType::Json) => Ok(IngestionRequest::JSON(data)),
         Ok(IngestionType::Multi) => Ok(IngestionRequest::Multi(data)),

@@ -36,7 +36,6 @@ use config::{
 };
 use hashbrown::HashSet;
 use infra::{
-    cache::file_data::TRACE_ID_FOR_CACHE_LATEST_FILE,
     schema::{
         SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
         get_stream_setting_index_fields,
@@ -298,7 +297,13 @@ async fn prepare_files(
         columns.remove(4);
         let prefix = columns.join("/");
         let partition = partition_files_with_size.entry(prefix).or_default();
-        partition.push(FileKey::new(0, file_key.clone(), parquet_meta, false));
+        partition.push(FileKey::new(
+            0,
+            "".to_string(), // here we don't need it
+            file_key.clone(),
+            parquet_meta,
+            false,
+        ));
         // mark the file as processing
         PROCESSING_FILES.write().await.insert(file_key);
     }
@@ -492,7 +497,7 @@ async fn move_files(
         // yield to other tasks
         tokio::task::yield_now().await;
         // merge file and get the big file key
-        let (new_file_name, new_file_meta, new_file_list) = match merge_files(
+        let (account, new_file_name, new_file_meta, new_file_list) = match merge_files(
             thread_id,
             latest_schema.clone(),
             &wal_dir,
@@ -520,7 +525,9 @@ async fn move_files(
         }
 
         // write file list to storage
-        if let Err(e) = db::file_list::set(&new_file_name, Some(new_file_meta), false).await {
+        if let Err(e) =
+            db::file_list::set(&account, &new_file_name, Some(new_file_meta), false).await
+        {
             log::error!(
                 "[INGESTER:JOB] Failed write parquet file meta: {}, error: {}",
                 new_file_name,
@@ -542,7 +549,10 @@ async fn move_files(
                     file.key
                 );
                 // add to pending delete list
-                if let Err(e) = db::file_list::local::add_pending_delete(&org_id, &file.key).await {
+                if let Err(e) =
+                    db::file_list::local::add_pending_delete(&org_id, &file.account, &file.key)
+                        .await
+                {
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",
                         file.key,
@@ -567,8 +577,12 @@ async fn move_files(
                             e.to_string()
                         );
                         // add to pending delete list
-                        if let Err(e) =
-                            db::file_list::local::add_pending_delete(&org_id, &file.key).await
+                        if let Err(e) = db::file_list::local::add_pending_delete(
+                            &org_id,
+                            &file.account,
+                            &file.key,
+                        )
+                        .await
                         {
                             log::error!(
                                 "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",
@@ -613,9 +627,14 @@ async fn merge_files(
     wal_dir: &Path,
     files_with_size: &[FileKey],
     num_uds_fields: usize,
-) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
+) -> Result<(String, String, FileMeta, Vec<FileKey>), anyhow::Error> {
     if files_with_size.is_empty() {
-        return Ok((String::from(""), FileMeta::default(), Vec::new()));
+        return Ok((
+            String::from(""),
+            String::from(""),
+            FileMeta::default(),
+            Vec::new(),
+        ));
     }
 
     let cfg = get_config();
@@ -647,7 +666,12 @@ async fn merge_files(
     }
     // no files need to merge
     if new_file_list.is_empty() {
-        return Ok((String::from(""), FileMeta::default(), Vec::new()));
+        return Ok((
+            String::from(""),
+            String::from(""),
+            FileMeta::default(),
+            Vec::new(),
+        ));
     }
 
     let retain_file_list = new_file_list.clone();
@@ -811,19 +835,16 @@ async fn merge_files(
         && cfg.cache_latest_files.cache_parquet
         && cfg.cache_latest_files.download_from_node
     {
-        infra::cache::file_data::disk::set(
-            TRACE_ID_FOR_CACHE_LATEST_FILE,
-            &new_file_key,
-            buf.clone(),
-        )
-        .await?;
+        infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
         log::debug!("merge_files {new_file_key} file_data::disk::set success");
     }
-    storage::put(&new_file_key, buf.clone()).await?;
+
+    let account = storage::get_account(&new_file_key).unwrap_or_default();
+    storage::put(&account, &new_file_key, buf.clone()).await?;
 
     // skip index generation if not enabled or not basic type
     if !cfg.common.inverted_index_enabled || !stream_type.is_basic_type() {
-        return Ok((new_file_key, new_file_meta, retain_file_list));
+        return Ok((account, new_file_key, new_file_meta, retain_file_list));
     }
 
     // skip index generation if no fields to index
@@ -843,7 +864,7 @@ async fn merge_files(
             stream_type,
             stream_name
         );
-        return Ok((new_file_key, new_file_meta, retain_file_list));
+        return Ok((account, new_file_key, new_file_meta, retain_file_list));
     }
 
     // generate tantivy inverted index and write to storage
@@ -860,7 +881,7 @@ async fn merge_files(
     .map_err(|e| anyhow::anyhow!("generate_tantivy_index_on_ingester error: {}", e))?;
     new_file_meta.index_size = index_size as i64;
 
-    Ok((new_file_key, new_file_meta, retain_file_list))
+    Ok((account, new_file_key, new_file_meta, retain_file_list))
 }
 
 fn split_perfix(prefix: &str) -> (String, StreamType, String, String) {

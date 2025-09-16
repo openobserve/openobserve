@@ -27,6 +27,7 @@ object_store.workspace = true
 once_cell.workspace = true
 parking_lot.workspace = true
 parquet.workspace = true
+reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha1.workspace = true
@@ -35,11 +36,11 @@ svix-ksuid.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
-zstd.workspace = true
+tempfile.workspace = true
 tracing.workspace = true
 sea-orm.workspace = true
 sea-orm-migration.workspace = true
-reqwest.workspace = true
+zstd.workspace = true
 
 [dev-dependencies]
 collapse.workspace = true

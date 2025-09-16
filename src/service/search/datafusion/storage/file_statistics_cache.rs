@@ -20,6 +20,8 @@ use datafusion::{common::Statistics, execution::cache::CacheAccessor};
 use object_store::{ObjectMeta, path::Path};
 use once_cell::sync::Lazy;
 
+use super::TRACE_ID_SEPARATOR;
+
 pub static GLOBAL_CACHE: Lazy<Arc<FileStatisticsCache>> =
     Lazy::new(|| Arc::new(FileStatisticsCache::default()));
 
@@ -106,7 +108,7 @@ impl FileStatisticsCache {
     }
 
     fn format_key(&self, k: &Path) -> String {
-        if let Some(mut p) = k.as_ref().find("/$$/") {
+        if let Some(mut p) = k.as_ref().find(TRACE_ID_SEPARATOR) {
             if let Some(pp) = k.as_ref()[..p].find("/schema=") {
                 p = pp;
             }
@@ -269,13 +271,13 @@ mod tests {
         // Add some entries
         for i in 0..10 {
             let meta = ObjectMeta {
-                location: Path::from(format!("test_file_{}", i)),
+                location: Path::from(format!("test_file_{i}")),
                 last_modified: DateTime::parse_from_rfc3339("2022-09-27T22:36:00+02:00")
                     .unwrap()
                     .into(),
                 size: 1024 * (i + 1),
-                e_tag: Some(format!("etag_{}", i)),
-                version: Some(format!("v{}", i)),
+                e_tag: Some(format!("etag_{i}")),
+                version: Some(format!("v{i}")),
             };
 
             let schema = Schema::new(vec![

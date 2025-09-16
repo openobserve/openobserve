@@ -81,7 +81,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     file_list::LOCAL_CACHE.create_table().await?;
     file_list::local_cache_gc().await?;
     if !config::is_local_disk_storage() {
-        storage::remote::test_config().await?;
+        storage::test_remote_config().await?;
     }
     // because of asynchronous, we need to wait for a while
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;

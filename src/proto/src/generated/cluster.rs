@@ -99,6 +99,8 @@ pub struct FileKey {
     pub deleted: bool,
     #[prost(bytes = "vec", optional, tag = "5")]
     pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
+    #[prost(string, tag = "6")]
+    pub account: ::prost::alloc::string::String,
 }
 #[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -129,7 +131,7 @@ pub struct FileContent {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SimpleFileList {
     #[prost(string, repeated, tag = "1")]
-    pub paths: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    pub files: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// Generated client implementations.
 pub mod event_client {

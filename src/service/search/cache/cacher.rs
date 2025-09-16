@@ -587,13 +587,12 @@ pub fn calculate_deltas_v1(
 }
 
 pub async fn cache_results_to_disk(
-    trace_id: &str,
     file_path: &str,
     file_name: &str,
     data: String,
 ) -> std::io::Result<()> {
     let file = format!("results/{file_path}/{file_name}");
-    match disk::set(trace_id, &file, Bytes::from(data)).await {
+    match disk::set(&file, Bytes::from(data)).await {
         Ok(_) => (),
         Err(e) => {
             log::error!("Error caching results to disk: {:?}", e);
@@ -692,7 +691,7 @@ pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
                 }
             }
         }
-        match disk::remove("", file.strip_prefix(&prefix).unwrap()).await {
+        match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
             Ok(_) => remove_files.push(file),
             Err(e) => {
                 log::error!("Error deleting cache: {:?}", e);
@@ -757,7 +756,7 @@ pub fn handle_histogram(
         Some(v) => v
             .as_str()
             .split(',')
-            .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
+            .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
             .collect::<Vec<&str>>(),
         None => return,
     };

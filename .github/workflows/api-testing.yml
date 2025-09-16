@@ -36,7 +36,7 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-05-20
+          toolchain: nightly-2025-07-20
 
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2

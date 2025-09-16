@@ -32,11 +32,11 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
     // delete files from storage
     let local_mode = config::get_config().common.local_mode;
     if let Err(e) = storage::del(
-        &files
+        files
             .iter()
             .filter_map(|file| {
                 if !ingester::is_wal_file(local_mode, &file.file) {
-                    Some(file.file.as_str())
+                    Some((file.account.as_str(), file.file.as_str()))
                 } else {
                     None
                 }
@@ -58,6 +58,7 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
         .filter_map(|file| {
             if file.index_file {
                 convert_parquet_file_name_to_tantivy_file(&file.file)
+                    .map(|f| (file.account.to_string(), f))
             } else {
                 None
             }
@@ -65,9 +66,9 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
         .collect::<Vec<_>>();
     if !inverted_index_files.is_empty()
         && let Err(e) = storage::del(
-            &inverted_index_files
+            inverted_index_files
                 .iter()
-                .map(|file| file.as_str())
+                .map(|file| (file.0.as_str(), file.1.as_str()))
                 .collect::<Vec<_>>(),
         )
         .await
@@ -85,10 +86,13 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
         .iter()
         .filter_map(|file| {
             if file.flattened {
-                Some(format!(
-                    "files{}/{}",
-                    config::get_config().common.column_all,
-                    file.file.strip_prefix("files/").unwrap()
+                Some((
+                    file.account.to_string(),
+                    format!(
+                        "files{}/{}",
+                        config::get_config().common.column_all,
+                        file.file.strip_prefix("files/").unwrap()
+                    ),
                 ))
             } else {
                 None
@@ -97,9 +101,9 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
         .collect::<Vec<_>>();
     if !flattened_files.is_empty()
         && let Err(e) = storage::del(
-            &flattened_files
+            flattened_files
                 .iter()
-                .map(|file| file.as_str())
+                .map(|file| (file.0.as_str(), file.1.as_str()))
                 .collect::<Vec<_>>(),
         )
         .await
@@ -115,7 +119,15 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
     if let Err(e) = infra_file_list::batch_remove_deleted(
         &files
             .iter()
-            .map(|file| FileKey::new(file.id, file.file.clone(), FileMeta::default(), false))
+            .map(|file| {
+                FileKey::new(
+                    file.id,
+                    file.account.clone(),
+                    file.file.clone(),
+                    FileMeta::default(),
+                    false,
+                )
+            })
             .collect::<Vec<_>>(),
     )
     .await
