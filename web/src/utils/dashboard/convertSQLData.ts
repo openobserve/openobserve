@@ -1985,7 +1985,7 @@ export const convertSQLData = async (
           ) {
             if (panelSchema.config?.legends_position === "right") {
               // Reserve minimum space for scroll legends and adjust center
-              const minScrollLegendWidth = Math.min(chartWidth * 0.22, 170); // 22% of chart width or 170px max
+              const minScrollLegendWidth = Math.min(chartWidth * 0.2, 170); // 20% of chart width or 170px max
               const reservedWidth = Math.max(minScrollLegendWidth, 120); // At least 120px for scroll legends (extra space for scroll indicators)
               const availableWidth = chartWidth - reservedWidth;
               const centerX = (availableWidth / 2 / chartWidth) * 100; // Convert to percentage
@@ -3190,11 +3190,61 @@ export const convertSQLData = async (
   ) {
     // Reserve minimum space for scroll legends to prevent chart overlap
     const chartWidth = chartPanelRef.value?.offsetWidth || 800;
-    const minScrollLegendWidth = Math.min(chartWidth * 0.22, 170); // 22% of chart width or 170px max
-    const reservedWidth = Math.max(minScrollLegendWidth, 120); // At least 120px for scroll legends (extra space for scroll indicators)
+    
+    // Calculate more appropriate reserved width based on container size
+    // For small containers, use a higher percentage to ensure proper spacing
+    let reservedWidthPercentage = 0.2; // Default 20%
+    if (chartWidth < 400) {
+      reservedWidthPercentage = 0.35; // Use 35% for very small containers
+    } else if (chartWidth < 600) {
+      reservedWidthPercentage = 0.28; // Use 28% for small containers
+    }
+    
+    const minScrollLegendWidth = Math.min(
+      chartWidth * reservedWidthPercentage,
+      200,
+    ); // Increased max to 200px
+    const reservedWidth = Math.max(minScrollLegendWidth, 140); // Increased minimum to 140px for better scroll indicators
 
     // Reserve space on the right so that the chart doesn't overlap with legends
     options.grid.right = reservedWidth;
+    
+    // Position legend properly on the right side
+    const containerWidth = chartPanelRef.value?.offsetWidth || 0;
+    const legendLeftPx = Math.max(containerWidth - reservedWidth, 0);
+    options.legend.left = legendLeftPx;
+    options.legend.right = 0;
+  }
+
+  // Handle scroll/auto legends with explicit width - ensure proper spacing and positioning
+  if (
+    legendConfig.orient == "vertical" &&
+    panelSchema.config?.show_legends &&
+    panelSchema.type != "gauge" &&
+    panelSchema.type != "metric" &&
+    !["pie", "donut"].includes(panelSchema.type) && // Exclude pie and donut charts - handled separately
+    panelSchema?.config?.legends_position == "right" &&
+    (panelSchema?.config?.legends_type === "scroll" ||
+      panelSchema?.config?.legends_type == null) && // null means auto, which can be scroll
+    panelSchema.config.legend_width &&
+    !isNaN(parseFloat(panelSchema.config.legend_width.value))
+  ) {
+    // Apply explicit legend width for scroll/auto legends
+    const legendWidth =
+      panelSchema.config.legend_width.unit === "%"
+        ? (chartPanelRef.value?.offsetWidth || 0) *
+          (panelSchema.config.legend_width.value / 100)
+        : panelSchema.config.legend_width.value;
+
+    // Reserve space on the right so that the chart doesn't overlap with legends
+    options.grid.right = legendWidth;
+    
+    // Position legend properly on the right side
+    const containerWidth = chartPanelRef.value?.offsetWidth || 0;
+    const legendLeftPx = Math.max(containerWidth - legendWidth, 0);
+    options.legend.left = legendLeftPx;
+    options.legend.right = 0;
+    
     // Don't constrain legend text width for scroll legends - let them scroll naturally
   }
 
@@ -3321,7 +3371,7 @@ export const convertSQLData = async (
       ) // Don't apply if explicit width is set
     ) {
       // Reserve minimum space for scroll legends to prevent chart overlap
-      const minScrollLegendWidth = Math.min(chartWidth * 0.22, 170); // 22% of chart width or 170px max
+      const minScrollLegendWidth = Math.min(chartWidth * 0.2, 170); // 20% of chart width or 170px max
       const reservedWidth = Math.max(minScrollLegendWidth, 120); // At least 120px for scroll legends (extra space for scroll indicators)
 
       // Position legend on the right side with reserved space
