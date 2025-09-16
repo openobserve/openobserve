@@ -697,9 +697,6 @@ test.describe("dashboard filter testcases", () => {
           url,
           status: response.status(),
         });
-        console.log(
-          `Captured _values API: ${url} => Status: ${response.status()}`
-        );
       }
     });
 
@@ -728,7 +725,7 @@ test.describe("dashboard filter testcases", () => {
       true
     );
 
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle');
 
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -756,11 +753,8 @@ test.describe("dashboard filter testcases", () => {
     const searchTerms = ["zi", "zio", "ziox"];
     for (const term of searchTerms) {
       await variableInput.fill(term);
-      await page.waitForTimeout(1000); // Allow API calls to complete
+      await page.waitForLoadState('networkidle'); // Allow API calls to complete
     }
-
-    // Wait for final dropdown options to load
-    await page.waitForTimeout(2000);
 
     // Select the final value
     const option = page.getByRole("option", { name: "ziox" });
@@ -768,46 +762,15 @@ test.describe("dashboard filter testcases", () => {
     await option.click();
 
     // Wait for any remaining network activity to settle
-    await page.waitForTimeout(3000);
-
-    // Verify all _values API calls returned 200 status code
-    console.log(`\n📊 API MONITORING RESULTS:`);
-    console.log(`Total _values API calls captured: ${valuesResponses.length}`);
+    await page.waitForLoadState('networkidle');
 
     // Assert that we captured at least one _values API call
     expect(valuesResponses.length).toBeGreaterThan(0);
 
-    // Print summary of all captured APIs
-    console.log(`\n📋 CAPTURED API CALLS SUMMARY:`);
-    console.log("=".repeat(50));
-    valuesResponses.forEach((res, index) => {
-      const statusEmoji = res.status === 200 ? "✅" : "❌";
-      console.log(`${index + 1}. ${statusEmoji} Status: ${res.status}`);
-      console.log(`   URL: ${res.url}`);
-      console.log(`   ${"-".repeat(80)}`);
-    });
-
     // Assert all collected responses have 200 status
-    let failedCalls = [];
     for (const res of valuesResponses) {
-      console.log(`🔍 Verifying API: ${res.url} => Status: ${res.status}`);
-      if (res.status !== 200) {
-        failedCalls.push(res);
-      }
       expect(res.status).toBe(200);
     }
-
-    console.log(`\n🎯 FINAL RESULTS:`);
-    console.log("=".repeat(50));
-    console.log(`✅ Total API calls: ${valuesResponses.length}`);
-    console.log(
-      `✅ Successful calls (200): ${
-        valuesResponses.filter((r) => r.status === 200).length
-      }`
-    );
-    console.log(`❌ Failed calls: ${failedCalls.length}`);
-    console.log(`✅ All _values API calls returned 200 status code!`);
-    console.log("=".repeat(50));
 
     // Add filter field and set value
     await pm.chartTypeSelector.searchAndAddField(
