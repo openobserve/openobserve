@@ -264,7 +264,7 @@ export const addPanel = async (
       x: 0,
       y: tab.panels?.length > 0 ? maxY + 10 : 0,
       w: 96,
-      h: 9,
+      h: 18,
       i: maxI + 1,
       panelId: panelData.id,
       static: false,
