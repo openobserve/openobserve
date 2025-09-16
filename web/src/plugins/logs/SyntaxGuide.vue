@@ -52,11 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   to find phrases starting with 'error code'.
                 </li>
                 <li>
-                  For regex search use
-                  <span class="bg-highlight">match_all('*code 40*')</span>
-                  to match patterns using regular expressions.
-                </li>
-                <li>
                   For case sensitive search use
                   <span class="bg-highlight">match_all('traceHits')</span>
                   with exact case matching.
@@ -138,13 +133,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >SELECT * FROM <b>stream</b> WHERE match_all('error code*')</span
                   >
                   to find phrases starting with 'error code'.
-                </li>
-                <li>
-                  For regex search use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE match_all('*code 40*')</span
-                  >
-                  to match patterns using regular expressions.
                 </li>
                 <li>
                   For case sensitive search use
