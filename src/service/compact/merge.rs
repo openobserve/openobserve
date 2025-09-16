@@ -40,7 +40,7 @@ use config::{
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
-    cache::{file_data, file_data::TRACE_ID_FOR_CACHE_LATEST_FILE},
+    cache::file_data,
     dist_lock, file_list as infra_file_list,
     schema::{
         SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
@@ -643,6 +643,7 @@ pub async fn merge_by_stream(
 
                 for file in delete_file_list {
                     events.push(FileKey {
+                        account: file.account.clone(),
                         deleted: true,
                         segment_ids: None,
                         ..file.clone()
@@ -819,7 +820,7 @@ pub async fn merge_files(
             "[COMPACTOR:WORKER:{thread_id}:{fi}] merge small file: {}",
             &file.key
         );
-        let buf = file_data::get(&file.key, None).await?;
+        let buf = file_data::get(&file.account, &file.key, None).await?;
         let schema = read_schema_from_bytes(&buf).await?;
         let schema = schema.as_ref().clone().with_metadata(Default::default());
         let schema_key = schema.hash_key();
@@ -967,15 +968,11 @@ pub async fn merge_files(
                 && cfg.cache_latest_files.cache_parquet
                 && cfg.cache_latest_files.download_from_node
             {
-                infra::cache::file_data::disk::set(
-                    TRACE_ID_FOR_CACHE_LATEST_FILE,
-                    &new_file_key,
-                    buf.clone(),
-                )
-                .await?;
+                infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
                 log::debug!("merge_files {new_file_key} file_data::disk::set success");
             }
-            storage::put(&new_file_key, buf.clone()).await?;
+            let account = storage::get_account(&new_file_key).unwrap_or_default();
+            storage::put(&account, &new_file_key, buf.clone()).await?;
 
             if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
                 // generate inverted index
@@ -992,7 +989,7 @@ pub async fn merge_files(
                 )
                 .await?;
             }
-            new_files.push(FileKey::new(0, new_file_key, new_file_meta, false));
+            new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
         }
         MergeParquetResult::Multiple { bufs, file_metas } => {
             for (buf, file_meta) in bufs.into_iter().zip(file_metas.into_iter()) {
@@ -1013,15 +1010,11 @@ pub async fn merge_files(
                     && cfg.cache_latest_files.cache_parquet
                     && cfg.cache_latest_files.download_from_node
                 {
-                    infra::cache::file_data::disk::set(
-                        TRACE_ID_FOR_CACHE_LATEST_FILE,
-                        &new_file_key,
-                        buf.clone(),
-                    )
-                    .await?;
+                    infra::cache::file_data::disk::set(&new_file_key, buf.clone()).await?;
                     log::debug!("merge_files {new_file_key} file_data::disk::set success");
                 }
-                storage::put(&new_file_key, buf.clone()).await?;
+                let account = storage::get_account(&new_file_key).unwrap_or_default();
+                storage::put(&account, &new_file_key, buf.clone()).await?;
 
                 if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
                     // generate inverted index
@@ -1039,7 +1032,7 @@ pub async fn merge_files(
                     .await?;
                 }
 
-                new_files.push(FileKey::new(0, new_file_key, new_file_meta, false));
+                new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
             }
             log::info!(
                 "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {:?}, original_size: {}, compressed_size: {}, took: {} ms",
@@ -1103,6 +1096,7 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         .filter(|v| v.deleted)
         .map(|v| FileListDeleted {
             id: 0,
+            account: v.account.clone(),
             file: v.key.clone(),
             index_file: v.meta.index_size > 0,
             flattened: v.meta.flattened,
@@ -1248,12 +1242,13 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     for file in files.iter() {
+        let file_account = file.account.to_string();
         let file_name = file.key.to_string();
         let file_size = file.meta.compressed_size;
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             let ret = if !file_data::disk::exist(&file_name).await {
-                file_data::disk::download("", &file_name, Some(file_size as usize)).await
+                file_data::disk::download(&file_account, &file_name, Some(file_size as usize)).await
             } else {
                 Ok(0)
             };
@@ -1293,14 +1288,16 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                             "[COMPACT] found invalid file: {}, will delete it",
                             file_name
                         );
-                        if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
+                        if let Err(e) =
+                            file_list::delete_parquet_file(&file_account, &file_name, true).await
+                        {
                             log::error!("[COMPACT] delete from file_list err: {}", e);
                         }
                         Some(file_name)
                     } else {
                         log::error!("[COMPACT] download file to cache err: {}", e);
                         // remove downloaded file
-                        let _ = file_data::disk::remove("", &file_name).await;
+                        let _ = file_data::disk::remove(&file_name).await;
                         None
                     }
                 }

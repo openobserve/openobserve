@@ -426,8 +426,7 @@ async fn validate_user_from_db(
                     password_ext_salt,
                 );
                 if hashed_pass.eq(&user_password) {
-                    let resp = TokenValidationResponseBuilder::from_db_user(&user).build();
-                    return Ok(resp);
+                    Ok(TokenValidationResponseBuilder::from_db_user(&user).build())
                 } else {
                     Err(ErrorForbidden("Not allowed"))
                 }

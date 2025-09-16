@@ -10,18 +10,23 @@ git-fetch-with-cli = true
 
 exceptions = [
     # We should probably NOT bundle CA certs but use the OS ones.
-    { name = "webpki-roots", allow = ["MPL-2.0"] },
+    { name = "webpki-roots", allow = ["MPL-2.0","CDLA-Permissive-2.0"] },
     { name = "openobserve", allow = ["AGPL-3.0"] },
     { name = "config", allow = ["AGPL-3.0"] },
     { name = "infra", allow = ["AGPL-3.0"] },
     { name = "ingester", allow = ["AGPL-3.0"] },
     { name = "wal", allow = ["AGPL-3.0"] },
     { name = "proto", allow = ["AGPL-3.0"] },
+    { name = "flight", allow = ["AGPL-3.0"] },
     { name = "report_server", allow = ["AGPL-3.0"] },
     { name = "arrayref", allow = ["BSD-2-Clause"] },
     { name = "mach", allow = ["BSD-2-Clause"] },
     { name = "fastdivide", allow = ["zlib-acknowledgement"] },
     { name = "foldhash", allow = ["Zlib"] },
+    { name = "adler32", allow = ["Zlib"] },
+    { name = "libz-rs-sys", allow = ["Zlib"] },
+    { name = "libz-rs", allow = ["Zlib"] },
+    { name = "zlib-rs", allow = ["Zlib"] },
     # These two are transitive deps of vrl via dep rustyline.
     # However, rustyline is needed only when we enable feature cli
     # which we haven't. Probably in Cargo.lock due to old code, need
@@ -32,8 +37,8 @@ exceptions = [
     { name = "tiny-keccak", allow = ["CC0-1.0"] },
     { name = "quoted_printable", allow = ["0BSD"] },
     { name = "ring", allow = ["BSD-4-Clause", "OpenSSL"] },
-    { name = "adler32", allow = ["Zlib"] },
     { name = "inferno", allow = ["CDDL-1.0"] },
+    { name = "libbz2-rs-sys", allow = ["bzip2-1.0.6"] },
 ]
 
 allow = [

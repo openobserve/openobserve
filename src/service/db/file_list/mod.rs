@@ -46,9 +46,10 @@ pub static BLOCKED_ORGS: Lazy<HashSet<String>> = Lazy::new(|| {
         .collect()
 });
 
-pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()> {
+pub async fn set(account: &str, key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()> {
     let mut file_data = FileKey::new(
         0,
+        account.to_string(),
         key.to_string(),
         meta.clone().unwrap_or_default(),
         deleted,
@@ -57,7 +58,7 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()>
     // write into file_list storage
     // retry 5 times
     for _ in 0..5 {
-        match progress(key, meta.as_ref(), deleted).await {
+        match progress(account, key, meta.as_ref(), deleted).await {
             Ok(v) => {
                 file_data.id = v;
                 break;
@@ -80,14 +81,14 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()>
     Ok(())
 }
 
-async fn progress(key: &str, data: Option<&FileMeta>, delete: bool) -> Result<i64> {
+async fn progress(account: &str, key: &str, data: Option<&FileMeta>, delete: bool) -> Result<i64> {
     let mut id = 0;
     if delete {
         if let Err(e) = infra::file_list::remove(key).await {
             log::error!("service:db:file_list: delete {}, remove error: {}", key, e);
         }
     } else if let Some(data) = data {
-        match infra::file_list::add(key, data).await {
+        match infra::file_list::add(account, key, data).await {
             Ok(v) => id = v,
             Err(e) => {
                 log::error!("service:db:file_list: add {}, add error: {}", key, e);

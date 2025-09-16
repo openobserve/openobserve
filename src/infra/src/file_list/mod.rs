@@ -52,8 +52,8 @@ pub fn connect_local_cache() -> Box<dyn FileList> {
 pub trait FileList: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn create_table_index(&self) -> Result<()>;
-    async fn add(&self, file: &str, meta: &FileMeta) -> Result<i64>;
-    async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<i64>;
+    async fn add(&self, account: &str, file: &str, meta: &FileMeta) -> Result<i64>;
+    async fn add_history(&self, account: &str, file: &str, meta: &FileMeta) -> Result<i64>;
     async fn remove(&self, file: &str) -> Result<()>;
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_with_id(&self, files: &[FileKey]) -> Result<()>;
@@ -189,13 +189,13 @@ pub async fn create_table_index() -> Result<()> {
 }
 
 #[inline]
-pub async fn add(file: &str, meta: &FileMeta) -> Result<i64> {
-    CLIENT.add(file, meta).await
+pub async fn add(account: &str, file: &str, meta: &FileMeta) -> Result<i64> {
+    CLIENT.add(account, file, meta).await
 }
 
 #[inline]
-pub async fn add_history(file: &str, meta: &FileMeta) -> Result<i64> {
-    CLIENT.add_history(file, meta).await
+pub async fn add_history(account: &str, file: &str, meta: &FileMeta) -> Result<i64> {
+    CLIENT.add_history(account, file, meta).await
 }
 
 #[inline]
@@ -539,6 +539,8 @@ pub struct FileRecord {
     #[sqlx(default)]
     pub id: i64,
     #[sqlx(default)]
+    pub account: String,
+    #[sqlx(default)]
     pub stream: String,
     pub date: String,
     pub file: String,
@@ -559,6 +561,7 @@ impl From<&FileRecord> for FileKey {
     fn from(r: &FileRecord) -> Self {
         Self {
             id: r.id,
+            account: r.account.clone(),
             key: "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
             meta: r.into(),
             deleted: r.deleted,
@@ -612,6 +615,8 @@ impl From<&StatsRecord> for StreamStats {
 pub struct FileDeletedRecord {
     #[sqlx(default)]
     pub id: i64,
+    #[sqlx(default)]
+    pub account: String,
     pub stream: String,
     pub date: String,
     pub file: String,

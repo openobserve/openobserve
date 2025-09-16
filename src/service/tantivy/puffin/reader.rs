@@ -22,13 +22,15 @@ use super::*;
 
 #[derive(Debug)]
 pub struct PuffinBytesReader {
+    account: String,
     source: Arc<object_store::ObjectMeta>,
     metadata: Option<PuffinMeta>,
 }
 
 impl PuffinBytesReader {
-    pub fn new(source: object_store::ObjectMeta) -> Self {
+    pub fn new(account: String, source: object_store::ObjectMeta) -> Self {
         Self {
+            account,
             source: Arc::new(source),
             metadata: None,
         }
@@ -42,6 +44,7 @@ impl PuffinBytesReader {
         range: Option<core::ops::Range<u64>>,
     ) -> Result<bytes::Bytes> {
         let raw_data = infra::cache::storage::get_range(
+            &self.account,
             &self.source.location,
             blob_metadata.get_offset(range),
         )
@@ -79,10 +82,12 @@ impl PuffinBytesReader {
         }
 
         // check MAGIC
-        let magic = infra::cache::storage::get_range(&self.source.location, 0..MAGIC_SIZE).await?;
+        let magic =
+            infra::cache::storage::get_range(&self.account, &self.source.location, 0..MAGIC_SIZE)
+                .await?;
         ensure!(magic.to_vec() == MAGIC, anyhow!("Header MAGIC mismatch"));
 
-        let puffin_meta = PuffinFooterBytesReader::new(self.source.clone())
+        let puffin_meta = PuffinFooterBytesReader::new(self.account.clone(), self.source.clone())
             .parse()
             .await?;
         self.metadata = Some(puffin_meta);
@@ -93,6 +98,7 @@ impl PuffinBytesReader {
 /// Footer layout: HeadMagic Payload PayloadSize Flags FootMagic
 ///                [4]       [?]     [4]         [4]   [4]
 struct PuffinFooterBytesReader {
+    account: String,
     source: Arc<object_store::ObjectMeta>,
     flags: PuffinFooterFlags,
     payload_size: u64,
@@ -100,8 +106,9 @@ struct PuffinFooterBytesReader {
 }
 
 impl PuffinFooterBytesReader {
-    fn new(source: Arc<object_store::ObjectMeta>) -> Self {
+    fn new(account: String, source: Arc<object_store::ObjectMeta>) -> Self {
         Self {
+            account,
             source,
             flags: PuffinFooterFlags::empty(),
             payload_size: 0,
@@ -121,6 +128,7 @@ impl PuffinFooterBytesReader {
             ));
         }
         let footer = infra::cache::storage::get_range(
+            &self.account,
             &self.source.location,
             (self.source.size - FOOTER_SIZE)..self.source.size,
         )
@@ -162,6 +170,7 @@ impl PuffinFooterBytesReader {
             ));
         }
         let payload = infra::cache::storage::get_range(
+            &self.account,
             &self.source.location,
             (self.source.size - FOOTER_SIZE - self.payload_size - MAGIC_SIZE)
                 ..(self.source.size - FOOTER_SIZE),

@@ -63,12 +63,13 @@ impl super::FileList for PostgresFileList {
         create_table_index().await
     }
 
-    async fn add(&self, file: &str, meta: &FileMeta) -> Result<i64> {
-        self.inner_add("file_list", file, meta).await
+    async fn add(&self, account: &str, file: &str, meta: &FileMeta) -> Result<i64> {
+        self.inner_add("file_list", account, file, meta).await
     }
 
-    async fn add_history(&self, file: &str, meta: &FileMeta) -> Result<i64> {
-        self.inner_add("file_list_history", file, meta).await
+    async fn add_history(&self, account: &str, file: &str, meta: &FileMeta) -> Result<i64> {
+        self.inner_add("file_list_history", account, file, meta)
+            .await
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
@@ -120,12 +121,13 @@ impl super::FileList for PostgresFileList {
         for files in chunks {
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-                "INSERT INTO file_list_deleted (org, stream, date, file, index_file, flattened, created_at)",
+                "INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, flattened, created_at)",
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
                     parse_file_key_columns(&item.file).expect("parse file key failed");
-                b.push_bind(org_id)
+                b.push_bind(&item.account)
+                    .push_bind(org_id)
                     .push_bind(stream_key)
                     .push_bind(date_key)
                     .push_bind(file_name)
@@ -223,7 +225,7 @@ impl super::FileList for PostgresFileList {
         let start = std::time::Instant::now();
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#
             )
@@ -332,7 +334,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let ret = if flattened.is_some() {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#
@@ -344,7 +346,7 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
             let (time_start, time_end) = time_range.unwrap_or((0, 0));
             let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
             let sql = r#"
-SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;
                 "#;
@@ -391,7 +393,7 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
 
         let (date_start, date_end) = date_range.unwrap_or(("".to_string(), "".to_string()));
         let sql = r#"
-SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
     WHERE stream = $1 AND date >= $2 AND date <= $3;
                 "#;
@@ -429,7 +431,7 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!(
-                "SELECT id, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size FROM file_list WHERE id IN ({ids})"
+                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size FROM file_list WHERE id IN ({ids})"
             );
             DB_QUERY_NUMS
                 .with_label_values(&["query_by_ids", "file_list"])
@@ -648,7 +650,7 @@ SELECT date
             .with_label_values(&["select", "file_list_deleted"])
             .inc();
         let items: Vec<FileListDeleted> = match sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT id, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 ORDER BY created_at ASC LIMIT $3;"#
+            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 ORDER BY created_at ASC LIMIT $3;"#
         )
         .bind(org_id)
         .bind(time_max)
@@ -659,6 +661,7 @@ SELECT date
                 .iter()
                 .map(|r| FileListDeleted {
                     id: r.id,
+                    account: r.account.to_string(),
                     file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                     index_file: r.index_file,
                     flattened: r.flattened,
@@ -724,7 +727,7 @@ SELECT date
             .with_label_values(&["select", "file_list_deleted"])
             .inc();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT id, stream, date, file, index_file, flattened FROM file_list_deleted;"#,
+            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted;"#,
         )
         .fetch_all(&pool)
         .await?;
@@ -732,6 +735,7 @@ SELECT date
             .iter()
             .map(|r| FileListDeleted {
                 id: r.id,
+                account: r.account.to_string(),
                 file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                 index_file: r.index_file,
                 flattened: r.flattened,
@@ -1441,7 +1445,13 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
 }
 
 impl PostgresFileList {
-    async fn inner_add(&self, table: &str, file: &str, meta: &FileMeta) -> Result<i64> {
+    async fn inner_add(
+        &self,
+        table: &str,
+        account: &str,
+        file: &str,
+        meta: &FileMeta,
+    ) -> Result<i64> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
@@ -1450,13 +1460,14 @@ impl PostgresFileList {
         let ret: std::result::Result<Option<i64>, sea_orm::SqlxError> = sqlx::query_scalar(
                     format!(
                         r#"
-INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     ON CONFLICT DO NOTHING
     RETURNING id;
             "#
                     ).as_str()
                 )
+                .bind(account)
                 .bind(org_id)
                 .bind(stream_key)
                 .bind(date_key)
@@ -1496,13 +1507,14 @@ INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, 
             let chunks = add_items.chunks(100);
             for files in chunks {
                 let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-                format!("INSERT INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)").as_str()
+                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)").as_str()
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let (stream_key, date_key, file_name) =
                         parse_file_key_columns(&item.key).expect("parse file key failed");
                     let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-                    b.push_bind(org_id)
+                    b.push_bind(&item.account)
+                        .push_bind(org_id)
                         .push_bind(stream_key)
                         .push_bind(date_key)
                         .push_bind(file_name)
@@ -1615,6 +1627,7 @@ pub async fn create_table() -> Result<()> {
 CREATE TABLE IF NOT EXISTS file_list
 (
     id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    account   VARCHAR(32) not null,
     org       VARCHAR(100) not null,
     stream    VARCHAR(256) not null,
     date      VARCHAR(16)  not null,
@@ -1638,6 +1651,7 @@ CREATE TABLE IF NOT EXISTS file_list
 CREATE TABLE IF NOT EXISTS file_list_history
 (
     id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    account   VARCHAR(32) not null,
     org       VARCHAR(100) not null,
     stream    VARCHAR(256) not null,
     date      VARCHAR(16)  not null,
@@ -1661,6 +1675,7 @@ CREATE TABLE IF NOT EXISTS file_list_history
 CREATE TABLE IF NOT EXISTS file_list_deleted
 (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    account    VARCHAR(32) not null,
     org        VARCHAR(100) not null,
     stream     VARCHAR(256) not null,
     date       VARCHAR(16)  not null,
@@ -1733,6 +1748,21 @@ CREATE TABLE IF NOT EXISTS stream_stats
     let column = "index_file";
     let data_type = "BOOLEAN default false not null";
     add_column("file_list_deleted", column, data_type).await?;
+
+    // create col account for multiple object storage account support, version >= 0.14.6
+    add_column("file_list", "account", "VARCHAR(32) default '' not null").await?;
+    add_column(
+        "file_list_history",
+        "account",
+        "VARCHAR(32) default '' not null",
+    )
+    .await?;
+    add_column(
+        "file_list_deleted",
+        "account",
+        "VARCHAR(32) default '' not null",
+    )
+    .await?;
 
     Ok(())
 }
@@ -1830,7 +1860,7 @@ pub async fn create_table_index() -> Result<()> {
                 .bind(date)
                 .bind(file)
                 .execute(&pool).await?;
-            if i % 1000 == 0 {
+            if i.is_multiple_of(1000) {
                 log::warn!("[POSTGRES] delete duplicate records: {}/{}", i, ret.len());
             }
         }

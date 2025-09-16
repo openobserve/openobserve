@@ -327,6 +327,12 @@ pub struct TokenValidationResponseBuilder {
     pub response: TokenValidationResponse,
 }
 
+impl Default for TokenValidationResponseBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Builder for creating a `TokenValidationResponse` from a `DBUser`.
 impl TokenValidationResponseBuilder {
     /// Creates a new `TokenValidationResponseBuilder` from a `DBUser`.
