@@ -83,7 +83,9 @@ describe("SearchResult Component", () => {
   });
 
   afterEach(() => {
-    wrapper.unmount();
+    if (wrapper) {
+      wrapper.unmount();
+    }
     vi.clearAllMocks();
   });
 
