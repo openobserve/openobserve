@@ -33,7 +33,6 @@ use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use tokio::sync::mpsc;
 use vector_enrichment::TableRegistry;
 
 use crate::{
@@ -97,78 +96,178 @@ pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashM
 pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
     Lazy::new(Default::default);
 
-/// Refreshes in-memory cache in the event of NATs restart.
-///
-/// We should add all in-memory caches listed above that a CacheMiss is not followed by
-/// reading from db, e.g. UserSession, Pipeline
-pub(crate) async fn update_cache(mut nats_event_rx: mpsc::Receiver<infra::db::nats::NatsEvent>) {
-    let mut first_conenction = true;
-    while let Some(event) = nats_event_rx.recv().await {
-        if let infra::db::nats::NatsEvent::Connected = event {
-            // Skip refreshing if it's the first time connecting to the client
-            if first_conenction {
-                first_conenction = false;
-                continue;
-            }
-            log::info!(
-                "[infra::config] received NATs event: {event}, refreshing in-memory cache for Alerts, Pipelines, RealtimeTriggers, Schema, Users, and UserSessions"
-            );
-            match crate::service::db::session::cache().await {
-                Ok(()) => log::info!(
-                    "[infra::config] Successfully refreshed in-memory cache \"UserSessions\""
-                ),
-                Err(e) => log::error!(
-                    "[infra::config] Error refreshing in-memory cache \"UserSessions\": {}",
-                    e
-                ),
-            }
-            match crate::service::db::user::cache().await {
-                Ok(()) => {
-                    log::info!("[infra::config] Successfully refreshed in-memory cache \"Users\"")
-                }
-                Err(e) => log::error!(
-                    "[infra::config] Error refreshing in-memory cache \"Users\": {}",
-                    e
-                ),
-            }
-            match crate::service::db::pipeline::cache().await {
-                Ok(()) => log::info!(
-                    "[infra::config] Successfully refreshed in-memory cache \"Pipelines\""
-                ),
-                Err(e) => log::error!(
-                    "[infra::config] Error refreshing in-memory cache \"Pipelines\": {}",
-                    e
-                ),
-            }
-            match crate::service::db::alerts::alert::cache().await {
-                Ok(()) => {
-                    log::info!("[infra::config] Successfully refreshed in-memory cache \"Alerts\"")
-                }
-                Err(e) => log::error!(
-                    "[infra::config] Error refreshing in-memory cache \"Alerts\": {}",
-                    e
-                ),
-            }
-            match crate::service::db::alerts::realtime_triggers::cache().await {
-                Ok(()) => log::info!(
-                    "[infra::config] Successfully refreshed in-memory cache \"RealtimeTriggers\""
-                ),
-                Err(e) => log::error!(
-                    "[infra::config] Error refreshing in-memory cache \"RealtimeTriggers\": {}",
-                    e
-                ),
-            }
-            match crate::service::db::schema::cache().await {
-                Ok(()) => {
-                    log::info!("[infra::config] Successfully refreshed in-memory cache \"Schema\"")
-                }
-                Err(e) => log::error!(
-                    "[infra::config] Error refreshing in-memory cache \"Schema\": {}",
-                    e
-                ),
-            }
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_static_variables_initialization() {
+        // Test that all static variables can be accessed and are properly initialized
+
+        // Test RwHashMap variables are initialized
+
+        // Test Arc<RwLock> variables
+        let users_rum_token = USERS_RUM_TOKEN.clone();
+        assert_eq!(users_rum_token.len(), 0);
+
+        // Test enrichment registry
+        let registry = ENRICHMENT_REGISTRY.clone();
+        assert!(!std::ptr::eq(registry.as_ref(), std::ptr::null()));
+    }
+
+    #[tokio::test]
+    async fn test_organization_setting_access() {
+        let org_settings = ORGANIZATION_SETTING.clone();
+        let read_guard = org_settings.read().await;
+        assert_eq!(read_guard.len(), 0);
+        drop(read_guard);
+
+        // Test write access
+        let mut write_guard = org_settings.write().await;
+        write_guard.insert("test_org".to_string(), OrganizationSetting::default());
+        assert_eq!(write_guard.len(), 1);
+        drop(write_guard);
+
+        // Verify the write was successful
+        let read_guard = org_settings.read().await;
+        assert_eq!(read_guard.len(), 1);
+        assert!(read_guard.contains_key("test_org"));
+    }
+
+    #[tokio::test]
+    async fn test_metric_cluster_map() {
+        let cluster_map = METRIC_CLUSTER_MAP.clone();
+        let read_guard = cluster_map.read().await;
+        assert_eq!(read_guard.len(), 0);
+        drop(read_guard);
+
+        // Test write access
+        let mut write_guard = cluster_map.write().await;
+        write_guard.insert(
+            "test_metric".to_string(),
+            vec!["node1".to_string(), "node2".to_string()],
+        );
+        assert_eq!(write_guard.len(), 1);
+        drop(write_guard);
+
+        // Verify the write was successful
+        let read_guard = cluster_map.read().await;
+        assert_eq!(read_guard.len(), 1);
+        assert!(read_guard.contains_key("test_metric"));
+        if let Some(nodes) = read_guard.get("test_metric") {
+            assert_eq!(nodes.len(), 2);
+            assert!(nodes.contains(&"node1".to_string()));
+            assert!(nodes.contains(&"node2".to_string()));
         }
     }
 
-    log::info!("[infra::config] stops to listen to NATs event to refresh in-memory caches");
+    #[tokio::test]
+    async fn test_metric_cluster_leader() {
+        let cluster_leader = METRIC_CLUSTER_LEADER.clone();
+        let read_guard = cluster_leader.read().await;
+        assert_eq!(read_guard.len(), 0);
+        drop(read_guard);
+
+        // Test write access
+        let mut write_guard = cluster_leader.write().await;
+        let leader = ClusterLeader {
+            name: "leader_node".to_string(),
+            last_received: chrono::Utc::now().timestamp_micros(),
+            updated_by: "test_node".to_string(),
+        };
+        write_guard.insert("test_cluster".to_string(), leader);
+        assert_eq!(write_guard.len(), 1);
+        drop(write_guard);
+
+        // Verify the write was successful
+        let read_guard = cluster_leader.read().await;
+        assert_eq!(read_guard.len(), 1);
+        assert!(read_guard.contains_key("test_cluster"));
+    }
+
+    #[tokio::test]
+    async fn test_maxmind_db_client() {
+        let maxmind_client = MAXMIND_DB_CLIENT.clone();
+        let read_guard = maxmind_client.read().await;
+        assert!(read_guard.is_none());
+        drop(read_guard);
+
+        // Test write access - just test that we can write None/Some pattern
+        let write_guard = maxmind_client.write().await;
+        // We can't create a MaxmindClient without a database file, so just test the Option pattern
+        assert!(write_guard.is_none());
+        drop(write_guard);
+
+        // Verify the state
+        let read_guard = maxmind_client.read().await;
+        assert!(read_guard.is_none());
+    }
+
+    #[test]
+    fn test_geoip_tables() {
+        // Test GEOIP_CITY_TABLE
+        let city_table = GEOIP_CITY_TABLE.clone();
+        let read_guard = city_table.read();
+        assert!(read_guard.is_none());
+        drop(read_guard);
+
+        // Test GEOIP_ASN_TABLE
+        let asn_table = GEOIP_ASN_TABLE.clone();
+        let read_guard = asn_table.read();
+        assert!(read_guard.is_none());
+        drop(read_guard);
+
+        #[cfg(feature = "enterprise")]
+        {
+            // Test GEOIP_ENT_TABLE (only available with enterprise feature)
+            let ent_table = GEOIP_ENT_TABLE.clone();
+            let read_guard = ent_table.read();
+            assert!(read_guard.is_none());
+        }
+    }
+
+    #[test]
+    fn test_dashmap_operations() {
+        // Test basic DashMap operations on KVS
+        let test_key = "test_key".to_string();
+        let test_value = bytes::Bytes::from("test_value");
+
+        // Insert
+        KVS.insert(test_key.clone(), test_value.clone());
+        assert_eq!(KVS.len(), 1);
+
+        // Get
+        let retrieved = KVS.get(&test_key);
+        assert!(retrieved.is_some());
+        assert_eq!(*retrieved.unwrap(), test_value);
+
+        // Remove
+        KVS.remove(&test_key);
+        assert_eq!(KVS.len(), 0);
+    }
+
+    #[test]
+    fn test_query_functions_cache() {
+        let test_key = "test_function".to_string();
+        let test_transform = Transform {
+            function: "test_function".to_string(),
+            name: "test".to_string(),
+            params: "".to_string(),
+            num_args: 0,
+            trans_type: Some(0),
+            streams: None,
+        };
+
+        // Insert
+        QUERY_FUNCTIONS.insert(test_key.clone(), test_transform.clone());
+        assert_eq!(QUERY_FUNCTIONS.len(), 1);
+
+        // Verify existence
+        assert!(QUERY_FUNCTIONS.contains_key(&test_key));
+
+        // Clean up
+        QUERY_FUNCTIONS.remove(&test_key);
+        assert_eq!(QUERY_FUNCTIONS.len(), 0);
+    }
 }

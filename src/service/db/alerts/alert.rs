@@ -24,7 +24,6 @@ use config::{
     utils::time::now_micros,
 };
 use infra::{
-    cluster_coordinator::alerts as cluster,
     db::{ORM_CLIENT, connect_to_orm},
     table::alerts as table,
 };
@@ -70,7 +69,7 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match table::put(client, org_id, "default", alert).await {
         Ok(alert) => {
-            cluster::emit_put_event(org_id, &alert, None).await?;
+            infra::coordinator::alerts::emit_put_event(org_id, &alert, None).await?;
             #[cfg(feature = "enterprise")]
             if create {
                 super_cluster::emit_create_event(org_id, "default", alert.clone()).await?;
@@ -136,7 +135,7 @@ pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<
     };
     let (_f, _) = get_folder_alert_by_id_db(org_id, alert_id).await?;
     let alert = table::update(client, org_id, None, alert).await?;
-    cluster::emit_put_event(org_id, &alert, None).await?;
+    infra::coordinator::alerts::emit_put_event(org_id, &alert, None).await?;
     #[cfg(feature = "enterprise")]
     if alert.id.is_some() {
         super_cluster::emit_update_event(org_id, None, alert.clone()).await?;
@@ -155,7 +154,7 @@ pub async fn create<C: TransactionTrait>(
     let alert = table::create(conn, org_id, folder_id, alert, false).await?;
     let schedule_key = scheduler_key(alert.id);
 
-    cluster::emit_put_event(org_id, &alert, Some(folder_id.to_string())).await?;
+    infra::coordinator::alerts::emit_put_event(org_id, &alert, Some(folder_id.to_string())).await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_create_event(org_id, folder_id, alert.clone()).await?;
 
@@ -185,7 +184,8 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     let alert = table::update(conn, org_id, folder_id, alert).await?;
     let schedule_key = scheduler_key(alert.id);
 
-    cluster::emit_put_event(org_id, &alert, folder_id.map(|id| id.to_string())).await?;
+    infra::coordinator::alerts::emit_put_event(org_id, &alert, folder_id.map(|id| id.to_string()))
+        .await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_update_event(org_id, folder_id, alert.clone()).await?;
 
@@ -227,7 +227,7 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     let alert_id_str = alert_id.to_string();
 
     table::delete_by_id(conn, org_id, alert_id).await?;
-    cluster::emit_delete_event(org_id, &alert_id_str).await?;
+    infra::coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete_event(
         org_id,
@@ -264,7 +264,7 @@ pub async fn delete_by_name(
     let alert_id_str = alert_id.to_string();
 
     table::delete_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
-    cluster::emit_delete_event(org_id, &alert_id_str).await?;
+    infra::coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;
 
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete_event(org_id, stream_type, stream_name, name, alert_id).await?;
@@ -306,7 +306,7 @@ pub async fn list_with_folders<C: ConnectionTrait>(
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    cluster::watch_events(put_into_cache, delete_from_cache).await
+    infra::coordinator::alerts::watch_events(put_into_cache, delete_from_cache).await
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
