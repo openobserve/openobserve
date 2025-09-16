@@ -15,10 +15,9 @@
 
 pub mod alerts;
 pub mod destinations;
+pub mod events;
 pub mod pipelines;
 
-use crate::db::Db;
-
-pub async fn get_coordinator() -> &'static Box<dyn Db> {
+pub async fn get_coordinator() -> &'static Box<dyn crate::db::Db> {
     super::db::get_coordinator().await
 }

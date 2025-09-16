@@ -19,7 +19,10 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use tokio::sync::mpsc;
 
-use crate::errors::*;
+use crate::{
+    errors::*,
+    queue::{DeliverPolicy, RetentionPolicy},
+};
 
 pub async fn init() -> Result<()> {
     Ok(())
@@ -46,6 +49,32 @@ impl Default for NopQueue {
 #[async_trait]
 impl super::Queue for NopQueue {
     async fn create(&self, _topic: &str) -> Result<()> {
+        self.create_with_retention_policy(_topic, RetentionPolicy::Limits)
+            .await
+    }
+
+    async fn create_with_retention_policy(
+        &self,
+        _topic: &str,
+        _retention_policy: RetentionPolicy,
+    ) -> Result<()> {
+        let max_age = config::get_config().nats.queue_max_age; // days
+        let max_age_secs = std::time::Duration::from_secs(max_age * 24 * 60 * 60);
+        self.create_with_retention_policy_and_max_age(_topic, _retention_policy, max_age_secs)
+            .await
+    }
+
+    async fn create_with_max_age(&self, _topic: &str, _max_age: std::time::Duration) -> Result<()> {
+        self.create_with_retention_policy_and_max_age(_topic, RetentionPolicy::Limits, _max_age)
+            .await
+    }
+
+    async fn create_with_retention_policy_and_max_age(
+        &self,
+        _topic: &str,
+        _retention_policy: RetentionPolicy,
+        _max_age: std::time::Duration,
+    ) -> Result<()> {
         todo!()
     }
 
@@ -53,7 +82,11 @@ impl super::Queue for NopQueue {
         todo!()
     }
 
-    async fn consume(&self, _topic: &str) -> Result<Arc<mpsc::Receiver<super::Message>>> {
+    async fn consume(
+        &self,
+        _topic: &str,
+        _deliver_policy: Option<DeliverPolicy>,
+    ) -> Result<Arc<mpsc::Receiver<super::Message>>> {
         todo!()
     }
 

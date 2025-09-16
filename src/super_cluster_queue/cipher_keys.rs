@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use infra::{
-    cluster_coordinator::get_coordinator,
+    coordinator::get_coordinator,
     errors::{DbError, Error, Result},
     table::cipher::EntryKind,
 };
