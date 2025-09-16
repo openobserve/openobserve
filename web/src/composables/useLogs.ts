@@ -4142,6 +4142,9 @@ const useLogs = () => {
         }
       } else {
         if (
+          searchObj.data.queryResults.hits?.some((item) =>
+            item.hasOwnProperty(store.state.zoConfig.timestamp_column),
+          ) ||
           searchObj.data.hasSearchDataTimestampField ||
           selectedFields.includes(store.state.zoConfig.timestamp_column)
         ) {
