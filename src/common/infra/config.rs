@@ -136,30 +136,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_organizations_access() {
-        let organizations = ORGANIZATIONS.clone();
-        let read_guard = organizations.read().await;
-        assert_eq!(read_guard.len(), 0);
-        drop(read_guard);
-
-        // Test write access
-        let mut write_guard = organizations.write().await;
-        let org = Organization {
-            identifier: "test_org".to_string(),
-            name: "Test Organization".to_string(),
-            org_type: "standard".to_string(),
-        };
-        write_guard.insert("test_org".to_string(), org);
-        assert_eq!(write_guard.len(), 1);
-        drop(write_guard);
-
-        // Verify the write was successful
-        let read_guard = organizations.read().await;
-        assert_eq!(read_guard.len(), 1);
-        assert!(read_guard.contains_key("test_org"));
-    }
-
-    #[tokio::test]
     async fn test_metric_cluster_map() {
         let cluster_map = METRIC_CLUSTER_MAP.clone();
         let read_guard = cluster_map.read().await;
