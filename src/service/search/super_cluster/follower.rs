@@ -35,7 +35,9 @@ use infra::{
     file_list::FileId,
     schema::get_stream_setting_index_fields,
 };
+use prometheus::register;
 use proto::cluster_rpc::{KvItem, SearchQuery};
+use sea_orm::sea_query::prepare;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::{
@@ -80,6 +82,7 @@ pub async fn search(
     ScanStats,
 )> {
     let start = std::time::Instant::now();
+    let mut checkpoint = 0usize;
     let cfg = config::get_config();
     let mut req: Request = (*flight_request).clone().into();
     let trace_id = trace_id.to_string();
@@ -93,18 +96,20 @@ pub async fn search(
         cfg.limit.cpu_num,
     )
     .await?;
+    let prepare_datafusion_context_took = start.elapsed().as_millis() as usize;
+    checkpoint = prepare_datafusion_context_took;
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
                 "[trace_id {trace_id}] flight->follower_leader: prepared datafusion context took: {} ms",
-                start.elapsed().as_millis(),
+                prepare_datafusion_context_took
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("search::super_cluster::follower prepare_datafusion_context".to_string())
                 .search_role("follower".to_string())
-                .duration(start.elapsed().as_millis() as usize)
+                .duration(prepare_datafusion_context_took)
                 .build()
         )
     );
@@ -112,18 +117,20 @@ pub async fn search(
     // register udf
     register_udf(&ctx, &req.org_id)?;
     datafusion_functions_json::register_all(&mut ctx)?;
+    let registered_udf_took = start.elapsed().as_millis() as usize - checkpoint;
+    checkpoint += registered_udf_took;
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
                 "[trace_id {trace_id}] flight->follower_leader: registered udf and ctx took: {} ms",
-                start.elapsed().as_millis(),
+                registered_udf_took
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("search::super_cluster::follower register udf and ctx".to_string())
                 .search_role("follower".to_string())
-                .duration(start.elapsed().as_millis() as usize)
+                .duration(registered_udf_took)
                 .build()
         )
     );
@@ -137,19 +144,20 @@ pub async fn search(
         &ctx,
         &proto,
     )?;
-    log::info!("[trace_id {trace_id}] flight->follower_leader: decoded physical plan");
+    let decode_physical_plan_took = start.elapsed().as_millis() as usize - checkpoint;
+    checkpoint += decode_physical_plan_took;
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
                 "[trace_id {trace_id}] flight->follower_leader: decoded physical plan took: {} ms",
-                start.elapsed().as_millis(),
+                decode_physical_plan_took
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("search::super_cluster::follower register udf and ctx".to_string())
                 .search_role("follower".to_string())
-                .duration(start.elapsed().as_millis() as usize)
+                .duration(decode_physical_plan_took)
                 .build()
         )
     );
@@ -179,7 +187,8 @@ pub async fn search(
 
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_num = file_id_list_vec.len();
-    let file_id_list_took = start.elapsed().as_millis() as usize;
+    let file_id_list_took = start.elapsed().as_millis() as usize - checkpoint;
+    checkpoint += file_id_list_took;
     log::info!(
         "{}",
         search_inspector_fields(
