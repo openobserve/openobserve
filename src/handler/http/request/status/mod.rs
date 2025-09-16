@@ -138,6 +138,7 @@ struct ConfigResponse<'a> {
     dashboard_placeholder: String,
     dashboard_show_symbol_enabled: bool,
     ingest_flatten_level: u32,
+    log_page_default_field_list: String,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -358,6 +359,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
         ingest_flatten_level: cfg.limit.ingest_flatten_level,
+        log_page_default_field_list: cfg.common.log_page_default_field_list.clone(),
     }))
 }
 
