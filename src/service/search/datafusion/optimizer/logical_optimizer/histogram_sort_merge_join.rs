@@ -15,13 +15,13 @@
 
 use std::{fmt, sync::Arc};
 
+use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     common::{DFSchemaRef, Result},
     logical_expr::{Expr, LogicalPlan, UserDefinedLogicalNodeCore},
     optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder},
     prelude::JoinType,
 };
-
 /// Configuration for creating HistogramJoinNode
 #[derive(Debug, Clone)]
 pub struct HistogramJoinNodeConfig {
@@ -99,11 +99,7 @@ impl Ord for HistogramJoinNode {
 }
 
 impl HistogramJoinNode {
-    pub fn new(
-        left: LogicalPlan,
-        right: LogicalPlan,
-        config: HistogramJoinNodeConfig,
-    ) -> Self {
+    pub fn new(left: LogicalPlan, right: LogicalPlan, config: HistogramJoinNodeConfig) -> Self {
         Self {
             left,
             right,
@@ -244,11 +240,8 @@ impl OptimizerRule for HistogramSortMergeJoinRule {
                         filter: join.filter,
                         schema: join.schema.clone(),
                     };
-                    let histogram_join = HistogramJoinNode::new(
-                        (*join.left).clone(),
-                        (*join.right).clone(),
-                        config,
-                    );
+                    let histogram_join =
+                        HistogramJoinNode::new((*join.left).clone(), (*join.right).clone(), config);
 
                     return Ok(datafusion::common::tree_node::Transformed::yes(
                         LogicalPlan::Extension(datafusion::logical_expr::Extension {
@@ -294,7 +287,7 @@ impl HistogramSortMergeJoinRule {
         let schema = plan.schema();
         schema.fields().iter().any(|field| {
             field.name().contains("timestamp")
-                || field.name() == "_timestamp"
+                || field.name() == TIMESTAMP_COL_NAME
                 || matches!(field.data_type(), arrow_schema::DataType::Timestamp(_, _))
         })
     }
@@ -320,10 +313,10 @@ impl HistogramSortMergeJoinRule {
     ) -> (String, String) {
         let left_time_col = self
             .find_time_column_in_plan(left_plan)
-            .unwrap_or_else(|| "_timestamp".to_string());
+            .unwrap_or_else(|| TIMESTAMP_COL_NAME.to_string());
         let right_time_col = self
             .find_time_column_in_plan(right_plan)
-            .unwrap_or_else(|| "_timestamp".to_string());
+            .unwrap_or_else(|| TIMESTAMP_COL_NAME.to_string());
 
         (left_time_col, right_time_col)
     }
@@ -336,8 +329,8 @@ impl HistogramSortMergeJoinRule {
         for field in schema.fields() {
             let name = field.name();
             if name.contains("timestamp")
-                || name == "_timestamp"
-                || name.ends_with("._timestamp")
+                || name == "TIMESTAMP_COL_NAME"
+                || name.ends_with(format!(".{TIMESTAMP_COL_NAME}").as_str())
                 || matches!(field.data_type(), arrow_schema::DataType::Timestamp(_, _))
             {
                 return Some(name.clone());
