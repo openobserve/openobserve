@@ -526,7 +526,7 @@ export default defineComponent({
       // Initialize GridStack with optimal configuration
       gridStackInstance = GridStack.init(
         {
-          column: 48, // 48-column grid for fine-grained positioning
+          column: 192, // 192-column grid for fine-grained positioning
           cellHeight: "34px", // Base cell height
           margin: 2, // Minimal margin between panels
           draggable: {
