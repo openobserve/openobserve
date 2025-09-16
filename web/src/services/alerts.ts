@@ -171,6 +171,7 @@ const alerts = {
     }
     return http().patch(url);
   },
+  bulkToggleState: (org_identifier: string, enable: boolean, data: any) => {
     const url = `/api/v2/${org_identifier}/alerts/bulk/enable?value=${enable}`;
     return http().post(url, data);
   },
