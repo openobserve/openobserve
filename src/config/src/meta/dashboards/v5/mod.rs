@@ -254,6 +254,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     legends_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    chart_align: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     unit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     unit_custom: Option<String>,
@@ -289,6 +291,8 @@ pub struct PanelConfig {
     line_interpolation: Option<LineInterpolation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     legend_width: Option<LegendWidth>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    legend_height: Option<LegendHeight>,
     base_map: Option<BaseMap>,
     #[serde(skip_serializing_if = "Option::is_none")]
     map_type: Option<MapType>,
@@ -631,6 +635,16 @@ pub struct SizeByValue {
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(default)]
 pub struct LegendWidth {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    pub value: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+pub struct LegendHeight {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<f64>)]
     pub value: Option<OrdF64>,
