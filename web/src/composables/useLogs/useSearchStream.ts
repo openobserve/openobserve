@@ -791,7 +791,7 @@ export const useSearchStream = () => {
     isPagination: boolean,
     appendResult: boolean = false,
   ) => {
-    removeTraceId(response.content.traceId);
+    removeTraceId(response.content.trace_id);
 
     if (searchObj.data.queryResults.aggs == null) {
       searchObj.data.queryResults.aggs = [];
