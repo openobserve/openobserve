@@ -821,7 +821,7 @@ export default defineComponent({
       //we will use the quasar next tick to ensure that the dom is updated before we call the method
       //we will also us the quasar's updateInputValue method to clear the input value
       this.$nextTick(() => {
-        const indexListSelectField = this.$refs.streamSelect;
+        const indexListSelectField = this.$refs.streamSelect as any;
         if (indexListSelectField && indexListSelectField.updateInputValue) {
           indexListSelectField.updateInputValue("");
         }
@@ -839,7 +839,7 @@ export default defineComponent({
       //we will use the quasar next tick to ensure that the dom is updated before we call the method
       //we will also us the quasar's updateInputValue method to clear the input value
       this.$nextTick(() => {
-        const indexListSelectField = this.$refs.streamSelect;
+        const indexListSelectField = this.$refs.streamSelect as any;
         if (indexListSelectField && indexListSelectField.updateInputValue) {
           indexListSelectField.updateInputValue("");
         }
