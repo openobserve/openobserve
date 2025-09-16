@@ -20,7 +20,6 @@ bytes.workspace = true
 chrono.workspace = true
 config.workspace = true
 datafusion.workspace = true
-etcd-client.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
 hashlink.workspace = true

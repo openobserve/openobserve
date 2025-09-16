@@ -27,8 +27,6 @@ pub enum Error {
     IoError(#[from] std::io::Error),
     #[error("DbError# {0}")]
     DbError(#[from] DbError),
-    #[error("EtcdError# {0}")]
-    EtcdError(#[from] etcd_client::Error),
     #[error("FromStrError# {0}")]
     FromStrError(#[from] FromStrError),
     #[error("FromI16Error# {0}")]

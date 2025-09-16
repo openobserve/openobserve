@@ -34,7 +34,7 @@ use once_cell::sync::Lazy;
 
 use crate::{
     meta::{cluster, stream::QueryPartitionStrategy},
-    utils::{file::get_file_meta, sysinfo},
+    utils::sysinfo,
 };
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
@@ -425,7 +425,6 @@ pub struct Config {
     pub memory_cache: MemoryCache,
     pub disk_cache: DiskCache,
     pub log: Log,
-    pub etcd: Etcd,
     pub nats: Nats,
     pub s3: S3,
     pub sns: Sns,
@@ -685,7 +684,7 @@ pub struct Common {
     #[env_config(name = "ZO_LOCAL_MODE_STORAGE", default = "disk")]
     pub local_mode_storage: String,
     pub is_local_storage: bool,
-    #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "etcd")]
+    #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "nats")]
     pub cluster_coordinator: String,
     #[env_config(name = "ZO_QUEUE_STORE", default = "")]
     pub queue_store: String,
@@ -743,8 +742,6 @@ pub struct Common {
         help = "Disable timestamp field compression"
     )]
     pub timestamp_compression_disabled: bool,
-    #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
-    pub feature_per_thread_lock: bool,
     #[env_config(name = "ZO_FEATURE_INGESTER_NONE_COMPRESSION", default = false)]
     pub feature_ingester_none_compression: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
@@ -1653,36 +1650,6 @@ pub struct Log {
 }
 
 #[derive(Debug, EnvConfig, Default)]
-pub struct Etcd {
-    #[env_config(name = "ZO_ETCD_ADDR", default = "localhost:2379")]
-    pub addr: String,
-    #[env_config(name = "ZO_ETCD_PREFIX", default = "/zinc/observe/")]
-    pub prefix: String,
-    #[env_config(name = "ZO_ETCD_CONNECT_TIMEOUT", default = 5)]
-    pub connect_timeout: u64,
-    #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 10)]
-    pub command_timeout: u64,
-    #[env_config(name = "ZO_ETCD_LOCK_WAIT_TIMEOUT", default = 3600)]
-    pub lock_wait_timeout: u64,
-    #[env_config(name = "ZO_ETCD_USER", default = "")]
-    pub user: String,
-    #[env_config(name = "ZO_ETCD_PASSWORD", default = "")]
-    pub password: String,
-    #[env_config(name = "ZO_ETCD_CLIENT_CERT_AUTH", default = false)]
-    pub cert_auth: bool,
-    #[env_config(name = "ZO_ETCD_TRUSTED_CA_FILE", default = "")]
-    pub ca_file: String,
-    #[env_config(name = "ZO_ETCD_CERT_FILE", default = "")]
-    pub cert_file: String,
-    #[env_config(name = "ZO_ETCD_KEY_FILE", default = "")]
-    pub key_file: String,
-    #[env_config(name = "ZO_ETCD_DOMAIN_NAME", default = "")]
-    pub domain_name: String,
-    #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 1000)]
-    pub load_page_size: i64,
-}
-
-#[derive(Debug, EnvConfig, Default)]
 pub struct Nats {
     #[env_config(name = "ZO_NATS_ADDR", default = "localhost:4222")]
     pub addr: String,
@@ -2082,11 +2049,6 @@ pub fn init() -> Config {
         panic!("compact config error: {e}");
     }
 
-    // check etcd config
-    if let Err(e) = check_etcd_config(&mut cfg) {
-        panic!("etcd config error: {e}");
-    }
-
     // check s3 config
     if let Err(e) = check_s3_config(&mut cfg) {
         panic!("s3 config error: {e}");
@@ -2332,7 +2294,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         if cfg.common.local_mode {
             cfg.common.meta_store = "sqlite".to_string();
         } else {
-            cfg.common.meta_store = "etcd".to_string();
+            cfg.common.meta_store = "nats".to_string();
         }
     }
     cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
@@ -2465,39 +2427,6 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check for pprof flamegraph
     if cfg.profiling.pprof_flamegraph_path.is_empty() {
         cfg.profiling.pprof_flamegraph_path = format!("{}flamegraph.svg", cfg.common.data_dir);
-    }
-
-    Ok(())
-}
-
-fn check_etcd_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if !cfg.etcd.prefix.is_empty() && !cfg.etcd.prefix.ends_with('/') {
-        cfg.etcd.prefix = format!("{}/", cfg.etcd.prefix);
-    }
-
-    if !cfg.etcd.cert_auth {
-        return Ok(());
-    }
-    if let Err(e) = get_file_meta(&cfg.etcd.ca_file) {
-        return Err(anyhow::anyhow!("ZO_ETCD_TRUSTED_CA_FILE check err: {}", e));
-    }
-    if let Err(e) = get_file_meta(&cfg.etcd.cert_file) {
-        return Err(anyhow::anyhow!("ZO_ETCD_TRUSTED_CA_FILE check err: {}", e));
-    }
-    if let Err(e) = get_file_meta(&cfg.etcd.key_file) {
-        return Err(anyhow::anyhow!("ZO_ETCD_TRUSTED_CA_FILE check err: {}", e));
-    }
-
-    // check domain name
-    if cfg.etcd.domain_name.is_empty() {
-        let mut name = cfg.etcd.addr.clone();
-        if name.contains("//") {
-            name = name.split("//").collect::<Vec<&str>>()[1].to_string();
-        }
-        if name.contains(':') {
-            name = name.split(':').collect::<Vec<&str>>()[0].to_string();
-        }
-        cfg.etcd.domain_name = name;
     }
 
     Ok(())
