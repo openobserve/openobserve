@@ -14,7 +14,7 @@ keywords = [
     "open-source",
     "opensource",
 ]
-license = "AGPL-3.0-only"
+license = "AGPL-3.0"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
 version = "0.14.6"
