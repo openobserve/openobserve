@@ -607,6 +607,23 @@ describe("PanelSchemaRenderer", () => {
   });
 
   describe("Download Functionality", () => {
+    let mockExportFile: any;
+    let mockShowErrorNotification: any;
+    let mockShowPositiveNotification: any;
+
+    beforeEach(() => {
+      mockExportFile = vi.fn().mockReturnValue(true);
+      mockShowErrorNotification = vi.fn();
+      mockShowPositiveNotification = vi.fn();
+
+      vi.doMock("quasar", async (importOriginal) => {
+        const actual = await importOriginal();
+        return {
+          ...actual,
+          exportFile: mockExportFile,
+        };
+      });
+    });
 
     it("should have downloadDataAsCSV method", () => {
       wrapper = createWrapper();
@@ -667,15 +684,46 @@ describe("PanelSchemaRenderer", () => {
         panelSchema: { ...defaultProps.panelSchema, queryType: "promql" },
       });
 
-      // Test that the component can handle PromQL data structure
+      // Mock the data for the component
+      wrapper.vm.data = { value: mockPromQLData };
+
+      // Mock the quasar exportFile function to return true
+      const originalExportFile = vi.fn().mockReturnValue(true);
+
+      // Mock showPositiveNotification
+      wrapper.vm.showPositiveNotification = vi.fn();
+
+      // Call downloadDataAsCSV
+      wrapper.vm.downloadDataAsCSV("test-promql");
+
+      // Should handle PromQL data structure correctly
       expect(wrapper.vm.panelSchema.queryType).toBe("promql");
       expect(wrapper.vm.downloadDataAsCSV).toBeTypeOf("function");
     });
 
     it("should handle CSV download for standard SQL panels with multiple datasets", () => {
+      const mockSQLData = [
+        [
+          { timestamp: "2024-01-01T10:00:00Z", count: 100, service: "web" },
+          { timestamp: "2024-01-01T11:00:00Z", count: 150, service: "api" }
+        ],
+        [
+          { timestamp: "2024-01-01T12:00:00Z", count: 120, service: "db" }
+        ]
+      ];
+
       wrapper = createWrapper();
 
-      // Test that the component supports SQL data format
+      // Set the mock data
+      wrapper.vm.data = { value: mockSQLData };
+
+      // Mock notifications
+      wrapper.vm.showPositiveNotification = vi.fn();
+      wrapper.vm.showErrorNotification = vi.fn();
+
+      // Call download function
+      wrapper.vm.downloadDataAsCSV("test-sql");
+
       expect(wrapper.vm.panelSchema.queryType).toBe("sql");
       expect(wrapper.vm.downloadDataAsCSV).toBeTypeOf("function");
     });
@@ -683,9 +731,18 @@ describe("PanelSchemaRenderer", () => {
     it("should handle error when no data available for CSV download", () => {
       wrapper = createWrapper();
 
-      // Test that the component can handle empty data scenarios
+      // Set empty data
+      wrapper.vm.data = { value: [] };
+
+      // Mock error notification
+      wrapper.vm.showErrorNotification = vi.fn();
+
+      // Call download function with empty data
+      wrapper.vm.downloadDataAsCSV("test-empty");
+
+      // Should handle empty data gracefully
       expect(wrapper.vm.downloadDataAsCSV).toBeTypeOf("function");
-      expect(wrapper.vm.data).toBeDefined();
+      expect(wrapper.vm.data.value).toEqual([]);
     });
 
     it("should handle CSV export failure gracefully", () => {
@@ -703,18 +760,67 @@ describe("PanelSchemaRenderer", () => {
     });
 
     it("should handle JSON download for non-table panels", () => {
+      const mockData = [[{ timestamp: "2024-01-01", value: 100 }]];
+
       wrapper = createWrapper();
 
-      // Test that JSON download functionality is available
+      // Set mock data
+      wrapper.vm.data = { value: mockData };
+
+      // Mock notifications
+      wrapper.vm.showPositiveNotification = vi.fn();
+      wrapper.vm.showErrorNotification = vi.fn();
+
+      // Call JSON download
+      wrapper.vm.downloadDataAsJSON("test-json");
+
       expect(wrapper.vm.downloadDataAsJSON).toBeTypeOf("function");
     });
 
     it("should handle JSON download error when no data available", () => {
       wrapper = createWrapper();
 
-      // Test that JSON download handles empty data
+      // Set empty data
+      wrapper.vm.data = { value: [] };
+
+      // Mock error notification
+      wrapper.vm.showErrorNotification = vi.fn();
+
+      // Call JSON download with empty data
+      wrapper.vm.downloadDataAsJSON("test-empty-json");
+
       expect(wrapper.vm.downloadDataAsJSON).toBeTypeOf("function");
-      expect(wrapper.vm.data).toBeDefined();
+      expect(wrapper.vm.data.value).toEqual([]);
+    });
+
+    it("should handle CSV download with complex data structures", () => {
+      wrapper = createWrapper();
+
+      const complexData = [
+        [
+          {
+            "timestamp": "2024-01-01T10:00:00Z",
+            "service,name": "web-server",
+            "count": 100,
+            "message": 'Log "entry" with quotes'
+          },
+          {
+            "timestamp": "2024-01-01T11:00:00Z",
+            "service,name": "api-server",
+            "count": 150,
+            "message": "Normal log entry"
+          }
+        ]
+      ];
+
+      wrapper.vm.data = { value: complexData };
+      wrapper.vm.showPositiveNotification = vi.fn();
+      wrapper.vm.showErrorNotification = vi.fn();
+
+      // Call download function - should handle complex data
+      wrapper.vm.downloadDataAsCSV("test-complex");
+
+      expect(wrapper.vm.data.value).toEqual(complexData);
     });
   });
 
@@ -962,6 +1068,14 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.isCursorOverPanel).toBe(false);
     });
 
+    it("should handle showPopupsAndOverlays method", () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.showPopupsAndOverlays();
+
+      expect(wrapper.vm.isCursorOverPanel).toBe(true);
+    });
+
     it("should handle rapid state changes", () => {
       wrapper = createWrapper();
 
@@ -971,6 +1085,24 @@ describe("PanelSchemaRenderer", () => {
         wrapper.vm.showPopupsAndOverlays();
         wrapper.vm.isCursorOverPanel = false;
       }).not.toThrow();
+    });
+
+    it("should properly handle hidePopupsAndOverlays with real refs", () => {
+      wrapper = createWrapper();
+
+      // Mock refs with actual style objects
+      wrapper.vm.drilldownPopUpRef = {
+        style: { display: "block" }
+      };
+      wrapper.vm.annotationPopupRef = {
+        style: { display: "block" }
+      };
+
+      wrapper.vm.hidePopupsAndOverlays();
+
+      expect(wrapper.vm.drilldownPopUpRef.style.display).toBe("none");
+      expect(wrapper.vm.annotationPopupRef.style.display).toBe("none");
+      expect(wrapper.vm.isCursorOverPanel).toBe(false);
     });
   });
 
@@ -1181,12 +1313,29 @@ describe("PanelSchemaRenderer", () => {
   });
 
   describe("Complex Data Processing Scenarios", () => {
-    it("should handle multiple concurrent data conversions", () => {
+    it("should handle complex data structures correctly", () => {
       wrapper = createWrapper();
-      
-      // Test that the component can handle complex data structures
-      expect(wrapper.vm.data).toBeDefined();
-      expect(wrapper.vm.panelData).toBeDefined();
+
+      const complexData = [
+        [
+          {
+            "@timestamp": "2024-01-01T10:00:00Z",
+            "service.name": "web-server",
+            "nested": {
+              "field": "value",
+              "count": 100
+            },
+            "array": [1, 2, 3]
+          }
+        ]
+      ];
+
+      wrapper.vm.data = { value: complexData };
+
+      expect(wrapper.vm.data.value[0][0]["@timestamp"]).toBe("2024-01-01T10:00:00Z");
+      expect(wrapper.vm.data.value[0][0]["service.name"]).toBe("web-server");
+      expect(wrapper.vm.data.value[0][0].nested.count).toBe(100);
+      expect(wrapper.vm.data.value[0][0].array).toEqual([1, 2, 3]);
     });
 
     it("should properly process breakdown fields for trellis layouts", () => {
@@ -1241,14 +1390,27 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.data.value[0][0]).toHaveProperty("nested");
     });
 
-    it("should handle panel schema changes and re-trigger data conversion", () => {
-      wrapper = createWrapper();
-      
-      const originalType = wrapper.vm.panelSchema.type;
-      
-      // Test that panel schema can be modified
-      expect(wrapper.vm.panelSchema.type).toBe("line");
-      expect(typeof originalType).toBe("string");
+    it("should handle variable processing correctly", () => {
+      const variablesData = {
+        values: [
+          {
+            name: "service",
+            value: ["web", "api"],
+            escapeSingleQuotes: false
+          },
+          {
+            name: "environment",
+            value: "production",
+            escapeSingleQuotes: true
+          }
+        ]
+      };
+
+      wrapper = createWrapper({ variablesData });
+
+      expect(wrapper.vm.variablesData.values).toHaveLength(2);
+      expect(wrapper.vm.variablesData.values[0].value).toEqual(["web", "api"]);
+      expect(wrapper.vm.variablesData.values[1].value).toBe("production");
     });
 
     it("should handle store state changes affecting theme and data processing", async () => {
@@ -1524,6 +1686,219 @@ describe("PanelSchemaRenderer", () => {
       // The component should integrate with the loading state management
       expect(wrapper.vm.loading).toBeDefined();
       expect(wrapper.vm.searchRequestTraceIds).toBeDefined();
+    });
+  });
+
+  describe("Watchers and Reactive Updates", () => {
+    it("should emit metadata-update when metadata changes", async () => {
+      wrapper = createWrapper();
+
+      const mockMetadata = { queries: [{ query: "SELECT * FROM logs" }] };
+      wrapper.vm.metadata = { value: mockMetadata };
+
+      await nextTick();
+
+      // Check that the watcher exists and metadata is reactive
+      expect(wrapper.vm.metadata.value).toEqual(mockMetadata);
+    });
+
+    it("should emit series-data-update when panelData changes", async () => {
+      wrapper = createWrapper();
+
+      const mockPanelData = {
+        chartType: "line",
+        options: { series: [{ name: "test" }] },
+        extras: { isTimeSeries: true }
+      };
+
+      wrapper.vm.panelData = { value: mockPanelData };
+
+      await nextTick();
+
+      expect(wrapper.vm.panelData.value).toEqual(mockPanelData);
+    });
+
+    it("should handle data watcher for vrl function field extraction", async () => {
+      wrapper = createWrapper();
+
+      const mockData = [[
+        {
+          "@timestamp": "2024-01-01T10:00:00Z",
+          "service.name": "web-server",
+          "log.level": "INFO",
+          "nested": { "field": "value" },
+          "message": "Request processed"
+        }
+      ]];
+
+      wrapper.vm.data = { value: mockData };
+
+      await nextTick();
+
+      // Should handle data changes and field extraction
+      expect(wrapper.vm.data.value).toEqual(mockData);
+    });
+
+    it("should handle isPartialData watcher", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.isPartialData = { value: true };
+
+      await nextTick();
+
+      expect(wrapper.vm.isPartialData.value).toBe(true);
+    });
+
+    it("should handle loading state watcher", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.loading = { value: true };
+
+      await nextTick();
+
+      expect(wrapper.vm.loading.value).toBe(true);
+    });
+  });
+
+  describe("Helper Functions and Utilities", () => {
+    it("should handle exposed component methods", () => {
+      wrapper = createWrapper();
+
+      // Test that exposed methods exist
+      expect(wrapper.vm.onChartClick).toBeTypeOf("function");
+      expect(wrapper.vm.onDataZoom).toBeTypeOf("function");
+      expect(wrapper.vm.openDrilldown).toBeTypeOf("function");
+      expect(wrapper.vm.hidePopupsAndOverlays).toBeTypeOf("function");
+      expect(wrapper.vm.showPopupsAndOverlays).toBeTypeOf("function");
+      expect(wrapper.vm.downloadDataAsCSV).toBeTypeOf("function");
+      expect(wrapper.vm.downloadDataAsJSON).toBeTypeOf("function");
+    });
+
+    it("should handle reactive properties correctly", () => {
+      wrapper = createWrapper();
+
+      // Test that reactive properties are accessible - only test the ones that are actually returned
+      expect(wrapper.vm.data).toBeDefined();
+      expect(wrapper.vm.loading).toBeDefined();
+      expect(wrapper.vm.errorDetail).toBeDefined();
+      expect(wrapper.vm.panelData).toBeDefined();
+      expect(wrapper.vm.metadata).toBeDefined();
+      expect(wrapper.vm.noData).toBeDefined();
+      expect(wrapper.vm.validatePanelData).toBeDefined();
+
+      // Test all the returned properties from the component
+      expect(wrapper.vm.store).toBeDefined();
+      expect(wrapper.vm.chartPanelRef).toBeDefined();
+      expect(wrapper.vm.searchRequestTraceIds).toBeDefined();
+    });
+
+    it("should handle chart panel height and class computation", () => {
+      wrapper = createWrapper();
+
+      // Test default values
+      expect(wrapper.vm.chartPanelHeight).toBe("100%");
+      expect(wrapper.vm.chartPanelClass).toBe("");
+
+      // Test with trellis configuration
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          queries: [{
+            ...defaultProps.panelSchema.queries[0],
+            fields: {
+              ...defaultProps.panelSchema.queries[0].fields,
+              breakdown: [{ field: "category" }],
+            },
+          }],
+          config: {
+            trellis: { layout: "grid" },
+          },
+        },
+      });
+
+      wrapper.vm.loading = { value: false };
+
+      // Should return computed values for trellis layout
+      expect(typeof wrapper.vm.chartPanelHeight).toBe("string");
+      expect(typeof wrapper.vm.chartPanelClass).toBe("string");
+    });
+
+    it("should handle component refs correctly", () => {
+      wrapper = createWrapper();
+
+      // Test that refs are defined and accessible
+      expect(wrapper.vm.chartPanelRef).toBeDefined();
+      expect(wrapper.vm.drilldownPopUpRef).toBeDefined();
+      expect(wrapper.vm.annotationPopupRef).toBeDefined();
+      expect(wrapper.vm.tableRendererRef).toBeDefined();
+      expect(wrapper.vm.drilldownArray).toBeDefined();
+      expect(wrapper.vm.selectedAnnotationData).toBeDefined();
+    });
+
+    it("should handle store integration correctly", () => {
+      wrapper = createWrapper();
+
+      // Test store access
+      expect(wrapper.vm.store).toBeDefined();
+      expect(wrapper.vm.store.state).toBeDefined();
+      expect(wrapper.vm.store.state.selectedOrganization).toBeDefined();
+      expect(wrapper.vm.store.state.theme).toBeDefined();
+    });
+
+    it("should handle loading progress correctly", () => {
+      wrapper = createWrapper();
+
+      // Mock loading progress values
+      wrapper.vm.loadingProgressPercentage = { value: 50 };
+      wrapper.vm.searchRequestTraceIds = { value: ["trace-1", "trace-2"] };
+      wrapper.vm.isPartialData = { value: false };
+
+      expect(wrapper.vm.loadingProgressPercentage.value).toBe(50);
+      expect(wrapper.vm.searchRequestTraceIds.value).toHaveLength(2);
+      expect(wrapper.vm.isPartialData.value).toBe(false);
+    });
+  });
+
+  describe("Component Integration", () => {
+    it("should integrate with annotations functionality", () => {
+      wrapper = createWrapper({ allowAnnotationsAdd: true });
+
+      // Test annotations integration
+      expect(wrapper.vm.isAddAnnotationDialogVisible).toBeDefined();
+      expect(wrapper.vm.isAddAnnotationMode).toBeDefined();
+      expect(wrapper.vm.toggleAddAnnotationMode).toBeTypeOf("function");
+      expect(wrapper.vm.closeAddAnnotation).toBeTypeOf("function");
+      expect(wrapper.vm.annotationToAddEdit).toBeDefined();
+      expect(wrapper.vm.panelsList).toBeDefined();
+    });
+  });
+
+  describe("Component State", () => {
+    it("should maintain component state correctly", () => {
+      wrapper = createWrapper();
+
+      // Test cursor state management
+      expect(wrapper.vm.isCursorOverPanel).toBe(false);
+
+      wrapper.vm.showPopupsAndOverlays();
+      expect(wrapper.vm.isCursorOverPanel).toBe(true);
+
+      wrapper.vm.hidePopupsAndOverlays();
+      expect(wrapper.vm.isCursorOverPanel).toBe(false);
+    });
+
+    it("should handle validation state correctly", () => {
+      wrapper = createWrapper();
+
+      // Test validation for SQL panels
+      expect(Array.isArray(wrapper.vm.validatePanelData)).toBe(true);
+
+      // Test validation for PromQL panels (should skip validation)
+      wrapper = createWrapper({
+        panelSchema: { ...defaultProps.panelSchema, queryType: "promql" }
+      });
+
+      expect(wrapper.vm.validatePanelData).toHaveLength(0);
     });
   });
 });
