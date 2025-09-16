@@ -93,10 +93,12 @@ pub async fn search(
         cfg.limit.cpu_num,
     )
     .await?;
+    log::info!("[trace_id {trace_id}] flight->follower_leader: prepared datafusion context");
 
     // register udf
     register_udf(&ctx, &req.org_id)?;
     datafusion_functions_json::register_all(&mut ctx)?;
+    log::info!("[trace_id {trace_id}] flight->search: registered udf and ctx");
 
     // Decode physical plan from bytes
     let proto = ComposedPhysicalExtensionCodec {
@@ -107,6 +109,7 @@ pub async fn search(
         &ctx,
         &proto,
     )?;
+    log::info!("[trace_id {trace_id}] flight->search: decoded physical plan");
 
     // replace empty table to real table
     let mut visitor = NewEmptyExecVisitor::default();

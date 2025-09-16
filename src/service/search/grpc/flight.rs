@@ -83,10 +83,14 @@ pub async fn search(
     let mut ctx =
         prepare_datafusion_context(work_group.clone(), vec![], vec![], false, cfg.limit.cpu_num)
             .await?;
+    
+    log::info!("[trace_id {trace_id}] flight->search: prepared datafusion context");
 
     // register udf
     register_udf(&ctx, &org_id)?;
     datafusion_functions_json::register_all(&mut ctx)?;
+    
+    log::info!("[trace_id {trace_id}] flight->search: registered udf and ctx");
 
     // Decode physical plan from bytes
     let proto = ComposedPhysicalExtensionCodec {
@@ -94,6 +98,8 @@ pub async fn search(
     };
     let mut physical_plan =
         physical_plan_from_bytes_with_extension_codec(&req.search_info.plan, &ctx, &proto)?;
+    
+    log::info!("[trace_id {trace_id}] flight->search: decoded physical plan");
 
     // replace empty table to real table
     let mut visitor = NewEmptyExecVisitor::default();
@@ -148,6 +154,8 @@ pub async fn search(
     let db_schema = infra::schema::get(&org_id, &stream_name, stream_type)
         .await
         .unwrap_or(arrow_schema::Schema::empty());
+    log::info!("[trace_id {trace_id}] flight->search: got latest schema and db schema");
+
     let stream_settings = unwrap_stream_settings(&db_schema);
     let stream_created_at = unwrap_stream_created_at(&db_schema);
     let fst_fields = get_stream_setting_fts_fields(&stream_settings)
@@ -187,6 +195,7 @@ pub async fn search(
     let mut tables = Vec::new();
     let mut scan_stats = ScanStats::new();
     let file_stats_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
+    log::info!("[trace_id {trace_id}] flight->search: datafusion tables init");
 
     // search in object storage
     let mut tantivy_file_list = Vec::new();
