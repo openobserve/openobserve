@@ -85,7 +85,10 @@ mod tests {
             ),
             (
                 "files/default/metadata/quickstart1/2024/02/16/16/7164299619311026293.parquet",
-                None,
+                Some(
+                    "files/default/index/quickstart1_metadata/2024/02/16/16/7164299619311026293.ttv"
+                        .to_string(),
+                ),
             ),
             (
                 "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.parquet",
