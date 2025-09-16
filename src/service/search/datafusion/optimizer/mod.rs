@@ -60,7 +60,6 @@ use crate::service::search::{
             add_sort_and_limit::AddSortAndLimitRule, add_timestamp::AddTimestampRule,
             histogram_sort_merge_join::HistogramSortMergeJoinRule,
             limit_join_right_side::LimitJoinRightSide, rewrite_histogram::RewriteHistogram,
-            rewrite_match::RewriteMatch,
         },
         physical_optimizer::{
             distribute_analyze::optimize_distribute_analyze,

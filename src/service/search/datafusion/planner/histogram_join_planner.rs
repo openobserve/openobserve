@@ -199,24 +199,6 @@ impl HistogramJoinPlanner {
             ));
         }
 
-        // Debug schema information
-        log::debug!(
-            "Left schema fields: {}",
-            physical_inputs[0].schema().fields().len()
-        );
-        log::debug!(
-            "Right schema fields: {}",
-            physical_inputs[1].schema().fields().len()
-        );
-        log::debug!(
-            "Join schema fields: {}",
-            histogram_join.schema.fields().len()
-        );
-
-        for (i, field) in histogram_join.schema.fields().iter().enumerate() {
-            log::debug!("Join schema field {}: {}", i, field.name());
-        }
-
         // Fix any empty sides for distributed histogram joins
         let (left_plan, right_plan) =
             self.fix_empty_exec_sides(physical_inputs[0].clone(), physical_inputs[1].clone())?;
@@ -238,11 +220,8 @@ impl HistogramJoinPlanner {
             remote_scan_nodes: None, // No remote scan nodes for now
             schema: arrow_schema,
         };
-        let histogram_join_exec = HistogramSortMergeJoinExec::new_with_schema(
-            left_plan,
-            right_plan,
-            config,
-        )?;
+        let histogram_join_exec =
+            HistogramSortMergeJoinExec::new_with_schema(left_plan, right_plan, config)?;
 
         Ok(Some(Arc::new(histogram_join_exec)))
     }

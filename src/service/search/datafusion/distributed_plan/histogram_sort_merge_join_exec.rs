@@ -22,8 +22,6 @@ use std::{
     task::{Context, Poll},
 };
 
-use config::get_config;
-
 // Configuration constants
 const MICROSECONDS_PER_SECOND: i64 = 1_000_000;
 
@@ -48,7 +46,7 @@ impl Default for HistogramJoinConfig {
             default_interval_seconds: 300, // 5 minutes
             default_minutes: 5,
             default_seconds: 60,
-            enable_one_to_one_join: false, //get_config().common.feature_join_match_one_enabled,
+            enable_one_to_one_join: false, // get_config().common.feature_join_match_one_enabled,
             max_polls_without_progress: 100,
             max_rows_per_time_bin: 5000,
             batch_size_limit: 5000,
@@ -425,32 +423,33 @@ impl ExecutionPlan for HistogramSortMergeJoinExec {
                     remote_scan_nodes,
                     partition,
                     context.clone(),
-                )? {
-                    log::info!(
-                        "HistogramSortMergeJoinExec: Using local data source for both sides of histogram join"
-                    );
-                    let left_stream = data_source.execute(partition, context.clone())?;
-                    let right_stream = data_source.execute(partition, context)?;
+                )?
+            {
+                log::info!(
+                    "HistogramSortMergeJoinExec: Using local data source for both sides of histogram join"
+                );
+                let left_stream = data_source.execute(partition, context.clone())?;
+                let right_stream = data_source.execute(partition, context)?;
 
-                    let config = HistogramStreamConfig {
-                        left_time_column: self.left_time_column.clone(),
-                        right_time_column: self.right_time_column.clone(),
-                        join_columns: self.join_columns.clone(),
-                        histogram_interval: self.histogram_interval.clone(),
-                        schema: self.schema(),
-                        enable_streaming: false, // Disable streaming - accumulate all results first
-                    };
-                    let join_stream = HistogramSortMergeJoinStream::new_with_streaming(
-                        left_stream,
-                        right_stream,
-                        config,
-                    )?;
+                let config = HistogramStreamConfig {
+                    left_time_column: self.left_time_column.clone(),
+                    right_time_column: self.right_time_column.clone(),
+                    join_columns: self.join_columns.clone(),
+                    histogram_interval: self.histogram_interval.clone(),
+                    schema: self.schema(),
+                    enable_streaming: false, // Disable streaming - accumulate all results first
+                };
+                let join_stream = HistogramSortMergeJoinStream::new_with_streaming(
+                    left_stream,
+                    right_stream,
+                    config,
+                )?;
 
-                    return Ok(Box::pin(RecordBatchStreamAdapter::new(
-                        self.schema(),
-                        Box::pin(join_stream),
-                    )));
-                }
+                return Ok(Box::pin(RecordBatchStreamAdapter::new(
+                    self.schema(),
+                    Box::pin(join_stream),
+                )));
+            }
         }
 
         // Standard execution path - execute both sides as provided
@@ -466,11 +465,8 @@ impl ExecutionPlan for HistogramSortMergeJoinExec {
             schema: self.schema(),
             enable_streaming: false, // Disable streaming - accumulate all results first
         };
-        let join_stream = HistogramSortMergeJoinStream::new_with_streaming(
-            left_stream,
-            right_stream,
-            config,
-        )?;
+        let join_stream =
+            HistogramSortMergeJoinStream::new_with_streaming(left_stream, right_stream, config)?;
 
         Ok(Box::pin(RecordBatchStreamAdapter::new(
             self.schema(),
@@ -684,7 +680,8 @@ impl HistogramSortMergeJoinStream {
             }
 
             // Remove empty batches to free memory and prevent accumulation
-            self.left_buffer.retain(|batch| !batch.histograms.is_empty());
+            self.left_buffer
+                .retain(|batch| !batch.histograms.is_empty());
             self.right_buffer
                 .retain(|batch| !batch.histograms.is_empty());
 
@@ -996,10 +993,10 @@ impl HistogramSortMergeJoinStream {
             ScalarValue::TimestampNanosecond(Some(ts), _) => Ok(ts / 1000), // Convert ns to μs
             ScalarValue::TimestampMillisecond(Some(ts), _) => Ok(ts * 1000), // Convert ms to μs
             ScalarValue::TimestampSecond(Some(ts), _) => Ok(ts * 1_000_000), // Convert s to μs
-            ScalarValue::Int64(Some(ts)) => Ok(ts),                         /* Assume already in
-                                                                              * microseconds */
+            ScalarValue::Int64(Some(ts)) => Ok(ts),                         // Assume already in
+            // microseconds
             ScalarValue::UInt64(Some(ts)) => Ok(ts as i64), // Assume already in microseconds
-              _ => Err(DataFusionError::Internal(format!(
+            _ => Err(DataFusionError::Internal(format!(
                 "Cannot convert {scalar:?} to timestamp microseconds. Expected timestamp or integer type."
             ))),
         }
@@ -1178,7 +1175,7 @@ impl HistogramSortMergeJoinStream {
                 (left_schema.as_ref(), source_field.name())
             } else {
                 if source_field_index >= right_field_count {
-                      return Err(DataFusionError::Internal(format!(
+                    return Err(DataFusionError::Internal(format!(
                         "Field index {source_field_index} out of bounds for right schema with {right_field_count} fields"
                     )));
                 }
@@ -1266,7 +1263,7 @@ impl HistogramSortMergeJoinStream {
 
             // Concatenate all values for this column
             if column_values.is_empty() {
-                  return Err(DataFusionError::Internal(format!(
+                return Err(DataFusionError::Internal(format!(
                     "No data found for field: {field_name}"
                 )));
             } else if column_values.len() == 1 {
@@ -1403,7 +1400,7 @@ impl Stream for HistogramSortMergeJoinStream {
                     log::info!(
                         "HistogramSortMergeJoinStream: NON-STREAMING - Completed join processing. Total result batches: {}",
                         self.result_buffer.len()
-                    );
+                    );                   
                 }
             }
 
@@ -1416,6 +1413,14 @@ impl Stream for HistogramSortMergeJoinStream {
                     self.result_buffer.len()
                 );
                 return Poll::Ready(Some(Ok(result)));
+            }
+
+            // If both streams are exhausted and no results, terminate the stream
+            if self.left_exhausted && self.right_exhausted {
+                log::info!(
+                    "HistogramSortMergeJoinStream: NON-STREAMING - Both streams exhausted, stream terminated"
+                );
+                return Poll::Ready(None);
             }
 
             // If we reach here, we're waiting for more data
