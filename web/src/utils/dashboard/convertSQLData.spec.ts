@@ -53,7 +53,14 @@ vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
     }
     return 90;
   }),
-  calculateRightLegendWidth: vi.fn(() => 140),
+  calculateRightLegendWidth: vi.fn(() => 160),
+  calculateChartDimensions: vi.fn(() => ({
+    availableWidth: 800,
+    availableHeight: 400,
+    legendSpace: { right: 160, bottom: 90 },
+    gridSpace: { left: 60, right: 160, top: 60, bottom: 90 }
+  })),
+  calculatePieChartRadius: vi.fn(() => 150),
 }));
 
 vi.mock("@/utils/dashboard/calculateGridForSubPlot", () => ({
@@ -9070,8 +9077,8 @@ describe("convertSQLData", () => {
       );
 
       // Should use calculateRightLegendWidth (mock returns 140)
-      expect(result.options.grid.right).toBe(140);
-      expect(result.options.legend.textStyle.width).toBe(85); // 140 - 55
+      expect(result.options.grid.right).toBe(160);
+      expect(result.options.legend.textStyle.width).toBe(105); // 160 - 55
       expect(result.options.legend.left).toBeGreaterThanOrEqual(0);
     });
 
@@ -9113,8 +9120,8 @@ describe("convertSQLData", () => {
       );
 
       // Should use calculateRightLegendWidth with scrollable=true
-      expect(result.options.grid.right).toBe(140);
-      expect(result.options.legend.textStyle.width).toBe(85);
+      expect(result.options.grid.right).toBe(160);
+      expect(result.options.legend.textStyle.width).toBe(100);
     });
 
     it("should calculate bottom legend height for plain legends", async () => {
@@ -9367,7 +9374,7 @@ describe("convertSQLData", () => {
 
       // Test right legend positioning
       expect(result.options.legend.orient).toBe("vertical");
-      expect(result.options.grid.right).toBe(140);
+      expect(result.options.grid.right).toBe(160);
       // Grid left might have different default value based on axis configuration
       expect(result.options.grid.left).toBeGreaterThanOrEqual(5);
     });
@@ -9648,8 +9655,8 @@ describe("convertSQLData", () => {
       );
 
       // Should fall back to automatic calculation when width is invalid
-      expect(result.options.grid.right).toBe(140); // Mock calculateRightLegendWidth returns 140
-      expect(result.options.legend.textStyle.width).toBe(85);
+      expect(result.options.grid.right).toBe(160); // Mock calculateRightLegendWidth returns 160
+      expect(result.options.legend.textStyle.width).toBe(100);
     });
 
     it("should handle zero chart panel dimensions", async () => {
