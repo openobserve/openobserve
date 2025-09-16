@@ -419,7 +419,7 @@ export const useSearchStream = () => {
     // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
     // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
     if (
-      (isPagination && searchPartitionMap[payload.traceId] === 1) ||
+      (isPagination && searchPartitionMap[payload.traceId].partition === 1) ||
       !appendResult
     ) {
       searchObj.data.queryResults.hits = response.content.results.hits;
@@ -814,14 +814,17 @@ export const useSearchStream = () => {
       payload.type === "search" &&
       response?.type === "search_response_hits"
     ) {
+      const isStreamingAggs = response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs;
+      const shouldAppendStreamingResults = isStreamingAggs ? !response.content?.results?.hits?.length : true;
+      searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition]++;
+      // If single partition has more than 1 chunk, then we need to append the results
+      const isChunkedHits = searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition] > 1;
+
       handleStreamingHits(
         payload,
         response,
         payload.isPagination,
-        !(
-          response.content?.streaming_aggs ||
-          searchObj.data.queryResults.streaming_aggs
-        ) && searchPartitionMap[payload.traceId] > 1,
+        (shouldAppendStreamingResults && (searchPartitionMap[payload.traceId].partition > 1 || isChunkedHits)),
       );
       return;
     }
@@ -832,14 +835,22 @@ export const useSearchStream = () => {
     ) {
       searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
         ? searchPartitionMap[payload.traceId]
-        : 0;
-      searchPartitionMap[payload.traceId]++;
+        : {
+          partition: 0,
+          chunks: {},
+        };
+
+      const isStreamingAggs = response.content?.streaming_aggs;
+      const shouldAppendStreamingResults = isStreamingAggs ? !response.content?.results?.hits?.length : true;
+
+      searchPartitionMap[payload.traceId].partition++;
+      searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition] = 0;
+      
       handleStreamingMetadata(
         payload,
         response,
         payload.isPagination,
-        !response.content?.streaming_aggs &&
-          searchPartitionMap[payload.traceId] > 1,
+        (shouldAppendStreamingResults && searchPartitionMap[payload.traceId].partition > 1),
       );
       return;
     }
@@ -879,8 +890,14 @@ export const useSearchStream = () => {
     if (response.type === "search_response") {
       searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
         ? searchPartitionMap[payload.traceId]
-        : 0;
-      searchPartitionMap[payload.traceId]++;
+        : {
+          partition: 0,
+          chunks: {},
+        };
+                      
+      searchPartitionMap[payload.traceId].partition++;
+      const isStreamingAggs = response.content?.streaming_aggs;
+      const shouldAppendStreamingResults = isStreamingAggs ? !response.content?.results?.hits?.length : true;
 
       if (payload.type === "search") {
         handleLogsResponse(
@@ -888,8 +905,7 @@ export const useSearchStream = () => {
           payload.isPagination,
           payload.traceId,
           response,
-          !response.content?.streaming_aggs &&
-            searchPartitionMap[payload.traceId] > 1, // In aggregation query, we need to replace the results instead of appending
+          (shouldAppendStreamingResults && searchPartitionMap[payload.traceId].partition > 1),
         );
       }
 

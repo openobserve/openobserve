@@ -95,7 +95,12 @@ const searchObjDebug = reactive(Object.assign({}, DEFAULT_SEARCH_DEBUG_DATA));
 // Aggregation data for search results
 const searchAggData = reactive(Object.assign({}, DEFAULT_SEARCH_AGG_DATA));
 
-const searchPartitionMap = reactive<{ [key: string]: number }>({});
+type SearchPartition = {
+  partition: number;
+  chunks: Record<number, number>;
+};
+
+const searchPartitionMap = reactive<Record<string, SearchPartition>>({});
 
 const histogramMappedData: any = [];
 
