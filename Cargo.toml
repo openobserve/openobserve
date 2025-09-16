@@ -94,7 +94,6 @@ arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true
 env_logger.workspace = true
-etcd-client.workspace = true
 faststr.workspace = true
 flate2.workspace = true
 futures.workspace = true
@@ -270,7 +269,6 @@ sqlparser = { version = "0.55.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.2"
 dotenvy = "0.15.7"
 env_logger = "0.10"
-etcd-client = { version = "0.12", features = ["tls"] }
 faststr = { version = "0.2", features = ["serde"] }
 flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
