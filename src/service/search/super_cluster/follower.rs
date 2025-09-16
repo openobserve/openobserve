@@ -43,7 +43,7 @@ use crate::service::{
     search::{
         cluster::flight::{
             check_work_group, get_inverted_index_file_list, get_online_querier_nodes,
-            partition_filt_list,
+            partition_file_list,
         },
         datafusion::{
             distributed_plan::{
@@ -80,6 +80,7 @@ pub async fn search(
     ScanStats,
 )> {
     let start = std::time::Instant::now();
+    let mut checkpoint = 0usize;
     let cfg = config::get_config();
     let mut req: Request = (*flight_request).clone().into();
     let trace_id = trace_id.to_string();
@@ -93,10 +94,44 @@ pub async fn search(
         cfg.limit.cpu_num,
     )
     .await?;
+    let prepare_datafusion_context_took = start.elapsed().as_millis() as usize;
+    checkpoint = prepare_datafusion_context_took;
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->follower_leader: prepared datafusion context took: {} ms",
+                prepare_datafusion_context_took
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("search::super_cluster::follower prepare_datafusion_context".to_string())
+                .search_role("follower".to_string())
+                .duration(prepare_datafusion_context_took)
+                .build()
+        )
+    );
 
     // register udf
     register_udf(&ctx, &req.org_id)?;
     datafusion_functions_json::register_all(&mut ctx)?;
+    let registered_udf_took = start.elapsed().as_millis() as usize - checkpoint;
+    checkpoint += registered_udf_took;
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->follower_leader: registered udf and ctx took: {} ms",
+                registered_udf_took
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("search::super_cluster::follower register udf and ctx".to_string())
+                .search_role("follower".to_string())
+                .duration(registered_udf_took)
+                .build()
+        )
+    );
 
     // Decode physical plan from bytes
     let proto = ComposedPhysicalExtensionCodec {
@@ -107,6 +142,23 @@ pub async fn search(
         &ctx,
         &proto,
     )?;
+    let decode_physical_plan_took = start.elapsed().as_millis() as usize - checkpoint;
+    checkpoint += decode_physical_plan_took;
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->follower_leader: decoded physical plan took: {} ms",
+                decode_physical_plan_took
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("search::super_cluster::follower register udf and ctx".to_string())
+                .search_role("follower".to_string())
+                .duration(decode_physical_plan_took)
+                .build()
+        )
+    );
 
     // replace empty table to real table
     let mut visitor = NewEmptyExecVisitor::default();
@@ -133,7 +185,8 @@ pub async fn search(
 
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_num = file_id_list_vec.len();
-    let file_id_list_took = start.elapsed().as_millis() as usize;
+    let file_id_list_took = start.elapsed().as_millis() as usize - checkpoint;
+    checkpoint += file_id_list_took;
     log::info!(
         "{}",
         search_inspector_fields(
@@ -143,7 +196,7 @@ pub async fn search(
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
-                .component("super:leader get file id".to_string())
+                .component("search::super_cluster::follower get file id".to_string())
                 .search_role("leader".to_string())
                 .duration(file_id_list_took)
                 .desc(format!("get files {} ids", file_id_list_num))
@@ -213,7 +266,7 @@ pub async fn search(
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
-                .component("super:leader get nodes".to_string())
+                .component("search::super_cluster::follower get nodes".to_string())
                 .search_role("leader".to_string())
                 .duration(get_node_start.elapsed().as_millis() as usize)
                 .desc(format!(
@@ -260,7 +313,7 @@ pub async fn search(
     });
 
     // partition file list
-    let partition_file_lists = partition_filt_list(file_id_list, &nodes, role_group).await?;
+    let partition_file_lists = partition_file_list(file_id_list, &nodes, role_group).await?;
     let mut need_ingesters = 0;
     let mut need_queriers = 0;
     for (i, node) in nodes.iter().enumerate() {
