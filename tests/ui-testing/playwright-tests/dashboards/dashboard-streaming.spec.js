@@ -11,7 +11,7 @@ import { waitForDashboardPage } from "./utils/dashCreation.js";
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
-test.describe.configure({ mode: "parallel" });
+test.describe.configure({ mode: "serial" });
 
 // Refactored test cases using Page Object Model
 
