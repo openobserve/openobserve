@@ -20,7 +20,7 @@ import { Dialog, Notify } from "quasar";
 import store from "@/test/unit/helpers/store";
 import { installQuasar } from "@/test/unit/helpers";
 import router from "@/test/unit/helpers/router";
-import { generateWhereClause } from "@/utils/alertQueryBuilder";
+import { generateWhereClause } from "@/utils/alerts/alertQueryBuilder";
 
 import PreviewAlert from "@/components/alerts/PreviewAlert.vue";
 

@@ -482,24 +482,24 @@ import useQuery from "@/composables/useQuery";
 import { convertDateToTimestamp } from "@/utils/date";
 import {
   generateSqlQuery,
-} from "@/utils/alertQueryBuilder";
+} from "@/utils/alerts/alertQueryBuilder";
 import {
   validateInputs as validateInputsUtil,
   validateSqlQuery as validateSqlQueryUtil,
   saveAlertJson as saveAlertJsonUtil,
   type ValidationContext,
   type JsonValidationContext,
-} from "@/utils/alertValidation";
+} from "@/utils/alerts/alertValidation";
 import {
   getAlertPayload as getAlertPayloadUtil,
   prepareAndSaveAlert as prepareAndSaveAlertUtil,
   type PayloadContext,
   type SaveAlertContext,
-} from "@/utils/alertPayload";
+} from "@/utils/alerts/alertPayload";
 import {
   getParser as getParserUtil,
   type SqlUtilsContext,
-} from "@/utils/alertSqlUtils";
+} from "@/utils/alerts/alertSqlUtils";
 
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import AlertsContainer from "./AlertsContainer.vue";
@@ -511,7 +511,7 @@ import {
   transformFEToBE as transformFEToBEUtil,
   retransformBEToFE as retransformBEToFEUtil,
   type TransformContext,
-} from "@/utils/alertDataTransforms";
+} from "@/utils/alerts/alertDataTransforms";
 
 const defaultValue: any = () => {
   return {
