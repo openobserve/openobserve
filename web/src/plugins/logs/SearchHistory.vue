@@ -254,7 +254,7 @@ import {
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { defineAsyncComponent, defineComponent } from "vue";
-import useLogs from "../../composables/useLogs";
+import { searchState } from "@/composables/useLogs/searchState";
 import TenstackTable from "../../plugins/logs/TenstackTable.vue";
 import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -264,6 +264,8 @@ import { date, QTable, useQuasar } from "quasar";
 import type { Ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -299,7 +301,7 @@ export default defineComponent({
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const searchDateTimeRef = ref(null);
     const wrapText = ref(true);
-    const { searchObj, extractTimestamps } = useLogs();
+    const { searchObj } = searchState();
     const dataToBeLoaded: any = ref([]);
     const dateTimeToBeSent = ref({
       valueType: "relative",
@@ -312,6 +314,8 @@ export default defineComponent({
     const isLoading = ref(false);
     const isDateTimeChanged = ref(false);
     const moreDetailsToDisplay = ref("");
+
+    const {extractTimestamps} = logsUtils();
 
     const activeTab = ref("query");
     const tabs = ref([
