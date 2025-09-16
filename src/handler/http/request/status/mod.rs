@@ -91,7 +91,7 @@ pub struct HealthzResponse {
     status: String,
 }
 
-#[cfg( feature = "enterprise")]
+#[cfg(feature = "enterprise")]
 pub fn reload_enterprise_config() -> Result<(), anyhow::Error> {
     refresh_o2_config()
         .and_then(|_| refresh_dex_config())
@@ -440,8 +440,7 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
         );
     }
     #[cfg(feature = "enterprise")]
-    if let Err(e) = reload_enterprise_config()
-    {
+    if let Err(e) = reload_enterprise_config() {
         return Ok(
             HttpResponse::InternalServerError().json(serde_json::json!({"status": e.to_string()}))
         );
