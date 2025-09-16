@@ -630,11 +630,6 @@ impl HistogramSortMergeJoinStream {
             let join_result = self.join_time_bin_rows(left_join_rows, right_join_rows);
             match join_result {
                 Ok(Some(joined)) => {
-                    log::debug!(
-                        "HistogramSortMergeJoinStream: Successfully joined time bin {} producing {} rows",
-                        time_bin,
-                        joined.num_rows()
-                    );
                     new_results.push(joined);
                 }
                 Ok(None) => {
@@ -667,10 +662,6 @@ impl HistogramSortMergeJoinStream {
 
         // Clear processed time bins to prevent reprocessing
         if processed_count > 0 {
-            log::debug!(
-                "HistogramSortMergeJoinStream: Cleared {} processed time bins",
-                processed_count
-            );
             // Clear all time bins from all batches to prevent reprocessing
             for left_batch in &mut self.left_buffer {
                 left_batch.histograms.clear();
