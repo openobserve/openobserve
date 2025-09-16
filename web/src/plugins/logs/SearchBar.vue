@@ -77,14 +77,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- moved to dropdown if ai chat is enabled -->
         <div
           style="border: 1px solid #c4c4c4; border-radius: 5px"
-          class="q-pr-xs q-ml-xs"
+          class="q-pr-xs q-ml-xs tw-flex tw-items-center tw-justify-center"
           v-if="!store.state.isAiChatEnabled"
         >
           <q-toggle
             data-test="logs-search-bar-show-histogram-toggle-btn"
             v-model="searchObj.meta.showHistogram"
+            class="o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+            size="xs"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
           >
-            <img
+          </q-toggle>
+          <img
               :src="histogramIcon"
               alt="Histogram"
               style="width: 20px; height: 20px"
@@ -92,16 +97,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-tooltip>
               {{ t("search.showHistogramLabel") }}
             </q-tooltip>
-          </q-toggle>
         </div>
         <div
           style="border: 1px solid #c4c4c4; border-radius: 5px"
-          class="q-pr-xs q-ml-xs"
+          class="q-pr-xs q-ml-xs tw-flex tw-items-center tw-justify-center"
         >
           <q-toggle
             data-test="logs-search-bar-sql-mode-toggle-btn"
             v-model="searchObj.meta.sqlMode"
             :disable="isSqlModeDisabled"
+            class="o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+            size="xs"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
           >
             <img
               :src="sqlIcon"
@@ -428,12 +436,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-toggle
                       data-test="logs-search-bar-show-histogram-toggle-btn"
                       v-model="searchObj.meta.showHistogram"
-                      dense
-                      class="q-pb-xs"
-                      size="32px"
+                      class="q-pb-xs o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+                      size="xs"
+                      flat
+                      :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
                     ></q-toggle>
                   </div>
-                  <q-item-label>
+                  <q-item-label class="q-ml-xs">
                     {{ t("search.showHistogramLabel") }}
                   </q-item-label>
                 </div>
@@ -441,44 +450,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-separator />
 
                 <div
-                  class="row no-wrap q-pl-sm q-mt-sm q-py-xs tw-w-[140px] tw-flex tw-items-start"
+                  class="row no-wrap q-pl-sm q-mt-sm q-py-xs tw-w-[140px] tw-flex tw-items-center"
                 >
                   <div class="tw-w-[30%]">
                     <q-toggle
                       data-test="logs-search-bar-wrap-table-content-toggle-btn"
                       v-model="searchObj.meta.toggleSourceWrap"
                       icon="wrap_text"
-                      style="margin: 0px"
-                      size="32px"
-                      class="q-pb-xs"
-                      dense
+                      size="xs"
+                      class="q-pb-xs o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+                      flat
+                      :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
                     ></q-toggle>
                   </div>
-                  <q-item-label> Wrap Content </q-item-label>
+                  <q-item-label class="tw-ml-[2px]"> Wrap Content </q-item-label>
                 </div>
                 <q-separator />
 
                 <div
-                  class="row no-wrap q-pl-sm q-mt-sm tw-w-[140px] tw-flex tw-items-start"
+                  class="row no-wrap q-pl-sm q-mt-sm tw-w-[140px] tw-flex tw-items-center"
                 >
                   <div class="tw-w-[30%]">
                     <q-toggle
                       data-test="logs-search-bar-quick-mode-toggle-btn"
                       v-model="searchObj.meta.quickMode"
                       @click="handleQuickMode"
-                      class="q-pb-xs"
-                      size="32px"
-                      dense
+                      class="q-pb-xs o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+                      size="xs"
+                      flat
+                      :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
                     ></q-toggle>
                   </div>
-                  <q-item-label>
+                  <q-item-label class="tw-ml-[2px]">
                     {{ t("search.quickModeLabel") }}
                   </q-item-label>
                 </div>
                 <q-separator />
 
                 <div
-                  class="row tw-h-[30px] q-pl-sm q-mt-xs no-wrap q-py-xs tw-w-[140px] tw-flex tw-items-center"
+                  class="row tw-h-[30px] q-pl-sm q-mt-xs no-wrap q-py-xs tw-w-[140px] tw-flex tw-items-center tw-pl-[12px]"
                 >
                   <div class="tw-w-[30%]">
                     <syntax-guide
@@ -498,7 +508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <q-separator />
                 <div
-                  class="row no-wrap q-pl-sm q-mt-xs q-py-xs tw-w-[140px] tw-flex tw-items-center"
+                  class="row no-wrap q-pl-sm q-mt-xs q-py-xs tw-w-[140px] tw-flex tw-items-center tw-pl-[12px]"
                 >
                   <div class="tw-w-[30%]">
                     <q-btn
@@ -531,6 +541,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-quick-mode-toggle-btn"
             v-model="searchObj.meta.quickMode"
             @click="handleQuickMode"
+            class="o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+            size="xs"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
           >
             <img
               :src="quickModeIcon"
@@ -551,8 +565,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-wrap-table-content-toggle-btn"
           v-model="searchObj.meta.toggleSourceWrap"
           icon="wrap_text"
-          class="float-left"
-          size="32px"
+          class="float-left o2-toggle-button-xs tw-flex tw-items-center tw-justify-center q-mr-xs"
+          size="xs"
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
           :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
         >
           <q-tooltip>
@@ -758,7 +774,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.moreActions") }}
           </q-tooltip>
         </q-btn>
-        <div class="float-left">
+        <div class="float-left tw-mr-[-4px]">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -844,7 +860,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button"
+                class="q-pa-none search-button cancel-search-button tw-w-[90px]"
                 @click="cancelVisualizeQueries"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -854,7 +870,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.runQuery')"
-                class="q-pa-none search-button"
+                class="q-pa-none o2-primary-button tw-h-[30px]"
+                no-caps
+                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                 @click="handleRunQueryFn"
                 :disable="disable"
                 >{{ t("search.runQuery") }}</q-btn
@@ -874,7 +892,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button"
+                class="q-pa-none search-button cancel-search-button tw-w-[90px]"
                 @click="cancelQuery"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -885,7 +903,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.runQuery')"
-                class="q-pa-none search-button"
+                class="q-pa-none o2-primary-button tw-h-[30px]"
+                style="font-size: 11px;"
+                no-caps
+                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                 @click="handleRunQueryFn"
                 :disable="
                   searchObj.loading == true ||
