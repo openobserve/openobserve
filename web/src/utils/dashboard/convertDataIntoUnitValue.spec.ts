@@ -30,7 +30,12 @@ import {
   validateDashboardJson,
   validateSQLPanelFields,
   calculateBottomLegendHeight,
-  calculateRightLegendWidth
+  calculateRightLegendWidth,
+  calculateChartContainerWidth,
+  calculateChartDimensions,
+  generateChartAlignmentProperties,
+  calculatePieChartRadius,
+  shouldApplyChartAlignment
 } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 vi.mock("quasar", () => ({
@@ -2789,6 +2794,357 @@ describe("Dashboard Data Conversion Utils", () => {
       expect(partialLegendConfig).toHaveProperty("height");
       expect(partialGridConfig.existingGridProp).toBe("value");
       expect(partialGridConfig).toHaveProperty("bottom");
+    });
+  });
+
+  describe("Additional Coverage for Missing Functions", () => {
+    describe("calculateChartDimensions", () => {
+      it("should calculate dimensions with no legends", () => {
+        const panelSchema = {
+          config: {
+            show_legends: false
+          }
+        };
+
+        const result = calculateChartDimensions(panelSchema, 800, 600, []);
+
+        expect(result.hasLegends).toBe(false);
+        expect(result.availableWidth).toBe(800);
+        expect(result.availableHeight).toBe(600);
+        expect(result.legendWidth).toBe(0);
+        expect(result.legendHeight).toBe(0);
+      });
+
+      it("should calculate dimensions with right positioned legends", () => {
+        const panelSchema = {
+          config: {
+            show_legends: true,
+            legends_position: "right",
+            legend_width: {
+              value: 200,
+              unit: "px"
+            }
+          }
+        };
+
+        const seriesData = [{ name: "series1" }, { name: "series2" }];
+        const result = calculateChartDimensions(panelSchema, 800, 600, seriesData);
+
+        expect(result.hasLegends).toBe(true);
+        expect(result.availableWidth).toBe(600); // 800 - 200
+        expect(result.legendWidth).toBe(200);
+      });
+
+      it("should calculate dimensions with bottom positioned legends", () => {
+        const panelSchema = {
+          config: {
+            show_legends: true,
+            legends_position: "bottom",
+            legend_height: {
+              value: 100,
+              unit: "px"
+            }
+          }
+        };
+
+        const seriesData = [{ name: "series1" }, { name: "series2" }];
+        const result = calculateChartDimensions(panelSchema, 800, 600, seriesData);
+
+        expect(result.hasLegends).toBe(true);
+        expect(result.availableHeight).toBe(500); // 600 - 100
+        expect(result.legendHeight).toBe(100);
+      });
+
+      it("should handle undefined config", () => {
+        const panelSchema = {};
+        const result = calculateChartDimensions(panelSchema, 800, 600, []);
+
+        expect(result.hasLegends).toBe(false);
+      });
+    });
+
+    describe("calculateChartContainerWidth", () => {
+      it("should calculate width for right legend position", () => {
+        const result = calculateChartContainerWidth(800, 200, "right");
+        expect(result).toBe(600);
+      });
+
+      it("should return full width for non-right position", () => {
+        const result = calculateChartContainerWidth(800, 200, "bottom");
+        expect(result).toBe(800);
+      });
+
+      it("should handle null legend position", () => {
+        const result = calculateChartContainerWidth(800, 200, null);
+        expect(result).toBe(800);
+      });
+
+      it("should handle default parameters", () => {
+        const result = calculateChartContainerWidth(800);
+        expect(result).toBe(800);
+      });
+    });
+
+    describe("calculatePieChartRadius", () => {
+      it("should return default radius for panels without layout", () => {
+        const panelSchema = {};
+        const result = calculatePieChartRadius(panelSchema, 400, 300);
+        expect(result).toBe(85);
+      });
+
+      it("should calculate radius based on layout dimensions", () => {
+        const panelSchema = {
+          layout: { w: 10, h: 8 }
+        };
+        const result = calculatePieChartRadius(panelSchema, 300, 240);
+        expect(result).toBeGreaterThan(0);
+      });
+
+      it("should return 0 for zero layout dimensions", () => {
+        const panelSchema = {
+          layout: { w: 0, h: 0 }
+        };
+        const result = calculatePieChartRadius(panelSchema, 400, 300);
+        expect(result).toBe(0);
+      });
+
+      it("should handle large layout dimensions", () => {
+        const panelSchema = {
+          layout: { w: 20, h: 15 }
+        };
+        const result = calculatePieChartRadius(panelSchema, 600, 450);
+        expect(result).toBeGreaterThan(0);
+      });
+    });
+
+    describe("shouldApplyChartAlignment", () => {
+      it("should return true for valid alignment configuration", () => {
+        const panelSchema = {
+          config: {
+            show_legends: true,
+            legends_position: "right",
+            legends_type: "plain"
+          }
+        };
+        const seriesData = [{ name: "series1" }];
+
+        const result = shouldApplyChartAlignment(panelSchema, seriesData);
+        expect(result).toBe(true);
+      });
+
+      it("should return false when legends are disabled", () => {
+        const panelSchema = {
+          config: {
+            show_legends: false,
+            legends_position: "right",
+            legends_type: "plain"
+          }
+        };
+        const seriesData = [{ name: "series1" }];
+
+        const result = shouldApplyChartAlignment(panelSchema, seriesData);
+        expect(result).toBe(false);
+      });
+
+      it("should return false when legend position is not right", () => {
+        const panelSchema = {
+          config: {
+            show_legends: true,
+            legends_position: "bottom",
+            legends_type: "plain"
+          }
+        };
+        const seriesData = [{ name: "series1" }];
+
+        const result = shouldApplyChartAlignment(panelSchema, seriesData);
+        expect(result).toBe(false);
+      });
+
+      it("should return false when no series data", () => {
+        const panelSchema = {
+          config: {
+            show_legends: true,
+            legends_position: "right",
+            legends_type: "plain"
+          }
+        };
+
+        const result = shouldApplyChartAlignment(panelSchema, []);
+        expect(result).toBe(false);
+      });
+
+      it("should handle null legends_type as valid", () => {
+        const panelSchema = {
+          config: {
+            show_legends: true,
+            legends_position: "right",
+            legends_type: null
+          }
+        };
+        const seriesData = [{ name: "series1" }];
+
+        const result = shouldApplyChartAlignment(panelSchema, seriesData);
+        expect(result).toBe(true);
+      });
+    });
+
+    describe("generateChartAlignmentProperties", () => {
+      it("should return empty object when alignment should not be applied", () => {
+        const result = generateChartAlignmentProperties("center", "bottom", false);
+        expect(result).toEqual({});
+      });
+
+      it("should return empty object when legend position is not right", () => {
+        const result = generateChartAlignmentProperties("center", "bottom", true);
+        expect(result).toEqual({});
+      });
+
+      it("should generate left alignment properties", () => {
+        const result = generateChartAlignmentProperties("left", "right", true);
+
+        expect(result).toEqual({
+          display: "grid",
+          gridTemplateRows: "1fr",
+          gridTemplateColumns: "minmax(0, 1fr) auto",
+          justifyItems: "start",
+          alignItems: "center",
+          paddingLeft: "5%"
+        });
+      });
+
+      it("should generate center alignment properties", () => {
+        const result = generateChartAlignmentProperties("center", "right", true);
+
+        expect(result).toEqual({
+          display: "grid",
+          gridTemplateRows: "1fr",
+          gridTemplateColumns: "1fr",
+          justifyItems: "center",
+          alignItems: "center"
+        });
+      });
+
+      it("should generate default (auto) alignment properties", () => {
+        const result = generateChartAlignmentProperties(null, "right", true);
+
+        expect(result).toEqual({
+          display: "grid",
+          gridTemplateRows: "1fr",
+          gridTemplateColumns: "1fr",
+          justifyItems: "center",
+          alignItems: "center"
+        });
+      });
+
+      it("should handle unknown alignment as default", () => {
+        const result = generateChartAlignmentProperties("unknown", "right", true);
+
+        expect(result).toEqual({
+          display: "grid",
+          gridTemplateRows: "1fr",
+          gridTemplateColumns: "1fr",
+          justifyItems: "center",
+          alignItems: "center"
+        });
+      });
+    });
+
+    describe("Edge Case Coverage", () => {
+      it("should handle getUnitValue with default case and toFixed fallback", () => {
+        const result = getUnitValue("123.456", "unknown-unit", "", 2);
+        expect(result.value).toBe("123.46");
+        expect(result.unit).toBe("");
+      });
+
+      it("should handle getContrastColor with invalid RGB format", () => {
+        const result = getContrastColor("rgb(invalid)", false);
+        expect(result).toBe("#000000"); // fallback to black for light theme
+      });
+
+      it("should handle getContrastColor with malformed hex", () => {
+        const result = getContrastColor("#zzz", false);
+        expect(result).toBe("#FFFFFF"); // returns white for light theme when hex is invalid
+      });
+
+      it("should handle calculateOptimalFontSize with empty text", () => {
+        const result = calculateOptimalFontSize("", 100);
+        expect(result).toBeGreaterThanOrEqual(1);
+      });
+
+      it("should handle isTimeSeries with non-array input", () => {
+        expect(() => {
+          isTimeSeries("not an array");
+        }).toThrow();
+      });
+
+      it("should handle isTimeStamp with empty array", () => {
+        const result = isTimeStamp([], false); // Empty array returns true (vacuous truth)
+        expect(result).toBe(true);
+      });
+
+      it("should handle convertOffsetToSeconds with edge cases", () => {
+        // Test with 'M' case for months
+        const result = convertOffsetToSeconds("6M", Date.now());
+        expect(result.periodAsStr).toContain("Months ago");
+        expect(result.seconds).toBeGreaterThan(0);
+      });
+
+      it("should handle validateDashboardJson with invalid panel validation", () => {
+        const dashboardJson = {
+          dashboardId: "test-id",
+          title: "Test Dashboard",
+          version: "v3",
+          tabs: [{
+            tabId: "tab1",
+            name: "Tab 1",
+            panels: [{
+              id: "panel1",
+              type: "line",
+              title: "Test Panel",
+              layout: { i: "1", x: 0, y: 0, w: 12, h: 8 },
+              queries: [{ query: "test query" }] // This should trigger validation
+            }]
+          }]
+        };
+
+        const errors = validateDashboardJson(dashboardJson);
+        expect(Array.isArray(errors)).toBe(true);
+      });
+
+      it("should cover remToPx helper function", () => {
+        // Test internal remToPx function by calling calculateBottomLegendHeight
+        // which uses remToPx internally
+        const result = calculateBottomLegendHeight(1, 100, [], 200);
+        expect(result).toBeGreaterThan(0);
+      });
+
+      it("should handle legend calculation edge cases", () => {
+        // Test calculateLegendWidth internal function through calculateChartDimensions
+        const panelSchema = {
+          config: {
+            show_legends: true,
+            legends_position: "right",
+            legends_type: "scroll"
+          }
+        };
+
+        const result = calculateChartDimensions(panelSchema, 800, 600, [{ name: "series1" }]);
+        expect(result.hasLegends).toBe(true);
+      });
+
+      it("should handle legend height calculation edge cases", () => {
+        // Test calculateLegendHeight internal function through calculateChartDimensions
+        const panelSchema = {
+          config: {
+            show_legends: true,
+            legends_position: "bottom",
+            legends_type: "scroll"
+          }
+        };
+
+        const result = calculateChartDimensions(panelSchema, 800, 600, [{ name: "series1" }]);
+        expect(result.hasLegends).toBe(true);
+      });
     });
   });
 });
