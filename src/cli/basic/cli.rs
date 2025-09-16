@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::path::PathBuf;
+
 use chrono::TimeZone;
 use clap::{Arg, ArgAction, Command};
 use config::utils::file::set_permission;
@@ -20,7 +22,6 @@ use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     file_list as infra_file_list, table,
 };
-use std::path::PathBuf;
 
 use crate::{
     cli::data::{

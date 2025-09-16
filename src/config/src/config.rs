@@ -338,7 +338,7 @@ pub fn load_config() -> Result<(), anyhow::Error> {
             }
         }
     }
-    
+
     Ok(())
 }
 static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =
