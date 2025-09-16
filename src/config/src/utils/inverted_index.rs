@@ -35,6 +35,7 @@ pub fn convert_parquet_file_name_to_tantivy_file(from: &str) -> Option<String> {
         "logs" => StreamType::Logs,
         "metrics" => StreamType::Metrics,
         "traces" => StreamType::Traces,
+        "metadata" => StreamType::Metadata,
         _ => return None,
     };
     parts[stream_type_pos] = Cow::Borrowed("index");

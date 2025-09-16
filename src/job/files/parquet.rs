@@ -811,7 +811,7 @@ async fn merge_files(
     storage::put(&account, &new_file_key, buf.clone()).await?;
 
     // skip index generation if not enabled or not basic type
-    if !cfg.common.inverted_index_enabled || !stream_type.is_basic_type() {
+    if !cfg.common.inverted_index_enabled || !stream_type.support_index() {
         return Ok((account, new_file_key, new_file_meta, retain_file_list));
     }
 
