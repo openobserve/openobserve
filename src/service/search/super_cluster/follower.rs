@@ -80,7 +80,6 @@ pub async fn search(
     ScanStats,
 )> {
     let start = std::time::Instant::now();
-    let mut checkpoint = 0usize;
     let cfg = config::get_config();
     let mut req: Request = (*flight_request).clone().into();
     let trace_id = trace_id.to_string();
@@ -96,7 +95,7 @@ pub async fn search(
     )
     .await?;
     let prepare_datafusion_context_took = start.elapsed().as_millis() as usize;
-    checkpoint = prepare_datafusion_context_took;
+    let prepare_datafusion_context_instant = std::time::Instant::now();
     log::info!(
         "{}",
         search_inspector_fields(
@@ -116,20 +115,20 @@ pub async fn search(
     // register udf
     register_udf(&ctx, &req.org_id)?;
     datafusion_functions_json::register_all(&mut ctx)?;
-    let registered_udf_took = start.elapsed().as_millis() as usize - checkpoint;
-    checkpoint += registered_udf_took;
+    let registered_udf_took = prepare_datafusion_context_instant.elapsed();
+    let registered_udf_instant = std::time::Instant::now();
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
                 "[trace_id {trace_id}] flight->follower_leader: registered udf and ctx took: {} ms",
-                registered_udf_took
+                registered_udf_took.as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("search::super_cluster::follower register udf and ctx".to_string())
                 .search_role("follower".to_string())
-                .duration(registered_udf_took)
+                .duration(registered_udf_took.as_millis() as usize)
                 .build()
         )
     );
@@ -143,20 +142,20 @@ pub async fn search(
         &ctx,
         &proto,
     )?;
-    let decode_physical_plan_took = start.elapsed().as_millis() as usize - checkpoint;
-    checkpoint += decode_physical_plan_took;
+    let decode_physical_plan_took = registered_udf_instant.elapsed();
+    let decode_physical_plan_instant = std::time::Instant::now();
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
                 "[trace_id {trace_id}] flight->follower_leader: decoded physical plan took: {} ms",
-                decode_physical_plan_took
+                decode_physical_plan_took.as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("search::super_cluster::follower register udf and ctx".to_string())
                 .search_role("follower".to_string())
-                .duration(decode_physical_plan_took)
+                .duration(decode_physical_plan_took.as_millis() as usize)
                 .build()
         )
     );
@@ -186,20 +185,21 @@ pub async fn search(
 
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_num = file_id_list_vec.len();
-    let file_id_list_took = start.elapsed().as_millis() as usize - checkpoint;
-    checkpoint += file_id_list_took;
+    let file_id_list_took = decode_physical_plan_instant.elapsed();
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
                 "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, files: {}, took: {} ms",
-                req.time_range, file_id_list_num, file_id_list_took,
+                req.time_range,
+                file_id_list_num,
+                file_id_list_took.as_millis(),
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("search::super_cluster::follower get file id".to_string())
                 .search_role("leader".to_string())
-                .duration(file_id_list_took)
+                .duration(file_id_list_took.as_millis() as usize)
                 .desc(format!("get files {} ids", file_id_list_num))
                 .build()
         )
@@ -208,7 +208,7 @@ pub async fn search(
     let mut scan_stats = ScanStats {
         files: file_id_list_num as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
-        file_list_took: file_id_list_took as i64,
+        file_list_took: file_id_list_took.as_millis() as i64,
         ..Default::default()
     };
 
@@ -286,7 +286,7 @@ pub async fn search(
         &nodes,
         &file_id_list_vec,
         start,
-        file_id_list_took,
+        file_id_list_took.as_millis() as usize,
         "leader".to_string(),
     )
     .await?;

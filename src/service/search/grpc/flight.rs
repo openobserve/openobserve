@@ -91,9 +91,6 @@ pub async fn search(
         cfg.limit.cpu_num,
     )
     .await?;
-    let mut ctx =
-        prepare_datafusion_context(work_group.clone(), vec![], vec![], false, cfg.limit.cpu_num)
-            .await?;
     log::info!(
         "{}",
         search_inspector_fields(
