@@ -20,6 +20,7 @@ use {
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::auth::{AuthExtractor, is_root_user},
     },
+
     actix_web::HttpResponse,
     config::meta::stream::StreamType,
     o2_openfga::meta::mapping::OFGA_MODELS,
@@ -48,6 +49,44 @@ pub async fn check_stream_permissions(
                         .get(stream_type_str)
                         .map_or(stream_type_str, |model| model.key),
                     stream_name
+                ),
+                org_id: org_id.to_string(),
+                bypass_check: false,
+                parent_id: "".to_string(),
+            },
+            user.role,
+            user.is_external,
+        )
+        .await
+        {
+            return Some(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+    None
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn check_resource_permissions(
+    org_id: &str,
+    user_id: &str,
+    resource_type: &str,
+    resource_id: &str,
+    method: &str,
+) -> Option<HttpResponse> {
+    if !is_root_user(user_id) {
+        let user: meta::user::User = USERS.get(&format!("{org_id}/{user_id}")).unwrap().clone();
+
+        if !crate::handler::http::auth::validator::check_permissions(
+            user_id,
+            AuthExtractor {
+                auth: "".to_string(),
+                method: method.to_string(),
+                o2_type: format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(resource_type)
+                        .map_or(resource_type, |model| model.key),
+                    resource_id
                 ),
                 org_id: org_id.to_string(),
                 bypass_check: false,

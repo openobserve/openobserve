@@ -456,17 +456,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-center move-btn q-mr-md no-border"
                   color="secondary"
                   :icon="outlinedDriveFileMove"
+                  no-caps
                   :label="'Move'"
                   @click="moveMultipleAlerts"
                 />
                 <q-btn
                   v-if="selectedAlerts.length > 0"
                   data-test="alert-list-export-alerts-btn"
-                  class="flex items-center export-btn no-border"
+                  class="flex items-center q-mr-md export-btn no-border"
                   color="secondary"
                   icon="download"
+                  no-caps
                   :label="'Export'"
                   @click="multipleExportAlert"
+                />
+                <q-btn
+                  v-if="selectedAlerts.length > 0"
+                  data-test="alert-list-pause-alerts-btn"
+                  class="flex items-center q-mr-md pause-btn no-border"
+                  color="secondary"
+                  icon="pause"
+                  :label="'Pause'"
+                  no-caps
+                  @click="bulkToggleAlerts('pause')"
+                />
+                <q-btn
+                  v-if="selectedAlerts.length > 0"
+                  data-test="alert-list-resume-alerts-btn"
+                  class="flex items-center resume-btn no-border"
+                  color="secondary"
+                  icon="play_arrow"
+                  :label="'Resume'"
+                  no-caps
+                  @click="bulkToggleAlerts('resume')"
                 />
                 <QTablePagination
                   :scope="scope"
@@ -1794,6 +1816,74 @@ export default defineComponent({
     const updateFolderIdToBeCloned = (folderId: any) => {
       folderIdToBeCloned.value = folderId.value;
     };
+    const bulkToggleAlerts = async (action: "pause" | "resume") => {
+
+    const dismiss = $q.notify({
+      spinner: true,
+      message: `${action === "resume" ? "Resuming" : "Pausing"} alerts...`,
+      timeout: 0,
+    });
+  try {
+    const isResuming = action === "resume";
+
+    // Filter alerts based on action
+    const alertsToToggle = selectedAlerts.value.filter((alert: any) =>
+      isResuming ? !alert.enabled : alert.enabled
+    );
+
+    if (alertsToToggle.length === 0) {
+      $q.notify({
+        type: "negative",
+        message: `No alerts to ${action}`,
+        timeout: 2000,
+      });
+      dismiss();
+      return;
+    }
+
+    // Collect IDs and names
+    const payload = {
+      ids: alertsToToggle.map((a: any) => a.alert_id),
+      names: alertsToToggle.map((a: any) => a.name),
+    };
+
+    // Toggle (true = resume, false = pause)
+    const response = await alertsService.bulkToggleState(
+      store.state.selectedOrganization.identifier,
+      isResuming,
+      payload
+    );
+
+    if (response) {
+      dismiss();
+      $q.notify({
+        type: "positive",
+        message: `Alerts ${action}d successfully`,
+        timeout: 2000,
+      });
+    }
+
+    // Refresh alerts
+    await getAlertsFn(store, activeFolderId.value);
+
+    // Trigger filterQuery re-evaluation
+    if (filterQuery.value) {
+      let tempQuery = filterQuery.value;
+      filterQuery.value = null;
+      await nextTick();
+      filterQuery.value = tempQuery;
+    }
+  } catch (error) {
+    dismiss();
+    console.error(`Error ${action}ing alerts:`, error);
+    $q.notify({
+      type: "negative",
+      message: `Error ${action}ing alerts. Please try again.`,
+      timeout: 2000,
+    });
+  }
+};
+
 
 
     return {
@@ -1898,6 +1988,7 @@ export default defineComponent({
       refreshImportedAlerts,
       folderIdToBeCloned,
       updateFolderIdToBeCloned,
+      bulkToggleAlerts,
     };
   },
 });
@@ -1916,6 +2007,14 @@ export default defineComponent({
 }
 
 .export-btn {
+  width: calc(14vw);
+}
+
+.pause-btn {
+  width: calc(14vw);
+}
+
+.resume-btn {
   width: calc(14vw);
 }
 
