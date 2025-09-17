@@ -362,7 +362,7 @@ mod tests {
             fields.push(Field::new("status", DataType::Utf8, false));
             let status: Vec<String> = (0..num_rows)
                 .map(|i| {
-                    if i % 2 == 0 {
+                    if i.is_multiple_of(2) {
                         "success".to_string()
                     } else {
                         "error".to_string()

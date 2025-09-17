@@ -16,7 +16,7 @@
 use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, get, post, web};
-use config::meta::short_url::ShortenUrlResponse;
+use config::meta::short_url::{ShortenUrlRequest, ShortenUrlResponse};
 use serde::Deserialize;
 
 use crate::{
@@ -32,10 +32,11 @@ use crate::{
 #[utoipa::path(
     post,
     context_path = "/api",
+    operation_id = "createShortUrl",
     summary = "Create short URL",
     description = "Generates a shortened URL from a longer original URL. This is useful for creating more manageable links for dashboards, reports, or search queries that can be easily shared via email, chat, or documentation. The short URL remains valid and can be used to redirect back to the original destination.",
     request_body(
-        content = Object,
+        content = ShortenUrlRequest,
         description = "The original URL to shorten",
         content_type = "application/json",
         example = json!({
@@ -61,7 +62,7 @@ use crate::{
 )]
 #[post("/{org_id}/short")]
 pub async fn shorten(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpResponse, Error> {
-    let req: config::meta::short_url::ShortenUrlRequest = match serde_json::from_slice(&body) {
+    let req: ShortenUrlRequest = match serde_json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
@@ -91,6 +92,7 @@ pub struct RetrieveQuery {
 #[utoipa::path(
     get,
     context_path = "/short",
+    operation_id = "resolveShortUrl",
     summary = "Resolve short URL",
     description = "Resolves a shortened URL back to its original destination. By default, this endpoint redirects the user to the original URL. When the 'type=ui' query parameter is provided, it returns the original URL as JSON instead of performing a redirect. This is useful for applications that need to inspect or validate URLs before navigation.",
     params(
