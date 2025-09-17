@@ -320,25 +320,25 @@ pub fn calculate_config_file_hash(path: &PathBuf) -> Result<String, anyhow::Erro
 pub fn load_config() -> Result<(), anyhow::Error> {
     match crate::config_path_manager::get_config_file_path() {
         Some(path) => {
-            log::info!("Loading config file from path: {:?}", path);
-            if dotenvy::from_path_override(path).is_ok() {
-                log::info!("Config loaded successfully from file");
-            } else {
-                log::error!("Config loading from file failed");
+            log::info!("Loading config from file {:?}", &path);
+            if dotenvy::from_path_override(&path).is_err() {
+                return Err(anyhow::anyhow!("Config loading from file failed"));
             }
+            log::info!("Config loaded successfully from file {path:?}");
         }
         None => {
             // Perform default .env discovery and set it in the config manager
             if let Ok(env_path) = dotenvy::dotenv_override() {
-                log::debug!("Config init: Found .env file at {:?} during boot", env_path);
+                log::debug!("Config init: Found .env file at {env_path:?} during boot");
                 // Set the default path in config manager
                 crate::config_path_manager::set_config_file_path(env_path)?;
             } else {
-                log::debug!("Config init: No .env file found during default discovery");
+                return Err(anyhow::anyhow!(
+                    "Config init: No .env file found during default discovery"
+                ));
             }
         }
     }
-
     Ok(())
 }
 static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =
@@ -2028,7 +2028,10 @@ pub struct EnrichmentTable {
 }
 
 pub fn init() -> Config {
-    let _ = load_config();
+    if let Err(e) = load_config() {
+        log::error!("Failed to load config {e}");
+        // do nothing
+    }
     let mut cfg = Config::init().expect("config init error");
 
     // set local mode
