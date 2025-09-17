@@ -26,7 +26,7 @@ vi.mock("@/aws-exports", () => {
     ddClientToken: undefined,
     ddSite: undefined,
   };
-  
+
   return {
     default: config,
   };
@@ -70,8 +70,8 @@ vi.mock("@/components/iam/organizations/AppOrganizations.vue", () => ({
   default: vi.fn(() => ({ name: "AppOrganizations" })),
 }));
 
-vi.mock("@/components/actionScripts/ActionScipts.vue", () => ({
-  default: vi.fn(() => ({ name: "ActionScipts" })),
+vi.mock("@/components/actionScripts/ActionScripts.vue", () => ({
+  default: vi.fn(() => ({ name: "ActionScripts" })),
 }));
 
 vi.mock("@/views/User.vue", () => ({
@@ -114,11 +114,11 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should return consistent structure on multiple calls", () => {
       const routes1 = useEnterpriseRoutes();
       const routes2 = useEnterpriseRoutes();
-      
+
       // Compare structure without function instances
       expect(routes1.length).toBe(routes2.length);
-      expect(routes1.map(r => ({ path: r.path, name: r.name }))).toEqual(
-        routes2.map(r => ({ path: r.path, name: r.name }))
+      expect(routes1.map((r) => ({ path: r.path, name: r.name }))).toEqual(
+        routes2.map((r) => ({ path: r.path, name: r.name })),
       );
     });
   });
@@ -163,7 +163,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should include users child route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const usersRoute = iamRoute.children.find((child: any) => child.name === "users");
+      const usersRoute = iamRoute.children.find(
+        (child: any) => child.name === "users",
+      );
       expect(usersRoute).toBeDefined();
     });
 
@@ -171,7 +173,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have correct users route path", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const usersRoute = iamRoute.children.find((child: any) => child.name === "users");
+      const usersRoute = iamRoute.children.find(
+        (child: any) => child.name === "users",
+      );
       expect(usersRoute.path).toBe("users");
     });
 
@@ -179,7 +183,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have users route component", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const usersRoute = iamRoute.children.find((child: any) => child.name === "users");
+      const usersRoute = iamRoute.children.find(
+        (child: any) => child.name === "users",
+      );
       expect(usersRoute.component).toBeDefined();
     });
 
@@ -187,7 +193,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have users route beforeEnter guard", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const usersRoute = iamRoute.children.find((child: any) => child.name === "users");
+      const usersRoute = iamRoute.children.find(
+        (child: any) => child.name === "users",
+      );
       expect(typeof usersRoute.beforeEnter).toBe("function");
     });
 
@@ -195,7 +203,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should include serviceAccounts child route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const serviceAccountsRoute = iamRoute.children.find((child: any) => child.name === "serviceAccounts");
+      const serviceAccountsRoute = iamRoute.children.find(
+        (child: any) => child.name === "serviceAccounts",
+      );
       expect(serviceAccountsRoute).toBeDefined();
     });
 
@@ -203,7 +213,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have correct serviceAccounts route path", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const serviceAccountsRoute = iamRoute.children.find((child: any) => child.name === "serviceAccounts");
+      const serviceAccountsRoute = iamRoute.children.find(
+        (child: any) => child.name === "serviceAccounts",
+      );
       expect(serviceAccountsRoute.path).toBe("serviceAccounts");
     });
 
@@ -211,7 +223,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should include organizations child route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const organizationsRoute = iamRoute.children.find((child: any) => child.name === "organizations");
+      const organizationsRoute = iamRoute.children.find(
+        (child: any) => child.name === "organizations",
+      );
       expect(organizationsRoute).toBeDefined();
     });
 
@@ -219,7 +233,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have correct organizations route path", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const organizationsRoute = iamRoute.children.find((child: any) => child.name === "organizations");
+      const organizationsRoute = iamRoute.children.find(
+        (child: any) => child.name === "organizations",
+      );
       expect(organizationsRoute.path).toBe("organizations");
     });
 
@@ -247,28 +263,36 @@ describe("useEnterpriseRoutes.ts", () => {
     // Test 21: Should add actions route when isCloud is true
     it("should add actions route when isCloud is true", () => {
       const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
+      const actionsRoute = routes.find(
+        (route: any) => route.name === "actionScripts",
+      );
       expect(actionsRoute).toBeDefined();
     });
 
     // Test 22: Should have correct actions route path
     it("should have correct actions route path", () => {
       const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
+      const actionsRoute = routes.find(
+        (route: any) => route.name === "actionScripts",
+      );
       expect(actionsRoute.path).toBe("actions");
     });
 
     // Test 23: Should have actions route component
     it("should have actions route component", () => {
       const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
+      const actionsRoute = routes.find(
+        (route: any) => route.name === "actionScripts",
+      );
       expect(actionsRoute.component).toBeDefined();
     });
 
     // Test 24: Should have actions route beforeEnter guard
     it("should have actions route beforeEnter guard", () => {
       const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
+      const actionsRoute = routes.find(
+        (route: any) => route.name === "actionScripts",
+      );
       expect(typeof actionsRoute.beforeEnter).toBe("function");
     });
 
@@ -276,7 +300,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should add groups child route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const groupsRoute = iamRoute.children.find((child: any) => child.name === "groups");
+      const groupsRoute = iamRoute.children.find(
+        (child: any) => child.name === "groups",
+      );
       expect(groupsRoute).toBeDefined();
     });
 
@@ -284,7 +310,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have correct groups route path", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const groupsRoute = iamRoute.children.find((child: any) => child.name === "groups");
+      const groupsRoute = iamRoute.children.find(
+        (child: any) => child.name === "groups",
+      );
       expect(groupsRoute.path).toBe("groups");
     });
 
@@ -292,7 +320,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should add editGroup child route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const editGroupRoute = iamRoute.children.find((child: any) => child.name === "editGroup");
+      const editGroupRoute = iamRoute.children.find(
+        (child: any) => child.name === "editGroup",
+      );
       expect(editGroupRoute).toBeDefined();
     });
 
@@ -300,7 +330,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have correct editGroup route path", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const editGroupRoute = iamRoute.children.find((child: any) => child.name === "editGroup");
+      const editGroupRoute = iamRoute.children.find(
+        (child: any) => child.name === "editGroup",
+      );
       expect(editGroupRoute.path).toBe("groups/edit/:group_name");
     });
 
@@ -308,7 +340,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should add roles child route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const rolesRoute = iamRoute.children.find((child: any) => child.name === "roles");
+      const rolesRoute = iamRoute.children.find(
+        (child: any) => child.name === "roles",
+      );
       expect(rolesRoute).toBeDefined();
     });
 
@@ -316,7 +350,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should add editRole child route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const editRoleRoute = iamRoute.children.find((child: any) => child.name === "editRole");
+      const editRoleRoute = iamRoute.children.find(
+        (child: any) => child.name === "editRole",
+      );
       expect(editRoleRoute).toBeDefined();
     });
 
@@ -324,7 +360,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have correct editRole route path", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const editRoleRoute = iamRoute.children.find((child: any) => child.name === "editRole");
+      const editRoleRoute = iamRoute.children.find(
+        (child: any) => child.name === "editRole",
+      );
       expect(editRoleRoute.path).toBe("roles/edit/:role_name");
     });
 
@@ -332,7 +370,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should add quota child route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const quotaRoute = iamRoute.children.find((child: any) => child.name === "quota");
+      const quotaRoute = iamRoute.children.find(
+        (child: any) => child.name === "quota",
+      );
       expect(quotaRoute).toBeDefined();
     });
 
@@ -360,7 +400,9 @@ describe("useEnterpriseRoutes.ts", () => {
     // Test 35: Should add actions route when isEnterprise is true
     it("should add actions route when isEnterprise is true", () => {
       const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
+      const actionsRoute = routes.find(
+        (route: any) => route.name === "actionScripts",
+      );
       expect(actionsRoute).toBeDefined();
     });
 
@@ -405,11 +447,11 @@ describe("useEnterpriseRoutes.ts", () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      
+
       const mockTo = {};
       const mockFrom = {};
       const mockNext = vi.fn();
-      
+
       iamRoute.beforeEnter(mockTo, mockFrom, mockNext);
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
@@ -419,12 +461,14 @@ describe("useEnterpriseRoutes.ts", () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const usersRoute = iamRoute.children.find((child: any) => child.name === "users");
-      
+      const usersRoute = iamRoute.children.find(
+        (child: any) => child.name === "users",
+      );
+
       const mockTo = {};
       const mockFrom = {};
       const mockNext = vi.fn();
-      
+
       usersRoute.beforeEnter(mockTo, mockFrom, mockNext);
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
@@ -434,12 +478,14 @@ describe("useEnterpriseRoutes.ts", () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const serviceAccountsRoute = iamRoute.children.find((child: any) => child.name === "serviceAccounts");
-      
+      const serviceAccountsRoute = iamRoute.children.find(
+        (child: any) => child.name === "serviceAccounts",
+      );
+
       const mockTo = {};
       const mockFrom = {};
       const mockNext = vi.fn();
-      
+
       serviceAccountsRoute.beforeEnter(mockTo, mockFrom, mockNext);
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
@@ -449,12 +495,14 @@ describe("useEnterpriseRoutes.ts", () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const organizationsRoute = iamRoute.children.find((child: any) => child.name === "organizations");
-      
+      const organizationsRoute = iamRoute.children.find(
+        (child: any) => child.name === "organizations",
+      );
+
       const mockTo = {};
       const mockFrom = {};
       const mockNext = vi.fn();
-      
+
       organizationsRoute.beforeEnter(mockTo, mockFrom, mockNext);
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
@@ -471,12 +519,14 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should call routeGuard for actions route", async () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      
+      const actionsRoute = routes.find(
+        (route: any) => route.name === "actionScripts",
+      );
+
       const mockTo = {};
       const mockFrom = {};
       const mockNext = vi.fn();
-      
+
       actionsRoute.beforeEnter(mockTo, mockFrom, mockNext);
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
@@ -486,12 +536,14 @@ describe("useEnterpriseRoutes.ts", () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const groupsRoute = iamRoute.children.find((child: any) => child.name === "groups");
-      
+      const groupsRoute = iamRoute.children.find(
+        (child: any) => child.name === "groups",
+      );
+
       const mockTo = {};
       const mockFrom = {};
       const mockNext = vi.fn();
-      
+
       groupsRoute.beforeEnter(mockTo, mockFrom, mockNext);
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
@@ -501,12 +553,14 @@ describe("useEnterpriseRoutes.ts", () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const editGroupRoute = iamRoute.children.find((child: any) => child.name === "editGroup");
-      
+      const editGroupRoute = iamRoute.children.find(
+        (child: any) => child.name === "editGroup",
+      );
+
       const mockTo = {};
       const mockFrom = {};
       const mockNext = vi.fn();
-      
+
       editGroupRoute.beforeEnter(mockTo, mockFrom, mockNext);
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
@@ -516,12 +570,14 @@ describe("useEnterpriseRoutes.ts", () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const rolesRoute = iamRoute.children.find((child: any) => child.name === "roles");
-      
+      const rolesRoute = iamRoute.children.find(
+        (child: any) => child.name === "roles",
+      );
+
       const mockTo = {};
       const mockFrom = {};
       const mockNext = vi.fn();
-      
+
       rolesRoute.beforeEnter(mockTo, mockFrom, mockNext);
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
@@ -531,12 +587,14 @@ describe("useEnterpriseRoutes.ts", () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const editRoleRoute = iamRoute.children.find((child: any) => child.name === "editRole");
-      
+      const editRoleRoute = iamRoute.children.find(
+        (child: any) => child.name === "editRole",
+      );
+
       const mockTo = {};
       const mockFrom = {};
       const mockNext = vi.fn();
-      
+
       editRoleRoute.beforeEnter(mockTo, mockFrom, mockNext);
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
@@ -546,12 +604,14 @@ describe("useEnterpriseRoutes.ts", () => {
       const { routeGuard } = await import("@/utils/zincutils");
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const quotaRoute = iamRoute.children.find((child: any) => child.name === "quota");
-      
+      const quotaRoute = iamRoute.children.find(
+        (child: any) => child.name === "quota",
+      );
+
       const mockTo = {};
       const mockFrom = {};
       const mockNext = vi.fn();
-      
+
       quotaRoute.beforeEnter(mockTo, mockFrom, mockNext);
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
@@ -600,7 +660,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have component for users route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const usersRoute = iamRoute.children.find((child: any) => child.name === "users");
+      const usersRoute = iamRoute.children.find(
+        (child: any) => child.name === "users",
+      );
       expect(usersRoute.component).toBeDefined();
     });
 
@@ -608,7 +670,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have component for serviceAccounts route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const serviceAccountsRoute = iamRoute.children.find((child: any) => child.name === "serviceAccounts");
+      const serviceAccountsRoute = iamRoute.children.find(
+        (child: any) => child.name === "serviceAccounts",
+      );
       expect(serviceAccountsRoute.component).toBeDefined();
     });
 
@@ -616,7 +680,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have component for organizations route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const organizationsRoute = iamRoute.children.find((child: any) => child.name === "organizations");
+      const organizationsRoute = iamRoute.children.find(
+        (child: any) => child.name === "organizations",
+      );
       expect(organizationsRoute.component).toBeDefined();
     });
   });
@@ -631,7 +697,9 @@ describe("useEnterpriseRoutes.ts", () => {
     // Test 56: Should have component for actions route
     it("should have component for actions route", () => {
       const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
+      const actionsRoute = routes.find(
+        (route: any) => route.name === "actionScripts",
+      );
       expect(typeof actionsRoute.component).toBe("function");
     });
 
@@ -639,7 +707,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have component for groups route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const groupsRoute = iamRoute.children.find((child: any) => child.name === "groups");
+      const groupsRoute = iamRoute.children.find(
+        (child: any) => child.name === "groups",
+      );
       expect(typeof groupsRoute.component).toBe("function");
     });
 
@@ -647,7 +717,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have component for editGroup route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const editGroupRoute = iamRoute.children.find((child: any) => child.name === "editGroup");
+      const editGroupRoute = iamRoute.children.find(
+        (child: any) => child.name === "editGroup",
+      );
       expect(typeof editGroupRoute.component).toBe("function");
     });
 
@@ -655,7 +727,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have component for roles route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const rolesRoute = iamRoute.children.find((child: any) => child.name === "roles");
+      const rolesRoute = iamRoute.children.find(
+        (child: any) => child.name === "roles",
+      );
       expect(typeof rolesRoute.component).toBe("function");
     });
 
@@ -663,7 +737,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have component for editRole route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const editRoleRoute = iamRoute.children.find((child: any) => child.name === "editRole");
+      const editRoleRoute = iamRoute.children.find(
+        (child: any) => child.name === "editRole",
+      );
       expect(typeof editRoleRoute.component).toBe("function");
     });
 
@@ -671,7 +747,9 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have component for quota route", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      const quotaRoute = iamRoute.children.find((child: any) => child.name === "quota");
+      const quotaRoute = iamRoute.children.find(
+        (child: any) => child.name === "quota",
+      );
       expect(typeof quotaRoute.component).toBe("function");
     });
   });
@@ -682,7 +760,7 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = undefined;
       config.default.isEnterprise = undefined;
-      
+
       const routes = useEnterpriseRoutes();
       expect(routes.length).toBe(1); // Should fallback to basic routes only
     });
@@ -692,7 +770,7 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = null;
       config.default.isEnterprise = null;
-      
+
       const routes = useEnterpriseRoutes();
       expect(routes.length).toBe(1); // Should fallback to basic routes only
     });
@@ -702,7 +780,7 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = true;
       config.default.isEnterprise = false;
-      
+
       const routes = useEnterpriseRoutes();
       expect(routes.length).toBe(1); // Should only add routes when string "true"
     });
@@ -712,7 +790,7 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = "";
       config.default.isEnterprise = "";
-      
+
       const routes = useEnterpriseRoutes();
       expect(routes.length).toBe(1); // Should fallback to basic routes only
     });
@@ -722,7 +800,7 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = "True";
       config.default.isEnterprise = "TRUE";
-      
+
       const routes = useEnterpriseRoutes();
       expect(routes.length).toBe(1); // Should be case sensitive, only "true" should work
     });
@@ -732,7 +810,7 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = "true";
       config.default.isEnterprise = "true";
-      
+
       const routes = useEnterpriseRoutes();
       expect(routes[0].name).toBe("iam");
     });
@@ -742,14 +820,14 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = "false";
       config.default.isEnterprise = "false";
-      
+
       const routes1 = useEnterpriseRoutes();
       const originalChildrenCount = routes1[0].children.length;
-      
+
       config.default.isCloud = "true";
       const routes2 = useEnterpriseRoutes();
       const newChildrenCount = routes2[0].children.length;
-      
+
       expect(newChildrenCount).toBeGreaterThan(originalChildrenCount);
     });
 
@@ -758,10 +836,10 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = "true";
       config.default.isEnterprise = "true";
-      
+
       const routes1 = useEnterpriseRoutes();
       const routes2 = useEnterpriseRoutes();
-      
+
       expect(routes1.length).toBe(routes2.length);
       expect(routes1[0].children.length).toBe(routes2[0].children.length);
     });
@@ -771,12 +849,12 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = "true";
       config.default.isEnterprise = "true";
-      
+
       const routes = useEnterpriseRoutes();
       const allRouteNames = routes.map((route: any) => route.name);
       const allChildNames = routes[0].children.map((child: any) => child.name);
       const allNames = [...allRouteNames, ...allChildNames];
-      
+
       const uniqueNames = [...new Set(allNames)];
       expect(uniqueNames.length).toBe(allNames.length); // No duplicates
     });
