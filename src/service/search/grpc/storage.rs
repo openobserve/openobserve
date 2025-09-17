@@ -769,7 +769,7 @@ pub async fn tantivy_search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} , is_add_filter_back: {}, file_num: {}, took: {} ms",
+                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {}, is_add_filter_back: {}, file_num: {}, took: {} ms",
                 query.trace_id,
                 index_condition,
                 tantivy_result,
