@@ -9,7 +9,13 @@ export default class DashboardVariables {
 
   // Method to add a dashboard variable
   // Parameters: name, streamtype, streamName, field
-  async addDashboardVariable(name, streamtype, streamName, field) {
+  async addDashboardVariable(
+    name,
+    streamtype,
+    streamName,
+    field,
+    customValueSearch = false // it is used only when we want to search custom value from variable dropdown
+  ) {
     // Open Variable Tab
     await this.page
       .locator('[data-test="dashboard-settings-variable-tab"]')
@@ -51,13 +57,47 @@ export default class DashboardVariables {
       .fill(field);
     await this.page.getByText(field).click();
 
-    // Save Variable and Close Settings
-    await this.page
-      .locator('[data-test="dashboard-variable-save-btn"]')
-      .click();
-    await this.page
-      .locator('[data-test="dashboard-settings-close-btn"]')
-      .click();
+    // Save Variable and Close Settings (skip if customValueSearch is true)
+    if (!customValueSearch) {
+      await this.page
+        .locator('[data-test="dashboard-variable-save-btn"]')
+        .click();
+      await this.page
+        .locator('[data-test="dashboard-settings-close-btn"]')
+        .click();
+    }
+
+    // Custom Value Search if want to search custom value from variable dropdown
+    if (customValueSearch) {
+      await this.page
+        .locator(
+          '[data-test="dashboard-query_values-show_multiple_values"] div'
+        )
+        .nth(2)
+        .click();
+      await this.page
+        .locator(
+          '[data-test="dashboard-multi-select-default-value-toggle-custom"]'
+        )
+        .click();
+      await this.page
+        .locator('[data-test="dashboard-add-custom-value-btn"]')
+        .click();
+      await this.page
+        .locator('[data-test="dashboard-variable-custom-value-0"]')
+        .click();
+      await this.page
+        .locator('[data-test="dashboard-variable-custom-value-0"]')
+        .fill("test");
+
+      // Save Variable and Close Settings
+      await this.page
+        .locator('[data-test="dashboard-variable-save-btn"]')
+        .click();
+      await this.page
+        .locator('[data-test="dashboard-settings-close-btn"]')
+        .click();
+    }
   }
 
   // Dynamic function to fill input by label
