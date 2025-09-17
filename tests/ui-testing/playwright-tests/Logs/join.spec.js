@@ -4,7 +4,7 @@ const testLogger = require('../utils/test-logger.js');
 
 // Utility Functions
 
-// Legacy login function replaced by global authentication via navigateToBase
+// Legacy login function replaced by global authentication via navigateToBase 
 
 test.describe("Join for logs", () => {
   test.describe.configure({ mode: 'parallel' });
