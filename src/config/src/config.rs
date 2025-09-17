@@ -1977,6 +1977,18 @@ pub struct Pipeline {
         help = "pipeline max file retention time in seconds"
     )]
     pub pipeline_max_file_retention_time_seconds: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_FILE_PUSH_BACK_INTERVAL",
+        default = 2,
+        help = "duration in seconds to push the file to back to the queue after a read complete"
+    )]
+    pub pipeline_file_push_back_interval: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_SINK_TASK_SPAWN_INTERVAL_MS",
+        default = 100,
+        help = "interval in milliseconds to spawn a new sink task"
+    )]
+    pub pipeline_sink_task_spawn_interval_ms: u64,
 }
 
 #[derive(EnvConfig, Default)]
@@ -2824,6 +2836,14 @@ fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     } else {
         cfg.pipeline.wal_size_limit *= 1024 * 1024;
+    }
+
+    if cfg.pipeline.pipeline_file_push_back_interval == 0 {
+        cfg.pipeline.pipeline_file_push_back_interval = 2; // 2 seconds
+    }
+
+    if cfg.pipeline.pipeline_sink_task_spawn_interval_ms == 0 {
+        cfg.pipeline.pipeline_sink_task_spawn_interval_ms = 100; // 100 milliseconds
     }
     Ok(())
 }
