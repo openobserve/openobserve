@@ -183,6 +183,9 @@ jobs:
                 "visualize.spec.js",
                 # "visualization-vrl.spec.js"
               ]
+          - testfolder: "Dashboards-Streaming"
+            browser: "chrome"
+            run_files: ["dashboard-streaming.spec.js",]
           - testfolder: "Pipelines"
             browser: "chrome"
             run_files: [
@@ -202,9 +205,7 @@ jobs:
                 "streamname.spec.js",
                 "streaming.spec.js",
               ]
-          - testfolder: "Dashboards-Streaming"
-            browser: "chrome"
-            run_files: ["dashboard-streaming.spec.js"]
+
 
     steps:
       - name: Clone the current repo
