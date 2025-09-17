@@ -892,7 +892,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :debounceTime="100"
               @update:query="updateQueryValue"
               @run-query="handleRunQueryFn"
-              @keydown="handleKeyDown"
               :class="
                 searchObj.data.editorValue == '' &&
                 searchObj.meta.queryEditorPlaceholderFlag
@@ -928,7 +927,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :readOnly="
                       searchObj.meta.logsVisualizeToggle === 'visualize'
                     "
-                    @keydown="handleKeyDown"
                     language="vrl"
                     @focus="
                       searchObj.meta.functionEditorPlaceholderFlag = false
@@ -1580,11 +1578,6 @@ export default defineComponent({
             timeout: 2000,
           });
         });
-    },
-    handleKeyDown(e) {
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-        this.handleRunQueryFn();
-      }
     },
   },
   props: {
