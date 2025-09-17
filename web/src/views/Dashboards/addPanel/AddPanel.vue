@@ -74,52 +74,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="dateTimePickerRef"
           :disable="disable"
         />
-        <!-- Error/Warning tooltips -->
-        <q-btn
-          v-if="errorMessage"
-          :icon="outlinedWarning"
-          flat
-          size="xs"
-          padding="2px"
-          data-test="dashboard-panel-error-data"
-          class="warning q-mr-xs"
-        >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
-            <div style="white-space: pre-wrap">
-              {{ errorMessage }}
-            </div>
-          </q-tooltip>
-        </q-btn>
-        <q-btn
-          v-if="maxQueryRangeWarning"
-          :icon="outlinedWarning"
-          flat
-          size="xs"
-          padding="2px"
-          data-test="dashboard-panel-max-duration-warning"
-          class="warning q-mr-xs"
-        >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
-            <div style="white-space: pre-wrap">
-              {{ maxQueryRangeWarning }}
-            </div>
-          </q-tooltip>
-        </q-btn>
-        <q-btn
-          v-if="limitNumberOfSeriesWarningMessage"
-          :icon="symOutlinedDataInfoAlert"
-          flat
-          size="xs"
-          padding="2px"
-          data-test="dashboard-panel-limit-number-of-series-warning"
-          class="warning q-mr-xs"
-        >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
-            <div style="white-space: pre-wrap">
-              {{ limitNumberOfSeriesWarningMessage }}
-            </div>
-          </q-tooltip>
-        </q-btn>
         <q-btn
           class="q-ml-md text-bold"
           outline
@@ -289,7 +243,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                       </div>
-                      <div class="tw-flex tw-justify-end tw-mr-2">
+                      <div class="tw-flex tw-justify-end tw-mr-2 tw-items-center">
+                        <!-- Error/Warning tooltips moved here -->
+                        <q-btn
+                          v-if="errorMessage"
+                          :icon="outlinedWarning"
+                          flat
+                          size="xs"
+                          padding="2px"
+                          data-test="dashboard-panel-error-data-inline"
+                          class="warning q-mr-xs"
+                        >
+                          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+                            <div style="white-space: pre-wrap">
+                              {{ errorMessage }}
+                            </div>
+                          </q-tooltip>
+                        </q-btn>
+                        <q-btn
+                          v-if="maxQueryRangeWarning"
+                          :icon="outlinedWarning"
+                          flat
+                          size="xs"
+                          padding="2px"
+                          data-test="dashboard-panel-max-duration-warning-inline"
+                          class="warning q-mr-xs"
+                        >
+                          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+                            <div style="white-space: pre-wrap">
+                              {{ maxQueryRangeWarning }}
+                            </div>
+                          </q-tooltip>
+                        </q-btn>
+                        <q-btn
+                          v-if="limitNumberOfSeriesWarningMessage"
+                          :icon="symOutlinedDataInfoAlert"
+                          flat
+                          size="xs"
+                          padding="2px"
+                          data-test="dashboard-panel-series-limit-warning-inline"
+                          class="warning q-mr-xs"
+                        >
+                          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+                            <div style="white-space: pre-wrap">
+                              {{ limitNumberOfSeriesWarningMessage }}
+                            </div>
+                          </q-tooltip>
+                        </q-btn>
                         <span v-if="lastTriggeredAt" class="lastRefreshedAt">
                           <span class="lastRefreshedAtIcon">🕑</span
                           ><RelativeTime
@@ -639,7 +639,7 @@ import {
   outlinedRunningWithErrors,
 } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
-import { getFunctionErrorMessage } from "@/utils/zincutils";
+import { getFunctionErrorMessage, errorMsgSet } from "@/utils/zincutils";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -1357,11 +1357,40 @@ export default defineComponent({
       limitNumberOfSeriesWarningMessage.value = message;
     };
 
-    // Handle result metadata updates for warnings
-    const handleResultMetadataUpdate = (resultMetaData: any) => {
-      // Handle max query range warnings
-      const combinedWarnings: any[] = [];
-      resultMetaData?.forEach((query: any) => {
+    const handleResultMetadataUpdate = (metadata: any) => {
+      if (metadata && metadata.length > 0 && Array.isArray(metadata[0])) {
+        const combinedWarnings: any[] = [];
+        const errorDedup = errorMsgSet();
+
+        metadata[0].forEach((query: any) => {
+          if (
+            query?.function_error &&
+            query?.new_start_time &&
+            query?.new_end_time
+          ) {
+            const combinedMessage = getFunctionErrorMessage(
+              query.function_error,
+              query.new_start_time,
+              query.new_end_time,
+              store.state.timezone,
+            );
+            combinedWarnings.push(combinedMessage);
+          } else if (query?.function_error) {
+            combinedWarnings.push(query.function_error);
+          }
+        });
+
+        // Deduplicate warnings
+        const dedupedWarnings = errorDedup(combinedWarnings);
+
+        // NOTE: for multi query, just show the first query warning
+        maxQueryRangeWarning.value =
+          dedupedWarnings.length > 0 ? dedupedWarnings.join(", ") : "";
+      } else if (metadata && metadata.length > 0) {
+        // Backward compatibility - handle old format
+        const query = metadata[0];
+        const combinedWarnings: any[] = [];
+
         if (
           query?.function_error &&
           query?.new_start_time &&
@@ -1377,11 +1406,10 @@ export default defineComponent({
         } else if (query?.function_error) {
           combinedWarnings.push(query.function_error);
         }
-      });
 
-      // For multi query, just show the first query warning
-      maxQueryRangeWarning.value =
-        combinedWarnings.length > 0 ? combinedWarnings[0] : "";
+        maxQueryRangeWarning.value =
+          combinedWarnings.length > 0 ? combinedWarnings[0] : "";
+      }
     };
 
     const onDataZoom = (event: any) => {

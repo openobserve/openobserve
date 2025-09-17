@@ -459,7 +459,7 @@ import {
   outlinedRunningWithErrors,
 } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
-import { getFunctionErrorMessage } from "@/utils/zincutils";
+import { getFunctionErrorMessage, errorMsgSet } from "@/utils/zincutils";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -873,18 +873,55 @@ export default defineComponent({
     };
 
     const onResultMetadataUpdate = (resultMetaData: any) => {
-      // only copy if is_ui_histogram is true
+      // only copy if is_ui_histogram is true - check first partition of first query
       if (
-        resultMetaData?.[0]?.converted_histogram_query &&
+        resultMetaData?.[0]?.[0]?.converted_histogram_query &&
         is_ui_histogram.value === true
+      ) {
+        dashboardPanelData.data.queries[0].query =
+          resultMetaData?.[0]?.[0]?.converted_histogram_query;
+      } else if (
+        // Backward compatibility - check if it's old format
+        resultMetaData?.[0]?.converted_histogram_query &&
+        is_ui_histogram.value === true &&
+        !Array.isArray(resultMetaData[0])
       ) {
         dashboardPanelData.data.queries[0].query =
           resultMetaData?.[0]?.converted_histogram_query;
       }
+      if (resultMetaData && resultMetaData.length > 0 && Array.isArray(resultMetaData[0])) {
+        const combinedWarnings: any[] = [];
+        const errorDedup = errorMsgSet();
 
-      // Handle max query range warnings
-      const combinedWarnings: any[] = [];
-      resultMetaData?.forEach((query: any) => {
+        resultMetaData[0].forEach((query: any) => {
+          if (
+            query?.function_error &&
+            query?.new_start_time &&
+            query?.new_end_time
+          ) {
+            const combinedMessage = getFunctionErrorMessage(
+              query.function_error,
+              query.new_start_time,
+              query.new_end_time,
+              store.state.timezone,
+            );
+            combinedWarnings.push(combinedMessage);
+          } else if (query?.function_error) {
+            combinedWarnings.push(query.function_error);
+          }
+        });
+
+        // Deduplicate warnings
+        const dedupedWarnings = errorDedup(combinedWarnings);
+
+        // NOTE: for multi query, just show the first query warning
+        maxQueryRangeWarning.value =
+          dedupedWarnings.length > 0 ? dedupedWarnings.join(", ") : "";
+      } else if (resultMetaData && resultMetaData.length > 0) {
+        // Backward compatibility - handle old format
+        const query = resultMetaData[0];
+        const combinedWarnings: any[] = [];
+
         if (
           query?.function_error &&
           query?.new_start_time &&
@@ -900,11 +937,10 @@ export default defineComponent({
         } else if (query?.function_error) {
           combinedWarnings.push(query.function_error);
         }
-      });
 
-      // For multi query, just show the first query warning
-      maxQueryRangeWarning.value =
-        combinedWarnings.length > 0 ? combinedWarnings[0] : "";
+        maxQueryRangeWarning.value =
+          combinedWarnings.length > 0 ? combinedWarnings[0] : "";
+      }
     };
 
     return {

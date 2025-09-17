@@ -381,7 +381,7 @@ import {
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
-import { getFunctionErrorMessage } from "@/utils/zincutils";
+import { getFunctionErrorMessage, errorMsgSet } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -450,8 +450,39 @@ export default defineComponent({
     const limitNumberOfSeriesWarningMessage = ref("");
 
     const handleResultMetadataUpdate = (metadata: any) => {
-      const combinedWarnings: any[] = [];
-      metadata.forEach((query: any) => {
+      if (metadata && metadata.length > 0 && Array.isArray(metadata[0])) {
+        const combinedWarnings: any[] = [];
+        const errorDedup = errorMsgSet();
+
+        metadata[0].forEach((query: any) => {
+          if (
+            query?.function_error &&
+            query?.new_start_time &&
+            query?.new_end_time
+          ) {
+            const combinedMessage = getFunctionErrorMessage(
+              query.function_error,
+              query.new_start_time,
+              query.new_end_time,
+              store.state.timezone,
+            );
+            combinedWarnings.push(combinedMessage);
+          } else if (query?.function_error) {
+            combinedWarnings.push(query.function_error);
+          }
+        });
+
+        // Deduplicate warnings
+        const dedupedWarnings = errorDedup(combinedWarnings);
+
+        // NOTE: for multi query, just show the first query warning
+        maxQueryRange.value =
+          dedupedWarnings.length > 0 ? [dedupedWarnings.join(", ")] : [];
+      } else if (metadata && metadata.length > 0) {
+        // Backward compatibility - handle old format
+        const query = metadata[0];
+        const combinedWarnings: any[] = [];
+
         if (
           query?.function_error &&
           query?.new_start_time &&
@@ -467,11 +498,10 @@ export default defineComponent({
         } else if (query?.function_error) {
           combinedWarnings.push(query.function_error);
         }
-      });
 
-      // NOTE: for multi query, just show the first query warning
-      maxQueryRange.value =
-        combinedWarnings.length > 0 ? [combinedWarnings[0]] : [];
+        maxQueryRange.value =
+          combinedWarnings.length > 0 ? [combinedWarnings[0]] : [];
+      }
     };
 
     // to store and show when the panel was last loaded
