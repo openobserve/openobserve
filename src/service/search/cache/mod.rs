@@ -713,7 +713,6 @@ fn sort_response(
     });
 }
 
-
 /// Caches search results to disk after applying filtering and validation strategies.
 ///
 /// # Caching Strategy
