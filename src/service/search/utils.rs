@@ -219,3 +219,15 @@ pub async fn collect_scan_stats(
     );
     scan_stats
 }
+
+pub fn check_query_default_limit_exceeded(num_rows: usize, partial_err: &mut String) {
+    let query_default_limit = config::get_config().limit.query_default_limit as usize;
+    let capped_err = format!("Result is capped to query result limit {query_default_limit}");
+    if num_rows > query_default_limit {
+        if !partial_err.is_empty() {
+            *partial_err = format!("{partial_err} \n {capped_err}");
+        } else {
+            *partial_err = capped_err;
+        }
+    }
+}

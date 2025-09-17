@@ -70,7 +70,7 @@ use crate::{
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
             request::Request,
             sql::Sql,
-            utils::{AsyncDefer, ScanStatsVisitor},
+            utils::{AsyncDefer, ScanStatsVisitor, check_query_default_limit_exceeded},
         },
     },
 };
@@ -562,8 +562,14 @@ pub async fn run_datafusion(
                     .build()
             )
         );
-        ret.map(|data| (data, visit.scan_stats, visit.partial_err))
-            .map_err(|e| e.into())
+        ret.map(|data| {
+            check_query_default_limit_exceeded(
+                data.iter().fold(0, |acc, batch| acc + batch.num_rows()),
+                &mut visit.partial_err,
+            );
+            (data, visit.scan_stats, visit.partial_err)
+        })
+        .map_err(|e| e.into())
     }
 }
 
