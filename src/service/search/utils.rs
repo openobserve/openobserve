@@ -218,8 +218,9 @@ pub async fn collect_scan_stats(
     }
 
     log::info!(
-        "[trace_id {trace_id}] collecting scan stats end: took {} ms",
-        start.elapsed().as_millis()
+        "[trace_id {trace_id}] collecting scan stats end: took {} ms, num_nodes: {}",
+        start.elapsed().as_millis(),
+        nodes.len()
     );
     log::info!(
         "[trace_id {trace_id}] collecting scan stats end: took {} ms, num_nodes: {}",
