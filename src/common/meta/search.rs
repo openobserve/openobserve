@@ -19,6 +19,9 @@ use config::meta::{search::Response, sql::OrderBy};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+pub const CAPPED_RESULTS_MSG: &str =
+    "ZO_QUERY_DEFAULT_LIMIT: Results are capped, total count might vary due to cache.";
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
 pub struct CachedQueryResponse {
     pub cached_response: Response,
