@@ -152,48 +152,6 @@ mod tests {
         }
     }
 
-    #[derive(Debug)]
-    struct MockEmptyExecPlan;
-    impl datafusion::physical_plan::DisplayAs for MockEmptyExecPlan {
-        fn fmt_as(
-            &self,
-            _: datafusion::physical_plan::DisplayFormatType,
-            _: &mut std::fmt::Formatter,
-        ) -> std::fmt::Result {
-            Ok(())
-        }
-    }
-    impl ExecutionPlan for MockEmptyExecPlan {
-        fn name(&self) -> &'static str {
-            "EmptyExec"
-        }
-        fn as_any(&self) -> &dyn Any {
-            self
-        }
-        fn properties(&self) -> &PlanProperties {
-            panic!("not needed")
-        }
-        fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
-            vec![]
-        }
-        fn with_new_children(
-            self: Arc<Self>,
-            _: Vec<Arc<dyn ExecutionPlan>>,
-        ) -> datafusion::common::Result<Arc<dyn ExecutionPlan>> {
-            Ok(self)
-        }
-        fn execute(
-            &self,
-            _: usize,
-            _: Arc<datafusion::execution::TaskContext>,
-        ) -> datafusion::common::Result<datafusion::execution::SendableRecordBatchStream> {
-            panic!("not needed")
-        }
-        fn statistics(&self) -> datafusion::common::Result<datafusion::common::Statistics> {
-            panic!("not needed")
-        }
-    }
-
     #[test]
     fn test_new_empty_exec_visitor() {
         let plan = Arc::new(MockExecPlan) as Arc<dyn ExecutionPlan>;

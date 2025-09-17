@@ -183,6 +183,9 @@ jobs:
                 "visualize.spec.js",
                 # "visualization-vrl.spec.js"
               ]
+          - testfolder: "Dashboards-Streaming"
+            browser: "chrome"
+            run_files: ["dashboard-streaming.spec.js",]
           - testfolder: "Pipelines"
             browser: "chrome"
             run_files: [
@@ -202,7 +205,6 @@ jobs:
                 "streamname.spec.js",
                 "streaming.spec.js",
               ]
-
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -255,7 +257,7 @@ jobs:
               "Logs-Core"|"Logs-Queries")
                 ACTUAL_FOLDER="Logs"
                 ;;
-              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts")
+              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming")
                 ACTUAL_FOLDER="Dashboards"
                 ;;
               *)

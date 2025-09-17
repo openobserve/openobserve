@@ -1468,7 +1468,7 @@ async fn handle_derived_stream_triggers(
                                     let (_, results): (Vec<_>, Vec<_>) =
                                         stream_pl_results.into_iter().unzip();
                                     json_data_by_stream
-                                        .entry(stream_params)
+                                        .entry(stream_params.clone())
                                         .or_default()
                                         .extend(results);
                                 }

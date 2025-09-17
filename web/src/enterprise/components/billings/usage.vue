@@ -100,7 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- new section introduced to show the usage for ingestion , search , functions -->
         <div v-if="!dataLoading && Object.keys(usageData).length > 0" class="row wrap justify-evenly q-gutter-md ">
-            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%; ">
+            <div class="tw-grid tw-grid-cols-3 tw-gap-4 tw-w-full">
+                <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%; ">
               <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
               :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
                style="height: 100%; gap: 12px">
@@ -120,50 +121,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                {{ usageData.ingestion }} {{ usageDataType.toUpperCase() }}
             </div>
             </div>
-            </div>
-            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
-               style="height: 100%; gap: 12px">
-              <!-- Top Section (60%) -->
-              <div class="column justify-between">
-                <!-- Title row -->
-                <div class="row justify-between">
-                  <div class="usage-tile-title">Search</div>
-                  <div style="opacity: 0.8;">
-                    <img :src="searchIcon" />
-                  </div>
                 </div>
-              </div>
-
-            <!-- Bottom Section (40%) -->
-            <div class="usage-data-to-display row items-end ">
-              {{ usageData.search }} {{ usageDataType.toUpperCase() }}
-            </div>
-            </div>
-            </div>
-            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
-               style="height: 100%; gap: 12px">
-              <!-- Top Section (60%) -->
-              <div class="column justify-between">
-                <!-- Title row -->
-                <div class="row justify-between">
-                  <div class="usage-tile-title">Functions</div>
-                  <div style="opacity: 0.8;">
-                    <img :src="functionsIcon" />
-                  </div>
+                <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
+                <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+                :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
+                style="height: 100%; gap: 12px">
+                <!-- Top Section (60%) -->
+                <div class="column justify-between">
+                    <!-- Title row -->
+                    <div class="row justify-between">
+                    <div class="usage-tile-title">Search</div>
+                    <div style="opacity: 0.8;">
+                        <img :src="searchIcon" />
+                    </div>
+                    </div>
                 </div>
-              </div>
 
-            <!-- Bottom Section (40%) -->
-            <div class="usage-data-to-display row items-end ">
-              {{ usageData.functions }} {{ usageDataType.toUpperCase() }}
-            </div>
-            </div>
-            </div>
+                <!-- Bottom Section (40%) -->
+                <div class="usage-data-to-display row items-end ">
+                {{ usageData.search }} {{ usageDataType.toUpperCase() }}
+                </div>
+                </div>
+                </div>
+                <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
+                <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+                :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
+                style="height: 100%; gap: 12px">
+                <!-- Top Section (60%) -->
+                <div class="column justify-between">
+                    <!-- Title row -->
+                    <div class="row justify-between">
+                    <div class="usage-tile-title">Functions</div>
+                    <div style="opacity: 0.8;">
+                        <img :src="functionsIcon" />
+                    </div>
+                    </div>
+                </div>
 
+                <!-- Bottom Section (40%) -->
+                <div class="usage-data-to-display row items-end ">
+                {{ usageData.functions }} {{ usageDataType.toUpperCase() }}
+                </div>
+                </div>
+                </div>
+            </div>
+            <div class="tw-grid tw-grid-cols-2 tw-gap-4 tw-w-full">
+                <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
+                <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+                :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
+                style="height: 100%; gap: 12px">
+                <!-- Top Section (60%) -->
+                <div class="column justify-between">
+                    <!-- Title row -->
+                    <div class="row justify-between">
+                    <div class="usage-tile-title">Pipelines</div>
+                    <div style="opacity: 0.8;" class="tw-bg-[#E6EFFE] tw-flex tw-items-center tw-justify-center tw-rounded-[9px] tw-h-[33px] tw-w-[33px]">
+                        <img :src="pipelineIcon" class="tw-h-[18px] tw-w-[18px] tw-mx-[7px] tw-my-[7px]" />
+                    </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Section (40%) -->
+                <div class="usage-data-to-display row items-end ">
+                {{ usageData.pipeline }} {{ usageDataType.toUpperCase() }}
+                </div>
+                </div>
+                </div>
+                <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
+                <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+                :class="store.state.theme === 'dark' ? 'dark-usage-tile-content' : 'light-usage-tile-content'"
+                style="height: 100%; gap: 12px">
+                <!-- Top Section (60%) -->
+                <div class="column justify-between">
+                    <!-- Title row -->
+                    <div class="row justify-between">
+                    <div class="usage-tile-title">Remote Pipelines</div>
+                    <div style="opacity: 0.8;" class="tw-bg-[#F2DCF5] tw-flex tw-items-center tw-justify-center tw-rounded-[9px] tw-h-[33px] tw-w-[33px]">
+                        <img :src="remotePipelineIcon" class="tw-h-[18px] tw-w-[18px] tw-mx-[7px] tw-my-[7px]" />
+                    </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Section (40%) -->
+                <div class="usage-data-to-display row items-end ">
+                {{ usageData.remotepipeline }} {{ usageDataType.toUpperCase() }}
+                </div>
+                </div>
+                </div>
+            </div>
         </div>
         <!-- charts section -->
         <div>
@@ -212,7 +257,9 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
       const usageData = ref<any>({
         ingestion: "0.00",
         search: "0.00",
-        functions: "0.00"
+        functions: "0.00",
+        pipeline: "0.00",
+        remotepipeline: "0.00"
       });
       let chartData: any = ref({});
       onMounted(async () => {
@@ -269,6 +316,8 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
       const ingestionIcon = getImageURL("images/usage/ingestion.svg");
       const searchIcon = getImageURL("images/usage/search.svg");
       const functionsIcon = getImageURL("images/usage/function.svg");
+      const pipelineIcon = getImageURL("images/usage/pipeline.svg");
+      const remotePipelineIcon = getImageURL("images/usage/remote_pipeline.svg");
       //this is the example data that needs to be used to get the chart in usage page 
       //we just need to have the data in the format of the dataModel
       //eg: date and value and in the array format
@@ -853,6 +902,8 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         usageData,
         getUsage,
         router,
+        pipelineIcon,
+        remotePipelineIcon,
       };
     },
   });
