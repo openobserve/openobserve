@@ -230,7 +230,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                   </div>
-                  <div class="tw-flex tw-justify-end tw-mr-2">
+                  <div class="tw-flex tw-justify-end tw-mr-2 tw-items-center">
+                    <!-- Error/Warning tooltips moved here -->
+                    <q-btn
+                      v-if="errorMessage"
+                      :icon="outlinedWarning"
+                      flat
+                      size="xs"
+                      padding="2px"
+                      data-test="dashboard-panel-error-data-inline"
+                      class="warning q-mr-xs"
+                    >
+                      <q-tooltip
+                        anchor="bottom right"
+                        self="top right"
+                        max-width="220px"
+                      >
+                        <div style="white-space: pre-wrap">
+                          {{ errorMessage }}
+                        </div>
+                      </q-tooltip>
+                    </q-btn>
+                    <q-btn
+                      v-if="maxQueryRangeWarning"
+                      :icon="outlinedWarning"
+                      flat
+                      size="xs"
+                      padding="2px"
+                      data-test="dashboard-panel-max-duration-warning-inline"
+                      class="warning q-mr-xs"
+                    >
+                      <q-tooltip
+                        anchor="bottom right"
+                        self="top right"
+                        max-width="220px"
+                      >
+                        <div style="white-space: pre-wrap">
+                          {{ maxQueryRangeWarning }}
+                        </div>
+                      </q-tooltip>
+                    </q-btn>
+                    <q-btn
+                      v-if="limitNumberOfSeriesWarningMessage"
+                      :icon="symOutlinedDataInfoAlert"
+                      flat
+                      size="xs"
+                      padding="2px"
+                      data-test="dashboard-panel-series-limit-warning-inline"
+                      class="warning q-mr-xs"
+                    >
+                      <q-tooltip
+                        anchor="bottom right"
+                        self="top right"
+                        max-width="220px"
+                      >
+                        <div style="white-space: pre-wrap">
+                          {{ limitNumberOfSeriesWarningMessage }}
+                        </div>
+                      </q-tooltip>
+                    </q-btn>
                     <span v-if="lastTriggeredAt" class="lastRefreshedAt">
                       <span class="lastRefreshedAtIcon">🕑</span
                       ><RelativeTime
@@ -243,6 +301,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <PanelSchemaRenderer
                       v-if="chartData"
                       @metadata-update="metaDataValue"
+                      @result-metadata-update="handleResultMetadataUpdate"
+                      @limit-number-of-series-warning-message-update="
+                        handleLimitNumberOfSeriesWarningMessage
+                      "
                       :key="dashboardPanelData.data.type"
                       :panelSchema="chartData"
                       :dashboard-id="queryParams?.dashboard"
@@ -426,6 +488,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <PanelSchemaRenderer
                         v-if="chartData"
                         @metadata-update="metaDataValue"
+                        @result-metadata-update="handleResultMetadataUpdate"
+                        @limit-number-of-series-warning-message-update="
+                          handleLimitNumberOfSeriesWarningMessage
+                        "
                         :key="dashboardPanelData.data.type"
                         :panelSchema="chartData"
                         :dashboard-id="queryParams?.dashboard"
@@ -519,6 +585,12 @@ import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
+import {
+  outlinedWarning,
+  outlinedRunningWithErrors,
+} from "@quasar/extras/material-icons-outlined";
+import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
+import { processQueryMetadataErrors } from "@/utils/zincutils";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -599,6 +671,11 @@ export default defineComponent({
     const seriesDataUpdate = (data: any) => {
       seriesData.value = data;
     };
+
+    // Warning messages
+    const maxQueryRangeWarning = ref("");
+    const limitNumberOfSeriesWarningMessage = ref("");
+    const errorMessage = ref("");
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);
@@ -1253,17 +1330,31 @@ export default defineComponent({
       }
     };
 
-    const handleChartApiError = (errorMessage: {
-      message: string;
-      code: string;
-    }) => {
-      if (errorMessage?.message) {
+    const handleChartApiError = (errorMsg: any) => {
+      if (typeof errorMsg === "string") {
+        errorMessage.value = errorMsg;
         const errorList = errorData.errors ?? [];
         errorList.splice(0);
-        errorList.push(errorMessage.message);
+        errorList.push(errorMsg);
+      } else if (errorMsg?.message) {
+        errorMessage.value = errorMsg.message ?? "";
+        const errorList = errorData.errors ?? [];
+        errorList.splice(0);
+        errorList.push(errorMsg.message);
       }
     };
 
+    // Handle limit number of series warning from PanelSchemaRenderer
+    const handleLimitNumberOfSeriesWarningMessage = (message: string) => {
+      limitNumberOfSeriesWarningMessage.value = message;
+    };
+
+    const handleResultMetadataUpdate = (metadata: any) => {
+      maxQueryRangeWarning.value = processQueryMetadataErrors(
+        metadata,
+        store.state.timezone,
+      );
+    };
     const onDataZoom = (event: any) => {
       // console.time("onDataZoom");
       const selectedDateObj = {
@@ -1675,6 +1766,14 @@ export default defineComponent({
       dateTimeForVariables,
       seriesDataUpdate,
       seriesData,
+      maxQueryRangeWarning,
+      limitNumberOfSeriesWarningMessage,
+      errorMessage,
+      handleLimitNumberOfSeriesWarningMessage,
+      handleResultMetadataUpdate,
+      outlinedWarning,
+      symOutlinedDataInfoAlert,
+      outlinedRunningWithErrors,
     };
   },
   methods: {
@@ -1717,5 +1816,9 @@ export default defineComponent({
   min-width: 200px;
   max-width: 500px;
   transition: width 0.2s ease;
+}
+
+.warning {
+  color: var(--q-warning);
 }
 </style>
