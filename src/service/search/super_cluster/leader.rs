@@ -355,6 +355,7 @@ async fn run_datafusion(
             check_query_default_limit_exceeded(
                 data.iter().fold(0, |acc, batch| acc + batch.num_rows()),
                 &mut visit.partial_err,
+                &sql,
             );
             (data, visit.scan_stats, visit.partial_err)
         })
