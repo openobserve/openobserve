@@ -159,14 +159,13 @@ export
     }
   }
 
+  // Set the streaming state to the desired state (enabled or disabled) eg: enabled = true, disabled = false
   async setStreamingState(enabled) {
-    // Navigate to logs page first to ensure we are in the correct org context
     await this.page.goto(
       process.env["ZO_BASE_URL"] + "/web/logs?org_identifier=default"
     );
     await this.page.waitForLoadState("networkidle");
 
-    // Navigate to the General Settings page
     await this.page.locator('[data-test="menu-link-settings-item"]').click();
     await this.page.goto(
       process.env["ZO_BASE_URL"] +
@@ -187,22 +186,12 @@ export
       }
     );
 
-    console.log(
-      `Streaming is currently ${isCurrentlyChecked ? "enabled" : "disabled"}.`
-    );
-    console.log(`Setting streaming to ${enabled ? "enabled" : "disabled"}.`);
-
-    // Only click the toggle if the current state doesn't match the desired state
     if (isCurrentlyChecked !== enabled) {
-      console.log(`${enabled ? "Enabling" : "Disabling"} streaming...`);
       await this.page.click(toggleSelector);
+      await this.page.waitForLoadState("networkidle");
 
-      // Wait for the toggle action to complete
-      await this.page.waitForTimeout(500);
-
-      // Save the changes
       await this.page.locator('[data-test="dashboard-add-submit"]').click();
-      await this.page.waitForTimeout(1000); // Wait for save operation
+      await this.page.waitForLoadState("networkidle");
 
       // Verify the new state
       const newCheckedState = await this.page.$eval(
@@ -212,16 +201,9 @@ export
         }
       );
 
-      if (newCheckedState === enabled) {
-        console.log(
-          `Streaming has been successfully ${enabled ? "enabled" : "disabled"}.`
-        );
-      } else {
-        console.log(`Failed to ${enabled ? "enable" : "disable"} streaming.`);
+      if (newCheckedState !== enabled) {
         throw new Error(`Failed to set streaming state to ${enabled}`);
       }
-    } else {
-      console.log(`Streaming is already ${enabled ? "enabled" : "disabled"}.`);
     }
   }
 }
