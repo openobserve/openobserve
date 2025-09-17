@@ -1,8 +1,8 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const logsdata = require("../../../test-data/logs_data.json");
-const testLogger = require('../utils/test-logger.js');
 
 // Utility Functions
 
@@ -33,7 +33,7 @@ async function ingestTestData(page) {
     streamName: streamName,
     logsdata: logsdata
   });
-  console.log(response);
+  testLogger.debug('API response received', { response });
 }
 async function applyQueryButton(page) {
   // click on the run query button
@@ -50,7 +50,6 @@ async function applyQueryButton(page) {
 }
 
 function removeUTFCharacters(text) {
-  // console.log(text, "tex");
   // Remove UTF characters using regular expression
   return text.replace(/[^\x00-\x7F]/g, " ");
 }
@@ -249,11 +248,11 @@ test.describe("Logs Queries testcases", () => {
     const functionName = 'e2efunction_' + randomString;
     await pm.logsPage.fillSavedFunctionNameInput(functionName);
     await pm.logsPage.clickSavedViewDialogSave();
+    await pm.logsPage.waitForTimeout(2000);
     await pm.logsPage.clickMenuLinkPipelineItem();
     // Strategic 2000ms wait for navigation to pipeline page - this is functionally necessary
-    await pm.logsPage.waitForTimeout(2000);
     // Wait for the realtime tab to be available
-    await page.locator('[data-test="tab-realtime"]').waitFor({ timeout: 30000 });
+    await page.waitForSelector('[data-test="tab-realtime"]');
     await pm.logsPage.clickTabRealtime();
     // Strategic 1000ms wait for realtime tab activation - this is functionally necessary
     await pm.logsPage.waitForTimeout(1000);

@@ -69,8 +69,6 @@ impl From<DashboardError> for HttpResponse {
 }
 
 /// CreateDashboard
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -95,6 +93,9 @@ impl From<DashboardError> for HttpResponse {
         (status = StatusCode::CREATED, description = "Dashboard created", body = CreateDashboardResponseBody),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"}))
+    )
 )]
 #[post("/{org_id}/dashboards")]
 pub async fn create_dashboard(
@@ -122,8 +123,6 @@ pub async fn create_dashboard(
 }
 
 /// UpdateDashboard
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -146,6 +145,9 @@ pub async fn create_dashboard(
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the dashboard", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"}))
+    )
 )]
 #[put("/{org_id}/dashboards/{dashboard_id}")]
 async fn update_dashboard(
@@ -178,8 +180,6 @@ async fn update_dashboard(
 }
 
 /// ListDashboards
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -196,6 +196,9 @@ async fn update_dashboard(
     responses(
         (status = StatusCode::OK, body = ListDashboardsResponseBody),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"}))
+    )
 )]
 #[get("/{org_id}/dashboards")]
 async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
@@ -215,8 +218,6 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
 }
 
 /// GetDashboard
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -234,6 +235,9 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
         (status = StatusCode::OK, body = GetDashboardResponseBody),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"}))
+    )
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}")]
 async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
@@ -247,8 +251,6 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
 }
 
 /// ExportDashboard
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -266,6 +268,9 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         (status = StatusCode::OK, body = GetDashboardResponseBody),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"}))
+    )
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}/export")]
 pub async fn export_dashboard(path: web::Path<(String, String)>) -> impl Responder {
@@ -279,8 +284,6 @@ pub async fn export_dashboard(path: web::Path<(String, String)>) -> impl Respond
 }
 
 /// DeleteDashboard
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -299,6 +302,9 @@ pub async fn export_dashboard(path: web::Path<(String, String)>) -> impl Respond
         (status = StatusCode::NOT_FOUND, description = "NotFound", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"}))
+    )
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}")]
 async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
@@ -313,8 +319,6 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
 }
 
 /// MoveDashboard
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -340,6 +344,9 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         (status = StatusCode::OK, description = "Dashboard Moved", body = Object),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"}))
+    )
 )]
 #[put("/{org_id}/folders/dashboards/{dashboard_id}")]
 async fn move_dashboard(
@@ -367,8 +374,6 @@ async fn move_dashboard(
 }
 
 /// MoveDashboards
-///
-/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -386,6 +391,9 @@ async fn move_dashboard(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"}))
     )
 )]
 #[patch("/{org_id}/dashboards/move")]

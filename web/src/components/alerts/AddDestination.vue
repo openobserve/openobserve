@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <q-separator />
-      <div class="row q-col-gutter-sm q-px-lg q-my-md">
+      <div class="row q-col-gutter-sm q-px-md q-mt-md q-mb-xs">
         <div v-if="isAlerts" class="col-12 q-pb-md">
           <app-tabs
             style="
@@ -245,11 +245,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-          <div class="col-12 q-py-sm">
-            <div class="q-py-sm">
+          <div class="col-12 q-py-sm ">
+            <div class="">
               <q-toggle
                 data-test="add-destination-skip-tls-verify-toggle"
-                class="q-mt-sm"
+                class="q-mt-sm o2-toggle-button-lg tw-mr-3 -tw-ml-4"
+                size="lg"
+                :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
                 v-model="formData.skip_tls_verify"
                 :label="t('alert_destinations.skip_tls_verify')"
               />
@@ -306,25 +308,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
     </div>
-    <div class="flex justify-center q-mt-lg">
+    <div class="flex justify-start q-ml-md ">
       <q-btn
         data-test="add-destination-cancel-btn"
         v-close-popup="true"
-        class="q-mb-md text-bold"
+        class="q-mr-md o2-secondary-button tw-h-[36px]"
         :label="t('alerts.cancel')"
-        text-color="light-text"
-        padding="sm md"
         no-caps
+        flat
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         @click="$emit('cancel:hideform')"
       />
       <q-btn
         data-test="add-destination-submit-btn"
+        class="o2-primary-button no-border tw-h-[36px]"
         :label="t('alerts.save')"
-        class="q-mb-md text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
-        @click="saveDestination"
+        type="submit"
         no-caps
+        flat
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+        @click="saveDestination"
       />
     </div>
   </q-page>
@@ -352,6 +355,7 @@ import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
 import useActions from "@/composables/useActions";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const props = defineProps({
   templates: {
@@ -373,6 +377,7 @@ const apiMethods = ["get", "post", "put"];
 const outputFormats = ["json", "ndjson"];
 const store = useStore();
 const { t } = useI18n();
+const { track } = useReo();
 const formData: Ref<DestinationData> = ref({
   name: "",
   url: "",
@@ -615,6 +620,10 @@ const saveDestination = () => {
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
+    track("Button Click", {
+      button: "Update Destination",
+      page: "Add Destination"
+    });
   } else {
     destinationService
       .create({
@@ -641,6 +650,10 @@ const saveDestination = () => {
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
+    track("Button Click", {
+      button: "Create Destination",
+      page: "Add Destination"
+    });
   }
 };
 const addApiHeader = (key: string = "", value: string = "") => {

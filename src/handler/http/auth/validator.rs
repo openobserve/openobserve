@@ -494,7 +494,7 @@ async fn validate_user_from_db(
                 );
                 if hashed_pass.eq(&user_password) {
                     let resp = TokenValidationResponseBuilder::from_db_user(&user).build();
-                    return Ok(resp);
+                    Ok(resp)
                 } else {
                     Err(ErrorForbidden("Not allowed"))
                 }

@@ -403,7 +403,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
             .with_label_values(&["query", "file_list"])
             .inc();
         let start = std::time::Instant::now();
-        let ret = if flattened.is_some() {
+        let ret = if let Some(flattened) = flattened {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
@@ -412,7 +412,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
                 "#
                 )
                 .bind(stream_key)
-                .bind(flattened.unwrap())
+                .bind(flattened)
                 .fetch_all(&pool).await
         } else {
             let (time_start, time_end) = time_range.unwrap_or((0, 0));
@@ -555,7 +555,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
             }
             partitions
         };
-        log::debug!("file_list day_partitions: {:?}", day_partitions);
+        log::debug!("file_list day_partitions: {day_partitions:?}");
 
         let mut tasks = Vec::with_capacity(day_partitions.len());
 
@@ -903,7 +903,7 @@ SELECT date
 SELECT 
     stream,
     MIN(CASE WHEN deleted IS FALSE THEN min_ts END) AS min_ts,
-    MAX(CASE WHEN deleted IS FALSE THEN max_ts END) AS max_ts,
+    MAX(CASE WHEN deleted IS FALSE THEN max_ts ELSE 0 END) AS max_ts,
     SUM(CASE 
         WHEN deleted IS TRUE AND created_at <= {min} THEN -1
         WHEN deleted IS FALSE THEN 1
@@ -1058,12 +1058,20 @@ INSERT INTO stream_stats
             if let Err(e) = sqlx::query(
                 r#"
 UPDATE stream_stats
-    SET file_num = file_num + $1, min_ts = $2, max_ts = $3, records = records + $4, original_size = original_size + $5, compressed_size = compressed_size + $6, index_size = index_size + $7
-    WHERE stream = $8;
+    SET file_num = file_num + $1, 
+        min_ts = CASE WHEN $2 = 0 THEN min_ts ELSE $3 END,
+        max_ts = CASE WHEN $4 = 0 THEN max_ts ELSE $5 END,
+        records = records + $6, 
+        original_size = original_size + $7, 
+        compressed_size = compressed_size + $8, 
+        index_size = index_size + $9
+    WHERE stream = $10;
                 "#,
             )
             .bind(stats.file_num)
             .bind(stats.doc_time_min)
+            .bind(stats.doc_time_min)
+            .bind(stats.doc_time_max)
             .bind(stats.doc_time_max)
             .bind(stats.doc_num)
             .bind(stats.storage_size as i64)
@@ -2059,7 +2067,7 @@ pub async fn create_table_index() -> Result<()> {
                 .bind(date)
                 .bind(file)
                 .execute(&pool).await?;
-            if i % 1000 == 0 {
+            if i.is_multiple_of(1000) {
                 log::warn!("[POSTGRES] delete duplicate records: {}/{}", i, ret.len());
             }
         }

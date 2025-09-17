@@ -33,7 +33,6 @@ use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use tokio::sync::mpsc;
 use vector_enrichment::TableRegistry;
 
 use crate::{
@@ -99,125 +98,10 @@ pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashM
 pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
     Lazy::new(Default::default);
 
-/// Refreshes in-memory cache in the event of NATs restart.
-///
-/// We should add all in-memory caches listed above that a CacheMiss is not followed by
-/// reading from db, e.g. UserSession, Pipeline
-pub(crate) async fn update_cache(mut nats_event_rx: mpsc::Receiver<infra::db::nats::NatsEvent>) {
-    let mut first_conenction = true;
-    while let Some(event) = nats_event_rx.recv().await {
-        if let infra::db::nats::NatsEvent::Connected = event {
-            // Skip refreshing if it's the first time connecting to the client
-            if first_conenction {
-                first_conenction = false;
-                continue;
-            }
-            log::info!(
-                "[infra::config] received NATs event: {event}, refreshing in-memory cache for Alerts, Pipelines, RealtimeTriggers, Schema, Users, and UserSessions"
-            );
-            match crate::service::db::session::cache().await {
-                Ok(()) => log::info!(
-                    "[infra::config] Successfully refreshed in-memory cache \"UserSessions\""
-                ),
-                Err(e) => log::error!(
-                    "[infra::config] Error refreshing in-memory cache \"UserSessions\": {e}"
-                ),
-            }
-            match crate::service::db::user::cache().await {
-                Ok(()) => {
-                    log::info!("[infra::config] Successfully refreshed in-memory cache \"Users\"")
-                }
-                Err(e) => {
-                    log::error!("[infra::config] Error refreshing in-memory cache \"Users\": {e}")
-                }
-            }
-            match crate::service::db::pipeline::cache().await {
-                Ok(()) => log::info!(
-                    "[infra::config] Successfully refreshed in-memory cache \"Pipelines\""
-                ),
-                Err(e) => log::error!(
-                    "[infra::config] Error refreshing in-memory cache \"Pipelines\": {e}"
-                ),
-            }
-            match crate::service::db::alerts::alert::cache().await {
-                Ok(()) => {
-                    log::info!("[infra::config] Successfully refreshed in-memory cache \"Alerts\"")
-                }
-                Err(e) => {
-                    log::error!("[infra::config] Error refreshing in-memory cache \"Alerts\": {e}")
-                }
-            }
-            match crate::service::db::alerts::realtime_triggers::cache().await {
-                Ok(()) => log::info!(
-                    "[infra::config] Successfully refreshed in-memory cache \"RealtimeTriggers\""
-                ),
-                Err(e) => log::error!(
-                    "[infra::config] Error refreshing in-memory cache \"RealtimeTriggers\": {e}"
-                ),
-            }
-            match crate::service::db::schema::cache().await {
-                Ok(()) => {
-                    log::info!("[infra::config] Successfully refreshed in-memory cache \"Schema\"")
-                }
-                Err(e) => {
-                    log::error!("[infra::config] Error refreshing in-memory cache \"Schema\": {e}")
-                }
-            }
-        }
-    }
-
-    log::info!("[infra::config] stops to listen to NATs event to refresh in-memory caches");
-}
-
 #[cfg(test)]
 mod tests {
-    use infra::db::nats::NatsEvent;
-    use tokio::time::{Duration, timeout};
 
     use super::*;
-
-    #[tokio::test]
-    async fn test_update_cache_first_connection() {
-        let (tx, rx) = mpsc::channel(100);
-
-        let handle = tokio::spawn(update_cache(rx));
-
-        // Send first connection event - should be skipped
-        tx.send(NatsEvent::Connected).await.unwrap();
-
-        // Give some time for processing
-        tokio::time::sleep(Duration::from_millis(10)).await;
-
-        // Close the sender to stop the update_cache function
-        drop(tx);
-
-        // Wait for the function to complete
-        let result = timeout(Duration::from_secs(1), handle).await;
-        assert!(result.is_ok(), "update_cache should complete gracefully");
-    }
-
-    #[tokio::test]
-    async fn test_update_cache_subsequent_connections() {
-        let (tx, rx) = mpsc::channel(100);
-
-        let handle = tokio::spawn(update_cache(rx));
-
-        // Send first connection event - should be skipped
-        tx.send(NatsEvent::Connected).await.unwrap();
-
-        // Send second connection event - should trigger cache refresh
-        tx.send(NatsEvent::Connected).await.unwrap();
-
-        // Give some time for processing
-        tokio::time::sleep(Duration::from_millis(50)).await;
-
-        // Close the sender to stop the update_cache function
-        drop(tx);
-
-        // Wait for the function to complete
-        let result = timeout(Duration::from_secs(2), handle).await;
-        assert!(result.is_ok(), "update_cache should complete gracefully");
-    }
 
     #[test]
     fn test_static_variables_initialization() {
@@ -411,37 +295,5 @@ mod tests {
         // Clean up
         QUERY_FUNCTIONS.remove(&test_key);
         assert_eq!(QUERY_FUNCTIONS.len(), 0);
-    }
-
-    #[tokio::test]
-    async fn test_cache_refresh_error_handling() {
-        let (tx, mut rx) = mpsc::channel::<NatsEvent>(10);
-
-        // Create a mock receiver that will simulate the update_cache behavior
-        tokio::spawn(async move {
-            let mut first_connection = true;
-            while let Some(event) = rx.recv().await {
-                if let NatsEvent::Connected = event {
-                    if first_connection {
-                        first_connection = false;
-                        continue;
-                    }
-                    // This simulates the cache refresh logic without actually calling the services
-                    // In real scenario, these would call actual cache refresh functions
-                    break;
-                }
-            }
-        });
-
-        // Send first connection (should be ignored)
-        tx.send(NatsEvent::Connected).await.unwrap();
-
-        // Send second connection (should trigger refresh)
-        tx.send(NatsEvent::Connected).await.unwrap();
-
-        // Give time for processing
-        tokio::time::sleep(Duration::from_millis(10)).await;
-
-        // Test passes if no panic occurs
     }
 }

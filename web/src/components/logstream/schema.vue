@@ -24,14 +24,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="row items-center no-wrap">
         <div class="col">
           <div
-            class="text-body1 tw-font-semibold tw-text-xl"
+            class="tw-text-[18px]"
             data-test="schema-title-text"
           >
             {{ t("logStream.schemaHeader") }}
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="close" />
+          <q-btn v-close-popup="true" round flat icon="cancel" >
+          </q-btn>
         </div>
       </div>
     </q-card-section>
@@ -158,6 +159,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @change="formDirtyFlag = true"
                   @update:model-value="markFormDirty"
                 />
+              </div>
+
+              <div class="row flex items-center q-pb-xs q-mt-lg">
+                <div>
+                  <label class="q-pr-sm tw-font-medium"
+                    >{{ t("logStream.flattenLevel") }}</label
+                  >
+                  <span class="tw-text-xs tw-font-normal">
+                    (Global is
+                    {{ store.state.zoConfig.ingest_flatten_level || 3 }})
+                  </span>
+                </div>
+                <q-input
+                  data-test="stream-details-flatten-level-input"
+                  v-model="flattenLevel"
+                  type="number"
+                  dense
+                  filled
+                  min="0"
+                  round
+                  class="q-mr-sm q-ml-sm data-retention-input"
+                  hide-bottom-space
+                  @change="formDirtyFlag = true"
+                  @update:model-value="markFormDirty"
+                />
+                <div></div>
               </div>
 
               <div class="row flex items-center q-pb-xs q-mt-lg">
@@ -416,9 +443,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template v-slot:body-cell-name="props">
-                  <q-td class="q-td--no-hover field-name">{{
-                    props.row.name
-                  }}</q-td>
+                  <q-td class="q-td--no-hover field-name"
+                    >{{ props.row.name }}
+                    <span v-if="isEnvQuickModeField(props.row.name)">
+                      <img
+                        :src="quickModeIcon"
+                        :alt="t('logStream.envQuickModeMsg')"
+                        class="tw-inline-block q-ml-xs tw-w-[20px]"
+                      />
+                      <q-tooltip
+                      class="tw-text-[12px] tw-w-[200px]"
+                    >
+                      {{ t('logStream.envQuickModeMsg') }}
+                    </q-tooltip>
+                  </span>
+                  </q-td>
                 </template>
                 <template v-slot:body-cell-type="props">
                   <q-td>{{ props.row.type }}</q-td>
@@ -607,9 +646,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
                   data-test="schema-add-field-button"
-                  class="q-my-sm no-border text-bold q-mr-md"
-                  padding="sm md"
-                  color="primary"
+                  class=" no-border q-mr-md o2-secondary-button tw-h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   no-caps
                   v-bind:disable="!selectedFields.length"
                   @click="updateDefinedSchemaFields"
@@ -629,13 +667,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     !selectedFields.length && !selectedDateFields.length
                   "
                   data-test="schema-delete-button"
-                  class="q-my-sm text-bold btn-delete"
-                  text-color="red"
-                  padding="sm md"
+                  class="q-my-sm text-bold btn-delete o2-secondary-button tw-h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   no-caps
-                  dense
                   flat
-                  style="border: 1px red solid"
                   @click="
                     activeMainTab == 'schemaSettings'
                       ? (confirmQueryModeChangeDialog = true)
@@ -652,24 +687,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-close-popup="true"
                   data-test="schema-cancel-button"
-                  class="q-my-sm text-bold q-ml-md btn-delete"
+                  class="q-ml-md o2-secondary-button tw-h-[36px]"
                   :label="t('logStream.cancel')"
-                  text-color="red"
-                  padding="sm md"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   no-caps
-                  dense
                   flat
-                  style="border: 1px red solid"
                 />
                 <q-btn
                   v-bind:disable="!formDirtyFlag"
                   data-test="schema-update-settings-button"
                   :label="t('logStream.updateSettings')"
-                  class="q-my-sm text-bold no-border q-ml-md"
-                  color="secondary"
-                  padding="sm xl"
+                  class=" no-border q-ml-md o2-primary-button tw-h-[36px"
+                  :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                   type="submit"
                   no-caps
+                  flat
                 />
               </div>
             </div>
@@ -767,7 +799,7 @@ export default defineComponent({
     AppTabs,
     QTablePagination,
     DateTime,
-    AssociatedRegexPatterns
+    AssociatedRegexPatterns,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
@@ -786,6 +818,7 @@ export default defineComponent({
     const dataRetentionDays = ref(0);
     const storeOriginalData = ref(false);
     const maxQueryRange = ref(0);
+    const flattenLevel = ref(null);
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDeleteDatesDialog = ref(false);
     const formDirtyFlag = ref(false);
@@ -831,7 +864,7 @@ export default defineComponent({
     const patternAssociationDialog = ref({
       show: false,
       data: [],
-      fieldName: ""
+      fieldName: "",
     });
 
     const selectedFields = ref([]);
@@ -1100,6 +1133,7 @@ export default defineComponent({
       calculateDateRange();
 
       maxQueryRange.value = streamResponse.settings.max_query_range || 0;
+      flattenLevel.value = streamResponse.settings.flatten_level || null;
       storeOriginalData.value =
         streamResponse.settings.store_original_data || false;
       approxPartition.value = streamResponse.settings.approx_partition || false;
@@ -1199,6 +1233,10 @@ export default defineComponent({
 
       settings["store_original_data"] = storeOriginalData.value;
       settings["approx_partition"] = approxPartition.value;
+
+      if (flattenLevel.value !== null) {
+        settings["flatten_level"] = Number(flattenLevel.value);
+      }
 
       const newSchemaFieldSet = new Set(
         newSchemaFields.value.map((field) => {
@@ -1436,23 +1474,66 @@ export default defineComponent({
       let [field, fieldType] = terms.split("@");
 
       var filtered = [];
+      const searchTerm = field?.toLowerCase() || "";
 
-      field = field.toLowerCase();
-      for (var i = 0; i < rows.length; i++) {
+      // Map labels -> values for index types
+      const labelToValueMap = {};
+      streamIndexType.forEach(({ label, value }) => {
+        labelToValueMap[label.toLowerCase()] = value;
+      });
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        let match = false;
+
         if (fieldType === "schemaFields") {
-          if (indexData.value.defined_schema_fields.includes(rows[i]["name"])) {
-            if (!field) {
-              filtered.push(rows[i]);
+          if (indexData.value.defined_schema_fields.includes(row.name)) {
+            // If no search field given, include directly
+            if (!searchTerm) {
+              match = true;
             } else {
-              if (rows[i]["name"].toLowerCase().includes(field)) {
-                filtered.push(rows[i]);
+              // Match by name
+              if (row.name.toLowerCase().includes(searchTerm)) {
+                match = true;
+              }
+              // Match by index_type (convert search label to value)
+              else if (
+                row.index_type.some((t) => {
+                  // check if search is label
+                  return (
+                    t.toLowerCase().includes(searchTerm) || // direct match with stored value
+                    labelToValueMap[searchTerm] === t // label → value match
+                  );
+                })
+              ) {
+                match = true;
               }
             }
           }
         } else {
-          if (rows[i]["name"].toLowerCase().includes(field)) {
-            filtered.push(rows[i]);
+          if (!searchTerm) {
+            match = true;
+          } else {
+            // Match by name
+            if (row.name.toLowerCase().includes(searchTerm)) {
+              match = true;
+            }
+            // Match by index_type
+            else if (
+              row.index_type.some((t) => {
+                return (
+                  t.toLowerCase().includes(searchTerm) ||
+                  labelToValueMap[searchTerm] === t
+                );
+              })
+            ) {
+              match = true;
+            }
           }
+        }
+
+        if (match) {
+          filtered.push(row);
         }
       }
 
@@ -1839,6 +1920,18 @@ export default defineComponent({
     return filteredValue;
   };
 
+    // store.state.zoConfig.default_quick_mode_fields: ["field1", "job", "log"]
+    const isEnvQuickModeField = (fieldName: string) => {
+      return (
+        store.state.zoConfig.default_quick_mode_fields.includes(fieldName)
+      );
+    };
+
+    const quickModeIcon = computed(() => {
+      return store.state.theme === "dark"
+        ? getImageURL("images/common/quick_mode_light.svg")
+        : getImageURL("images/common/quick_mode.svg");
+    });
 
     return {
       t,
@@ -1858,6 +1951,7 @@ export default defineComponent({
       storeOriginalData,
       approxPartition,
       maxQueryRange,
+      flattenLevel,
       showDataRetention,
       formatSizeFromMB,
       confirmQueryModeChangeDialog,
@@ -1925,6 +2019,8 @@ export default defineComponent({
       computedIndexType,
       checkIfOptionPresentInDefaultEnv,
       updateIndexType,
+      isEnvQuickModeField,
+      quickModeIcon,
     };
   },
   created() {
@@ -2224,12 +2320,10 @@ export default defineComponent({
   width: 100%;
 }
 .dark-theme-floating-buttons {
-  background-color: var(--q-light);
-  backdrop-filter: blur(10px);
+  background-color: #181a1b;
 }
 .light-theme-floating-buttons {
-  background-color: var(--q-light);
-  backdrop-filter: blur(10px);
+  background-color: #ffffff
 }
 
 .warning-text {

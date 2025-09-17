@@ -213,8 +213,8 @@ describe("PipelinesList", () => {
 
     it("should have perPageOptions array", () => {
       expect(wrapper.vm.perPageOptions).toHaveLength(5);
-      expect(wrapper.vm.perPageOptions[0].value).toBe(5);
-      expect(wrapper.vm.perPageOptions[4].value).toBe(100);
+      expect(wrapper.vm.perPageOptions[0].value).toBe(20);
+      expect(wrapper.vm.perPageOptions[4].value).toBe(500);
     });
   });
 

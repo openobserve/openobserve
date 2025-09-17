@@ -63,14 +63,14 @@ fn create_cli_app() -> Command {
                 .about("migrate file-list")
                 .args([
                     arg!("prefix", 'p', "prefix", "only migrate specified prefix, default is all"),
-                    arg!("from", 'f', "from", "migrate from: sled, sqlite, etcd, mysql, postgresql"),
+                    arg!("from", 'f', "from", "migrate from: sqlite, mysql, postgresql"),
                     arg!("to", 't', "to", "migrate to: sqlite, mysql, postgresql"),
                 ]),
             Command::new("migrate-meta")
                 .about("migrate meta")
                 .args([
-                    arg!("from", 'f', "from", "migrate from: sled, sqlite, etcd, mysql, postgresql", true).value_name("from"),
-                    arg!("to", 't', "to", "migrate to: sqlite, etcd, mysql, postgresql", true).value_name("to"),
+                    arg!("from", 'f', "from", "migrate from: sqlite, mysql, postgresql", true).value_name("from"),
+                    arg!("to", 't', "to", "migrate to: sqlite, mysql, postgresql", true).value_name("to"),
                 ]),
             Command::new("migrate-dashboards").about("migrate-dashboards"),
             Command::new("migrate-pipeline").about("migrate pipelines")
@@ -170,15 +170,16 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     // init infra, create data dir & tables
     let cfg = config::get_config();
     infra::init().await.expect("infra init failed");
+    db::org_users::cache().await?;
     match name.as_str() {
         "reset" => {
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "root" => {
-                    let _ = users::update_user(
+                    let ret = users::update_user(
                         meta::organization::DEFAULT_ORG,
                         cfg.auth.root_user_email.as_str(),
-                        false,
+                        meta::user::UserUpdateMode::CliUpdate,
                         cfg.auth.root_user_email.as_str(),
                         meta::user::UpdateUser {
                             change_password: true,
@@ -198,6 +199,12 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         },
                     )
                     .await?;
+                    if !ret.status().is_success() {
+                        return Err(anyhow::anyhow!(
+                            "reset root user failed, error: {:?}",
+                            ret.body()
+                        ));
+                    }
                 }
                 "user" => {
                     db::user::reset().await?;
@@ -216,12 +223,18 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     db::functions::reset().await?;
                 }
                 "stream-stats" => {
-                    // init nats client
-                    let (tx, _rx) = tokio::sync::mpsc::channel::<infra::db::nats::NatsEvent>(1);
-                    if !cfg.common.local_mode
-                        && cfg.common.cluster_coordinator.to_lowercase() == "nats"
-                    {
-                        infra::db::nats::init_nats_client(tx).await?;
+                    if cfg.limit.calculate_stats_step_limit_secs < 3600 {
+                        println!(
+                            r#"
+------------------------------------------------------------------------------
+Warning: !!! 
+calculate_stats_step_limit_secs good to be at least 3600 for stats reset,
+suggested to run again with:
+
+ZO_CALCULATE_STATS_STEP_LIMIT_SECS=3600 ./openobserve reset -c stream-stats
+------------------------------------------------------------------------------
+"#
+                        );
                     }
                     // reset stream stats update offset
                     db::compact::stats::set_offset(0, None).await?;
@@ -364,6 +377,12 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 }
                 Some(("metrics", _)) => {
                     super::http::local_node_metrics().await?;
+                }
+                Some(("node-list", _)) => {
+                    super::http::refresh_nodes_list().await?;
+                }
+                Some(("user-sessions", _)) => {
+                    super::http::refresh_user_sessions().await?;
                 }
                 _ => {
                     return Err(anyhow::anyhow!("unsupported sub command: {name}"));
@@ -1047,7 +1066,7 @@ mod tests {
     #[test]
     fn test_migration_source_target_validation() {
         // Test valid migration sources and targets
-        let valid_sources = ["sled", "sqlite", "etcd", "mysql", "postgresql"];
+        let valid_sources = ["sqlite", "mysql", "postgresql"];
         let valid_targets = ["sqlite", "mysql", "postgresql"];
 
         for source in valid_sources {

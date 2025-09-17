@@ -803,6 +803,11 @@ import { cloneDeep } from "lodash-es";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import searchService from "@/services/search";
 import useHttpStreaming from "@/composables/useStreamingSearch";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { useSearchBar } from "@/composables/useLogs/useSearchBar";
+import { useSearchStream } from "@/composables/useLogs/useSearchStream";
+import { searchState } from "@/composables/useLogs/searchState";
+import { useStreamFields } from "@/composables/useLogs/useStreamFields";
 
 interface Filter {
   fieldName: string;
@@ -851,20 +856,19 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const {
-      searchObj,
-      updatedLocalLogFilterField,
-      handleQueryData,
-      onStreamChange,
-      filterHitsColumns,
-      extractFields,
-      validateFilterForMultiStream,
       reorderSelectedFields,
       getFilterExpressionByFieldType,
       extractValueQuery,
-      fnParsedSQL,
-      fnUnparsedSQL,
-      streamSchemaFieldsIndexMapping,
     } = useLogs();
+
+    const { filterHitsColumns, extractFields } = useStreamFields();
+
+    const { searchObj, streamSchemaFieldsIndexMapping } = searchState();
+
+    const { onStreamChange, handleQueryData } = useSearchBar();
+    const { validateFilterForMultiStream } = useSearchStream();
+
+    const {fnParsedSQL, fnUnparsedSQL, updatedLocalLogFilterField} = logsUtils();
 
     const {
       fetchQueryDataWithWebSocket,
@@ -986,8 +990,8 @@ export default defineComponent({
               slot: "interesting_fields_slot",
             });
           }
-          searchObj.meta.useUserDefinedSchemas = "interesting_fields";
-          showOnlyInterestingFields.value = true;
+
+          setDefaultFieldTab();
         } else {
           userDefinedSchemaBtnGroupOption.value =
             userDefinedSchemaBtnGroupOption.value.filter(
@@ -1027,6 +1031,15 @@ export default defineComponent({
       },
     );
 
+    /**
+     * Added this watcher to set default field tab when user defined schema toggle is changed
+     * As when user selects stream defineSchema flag is set and there is no any event to identify that
+     * so we are using this watcher to set default field tab as per the stream settings
+     */
+    watch(showUserDefinedSchemaToggle, () => {
+      setDefaultFieldTab();
+    });
+
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
         streamOptions.value = streamList.value;
@@ -1038,6 +1051,19 @@ export default defineComponent({
     };
 
     const selectedStream = ref("");
+
+    // if interesting field is enabled, then set default tab as interesting fields
+    // otherwise set default tab as user defined schema
+    // store.state.zoConfig.interesting_field_enabled was set as interesting fields was getting set by default with _timestamp field
+    function setDefaultFieldTab() {
+      if (store.state.zoConfig.log_page_default_field_list === "uds") {
+        searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
+        showOnlyInterestingFields.value = false;
+      } else {
+        searchObj.meta.useUserDefinedSchemas = "interesting_fields";
+        showOnlyInterestingFields.value = true;
+      }
+    }
 
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];

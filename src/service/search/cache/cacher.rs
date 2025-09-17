@@ -758,7 +758,7 @@ pub fn handle_histogram(
         Some(v) => v
             .as_str()
             .split(',')
-            .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
+            .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
             .collect::<Vec<&str>>(),
         None => return,
     };
@@ -987,8 +987,6 @@ mod tests {
             order_by: vec![("_timestamp".to_string(), OrderBy::Desc)],
             histogram_interval: None,
             sorted_by_time: true,
-            index_condition: None,
-            index_optimize_mode: None,
         };
 
         let result = get_ts_col_order_by(&sql, "_timestamp", false);

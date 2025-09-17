@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,13 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod ai_prompts;
-pub mod alerts;
-pub mod destinations;
-pub mod pipelines;
-
-use crate::db::Db;
-
-pub async fn get_coordinator() -> &'static Box<dyn Db> {
-    super::db::get_coordinator().await
-}
+export const getDataValue = (obj: any, alias: string): any => {
+  return obj?.[alias] || obj?.[alias?.toLowerCase()];
+};

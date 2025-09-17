@@ -91,8 +91,11 @@ use crate::{
     handler::grpc::request::search::Searcher,
     service::search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        sql::visitor::histogram_interval::{
-            convert_histogram_interval_to_seconds, generate_histogram_interval,
+        sql::{
+            rewriter::index::use_inverted_index,
+            visitor::histogram_interval::{
+                convert_histogram_interval_to_seconds, generate_histogram_interval,
+            },
         },
     },
 };
@@ -208,6 +211,7 @@ pub async fn search(
                     start_time,
                     end_time,
                     s_event_type,
+                    in_req.search_event_context.clone(),
                 ),
             )
             .await;
@@ -1063,7 +1067,7 @@ pub async fn search_partition(
         is_histogram,
     );
 
-    if cfg.common.align_partitions_for_index && is_use_inverted_index(&Arc::new(sql)) {
+    if cfg.common.align_partitions_for_index && use_inverted_index(&sql) {
         step *= step_factor;
     }
 
@@ -1214,6 +1218,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
             scan_stats,
             work_group: work_group.to_string(),
             search_type,
+            search_event_context: result.search_event_context.map(Into::into),
         });
     }
 
@@ -1490,16 +1495,4 @@ pub fn generate_search_schema_diff(
     }
 
     diff_fields
-}
-
-// inverted index only support single table
-pub fn is_use_inverted_index(sql: &Arc<Sql>) -> bool {
-    if sql.stream_names.len() != 1 {
-        return false;
-    }
-
-    let cfg = get_config();
-    cfg.common.inverted_index_enabled
-        && !cfg.common.feature_query_without_index
-        && sql.index_condition.is_some()
 }

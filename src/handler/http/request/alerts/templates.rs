@@ -39,8 +39,6 @@ impl From<TemplateError> for HttpResponse {
 }
 
 /// CreateTemplate
-///
-/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Templates",
@@ -60,6 +58,9 @@ impl From<TemplateError> for HttpResponse {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/alerts/templates")]
@@ -80,8 +81,6 @@ pub async fn save_template(
 }
 
 /// UpdateTemplate
-///
-/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Templates",
@@ -102,6 +101,9 @@ pub async fn save_template(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/alerts/templates/{template_name}")]
@@ -118,8 +120,6 @@ pub async fn update_template(
 }
 
 /// GetTemplateByName
-///
-/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Templates",
@@ -139,6 +139,9 @@ pub async fn update_template(
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = Template),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/alerts/templates/{template_name}")]
@@ -151,8 +154,6 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
 }
 
 /// ListTemplates
-///
-/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Templates",
@@ -171,6 +172,9 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<Template>),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/alerts/templates")]
@@ -211,8 +215,6 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
 }
 
 /// DeleteTemplate
-///
-/// #{"ratelimit_module":"Templates", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Templates",
@@ -233,6 +235,9 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
         (status = 409, description = "Conflict", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound",  content_type = "application/json", body = ()),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/alerts/templates/{template_name}")]

@@ -563,7 +563,7 @@ async fn process_node(
                 // send received results directly via `result_sender` for collection
                 let result_sender = result_sender.unwrap();
                 while let Some((idx, mut record, flattened)) = receiver.recv().await {
-                    if !flattened {
+                    if !flattened && !record.is_null() && record.is_object() {
                         record = match flatten::flatten_with_level(
                             record,
                             cfg.limit.ingest_flatten_level,
@@ -647,7 +647,7 @@ async fn process_node(
             log::debug!("[Pipeline]: cond node {node_idx} starts processing");
             while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
                 // value must be flattened before condition params can take effect
-                if !flattened {
+                if !flattened && !record.is_null() && record.is_object() {
                     record = match flatten::flatten_with_level(
                         record,
                         cfg.limit.ingest_flatten_level,
@@ -693,7 +693,11 @@ async fn process_node(
             let mut result_array_records = Vec::new();
             while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
                 if let Some((vrl_runtime, is_result_array_vrl)) = &vrl_runtime {
-                    if func_params.after_flatten && !flattened {
+                    if func_params.after_flatten
+                        && !flattened
+                        && !record.is_null()
+                        && record.is_object()
+                    {
                         record = match flatten::flatten_with_level(
                             record,
                             cfg.limit.ingest_flatten_level,
@@ -833,7 +837,7 @@ async fn process_node(
             .timestamp_micros();
             while let Some((_, mut record, flattened)) = receiver.recv().await {
                 // handle timestamp before sending to remote_write service
-                if !flattened {
+                if !flattened && !record.is_null() && record.is_object() {
                     record = match flatten::flatten_with_level(
                         record,
                         cfg.limit.ingest_flatten_level,
@@ -854,23 +858,27 @@ async fn process_node(
                         }
                     };
                 }
-                if let Err(e) =
-                    crate::service::logs::ingest::handle_timestamp(&mut record, min_ts, max_ts)
-                {
-                    let err_msg = format!("DestinationNode error handling timestamp: {e}");
-                    if let Err(send_err) = error_sender
-                        .send((node.id.to_string(), node.node_type(), err_msg, None))
-                        .await
+                if !record.is_null() && record.is_object() {
+                    if let Err(e) =
+                        crate::service::logs::ingest::handle_timestamp(&mut record, min_ts, max_ts)
                     {
-                        log::error!(
-                            "[Pipeline] {pipeline_name} : DestinationNode failed sending errors for collection caused by: {send_err}"
-                        );
-                        break;
+                        let err_msg = format!("DestinationNode error handling timestamp: {e}");
+                        if let Err(send_err) = error_sender
+                            .send((node.id.to_string(), node.node_type(), err_msg, None))
+                            .await
+                        {
+                            log::error!(
+                                "[Pipeline] {} : DestinationNode failed sending errors for collection caused by: {send_err}",
+                                pipeline_name
+                            );
+                            break;
+                        }
+                        continue;
                     }
-                    continue;
+
+                    records.push(record);
+                    count += 1;
                 }
-                records.push(record);
-                count += 1;
             }
 
             log::debug!(

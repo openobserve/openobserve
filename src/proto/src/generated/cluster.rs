@@ -1002,6 +1002,26 @@ pub struct SearchQuery {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SearchEventContext {
+    #[prost(string, optional, tag = "1")]
+    pub alert_key: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "2")]
+    pub derived_stream_key: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "3")]
+    pub report_key: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "4")]
+    pub dashboard_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "5")]
+    pub dashboard_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "6")]
+    pub dashboard_folder_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "7")]
+    pub dashboard_folder_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "8")]
+    pub alert_name: ::core::option::Option<::prost::alloc::string::String>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct QueryStatus {
     #[prost(string, tag = "1")]
     pub trace_id: ::prost::alloc::string::String,
@@ -1025,6 +1045,8 @@ pub struct QueryStatus {
     pub work_group: ::core::option::Option<i32>,
     #[prost(string, optional, tag = "11")]
     pub search_type: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(message, optional, tag = "12")]
+    pub search_event_context: ::core::option::Option<SearchEventContext>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2673,10 +2695,6 @@ pub struct SearchInfo {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IndexInfo {
-    #[prost(bool, tag = "1")]
-    pub use_inverted_index: bool,
-    #[prost(string, tag = "2")]
-    pub index_condition: ::prost::alloc::string::String,
     #[prost(message, repeated, tag = "3")]
     pub equal_keys: ::prost::alloc::vec::Vec<KvItem>,
     #[prost(message, optional, tag = "5")]
@@ -2701,7 +2719,7 @@ pub struct SuperClusterInfo {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IdxOptimizeMode {
-    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2, 3, 4, 5")]
+    #[prost(oneof = "idx_optimize_mode::Mode", tags = "4, 5")]
     pub mode: ::core::option::Option<idx_optimize_mode::Mode>,
 }
 /// Nested message and enum types in `IdxOptimizeMode`.
@@ -2709,38 +2727,11 @@ pub mod idx_optimize_mode {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Mode {
-        #[prost(message, tag = "1")]
-        SimpleSelect(super::SimpleSelect),
-        #[prost(message, tag = "2")]
-        SimpleCount(super::SimpleCount),
-        #[prost(message, tag = "3")]
-        SimpleHistogram(super::SimpleHistogram),
         #[prost(message, tag = "4")]
         SimpleTopn(super::SimpleTopN),
         #[prost(message, tag = "5")]
         SimpleDistinct(super::SimpleDistinct),
     }
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SimpleSelect {
-    #[prost(uint32, tag = "1")]
-    pub index: u32,
-    #[prost(bool, tag = "2")]
-    pub asc: bool,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SimpleCount {}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SimpleHistogram {
-    #[prost(int64, tag = "1")]
-    pub min_value: i64,
-    #[prost(uint64, tag = "2")]
-    pub bucket_width: u64,
-    #[prost(uint32, tag = "3")]
-    pub num_buckets: u32,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

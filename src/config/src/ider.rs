@@ -22,6 +22,7 @@ use std::{
 use parking_lot::Mutex;
 use rand::Rng;
 use svix_ksuid::{Ksuid, KsuidLike};
+use uuid::Uuid;
 
 static IDER: LazyLock<Mutex<SnowflakeIdGenerator>> = LazyLock::new(|| {
     let machine_id = super::cluster::LOCAL_NODE_ID.load(Ordering::Relaxed);
@@ -35,7 +36,7 @@ pub fn init() {
 
 pub fn reload_machine_id() {
     let machine_id = super::cluster::LOCAL_NODE_ID.load(Ordering::Relaxed);
-    log::info!("init ider with machine_id: {}", machine_id);
+    log::info!("init ider with machine_id: {machine_id}");
     let new_ider = SnowflakeIdGenerator::new(machine_id);
     let mut w = IDER.lock();
     _ = std::mem::replace(&mut *w, new_ider);
@@ -51,11 +52,58 @@ pub fn uuid() -> String {
     Ksuid::new(None, None).to_string()
 }
 
-/// Generate a new trace_id.
+/// Generate a unique id like uuid for file name.
+pub fn generate_file_name() -> String {
+    let id = generate();
+    let rand_str = format!("{:04x}", rand::random::<u16>());
+    id + rand_str.as_str()
+}
+
+/// Generate a new trace_id using UUID v7.
 pub fn generate_trace_id() -> String {
-    let trace_id = crate::utils::rand::get_rand_u128()
-        .unwrap_or_else(|| crate::utils::time::now_micros() as u128);
+    // Generate UUID v7 (time-ordered UUID)
+    let uuid_v7 = Uuid::now_v7();
+
+    // Convert UUID to 128-bit integer and then to OpenTelemetry TraceId
+    let trace_id = uuid_v7.as_u128();
     opentelemetry::trace::TraceId::from(trace_id).to_string()
+}
+
+/// Extract timestamp from UUID v7 trace ID
+/// Returns the timestamp in microseconds since Unix epoch, or None if parsing fails
+pub fn get_start_time_from_trace_id(trace_id: &str) -> Option<i64> {
+    // First, convert the hex string back to UUID format if needed
+    let uuid_str = if trace_id.len() == 32 {
+        // Convert from hex format (32 chars) to UUID format (with hyphens)
+        format!(
+            "{}-{}-{}-{}-{}",
+            &trace_id[0..8],
+            &trace_id[8..12],
+            &trace_id[12..16],
+            &trace_id[16..20],
+            &trace_id[20..32]
+        )
+    } else {
+        trace_id.to_string()
+    };
+
+    // Parse the UUID and extract timestamp
+    if let Ok(uuid) = Uuid::parse_str(&uuid_str) {
+        // Check if it's actually a UUID v7
+        if uuid.get_version() == Some(uuid::Version::SortRand) {
+            if let Some(timestamp) = uuid.get_timestamp() {
+                // Convert to microseconds: seconds * 1_000_000 + nanoseconds / 1_000
+                let (seconds, nanoseconds) = timestamp.to_unix();
+                Some((seconds * 1_000_000 + nanoseconds as u64 / 1_000) as i64)
+            } else {
+                None // No timestamp available
+            }
+        } else {
+            None // Not a UUID v7
+        }
+    } else {
+        None // Failed to parse as UUID
+    }
 }
 
 /// Generate a new span_id.
@@ -249,21 +297,212 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_generate_trace_id() {
+    fn test_generate_trace_id_basic() {
         let trace_id = generate_trace_id();
-        println!("trace_id: {}", trace_id);
-        let trace_id1 = format!("{}-{}", trace_id, "0");
-        let trace_id2 = format!("{}-{}", trace_id1, "abcd");
 
-        let new_id = trace_id
-            .split('-')
-            .next()
-            .and_then(|id| opentelemetry::trace::TraceId::from_hex(id).ok());
-        assert!(new_id.is_some());
-        let new_id = new_id.unwrap();
-        let new_id1 = format!("{}-{}", new_id, "0");
-        let new_id2 = format!("{}-{}", new_id1, "abcd");
-        assert_eq!(new_id2, trace_id2);
+        // Basic format validation
+        assert_eq!(trace_id.len(), 32, "Trace ID should be 32 characters long");
+        assert!(
+            trace_id.chars().all(|c| c.is_ascii_hexdigit()),
+            "Trace ID should contain only hex characters"
+        );
+        assert_ne!(
+            trace_id, "00000000000000000000000000000000",
+            "Trace ID should not be all zeros"
+        );
+
+        // Should be parseable as OpenTelemetry TraceId
+        assert!(
+            opentelemetry::trace::TraceId::from_hex(&trace_id).is_ok(),
+            "Should be valid OpenTelemetry TraceId"
+        );
+    }
+
+    #[test]
+    fn test_generate_trace_id_uuid_v7() {
+        let trace_id1 = generate_trace_id();
+        let trace_id2 = generate_trace_id();
+
+        // Trace IDs should be unique
+        assert_ne!(trace_id1, trace_id2, "Generated trace IDs should be unique");
+
+        // Trace IDs should be 32 characters long (16 bytes in hex)
+        assert_eq!(trace_id1.len(), 32, "Trace ID should be 32 characters long");
+        assert_eq!(trace_id2.len(), 32, "Trace ID should be 32 characters long");
+
+        // Trace IDs should be valid hex
+        assert!(
+            trace_id1.chars().all(|c| c.is_ascii_hexdigit()),
+            "Trace ID should contain only hex characters"
+        );
+        assert!(
+            trace_id2.chars().all(|c| c.is_ascii_hexdigit()),
+            "Trace ID should contain only hex characters"
+        );
+
+        // Trace IDs should not be all zeros
+        assert_ne!(
+            trace_id1, "00000000000000000000000000000000",
+            "Trace ID should not be all zeros"
+        );
+        assert_ne!(
+            trace_id2, "00000000000000000000000000000000",
+            "Trace ID should not be all zeros"
+        );
+
+        // Verify they can be parsed as OpenTelemetry TraceIds
+        assert!(
+            opentelemetry::trace::TraceId::from_hex(&trace_id1).is_ok(),
+            "Should be valid OpenTelemetry TraceId"
+        );
+        assert!(
+            opentelemetry::trace::TraceId::from_hex(&trace_id2).is_ok(),
+            "Should be valid OpenTelemetry TraceId"
+        );
+
+        // Verify they are actually UUID v7 by converting back to UUID format and checking version
+        let uuid_str1 = format!(
+            "{}-{}-{}-{}-{}",
+            &trace_id1[0..8],
+            &trace_id1[8..12],
+            &trace_id1[12..16],
+            &trace_id1[16..20],
+            &trace_id1[20..32]
+        );
+        let uuid_str2 = format!(
+            "{}-{}-{}-{}-{}",
+            &trace_id2[0..8],
+            &trace_id2[8..12],
+            &trace_id2[12..16],
+            &trace_id2[16..20],
+            &trace_id2[20..32]
+        );
+
+        let uuid1 = Uuid::parse_str(&uuid_str1).unwrap();
+        let uuid2 = Uuid::parse_str(&uuid_str2).unwrap();
+
+        assert_eq!(
+            uuid1.get_version(),
+            Some(uuid::Version::SortRand),
+            "Should be UUID v7"
+        );
+        assert_eq!(
+            uuid2.get_version(),
+            Some(uuid::Version::SortRand),
+            "Should be UUID v7"
+        );
+    }
+
+    #[test]
+    fn test_get_start_time_from_trace_id_valid_cases() {
+        // Test with a generated UUID v7 trace ID (hex format)
+        let trace_id = generate_trace_id();
+        let timestamp = get_start_time_from_trace_id(&trace_id);
+
+        // Should successfully extract timestamp
+        assert!(
+            timestamp.is_some(),
+            "Should extract timestamp from valid UUID v7"
+        );
+        let timestamp = timestamp.unwrap();
+
+        // Timestamp should be reasonable (not too far in past or future)
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as i64;
+
+        // Allow for some tolerance (within last hour and next hour)
+        assert!(
+            timestamp >= now - 3600_000_000,
+            "Timestamp should not be too far in past"
+        );
+        assert!(
+            timestamp <= now + 3600_000_000,
+            "Timestamp should not be too far in future"
+        );
+
+        // Test with UUID v7 in standard format (with hyphens)
+        let uuid_v7_standard = Uuid::now_v7().to_string();
+        let standard_result = get_start_time_from_trace_id(&uuid_v7_standard);
+        assert!(
+            standard_result.is_some(),
+            "Should extract timestamp from standard UUID v7 format"
+        );
+
+        // Verify both formats give reasonable timestamps
+        let standard_timestamp = standard_result.unwrap();
+        assert!(standard_timestamp >= now - 3600_000_000);
+        assert!(standard_timestamp <= now + 3600_000_000);
+    }
+
+    #[test]
+    fn test_get_start_time_from_trace_id_invalid_cases() {
+        // Test with invalid UUID string
+        let invalid_result = get_start_time_from_trace_id("invalid-uuid");
+        assert!(
+            invalid_result.is_none(),
+            "Should return None for invalid UUID string"
+        );
+
+        // Test with empty string
+        let empty_result = get_start_time_from_trace_id("");
+        assert!(
+            empty_result.is_none(),
+            "Should return None for empty string"
+        );
+
+        // Test with too short string
+        let short_result = get_start_time_from_trace_id("123");
+        assert!(
+            short_result.is_none(),
+            "Should return None for too short string"
+        );
+
+        // Test with too long string
+        let long_result = get_start_time_from_trace_id("1234567890123456789012345678901234567890");
+        assert!(
+            long_result.is_none(),
+            "Should return None for too long string"
+        );
+
+        // Test with UUID v4 (should return None)
+        let uuid_v4 = Uuid::new_v4().to_string().replace('-', "");
+        let v4_result = get_start_time_from_trace_id(&uuid_v4);
+        assert!(v4_result.is_none(), "Should return None for UUID v4");
+
+        // Test with UUID v1 (should return None) - using a known v1 UUID
+        let uuid_v1_str = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"; // Known UUID v1
+        let v1_result = get_start_time_from_trace_id(&uuid_v1_str.replace('-', ""));
+        assert!(v1_result.is_none(), "Should return None for UUID v1");
+
+        // Test with non-hex characters
+        let non_hex_result = get_start_time_from_trace_id("gggggggggggggggggggggggggggggggg");
+        assert!(
+            non_hex_result.is_none(),
+            "Should return None for non-hex characters"
+        );
+    }
+
+    #[test]
+    fn test_get_start_time_from_trace_id_time_ordering() {
+        // Generate two UUID v7s with a small delay to ensure different timestamps
+        let trace_id1 = generate_trace_id();
+        std::thread::sleep(std::time::Duration::from_millis(1));
+        let trace_id2 = generate_trace_id();
+
+        let timestamp1 = get_start_time_from_trace_id(&trace_id1).unwrap();
+        let timestamp2 = get_start_time_from_trace_id(&trace_id2).unwrap();
+
+        // Timestamp2 should be greater than timestamp1 (time ordering)
+        assert!(
+            timestamp2 > timestamp1,
+            "UUID v7 timestamps should be time-ordered"
+        );
+
+        // The difference should be reasonable (at least 1ms = 1000 microseconds)
+        let diff = timestamp2 - timestamp1;
+        assert!(diff >= 1000, "Time difference should be at least 1ms");
     }
 
     #[test]
@@ -303,16 +542,36 @@ mod tests {
     fn test_generate_span_id() {
         let span_id1 = generate_span_id();
         let span_id2 = generate_span_id();
+
+        // Uniqueness
         assert_ne!(span_id1, span_id2, "Generated span IDs should be unique");
+
+        // Format validation
         assert_eq!(
             span_id1.len(),
             16,
             "Span ID should be 16 characters long (8 bytes in hex)"
         );
+        assert!(
+            span_id1.chars().all(|c| c.is_ascii_hexdigit()),
+            "Span ID should contain only hex characters"
+        );
+
+        // Should not be all zeros (this is tested in the function itself with recursion)
         assert_ne!(
             span_id1, "0000000000000000",
             "Span ID should not be all zeros"
         );
+
+        // Test multiple generations to ensure no all-zero IDs slip through
+        for _ in 0..100 {
+            let span_id = generate_span_id();
+            assert_ne!(
+                span_id, "0000000000000000",
+                "Span ID should never be all zeros"
+            );
+            assert_eq!(span_id.len(), 16, "All span IDs should be 16 characters");
+        }
     }
 
     #[test]
@@ -320,11 +579,21 @@ mod tests {
         let mut generator = SnowflakeIdGenerator::new(1);
         let id1 = generator.real_time_generate();
         let id2 = generator.real_time_generate();
+
+        // Uniqueness
         assert_ne!(id1, id2, "Generated snowflake IDs should be unique");
 
         // Test timestamp extraction
         let timestamp = to_timestamp_millis(id1);
         assert!(timestamp > 0, "Timestamp should be positive");
+
+        // Test that IDs are monotonically increasing (time-ordered)
+        assert!(id2 > id1, "Snowflake IDs should be time-ordered");
+
+        // Test with different machine IDs
+        let mut generator2 = SnowflakeIdGenerator::new(2);
+        let id3 = generator2.real_time_generate();
+        assert_ne!(id1, id3, "IDs from different machines should be different");
     }
 
     #[test]

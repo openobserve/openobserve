@@ -269,6 +269,7 @@ impl FileData {
     }
 
     async fn gc(&mut self, need_release_size: usize) -> Result<(), anyhow::Error> {
+        let start = std::time::Instant::now();
         log::info!(
             "[CacheType:{}] File disk cache start gc {}/{}, need to release {} bytes",
             self.file_type,
@@ -350,9 +351,10 @@ impl FileData {
             drop(r);
         }
         log::info!(
-            "[CacheType:{}] File disk cache gc done, released {} bytes",
+            "[CacheType:{}] File disk cache gc done, released {} bytes, took={}",
             self.file_type,
-            release_size
+            release_size,
+            start.elapsed().as_millis()
         );
 
         Ok(())
@@ -689,7 +691,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     let idx = get_bucket_idx(&file_key);
                     let total = LOADING_FROM_DISK_NUM.fetch_add(1, Ordering::Relaxed);
                     // print progress
-                    if total % 1000 == 0 {
+                    if total.is_multiple_of(1000) {
                         log::info!("Loading disk cache {total}");
                     }
                     if file_key.starts_with("files") {

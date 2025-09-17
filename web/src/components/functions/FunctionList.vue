@@ -19,30 +19,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
     <div v-if="!showAddJSTransformDialog">
-      <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4" 
-      :class="store.state.theme === 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+      <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4 tw-h-[71px] tw-border-b-[1px]" 
+      :class="store.state.theme === 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
       >
-        <div class="q-table__title">
+        <div class="q-table__title tw-font-[600]">
             {{ t("function.header") }}
           </div>
           <div class="q-ml-auto" data-test="functions-list-search-input">
             <q-input
               v-model="filterQuery"
               borderless
-              filled
               dense
-              class="q-ml-auto no-border"
+              class="q-ml-auto no-border o2-search-input"
               :placeholder="t('function.search')"
+              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             >
               <template #prepend>
-                <q-icon name="search" class="cursor-pointer" />
+                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
               </template>
             </q-input>
           </div>
           <q-btn
-            class="q-ml-md text-bold no-border"
-            padding="sm lg"
-            color="secondary"
+              class="q-ml-md o2-primary-button tw-h-[36px]"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             no-caps
             :label="t(`function.add`)"
             @click="showAddUpdateFn({})"
@@ -50,15 +50,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <q-table
         ref="qTable"
-        :rows="jsTransforms"
+        :rows="visibleRows"
         :columns="columns"
         row-key="id"
         :pagination="pagination"
         :filter="filterQuery"
-        :filter-method="filterData"
         style="width: 100%"
-        :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
-        class="o2-quasar-table"
+        :style="hasVisibleRows
+            ? 'width: 100%; height: calc(100vh - 114px)' 
+            : 'width: 100%'"
+        class="o2-quasar-table o2-quasar-table-header-sticky"
+        :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
       >
         <template #no-data>
           <NoData />
@@ -111,25 +113,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</pre>
           </q-td>
         </template>
-        <template #top="scope">
-          <QTablePagination
-            :scope="scope"
-            :pageTitle="t('function.header')"
-            :position="'top'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
 
         <template #bottom="scope">
-          <QTablePagination
+          <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
+            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
+                  {{ resultTotal }} {{ t('function.header') }}
+                </div>
+            <QTablePagination
             :scope="scope"
             :position="'bottom'"
             :resultTotal="resultTotal"
             :perPageOptions="perPageOptions"
             @update:changeRecordPerPage="changePagination"
           />
+          </div>
+
         </template>
 
         <template v-slot:header="props">
@@ -236,6 +234,7 @@ import {
   outlinedAccountTree,
 } from "@quasar/extras/material-icons-outlined";
 import useLogs from "@/composables/useLogs";
+import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
   name: "functionList",
@@ -267,6 +266,8 @@ export default defineComponent({
     const { searchObj } = useLogs();
     const pipelineList = ref([]);
     const selectedPipeline = ref("");
+    const filterQuery = ref("");
+    const { track } = useReo();
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -374,12 +375,11 @@ export default defineComponent({
       value: number | String;
     }
     const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
       { label: "20", value: 20 },
       { label: "50", value: 50 },
       { label: "100", value: 100 },
-      { label: "All", value: 0 },
+      { label: "250", value: 250 },
+      { label: "500", value: 500 },
     ];
     const resultTotal = ref<number>(0);
     const maxRecordToReturn = ref<number>(100);
@@ -420,6 +420,10 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
+        track("Button Click", {
+          button: "Add Function",
+          page: "Functions"
+        });
       } else {
         isUpdated.value = true;
         action = "Update Function";
@@ -430,6 +434,10 @@ export default defineComponent({
             name: props.row.name,
             org_identifier: store.state.selectedOrganization.identifier,
           },
+        });
+        track("Button Click", {
+          button: "Update Function",
+          page: "Functions"
         });
       }
       addTransform();
@@ -565,6 +573,25 @@ export default defineComponent({
       emit("sendToAiChat", value);
     };
 
+    const filterData = (rows: any, terms: any) => {
+      var filtered = [];
+      terms = terms.toLowerCase();
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i]["name"].toLowerCase().includes(terms)) {
+          filtered.push(rows[i]);
+        }
+      }
+      return filtered;
+    };
+
+    const visibleRows = computed(() => {
+      if (!filterQuery.value) return jsTransforms.value || []
+      return filterData(jsTransforms.value || [], filterQuery.value)
+    });
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+
+
+
     return {
       t,
       qTable,
@@ -601,20 +628,13 @@ export default defineComponent({
       onPipelineSelect,
       transformedPipelineList,
       getAssociatedPipelines,
-      filterQuery: ref(""),
-      filterData(rows: any, terms: any) {
-        var filtered = [];
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
+      filterQuery,
+      filterData,
       getImageURL,
       verifyOrganizationStatus,
-      sendToAiChat
+      sendToAiChat,
+      visibleRows,
+      hasVisibleRows,
     };
   },
   computed: {

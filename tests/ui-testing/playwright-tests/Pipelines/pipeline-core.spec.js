@@ -2,6 +2,7 @@ import { test, expect } from "../baseFixtures.js";
 import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
+const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
 
@@ -62,7 +63,7 @@ async function ingestion(page) {
       streamName: streamName,
       logsdata: logsdata
     });
-    console.log(response);
+    testLogger.debug('API response received', { response });
   }
 }
 
@@ -194,7 +195,7 @@ test.describe("Core Pipeline Tests", () => {
     await page.getByRole("img", { name: "Function", exact: true }).click();
     await pageManager.pipelinesPage.toggleCreateFunction();
     await pageManager.pipelinesPage.enterFunctionName(randomFunctionName);
-    await page.locator('[data-test="logs-vrl-function-editor"]').getByRole('textbox').click();
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator('.monaco-editor').click();
     await page.keyboard.type(".a=41", { delay: 100 });
     await page.keyboard.press("Enter");
     await page.keyboard.type(".", { delay: 100 });

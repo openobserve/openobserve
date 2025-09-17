@@ -14,8 +14,7 @@ export default class LogsVisualise {
     );
     this.queryEditor = page
       .locator("#fnEditor")
-      .getByRole("textbox")
-      .locator("div");
+      .locator(".inputarea");
 
     // Dashboard locators
     this.addToDashboardBtn = page.getByRole("button", {
@@ -37,8 +36,7 @@ export default class LogsVisualise {
 
     // Query editor locators
     this.logsQueryEditor = page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole("textbox");
+      .locator('[data-test="logs-search-bar-query-editor"]');
     //Functions
   }
   async openLogs() {
@@ -208,22 +206,22 @@ export default class LogsVisualise {
 
   //open query editor
   async openQueryEditor() {
-    await this.page.locator(".cm-line").first().click();
+    await this.page.locator('[data-test="logs-search-bar-query-editor"]').locator('.monaco-editor').click();
   }
 
   //fill query editor
   async fillQueryEditor(sqlQuery) {
-    const queryEditor = this.page.locator(".cm-line").first();
+    const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]');
     await queryEditor.waitFor({ state: "visible", timeout: 5000 });
-    await queryEditor.click();
-    await queryEditor.type(sqlQuery);
+    await queryEditor.locator('.monaco-editor').click();
+    await queryEditor.locator('.inputarea').fill(sqlQuery);
   }
 
   //fill logs query editor with SQL query
   async fillLogsQueryEditor(sqlQuery) {
     await this.logsQueryEditor.waitFor({ state: "visible", timeout: 5000 });
-    await this.logsQueryEditor.click();
-    await this.logsQueryEditor.fill(sqlQuery);
+    await this.logsQueryEditor.locator('.monaco-editor').click();
+    await this.logsQueryEditor.locator('.inputarea').fill(sqlQuery);
   }
 
   // Open the first VRL Function Editor
@@ -301,17 +299,150 @@ export default class LogsVisualise {
     const chartRenderer = page.locator(
       '[data-test="chart-renderer"], [data-test="dashboard-panel-table"]'
     );
-    const chartExists = await chartRenderer.count();
 
-    if (chartExists > 0) {
-      // Check if the chart is visible without using expect in page object
-      const isVisible = await chartRenderer.first().isVisible();
-      if (!isVisible) {
-        throw new Error("Chart renderer is present but not visible");
+    try {
+      // Wait for chart renderer to be present and visible
+      await chartRenderer.first().waitFor({
+        state: "visible",
+        timeout: 15000,
+      });
+
+      // Additional check to ensure the chart is actually rendered
+      const chartExists = await chartRenderer.count();
+
+      if (chartExists > 0) {
+        // Double-check visibility after waiting
+        const isVisible = await chartRenderer.first().isVisible();
+        if (!isVisible) {
+          // Wait for chart content to be rendered intelligently
+          const chartContentReady = await this.waitForChartContent(page, 3000);
+
+          if (!chartContentReady) {
+            // Fallback: try waiting for chart renderer to be stable
+            try {
+              await chartRenderer.first().waitFor({
+                state: "visible",
+                timeout: 2000,
+              });
+            } catch (fallbackError) {
+              throw new Error(
+                `Chart renderer present but content failed to load after intelligent waiting. Error: ${fallbackError.message}`
+              );
+            }
+          }
+
+          // Final visibility check after intelligent waiting
+          const isVisibleRetry = await chartRenderer.first().isVisible();
+          if (!isVisibleRetry) {
+            throw new Error(
+              "Chart renderer is present but not visible after intelligent retry"
+            );
+          }
+        }
+      }
+
+      return chartExists > 0;
+    } catch (error) {
+      // If waiting times out, check if element exists but is not visible
+      const chartExists = await chartRenderer.count();
+      if (chartExists > 0) {
+        const isVisible = await chartRenderer.first().isVisible();
+        throw new Error(
+          `Chart renderer found (${chartExists} elements) but visibility check failed. Is visible: ${isVisible}. Original error: ${error.message}`
+        );
+      } else {
+        throw new Error(
+          `No chart renderer found. Original error: ${error.message}`
+        );
+      }
+    }
+  }
+
+  // RECOMMENDED: Native browser function (fastest & most reliable)
+  async waitForChartContent(page, timeout = 5000) {
+    return page
+      .waitForFunction(
+        () =>
+          document.querySelector(
+            '[data-test="chart-renderer"], [data-test="dashboard-panel-table"]'
+          )?.offsetParent !== null,
+        {},
+        { timeout }
+      )
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  // Get quick mode toggle state using the most reliable method
+  async getQuickModeToggleState() {
+    const quickModeToggle = this.page.locator(
+      '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
+    );
+
+    // Wait for the toggle to be present
+    await quickModeToggle.waitFor({ state: "visible", timeout: 10000 });
+
+    // Check aria-checked attribute - this is the most reliable indicator
+    // Falls back to aria-pressed if aria-checked is not available
+    let ariaChecked = await quickModeToggle.getAttribute("aria-checked");
+    if (ariaChecked === null) {
+      ariaChecked = await quickModeToggle.getAttribute("aria-pressed");
+    }
+
+    return ariaChecked === "true";
+  }
+
+  // Verify quick mode toggle state
+  async verifyQuickModeToggle(expectedState = true) {
+    const isChecked = await this.getQuickModeToggleState();
+
+    // Validate the toggle state matches expectation
+    if (expectedState !== isChecked) {
+      throw new Error(
+        `Expected quick mode to be ${expectedState} but actual state is ${isChecked}`
+      );
+    }
+
+    return isChecked;
+  }
+
+  // Toggle quick mode to specific state (enable/disable)
+  async setQuickModeToggle(enableState) {
+    const quickModeToggle = this.page.locator(
+      '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
+    );
+
+    await quickModeToggle.waitFor({ state: "visible", timeout: 10000 });
+
+    const currentState = await this.getQuickModeToggleState();
+
+    // Only click if we need to change the state
+    if (currentState !== enableState) {
+      await quickModeToggle.click();
+
+      // Wait for state change to complete
+      await this.page.waitForTimeout(500);
+
+      // Verify the state actually changed
+      const newState = await this.getQuickModeToggleState();
+      if (newState !== enableState) {
+        throw new Error(
+          `Failed to set quick mode to ${enableState}. Current state: ${newState}`
+        );
       }
     }
 
-    return chartExists > 0;
+    return enableState;
+  }
+
+  // Enable quick mode if it's currently disabled
+  async enableQuickModeIfDisabled() {
+    return await this.setQuickModeToggle(true);
+  }
+
+  // Disable quick mode if it's currently enabled
+  async disableQuickModeIfEnabled() {
+    return await this.setQuickModeToggle(false);
   }
 
   // Helper function to verify chart type selection
@@ -352,5 +483,11 @@ export default class LogsVisualise {
     // Submit panel settings
     await this.updateSettingsBtn.waitFor({ state: "visible", timeout: 5000 });
     await this.updateSettingsBtn.click();
+  }
+
+  //wait for query inspector to be visible
+  async waitForQueryInspector(page) {
+    const queryInspector = page.getByText("Query Inspectorclose");
+    await expect(queryInspector).toBeVisible({ timeout: 10000 });
   }
 }

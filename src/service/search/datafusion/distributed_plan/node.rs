@@ -15,18 +15,12 @@
 
 use std::sync::Arc;
 
-use config::{
-    meta::{cluster::NodeInfo, inverted_index::IndexOptimizeMode, sql::TableReferenceExt},
-    utils::json,
-};
+use config::meta::{cluster::NodeInfo, sql::TableReferenceExt};
 use datafusion::common::TableReference;
 use hashbrown::HashMap;
 use proto::cluster_rpc::{IndexInfo, KvItem, QueryIdentifier, SearchInfo, SuperClusterInfo};
 
-use crate::service::search::{
-    index::IndexCondition,
-    request::{FlightSearchRequest, Request},
-};
+use crate::service::search::request::{FlightSearchRequest, Request};
 
 #[derive(Debug, Clone)]
 pub struct RemoteScanNodes {
@@ -34,8 +28,6 @@ pub struct RemoteScanNodes {
     pub nodes: Vec<Arc<dyn NodeInfo>>,
     pub file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
     pub equal_keys: HashMap<TableReference, Vec<KvItem>>,
-    pub index_condition: Option<IndexCondition>,
-    pub index_optimize_mode: Option<IndexOptimizeMode>,
     pub is_leader: bool, // for super cluster
     pub opentelemetry_context: opentelemetry::Context,
 }
@@ -47,8 +39,6 @@ impl RemoteScanNodes {
         nodes: Vec<Arc<dyn NodeInfo>>,
         file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
-        index_condition: Option<IndexCondition>,
-        index_optimize_mode: Option<IndexOptimizeMode>,
         is_leader: bool,
         opentelemetry_context: opentelemetry::Context,
     ) -> Self {
@@ -57,8 +47,6 @@ impl RemoteScanNodes {
             nodes,
             file_id_lists,
             equal_keys,
-            index_condition,
-            index_optimize_mode,
             is_leader,
             opentelemetry_context,
         }
@@ -89,16 +77,9 @@ impl RemoteScanNodes {
             is_analyze: false, // set in distribute Analyze
         };
 
-        let index_condition = match &self.index_condition {
-            Some(index_condition) => json::to_string(&index_condition).unwrap(),
-            None => "".to_string(),
-        };
-
         let index_info = IndexInfo {
-            use_inverted_index: self.req.use_inverted_index,
-            index_condition,
             equal_keys: self.equal_keys.get(table_name).unwrap_or(&vec![]).clone(),
-            index_optimize_mode: self.index_optimize_mode.clone().map(|x| x.into()),
+            index_optimize_mode: None, // set in LeaderIndexOptimizerule
         };
 
         let super_cluster_info = SuperClusterInfo {
@@ -120,7 +101,7 @@ impl RemoteScanNodes {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RemoteScanNode {
     pub nodes: Vec<Arc<dyn NodeInfo>>,
     pub opentelemetry_context: opentelemetry::Context,
@@ -181,7 +162,7 @@ impl RemoteScanNode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SearchInfos {
     pub plan: Vec<u8>,
     pub file_id_list: Vec<Vec<i64>>,

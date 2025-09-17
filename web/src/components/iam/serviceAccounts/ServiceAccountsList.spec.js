@@ -637,7 +637,7 @@ describe("ServiceAccountsList Component", () => {
     it("has correct per page options", () => {
       const perPageOptions = wrapper.vm.perPageOptions;
       expect(perPageOptions).toEqual([
-        { label: "25", value: 25 },
+        { label: "20", value: 20 },
         { label: "50", value: 50 },
         { label: "100", value: 100 },
         { label: "250", value: 250 },

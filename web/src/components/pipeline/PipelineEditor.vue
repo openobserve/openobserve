@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex justify-between items-center q-py-sm">
+  <div class="flex justify-between items-center q-py-sm q-px-sm">
     <div class="flex items-center">
       <div
         data-test="add-pipeline-back-btn"
@@ -40,29 +40,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('pipeline.pipelineName')"
           style="border: 1px solid #eaeaea; width: calc(30vw)"
           filled
-          dense    
+          dense
         />
       </div>
     </div>
 
     <div class="flex justify-end">
+      <!-- this is normal secondary button but only icon is there without label -->
         <q-btn
-
-              outline
-              class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode"
-              size="sm"
-              no-caps
-              icon="code"
-              data-test="pipeline-json-edit-btn"
-              @click="openJsonEditor"
-            >
+          class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw-h-[36px] o2-secondary-button tw-min-w-0"
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          no-caps
+          flat
+          icon="code"
+          data-test="pipeline-json-edit-btn"
+          @click="openJsonEditor"
+        >
               <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
             </q-btn>
       <q-btn
         data-test="add-pipeline-cancel-btn"
         label="Cancel"
-        class="text-bold border q-ml-md"
-        padding="sm xl"
+        flat
+        class="q-ml-md o2-secondary-button tw-h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         no-caps
         @click="openCancelDialog"
       />
@@ -70,10 +71,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-btn
         data-test="add-pipeline-save-btn"
         label="Save"
-        class="text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
+        class="q-ml-md o2-primary-button tw-h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
         no-caps
+        flat
         :loading="isPipelineSaving"
         :disable="isPipelineSaving"
         @click="savePipeline"
@@ -81,9 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
 
-  <q-separator class="q-mb-sm" />
+  <q-separator class="q-mb-sm q-px-sm" />
 
-  <div class="flex q-mt-md">
+  <div class="flex q-mt-md q-px-sm">
     <div class="nodes-drag-container q-pr-md">
       <div
         data-test="pipeline-editor-nodes-list-title"
@@ -221,6 +222,7 @@ import { MarkerType } from "@vue-flow/core";
 import ExternalDestination from "./NodeForm/ExternalDestination.vue";
 import JsonEditor from "../common/JsonEditor.vue";
 import { validatePipeline as validatePipelineUtil, type ValidationResult } from '../../utils/validatePipeline';
+import { useReo } from "@/services/reodotdev_analytics";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
@@ -449,6 +451,45 @@ const dialog = ref({
 });
 
 const validationErrors = ref<string[]>([]);
+
+const { track } = useReo();
+
+// Watch for dialog changes to track node drops
+watch(
+  () => pipelineObj.dialog.show,
+  (newShow, oldShow) => {
+    // Track when dialog opens (node is dropped)
+    if (newShow && !oldShow && pipelineObj.dialog.name) {
+      let buttonName = "";
+      
+      if (pipelineObj.dialog.name === "stream") {
+        // Check if it's input or output stream from the current selected node data
+        const ioType = pipelineObj.currentSelectedNodeData?.type;
+        if (ioType === "input") {
+          buttonName = "Add Input Stream Node";
+        } else if (ioType === "output") {
+          buttonName = "Add Output Stream Node";
+        } else {
+          buttonName = "Add Stream Node";
+        }
+      } else {
+        const nodeTypeMap: { [key: string]: string } = {
+          query: "Add Query Node",
+          condition: "Add Condition Node", 
+          function: "Add Function Node",
+          remote_stream: "Add Remote Stream Node"
+        };
+        buttonName = nodeTypeMap[pipelineObj.dialog.name] || `Add ${pipelineObj.dialog.name}`;
+      }
+      
+      track("Button Click", {
+        button: buttonName,
+        page: "Pipeline Editor"
+      });
+    }
+  },
+  { immediate: false }
+);
 
 onBeforeMount(() => {
   if (config.isEnterprise == "true") {
@@ -850,6 +891,10 @@ const onSubmitPipeline = async () => {
       isPipelineSaving.value = false;
       dismiss();
     });
+    track("Button Click", {
+      button: "Save Pipeline",
+      page: "Add Pipeline"
+    });
 };
 
 const openCancelDialog = () => {
@@ -869,6 +914,10 @@ const openCancelDialog = () => {
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
+      });
+      track("Button Click", {
+        button: "Cancel Pipeline",
+        page: "Add Pipeline"
       });
     };
   } else {
@@ -1040,7 +1089,7 @@ const savePipelineJson = async (json: string) => {
 }
 
 .pipeline-chart-container {
-  height: 80vh;
+  height: 84vh;
   border-radius: 12px;
   width: calc(100% - 200px);
 }

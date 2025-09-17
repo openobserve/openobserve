@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{cluster::LOCAL_NODE, spawn_pausable_job};
-use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_enterprise_config;
 #[cfg(feature = "enterprise")]
@@ -115,6 +114,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::user::watch());
     tokio::task::spawn(db::org_users::watch());
     tokio::task::spawn(db::organization::watch());
+
+    #[cfg(feature = "cloud")]
+    tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
 
     // check version
     db::metas::version::set()
@@ -239,11 +241,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::ai_prompts::cache()
         .await
         .expect("ai prompts cache failed");
-
-    infra_file_list::create_table_index().await?;
-    if !LOCAL_NODE.is_alert_manager() {
-        infra_file_list::LOCAL_CACHE.create_table_index().await?;
-    }
 
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {

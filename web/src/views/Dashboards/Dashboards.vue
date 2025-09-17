@@ -470,6 +470,7 @@ import useNotifications from "@/composables/useNotifications";
 import { filter, forIn } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { useLoading } from "@/composables/useLoading";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -517,6 +518,7 @@ export default defineComponent({
     const filterQuery = ref("");
     const folderSearchQuery = ref("");
     const selected = ref([]);
+    const { track } = useReo();
 
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
@@ -766,10 +768,18 @@ export default defineComponent({
     };
     const addDashboard = () => {
       showAddDashboardDialog.value = true;
+      track("Button Click", {
+        button: "Add Dashboard",
+        page: "Dashboards",
+      });
     };
     const addFolder = () => {
       isFolderEditMode.value = false;
       showAddFolderDialog.value = true;
+      track("Button Click", {
+        button: "Add Folder",
+        page: "Dashboards",
+      });
     };
     const importDashboard = () => {
       router.push({

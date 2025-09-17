@@ -56,8 +56,6 @@ impl From<FolderError> for HttpResponse {
 }
 
 /// CreateFolder
-///
-/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -84,6 +82,9 @@ impl From<FolderError> for HttpResponse {
         (status = StatusCode::OK, description = "Folder created", body = CreateFolderResponseBody),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "create"}))
+    ),
 )]
 #[post("/v2/{org_id}/folders/{folder_type}")]
 pub async fn create_folder(
@@ -102,8 +103,6 @@ pub async fn create_folder(
 }
 
 /// UpdateFolder
-///
-/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -130,6 +129,9 @@ pub async fn create_folder(
         (status = StatusCode::OK, description = "Folder updated", body = String),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "update"}))
+    ),
 )]
 #[put("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
 pub async fn update_folder(
@@ -145,8 +147,6 @@ pub async fn update_folder(
 }
 
 /// ListFolders
-///
-/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -162,6 +162,9 @@ pub async fn update_folder(
     ),
     responses(
         (status = StatusCode::OK, body = ListFoldersResponseBody),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "list"}))
     ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}")]
@@ -190,8 +193,6 @@ pub async fn list_folders(
 }
 
 /// GetFolder
-///
-/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -210,6 +211,9 @@ pub async fn list_folders(
         (status = StatusCode::OK, body = GetFolderResponseBody),
         (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"}))
+    ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
 pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl Responder {
@@ -224,8 +228,6 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
 }
 
 /// GetFolderByName
-///
-/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -244,6 +246,9 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
         (status = StatusCode::OK, body = GetFolderResponseBody),
         (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"}))
+    ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}/name/{folder_name}")]
 pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -> impl Responder {
@@ -258,8 +263,6 @@ pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -
 }
 
 /// DeleteFolder
-///
-/// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Folders",
@@ -279,6 +282,9 @@ pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -
         (status = StatusCode::NOT_FOUND, description = "NotFound", body = String),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = String),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "delete"}))
+    ),
 )]
 #[delete("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
 async fn delete_folder(path: web::Path<(String, FolderType, String)>) -> impl Responder {
@@ -294,8 +300,6 @@ pub mod deprecated {
     use super::*;
 
     /// CreateFolder
-    ///
-    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"create"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -321,6 +325,9 @@ pub mod deprecated {
             (status = StatusCode::OK, description = "Folder created", body = CreateFolderResponseBody),
             (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
         ),
+        extensions(
+            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "create"}))
+        ),
     )]
     #[post("/{org_id}/folders")]
     pub async fn create_folder(
@@ -340,8 +347,6 @@ pub mod deprecated {
     }
 
     /// UpdateFolder
-    ///
-    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"update"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -368,6 +373,9 @@ pub mod deprecated {
             (status = StatusCode::OK, description = "Folder updated", body = String),
             (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
         ),
+        extensions(
+            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "update"}))
+        ),
     )]
     #[put("/{org_id}/folders/{folder_id}")]
     pub async fn update_folder(
@@ -384,8 +392,6 @@ pub mod deprecated {
     }
 
     /// ListFolders
-    ///
-    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"list"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -401,6 +407,9 @@ pub mod deprecated {
         ),
         responses(
             (status = StatusCode::OK, body = ListFoldersResponseBody),
+        ),
+        extensions(
+            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "list"}))
         ),
     )]
     #[get("/{org_id}/folders")]
@@ -427,8 +436,6 @@ pub mod deprecated {
     }
 
     /// GetFolder
-    ///
-    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -447,6 +454,9 @@ pub mod deprecated {
             (status = StatusCode::OK, body = GetFolderResponseBody),
             (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
         ),
+        extensions(
+            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"}))
+        ),
     )]
     #[get("/{org_id}/folders/{folder_id}")]
     pub async fn get_folder(path: web::Path<(String, String)>) -> impl Responder {
@@ -462,8 +472,6 @@ pub mod deprecated {
     }
 
     /// GetFolderByName
-    ///
-    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"get"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -482,6 +490,9 @@ pub mod deprecated {
             (status = StatusCode::OK, body = GetFolderResponseBody),
             (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
         ),
+        extensions(
+            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"}))
+        ),
     )]
     #[get("/{org_id}/folders/name/{folder_name}")]
     pub async fn get_folder_by_name(path: web::Path<(String, String)>) -> impl Responder {
@@ -497,8 +508,6 @@ pub mod deprecated {
     }
 
     /// DeleteFolder
-    ///
-    /// #{"ratelimit_module":"Folders", "ratelimit_module_operation":"delete"}#
     #[deprecated]
     #[utoipa::path(
         context_path = "/api",
@@ -517,6 +526,9 @@ pub mod deprecated {
             (status = StatusCode::OK, description = "Success", body = ()),
             (status = StatusCode::NOT_FOUND, description = "NotFound", body = ()),
             (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
+        ),
+        extensions(
+            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "delete"}))
         ),
     )]
     #[delete("/{org_id}/folders/{folder_id}")]

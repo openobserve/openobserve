@@ -16,29 +16,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-card class="add-user-dialog column full-height ">
-    <q-card-section class="q-px-md q-py-md tw-w-full">
-      <div class="row items-center no-wrap">
+    <q-card-section class="q-py-md tw-w-full">
+      <div class="row items-center no-wrap q-py-sm">
         <div class="col">
-          <div v-if="beingUpdated" class="text-h6">
+          <div v-if="beingUpdated" style="font-size: 18px">
             {{ t("user.editUser") }}
           </div>
-          <div v-else class="text-h6">{{ t("user.add") }}</div>
+          <div v-else style="font-size: 18px">{{ t("user.add") }}</div>
         </div>
         <div class="col-auto">
-          <q-btn
-            data-test="close-user-button"
-            v-close-popup="true"
-            round
-            flat
-            icon="cancel"
-            @click="
-              router.push({
-                name: 'users',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              })
-            "
+          <q-icon
+            data-test="add-user-close-dialog-btn"
+            name="cancel"
+            class="cursor-pointer"
+            size="20px"
+            @click="$emit('cancel:hideform')"
           />
         </div>
       </div>
@@ -47,9 +39,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <q-form ref="updateUserForm" @submit.prevent="onSubmit">
           <!-- <p class="q-pt-sm tw-truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
-          <p class="q-pt-sm tw-truncate" v-if="!existingUser">{{t('user.email')}} : <strong>{{formData.email}}</strong></p>
-          <p class="q-pt-sm tw-truncate" v-if="(!existingUser && !beingUpdated)">{{t('user.roles')}} : <strong>{{formData.role}}</strong></p>
-          <p class="q-pt-sm tw-truncate" v-if="(!existingUser && !beingUpdated && formData?.custom_role?.length)">{{t('user.customRole')}} : <strong>{{formData.custom_role.join(', ')}}</strong></p>
+          <p class="q-pt-sm tw-truncate" v-if="!existingUser">
+            {{ t("user.email") }} : <strong>{{ formData.email }}</strong>
+          </p>
+          <p class="q-pt-sm tw-truncate" v-if="!existingUser && !beingUpdated">
+            {{ t("user.roles") }} : <strong>{{ formData.role }}</strong>
+          </p>
+          <p
+            class="q-pt-sm tw-truncate"
+            v-if="
+              !existingUser && !beingUpdated && formData?.custom_role?.length
+            "
+          >
+            {{ t("user.customRole") }} :
+            <strong>{{ formData.custom_role.join(", ") }}</strong>
+          </p>
           <q-input
             v-if="existingUser && !beingUpdated"
             v-model="formData.email"
@@ -87,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (val && val.length >= 8) ||
                   'Password must be at least 8 characters long',
               ]"
-               data-test="user-password-field"
+              data-test="user-password-field"
             >
               <template v-slot:append>
                 <q-icon
@@ -127,13 +131,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="user-last-name-field"
           />
           <q-select
-            v-if="(existingUser || beingUpdated) && (
-              (userRole !== 'member' &&
-                store.state.userInfo.email !== formData.email) 
-            )"
+            v-if="
+              (existingUser || beingUpdated) &&
+              userRole !== 'member' &&
+              store.state.userInfo.email !== formData.email
+            "
             v-model="formData.role"
             :label="t('user.role') + ' *'"
-            :options="roles" 
+            :options="roles"
             color="input-border"
             bg-color="input-bg"
             class="q-pt-md q-pb-md showLabelOnTop"
@@ -145,30 +150,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             :rules="[(val: any) => !!val || 'Field is required']"
             data-test="user-role-field"
-            />
+          />
           <q-select
-              v-if="(existingUser || beingUpdated) && (
-                (userRole !== 'member' &&
-                  store.state.userInfo.email !== formData.email) 
-                )"
-              v-model="formData.custom_role"
-              :label="t('user.customRole')"
-              :options="filterdOption"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-pt-md q-pb-md showLabelOnTop"
-              multiple
-              emit-value
-              map-options
-              stack-label
-              outlined
-              filled
-              dense
-              use-input
-              @filter="filterFn"
+            v-if="
+              (existingUser || beingUpdated) &&
+              userRole !== 'member' &&
+              store.state.userInfo.email !== formData.email
+            "
+            v-model="formData.custom_role"
+            :label="t('user.customRole')"
+            :options="filterdOption"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-pt-md q-pb-md showLabelOnTop"
+            multiple
+            emit-value
+            map-options
+            stack-label
+            outlined
+            filled
+            dense
+            use-input
+            @filter="filterFn"
             data-test="user-custom-role-field"
-              :disable="filterdOption.length === 0"
-            />
+            :disable="filterdOption.length === 0"
+          />
           <div v-if="beingUpdated">
             <q-toggle
               v-model="formData.change_password"
@@ -205,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (val && val.length >= 8) ||
                   'Password must be at least 8 characters long',
               ]"
-            data-test="user-old-passoword-field"
+              data-test="user-old-passoword-field"
             >
               <template v-slot:append>
                 <q-icon
@@ -285,24 +291,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             maxlength="100"
           />
 
-          <div class="flex justify-end q-mt-md">
+          <div class="flex justify-start ">
             <q-btn
-              v-close-popup="true"
-              class="q-mb-md text-bold"
+              v-close-popup
+              class="q-mr-md o2-secondary-button tw-h-[36px]"
               :label="t('user.cancel')"
-              text-color="light-text"
-              padding="sm md"
               no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               @click="$emit('cancel:hideform')"
               data-test="cancel-user-button"
             />
             <q-btn
+              class="o2-primary-button no-border tw-h-[36px]"
               :label="t('user.save')"
-              class="q-mb-md text-bold no-border q-ml-md"
-              color="secondary"
-              padding="sm xl"
               type="submit"
               no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               data-test="save-user-button"
             />
           </div>
@@ -338,9 +344,10 @@ import {
   getImageURL,
   useLocalCurrentUser,
   useLocalUserInfo,
-  invlidateLoginData,
+  invalidateLoginData,
 } from "@/utils/zincutils";
 import config from "@/aws-exports";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const defaultValue: any = () => {
   return {
@@ -391,6 +398,7 @@ export default defineComponent({
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
+    const { track } = useReo();
     const $q = useQuasar();
     const formData: any = ref(defaultValue());
     const existingUser = ref(true);
@@ -414,7 +422,7 @@ export default defineComponent({
     watch(
       () => store.state.organizations,
       () => setOrganizationOptions(),
-      { deep: true }
+      { deep: true },
     );
 
     const setOrganizationOptions = () => {
@@ -454,18 +462,20 @@ export default defineComponent({
       logout_confirm,
       loggedInUserEmail,
       filterdOption,
-      filterFn (val:any, update:any) {
-        if (val === '') {
+      invalidateLoginData,
+      filterFn(val: any, update: any) {
+        if (val === "") {
           update(() => {
-            filterdOption.value = props.customRoles
-          })
-          return
+            filterdOption.value = props.customRoles;
+          });
+          return;
         }
         update(() => {
           const needle = val.toLowerCase()
           filterdOption.value = props.customRoles.filter((v:any) => v.toLowerCase().indexOf(needle) > -1)
         })
-      }
+      },
+      track,
     };
   },
   created() {
@@ -479,18 +489,18 @@ export default defineComponent({
     ) {
       this.existingUser = false;
       this.beingUpdated = true;
-      this.formData = {...this.modelValue};
+      this.formData = { ...this.modelValue };
       this.formData.change_password = false;
       this.formData.password = "";
-      if(config.isEnterprise == "true" || config.isCloud == true){
-        this.fetchUserRoles(this.modelValue.email)
+      if (config.isEnterprise == "true" || config.isCloud == true) {
+        this.fetchUserRoles(this.modelValue.email);
       }
     }
   },
   methods: {
     signout() {
       if (config.isEnterprise == "true") {
-        invlidateLoginData();
+        this.invalidateLoginData();
       }
 
       this.store.dispatch("logout");
@@ -522,7 +532,10 @@ export default defineComponent({
         userServiece
           .update(this.formData, selectedOrg, userEmail)
           .then((res: any) => {
-            if (this.formData.change_password == true && this.loggedInUserEmail === this.modelValue?.email) {
+            if (
+              this.formData.change_password == true &&
+              this.loggedInUserEmail === this.modelValue?.email
+            ) {
               this.logout_confirm = true;
             } else {
               dismiss();
@@ -539,28 +552,32 @@ export default defineComponent({
             dismiss();
             this.formData.email = userEmail;
           });
+          this.track("Button Click", {
+            button: "Update User",
+            page: "Add User"
+          });
       } else {
         if (this.existingUser) {
           const userEmail = this.formData.email;
-         
+
           userServiece
             .updateexistinguser(
-              { 
+              {
                 role: this.formData.role,
-                custom_role: this.formData.custom_role 
+                custom_role: this.formData.custom_role,
               },
               selectedOrg,
-              userEmail
+              userEmail,
             )
             .then((res: any) => {
               dismiss();
               this.formData.email = userEmail;
-                this.existingUser = true;
-                this.$emit("updated", res.data, this.formData, "created");
+              this.existingUser = true;
+              this.$emit("updated", res.data, this.formData, "created");
               // }
             })
             .catch((err: any) => {
-              if(err.response.data.code === 422){
+              if (err.response.data.code === 422) {
                 // this.$q.notify({
                 //   color: "positive",
                 //   type: 'positive',
@@ -568,8 +585,7 @@ export default defineComponent({
                 // });
                 dismiss();
                 this.existingUser = false;
-              }
-              else{
+              } else {
                 this.$q.notify({
                   color: "negative",
                   message: err.response.data.message,
@@ -578,6 +594,10 @@ export default defineComponent({
                 dismiss();
                 this.formData.email = userEmail;
               }
+            });
+            this.track("Button Click", {
+              button: "Update User",
+              page: "Add User"
             });
         } else {
           userServiece
@@ -594,15 +614,19 @@ export default defineComponent({
               });
               dismiss();
             });
+            this.track("Button Click", {
+              button: "Create User",
+              page: "Add User"
+            });
         }
       }
     },
-    async fetchUserRoles(userEmail:any) {
+    async fetchUserRoles(userEmail: any) {
       const orgId = this.store.state.selectedOrganization.identifier;
       try {
         const response = await userServiece.getUserRoles(orgId, userEmail);
-        const existingUserRoles = response.data; 
-        this.formData.custom_role = existingUserRoles
+        const existingUserRoles = response.data;
+        this.formData.custom_role = existingUserRoles;
       } catch (error) {
         console.error("Error fetching user roles:", error);
       }
@@ -616,7 +640,7 @@ export default defineComponent({
 });
 </script>
 <style scoped lang="scss">
-  .add-user-dialog{
-    width: 30vw;
-  }
+.add-user-dialog {
+  width: 30vw;
+}
 </style>

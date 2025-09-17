@@ -22,7 +22,7 @@ export class LogsQueryPage {
   async typeQuery(query) {
     const queryEditor = this.page.locator(this.queryEditor);
     await expect(queryEditor).toBeVisible();
-    await queryEditor.locator(".cm-content").fill(query);
+    await queryEditor.locator(".inputarea").fill(query);
   }
 
   async clickRefresh() {

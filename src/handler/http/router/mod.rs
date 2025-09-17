@@ -264,7 +264,9 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
             .service(status::flush_node)
             .service(status::list_node)
             .service(status::node_metrics)
-            .service(status::consistent_hash),
+            .service(status::consistent_hash)
+            .service(status::refresh_nodes_list)
+            .service(status::refresh_user_sessions),
     );
 
     if get_config().common.swagger_enabled {
@@ -375,12 +377,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(users::delete)
         .service(users::update)
         .service(users::add_user_to_org)
-        .service(users::list_roles);
-
-    #[cfg(not(feature = "cloud"))]
-    let service = service.service(users::list_invitations);
-
-    let service = service
+        .service(users::list_invitations)
+        .service(users::decline_invitation)
+        .service(users::list_roles)
         .service(organization::org::organizations)
         .service(organization::settings::get)
         .service(organization::settings::create)
@@ -609,6 +608,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
     let service = service
         .service(organization::org::get_org_invites)
         .service(organization::org::generate_org_invite)
+        .service(organization::org::delete_org_invite)
         .service(organization::org::accept_org_invite)
         .service(cloud::billings::create_checkout_session)
         .service(cloud::billings::process_session_detail)

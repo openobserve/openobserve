@@ -8,40 +8,43 @@ import { nextTick } from "vue";
 vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
   default: {
     name: "RenderDashboardCharts",
-    template: '<div class="render-dashboard-charts-mock" ref="renderDashboardRef"><slot /></div>',
+    template:
+      '<div class="render-dashboard-charts-mock" ref="renderDashboardRef"><slot /></div>',
     props: ["viewOnly", "dashboardData", "currentTimeObj", "searchType"],
     emits: ["variablesData"],
     methods: {
-      layoutUpdate: vi.fn()
+      layoutUpdate: vi.fn(),
     },
     setup() {
       return {
-        layoutUpdate: vi.fn()
+        layoutUpdate: vi.fn(),
       };
-    }
-  }
+    },
+  },
 }));
 
 vi.mock("@/utils/rum/api.json", () => ({
   default: {
     title: "RUM API Dashboard",
     panels: [],
-    variables: { list: [] }
-  }
+    variables: { list: [] },
+  },
 }));
 
 vi.mock("@/services/search", () => ({
   default: {
     search: vi.fn().mockResolvedValue({
       data: {
-        hits: []
-      }
-    })
-  }
+        hits: [],
+      },
+    }),
+  },
 }));
 
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
-  convertDashboardSchemaVersion: vi.fn((data) => data || { variables: { list: [] } })
+  convertDashboardSchemaVersion: vi.fn(
+    (data) => data || { variables: { list: [] } },
+  ),
 }));
 
 // Mock Vue Router
@@ -51,35 +54,35 @@ const mockRouterReplace = vi.fn();
 vi.mock("vue-router", () => ({
   useRouter: () => ({
     push: mockRouterPush,
-    replace: mockRouterReplace
+    replace: mockRouterReplace,
   }),
   useRoute: () => ({
     query: {
       dashboard: "test-dashboard",
       folder: "test-folder",
-      org_identifier: "test-org"
-    }
-  })
+      org_identifier: "test-org",
+    },
+  }),
 }));
 
 // Mock Vuex store
 const mockStore = {
   state: {
     selectedOrganization: {
-      identifier: "test-org"
-    }
-  }
+      identifier: "test-org",
+    },
+  },
 };
 
 vi.mock("vuex", () => ({
-  useStore: () => mockStore
+  useStore: () => mockStore,
 }));
 
 // Mock Vue i18n
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
-    t: vi.fn((key) => key)
-  })
+    t: vi.fn((key) => key),
+  }),
 }));
 
 // Mock console methods
@@ -87,71 +90,82 @@ global.console = {
   ...console,
   error: vi.fn(),
   warn: vi.fn(),
-  log: vi.fn()
+  log: vi.fn(),
 };
 
 // i18n is handled by mock
 
 describe("ApiDashboard", () => {
   let wrapper: any;
-  
+
   const defaultProps = {
     dateTime: {
       startTime: 1234567890,
       endTime: 1234568000,
       type: "relative",
-      period: "15m"
+      period: "15m",
     },
     selectedDate: {
       startTime: 1234567890,
-      endTime: 1234568000
-    }
+      endTime: 1234568000,
+    },
   };
 
   const createWrapper = (props = {}) => {
     const wrapper = mount(ApiDashboard, {
       props: {
         ...defaultProps,
-        ...props
+        ...props,
       },
       global: {
         stubs: {
           "q-page": {
             name: "q-page",
             template: '<div class="q-page"><slot /></div>',
-            props: ["class", "key"]
+            props: ["class", "key"],
           },
           "q-spinner-hourglass": {
             name: "q-spinner-hourglass",
             template: '<div class="q-spinner-hourglass"></div>',
-            props: ["color", "size", "style"]
+            props: ["color", "size", "style"],
           },
-          "RenderDashboardCharts": {
+          RenderDashboardCharts: {
             name: "RenderDashboardCharts",
-            template: '<div class="render-dashboard-charts-mock" data-test="render-dashboard-charts"><slot /></div>',
-            props: ["viewOnly", "dashboardData", "currentTimeObj", "searchType"],
+            template:
+              '<div class="render-dashboard-charts-mock" data-test="render-dashboard-charts"><slot /></div>',
+            props: [
+              "viewOnly",
+              "dashboardData",
+              "currentTimeObj",
+              "searchType",
+            ],
             emits: ["variablesData"],
             methods: {
-              layoutUpdate: vi.fn()
-            }
-          }
-        }
-      }
+              layoutUpdate: vi.fn(),
+            },
+          },
+        },
+      },
     });
-    
+
     // Initialize variablesData ref to prevent null reference errors
     if (wrapper.vm.variablesData === null) {
-      wrapper.vm.variablesData = { value: { isVariablesLoading: false, values: [] } };
+      wrapper.vm.variablesData = {
+        value: { isVariablesLoading: false, values: [] },
+      };
     } else if (wrapper.vm.variablesData.value === null) {
-      wrapper.vm.variablesData.value = { isVariablesLoading: false, values: [] };
+      wrapper.vm.variablesData.value = {
+        isVariablesLoading: false,
+        values: [],
+      };
     }
-    
+
     return wrapper;
   };
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    
+
     // Reset search service mock
     const searchModule = await import("@/services/search");
     const mockSearchService = vi.mocked(searchModule.default);
@@ -162,26 +176,28 @@ describe("ApiDashboard", () => {
             url: "https://api.example.com/users?id=1",
             max_duration: 150.25,
             max_resource_size: 1024.5,
-            error_count: 5
+            error_count: 5,
           },
           {
             url: "https://api.example.com/orders",
             max_duration: 89.75,
             max_resource_size: 512.0,
-            error_count: 2
-          }
-        ]
+            error_count: 2,
+          },
+        ],
       },
       status: 200,
       statusText: "OK",
       headers: {},
-      config: {} as any
+      config: {} as any,
     });
   });
 
   afterEach(() => {
     if (wrapper) {
       wrapper.unmount();
+      vi.clearAllMocks();
+      vi.resetAllMocks();
     }
   });
 
@@ -198,11 +214,11 @@ describe("ApiDashboard", () => {
         startTime: 1234567890,
         endTime: 1234568000,
         type: "relative",
-        period: "15m"
+        period: "15m",
       });
       expect(wrapper.vm.$props.selectedDate).toEqual({
         startTime: 1234567890,
-        endTime: 1234568000
+        endTime: 1234568000,
       });
     });
 
@@ -212,14 +228,14 @@ describe("ApiDashboard", () => {
           startTime: 1609459200,
           endTime: 1609545600,
           type: "absolute",
-          period: "1h"
+          period: "1h",
         },
         selectedDate: {
           startTime: 1609459200,
-          endTime: 1609545600
-        }
+          endTime: 1609545600,
+        },
       };
-      
+
       wrapper = createWrapper(customProps);
       expect(wrapper.vm.$props.dateTime).toEqual(customProps.dateTime);
       expect(wrapper.vm.$props.selectedDate).toEqual(customProps.selectedDate);
@@ -233,7 +249,10 @@ describe("ApiDashboard", () => {
       expect(wrapper.vm.isLoading).toEqual([]);
       expect(wrapper.vm.eventLog).toEqual([]);
       expect(wrapper.vm.refreshInterval).toBe(0);
-      expect(wrapper.vm.variablesData.value).toEqual({ isVariablesLoading: false, values: [] });
+      expect(wrapper.vm.variablesData).toEqual({
+        isVariablesLoading: false,
+        values: [],
+      });
     });
   });
 
@@ -253,14 +272,18 @@ describe("ApiDashboard", () => {
     });
 
     it("should render RenderDashboardCharts component", () => {
-      const renderComponent = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      const renderComponent = wrapper.findComponent({
+        name: "RenderDashboardCharts",
+      });
       expect(renderComponent.exists()).toBe(true);
     });
 
     it("should pass correct props to RenderDashboardCharts", () => {
-      const renderComponent = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      const renderComponent = wrapper.findComponent({
+        name: "RenderDashboardCharts",
+      });
       const props = renderComponent.props();
-      
+
       expect(props.viewOnly).toBe(true);
       expect(props.searchType).toBe("RUM");
       expect(props.currentTimeObj).toEqual(defaultProps.dateTime);
@@ -270,7 +293,7 @@ describe("ApiDashboard", () => {
     it("should show loading spinner when isLoading has items", async () => {
       wrapper.vm.isLoading = [true];
       await wrapper.vm.$nextTick();
-      
+
       const loadingDiv = wrapper.find(".q-pb-lg.flex.items-center");
       expect(loadingDiv.exists()).toBe(true);
     });
@@ -278,7 +301,7 @@ describe("ApiDashboard", () => {
     it("should hide dashboard when loading", async () => {
       wrapper.vm.isLoading = [true];
       await wrapper.vm.$nextTick();
-      
+
       const dashboard = wrapper.find(".api-performance-dashboards");
       expect(dashboard.attributes("style")).toContain("visibility: hidden");
     });
@@ -286,7 +309,7 @@ describe("ApiDashboard", () => {
     it("should show dashboard when not loading", async () => {
       wrapper.vm.isLoading = [];
       await wrapper.vm.$nextTick();
-      
+
       const dashboard = wrapper.find(".api-performance-dashboards");
       expect(dashboard.attributes("style")).toContain("visibility: visible");
     });
@@ -308,16 +331,23 @@ describe("ApiDashboard", () => {
     });
 
     it("should handle dashboard schema conversion", async () => {
-      const convertModule = await import("@/utils/dashboard/convertDashboardSchemaVersion");
-      const mockConvert = vi.mocked(convertModule.convertDashboardSchemaVersion);
-      
+      const convertModule = await import(
+        "@/utils/dashboard/convertDashboardSchemaVersion"
+      );
+      const mockConvert = vi.mocked(
+        convertModule.convertDashboardSchemaVersion,
+      );
+
       // Ensure variablesData ref is properly initialized
       if (!wrapper.vm.variablesData.value) {
-        wrapper.vm.variablesData.value = { isVariablesLoading: false, values: [] };
+        wrapper.vm.variablesData.value = {
+          isVariablesLoading: false,
+          values: [],
+        };
       }
-      
+
       await wrapper.vm.loadDashboard();
-      
+
       expect(mockConvert).toHaveBeenCalled();
       expect(wrapper.vm.currentDashboardData.data).toBeTruthy();
     });
@@ -326,23 +356,29 @@ describe("ApiDashboard", () => {
       // Test the scenario where loadDashboard initializes variablesData when no variables exist
       // First ensure variablesData.value exists
       if (!wrapper.vm.variablesData.value) {
-        wrapper.vm.variablesData.value = { isVariablesLoading: true, values: null };
+        wrapper.vm.variablesData.value = {
+          isVariablesLoading: true,
+          values: null,
+        };
       } else {
-        wrapper.vm.variablesData.value = { isVariablesLoading: true, values: null };
+        wrapper.vm.variablesData.value = {
+          isVariablesLoading: true,
+          values: null,
+        };
       }
-      
+
       // Simulate what loadDashboard does when there are no variables
       // Since we can't easily mock the internal function, let's test the behavior directly
       wrapper.vm.currentDashboardData.data = { variables: { list: [] } };
-      
+
       // Manually trigger the same logic that loadDashboard would do
-      if (!(wrapper.vm.currentDashboardData.data?.variables?.list?.length)) {
+      if (!wrapper.vm.currentDashboardData.data?.variables?.list?.length) {
         if (wrapper.vm.variablesData.value) {
           wrapper.vm.variablesData.value.isVariablesLoading = false;
           wrapper.vm.variablesData.value.values = [];
         }
       }
-      
+
       // Verify the initialization happened
       expect(wrapper.vm.variablesData.value.isVariablesLoading).toBe(false);
       expect(wrapper.vm.variablesData.value.values).toEqual([]);
@@ -351,22 +387,35 @@ describe("ApiDashboard", () => {
     it("should not modify variables data when variables exist", async () => {
       // Ensure variablesData.value exists before setting
       if (!wrapper.vm.variablesData.value) {
-        wrapper.vm.variablesData.value = { isVariablesLoading: true, values: ["existing"] };
+        wrapper.vm.variablesData.value = {
+          isVariablesLoading: true,
+          values: ["existing"],
+        };
       } else {
-        wrapper.vm.variablesData.value = { isVariablesLoading: true, values: ["existing"] };
+        wrapper.vm.variablesData.value = {
+          isVariablesLoading: true,
+          values: ["existing"],
+        };
       }
-      
+
       // Mock the convertDashboardSchemaVersion to return data with variables list
-      const convertModule = await import("@/utils/dashboard/convertDashboardSchemaVersion");
-      const mockConvert = vi.mocked(convertModule.convertDashboardSchemaVersion);
+      const convertModule = await import(
+        "@/utils/dashboard/convertDashboardSchemaVersion"
+      );
+      const mockConvert = vi.mocked(
+        convertModule.convertDashboardSchemaVersion,
+      );
       mockConvert.mockReturnValue({
-        variables: { list: [{ name: "var1" }] }
+        variables: { list: [{ name: "var1" }] },
       });
-      
+
       await wrapper.vm.loadDashboard();
-      
+
       // When variables exist with length > 0, variablesData should not be modified
-      expect(wrapper.vm.variablesData.value).toEqual({ isVariablesLoading: true, values: ["existing"] });
+      expect(wrapper.vm.variablesData.value).toEqual({
+        isVariablesLoading: true,
+        values: ["existing"],
+      });
     });
   });
 
@@ -374,9 +423,9 @@ describe("ApiDashboard", () => {
     beforeEach(() => {
       wrapper = createWrapper();
       // Mock window.dispatchEvent
-      Object.defineProperty(window, 'dispatchEvent', {
+      Object.defineProperty(window, "dispatchEvent", {
         value: vi.fn(),
-        writable: true
+        writable: true,
       });
     });
 
@@ -387,7 +436,7 @@ describe("ApiDashboard", () => {
     it("should handle layout updates", async () => {
       // Test that the component has necessary layout management capabilities
       expect(wrapper.vm.apiDashboardChartsRef).toBeDefined();
-      
+
       // Test that component doesn't crash when mounted
       expect(wrapper.exists()).toBe(true);
     });
@@ -400,40 +449,50 @@ describe("ApiDashboard", () => {
 
     it("should handle variables data updates", () => {
       // Test that variablesData can be updated
-      const newData = { isVariablesLoading: true, values: [{ variable1: "value1", variable2: "value2" }] };
-      
+      const newData = {
+        isVariablesLoading: true,
+        values: [{ variable1: "value1", variable2: "value2" }],
+      };
+
       // Ensure variablesData.value exists before setting
       if (!wrapper.vm.variablesData.value) {
         wrapper.vm.variablesData.value = {};
       }
       wrapper.vm.variablesData.value = newData;
-      
+
       expect(wrapper.vm.variablesData.value).toEqual(newData);
     });
 
     it("should maintain variables data structure", () => {
       const testData = { isVariablesLoading: false, values: [] };
-      
+
       // Ensure variablesData.value exists before setting
       if (!wrapper.vm.variablesData.value) {
         wrapper.vm.variablesData.value = {};
       }
       wrapper.vm.variablesData.value = testData;
-      
+
       // Verify the structure is maintained
-      expect(wrapper.vm.variablesData.value).toHaveProperty('isVariablesLoading');
-      expect(wrapper.vm.variablesData.value).toHaveProperty('values');
+      expect(wrapper.vm.variablesData.value).toHaveProperty(
+        "isVariablesLoading",
+      );
+      expect(wrapper.vm.variablesData.value).toHaveProperty("values");
       expect(wrapper.vm.variablesData.value.isVariablesLoading).toBe(false);
       expect(wrapper.vm.variablesData.value.values).toEqual([]);
     });
 
     it("should handle RenderDashboardCharts variablesData event", async () => {
-      const renderComponent = wrapper.findComponent({ name: "RenderDashboardCharts" });
-      const newVariablesData = { isVariablesLoading: true, values: [{ testVariable: "testValue" }] };
-      
+      const renderComponent = wrapper.findComponent({
+        name: "RenderDashboardCharts",
+      });
+      const newVariablesData = {
+        isVariablesLoading: true,
+        values: [{ testVariable: "testValue" }],
+      };
+
       // Test that the component can handle the event without error
       await renderComponent.vm.$emit("variablesData", newVariablesData);
-      
+
       // Verify the component still exists and functions
       expect(renderComponent.exists()).toBe(true);
       expect(wrapper.exists()).toBe(true);
@@ -447,9 +506,9 @@ describe("ApiDashboard", () => {
 
     it("should show settings dialog when addSettingsData is called", () => {
       expect(wrapper.vm.showDashboardSettingsDialog).toBe(false);
-      
+
       wrapper.vm.addSettingsData();
-      
+
       expect(wrapper.vm.showDashboardSettingsDialog).toBe(true);
     });
   });
@@ -466,8 +525,13 @@ describe("ApiDashboard", () => {
 
     it("should handle variables data structure", () => {
       // Test that the component can handle variables data
-      expect(wrapper.vm.variablesData.value).toBeDefined();
-      expect(wrapper.vm.variablesData.value).toEqual({ isVariablesLoading: false, values: [] });
+      console.log("wrapper.vm.variablesData ======", wrapper.vm.variablesData);
+      expect(wrapper.vm.variablesData).toBeDefined();
+
+      expect(wrapper.vm.variablesData).toEqual({
+        isVariablesLoading: false,
+        values: [],
+      });
     });
 
     it("should have reactive data properties", () => {
@@ -485,19 +549,19 @@ describe("ApiDashboard", () => {
     it("should handle prop changes", async () => {
       const newSelectedDate = {
         startTime: 1234567999,
-        endTime: 1234568999
+        endTime: 1234568999,
       };
-      
+
       await wrapper.setProps({ selectedDate: newSelectedDate });
       await nextTick();
-      
-      expect(wrapper.props('selectedDate')).toEqual(newSelectedDate);
+
+      expect(wrapper.props("selectedDate")).toEqual(newSelectedDate);
     });
 
     it("should maintain component state on prop changes", async () => {
       await wrapper.setProps({ selectedDate: defaultProps.selectedDate });
       await nextTick();
-      
+
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.vm).toBeTruthy();
     });
@@ -510,7 +574,9 @@ describe("ApiDashboard", () => {
 
     it("should access store data correctly", () => {
       expect(wrapper.vm.store).toBe(mockStore);
-      expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe("test-org");
+      expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe(
+        "test-org",
+      );
     });
   });
 
@@ -551,30 +617,38 @@ describe("ApiDashboard", () => {
     });
 
     it("should pass dashboard data to RenderDashboardCharts", () => {
-      const renderComponent = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      const renderComponent = wrapper.findComponent({
+        name: "RenderDashboardCharts",
+      });
       const props = renderComponent.props();
-      
+
       expect(props.dashboardData).toBe(wrapper.vm.currentDashboardData.data);
     });
 
     it("should pass current time object to RenderDashboardCharts", () => {
-      const renderComponent = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      const renderComponent = wrapper.findComponent({
+        name: "RenderDashboardCharts",
+      });
       const props = renderComponent.props();
-      
+
       expect(props.currentTimeObj).toEqual(defaultProps.dateTime);
     });
 
     it("should set search type to RUM for RenderDashboardCharts", () => {
-      const renderComponent = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      const renderComponent = wrapper.findComponent({
+        name: "RenderDashboardCharts",
+      });
       const props = renderComponent.props();
-      
+
       expect(props.searchType).toBe("RUM");
     });
 
     it("should set viewOnly to true for RenderDashboardCharts", () => {
-      const renderComponent = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      const renderComponent = wrapper.findComponent({
+        name: "RenderDashboardCharts",
+      });
       const props = renderComponent.props();
-      
+
       expect(props.viewOnly).toBe(true);
     });
   });
@@ -588,14 +662,14 @@ describe("ApiDashboard", () => {
       const searchModule = await import("@/services/search");
       const mockSearchService = vi.mocked(searchModule.default);
       expect(mockSearchService.search).toBeDefined();
-      expect(typeof mockSearchService.search).toBe('function');
+      expect(typeof mockSearchService.search).toBe("function");
     });
 
     it("should handle search service errors gracefully", async () => {
       const searchModule = await import("@/services/search");
       const mockSearchService = vi.mocked(searchModule.default);
       mockSearchService.search.mockRejectedValue(new Error("API Error"));
-      
+
       // The component should not crash when search fails
       expect(wrapper.exists()).toBe(true);
     });

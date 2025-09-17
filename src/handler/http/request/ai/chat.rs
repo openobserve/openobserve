@@ -30,8 +30,6 @@ use crate::{
 };
 
 /// CreateChat
-///
-/// #{"ratelimit_module":"Chat", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Ai",
@@ -61,6 +59,9 @@ use crate::{
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Chat", "operation": "create"}))
+    )
 )]
 #[post("/{org_id}/ai/chat")]
 pub async fn chat(Json(body): Json<PromptRequest>) -> impl Responder {
@@ -89,8 +90,6 @@ struct TraceInfo {
 }
 
 /// CreateChatStream
-///
-/// #{"ratelimit_module":"Chat", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Ai",
@@ -120,6 +119,9 @@ struct TraceInfo {
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Chat", "operation": "create"}))
+    )
 )]
 #[post("/{org_id}/ai/chat_stream")]
 pub async fn chat_stream(

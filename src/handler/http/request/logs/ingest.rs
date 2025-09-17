@@ -73,7 +73,10 @@ pub async fn bulk(
     let mut resp = match logs::bulk::ingest(**thread_id, &org_id, body, user_email).await {
         Ok(v) => MetaHttpResponse::json(v),
         Err(e) => {
-            log::error!("Error processing request {org_id}/_bulk: {e}");
+            // we do not want to log trial period expired errors
+            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+                log::error!("Error processing request {org_id}/_bulk: {e}");
+            }
             if matches!(e, infra::errors::Error::ResourceError(_)) {
                 HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                     http::StatusCode::SERVICE_UNAVAILABLE,
@@ -151,7 +154,10 @@ pub async fn multi(
             _ => MetaHttpResponse::json(v),
         },
         Err(e) => {
-            log::error!("Error processing request {org_id}/{stream_name}/_multi: {e}");
+            // we do not want to log trial period expired errors
+            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+                log::error!("Error processing request {org_id}/{stream_name}/_multi: {e}");
+            }
             if matches!(e, infra::errors::Error::ResourceError(_)) {
                 HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                     http::StatusCode::SERVICE_UNAVAILABLE,
@@ -229,7 +235,10 @@ pub async fn json(
             _ => MetaHttpResponse::json(v),
         },
         Err(e) => {
-            log::error!("Error processing request {org_id}/{stream_name}/_json: {e}");
+            // we do not want to log trial period expired errors
+            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+                log::error!("Error processing request {org_id}/{stream_name}/_json: {e}");
+            }
             if matches!(e, infra::errors::Error::ResourceError(_)) {
                 HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                     http::StatusCode::SERVICE_UNAVAILABLE,
@@ -305,7 +314,10 @@ pub async fn handle_kinesis_request(
                 error_message: None,
             }),
             Err(e) => {
-                log::error!("Error processing kinesis request: {e}");
+                // we do not want to log trial period expired errors
+                if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+                    log::error!("Error processing kinesis request: {e}");
+                }
                 if matches!(e, infra::errors::Error::ResourceError(_)) {
                     HttpResponse::ServiceUnavailable().json(KinesisFHIngestionResponse {
                         request_id,
@@ -347,7 +359,10 @@ pub async fn handle_gcp_request(
         {
             Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
-                log::error!("Error processing request {org_id}/{stream_name}/_gcp: {e:?}");
+                // we do not want to log trial period expired errors
+                if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+                    log::error!("Error processing request {org_id}/{stream_name}/_gcp: {e:?}");
+                }
                 if matches!(e, infra::errors::Error::ResourceError(_)) {
                     HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                         http::StatusCode::SERVICE_UNAVAILABLE,
@@ -435,9 +450,12 @@ pub async fn otlp_logs_write(
     {
         Ok(v) => v,
         Err(e) => {
-            log::error!(
-                "Error processing otlp {content_type} logs write request {org_id}/{in_stream_name:?}: {e:?}"
-            );
+            // we do not want to log trial period expired errors
+            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+                log::error!(
+                    "Error processing otlp {content_type} logs write request {org_id}/{in_stream_name:?}: {e:?}"
+                );
+            }
             if matches!(e, infra::errors::Error::ResourceError(_)) {
                 HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                     http::StatusCode::SERVICE_UNAVAILABLE,
@@ -500,7 +518,10 @@ pub async fn hec(
             }
         }
         Err(e) => {
-            log::error!("Error processing request {org_id}/_hec: {e}");
+            // we do not want to log trial period expired errors
+            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+                log::error!("Error processing request {org_id}/_hec: {e}");
+            }
             let res = HecResponse::from(HecStatus::Custom(e.to_string(), 400));
             if matches!(e, infra::errors::Error::ResourceError(_)) {
                 HttpResponse::ServiceUnavailable().json(res)

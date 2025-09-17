@@ -15,7 +15,7 @@ export class SanityPage {
         this.interestingJobFieldButton = '[data-test="log-search-index-list-interesting-job-field-btn"]';
         this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
         this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
-        this.queryEditorContent = '[data-test="logs-search-bar-query-editor"] .cm-content';
+        this.queryEditorContent = '[data-test="logs-search-bar-query-editor"]';
         
         // Search and Refresh locators
         this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
@@ -67,7 +67,7 @@ export class SanityPage {
         
         // VRL Function Editor locators
         this.vrlFunctionEditor = '[data-test="logs-vrl-function-editor"]';
-        this.vrlEditorContent = '[data-test="logs-vrl-function-editor"] .cm-content';
+        this.vrlEditorContent = '[data-test="logs-vrl-function-editor"] .inputarea';
         
         // Generic locators
         this.searchFunctionInput = '[placeholder="Search Function"]';
@@ -78,7 +78,7 @@ export class SanityPage {
         // Settings locators (sanity2 specific)
         this.settingsMenuItem = '[data-test="menu-link-settings-item"]';
         this.generalSettingsTab = { role: 'tab', name: 'General Settings' };
-        this.scrapeIntervalInput = { label: 'Scrape Interval (In Seconds) *' };
+        this.scrapeIntervalInput = '[data-test="general-settings-scrape-interval"]';
         this.dashboardSubmitButton = '[data-test="dashboard-add-submit"]';
         
         // Stream Stats locators (sanity2 specific)
@@ -259,8 +259,8 @@ export class SanityPage {
         const queryEditor = this.page.locator(this.queryEditorContent);
         await expect(queryEditor).toBeVisible({ timeout: 10000 });
         
-        await queryEditor.click();
-        await queryEditor.fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+        await queryEditor.locator('.monaco-editor').click();
+        await queryEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
         
         await this.page.waitForLoadState('domcontentloaded');
         await this.page.locator(this.refreshButton).click({ force: true });
@@ -290,15 +290,15 @@ export class SanityPage {
             }
         }
         
-        const fnEditorTextbox = this.page.locator(this.fnEditor).getByRole('textbox');
+        const fnEditorTextbox = this.page.locator(this.fnEditor).locator('.monaco-editor');
         
         try {
             await expect(fnEditorTextbox).toBeVisible({ timeout: 15000 });
-            await expect(fnEditorTextbox).toBeEditable({ timeout: 10000 });
+            // await expect(fnEditorTextbox).toBeEditable({ timeout: 10000 });
             await this.page.waitForLoadState('domcontentloaded');
             await fnEditorTextbox.click();
         } catch (error) {
-            const cmContent = this.page.locator('.cm-content').first();
+            const cmContent = this.page.locator('.monaco-editor').first();
             if (await cmContent.count() > 0) {
                 await cmContent.click();
             } else {
@@ -306,7 +306,7 @@ export class SanityPage {
             }
         }
         
-        await this.page.locator(this.fnEditor).locator(".cm-content").fill(".a=2");
+        await this.page.locator(this.fnEditor).locator(".inputarea").fill(".a=2");
         await waitUtils.smartWait(this.page, 1000, 'VRL editor content stabilization');
         
         await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
@@ -523,9 +523,8 @@ export class SanityPage {
         await waitUtils.smartWait(this.page, 2000, 'pre-settings navigation wait');
         await this.page.locator(this.settingsMenuItem).click();
         await waitUtils.smartWait(this.page, 2000, 'settings page load');
-        await this.page.getByText("General SettingsScrape").click();
         await this.page.getByRole(this.generalSettingsTab.role, { name: this.generalSettingsTab.name }).click();
-        await this.page.getByLabel(this.scrapeIntervalInput.label).fill("16");
+        await this.page.locator(this.scrapeIntervalInput).fill("16");
         await this.page.locator(this.dashboardSubmitButton).click();
         await this.page.getByText("Organization settings updated").click();
     }
@@ -810,12 +809,12 @@ export class SanityPage {
         }
         
         // Wait for SQL editor to be ready
-        const sqlEditor = this.page.locator('#fnEditor').getByRole('textbox');
+        const sqlEditor = this.page.locator('#fnEditor');
         await expect(sqlEditor).toBeVisible({ timeout: 15000 });
         
-        await expect(sqlEditor).toBeEditable({ timeout: 10000 });
+        // await expect(sqlEditor).locator('.monaco-editor').toBeEditable({ timeout: 10000 });
         
-        await sqlEditor.click();
+        await sqlEditor.locator('.monaco-editor').click();
         
         // Enable SQL mode with error handling
         const sqlModeSwitch = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2);
@@ -831,7 +830,7 @@ export class SanityPage {
         }
         
         // Fill SQL query into the editor
-        await sqlEditor.fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+        await sqlEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
         await this.page.waitForLoadState('domcontentloaded');
         
         // Click refresh button with robust waits

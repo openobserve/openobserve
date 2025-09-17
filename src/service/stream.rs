@@ -876,11 +876,7 @@ pub async fn delete_stream(
         db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
     {
         log::error!(
-            "Failed to create retention job for stream: {}/{}/{}, error: {}",
-            org_id,
-            stream_type,
-            stream_name,
-            e
+            "Failed to create retention job for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
         );
         return Ok(HttpResponse::InternalServerError()
             .append_header((ERROR_HEADER, format!("failed to delete stream: {e}")))

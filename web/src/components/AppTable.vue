@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       flat
       :bordered="bordered"
       ref="qTableRef"
-      :title="title"
       :rows="rows"
       :columns="columns as []"
       :table-colspan="9"
@@ -42,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :filter="filter && filter.value"
       :filter-method="filter && filter.method"
       @virtual-scroll="onScroll"
+      :style="tableStyle"
     >
       <template #no-data>
         <NoData class="q-mb-lg" />
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-th>
         </q-tr>
       </template>
-       <template #top="scope">
+       <template #top="scope" v-if="!hideTopPagination">
         <div class="tw-flex tw-items-center tw-justify-between tw-w-full q-py-xs  "> 
           <span class="tw-font-bold tw-text-[14px] tw-w-full q-pa-none">
           {{ rows.length }} {{ title }}
@@ -111,13 +111,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tr>
       </template>
       <template  #bottom="scope">
-        <QTablePagination
-          :scope="scope"
-          :position="'bottom'"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          @update:changeRecordPerPage="changePagination"
-        />
+        <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+          <div v-if="showBottomPaginationWithTitle" class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+            {{ resultTotal }} {{ title }}
+          </div>
+            <QTablePagination
+              :scope="scope"
+              :position="'bottom'"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
+        </div>
       </template>
     </q-table>
   </div>
@@ -171,7 +176,7 @@ const props = defineProps({
   },
   rowsPerPage: {
     type: Number,
-    default: 25,
+    default: 20,
   },
   dense: {
     type: Boolean,
@@ -189,12 +194,24 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  tableStyle: {
+    type: String,
+    default: "",
+  },
+  hideTopPagination: {
+    type: Boolean,
+    default: false,
+  },
+  showBottomPaginationWithTitle: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(["event-emitted"]);
 
 const perPageOptions: any = [
-      { label: "25", value: 25 },
+      { label: "20", value: 20 },
       { label: "50", value: 50 },
       { label: "100", value: 100 },
       { label: "250", value: 250 },
@@ -202,7 +219,7 @@ const perPageOptions: any = [
 ];
 
 const resultTotal = ref<number>(0);
-const selectedPerPage = ref<number>(25);
+const selectedPerPage = ref<number>(20);
 
 const qTableRef: Ref<InstanceType<typeof QTable> | null> = ref(null);
 

@@ -30,6 +30,8 @@ import configService from "./services/config";
 
 import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
+import { useReo } from "./services/reodotdev_analytics";
+
 
 const app = createApp(App);
 const router = createRouter(store);
@@ -46,6 +48,13 @@ app
 
 // const router = createRouter(store);
 app.use(store).use(router);
+
+const { reoInit } = useReo();
+
+reoInit();
+
+
+
 // app.use(SearchPlugin);
 
 const getConfig = async () => {

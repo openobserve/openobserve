@@ -94,7 +94,6 @@ arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true
 env_logger.workspace = true
-etcd-client.workspace = true
 faststr.workspace = true
 flate2.workspace = true
 futures.workspace = true
@@ -235,7 +234,7 @@ actix-tls = { version = "3.4", features = [
 anyhow = "1.0"
 arc-swap = "1.7.1"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
-async-nats = "0.39"
+async-nats = "0.42"
 async-stream = "0.3.6"
 async-trait = "0.1"
 async-recursion = "1.0"
@@ -270,7 +269,6 @@ sqlparser = { version = "0.55.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.2"
 dotenvy = "0.15.7"
 env_logger = "0.10"
-etcd-client = { version = "0.12", features = ["tls"] }
 faststr = { version = "0.2", features = ["serde"] }
 flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
@@ -378,7 +376,7 @@ tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-log = "0.2"
 tracing-opentelemetry = "0.27"
-tracing-subscriber = { version = "0.3.0", features = [
+tracing-subscriber = { version = "0.3.20", features = [
     "env-filter",
     "json",
     "registry",
@@ -387,6 +385,7 @@ url = "2.5"
 urlencoding = "2.1"
 utoipa = { version = "5", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
+uuid = { version = "1.18.1", features = ["v7"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "063cabbbf4bc6f75794fa0ccd3b0bd5c074f0e35" }
 vrl = { version = "0.22", features = ["value", "compiler", "test"] }
 zip = "3.0.0"

@@ -1,6 +1,9 @@
-import { test, expect } from "../baseFixtures";
+const {
+  test,
+  expect,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
 import logData from "../../fixtures/log.json";
-import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
@@ -48,10 +51,8 @@ test.describe.configure({ mode: "parallel" });
 
 test.describe("HTML chart dashboard", () => {
   test.beforeEach(async ({ page }) => {
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestion(page);
-    await page.waitForTimeout(2000);
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
@@ -81,14 +82,12 @@ test.describe("HTML chart dashboard", () => {
 
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .getByRole("textbox")
-      .locator("div")
+      .locator(".monaco-editor")
       .click();
 
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .getByRole("textbox")
-      .locator("div")
+      .locator(".inputarea")
       .fill(BASIC_HTML_SNIPPET);
 
     await expect(
@@ -139,14 +138,12 @@ test.describe("HTML chart dashboard", () => {
 
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .getByRole("textbox")
-      .locator("div")
+      .locator(".monaco-editor")
       .click();
 
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .getByRole("textbox")
-      .locator("div")
+      .locator(".inputarea")
       .fill(VARIABLE_HTML_SNIPPET);
 
     await expect(
@@ -185,13 +182,11 @@ test.describe("HTML chart dashboard", () => {
 
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .getByRole("textbox")
-      .locator("div")
+      .locator(".monaco-editor")
       .click();
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .getByRole("textbox")
-      .locator("div")
+      .locator(".inputarea")
       .fill(XSS_HTML_SNIPPET);
 
     await expect(page.getByRole("heading", { name: "XSS Test" })).toBeVisible();
@@ -221,13 +216,11 @@ test.describe("HTML chart dashboard", () => {
 
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .getByRole("textbox")
-      .locator("div")
+      .locator(".monaco-editor")
       .click();
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .getByRole("textbox")
-      .locator("div")
+      .locator(".inputarea")
       .fill(UNDEFINED_VARIABLE_HTML_SNIPPET);
 
     await expect(

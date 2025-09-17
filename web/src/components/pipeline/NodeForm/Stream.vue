@@ -23,23 +23,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
-    <div class="stream-routing-title q-pb-sm q-pl-md">
+    <div class="stream-routing-title q-pb-sm q-pl-md tw-flex tw-items-center tw-justify-between">
       {{ t("pipeline.streamTitle") }}
+      <div>
+          <q-btn v-close-popup="true" round flat icon="cancel" >
+          </q-btn>
+        </div>
     </div>
+    
     <q-separator />
 
-    <div   class="stream-routing-container full-width q-pa-md">
+    <div   class="stream-routing-container full-width q-py-md">
       <q-toggle
-      v-if="selectedNodeType == 'input'"
+        v-if="selectedNodeType == 'input'"
         data-test="create-stream-toggle"
-        class="q-mb-sm"
+        class="q-mb-sm tw-mr-3 tw-h-[36px] o2-toggle-button-lg"
+        size="lg"
+        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
         :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
         v-model="createNewStream"
       />
 
       <q-form   @submit="saveStream">
 
-      <div v-if="!createNewStream">
+      <div v-if="!createNewStream" class="q-px-md">
         <div class="flex justify-start items-center" style="padding-top: 0px">
           <div
             data-test="input-node-stream-type-select"
@@ -117,36 +124,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="flex justify-start full-width"
+          class="flex justify-start full-width q-mt-sm"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
+        <q-btn
+            v-if="pipelineObj.isEditNode"
+            data-test="input-node-stream-delete-btn"
+            class="o2-secondary-button tw-h-[36px] q-mr-md"
+            color="negative"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            no-caps
+            @click="openDeleteDialog"
+            >
+            <q-icon name="delete" class="q-mr-xs" />
+            {{ t('pipeline.deleteNode') }}
+          </q-btn>
           <q-btn
             data-test="input-node-stream-cancel-btn"
-            class="text-bold"
+            class="o2-secondary-button tw-h-[36px]"
             :label="t('alerts.cancel')"
-            text-color="light-text"
-            padding="sm md"
             no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             @click="openCancelDialog"
           />
           <q-btn
             data-test="input-node-stream-save-btn"
             :label="t('alerts.save')"
-            class="text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
+            class="no-border q-ml-md o2-primary-button tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            flat
             no-caps
             type="submit"
-          />
-          <q-btn
-            v-if="pipelineObj.isEditNode"
-            data-test="input-node-stream-delete-btn"
-            :label="t('pipeline.deleteNode')"
-            class="text-bold no-border q-ml-md"
-            color="negative"
-            padding="sm xl"
-            no-caps
-            @click="openDeleteDialog"
           />
         </div>
       </div>
@@ -509,7 +519,7 @@ defineExpose({
 
 <style >
 .stream-routing-title {
-  font-size: 20px;
+  font-size: 18px;
   padding-top: 16px;
 }
 .pipeline-add-stream {

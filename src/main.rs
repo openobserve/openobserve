@@ -283,6 +283,11 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("meter provider init failed");
             };
 
+            // Register job runtime for metrics collection
+            if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                openobserve::service::runtime_metrics::register_runtime("job".to_string(), handle);
+            }
+
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
@@ -294,7 +299,6 @@ async fn main() -> Result<(), anyhow::Error> {
             _ = metadata::close().await;
             // flush WAL cache to disk
             _ = ingester::flush_all().await;
-            common_infra::wal::flush_all_to_disk().await;
             // flush compact offset cache to disk disk
             _ = db::compact::files::sync_cache_to_db().await;
             // flush db
@@ -327,6 +331,13 @@ async fn main() -> Result<(), anyhow::Error> {
             .max_blocking_threads(cfg.limit.grpc_runtime_blocking_worker_num)
             .build()
             .expect("grpc runtime init failed");
+
+        // Register gRPC runtime for metrics collection
+        openobserve::service::runtime_metrics::register_runtime(
+            "grpc".to_string(),
+            rt.handle().clone(),
+        );
+
         let _guard = rt.enter();
         rt.block_on(async move {
             let ret = if config::cluster::LOCAL_NODE.is_router() {
@@ -344,8 +355,16 @@ async fn main() -> Result<(), anyhow::Error> {
     // wait for gRPC init
     grpc_init_rx.await.ok();
 
+    // Register main HTTP runtime for metrics collection
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        openobserve::service::runtime_metrics::register_runtime("http".to_string(), handle);
+    }
+
+    // Start runtime metrics collector
+    openobserve::service::runtime_metrics::start_metrics_collector().await;
+
     // let node online
-    let _ = cluster::set_online(false).await;
+    let _ = cluster::set_online().await;
 
     // initialize the jobs are deferred until the gRPC service starts
     job::init_deferred()
@@ -664,7 +683,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     let server = HttpServer::new(move || {
         let cfg = get_config();
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.common.feature_per_thread_lock {
+        if cfg.limit.mem_table_bucket_num > 1 {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
         let scheme = if cfg.http.tls_enabled {
@@ -769,7 +788,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     let server = HttpServer::new(move || {
         let cfg = get_config();
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.common.feature_per_thread_lock {
+        if cfg.limit.mem_table_bucket_num > 1 {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
 
@@ -894,7 +913,7 @@ async fn graceful_shutdown(handle: ServerHandle) {
     // println!("ctrl-c received!");
 
     // offline the node
-    if let Err(e) = cluster::set_offline(true).await {
+    if let Err(e) = cluster::set_offline().await {
         log::error!("set offline failed: {e}");
     }
     log::info!("Node is offline");
@@ -1054,7 +1073,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
     let server = HttpServer::new(move || {
         let cfg = get_config();
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.common.feature_per_thread_lock {
+        if cfg.limit.mem_table_bucket_num > 1 {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
         let scheme = if cfg.http.tls_enabled {

@@ -34,7 +34,7 @@ use once_cell::sync::Lazy;
 
 use crate::{
     meta::{cluster, stream::QueryPartitionStrategy},
-    utils::{file::get_file_meta, sysinfo},
+    utils::sysinfo,
 };
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
@@ -425,7 +425,6 @@ pub struct Config {
     pub memory_cache: MemoryCache,
     pub disk_cache: DiskCache,
     pub log: Log,
-    pub etcd: Etcd,
     pub nats: Nats,
     pub s3: S3,
     pub sns: Sns,
@@ -685,7 +684,7 @@ pub struct Common {
     #[env_config(name = "ZO_LOCAL_MODE_STORAGE", default = "disk")]
     pub local_mode_storage: String,
     pub is_local_storage: bool,
-    #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "etcd")]
+    #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "nats")]
     pub cluster_coordinator: String,
     #[env_config(name = "ZO_QUEUE_STORE", default = "")]
     pub queue_store: String,
@@ -743,8 +742,6 @@ pub struct Common {
         help = "Disable timestamp field compression"
     )]
     pub timestamp_compression_disabled: bool,
-    #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
-    pub feature_per_thread_lock: bool,
     #[env_config(name = "ZO_FEATURE_INGESTER_NONE_COMPRESSION", default = false)]
     pub feature_ingester_none_compression: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
@@ -765,8 +762,6 @@ pub struct Common {
     pub feature_query_partition_strategy: QueryPartitionStrategy,
     #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
     pub feature_query_exclude_all: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_WITHOUT_INDEX", default = false)]
-    pub feature_query_without_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
     pub feature_query_remove_filter_with_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
@@ -894,7 +889,7 @@ pub struct Common {
     // MMDB
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
-    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = false)]
+    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = true)]
     pub mmdb_disable_download: bool,
     #[env_config(name = "ZO_MMDB_UPDATE_DURATION_DAYS", default = 30)] // default 30 days
     pub mmdb_update_duration_days: u64,
@@ -1119,6 +1114,12 @@ pub struct Common {
         help = "Enable to use large partition for index. This will apply for all streams"
     )]
     pub align_partitions_for_index: bool,
+    #[env_config(
+        name = "ZO_LOG_PAGE_DEFAULT_FIELD_LIST",
+        default = "uds",
+        help = "Which fields to show by default in logs search page. Valid values - all,uds,interesting"
+    )]
+    pub log_page_default_field_list: String,
 }
 
 #[derive(EnvConfig, Default)]
@@ -1222,8 +1223,6 @@ pub struct Limit {
     pub ingest_allowed_in_future: i64,
     #[env_config(name = "ZO_INGEST_FLATTEN_LEVEL", default = 3)] // default flatten level
     pub ingest_flatten_level: u32,
-    #[env_config(name = "ZO_IGNORE_FILE_RETENTION_BY_STREAM", default = false)]
-    pub ignore_file_retention_by_stream: bool,
     #[env_config(name = "ZO_LOGS_FILE_RETENTION", default = "hourly")]
     pub logs_file_retention: String,
     #[env_config(name = "ZO_TRACES_FILE_RETENTION", default = "hourly")]
@@ -1409,12 +1408,6 @@ pub struct Limit {
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
     #[env_config(
-        name = "ZO_INVERTED_INDEX_CACHE_MAX_ENTRIES",
-        default = 100000,
-        help = "Maximum number of entries in the inverted index cache. Higher values increase memory usage but may improve query performance."
-    )]
-    pub inverted_index_cache_max_entries: usize,
-    #[env_config(
         name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
         default = 10000,
         help = "Maximum number of entries in the inverted index result cache. Higher values increase memory usage but may improve query performance."
@@ -1432,6 +1425,18 @@ pub struct Limit {
         help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
     )]
     pub inverted_index_skip_threshold: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_MIN_TOKEN_LENGTH",
+        default = 2,
+        help = "Minimum length of a token in the inverted index."
+    )]
+    pub inverted_index_min_token_length: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_MAX_TOKEN_LENGTH",
+        default = 64,
+        help = "Maximum length of a token in the inverted index."
+    )]
+    pub inverted_index_max_token_length: usize,
     #[env_config(
         name = "ZO_DEFAULT_MAX_QUERY_RANGE_DAYS",
         default = 0,
@@ -1505,8 +1510,9 @@ pub struct Compact {
     pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
     pub blocked_orgs: String,
-    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_HISTORY", default = false)]
-    pub data_retention_history: bool,
+    #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_MODE", default = "deleted")]
+    // "history" "deleted" "none"
+    pub file_list_deleted_mode: String,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
         default = 0,
@@ -1646,36 +1652,6 @@ pub struct Log {
 }
 
 #[derive(Debug, EnvConfig, Default)]
-pub struct Etcd {
-    #[env_config(name = "ZO_ETCD_ADDR", default = "localhost:2379")]
-    pub addr: String,
-    #[env_config(name = "ZO_ETCD_PREFIX", default = "/zinc/observe/")]
-    pub prefix: String,
-    #[env_config(name = "ZO_ETCD_CONNECT_TIMEOUT", default = 5)]
-    pub connect_timeout: u64,
-    #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 10)]
-    pub command_timeout: u64,
-    #[env_config(name = "ZO_ETCD_LOCK_WAIT_TIMEOUT", default = 3600)]
-    pub lock_wait_timeout: u64,
-    #[env_config(name = "ZO_ETCD_USER", default = "")]
-    pub user: String,
-    #[env_config(name = "ZO_ETCD_PASSWORD", default = "")]
-    pub password: String,
-    #[env_config(name = "ZO_ETCD_CLIENT_CERT_AUTH", default = false)]
-    pub cert_auth: bool,
-    #[env_config(name = "ZO_ETCD_TRUSTED_CA_FILE", default = "")]
-    pub ca_file: String,
-    #[env_config(name = "ZO_ETCD_CERT_FILE", default = "")]
-    pub cert_file: String,
-    #[env_config(name = "ZO_ETCD_KEY_FILE", default = "")]
-    pub key_file: String,
-    #[env_config(name = "ZO_ETCD_DOMAIN_NAME", default = "")]
-    pub domain_name: String,
-    #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 1000)]
-    pub load_page_size: i64,
-}
-
-#[derive(Debug, EnvConfig, Default)]
 pub struct Nats {
     #[env_config(name = "ZO_NATS_ADDR", default = "localhost:4222")]
     pub addr: String,
@@ -1717,12 +1693,20 @@ pub struct Nats {
     pub subscription_capacity: usize,
     #[env_config(name = "ZO_NATS_QUEUE_MAX_AGE", default = 60)] // days
     pub queue_max_age: u64,
+    #[env_config(name = "ZO_NATS_EVENT_MAX_AGE", default = 3600)] // seconds
+    pub event_max_age: u64,
     #[env_config(
         name = "ZO_NATS_QUEUE_MAX_SIZE",
         help = "The maximum size of the queue in MB, default is 2048MB",
         default = 2048
     )]
     pub queue_max_size: i64,
+    #[env_config(
+        name = "ZO_NATS_V211_SUPPORT",
+        help = "Support NATS v2.11.x",
+        default = false
+    )]
+    pub v211_support: bool,
 }
 
 #[derive(Debug, Default, EnvConfig)]
@@ -2055,11 +2039,6 @@ pub fn init() -> Config {
         panic!("compact config error: {e}");
     }
 
-    // check etcd config
-    if let Err(e) = check_etcd_config(&mut cfg) {
-        panic!("etcd config error: {e}");
-    }
-
     // check s3 config
     if let Err(e) = check_s3_config(&mut cfg) {
         panic!("s3 config error: {e}");
@@ -2086,6 +2065,11 @@ pub fn init() -> Config {
     // check nats config
     if let Err(e) = check_nats_config(&mut cfg) {
         panic!("nats config error: {e}");
+    }
+
+    // check inverted index config
+    if let Err(e) = check_inverted_index_config(&mut cfg) {
+        panic!("inverted index config error: {e}");
     }
 
     cfg
@@ -2300,7 +2284,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         if cfg.common.local_mode {
             cfg.common.meta_store = "sqlite".to_string();
         } else {
-            cfg.common.meta_store = "etcd".to_string();
+            cfg.common.meta_store = "nats".to_string();
         }
     }
     cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
@@ -2348,6 +2332,14 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.common.default_hec_stream.is_empty() {
         cfg.common.default_hec_stream = "_hec".to_string();
+    }
+
+    cfg.common.log_page_default_field_list = cfg.common.log_page_default_field_list.to_lowercase();
+    if !matches!(
+        cfg.common.log_page_default_field_list.as_str(),
+        "uds" | "all" | "interesting"
+    ) {
+        cfg.common.log_page_default_field_list = "uds".to_string();
     }
 
     Ok(())
@@ -2433,39 +2425,6 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check for pprof flamegraph
     if cfg.profiling.pprof_flamegraph_path.is_empty() {
         cfg.profiling.pprof_flamegraph_path = format!("{}flamegraph.svg", cfg.common.data_dir);
-    }
-
-    Ok(())
-}
-
-fn check_etcd_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if !cfg.etcd.prefix.is_empty() && !cfg.etcd.prefix.ends_with('/') {
-        cfg.etcd.prefix = format!("{}/", cfg.etcd.prefix);
-    }
-
-    if !cfg.etcd.cert_auth {
-        return Ok(());
-    }
-    if let Err(e) = get_file_meta(&cfg.etcd.ca_file) {
-        return Err(anyhow::anyhow!("ZO_ETCD_TRUSTED_CA_FILE check err: {}", e));
-    }
-    if let Err(e) = get_file_meta(&cfg.etcd.cert_file) {
-        return Err(anyhow::anyhow!("ZO_ETCD_TRUSTED_CA_FILE check err: {}", e));
-    }
-    if let Err(e) = get_file_meta(&cfg.etcd.key_file) {
-        return Err(anyhow::anyhow!("ZO_ETCD_TRUSTED_CA_FILE check err: {}", e));
-    }
-
-    // check domain name
-    if cfg.etcd.domain_name.is_empty() {
-        let mut name = cfg.etcd.addr.clone();
-        if name.contains("//") {
-            name = name.split("//").collect::<Vec<&str>>()[1].to_string();
-        }
-        if name.contains(':') {
-            name = name.split(':').collect::<Vec<&str>>()[0].to_string();
-        }
-        cfg.etcd.domain_name = name;
     }
 
     Ok(())
@@ -2892,6 +2851,25 @@ fn check_nats_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.nats.queue_max_size = 2048; // 2GB
     }
     cfg.nats.queue_max_size *= 1024 * 1024; // convert to bytes
+    Ok(())
+}
+
+fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.limit.inverted_index_result_cache_max_entries == 0 {
+        cfg.limit.inverted_index_result_cache_max_entries = 10000;
+    }
+    if cfg.limit.inverted_index_result_cache_max_entry_size == 0 {
+        cfg.limit.inverted_index_result_cache_max_entry_size = 20480;
+    }
+    if cfg.limit.inverted_index_skip_threshold == 0 {
+        cfg.limit.inverted_index_skip_threshold = 35;
+    }
+    if cfg.limit.inverted_index_min_token_length == 0 {
+        cfg.limit.inverted_index_min_token_length = 2;
+    }
+    if cfg.limit.inverted_index_max_token_length == 0 {
+        cfg.limit.inverted_index_max_token_length = 64;
+    }
     Ok(())
 }
 

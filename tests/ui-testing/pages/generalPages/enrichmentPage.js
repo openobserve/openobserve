@@ -129,7 +129,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             });
             
             // Get textbox using the original working approach
-            const textbox = this.page.locator(this.vrlEditor).getByRole('textbox');
+            const textbox = this.page.locator(this.vrlEditor).locator('.inputarea');
             await textbox.waitFor({ state: 'visible', timeout: 15000 });
             
             // Fill the VRL query

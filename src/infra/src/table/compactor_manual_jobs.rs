@@ -151,7 +151,7 @@ pub async fn add(job: CompactorManualJob) -> Result<(), errors::Error> {
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::insert(active).exec(client).await.map_err(|e| {
-        log::error!("[COMPACTOR] add job error: {}", e);
+        log::error!("[COMPACTOR] add job error: {e}");
         e
     })?;
 

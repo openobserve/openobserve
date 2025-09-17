@@ -918,7 +918,7 @@ pub async fn merge_files(
                 ));
             }
 
-            let id = ider::generate();
+            let id = ider::generate_file_name();
             let new_file_key = format!("{prefix}/{id}{FILE_EXT_PARQUET}");
             log::info!(
                 "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
@@ -942,7 +942,7 @@ pub async fn merge_files(
             let account = storage::get_account(&new_file_key).unwrap_or_default();
             storage::put(&account, &new_file_key, buf.clone()).await?;
 
-            if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
+            if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
                 // generate inverted index
                 generate_inverted_index(
                     &new_file_key,
@@ -966,7 +966,7 @@ pub async fn merge_files(
                     ));
                 }
 
-                let id = ider::generate();
+                let id = ider::generate_file_name();
                 let new_file_key = format!("{prefix}/{id}{FILE_EXT_PARQUET}");
 
                 // upload file to storage
@@ -982,7 +982,7 @@ pub async fn merge_files(
                 let account = storage::get_account(&new_file_key).unwrap_or_default();
                 storage::put(&account, &new_file_key, buf.clone()).await?;
 
-                if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
+                if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
                     // generate inverted index
                     generate_inverted_index(
                         &new_file_key,
@@ -1113,7 +1113,7 @@ pub fn generate_inverted_idx_recordbatch(
     index_fields: &[String],
 ) -> Result<Option<RecordBatch>, anyhow::Error> {
     let cfg = get_config();
-    if !cfg.common.inverted_index_enabled || batches.is_empty() || !stream_type.is_basic_type() {
+    if !cfg.common.inverted_index_enabled || batches.is_empty() || !stream_type.support_index() {
         return Ok(None);
     }
 

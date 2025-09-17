@@ -37,13 +37,15 @@ use {
     o2_openfga::config::get_config as get_openfga_config,
 };
 
+#[cfg(feature = "cloud")]
+use crate::common::meta::user::UserList;
 use crate::{
     common::{
         meta::{
             self,
             user::{
                 AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser, UpdateUser,
-                UserOrgRole, UserRequest, UserRoleRequest, get_roles,
+                UserOrgRole, UserRequest, UserRoleRequest, UserUpdateMode, get_roles,
             },
         },
         utils::auth::{UserEmail, generate_presigned_url, is_valid_email},
@@ -54,8 +56,6 @@ use crate::{
 pub mod service_accounts;
 
 /// ListUsers
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -73,6 +73,9 @@ pub mod service_accounts;
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/users")]
@@ -117,8 +120,6 @@ pub async fn list(
 }
 
 /// CreateUser
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -137,6 +138,9 @@ pub async fn list(
     request_body(content = PostUserRequest, description = "User data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/users")]
@@ -176,8 +180,6 @@ pub async fn save(
 }
 
 /// UpdateUser
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -197,6 +199,9 @@ pub async fn save(
     request_body(content = UpdateUser, description = "User data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/users/{email_id}")]
@@ -240,13 +245,15 @@ pub async fn update(
         });
     }
     let initiator_id = &user_email.user_id;
-    let self_update = user_email.user_id.eq(&email_id);
-    users::update_user(&org_id, &email_id, self_update, initiator_id, user).await
+    let update_mode = if user_email.user_id.eq(&email_id) {
+        UserUpdateMode::SelfUpdate
+    } else {
+        UserUpdateMode::OtherUpdate
+    };
+    users::update_user(&org_id, &email_id, update_mode, initiator_id, user).await
 }
 
 /// AddUserToOrganization
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -265,6 +272,9 @@ pub async fn update(
     request_body(content = UserRoleRequest, description = "User role", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/users/{email_id}")]
@@ -300,8 +310,6 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
     auth_cookie
 }
 /// RemoveUserFromOrganization
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -320,6 +328,9 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/users/{email_id}")]
@@ -333,8 +344,6 @@ pub async fn delete(
 }
 
 /// AuthenticateUser
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
 context_path = "/auth",
     tag = "Auth",
@@ -347,6 +356,9 @@ context_path = "/auth",
     request_body(content = SignInUser, description = "User login", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = SignInResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"}))
     )
 )]
 #[post("/login")]
@@ -734,8 +746,6 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
 }
 
 /// ListUserRoles
-///
-/// #{"ratelimit_module":"Users", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -753,6 +763,9 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/users/roles")]
@@ -820,7 +833,51 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
 #[get("/invites")]
 pub async fn list_invitations(user_email: UserEmail) -> Result<HttpResponse, Error> {
     let user_id = user_email.user_id.as_str();
-    users::list_user_invites(user_id).await
+    users::list_user_invites(user_id, true).await
+}
+
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "UserInvitations",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("token" = String, Path, description = "invitation token"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+    )
+)]
+#[delete("/invites/{token}")]
+pub async fn decline_invitation(
+    user_email: UserEmail,
+    path: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    use crate::service::organization;
+
+    let token = path.into_inner();
+    let user_id = user_email.user_id.as_str();
+
+    match organization::decline_invitation(user_id, &token).await {
+        Ok(_) => Ok(HttpResponse::Ok()
+            .json(serde_json::json!({"message":"Invitation declined successfully"}))),
+
+        Err(err) => {
+            Ok(HttpResponse::BadRequest().json(serde_json::json!({"message": err.to_string()})))
+        }
+    }
+}
+
+#[cfg(not(feature = "cloud"))]
+#[delete("/invites/{token}")]
+pub async fn decline_invitation(
+    _user_email: UserEmail,
+    _path: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
 #[cfg(not(feature = "cloud"))]

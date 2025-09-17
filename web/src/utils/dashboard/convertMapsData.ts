@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { getDataValue } from "./aliasUtils";
+
 const countries = [
   { name: "Afghanistan", alpha2: "AF", alpha3: "AFG" },
   { name: "Aland", alpha2: "AX", alpha3: "ALA" },
@@ -323,8 +325,10 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
         },
       },
       data: mapData[index]?.map((item: any) => {
-        const countryName = getCountryName(item[query.fields.name.alias]); // Map to full country name
-        const value = item[query.fields.value_for_maps.alias];
+        const countryName = getCountryName(
+          getDataValue(item, query.fields.name.alias),
+        ); // Map to full country name
+        const value = getDataValue(item, query.fields.value_for_maps.alias);
 
         if (query.customQuery) {
           // For custom queries

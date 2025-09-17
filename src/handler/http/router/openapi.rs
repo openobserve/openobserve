@@ -433,11 +433,18 @@ pub async fn openapi_info() -> OpenapiInfo {
                 utoipa::openapi::HttpMethod::Trace => "TRACE",
             };
 
+            let extensions: std::collections::HashMap<String, serde_json::Value> = operation
+                .extensions
+                .as_ref()
+                .map(|ext| ext.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                .unwrap_or_default();
+
             let operation_info = (
                 method.to_string(),
                 path.clone(),
                 operation.clone().description,
                 tags.clone(),
+                extensions,
             );
 
             for tag in tags {

@@ -51,6 +51,9 @@ const useEnterpriseRoutes = () => {
         {
           path: "users",
           name: "users",
+          meta: {
+            title: "Users",
+          },
           component: Users,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -59,6 +62,9 @@ const useEnterpriseRoutes = () => {
         {
           path: "serviceAccounts",
           name: "serviceAccounts",
+          meta: {
+            title: "Service Accounts",
+          },
           component: ServiceAccountsList,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -67,6 +73,9 @@ const useEnterpriseRoutes = () => {
         {
           path: "organizations",
           name: "organizations",
+          meta: {
+            title: "Organizations",
+          },
           component: Organizations,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -82,6 +91,9 @@ const useEnterpriseRoutes = () => {
     routes.push({
       path: "actions",
       name: "actionScripts",
+      meta:{
+        title: "Action Scripts",
+      },
       component: ActionScipts,
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -92,6 +104,9 @@ const useEnterpriseRoutes = () => {
         {
           path: "groups",
           name: "groups",
+          meta: {
+            title: "Groups",
+          },
           component: AppGroups,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -100,6 +115,9 @@ const useEnterpriseRoutes = () => {
         {
           path: "groups/edit/:group_name",
           name: "editGroup",
+          meta:{
+            title: "Edit Group",
+          },
           component: EditGroup,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -108,6 +126,9 @@ const useEnterpriseRoutes = () => {
         {
           path: "roles",
           name: "roles",
+          meta:{
+            title: "Roles",
+          },
           component: AppRoles,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -116,6 +137,9 @@ const useEnterpriseRoutes = () => {
         {
           path: "roles/edit/:role_name",
           name: "editRole",
+          meta:{
+            title: "Edit Role",
+          },
           component: EditRole,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -124,7 +148,10 @@ const useEnterpriseRoutes = () => {
         {
           path: "quota",
           name: "quota",
-          component: Quota ,
+          meta: {
+            title: "Quota",
+          },
+          component: Quota,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

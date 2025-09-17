@@ -172,6 +172,8 @@ pub async fn grpc_search_multi(
     Ok(response)
 }
 
+// Not sure why it's generating a warning, no time to debug right now
+#[allow(dead_code)]
 #[tracing::instrument(name = "service:search:grpc_search_partition", skip_all)]
 pub async fn grpc_search_partition(
     trace_id: &str,

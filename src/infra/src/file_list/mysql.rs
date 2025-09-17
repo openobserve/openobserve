@@ -393,7 +393,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
             .with_label_values(&["query", "file_list"])
             .inc();
         let start = std::time::Instant::now();
-        let ret = if flattened.is_some() {
+        let ret = if let Some(flattened) = flattened {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
@@ -402,7 +402,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
                 "#,
             )
             .bind(stream_key)
-            .bind(flattened.unwrap())
+            .bind(flattened)
             .fetch_all(&pool)
             .await
         } else {
@@ -545,7 +545,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
             }
             partitions
         };
-        log::debug!("file_list day_partitions: {:?}", day_partitions);
+        log::debug!("file_list day_partitions: {day_partitions:?}");
 
         let mut tasks = Vec::with_capacity(day_partitions.len());
 
@@ -960,7 +960,7 @@ SELECT date
 SELECT 
     stream,
     MIN(CASE WHEN deleted IS FALSE THEN min_ts END) AS min_ts,
-    MAX(CASE WHEN deleted IS FALSE THEN max_ts END) AS max_ts,
+    MAX(CASE WHEN deleted IS FALSE THEN max_ts ELSE 0 END) AS max_ts,
     CAST(SUM(CASE 
         WHEN deleted IS TRUE AND created_at <= {min} THEN -1
         WHEN deleted IS FALSE THEN 1
@@ -1114,12 +1114,20 @@ INSERT INTO stream_stats
             if let Err(e) = sqlx::query(
                 r#"
 UPDATE stream_stats
-    SET file_num = file_num + ?, min_ts = ?, max_ts = ?, records = records + ?, original_size = original_size + ?, compressed_size = compressed_size + ?, index_size = index_size + ?
+    SET file_num = file_num + ?, 
+        min_ts = CASE WHEN ? = 0 THEN min_ts ELSE ? END,
+        max_ts = CASE WHEN ? = 0 THEN max_ts ELSE ? END,
+        records = records + ?, 
+        original_size = original_size + ?, 
+        compressed_size = compressed_size + ?, 
+        index_size = index_size + ?
     WHERE stream = ?;
                 "#,
             )
             .bind(stats.file_num)
             .bind(stats.doc_time_min)
+            .bind(stats.doc_time_min)
+            .bind(stats.doc_time_max)
             .bind(stats.doc_time_max)
             .bind(stats.doc_num)
             .bind(stats.storage_size as i64)
@@ -2168,7 +2176,7 @@ pub async fn create_table_index() -> Result<()> {
             .bind(file)
             .execute(&pool)
             .await?;
-            if i % 1000 == 0 {
+            if i.is_multiple_of(1000) {
                 log::warn!("[MYSQL] delete duplicate records: {}/{}", i, ret.len());
             }
         }

@@ -15,26 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md">
+    <q-card-section class="tw-w-full q-py-md">
       <div data-test="add-group-section">
-        <div class="flex justify-between items-center q-px-md q-py-sm">
+        <div class="flex justify-between items-center q-py-sm">
           <div data-test="add-group-section-title" style="font-size: 18px">
             {{ t("iam.addGroup") }}
           </div>
-          <q-btn
+          <q-icon
             data-test="add-group-close-dialog-btn"
-            round
-            dense
-            flat
-            icon="cancel"
-            size="12px"
+            name="cancel"
+            class="cursor-pointer"
+            size="20px"
             @click="emits('cancel:hideform')"
           />
         </div>
-
-        <div class="full-width bg-grey-4" style="height: 1px" />
-
-        <div class="q-px-md q-mt-md o2-input">
+        <q-separator class="tw-w-full" />
+        <div class=" q-mt-md o2-input">
           <div data-test="add-group-groupname-input-btn">
             <q-input
               v-model.trim="name"
@@ -61,25 +57,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-input>
           </div>
 
-          <div class="flex justify-center q-mt-lg">
+          <div class="flex justify-start q-mt-sm">
             <q-btn
-              data-test="add-group-cancel-btn"
-              v-close-popup="true"
-              class="q-mb-md text-bold"
+              v-close-popup
+              class="q-mr-md o2-secondary-button tw-h-[36px]"
               :label="t('alerts.cancel')"
-              text-color="light-text"
-              padding="sm md"
               no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               @click="$emit('cancel:hideform')"
+              data-test="add-group-cancel-btn"
             />
             <q-btn
-              data-test="add-group-submit-btn"
+              class="o2-primary-button no-border tw-h-[36px]"
               :label="t('alerts.save')"
-              class="q-mb-md text-bold no-border q-ml-md"
-              color="secondary"
-              padding="sm xl"
               no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               @click="saveGroup"
+              data-test="add-group-submit-btn"
             />
           </div>
         </div>
@@ -94,6 +90,7 @@ import { useQuasar } from "quasar";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const { t } = useI18n();
 const props = defineProps({
@@ -116,6 +113,8 @@ const emits = defineEmits(["cancel:hideform", "added:group"]);
 const name = ref(props.group?.name || "");
 
 const q = useQuasar();
+
+const { track } = useReo();
 
 const store = useStore();
 
@@ -149,6 +148,10 @@ const saveGroup = () => {
       });
       }
       console.log(err);
+    });
+    track("Button Click", {
+      button: "Save Group",
+      page: "Add Group"
     });
 };
 </script>

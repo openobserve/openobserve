@@ -137,6 +137,8 @@ struct ConfigResponse<'a> {
     ai_enabled: bool,
     dashboard_placeholder: String,
     dashboard_show_symbol_enabled: bool,
+    ingest_flatten_level: u32,
+    log_page_default_field_list: String,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -356,6 +358,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         ai_enabled,
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
+        ingest_flatten_level: cfg.limit.ingest_flatten_level,
+        log_page_default_field_list: cfg.common.log_page_default_field_list.clone(),
     }))
 }
 
@@ -618,15 +622,15 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                         "is_valid": res.0.is_valid,
                     }))
                     .unwrap();
-                    let is_new_usr = process_token(res)
-                        .await
-                        .map(|new_user| format!("&new_user_login={new_user}"));
+                    let url_params = process_token(res).await.map(|(new_user, pending_invites)| {
+                        format!("&new_user_login={new_user}&pending_invites={pending_invites}")
+                    });
                     login_url = format!(
                         "{}#id_token={}.{}{}",
                         login_data.url,
                         ID_TOKEN_HEADER,
                         base64::encode(&id_token),
-                        is_new_usr.unwrap_or_default()
+                        url_params.unwrap_or_default()
                     );
                 }
                 Err(e) => {
@@ -957,6 +961,26 @@ async fn consistent_hash(body: web::Json<HashFileRequest>) -> Result<HttpRespons
         ret.files.insert(file.clone(), nodes);
     }
     Ok(MetaHttpResponse::json(ret))
+}
+
+#[get("/refresh_nodes_list")]
+async fn refresh_nodes_list() -> Result<HttpResponse, Error> {
+    match cluster::cache_node_list().await {
+        Ok(node_ids) => Ok(MetaHttpResponse::json(node_ids)),
+        Err(e) => {
+            log::error!("[CLUSTER] refresh_node_list failed: {}", e);
+            Ok(MetaHttpResponse::internal_error(e.to_string()))
+        }
+    }
+}
+
+#[get("/refresh_user_sessions")]
+async fn refresh_user_sessions() -> Result<HttpResponse, Error> {
+    let _ = db::session::cache().await.map_err(|e| {
+        log::error!("[CLUSTER] refresh_user_sessions failed: {}", e);
+        e
+    });
+    Ok(MetaHttpResponse::json("user sessions refreshed"))
 }
 
 #[cfg(test)]

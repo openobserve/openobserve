@@ -29,7 +29,7 @@ use crate::{
             self,
             http::HttpResponse as MetaHttpResponse,
             service_account::{APIToken, ServiceAccountRequest, UpdateServiceAccountRequest},
-            user::{UpdateUser, UserRequest},
+            user::{UpdateUser, UserRequest, UserUpdateMode},
         },
         utils::auth::UserEmail,
     },
@@ -37,8 +37,7 @@ use crate::{
 };
 
 /// ListServiceAccounts
-///
-/// #{"ratelimit_module":"Service Accounts", "ratelimit_module_operation":"list"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "ServiceAccounts",
@@ -55,6 +54,9 @@ use crate::{
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "list"}))
     )
 )]
 #[get("/{org_id}/service_accounts")]
@@ -95,8 +97,7 @@ pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpRes
 }
 
 /// CreateServiceAccount
-///
-/// #{"ratelimit_module":"Service Accounts", "ratelimit_module_operation":"create"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "ServiceAccounts",
@@ -115,6 +116,9 @@ pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpRes
     request_body(content = ServiceAccountRequest, description = "ServiceAccount data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "create"}))
     )
 )]
 #[post("/{org_id}/service_accounts")]
@@ -143,8 +147,7 @@ pub async fn save(
 }
 
 /// UpdateServiceAccount
-///
-/// #{"ratelimit_module":"Service Accounts", "ratelimit_module_operation":"update"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "ServiceAccounts",
@@ -163,6 +166,9 @@ pub async fn save(
     request_body(content = UpdateServiceAccountRequest, description = "Service Account data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "update"}))
     )
 )]
 #[put("/{org_id}/service_accounts/{email_id}")]
@@ -220,12 +226,18 @@ pub async fn update(
     };
     let initiator_id = &user_email.user_id;
 
-    users::update_user(&org_id, &email_id, false, initiator_id, user).await
+    users::update_user(
+        &org_id,
+        &email_id,
+        UserUpdateMode::OtherUpdate,
+        initiator_id,
+        user,
+    )
+    .await
 }
 
 /// RemoveServiceAccount
-///
-/// #{"ratelimit_module":"Service Accounts", "ratelimit_module_operation":"delete"}#
+
 #[utoipa::path(
     context_path = "/api",
     tag = "ServiceAccounts",
@@ -242,6 +254,9 @@ pub async fn update(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "delete"}))
     )
 )]
 #[delete("/{org_id}/service_accounts/{email_id}")]
@@ -255,8 +270,7 @@ pub async fn delete(
 }
 
 /// GetAPIToken
-///
-/// #{"ratelimit_module":"Service Accounts", "ratelimit_module_operation":"get"}#
+
 #[utoipa::path(
     context_path = "/api",
      tag = "ServiceAccounts",
@@ -274,6 +288,9 @@ pub async fn delete(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = APIToken),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "get"}))
     )
 )]
 #[get("/{org_id}/service_accounts/{email_id}")]
