@@ -71,7 +71,7 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         if sql.limit > 0 {
             Some(sql.limit as usize)
         } else {
-            // Additinal 5 rows to check if there is data more than the specified default limit
+            // Additional 5 rows to check if there is data more than the specified default limit
             Some(cfg.limit.query_default_limit as usize + 5)
         }
     } else {
