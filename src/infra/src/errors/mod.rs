@@ -89,6 +89,8 @@ pub enum Error {
     OtherError(#[from] anyhow::Error),
     #[error("Expired Trial Period")]
     TrialPeriodExpired,
+    #[error("Error# {0}")]
+    CockooError(#[from] cuckoofilter_mmap::CuckooError),
 }
 
 unsafe impl Send for Error {}

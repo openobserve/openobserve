@@ -189,6 +189,7 @@ tokio-rustls.workspace = true
 roaring.workspace = true
 flight.workspace = true
 async-stream.workspace = true
+cuckoofilter-mmap.workspace = true
 
 [dev-dependencies]
 async-walkdir.workspace = true
@@ -390,3 +391,4 @@ vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://
 vrl = { version = "0.22", features = ["value", "compiler", "test"] }
 zip = "3.0.0"
 zstd = "0.13"
+cuckoofilter-mmap = "0.1.0"
