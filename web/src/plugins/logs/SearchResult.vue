@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-md"
           >
             <q-icon name="warning" color="warning" size="sm" />
-            <q-tooltip position="top" class="tw-text-sm tw-font-semibold tw-max-w-[70%] tw-w-fit" >
+            <q-tooltip position="top" class="tw-text-sm tw-font-semibold tw-w-[70%]" >
               <ul class="tw-list-disc tw-ml-4 tw-space-y-1">
                 <li v-for="(err, idx) in searchObj.data.histogram_function_error" :key="idx">
                   {{ err }}
