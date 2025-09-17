@@ -1,0 +1,792 @@
+{
+  "config": {
+    "configFile": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/playwright.config.js",
+    "rootDir": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 15000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/test-results",
+        "repeatEach": 1,
+        "retries": 2,
+        "metadata": {},
+        "id": "",
+        "name": "",
+        "testDir": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 15000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.50.1",
+    "workers": 4,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "poc-test-scenarios.spec.js",
+      "file": "poc-test-scenarios.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "POC Authentication Tests",
+          "file": "poc-test-scenarios.spec.js",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should always pass - valid login simulation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 15000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "status": "passed",
+                      "duration": 157,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-08-23T04:35:31.197Z",
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "062460af9ad44771e31d-587660acb2650bc388c4",
+              "file": "poc-test-scenarios.spec.js",
+              "line": 5,
+              "column": 3
+            },
+            {
+              "title": "should fail consistently - invalid credentials",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 15000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "status": "failed",
+                      "duration": 93,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Login Failed 401\"\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Login Failed 401\"\u001b[39m\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:16:22",
+                        "matcherResult": {
+                          "message": "\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Login Failed 401\"\u001b[39m",
+                          "pass": false
+                        },
+                        "location": {
+                          "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                          "column": 22,
+                          "line": 16
+                        },
+                        "snippet": "  14 |     await page.goto('data:text/html,<html><body>Login Failed 401</body></html>');\n  15 |     const response = await page.locator('body').textContent();\n> 16 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  17 |   });\n  18 | });\n  19 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                            "column": 22,
+                            "line": 16
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Login Failed 401\"\u001b[39m\n\n  14 |     await page.goto('data:text/html,<html><body>Login Failed 401</body></html>');\n  15 |     const response = await page.locator('body').textContent();\n> 16 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  17 |   });\n  18 | });\n  19 |\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:16:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-08-23T04:35:31.478Z",
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                        "column": 22,
+                        "line": 16
+                      }
+                    },
+                    {
+                      "workerIndex": 1,
+                      "status": "failed",
+                      "duration": 280,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Login Failed 401\"\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Login Failed 401\"\u001b[39m\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:16:22",
+                        "matcherResult": {
+                          "message": "\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Login Failed 401\"\u001b[39m",
+                          "pass": false
+                        },
+                        "location": {
+                          "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                          "column": 22,
+                          "line": 16
+                        },
+                        "snippet": "  14 |     await page.goto('data:text/html,<html><body>Login Failed 401</body></html>');\n  15 |     const response = await page.locator('body').textContent();\n> 16 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  17 |   });\n  18 | });\n  19 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                            "column": 22,
+                            "line": 16
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Login Failed 401\"\u001b[39m\n\n  14 |     await page.goto('data:text/html,<html><body>Login Failed 401</body></html>');\n  15 |     const response = await page.locator('body').textContent();\n> 16 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  17 |   });\n  18 | });\n  19 |\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:16:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-08-23T04:35:31.966Z",
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                        "column": 22,
+                        "line": 16
+                      }
+                    },
+                    {
+                      "workerIndex": 2,
+                      "status": "failed",
+                      "duration": 243,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Login Failed 401\"\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Login Failed 401\"\u001b[39m\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:16:22",
+                        "matcherResult": {
+                          "message": "\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Login Failed 401\"\u001b[39m",
+                          "pass": false
+                        },
+                        "location": {
+                          "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                          "column": 22,
+                          "line": 16
+                        },
+                        "snippet": "  14 |     await page.goto('data:text/html,<html><body>Login Failed 401</body></html>');\n  15 |     const response = await page.locator('body').textContent();\n> 16 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  17 |   });\n  18 | });\n  19 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                            "column": 22,
+                            "line": 16
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Login Failed 401\"\u001b[39m\n\n  14 |     await page.goto('data:text/html,<html><body>Login Failed 401</body></html>');\n  15 |     const response = await page.locator('body').textContent();\n> 16 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  17 |   });\n  18 | });\n  19 |\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:16:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 2,
+                      "startTime": "2025-08-23T04:35:32.909Z",
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                        "column": 22,
+                        "line": 16
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "062460af9ad44771e31d-6c0346424932336cc165",
+              "file": "poc-test-scenarios.spec.js",
+              "line": 12,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "POC Data Ingestion Tests",
+          "file": "poc-test-scenarios.spec.js",
+          "line": 20,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should pass - data ingestion endpoint",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 15000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "status": "passed",
+                      "duration": 215,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-08-23T04:35:33.710Z",
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "062460af9ad44771e31d-b0b29b92df827b7fbb17",
+              "file": "poc-test-scenarios.spec.js",
+              "line": 21,
+              "column": 3
+            },
+            {
+              "title": "should be flaky - network dependent operation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 15000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "status": "failed",
+                      "duration": 69,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"pass\"\u001b[39m\nReceived: \u001b[31m\"fail\"\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"pass\"\u001b[39m\nReceived: \u001b[31m\"fail\"\u001b[39m\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:36:22",
+                        "matcherResult": {
+                          "actual": "fail",
+                          "expected": "pass",
+                          "message": "\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"pass\"\u001b[39m\nReceived: \u001b[31m\"fail\"\u001b[39m",
+                          "name": "toBe",
+                          "pass": false
+                        },
+                        "location": {
+                          "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                          "column": 22,
+                          "line": 36
+                        },
+                        "snippet": "  34 |     if (testInfo.retry === 0) {\n  35 |       // Fail on first attempt\n> 36 |       expect('fail').toBe('pass');\n     |                      ^\n  37 |     } else {\n  38 |       // Pass on retry\n  39 |       expect('pass').toBe('pass');"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                            "column": 22,
+                            "line": 36
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"pass\"\u001b[39m\nReceived: \u001b[31m\"fail\"\u001b[39m\n\n  34 |     if (testInfo.retry === 0) {\n  35 |       // Fail on first attempt\n> 36 |       expect('fail').toBe('pass');\n     |                      ^\n  37 |     } else {\n  38 |       // Pass on retry\n  39 |       expect('pass').toBe('pass');\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:36:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-08-23T04:35:34.081Z",
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                        "column": 22,
+                        "line": 36
+                      }
+                    },
+                    {
+                      "workerIndex": 4,
+                      "status": "passed",
+                      "duration": 181,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-08-23T04:35:34.517Z",
+                      "attachments": []
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "062460af9ad44771e31d-d81a57ee0030dfc0db34",
+              "file": "poc-test-scenarios.spec.js",
+              "line": 28,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "POC Query Tests",
+          "file": "poc-test-scenarios.spec.js",
+          "line": 44,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should pass - basic query validation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 15000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "status": "passed",
+                      "duration": 122,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-08-23T04:35:34.844Z",
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "062460af9ad44771e31d-03d637194d44b726a241",
+              "file": "poc-test-scenarios.spec.js",
+              "line": 45,
+              "column": 3
+            },
+            {
+              "title": "should fail - malformed query",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 15000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "status": "failed",
+                      "duration": 94,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Query syntax error\"\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Query syntax error\"\u001b[39m\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:56:22",
+                        "matcherResult": {
+                          "message": "\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Query syntax error\"\u001b[39m",
+                          "pass": false
+                        },
+                        "location": {
+                          "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                          "column": 22,
+                          "line": 56
+                        },
+                        "snippet": "  54 |     await page.goto('data:text/html,<html><body>Query syntax error</body></html>');\n  55 |     const response = await page.locator('body').textContent();\n> 56 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  57 |   });\n  58 | });\n  59 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                            "column": 22,
+                            "line": 56
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Query syntax error\"\u001b[39m\n\n  54 |     await page.goto('data:text/html,<html><body>Query syntax error</body></html>');\n  55 |     const response = await page.locator('body').textContent();\n> 56 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  57 |   });\n  58 | });\n  59 |\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:56:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-08-23T04:35:34.972Z",
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                        "column": 22,
+                        "line": 56
+                      }
+                    },
+                    {
+                      "workerIndex": 5,
+                      "status": "failed",
+                      "duration": 247,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Query syntax error\"\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Query syntax error\"\u001b[39m\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:56:22",
+                        "matcherResult": {
+                          "message": "\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Query syntax error\"\u001b[39m",
+                          "pass": false
+                        },
+                        "location": {
+                          "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                          "column": 22,
+                          "line": 56
+                        },
+                        "snippet": "  54 |     await page.goto('data:text/html,<html><body>Query syntax error</body></html>');\n  55 |     const response = await page.locator('body').textContent();\n> 56 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  57 |   });\n  58 | });\n  59 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                            "column": 22,
+                            "line": 56
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Query syntax error\"\u001b[39m\n\n  54 |     await page.goto('data:text/html,<html><body>Query syntax error</body></html>');\n  55 |     const response = await page.locator('body').textContent();\n> 56 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  57 |   });\n  58 | });\n  59 |\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:56:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-08-23T04:35:35.544Z",
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                        "column": 22,
+                        "line": 56
+                      }
+                    },
+                    {
+                      "workerIndex": 6,
+                      "status": "failed",
+                      "duration": 166,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Query syntax error\"\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Query syntax error\"\u001b[39m\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:56:22",
+                        "matcherResult": {
+                          "message": "\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Query syntax error\"\u001b[39m",
+                          "pass": false
+                        },
+                        "location": {
+                          "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                          "column": 22,
+                          "line": 56
+                        },
+                        "snippet": "  54 |     await page.goto('data:text/html,<html><body>Query syntax error</body></html>');\n  55 |     const response = await page.locator('body').textContent();\n> 56 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  57 |   });\n  58 | });\n  59 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                            "column": 22,
+                            "line": 56
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"Query syntax error\"\u001b[39m\n\n  54 |     await page.goto('data:text/html,<html><body>Query syntax error</body></html>');\n  55 |     const response = await page.locator('body').textContent();\n> 56 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  57 |   });\n  58 | });\n  59 |\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:56:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 2,
+                      "startTime": "2025-08-23T04:35:36.547Z",
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                        "column": 22,
+                        "line": 56
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "062460af9ad44771e31d-6b7c1233c92c590bbede",
+              "file": "poc-test-scenarios.spec.js",
+              "line": 52,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "POC CTE Query Tests",
+          "file": "poc-test-scenarios.spec.js",
+          "line": 60,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should pass - simple CTE query test",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 15000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "status": "passed",
+                      "duration": 213,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-08-23T04:35:37.176Z",
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "062460af9ad44771e31d-db1970eb2ff2c8516e64",
+              "file": "poc-test-scenarios.spec.js",
+              "line": 61,
+              "column": 3
+            },
+            {
+              "title": "should fail - complex CTE validation",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 15000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "status": "failed",
+                      "duration": 129,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"CTE query failed validation\"\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"CTE query failed validation\"\u001b[39m\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:72:22",
+                        "matcherResult": {
+                          "message": "\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"CTE query failed validation\"\u001b[39m",
+                          "pass": false
+                        },
+                        "location": {
+                          "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                          "column": 22,
+                          "line": 72
+                        },
+                        "snippet": "  70 |     await page.goto('data:text/html,<html><body>CTE query failed validation</body></html>');\n  71 |     const response = await page.locator('body').textContent();\n> 72 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  73 |   });\n  74 |\n  75 |   test('should be flaky - CTE performance dependent test', async ({ page }) => {"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                            "column": 22,
+                            "line": 72
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"CTE query failed validation\"\u001b[39m\n\n  70 |     await page.goto('data:text/html,<html><body>CTE query failed validation</body></html>');\n  71 |     const response = await page.locator('body').textContent();\n> 72 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  73 |   });\n  74 |\n  75 |   test('should be flaky - CTE performance dependent test', async ({ page }) => {\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:72:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-08-23T04:35:37.529Z",
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                        "column": 22,
+                        "line": 72
+                      }
+                    },
+                    {
+                      "workerIndex": 8,
+                      "status": "failed",
+                      "duration": 235,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"CTE query failed validation\"\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"CTE query failed validation\"\u001b[39m\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:72:22",
+                        "matcherResult": {
+                          "message": "\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"CTE query failed validation\"\u001b[39m",
+                          "pass": false
+                        },
+                        "location": {
+                          "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                          "column": 22,
+                          "line": 72
+                        },
+                        "snippet": "  70 |     await page.goto('data:text/html,<html><body>CTE query failed validation</body></html>');\n  71 |     const response = await page.locator('body').textContent();\n> 72 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  73 |   });\n  74 |\n  75 |   test('should be flaky - CTE performance dependent test', async ({ page }) => {"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                            "column": 22,
+                            "line": 72
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"CTE query failed validation\"\u001b[39m\n\n  70 |     await page.goto('data:text/html,<html><body>CTE query failed validation</body></html>');\n  71 |     const response = await page.locator('body').textContent();\n> 72 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  73 |   });\n  74 |\n  75 |   test('should be flaky - CTE performance dependent test', async ({ page }) => {\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:72:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-08-23T04:35:38.043Z",
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                        "column": 22,
+                        "line": 72
+                      }
+                    },
+                    {
+                      "workerIndex": 9,
+                      "status": "failed",
+                      "duration": 225,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"CTE query failed validation\"\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"CTE query failed validation\"\u001b[39m\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:72:22",
+                        "matcherResult": {
+                          "message": "\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"CTE query failed validation\"\u001b[39m",
+                          "pass": false
+                        },
+                        "location": {
+                          "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                          "column": 22,
+                          "line": 72
+                        },
+                        "snippet": "  70 |     await page.goto('data:text/html,<html><body>CTE query failed validation</body></html>');\n  71 |     const response = await page.locator('body').textContent();\n> 72 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  73 |   });\n  74 |\n  75 |   test('should be flaky - CTE performance dependent test', async ({ page }) => {"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                            "column": 22,
+                            "line": 72
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"Success\"\u001b[39m\nReceived string:    \u001b[31m\"CTE query failed validation\"\u001b[39m\n\n  70 |     await page.goto('data:text/html,<html><body>CTE query failed validation</body></html>');\n  71 |     const response = await page.locator('body').textContent();\n> 72 |     expect(response).toContain('Success'); // This will fail\n     |                      ^\n  73 |   });\n  74 |\n  75 |   test('should be flaky - CTE performance dependent test', async ({ page }) => {\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:72:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 2,
+                      "startTime": "2025-08-23T04:35:38.820Z",
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                        "column": 22,
+                        "line": 72
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "062460af9ad44771e31d-997f00190b0478eba2a1",
+              "file": "poc-test-scenarios.spec.js",
+              "line": 68,
+              "column": 3
+            },
+            {
+              "title": "should be flaky - CTE performance dependent test",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 15000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 10,
+                      "status": "failed",
+                      "duration": 155,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"cte_\u001b[7mpass\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"cte_\u001b[7mfail\u001b[27m\"\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"cte_\u001b[7mpass\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"cte_\u001b[7mfail\u001b[27m\"\u001b[39m\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:83:26",
+                        "matcherResult": {
+                          "actual": "cte_fail",
+                          "expected": "cte_pass",
+                          "message": "\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"cte_\u001b[7mpass\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"cte_\u001b[7mfail\u001b[27m\"\u001b[39m",
+                          "name": "toBe",
+                          "pass": false
+                        },
+                        "location": {
+                          "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                          "column": 26,
+                          "line": 83
+                        },
+                        "snippet": "  81 |     if (testInfo.retry === 0) {\n  82 |       // Fail on first attempt\n> 83 |       expect('cte_fail').toBe('cte_pass');\n     |                          ^\n  84 |     } else {\n  85 |       // Pass on retry\n  86 |       expect('cte_pass').toBe('cte_pass');"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                            "column": 26,
+                            "line": 83
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"cte_\u001b[7mpass\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"cte_\u001b[7mfail\u001b[27m\"\u001b[39m\n\n  81 |     if (testInfo.retry === 0) {\n  82 |       // Fail on first attempt\n> 83 |       expect('cte_fail').toBe('cte_pass');\n     |                          ^\n  84 |     } else {\n  85 |       // Pass on retry\n  86 |       expect('cte_pass').toBe('cte_pass');\n    at /Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js:83:26"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-08-23T04:35:39.670Z",
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/Users/nehaopenobserve/Documents/playwright-o2-web/openobserve/tests/ui-testing/poc-ingest/poc-test-scenarios.spec.js",
+                        "column": 26,
+                        "line": 83
+                      }
+                    },
+                    {
+                      "workerIndex": 11,
+                      "status": "passed",
+                      "duration": 198,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2025-08-23T04:35:40.402Z",
+                      "attachments": []
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "062460af9ad44771e31d-3c292fbe08f415e389fc",
+              "file": "poc-test-scenarios.spec.js",
+              "line": 75,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-08-23T04:35:30.883Z",
+    "duration": 9939.033000000001,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 3,
+    "flaky": 2
+  }
+}
