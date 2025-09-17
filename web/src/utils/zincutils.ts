@@ -1193,3 +1193,9 @@ export const getDuration = (createdAt: number) => {
     duration: durationFormatter(durationInSeconds),
   };
 };
+
+
+export const mergeAndRemoveDuplicates = (arr1: string[], arr2: string[]): string[] => {
+  // Merge both arrays, then remove duplicates using Set
+  return [...new Set([...arr1, ...arr2])];
+};
