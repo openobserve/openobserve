@@ -372,6 +372,7 @@ pub async fn remote_write(
                         if stream_params.stream_type != StreamType::Metrics {
                             continue;
                         }
+
                         // add partition keys
                         if !stream_partitioning_map.contains_key(stream_params.stream_name.as_str())
                         {
