@@ -145,7 +145,7 @@ export const usePanelDataLoader = (
       queries: [] as any,
     },
     annotations: [] as any,
-    resultMetaData: [] as any,
+    resultMetaData: [] as any, // 2D array: [queryIndex][partitionIndex]
     lastTriggeredAt: null as any,
     isCachedDataDifferWithCurrentTimeRange: false,
     searchRequestTraceIds: <string[]>[],
@@ -438,9 +438,9 @@ export const usePanelDataLoader = (
       // histogram_interval from partition api response
       const histogramInterval = res?.data?.histogram_interval ?? undefined;
 
-      // Add empty objects to state.resultMetaData for the results of this query
+      // Add empty arrays to state.resultMetaData for the partition results of this query
       state.data.push([]);
-      state.resultMetaData.push({});
+      state.resultMetaData.push([]); // Now each query has an array of partition results
 
       const currentQueryIndex = state.data.length - 1;
 
@@ -542,12 +542,19 @@ export const usePanelDataLoader = (
             ];
           }
 
-          // update result metadata
-          state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
+          // update result metadata - add to partition results array
+          // Store each partition's result metadata
+          state.resultMetaData[currentQueryIndex].push(searchRes.data ?? {});
 
-          if (searchRes.data.is_partial == true) {
+          if (
+            searchRes.data.is_partial == true &&
+            searchRes.data.new_end_time &&
+            searchRes.data.new_start_time
+          ) {
             // set the new start time as the start time of query
-            state.resultMetaData[currentQueryIndex].new_end_time =
+            // Update the last partition result
+            const lastPartitionIndex = state.resultMetaData[currentQueryIndex].length - 1;
+            state.resultMetaData[currentQueryIndex][lastPartitionIndex].new_end_time =
               endISOTimestamp;
 
             // need to break the loop, save the cache
@@ -579,16 +586,18 @@ export const usePanelDataLoader = (
               // set that is_partial to true if it is not last partition which we need to call
               if (i != 0) {
                 // set that is_partial to true
-                state.resultMetaData[currentQueryIndex].is_partial = true;
+                // Update the last partition result
+                const lastPartitionIndex = state.resultMetaData[currentQueryIndex].length - 1;
+                state.resultMetaData[currentQueryIndex][lastPartitionIndex].is_partial = true;
                 // set function error
-                state.resultMetaData[currentQueryIndex].function_error =
+                state.resultMetaData[currentQueryIndex][lastPartitionIndex].function_error =
                   `Query duration is modified due to query range restriction of ${max_query_range} hours`;
                 // set the new start time and end time
-                state.resultMetaData[currentQueryIndex].new_end_time =
+                state.resultMetaData[currentQueryIndex][lastPartitionIndex].new_end_time =
                   endISOTimestamp;
 
                 // set the new start time as the start time of query
-                state.resultMetaData[currentQueryIndex].new_start_time =
+                state.resultMetaData[currentQueryIndex][lastPartitionIndex].new_start_time =
                   partition[0];
 
                 // need to break the loop, save the cache
@@ -648,17 +657,20 @@ export const usePanelDataLoader = (
       ];
     }
 
-    // update result metadata
-    state.resultMetaData[payload?.meta?.currentQueryIndex] =
-      searchRes?.content?.results ?? {};
+    // update result metadata - for streaming, we replace instead of append
+    state.resultMetaData[payload?.meta?.currentQueryIndex] = [
+      searchRes?.content?.results ?? {},
+    ];
   };
 
   const handleStreamingHistogramMetadata = (payload: any, searchRes: any) => {
-    // update result metadata
-    state.resultMetaData[payload?.meta?.currentQueryIndex] = {
-      ...(searchRes?.content ?? {}),
-      ...(searchRes?.content?.results ?? {}),
-    };
+    // update result metadata - for streaming, we replace instead of append
+    state.resultMetaData[payload?.meta?.currentQueryIndex] = [
+      {
+        ...(searchRes?.content ?? {}),
+        ...(searchRes?.content?.results ?? {}),
+      },
+    ];
   };
 
   const handleStreamingHistogramHits = (payload: any, searchRes: any) => {
@@ -668,10 +680,12 @@ export const usePanelDataLoader = (
       code: "",
     };
 
+    // Get the first partition's metadata (streaming typically has single partition)
+    const firstPartitionMetadata =
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[0];
+
     // is streaming aggs
-    const streaming_aggs =
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]
-        ?.streaming_aggs ?? false;
+    const streaming_aggs = firstPartitionMetadata?.streaming_aggs ?? false;
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
@@ -681,9 +695,7 @@ export const usePanelDataLoader = (
     }
     // if order by is desc, append new partition response at end
     else if (
-      state?.resultMetaData?.[
-        payload?.meta?.currentQueryIndex
-      ]?.order_by?.toLowerCase() === "asc"
+      firstPartitionMetadata?.order_by?.toLowerCase() === "asc"
     ) {
       // else append new partition response at start
       state.data[payload?.meta?.currentQueryIndex] = [
@@ -697,9 +709,11 @@ export const usePanelDataLoader = (
       ];
     }
 
-    // update result metadata
-    state.resultMetaData[payload?.meta?.currentQueryIndex].hits =
-      searchRes?.content?.results?.hits ?? {};
+    // update result metadata - update the first partition result
+    if (state.resultMetaData[payload?.meta?.currentQueryIndex]?.[0]) {
+      state.resultMetaData[payload?.meta?.currentQueryIndex][0].hits =
+        searchRes?.content?.results?.hits ?? {};
+    }
   };
 
   // Limit, aggregation, vrl function, pagination, function error and query error
@@ -1311,7 +1325,9 @@ export const usePanelDataLoader = (
                   // if there is an function error and which not related to stream range, throw error
                   if (
                     searchRes.data.function_error &&
-                    searchRes.data.is_partial != true
+                    searchRes.data.is_partial != true &&
+                    searchRes.data.new_end_time &&
+                    searchRes.data.new_start_time
                   ) {
                     // abort on unmount
                     if (abortControllerRef) {
@@ -1337,7 +1353,7 @@ export const usePanelDataLoader = (
                   ) {
                     state.data.push([]);
                     state.metadata.queries.push({});
-                    state.resultMetaData.push({});
+                    state.resultMetaData.push([{}]); // Initialize as array with one element
 
                     if (
                       searchRes?.data?.hits &&
@@ -1350,11 +1366,13 @@ export const usePanelDataLoader = (
                       );
                     }
 
-                    // update result metadata
-                    state.resultMetaData[i] = {
-                      ...searchRes.data,
-                      hits: searchRes.data.hits[i],
-                    };
+                    // update result metadata - single partition per query
+                    state.resultMetaData[i] = [
+                      {
+                        ...searchRes.data,
+                        hits: searchRes.data.hits[i],
+                      },
+                    ];
 
                     // Update the metadata for the current query
                     Object.assign(
@@ -1423,12 +1441,12 @@ export const usePanelDataLoader = (
               if (searchResponse?.value?.hits?.length > 0) {
                 // Add empty objects to state.resultMetaData for the results of this query
                 state.data.push([]);
-                state.resultMetaData.push({});
+                state.resultMetaData.push([{}]); // Initialize as array with one element
 
                 const currentQueryIndex = state.data.length - 1;
 
                 state.data[currentQueryIndex] = searchResponse.value.hits;
-                state.resultMetaData[currentQueryIndex] = searchResponse.value;
+                state.resultMetaData[currentQueryIndex] = [searchResponse.value]; // Wrap in array
                 // set loading to false
                 state.loading = false;
 
@@ -1699,6 +1717,7 @@ export const usePanelDataLoader = (
 
     return { query, metadata };
   };
+
 
   /**
    * Processes an API error based on the given error and type.

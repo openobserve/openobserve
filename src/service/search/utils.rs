@@ -23,6 +23,7 @@ use tokio::sync::Mutex;
 use {crate::service::grpc::make_grpc_search_client, config::meta::cluster::NodeInfo};
 
 use super::{DATAFUSION_RUNTIME, datafusion::distributed_plan::remote_scan::RemoteScanExec};
+use crate::{common::meta::search::CAPPED_RESULTS_MSG, service::search::sql::Sql};
 
 type Cleanup = Pin<Box<dyn Future<Output = ()> + Send>>;
 
@@ -222,4 +223,19 @@ pub async fn collect_scan_stats(
         nodes.len()
     );
     scan_stats
+}
+
+pub fn check_query_default_limit_exceeded(num_rows: usize, partial_err: &mut String, sql: &Sql) {
+    let query_default_limit = config::get_config().limit.query_default_limit as usize;
+    if sql.limit > config::QUERY_WITH_NO_LIMIT && sql.limit <= 0 {
+        let capped_err = format!("{} limit: {query_default_limit}", CAPPED_RESULTS_MSG);
+        if num_rows > query_default_limit {
+            if !partial_err.is_empty() {
+                partial_err.push_str("\n");
+                partial_err.push_str(&capped_err);
+            } else {
+                *partial_err = capped_err;
+            }
+        }
+    }
 }
