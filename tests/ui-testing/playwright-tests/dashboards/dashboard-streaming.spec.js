@@ -71,7 +71,7 @@ test.describe("dashboard streaming testcases", () => {
     );
 
     // await page.waitForTimeout(3000);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState("networkidle");
 
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -98,25 +98,15 @@ test.describe("dashboard streaming testcases", () => {
     for (const term of searchTerms) {
       await variableInput.fill(term);
       // await page.waitForTimeout(1500);
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState("networkidle");
     }
+    // Select the final value
+    const option = page.getByRole("option", { name: "ziox" });
+    await option.waitFor({ state: "visible", timeout: 10000 });
+    await option.click();
 
-    // Try to select a value (if available)
-    // try {
-    //   const option = page.getByRole("option").first();
-    //   if (await option.isVisible()) {
-    //     await option.click();
-    //   }
-    // } catch (error) {
-    //   // No options available, continue
-    // }
- // Select the final value
- const option = page.getByRole("option", { name: "ziox" });
- await option.waitFor({ state: "visible", timeout: 10000 });
- await option.click();
-
- // Wait for any remaining network activity to settle
- await page.waitForLoadState('networkidle');
+    // Wait for any remaining network activity to settle
+    await page.waitForLoadState("networkidle");
 
     expect(valuesResponses.length).toBeGreaterThan(0);
 

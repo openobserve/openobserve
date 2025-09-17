@@ -725,7 +725,7 @@ test.describe("dashboard filter testcases", () => {
       true
     );
 
-    await page.waitForLoadState('networkidle');
+    // await page.waitForLoadState('networkidle');
 
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
