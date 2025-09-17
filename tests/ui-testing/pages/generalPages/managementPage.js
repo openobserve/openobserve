@@ -158,4 +158,52 @@ export
       await this.page.locator('[data-test="dashboard-add-submit"]').click();
     }
   }
+
+  // Set the streaming state to the desired state (enabled or disabled) eg: enabled = true, disabled = false
+  async setStreamingState(enabled) {
+    await this.page.goto(
+      process.env["ZO_BASE_URL"] + "/web/logs?org_identifier=default"
+    );
+    await this.page.waitForLoadState("networkidle");
+
+    await this.page.locator('[data-test="menu-link-settings-item"]').click();
+    await this.page.goto(
+      process.env["ZO_BASE_URL"] +
+        "/web/settings/general?org_identifier=default"
+    );
+    await this.page.waitForLoadState("networkidle");
+
+    const toggleSelector = '[data-test="general-settings-enable-streaming"]';
+
+    // Wait for the toggle element to be visible
+    await this.page.waitForSelector(toggleSelector);
+
+    // Get the current state of the toggle
+    const isCurrentlyChecked = await this.page.$eval(
+      toggleSelector,
+      (toggle) => {
+        return toggle.getAttribute("aria-checked") === "true";
+      }
+    );
+
+    if (isCurrentlyChecked !== enabled) {
+      await this.page.click(toggleSelector);
+      await this.page.waitForLoadState("networkidle");
+
+      await this.page.locator('[data-test="dashboard-add-submit"]').click();
+      await this.page.waitForLoadState("networkidle");
+
+      // Verify the new state
+      const newCheckedState = await this.page.$eval(
+        toggleSelector,
+        (toggle) => {
+          return toggle.getAttribute("aria-checked") === "true";
+        }
+      );
+
+      if (newCheckedState !== enabled) {
+        throw new Error(`Failed to set streaming state to ${enabled}`);
+      }
+    }
+  }
 }
