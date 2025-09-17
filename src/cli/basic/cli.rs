@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::path::PathBuf;
+
 use chrono::TimeZone;
 use config::utils::file::set_permission;
 use infra::{file_list as infra_file_list, table};
@@ -32,6 +34,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     let app = clap::Command::new("openobserve")
         .version(config::VERSION)
         .about(clap::crate_description!())
+        .arg(
+            clap::Arg::new("config")
+                .short('c')
+                .long("config")
+                .value_name("FILE")
+                .help("Path to config file to load and watch for changes")
+        )
         .subcommands(&[
             clap::Command::new("reset")
                 .about("reset openobserve data")
@@ -283,6 +292,18 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 ])
         ])
         .get_matches();
+
+    // Handle config file argument
+    if let Some(config_file_path) = app.get_one::<String>("config") {
+        let path = PathBuf::from(config_file_path);
+        config::config_path_manager::set_config_file_path(path.clone())
+            .and_then(|_| crate::job::config_watcher::reload_config(&path))
+            .map_err(|e|
+                anyhow::anyhow!(
+                    "set config from file path {config_file_path} failed with {e}, stopping boot up... ",
+                )
+            )?;
+    }
 
     if app.subcommand().is_none() {
         return Ok(false);
