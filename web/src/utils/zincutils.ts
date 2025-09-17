@@ -856,18 +856,6 @@ export const getFunctionErrorMessage = (
   }
 };
 
-export const errorMsgSet = () => {
-  const errorMsgSet = new Set();
-
-  return function (errorMsgArr: string[]) {
-    for (const errorMsg of errorMsgArr) {
-      if (errorMsg) {
-        errorMsgSet.add(errorMsg);
-      }
-    }
-    return Array.from(errorMsgSet);
-  };
-};
 
 export const generateTraceContext = () => {
   const traceId = getUUID().replace(/-/g, "");
@@ -1217,7 +1205,6 @@ export const processQueryMetadataErrors = (
   }
 
   const combinedWarnings: string[] = [];
-  const errorDedup = errorMsgSet();
 
   // Handle multi-query format (array of arrays)
   if (Array.isArray(metadata[0])) {
@@ -1250,7 +1237,7 @@ export const processQueryMetadataErrors = (
     }
   }
 
-  // Deduplicate and join warnings
-  const dedupedWarnings = errorDedup(combinedWarnings);
+  // Deduplicate using mergeAndRemoveDuplicates (pass empty array as second param)
+  const dedupedWarnings = mergeAndRemoveDuplicates(combinedWarnings, []);
   return dedupedWarnings.join(", ");
 };

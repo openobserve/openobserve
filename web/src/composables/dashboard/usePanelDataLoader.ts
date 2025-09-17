@@ -37,7 +37,6 @@ import {
   generateTraceContext,
   isWebSocketEnabled,
   isStreamingEnabled,
-  errorMsgSet,
 } from "@/utils/zincutils";
 import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
@@ -547,7 +546,11 @@ export const usePanelDataLoader = (
           // Store each partition's result metadata
           state.resultMetaData[currentQueryIndex].push(searchRes.data ?? {});
 
-          if (searchRes.data.is_partial == true) {
+          if (
+            searchRes.data.is_partial == true &&
+            searchRes.data.new_end_time &&
+            searchRes.data.new_start_time
+          ) {
             // set the new start time as the start time of query
             // Update the last partition result
             const lastPartitionIndex = state.resultMetaData[currentQueryIndex].length - 1;
@@ -1322,7 +1325,9 @@ export const usePanelDataLoader = (
                   // if there is an function error and which not related to stream range, throw error
                   if (
                     searchRes.data.function_error &&
-                    searchRes.data.is_partial != true
+                    searchRes.data.is_partial != true &&
+                    searchRes.data.new_end_time &&
+                    searchRes.data.new_start_time
                   ) {
                     // abort on unmount
                     if (abortControllerRef) {
@@ -1713,8 +1718,6 @@ export const usePanelDataLoader = (
     return { query, metadata };
   };
 
-  // Create an instance of errorMsgSet for deduplicating errors
-  const deduplicateErrors = errorMsgSet();
 
   /**
    * Processes an API error based on the given error and type.
