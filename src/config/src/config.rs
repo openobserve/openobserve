@@ -1118,6 +1118,12 @@ pub struct Common {
         help = "Enable to use large partition for index. This will apply for all streams"
     )]
     pub align_partitions_for_index: bool,
+    #[env_config(
+        name = "ZO_LOG_PAGE_DEFAULT_FIELD_LIST",
+        default = "uds",
+        help = "Which fields to show by default in logs search page. Valid values - all,uds,interesting"
+    )]
+    pub log_page_default_field_list: String,
 }
 
 #[derive(EnvConfig, Default)]
@@ -2342,6 +2348,14 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.common.default_hec_stream.is_empty() {
         cfg.common.default_hec_stream = "_hec".to_string();
+    }
+
+    cfg.common.log_page_default_field_list = cfg.common.log_page_default_field_list.to_lowercase();
+    if !matches!(
+        cfg.common.log_page_default_field_list.as_str(),
+        "uds" | "all" | "interesting"
+    ) {
+        cfg.common.log_page_default_field_list = "uds".to_string();
     }
 
     Ok(())
