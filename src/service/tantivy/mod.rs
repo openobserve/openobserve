@@ -31,7 +31,7 @@ use config::{
 };
 use futures::TryStreamExt;
 use hashbrown::HashSet;
-use infra::{cache::file_data::TRACE_ID_FOR_CACHE_LATEST_FILE, storage};
+use infra::storage;
 use parquet::arrow::async_reader::ParquetRecordBatchStream;
 use puffin_directory::writer::PuffinDirWriter;
 use tokio::task::JoinHandle;
@@ -72,17 +72,14 @@ pub(crate) async fn create_tantivy_index(
         && cfg.cache_latest_files.cache_index
         && cfg.cache_latest_files.download_from_node
     {
-        infra::cache::file_data::disk::set(
-            TRACE_ID_FOR_CACHE_LATEST_FILE,
-            &idx_file_name,
-            Bytes::from(puffin_bytes.clone()),
-        )
-        .await?;
+        infra::cache::file_data::disk::set(&idx_file_name, Bytes::from(puffin_bytes.clone()))
+            .await?;
         log::info!("file: {idx_file_name} file_data::disk::set success");
     }
 
     // the index file is stored in the same account as the parquet file
-    match storage::put(&idx_file_name, Bytes::from(puffin_bytes)).await {
+    let account = storage::get_account(parquet_file_name).unwrap_or_default();
+    match storage::put(&account, &idx_file_name, Bytes::from(puffin_bytes)).await {
         Ok(_) => {
             log::info!(
                 "{} generated tantivy index file: {}, size {}, took: {} ms",

@@ -33,15 +33,13 @@ pub mod remote {
     use config::{
         meta::stream::{FileMeta, StreamType},
         utils::{
-            arrow::record_batches_to_json_rows,
-            parquet::{read_recordbatch_from_bytes, write_recordbatch_to_parquet},
-            record_batch_ext::convert_json_to_record_batch,
+            parquet::write_recordbatch_to_parquet, record_batch_ext::convert_json_to_record_batch,
         },
     };
 
     use super::*;
 
-    fn get_remote_key_prefix(org_id: &str, table_name: &str) -> String {
+    pub(crate) fn get_remote_key_prefix(org_id: &str, table_name: &str) -> String {
         format!(
             "files/{}/{}/{}",
             org_id,
@@ -51,7 +49,7 @@ pub mod remote {
     }
 
     /// Create remote key with enrichment table prefix
-    fn create_remote_key(org_id: &str, table_name: &str, created_at: i64) -> String {
+    pub(crate) fn create_remote_key(org_id: &str, table_name: &str, created_at: i64) -> String {
         let ts = chrono::DateTime::from_timestamp_micros(created_at).unwrap();
         let file_name = format!(
             "{:04}/{:02}/{:02}/{:02}/{}.parquet",
@@ -78,49 +76,17 @@ pub mod remote {
     ) -> Result<()> {
         // Create remote key with enrichment table prefix
         let remote_key = create_remote_key(org_id, table_name, created_at);
+        let account = infra::storage::get_account(&remote_key).unwrap_or_default();
 
         // Use existing storage::put function for remote upload
-        infra::storage::put(&remote_key, Bytes::from(data.to_owned()))
+        infra::storage::put(&account, &remote_key, Bytes::from(data.to_owned()))
             .await
             .map_err(|e| anyhow!("Failed to upload enrichment table to remote: {}", e))?;
 
-        crate::service::db::file_list::set(&remote_key, Some(file_meta), false).await?;
+        crate::service::db::file_list::set(&account, &remote_key, Some(file_meta), false).await?;
 
-        log::debug!("Uploaded enrichment table {} to remote", table_name);
+        log::debug!("Uploaded enrichment table {table_name} to remote");
         Ok(())
-    }
-
-    /// Fetch data from remote using existing infra::storage::get_bytes function
-    pub async fn retrieve(org_id: &str, table_name: &str) -> Result<Vec<Value>> {
-        // Create remote key with enrichment table prefix
-        let remote_key = get_remote_key_prefix(org_id, table_name);
-
-        let files = infra::storage::list(&remote_key).await?;
-
-        let mut records = Vec::new();
-        for file in files {
-            match infra::storage::get(&file).await {
-                Ok(data_bytes) => {
-                    let data_bytes = data_bytes
-                        .bytes()
-                        .await
-                        .map_err(|e| anyhow!("Failed to get data bytes: {}", e))?;
-                    let (_schema, batches) = read_recordbatch_from_bytes(&data_bytes).await?;
-                    let batches: Vec<_> = batches.iter().collect();
-                    let table_data = record_batches_to_json_rows(&batches)?;
-                    let table_data = table_data
-                        .iter()
-                        .map(|row| Value::Object(row.clone()))
-                        .collect::<Vec<_>>();
-                    log::debug!("Fetched enrichment table {} from remote", remote_key);
-                    records.extend(table_data);
-                }
-                Err(e) => {
-                    log::warn!("Enrichment table {} not found in remote: {}", remote_key, e);
-                }
-            }
-        }
-        Ok(records)
     }
 
     /// Merge and upload data to remote
@@ -166,10 +132,7 @@ pub mod remote {
 
         upload_to_remote(org_id, table_name, file_meta, &data, min_ts).await?;
 
-        log::debug!(
-            "Merged and uploaded enrichment table {} to remote",
-            table_name
-        );
+        log::debug!("Merged and uploaded enrichment table {table_name} to remote");
 
         // Delete the data from the db
         database::delete(org_id, table_name).await?;
@@ -218,33 +181,6 @@ pub mod remote {
         Ok(())
     }
 
-    pub async fn delete(org_id: &str, table_name: &str) -> Result<()> {
-        // Create remote key with enrichment table prefix
-        let remote_key = get_remote_key_prefix(org_id, table_name);
-
-        let files = infra::storage::list(&remote_key)
-            .await
-            .map_err(|e| anyhow!("Failed to list remote keys for deletion: {}", e))?;
-        let files: Vec<_> = files.iter().map(|file| file.as_str()).collect();
-
-        if files.is_empty() {
-            return Ok(());
-        }
-
-        log::debug!(
-            "Attempting to delete {} files for enrichment table {} from remote",
-            files.len(),
-            table_name
-        );
-
-        infra::storage::del(&files)
-            .await
-            .map_err(|e| anyhow!("Failed to delete enrichment table from remote: {}", e))?;
-
-        log::debug!("Deleted enrichment table {} from remote", table_name);
-        Ok(())
-    }
-
     pub async fn get_merge_threshold_mb() -> Result<i64> {
         let cfg = config::get_config();
         let merge_threshold_mb = cfg.enrichment_table.merge_threshold_mb;
@@ -274,15 +210,12 @@ pub mod remote {
                     match merge_and_upload_to_remote(&org_id, &table_name).await {
                         Ok(_) => {
                             log::debug!(
-                                "Merged and uploaded enrichment table {} to remote",
-                                table_name
+                                "Merged and uploaded enrichment table {table_name} to remote"
                             );
                         }
                         Err(e) => {
                             log::error!(
-                                "Failed to merge and upload enrichment table {}: {}",
-                                table_name,
-                                e
+                                "Failed to merge and upload enrichment table {table_name}: {e}"
                             );
                         }
                     }
@@ -335,7 +268,7 @@ pub mod local {
             .await
             .map_err(|e| anyhow!("Failed to write metadata file: {}", e))?;
 
-        log::debug!("Stored enrichment table {} to local storage", key);
+        log::debug!("Stored enrichment table {key} to local storage");
         Ok(())
     }
 
@@ -397,7 +330,7 @@ pub mod local {
             .await
             .map_err(|e| anyhow!("Failed to write metadata file: {}", e))?;
 
-        log::debug!("Deleted enrichment table {} from local storage", key);
+        log::debug!("Deleted enrichment table {key} from local storage");
         Ok(())
     }
 
@@ -483,7 +416,7 @@ pub mod database {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to save enrichment data: {}", e))?;
 
-        log::debug!("Stored enrichment table {} to database", table_name);
+        log::debug!("Stored enrichment table {table_name} to database");
         Ok(())
     }
 
@@ -493,11 +426,7 @@ pub mod database {
         {
             Ok(data) => Ok(data.0),
             Err(e) => {
-                log::error!(
-                    "Failed to retrieve enrichment table {} from database: {}",
-                    table_name,
-                    e
-                );
+                log::error!("Failed to retrieve enrichment table {table_name} from database: {e}");
                 Err(anyhow::anyhow!(
                     "Failed to retrieve enrichment table {}: {}",
                     table_name,
@@ -515,10 +444,7 @@ pub mod database {
                 anyhow::anyhow!("Failed to delete enrichment table {}: {e}", table_name)
             })?;
 
-        log::debug!(
-            "Deleted enrichment table {} from database storage",
-            table_name
-        );
+        log::debug!("Deleted enrichment table {table_name} from database storage");
         Ok(())
     }
 

@@ -149,6 +149,7 @@ struct ConfigResponse<'a> {
     dashboard_placeholder: String,
     ai_enabled: bool,
     dashboard_show_symbol_enabled: bool,
+    log_page_default_field_list: String,
 }
 
 #[derive(Serialize)]
@@ -356,6 +357,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         ai_enabled,
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
+        log_page_default_field_list: cfg.common.log_page_default_field_list.clone(),
     }))
 }
 

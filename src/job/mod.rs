@@ -44,7 +44,7 @@ mod promql_self_consume;
 mod stats;
 pub(crate) mod syslog_server;
 
-pub use file_downloader::queue_download;
+pub use file_downloader::{download_from_node, queue_download};
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 pub async fn init() -> Result<(), anyhow::Error> {

@@ -51,6 +51,10 @@ pub type RwAHashMap<K, V> = tokio::sync::RwLock<HashMap<K, V>>;
 pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
+// for DDL commands and migrations
+pub const DB_SCHEMA_VERSION: u64 = 3;
+pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
+
 // global version variables
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
@@ -92,10 +96,6 @@ pub const TIMESTAMP_COL_NAME: &str = "_timestamp";
 pub const ID_COL_NAME: &str = "_o2_id";
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ALL_VALUES_COL_NAME: &str = "_all_values";
-
-// for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 2;
-pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 9] = [
     "log", "message", "msg", "content", "data", "body", "json", "error", "errors",
@@ -780,8 +780,6 @@ pub struct Common {
         help = "Disable timestamp field compression"
     )]
     pub timestamp_compression_disabled: bool,
-    #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
-    pub feature_per_thread_lock: bool,
     #[env_config(name = "ZO_FEATURE_INGESTER_NONE_COMPRESSION", default = false)]
     pub feature_ingester_none_compression: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
@@ -1138,6 +1136,12 @@ pub struct Common {
         help = "Config file watcher interval in seconds. Set to 0 to disable"
     )]
     pub env_watcher_interval: u64,
+    #[env_config(
+        name = "ZO_LOG_PAGE_DEFAULT_FIELD_LIST",
+        default = "uds",
+        help = "Which fields to show by default in logs search page. Valid values - all,uds,interesting"
+    )]
+    pub log_page_default_field_list: String,
 }
 
 #[derive(EnvConfig)]
@@ -1533,7 +1537,7 @@ pub struct Compact {
     pub file_list_deleted_mode: String,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
-        default = 500,
+        default = 0,
         help = "Batch size for compact get pending jobs"
     )]
     pub batch_size: i64,
@@ -1569,11 +1573,8 @@ pub struct CacheLatestFiles {
     pub delete_merge_files: bool,
     #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_FROM_NODE", default = false)]
     pub download_from_node: bool,
-    #[env_config(
-        name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_FROM_NODE_MAX_SIZE",
-        default = 250
-    )]
-    pub download_from_node_max_size: usize,
+    #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_NODE_SIZE", default = 100)] // MB
+    pub download_node_size: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1760,8 +1761,20 @@ pub struct Nats {
     pub v211_support: bool,
 }
 
-#[derive(Debug, EnvConfig)]
+#[derive(Debug, Default, EnvConfig)]
 pub struct S3 {
+    #[env_config(
+        name = "ZO_S3_ACCOUNTS",
+        default = "",
+        help = "comma separated list of accounts"
+    )]
+    pub accounts: String,
+    #[env_config(
+        name = "ZO_S3_STREAM_STRATEGY",
+        default = "",
+        help = "stream strategy, default is: empty, only use default account, other value is: file_hash, stream_hash, stream1:account1,stream2:account2"
+    )]
+    pub stream_strategy: String,
     #[env_config(name = "ZO_S3_PROVIDER", default = "")]
     pub provider: String,
     #[env_config(name = "ZO_S3_SERVER_URL", default = "")]
@@ -2368,6 +2381,14 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.default_hec_stream = "_hec".to_string();
     }
 
+    cfg.common.log_page_default_field_list = cfg.common.log_page_default_field_list.to_lowercase();
+    if !matches!(
+        cfg.common.log_page_default_field_list.as_str(),
+        "uds" | "all" | "interesting"
+    ) {
+        cfg.common.log_page_default_field_list = "uds".to_string();
+    }
+
     Ok(())
 }
 
@@ -2733,7 +2754,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.compact.batch_size < 1 {
-        cfg.compact.batch_size = 100;
+        cfg.compact.batch_size = cfg.limit.cpu_num as i64;
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;

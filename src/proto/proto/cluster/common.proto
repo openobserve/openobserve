@@ -51,6 +51,7 @@ message FileKey {
     FileMeta       meta        = 3;
     bool           deleted     = 4;
     optional bytes segment_ids = 5;
+    string         account     = 6;
 }
 
 message IdxFileName {
@@ -68,5 +69,5 @@ message FileContent {
 }
 
 message SimpleFileList {
-    repeated string paths = 1;
+    repeated string files = 1;
 }

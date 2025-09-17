@@ -16,25 +16,17 @@
 use std::ops::Range;
 
 use anyhow::Result;
-use bytes::Bytes;
 use config::{
-    cluster::LOCAL_NODE,
-    get_config,
-    meta::{cluster::get_internal_grpc_token, stream::FileKey},
-    metrics,
+    cluster::LOCAL_NODE, get_config, meta::stream::FileKey, metrics,
     utils::inverted_index::convert_parquet_file_name_to_tantivy_file,
 };
-use futures_util::StreamExt;
-use infra::cache::file_data::{TRACE_ID_FOR_CACHE_LATEST_FILE, disk};
+use infra::cache::file_data::{CacheType, disk};
 use opentelemetry::global;
 use proto::cluster_rpc::{
-    EmptyResponse, FileContent, FileContentResponse, FileList, SimpleFileList,
-    event_client::EventClient, event_server::Event,
+    EmptyResponse, FileContent, FileContentResponse, FileList, SimpleFileList, event_server::Event,
 };
-use tonic::{
-    Request, Response, Status, codec::CompressionEncoding, codegen::tokio_stream,
-    metadata::MetadataValue,
-};
+use tokio_stream::wrappers::ReceiverStream;
+use tonic::{Request, Response, Status, codegen::tokio_stream};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::handler::grpc::MetadataMap;
@@ -45,8 +37,7 @@ const CHUNK_SIZE: usize = 4 * 1024 * 1024; // 4MB chunks
 
 #[tonic::async_trait]
 impl Event for Eventer {
-    type GetFilesStream =
-        tokio_stream::wrappers::ReceiverStream<Result<FileContentResponse, Status>>;
+    type GetFilesStream = ReceiverStream<Result<FileContentResponse, Status>>;
 
     async fn send_file_list(
         &self,
@@ -70,13 +61,18 @@ impl Event for Eventer {
         // cache latest files for querier
         if cfg.cache_latest_files.enabled && LOCAL_NODE.is_querier() {
             let mut files_to_download = Vec::new();
-            let mut index_files_to_download = Vec::new();
 
             // Collect files to download
             for item in put_items.iter() {
                 // cache parquet
                 if cfg.cache_latest_files.cache_parquet {
-                    files_to_download.push((item.key.clone(), item.meta.compressed_size));
+                    files_to_download.push((
+                        item.id,
+                        item.account.clone(),
+                        item.key.clone(),
+                        item.meta.compressed_size,
+                        item.meta.max_ts,
+                    ));
                 }
 
                 // cache index for the parquet
@@ -84,84 +80,62 @@ impl Event for Eventer {
                     && item.meta.index_size > 0
                     && let Some(ttv_file) = convert_parquet_file_name_to_tantivy_file(&item.key)
                 {
-                    index_files_to_download.push((ttv_file, item.meta.index_size));
+                    files_to_download.push((
+                        item.id,
+                        item.account.clone(),
+                        ttv_file,
+                        item.meta.index_size,
+                        item.meta.max_ts,
+                    ));
                 }
             }
 
             // Try batch download first
             if get_config().cache_latest_files.download_from_node {
                 let mut failed_files = Vec::new();
-                let mut failed_index_files = Vec::new();
 
-                // Try batch download for parquet files
+                // Try batch download files
                 if !files_to_download.is_empty() {
-                    match get_files_from_notifier(&grpc_addr, &files_to_download).await {
+                    match crate::job::download_from_node(&grpc_addr, &files_to_download).await {
                         Ok(failed) => failed_files = failed,
                         Err(e) => {
-                            log::error!("Failed to get files from notifier: {}", e);
+                            log::error!("[gRPC:Event] Failed to get files from notifier: {e}");
                             failed_files = files_to_download;
                         }
                     }
                 }
 
-                // Try batch download for index files
-                if !index_files_to_download.is_empty() {
-                    match get_files_from_notifier(&grpc_addr, &index_files_to_download).await {
-                        Ok(failed) => failed_index_files = failed,
-                        Err(e) => {
-                            log::error!("Failed to get index files from notifier: {}", e);
-                            failed_index_files = index_files_to_download;
-                        }
-                    }
-                }
-
                 // Fallback to individual downloads for failed files
-                for (file, size) in failed_files {
-                    if let Err(e) = infra::cache::file_data::download(
-                        TRACE_ID_FOR_CACHE_LATEST_FILE,
-                        &file,
-                        Some(size as usize),
+                for (id, account, file, size, ts) in failed_files {
+                    if let Err(e) = crate::job::queue_download(
+                        "".to_string(),
+                        id,
+                        account,
+                        file,
+                        size,
+                        ts,
+                        CacheType::Disk,
                     )
                     .await
                     {
-                        log::error!("Failed to cache file data: {}", e);
-                    }
-                }
-
-                for (file, size) in failed_index_files {
-                    if let Err(e) = infra::cache::file_data::download(
-                        TRACE_ID_FOR_CACHE_LATEST_FILE,
-                        &file,
-                        Some(size as usize),
-                    )
-                    .await
-                    {
-                        log::error!("Failed to cache index file data: {}", e);
+                        log::error!("[gRPC:Event] Failed to cache file data: {e}");
                     }
                 }
             } else {
                 // Direct download when download_from_node_enabled is false
-                for (file, size) in files_to_download {
-                    if let Err(e) = infra::cache::file_data::download(
-                        TRACE_ID_FOR_CACHE_LATEST_FILE,
-                        &file,
-                        Some(size as usize),
+                for (id, account, file, size, ts) in files_to_download {
+                    if let Err(e) = crate::job::queue_download(
+                        "".to_string(),
+                        id,
+                        account,
+                        file,
+                        size,
+                        ts,
+                        CacheType::Disk,
                     )
                     .await
                     {
-                        log::error!("Failed to cache file data: {}", e);
-                    }
-                }
-
-                for (file, size) in index_files_to_download {
-                    if let Err(e) = infra::cache::file_data::download(
-                        TRACE_ID_FOR_CACHE_LATEST_FILE,
-                        &file,
-                        Some(size as usize),
-                    )
-                    .await
-                    {
-                        log::error!("Failed to cache index file data: {}", e);
+                        log::error!("[gRPC:Event] Failed to cache file data: {e}");
                     }
                 }
             }
@@ -215,22 +189,19 @@ impl Event for Eventer {
         request: Request<SimpleFileList>,
     ) -> Result<Response<Self::GetFilesStream>, Status> {
         let file_list = request.into_inner();
-        let (tx, rx) = tokio::sync::mpsc::channel(32);
+        let (tx, rx) = tokio::sync::mpsc::channel(4);
 
         // Spawn a task to handle the streaming
         tokio::spawn(async move {
-            for path in file_list.paths.iter() {
-                log::info!("handle_file_chunked: {}", path);
+            for path in file_list.files.iter() {
                 if let Err(e) = handle_file_chunked(path, tx.clone()).await {
-                    log::error!("Failed to handle file {}: {}", path, e);
+                    log::error!("[gRPC:Event] Failed to handle file {path}: {e}");
                     break;
                 }
             }
         });
 
-        Ok(Response::new(tokio_stream::wrappers::ReceiverStream::new(
-            rx,
-        )))
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 }
 
@@ -240,18 +211,11 @@ async fn handle_file_chunked(
 ) -> Result<(), Status> {
     let start = std::time::Instant::now();
     let filename = path.to_string();
-    let mut offset = 0_u64;
+    let mut offset = 0u64;
     let total_size = disk::get_size(path).await.unwrap_or(0) as u64;
 
     while offset < total_size {
         let chunk_size = std::cmp::min(CHUNK_SIZE as u64, total_size - offset);
-        log::debug!(
-            "handle_file_chunked {} offset: {}, chunk_size: {}",
-            filename,
-            offset,
-            chunk_size
-        );
-
         let chunk = match infra::cache::file_data::disk::get(
             path,
             Some(Range {
@@ -264,7 +228,7 @@ async fn handle_file_chunked(
             Some(file_data) => file_data,
             None => {
                 if let Err(e) = tx.send(Err(Status::not_found(path))).await {
-                    log::error!("Failed to send error: {}", e);
+                    log::error!("[gRPC:Event] Failed to send error: {e}");
                 }
                 return Err(Status::not_found(path));
             }
@@ -278,7 +242,7 @@ async fn handle_file_chunked(
         };
 
         if let Err(e) = tx.send(Ok(response)).await {
-            log::error!("Failed to send file chunk: {}", e);
+            log::error!("[gRPC:Event] Failed to send file chunk: {e}");
             return Err(Status::internal("Failed to send file chunk"));
         }
 
@@ -286,7 +250,7 @@ async fn handle_file_chunked(
     }
 
     log::info!(
-        "handle file:{}, total_size: {}, offset: {} elapsed: {}ms",
+        "[gRPC:Event] Send file: {}, total_size: {}, offset: {} took: {} ms",
         path,
         total_size,
         offset,
@@ -296,92 +260,278 @@ async fn handle_file_chunked(
     Ok(())
 }
 
-async fn get_files_from_notifier(
-    addr: &str,
-    files_meta: &[(String, i64)],
-) -> Result<Vec<(String, i64)>> {
-    let start = std::time::Instant::now();
-    log::debug!("get_files_from_notifier start, files: {:?}", files_meta);
-    let token: MetadataValue<_> = get_internal_grpc_token()
-        .parse()
-        .map_err(|_| anyhow::anyhow!("Invalid token"))?;
+#[cfg(test)]
+mod tests {
+    use proto::cluster_rpc::{FileKey, FileList, FileMeta};
 
-    let channel = crate::service::grpc::get_cached_channel(addr).await?;
-    let client = EventClient::with_interceptor(channel, move |mut req: Request<()>| {
-        req.metadata_mut().insert("authorization", token.clone());
-        Ok(req)
-    });
+    use super::*;
 
-    let filekeys = files_meta
-        .iter()
-        .map(|(path, _)| path.clone())
-        .collect::<Vec<String>>();
-    let mut request = Request::new(SimpleFileList {
-        paths: filekeys.to_vec(),
-    });
-    request.set_timeout(std::time::Duration::from_secs(
-        get_config().limit.query_timeout,
-    ));
+    #[test]
+    fn test_file_content_response_creation() {
+        // Test creating a FileContentResponse
+        let file_content = FileContent {
+            content: b"test content".to_vec(),
+            filename: "test.txt".to_string(),
+        };
 
-    let response = client
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(
-            get_config().cache_latest_files.download_from_node_max_size * 1024 * 1024,
-        )
-        .max_encoding_message_size(
-            get_config().cache_latest_files.download_from_node_max_size * 1024 * 1024,
-        )
-        .get_files(request)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to get files from {addr}, {e}"))?;
+        let response = FileContentResponse {
+            entries: vec![file_content.clone()],
+        };
 
-    let mut response_stream = response.into_inner();
-    let mut file_contents = std::collections::HashMap::new();
-    let mut downloaded_files = std::collections::HashSet::new();
+        assert_eq!(response.entries.len(), 1);
+        assert_eq!(response.entries[0].content, b"test content");
+        assert_eq!(response.entries[0].filename, "test.txt");
+    }
 
-    while let Some(response) = response_stream.next().await {
-        let response =
-            response.map_err(|e| anyhow::anyhow!("Failed to receive file chunk: {}", e))?;
-        for content in response.entries {
-            file_contents.insert(content.filename.clone(), content.content);
-            downloaded_files.insert(content.filename);
+    #[test]
+    fn test_file_key_creation() {
+        // Test creating FileKey directly
+        let file_key = FileKey {
+            id: 123,
+            key: "test/file.parquet".to_string(),
+            account: "test_account".to_string(),
+            deleted: false,
+            meta: Some(FileMeta {
+                compressed_size: 1024,
+                index_size: 512,
+                max_ts: 1234567890,
+                ..Default::default()
+            }),
+            segment_ids: None,
+        };
+
+        assert_eq!(file_key.id, 123);
+        assert_eq!(file_key.key, "test/file.parquet");
+        assert_eq!(file_key.account, "test_account");
+    }
+
+    #[test]
+    fn test_filter_deleted_items() {
+        // Test filtering deleted items from FileList
+        let items = vec![
+            FileKey {
+                id: 1,
+                key: "test/file1.parquet".to_string(),
+                account: "test_account".to_string(),
+                deleted: false,
+                meta: Some(FileMeta {
+                    compressed_size: 1024,
+                    index_size: 512,
+                    max_ts: 1234567890,
+                    ..Default::default()
+                }),
+                segment_ids: None,
+            },
+            FileKey {
+                id: 2,
+                key: "test/file2.parquet".to_string(),
+                account: "test_account".to_string(),
+                deleted: true,
+                meta: Some(FileMeta {
+                    compressed_size: 2048,
+                    index_size: 1024,
+                    max_ts: 1234567891,
+                    ..Default::default()
+                }),
+                segment_ids: None,
+            },
+            FileKey {
+                id: 3,
+                key: "test/file3.parquet".to_string(),
+                account: "test_account".to_string(),
+                deleted: false,
+                meta: Some(FileMeta {
+                    compressed_size: 3072,
+                    index_size: 1536,
+                    max_ts: 1234567892,
+                    ..Default::default()
+                }),
+                segment_ids: None,
+            },
+        ];
+
+        let non_deleted_items: Vec<&FileKey> = items.iter().filter(|v| !v.deleted).collect();
+
+        assert_eq!(non_deleted_items.len(), 2);
+        assert_eq!(non_deleted_items[0].id, 1);
+        assert_eq!(non_deleted_items[1].id, 3);
+    }
+
+    #[test]
+    fn test_chunk_size_calculation() {
+        // Test chunk size calculation logic
+        let total_size = 10000u64;
+        let mut offset = 0u64;
+        let chunk_size = 4096u64;
+
+        let mut chunks = Vec::new();
+        while offset < total_size {
+            let current_chunk_size = std::cmp::min(chunk_size, total_size - offset);
+            chunks.push(current_chunk_size);
+            offset += current_chunk_size;
+        }
+
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], 4096);
+        assert_eq!(chunks[1], 4096);
+        assert_eq!(chunks[2], 1808); // 10000 - 8192
+        assert_eq!(offset, total_size);
+    }
+
+    #[test]
+    fn test_range_creation() {
+        // Test creating ranges for file reading
+        let offset = 1024u64;
+        let chunk_size = 512u64;
+        let range = Range {
+            start: offset,
+            end: offset + chunk_size,
+        };
+
+        assert_eq!(range.start, 1024);
+        assert_eq!(range.end, 1536);
+        assert_eq!(range.end - range.start, 512);
+    }
+
+    #[test]
+    fn test_file_meta_validation() {
+        // Test FileMeta validation
+        let valid_meta = FileMeta {
+            compressed_size: 1024,
+            index_size: 512,
+            max_ts: 1234567890,
+            ..Default::default()
+        };
+
+        assert!(valid_meta.compressed_size > 0);
+        assert!(valid_meta.index_size > 0);
+        assert!(valid_meta.max_ts > 0);
+
+        // Test with zero values
+        let zero_meta = FileMeta {
+            compressed_size: 0,
+            index_size: 0,
+            max_ts: 0,
+            ..Default::default()
+        };
+
+        assert_eq!(zero_meta.compressed_size, 0);
+        assert_eq!(zero_meta.index_size, 0);
+        assert_eq!(zero_meta.max_ts, 0);
+    }
+
+    #[test]
+    fn test_cache_type_enum() {
+        // Test CacheType enum values
+        assert_eq!(CacheType::Disk as u32, 0);
+        assert_eq!(CacheType::Memory as u32, 1);
+    }
+
+    #[test]
+    fn test_metadata_map_creation() {
+        // Test MetadataMap creation from tonic Request
+        let mut metadata = tonic::metadata::MetadataMap::new();
+        metadata.insert("test_key", "test_value".parse().unwrap());
+
+        let request = Request::new(FileList {
+            node_addr: "test_node".to_string(),
+            items: vec![],
+        });
+        // Note: We can't easily test MetadataMap extraction without a real gRPC context
+        // This test just ensures the type exists and can be referenced
+        let _metadata_map = MetadataMap(&request.metadata().clone());
+    }
+
+    #[test]
+    fn test_empty_response_creation() {
+        // Test EmptyResponse creation
+        let empty_response = EmptyResponse {};
+        // EmptyResponse is a unit struct, so its size is 0
+        assert_eq!(std::mem::size_of_val(&empty_response), 0);
+    }
+
+    #[test]
+    fn test_convert_parquet_to_tantivy_filename() {
+        // Test parquet to tantivy filename conversion
+        let parquet_file =
+            "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet";
+        let tantivy_file = convert_parquet_file_name_to_tantivy_file(parquet_file);
+
+        // The conversion should return Some for valid parquet files
+        assert!(tantivy_file.is_some());
+        assert_eq!(
+            tantivy_file.unwrap(),
+            "files/default/index/quickstart1_logs/2024/02/16/16/7164299619311026293.ttv"
+        );
+
+        // Test with non-parquet file
+        let non_parquet_file = "test/file.txt";
+        let tantivy_result = convert_parquet_file_name_to_tantivy_file(non_parquet_file);
+        assert!(tantivy_result.is_none());
+
+        // Test with invalid path format
+        let invalid_path = "test/file.parquet";
+        let invalid_result = convert_parquet_file_name_to_tantivy_file(invalid_path);
+        assert!(invalid_result.is_none());
+    }
+
+    #[test]
+    fn test_file_download_batch_creation() {
+        // Test creating file download batch
+        let files_to_download = [
+            (
+                "file1".to_string(),
+                "account1".to_string(),
+                "key1".to_string(),
+                1024,
+                1234567890,
+            ),
+            (
+                "file2".to_string(),
+                "account2".to_string(),
+                "key2".to_string(),
+                2048,
+                1234567891,
+            ),
+        ];
+
+        assert_eq!(files_to_download.len(), 2);
+        assert_eq!(files_to_download[0].0, "file1");
+        assert_eq!(files_to_download[0].1, "account1");
+        assert_eq!(files_to_download[0].2, "key1");
+        assert_eq!(files_to_download[0].3, 1024);
+        assert_eq!(files_to_download[0].4, 1234567890);
+    }
+
+    #[test]
+    fn test_error_handling_patterns() {
+        // Test common error handling patterns used in the code
+        let result: Result<(), anyhow::Error> = Err(anyhow::anyhow!("test error"));
+
+        match result {
+            Ok(_) => panic!("Expected error"),
+            Err(e) => {
+                assert_eq!(e.to_string(), "test error");
+            }
         }
     }
 
-    let time = start.elapsed().as_millis();
-    log::debug!(
-        "Successfully retrieved {} files from {} in {}ms",
-        downloaded_files.len(),
-        addr,
-        time
-    );
+    #[test]
+    fn test_logging_patterns() {
+        // Test that logging patterns are consistent
+        let path = "test/file.parquet";
+        let total_size = 1024u64;
+        let offset = 512u64;
+        let elapsed_ms = 100u128;
 
-    // Cache the file contents
-    for (filekey, content) in file_contents {
-        let bytes = Bytes::from(content);
-        if let Err(e) =
-            infra::cache::file_data::set(TRACE_ID_FOR_CACHE_LATEST_FILE, &filekey, bytes).await
-        {
-            log::error!("Failed to cache file {}: {}", filekey, e);
-            downloaded_files.remove(&filekey);
-        } else {
-            log::info!("file:{} infra cache set successfully", filekey);
-        }
+        // This test just ensures the logging format is valid
+        let log_message = format!(
+            "[gRPC:Event] Send file: {path}, total_size: {total_size}, offset: {offset} took: {elapsed_ms} ms"
+        );
+
+        assert!(log_message.contains(path));
+        assert!(log_message.contains(&total_size.to_string()));
+        assert!(log_message.contains(&offset.to_string()));
+        assert!(log_message.contains(&elapsed_ms.to_string()));
     }
-
-    // Return list of failed files
-    let failed_files: Vec<_> = files_meta
-        .iter()
-        .filter(|(f, _)| !downloaded_files.contains(f))
-        .cloned()
-        .collect();
-    log::debug!(
-        "Failed retrieved {} files from {} in {}ms",
-        failed_files.len(),
-        addr,
-        time
-    );
-
-    Ok(failed_files)
 }

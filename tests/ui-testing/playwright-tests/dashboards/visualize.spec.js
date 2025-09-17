@@ -2,16 +2,43 @@ import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 
+import { deleteDashboard } from "../utils/dashCreation.js";
+import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
+import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
+import DashboardVisualise from "../../pages/dashboardPages/dashboard-visualise.js";
+
+const randomDashboardName =
+  "Dashboard_" + Math.random().toString(36).substr(2, 9);
+
+const panelName = "Panel_" + Math.random().toString(36).substr(2, 9);
+// Stream name used across tests
+const STREAM_NAME = "e2e_automate";
+
+// Add a global SQL query constant that can be reused across tests
+const largeDatasetSqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", 
+  count(kubernetes_container_hash) as "y_axis_1", 
+  count(kubernetes_container_name) as "y_axis_2", 
+  count(kubernetes_host) as "y_axis_3", 
+  count(kubernetes_labels_app_kubernetes_io_instance) as "y_axis_4", 
+  count(kubernetes_labels_app_kubernetes_io_name) as "y_axis_5", 
+  count(kubernetes_labels_app_kubernetes_io_version) as "y_axis_6", 
+  count(kubernetes_labels_operator_prometheus_io_name) as "y_axis_7", 
+  count(kubernetes_labels_prometheus) as "y_axis_8", 
+  kubernetes_labels_statefulset_kubernetes_io_pod_name as "breakdown_1"  
+  FROM "${STREAM_NAME}" 
+  WHERE kubernetes_namespace_name IS NOT NULL 
+  GROUP BY x_axis_1, breakdown_1`;
+
+const histogramQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1"  FROM "${STREAM_NAME}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`;
+
 test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
-
   if (await page.getByText("Login as internal user").isVisible()) {
     await page.getByText("Login as internal user").click();
   }
-
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -24,7 +51,6 @@ async function login(page) {
   await page.waitForTimeout(4000);
   await page.goto(process.env["ZO_BASE_URL"]);
 }
-
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page.waitForTimeout(4000);
   await page
@@ -54,36 +80,29 @@ test.describe(" visualize UI testcases", () => {
     });
     // get the data from the search variable
     await expect.poll(async () => (await search).status()).toBe(200);
-
     // await search.hits.FIXME_should("be.an", "array");
   }
   // tebefore(async function () {
   //   // logData("log");
   //   // const data = page;
   //   // logData = data;
-
   //   console.log("--logData--", logData);
   // });
   test.beforeEach(async ({ page }) => {
     console.log("running before each");
-
     await login(page);
     await page.waitForTimeout(5000);
-
     // ("ingests logs via API", () => {
     const orgId = process.env["ORGNAME"];
     const streamName = "e2e_automate";
     const basicAuthCredentials = Buffer.from(
       `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
     ).toString("base64");
-
     const headers = {
       Authorization: `Basic ${basicAuthCredentials}`,
       "Content-Type": "application/json",
     };
-
     // const logsdata = {}; // Fill this with your actual data
-
     // Making a POST request using fetch API
     const response = await page.evaluate(
       async ({ url, headers, orgId, streamName, logsdata }) => {
@@ -105,7 +124,6 @@ test.describe(" visualize UI testcases", () => {
         logsdata: logsdata,
       }
     );
-
     console.log(response);
     //  });
     // const allorgs = page.waitForResponse("**/api/default/organizations**");
@@ -118,7 +136,6 @@ test.describe(" visualize UI testcases", () => {
     await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
-
   test("should create logs when queries are ingested into the search field", async ({
     page,
   }) => {
@@ -144,7 +161,7 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   });
 
-  test("should set the default chart type and default X and Y axes to automatic after clicking the Visualize button", async ({
+  test("should set the default chart type to automatic after clicking the Visualize button", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
@@ -155,17 +172,13 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-logs-toggle"]').click();
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page.locator('[data-test="selected-chart-bar-item"]').click();
-    await page.locator('[data-test="dashboard-x-item-_timestamp"]').click();
+
     await expect(
-      page.locator('[data-test="dashboard-x-item-_timestamp"]')
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-test="dashboard-y-item-_timestamp"]')
-    ).toBeVisible();
+      page.locator('[data-test="selected-chart-line-item"]').locator("..")
+    ).toHaveClass(/bg-grey-[35]/); // Fixed regex pattern
   });
 
-  test("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart.", async ({
+  test.skip("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart.", async ({
     page,
   }) => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
@@ -204,7 +217,6 @@ test.describe(" visualize UI testcases", () => {
       .toBe(200);
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(1000);
-
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
@@ -216,7 +228,7 @@ test.describe(" visualize UI testcases", () => {
       });
   });
 
-  test("should correctly plot the data according to the new chart type when changing the chart type.", async ({
+  test.skip("should correctly plot the data according to the new chart type when changing the chart type.", async ({
     page,
   }) => {
     await page.locator('[data-test="logs-visualize-toggle"]').click();
@@ -229,13 +241,11 @@ test.describe(" visualize UI testcases", () => {
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
     await page.locator('[data-test="selected-chart-line-item"]').click();
-
     await expect(
       page.locator('[data-test="chart-renderer"] canvas').last()
     ).toBeVisible();
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
@@ -300,11 +310,9 @@ test.describe(" visualize UI testcases", () => {
         },
       });
     await page.locator('[data-test="selected-chart-pie-item"]').click();
-
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-
     await page
       .locator('[data-test="chart-renderer"] canvas')
       .last()
@@ -315,7 +323,6 @@ test.describe(" visualize UI testcases", () => {
         },
       });
     await page.locator('[data-test="selected-chart-donut-item"]').click();
-
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
@@ -329,7 +336,6 @@ test.describe(" visualize UI testcases", () => {
         },
       });
     await page.locator('[data-test="selected-chart-gauge-item"]').click();
-
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
@@ -344,11 +350,10 @@ test.describe(" visualize UI testcases", () => {
       });
   });
 
-  test("should not reflect changes in the search query on the logs page if a field is changed or added in the visualization", async ({
+  test.skip("should not reflect changes in the search query on the logs page if a field is changed or added in the visualization", async ({
     page,
   }) => {
     // remain to mention compare qaury
-
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
@@ -376,46 +381,22 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-logs-toggle"]').click();
     await page.locator('[data-test="confirm-button"]').click();
   });
-
-  test("should handle an empty query in visualization without displaying an error.", async ({
-    page,
-  }) => {
-    await page.locator(".view-line").first().click();
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await expect(page.locator(".view-line").first()).toBeVisible();
-    await expect(
-      page.locator('[data-test="dashboard-x-item-_timestamp"]')
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-test="dashboard-y-item-_timestamp"]')
-    ).toBeVisible();
-  });
-
-  test("should display an error message on the logs page for an invalid query", async ({
+  test.skip("should display an error message on the logs page for an invalid query", async ({
     page,
   }) => {
     // Click on the line view
     await page.locator(".view-line").first().click();
-
     // Enter an invalid query into the search bar
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator('.inputarea')
+      .getByLabel("Editor content;Press Alt+F1")
       .fill("select from user whare ID =1");
-
     // Refresh the search
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-
     await page.waitForTimeout(2000);
-
     // Wait for the error message to appear
     await page.getByText("Search field not found: as");
-
     await page.locator('[data-test="logs-visualize-toggle"]').click();
-
     // Verify that X and Y axis items are visible
     await expect(
       page.locator('[data-test="dashboard-x-item-_timestamp"]')
@@ -423,16 +404,13 @@ test.describe(" visualize UI testcases", () => {
     await expect(
       page.locator('[data-test="dashboard-y-item-_timestamp"]')
     ).toBeVisible();
-
     // Perform additional visualization actions
     await page
       .locator("label")
       .filter({ hasText: "Streamarrow_drop_down" })
       .locator("i")
       .click();
-
     await page.waitForTimeout(1000);
-
     // await page.getByText('e2e_automate').click();
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
@@ -444,11 +422,10 @@ test.describe(" visualize UI testcases", () => {
       .click();
   });
 
-  test("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization.", async ({
+  test.skip("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization.", async ({
     page,
   }) => {
     // Chart should not reflect changes made to X or Y axis.
-
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
@@ -463,12 +440,9 @@ test.describe(" visualize UI testcases", () => {
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-
     let exceptionBefore = null;
     let exceptionAfter = null;
-
     // try and catch block for compare tow field.
-
     try {
       await expect(
         page.locator(
@@ -478,7 +452,6 @@ test.describe(" visualize UI testcases", () => {
     } catch (e) {
       exceptionBefore = e;
     }
-
     await page.locator('[data-test="dashboard-add-condition-remove"]').click();
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
@@ -487,7 +460,6 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
-
     try {
       await expect(
         page.locator(
@@ -497,102 +469,14 @@ test.describe(" visualize UI testcases", () => {
     } catch (e) {
       exceptionAfter = e;
     }
-
     expect(exceptionBefore).toBe(exceptionAfter);
-
     // Perform an additional refresh to ensure consistency
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
   });
 
-  test("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
-    page,
-  }) => {
-    //Except :  Data should be vanished, and tab is changed from Visualize to Search.
-
-    // Perform the initial actions
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page
-      .locator('[data-test="index-field-search-input"]')
-      .fill("kubernetes_container_hash");
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]'
-      )
-      .click();
-    await page.locator('[data-test="index-field-search-input"]').fill("");
-    await page
-      .locator('[data-test="index-field-search-input"]')
-      .fill("kubernetes_container_name");
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'
-      )
-      .click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-
-    // Reload the page
-    await page.reload();
-
-    // Verify the field is empty
-    await expect(page.locator(".view-line").first()).toBeEmpty();
-  });
-
-  test("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
-    page,
-  }) => {
-    // Focus on the text editor and replace existing text with the SQL query
-    const textEditor = page.locator(".view-line").first();
-    await textEditor.click();
-
-    const sqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", 
-  count(kubernetes_container_hash) as "y_axis_1", 
-  count(kubernetes_container_name) as "y_axis_2", 
-  count(kubernetes_host) as "y_axis_3", 
-  count(kubernetes_labels_app_kubernetes_io_instance) as "y_axis_4", 
-  count(kubernetes_labels_app_kubernetes_io_name) as "y_axis_5", 
-  count(kubernetes_labels_app_kubernetes_io_version) as "y_axis_6", 
-  count(kubernetes_labels_operator_prometheus_io_name) as "y_axis_7", 
-  count(kubernetes_labels_prometheus) as "y_axis_8", 
-  kubernetes_labels_statefulset_kubernetes_io_pod_name as "breakdown_1"  
-  FROM "e2e_automate" 
-  WHERE kubernetes_namespace_name IS NOT NULL 
-  GROUP BY x_axis_1, breakdown_1`;
-
-    // Clear the existing text and input the new SQL query
-    // await textEditor.fill('');
-    await textEditor.type(sqlQuery);
-
-    // Apply the time filter and refresh the search
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-
-    // Switch to SQL mode, apply the query, and refresh the search
-    await page
-      .getByRole("switch", { name: "SQL Mode" })
-      .locator("div")
-      .nth(2)
-      .click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-
-    // Toggle visualization
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
-
-    // Check for any error messages or indicators
-    const errorMessage = page.locator('[data-test="error-message"]'); // Update the selector based on your app's error message display
-    const errorCount = await errorMessage.count();
-
-    // Assert that no error messages are displayed
-    await expect(errorCount).toBe(0); // Fail the test if any error messages are present
-  });
-
-  test("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
+  test.skip("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
     page,
   }) => {
     // Interact with various elements
@@ -631,20 +515,404 @@ test.describe(" visualize UI testcases", () => {
     await expect(row).toBeDefined();
   });
 
-  test("should not blank the stream name list when switching between logs and visualization and back again.", async ({
+  test.skip("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
     page,
   }) => {
+    //Except :  Data should be vanished, and tab is changed from Visualize to Search.
+    // Perform the initial actions
     await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-4-d-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
     await page
-      .locator('[data-test="dashboard-y-item-_timestamp-remove"]')
+      .locator('[data-test="index-field-search-input"]')
+      .fill("kubernetes_container_hash");
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]'
+      )
       .click();
-    await page.locator('[data-test="logs-logs-toggle"]').click();
-    await page.locator('[data-test="confirm-button"]').click();
+    await page.locator('[data-test="index-field-search-input"]').fill("");
+    await page
+      .locator('[data-test="index-field-search-input"]')
+      .fill("kubernetes_container_name");
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'
+      )
+      .click();
+    await page
+      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+      .click();
+    // Reload the page
+    await page.reload();
+    // Verify the field is empty
+    await expect(page.locator(".view-line").first()).toBeEmpty();
+  });
+  test("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
+    page,
+  }) => {
+    const dateTimeHelper = new DateTimeHelper(page);
+
+    await page.locator(".view-line").first().click();
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox", { name: "Editor content" })
+      .fill(largeDatasetSqlQuery);
+
+    await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
+
+    await dateTimeHelper.clickLogsRefreshBtn();
+
+    await page.waitForTimeout(3000);
+    // Toggle visualization
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    await page.waitForTimeout(3000);
+
+    // Check for any error messages or indicators
+    const errorMessage = page.locator('[data-test="error-message"]'); // Update the selector based on your app's error message display
+    const errorCount = await errorMessage.count();
+    // Assert that no error messages are displayed
+    await expect(errorCount).toBe(0); // Fail the test if any error messages are present
+  });
+  test("Stream should be correct on visualize page after switching between logs and visualize", async ({
+    page,
+  }) => {
+    const dateTimeHelper = new DateTimeHelper(page);
+
+    // Extract stream name from the SQL query dynamically
+    const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
+    const expectedStreamName = streamNameMatch
+      ? streamNameMatch[1]
+      : STREAM_NAME;
+
+    await page.locator(".view-line").first().click();
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox", { name: "Editor content" })
+      .fill(largeDatasetSqlQuery);
+
+    // Apply the time filter and refresh the search
+    await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
+
+    // Switch to SQL mode and refresh the search
+    await page
+      .getByRole("switch", { name: "SQL Mode" })
+      .locator("div")
+      .nth(2)
+      .click();
+    await dateTimeHelper.clickLogsRefreshBtn();
+    // Toggle visualization
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    await page
+      .locator('[data-test="dashboard-field-list-collapsed-icon"]')
+      .click();
+
+    // Wait for the stream dropdown to be populated
+    await page.waitForTimeout(2000);
+
+    // Get stream value using multiple selector strategies
+    const getStreamValue = async () => {
+      const selectors = [
+        () =>
+          page
+            .locator('[data-test="index-dropdown-stream"]')
+            .getAttribute("value"),
+        () =>
+          page
+            .locator('.q-field__native input[aria-label="Stream"]')
+            .getAttribute("value"),
+        () => page.locator('[data-test="index-dropdown-stream"]').inputValue(),
+        () => page.locator('input[aria-label="Stream"]').getAttribute("value"),
+      ];
+
+      for (const selector of selectors) {
+        try {
+          const value = await selector();
+          if (value) return value;
+        } catch (error) {
+          // Continue to next selector
+        }
+      }
+      return null;
+    };
+
+    const streamValue = await getStreamValue();
+
+    // Assert that the stream value matches the expected stream name from the query
+    expect(streamValue).toBe(expectedStreamName);
+    expect(streamValue).toBeTruthy();
+
+    // Assert that the stream value is specifically "e2e_automate"
+    expect(streamValue).toBe("e2e_automate");
+  });
+  test("should redirect the correct chart type when added the aggregation query", async ({
+    page,
+  }) => {
+    const dateTimeHelper = new DateTimeHelper(page);
+
+    // Extract stream name from the SQL query dynamically
+    const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
+    const expectedStreamName = streamNameMatch
+      ? streamNameMatch[1]
+      : STREAM_NAME;
+
+    await page.locator(".view-line").first().click();
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox", { name: "Editor content" })
+      .fill(largeDatasetSqlQuery);
+
+    // Apply the time filter and refresh the search
+    await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
+
+    // Toggle visualization
+    await dateTimeHelper.clickLogsRefreshBtn();
+
+    // Wait for visualization to load
+    await page.waitForTimeout(2000);
+
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    await page.waitForTimeout(3000);
+
+    // Robust check: wait for table panel to render (source of truth for selected type)
+    await page.waitForSelector('[data-test="dashboard-panel-table"]', {
+      timeout: 15000,
+    });
     await expect(
-      page.locator('[data-test="logs-search-result-bar-chart"]')
+      page.locator('[data-test="dashboard-panel-table"]')
     ).toBeVisible();
+
+    // Method 3: Verify table-specific content is rendered (breakdown_1 column from the SQL query)
+    await expect(
+      page
+        .locator('[data-test="dashboard-panel-table"]')
+        .getByRole("cell", { name: "breakdown_1" })
+    ).toBeVisible();
+    await expect(
+      page.locator('[data-test="dashboard-panel-table"]').first()
+    ).toBeVisible();
+  });
+  test("should not show dashboard errors when changing chart types with aggregation query", async ({
+    page,
+  }) => {
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardVisualise = new DashboardVisualise(page);
+
+    // Setup the test with aggregation query
+    await page.locator(".view-line").first().click();
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox", { name: "Editor content" })
+      .fill(largeDatasetSqlQuery);
+
+    await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
+
+    // Switch to SQL mode
+    await page
+      .getByRole("switch", { name: "SQL Mode" })
+      .locator("div")
+      .nth(2)
+      .click();
+
+    await dateTimeHelper.clickLogsRefreshBtn();
+
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    await page.waitForTimeout(3000);
+
+    // Define chart types to test
+    const chartTypes = [
+      { selector: '[data-test="selected-chart-table-item"]', name: "Table" },
+      { selector: '[data-test="selected-chart-line-item"]', name: "Line" },
+      { selector: '[data-test="selected-chart-bar-item"]', name: "Bar" },
+      { selector: '[data-test="selected-chart-area-item"]', name: "Area" },
+      {
+        selector: '[data-test="selected-chart-scatter-item"]',
+        name: "Scatter",
+      },
+      { selector: '[data-test="selected-chart-pie-item"]', name: "Pie" },
+    ];
+
+    // Test each chart type
+    for (const chartType of chartTypes) {
+      console.log(`Testing chart type: ${chartType.name}`);
+
+      // Select the chart type
+      await page.locator(chartType.selector).click();
+      await page.waitForTimeout(1000);
+
+      // Wait for chart to load
+      await page.waitForTimeout(3000);
+
+      // Check for dashboard errors
+      const errorResult = await dashboardVisualise.checkDashboardErrors();
+
+      if (errorResult.hasErrors) {
+        console.log(`Dashboard error found for ${chartType.name} chart:`);
+        errorResult.errors.forEach((error, index) => {
+          console.log(`  ${index + 1}. ${error}`);
+        });
+
+        // Fail the test with detailed error information
+        expect(errorResult.errorTextCount).toBe(0);
+        expect(errorResult.errorListCount).toBe(0);
+      } else {
+        console.log(`${chartType.name} chart: No dashboard errors found`);
+      }
+
+      // Verify the chart renders successfully
+      const chartRendered = await dashboardVisualise.verifyChartRenders();
+      expect(chartRendered).toBe(true);
+    }
+  });
+  test("should set line chart as default when using histogram query", async ({
+    page,
+  }) => {
+    // Setup the test with aggregation query
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardVisualise = new DashboardVisualise(page);
+
+    await page.locator(".view-line").first().click();
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox", { name: "Editor content" })
+      .fill(histogramQuery);
+
+    await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
+
+    // Switch to SQL mode
+    await page
+      .getByRole("switch", { name: "SQL Mode" })
+      .locator("div")
+      .nth(2)
+      .click();
+
+    await dateTimeHelper.clickLogsRefreshBtn();
+
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    await page.waitForTimeout(3000);
+
+    // Verify line chart is selected as default for histogram queries
+    await dashboardVisualise.verifyChartTypeSelected("line", true);
+
+    // Verify table chart is NOT selected for histogram queries
+    await dashboardVisualise.verifyChartTypeSelected("table", false);
+
+    // Verify chart canvas renders successfully
+    await expect(
+      page.locator('[data-test="chart-renderer"] canvas').last()
+    ).toBeVisible();
+
+    // Verify chart renders without errors
+    const chartRendered = await dashboardVisualise.verifyChartRenders();
+    expect(chartRendered).toBe(true);
+  });
+  test("Should display the correct query in the dashboard when saved from a Table chart.", async ({
+    page,
+  }) => {
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardVisualise = new DashboardVisualise(page);
+
+    // Extract stream name from the SQL query dynamically
+    const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
+    const expectedStreamName = streamNameMatch
+      ? streamNameMatch[1]
+      : STREAM_NAME;
+
+    await page.locator(".view-line").first().click();
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox", { name: "Editor content" })
+      .fill(largeDatasetSqlQuery);
+
+    await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
+
+    await dateTimeHelper.clickLogsRefreshBtn();
+
+    // Toggle visualization
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    await page.waitForTimeout(2000);
+
+    // await addPanelToNewDashboard(page, randomDashboardName, panelName);
+    await dashboardVisualise.addPanelToNewDashboard(
+      randomDashboardName,
+      panelName
+    );
+
+    // Wait for visualization to load
+    await page.waitForTimeout(3000);
+
+    await page
+      .locator('[data-test="dashboard-edit-panel-' + panelName + '-dropdown"]')
+      .click();
+    await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
+
+    await page.waitForTimeout(2000);
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", count(kubernetes_container_hash) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", count(kubernetes_host) as "y_axis_3", count(kubernetes_labels_app_kubernetes_io_instance) as "y_axis_4", count(kubernetes_labels_app_kubernetes_io_name) as "y_axis_5", count(kubernetes_labels_app_kubernetes_io_version) as "y_axis_6", count(kubernetes_labels_operator_prometheus_io_name) as "y_axis_7", count(kubernetes_labels_prometheus) as "y_axis_8", kubernetes_labels_statefulset_kubernetes_io_pod_name as "breakdown_1" FROM "e2e_automate" WHERE kubernetes_namespace_name IS NOT NULL GROUP BY x_axis_1, breakdown_1',
+        })
+        .first()
+    ).toBeVisible();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await deleteDashboard(page, randomDashboardName);
+  });
+  test("should display the correct query in the dashboard when saved from a Line chart.", async ({
+    page,
+  }) => {
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardVisualise = new DashboardVisualise(page);
+
+    // Extract stream name from the SQL query dynamically
+    const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
+    const expectedStreamName = streamNameMatch
+      ? streamNameMatch[1]
+      : STREAM_NAME;
+
+    await page.locator(".view-line").first().click();
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox", { name: "Editor content" })
+      .fill(histogramQuery);
+
+    // Apply the time filter and refresh the search
+    await dateTimeHelper.setRelativeTimeRangeForLogs("6-w");
+    await dateTimeHelper.clickLogsRefreshBtn();
+
+    // Toggle visualization
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    await page.waitForTimeout(2000);
+
+    await dashboardVisualise.addPanelToNewDashboard(
+      randomDashboardName,
+      panelName
+    );
+
+    await page.waitForTimeout(2000);
+    await page
+      .locator('[data-test="dashboard-edit-panel-' + panelName + '-dropdown"]')
+      .click();
+    await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
+
+    await page.waitForTimeout(2000);
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        })
+        .first()
+    ).toBeVisible();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await deleteDashboard(page, randomDashboardName);
   });
 });

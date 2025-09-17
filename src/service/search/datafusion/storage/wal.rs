@@ -24,6 +24,8 @@ use object_store::{
     PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, path::Path,
 };
 
+use super::format_location;
+
 /// File system for local wal
 #[derive(Debug, Default)]
 pub struct FS {}
@@ -32,14 +34,6 @@ impl FS {
     /// Create new local wal storage.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    fn format_location(&self, location: &Path) -> Path {
-        let mut path = location.to_string();
-        if let Some(p) = path.find("/$$/") {
-            path = path[p + 4..].to_string();
-        }
-        path.into()
     }
 }
 
@@ -52,23 +46,23 @@ impl std::fmt::Display for FS {
 #[async_trait]
 impl ObjectStore for FS {
     async fn get(&self, location: &Path) -> Result<GetResult> {
-        let location = &self.format_location(location);
-        storage::LOCAL_WAL.get(location).await
+        let (_, location) = format_location(location);
+        storage::wal::get(&location).await
     }
 
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
-        let location = &self.format_location(location);
-        storage::LOCAL_WAL.get_opts(location, options).await
+        let (_, location) = format_location(location);
+        storage::wal::get_opts(&location, options).await
     }
 
     async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
-        let location = &self.format_location(location);
-        storage::LOCAL_WAL.get_range(location, range).await
+        let (_, location) = format_location(location);
+        storage::wal::get_range(&location, range).await
     }
 
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
-        let location = &self.format_location(location);
-        storage::LOCAL_WAL.head(location).await
+        let (_, location) = format_location(location);
+        storage::wal::head(&location).await
     }
 
     #[tracing::instrument(name = "datafusion::storage::local_wal::list", skip_all)]
@@ -77,7 +71,7 @@ impl ObjectStore for FS {
         let objects = match super::file_list::get(&key) {
             Ok(objects) => objects,
             Err(e) => {
-                log::error!("Error getting file list for wal storage: {}", e);
+                log::error!("Error getting file list for wal storage: {e}");
                 vec![]
             }
         };
@@ -89,7 +83,7 @@ impl ObjectStore for FS {
     }
 
     async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
-        log::error!("NotImplemented list_with_delimiter: {:?}", prefix);
+        log::error!("NotImplemented list_with_delimiter: {prefix:?}");
         Err(object_store::Error::NotImplemented {})
     }
 
@@ -99,12 +93,12 @@ impl ObjectStore for FS {
         _payload: PutPayload,
         _opts: PutOptions,
     ) -> Result<PutResult> {
-        log::error!("NotImplemented put_opts: {}", location);
+        log::error!("NotImplemented put_opts: {location}");
         Err(object_store::Error::NotImplemented {})
     }
 
     async fn put_multipart(&self, location: &Path) -> Result<Box<dyn MultipartUpload>> {
-        log::error!("NotImplemented put_multipart: {}", location);
+        log::error!("NotImplemented put_multipart: {location}");
         Err(object_store::Error::NotImplemented)
     }
 
@@ -113,22 +107,22 @@ impl ObjectStore for FS {
         location: &Path,
         _opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
-        log::error!("NotImplemented put_multipart_opts: {}", location);
+        log::error!("NotImplemented put_multipart_opts: {location}");
         Err(object_store::Error::NotImplemented)
     }
 
     async fn delete(&self, location: &Path) -> Result<()> {
-        log::error!("NotImplemented delete: {}", location);
+        log::error!("NotImplemented delete: {location}");
         Err(object_store::Error::NotImplemented {})
     }
 
     async fn copy(&self, from: &Path, to: &Path) -> Result<()> {
-        log::error!("NotImplemented copy: from {} to {}", from, to);
+        log::error!("NotImplemented copy: from {from} to {to}");
         Err(object_store::Error::NotImplemented {})
     }
 
     async fn copy_if_not_exists(&self, from: &Path, to: &Path) -> Result<()> {
-        log::error!("NotImplemented copy_if_not_exists: from {} to {}", from, to);
+        log::error!("NotImplemented copy_if_not_exists: from {from} to {to}");
         Err(object_store::Error::NotImplemented {})
     }
 }
