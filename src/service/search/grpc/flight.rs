@@ -71,6 +71,7 @@ pub async fn search(
     let org_id = req.query_identifier.org_id.to_string();
     let stream_type = StreamType::from(req.query_identifier.stream_type.as_str());
     let work_group = req.super_cluster_info.work_group.clone();
+    let start = std::time::Instant::now();
 
     let trace_id = Arc::new(trace_id.to_string());
     log::info!("[trace_id {trace_id}] flight->search: start");
@@ -85,15 +86,66 @@ pub async fn search(
         cfg.limit.cpu_num,
     )
     .await?;
+    let datafusion_finish_took = start.elapsed().as_millis() as usize;
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->search: prepared datafusion context took: {} ms",
+                start.elapsed().as_millis(),
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight::do_get::search prepare_datafusion_context".to_string())
+                .search_role("follower".to_string())
+                .duration(datafusion_finish_took)
+                .build()
+        )
+    );
 
     // register udf
     register_udf(&ctx, &org_id)?;
     datafusion_functions_json::register_all(&mut ctx)?;
+    let registered_udf_ctx_took = start.elapsed().as_millis() as usize - datafusion_finish_took;
+
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->search: registered udf and ctx took: {} ms",
+                start.elapsed().as_millis(),
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight::do_get::search prepare_datafusion_context".to_string())
+                .search_role("follower".to_string())
+                .duration(registered_udf_ctx_took)
+                .build()
+        )
+    );
 
     // Decode physical plan from bytes
     let proto = get_physical_extension_codec();
     let mut physical_plan =
         physical_plan_from_bytes_with_extension_codec(&req.search_info.plan, &ctx, &proto)?;
+
+    let physical_plan_decode_took =
+        start.elapsed().as_millis() as usize - datafusion_finish_took - registered_udf_ctx_took;
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->search: decoded physical plan took: {} ms",
+                start.elapsed().as_millis(),
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight::do_get::search prepare_datafusion_context".to_string())
+                .search_role("follower".to_string())
+                .duration(physical_plan_decode_took)
+                .build()
+        )
+    );
 
     // replace empty table to real table
     let mut visitor = NewEmptyExecVisitor::default();
@@ -145,9 +197,26 @@ pub async fn search(
         latest_schema_map.insert(field.name(), field);
     }
 
+    let db_schema_get_start = std::time::Instant::now();
     let db_schema = infra::schema::get(&org_id, &stream_name, stream_type)
         .await
         .unwrap_or(arrow_schema::Schema::empty());
+    let db_schema_get_took = db_schema_get_start.elapsed().as_millis() as usize;
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->search: got latest schema and db schema took: {db_schema_get_took} ms"
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight::do_get::search db_schema_fetch".to_string())
+                .search_role("follower".to_string())
+                .duration(db_schema_get_took)
+                .build()
+        )
+    );
+
     let stream_settings = unwrap_stream_settings(&db_schema);
     let stream_created_at = unwrap_stream_created_at(&db_schema);
     let fst_fields = get_stream_setting_fts_fields(&stream_settings)
@@ -186,7 +255,24 @@ pub async fn search(
     // get all tables
     let mut tables = Vec::new();
     let mut scan_stats = ScanStats::new();
+    let file_stats_cache_start = std::time::Instant::now();
     let file_stats_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
+    log::info!("[trace_id {trace_id}] flight->search: file_stats_cache_took init");
+    let file_stats_cache_took = file_stats_cache_start.elapsed().as_millis() as usize;
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] flight->search: file_stats_cache_took took: {file_stats_cache_took} ms"
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .node_name(LOCAL_NODE.name.clone())
+                .component("flight::do_get::search file_stats_cache_took".to_string())
+                .search_role("follower".to_string())
+                .duration(file_stats_cache_took)
+                .build()
+        )
+    );
 
     // search in object storage
     let mut tantivy_file_list = Vec::new();
