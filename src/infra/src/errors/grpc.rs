@@ -53,7 +53,7 @@ impl From<DataFusionError> for Error {
                 None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
             };
         }
-        if err.contains("parquet not found") {
+        if err.contains("parquet not found") || err.contains("parquet file not found") {
             log::error!("[Datafusion] Parquet file not found: {}", err);
             return Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound);
         }
