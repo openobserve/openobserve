@@ -364,7 +364,7 @@ async fn main() -> Result<(), anyhow::Error> {
     openobserve::service::runtime_metrics::start_metrics_collector().await;
 
     // let node online
-    let _ = cluster::set_online(false).await;
+    let _ = cluster::set_online().await;
 
     // initialize the jobs are deferred until the gRPC service starts
     job::init_deferred()
@@ -683,7 +683,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     let server = HttpServer::new(move || {
         let cfg = get_config();
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.common.feature_per_thread_lock {
+        if cfg.limit.mem_table_bucket_num > 1 {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
         let scheme = if cfg.http.tls_enabled {
@@ -788,7 +788,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     let server = HttpServer::new(move || {
         let cfg = get_config();
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.common.feature_per_thread_lock {
+        if cfg.limit.mem_table_bucket_num > 1 {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
 
@@ -913,7 +913,7 @@ async fn graceful_shutdown(handle: ServerHandle) {
     // println!("ctrl-c received!");
 
     // offline the node
-    if let Err(e) = cluster::set_offline(true).await {
+    if let Err(e) = cluster::set_offline().await {
         log::error!("set offline failed: {e}");
     }
     log::info!("Node is offline");
@@ -1073,7 +1073,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
     let server = HttpServer::new(move || {
         let cfg = get_config();
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.common.feature_per_thread_lock {
+        if cfg.limit.mem_table_bucket_num > 1 {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
         let scheme = if cfg.http.tls_enabled {

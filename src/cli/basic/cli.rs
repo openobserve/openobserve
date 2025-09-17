@@ -63,14 +63,14 @@ fn create_cli_app() -> Command {
                 .about("migrate file-list")
                 .args([
                     arg!("prefix", 'p', "prefix", "only migrate specified prefix, default is all"),
-                    arg!("from", 'f', "from", "migrate from: sled, sqlite, etcd, mysql, postgresql"),
+                    arg!("from", 'f', "from", "migrate from: sqlite, mysql, postgresql"),
                     arg!("to", 't', "to", "migrate to: sqlite, mysql, postgresql"),
                 ]),
             Command::new("migrate-meta")
                 .about("migrate meta")
                 .args([
-                    arg!("from", 'f', "from", "migrate from: sled, sqlite, etcd, mysql, postgresql", true).value_name("from"),
-                    arg!("to", 't', "to", "migrate to: sqlite, etcd, mysql, postgresql", true).value_name("to"),
+                    arg!("from", 'f', "from", "migrate from: sqlite, mysql, postgresql", true).value_name("from"),
+                    arg!("to", 't', "to", "migrate to: sqlite, mysql, postgresql", true).value_name("to"),
                 ]),
             Command::new("migrate-dashboards").about("migrate-dashboards"),
             Command::new("migrate-pipeline").about("migrate pipelines")
@@ -1066,7 +1066,7 @@ mod tests {
     #[test]
     fn test_migration_source_target_validation() {
         // Test valid migration sources and targets
-        let valid_sources = ["sled", "sqlite", "etcd", "mysql", "postgresql"];
+        let valid_sources = ["sqlite", "mysql", "postgresql"];
         let valid_targets = ["sqlite", "mysql", "postgresql"];
 
         for source in valid_sources {

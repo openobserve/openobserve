@@ -21,7 +21,8 @@ vi.mock("@/utils/zincutils", () => ({
   generateTraceContext: vi.fn(() => ({ 
     traceparent: "mock-traceparent",
     traceId: "mock-trace-id"
-  }))
+  })),
+  useLocalWrapContent: vi.fn(() => false),
 }));
 
 vi.mock("@/aws-exports", () => ({
@@ -31,8 +32,8 @@ vi.mock("@/aws-exports", () => ({
   }
 }));
 
-vi.mock("@/composables/useLogs", () => ({
-  default: () => ({
+vi.mock("@/composables/useLogs/searchState", () => ({
+  searchState: () => ({
     searchObj: {
       organizationIdentifier: "test-org",
       data: {
