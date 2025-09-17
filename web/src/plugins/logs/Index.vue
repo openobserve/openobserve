@@ -1365,27 +1365,6 @@ export default defineComponent({
       return true;
     };
 
-    watch(
-      () => [
-        searchObj.data.tempFunctionContent,
-        searchObj.meta.logsVisualizeToggle,
-      ],
-      () => {
-        if (
-          searchObj.meta.logsVisualizeToggle == "visualize" &&
-          searchObj.data.transformType === "function" &&
-          searchObj.data.tempFunctionContent
-        ) {
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].vrlFunctionQuery = searchObj.data.tempFunctionContent;
-        } else {
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].vrlFunctionQuery = "";
-        }
-      },
-    );
     const closeSearchHistoryfn = () => {
       router.back();
       showSearchHistory.value = false;
