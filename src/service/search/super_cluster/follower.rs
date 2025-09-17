@@ -94,8 +94,7 @@ pub async fn search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {trace_id}] flight->follower_leader: prepared datafusion context took: {} ms",
-                prepare_datafusion_context_took
+                "[trace_id {trace_id}] flight->follower_leader: prepared datafusion context took: {prepare_datafusion_context_took} ms"
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
@@ -181,9 +180,7 @@ pub async fn search(
         search_inspector_fields(
             format!(
                 "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, files: {}, took: {} ms",
-                req.time_range,
-                file_id_list_num,
-                file_id_list_took,
+                req.time_range, file_id_list_num, file_id_list_took,
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
@@ -263,7 +260,7 @@ pub async fn search(
         &nodes,
         &file_id_list_vec,
         start,
-        file_id_list_took as usize,
+        file_id_list_took,
         "leader".to_string(),
     )
     .await?;

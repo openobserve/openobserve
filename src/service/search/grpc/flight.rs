@@ -206,8 +206,7 @@ pub async fn search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {trace_id}] flight->search: got latest schema and db schema took: {} ms",
-                db_schema_get_took
+                "[trace_id {trace_id}] flight->search: got latest schema and db schema took: {db_schema_get_took} ms"
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
@@ -264,8 +263,7 @@ pub async fn search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {trace_id}] flight->search: file_stats_cache_took took: {} ms",
-                file_stats_cache_took
+                "[trace_id {trace_id}] flight->search: file_stats_cache_took took: {file_stats_cache_took} ms"
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
