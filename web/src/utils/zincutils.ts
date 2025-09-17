@@ -588,96 +588,102 @@ export function formatDuration(ms: number) {
  * Efficiently adds spaces around operators without using complex regex
  * Avoids exponential backtracking by using a simple state-based approach
  * This function safely handles operators within quoted strings and function calls
- * 
+ *
  * @param input - The input string to process
  * @returns The processed string with properly spaced operators
  */
 export function addSpacesToOperators(input: string): string {
-  let result = '';
+  let result = "";
   let i = 0;
   let inSingleQuote = false;
   let inDoubleQuote = false;
   let parenDepth = 0;
-  
+
   while (i < input.length) {
     const char = input[i];
     const nextChar = input[i + 1];
-    const prevChar = i > 0 ? input[i - 1] : '';
-    
+    const prevChar = i > 0 ? input[i - 1] : "";
+
     // Track quote states
     if (char === "'" && !inDoubleQuote) {
       inSingleQuote = !inSingleQuote;
     } else if (char === '"' && !inSingleQuote) {
       inDoubleQuote = !inDoubleQuote;
     }
-    
+
     // Track parentheses depth (for function calls)
     if (!inSingleQuote && !inDoubleQuote) {
-      if (char === '(') {
+      if (char === "(") {
         parenDepth++;
-      } else if (char === ')') {
+      } else if (char === ")") {
         parenDepth--;
       }
     }
-    
+
     // Only process operators when we're outside quotes and parentheses
-    const shouldProcessOperators = !inSingleQuote && !inDoubleQuote && parenDepth === 0;
-    
+    const shouldProcessOperators =
+      !inSingleQuote && !inDoubleQuote && parenDepth === 0;
+
     if (shouldProcessOperators) {
       // Handle two-character operators first
       if (i < input.length - 1) {
         const twoChar = char + nextChar;
-        if (twoChar === '!=' || twoChar === '<=' || twoChar === '>=') {
+        if (twoChar === "!=" || twoChar === "<=" || twoChar === ">=") {
           // Add space before if needed
-          if (prevChar && prevChar !== ' ') {
-            result += ' ';
+          if (prevChar && prevChar !== " ") {
+            result += " ";
           }
           result += twoChar;
           // Add space after if needed
-          if (i + 2 < input.length && input[i + 2] !== ' ') {
-            result += ' ';
+          if (i + 2 < input.length && input[i + 2] !== " ") {
+            result += " ";
           }
           i += 2;
           continue;
         }
       }
-      
+
       // Handle special case of "! =" (space between ! and =)
-      if (char === '!' && nextChar === ' ' && i + 2 < input.length && input[i + 2] === '=') {
+      if (
+        char === "!" &&
+        nextChar === " " &&
+        i + 2 < input.length &&
+        input[i + 2] === "="
+      ) {
         // Add space before if needed
-        if (prevChar && prevChar !== ' ') {
-          result += ' ';
+        if (prevChar && prevChar !== " ") {
+          result += " ";
         }
-        result += '!=';
+        result += "!=";
         // Add space after if needed
-        if (i + 3 < input.length && input[i + 3] !== ' ') {
-          result += ' ';
+        if (i + 3 < input.length && input[i + 3] !== " ") {
+          result += " ";
         }
         i += 3;
         continue;
       }
-      
+
       // Handle single-character operators
-      if (char === '=' || char === '>' || char === '<') {
+      if (char === "=" || char === ">" || char === "<") {
         // Add space before if needed
-        if (prevChar && prevChar !== ' ') {
-          result += ' ';
+        if (prevChar && prevChar !== " ") {
+          result += " ";
         }
         result += char;
         // Add space after if needed
-        if (nextChar && nextChar !== ' ') {
-          result += ' ';
+        if (nextChar && nextChar !== " ") {
+          result += " ";
         }
         i++;
         continue;
       }
     }
-    
+
     // Default: just add the character
     result += char;
     i++;
   }
-  
+
   return result;
 }
 
@@ -856,6 +862,19 @@ export const getFunctionErrorMessage = (
   }
 };
 
+export const errorMsgSet = () => {
+  const errorMsgSet = new Set();
+
+  return function (errorMsgArr: string[]) {
+    for (const errorMsg of errorMsgArr) {
+      if (errorMsg) {
+        errorMsgSet.add(errorMsg);
+      }
+    }
+    return Array.from(errorMsgSet);
+  };
+};
+
 export const generateTraceContext = () => {
   const traceId = getUUID().replace(/-/g, "");
   const spanId = getUUID().replace(/-/g, "").slice(0, 16);
@@ -924,7 +943,7 @@ export const durationFormatter = (durationInSeconds: number): string => {
   return formattedDuration;
 };
 
-export const getTimezoneOffset = (timezone: string |null = null) => {
+export const getTimezoneOffset = (timezone: string | null = null) => {
   const now = new Date();
 
   // Get the day, month, and year from the date object
@@ -942,7 +961,9 @@ export const getTimezoneOffset = (timezone: string |null = null) => {
   // Combine them in the HH:MM format
   const scheduleTime = `${hours}:${minutes}`;
 
-  const ScheduleTimezone = timezone ? timezone : Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const ScheduleTimezone = timezone
+    ? timezone
+    : Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const convertedDateTime = convertDateToTimestamp(
     scheduleDate,
@@ -1156,8 +1177,6 @@ export function isAboveMinRefreshInterval(
   const minInterval = Number(config?.min_auto_refresh_interval) || 1;
   return value >= minInterval;
 }
-
-
 
 export const localTimeToMicroseconds = () => {
   // Create a Date object representing the current local time
