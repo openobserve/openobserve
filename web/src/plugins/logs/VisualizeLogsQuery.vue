@@ -889,10 +889,23 @@ export default defineComponent({
         dashboardPanelData.data.queries[0].query =
           resultMetaData?.[0]?.converted_histogram_query;
       }
-      maxQueryRangeWarning.value = processQueryMetadataErrors(
-        resultMetaData,
-        store.state.timezone,
-      );
+
+      if (Object.keys(props.searchResponse).length > 0) {
+        if (is_ui_histogram.value === true) {
+          maxQueryRangeWarning.value = [
+            ...searchObj.data.histogram_function_error,
+          ].join(", ");
+        } else {
+          maxQueryRangeWarning.value = [...searchObj.data.functionError].join(
+            ",",
+          );
+        }
+      } else {
+        maxQueryRangeWarning.value = processQueryMetadataErrors(
+          resultMetaData,
+          store.state.timezone,
+        );
+      }
     };
 
     return {
