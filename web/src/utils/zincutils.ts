@@ -1218,7 +1218,7 @@ export const processQueryMetadataErrors = (
         );
         combinedWarnings.push(combinedMessage);
       } else if (query?.function_error) {
-        combinedWarnings.push(query.function_error);
+        combinedWarnings.push(...query.function_error);
       }
     });
   } else {
