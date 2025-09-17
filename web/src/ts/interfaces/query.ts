@@ -49,7 +49,7 @@ export interface WebSocketSearchResponse {
       hits: any[];
       total: number;
       took: number;
-      function_error?: any;
+      function_error?: string;
       new_start_time?: number;
       new_end_time?: number;
       scan_size?: number;
