@@ -144,7 +144,7 @@ pub async fn search(
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
-                .component("search::super_cluster::follower register udf and ctx".to_string())
+                .component("search::super_cluster::follower decode physical plan".to_string())
                 .search_role("follower".to_string())
                 .duration(decode_physical_plan_took.as_millis() as usize)
                 .build()
@@ -185,7 +185,7 @@ pub async fn search(
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("search::super_cluster::follower get file id".to_string())
-                .search_role("leader".to_string())
+                .search_role("follower".to_string())
                 .duration(file_id_list_took)
                 .desc(format!("get files {file_id_list_num} ids"))
                 .build()

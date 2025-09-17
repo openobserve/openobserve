@@ -76,7 +76,6 @@ pub async fn search(
     let trace_id = Arc::new(trace_id.to_string());
     log::info!("[trace_id {trace_id}] flight->search: start");
 
-    let datafusion_finish_took = start.elapsed().as_millis() as usize;
     // create datafusion context, just used for decode plan, the params can use default
     let mut ctx = prepare_datafusion_context(
         &trace_id,
@@ -87,6 +86,7 @@ pub async fn search(
         cfg.limit.cpu_num,
     )
     .await?;
+    let datafusion_finish_took = start.elapsed().as_millis() as usize;
     log::info!(
         "{}",
         search_inspector_fields(
@@ -269,7 +269,7 @@ pub async fn search(
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight::do_get::search file_stats_cache_took".to_string())
                 .search_role("follower".to_string())
-                .duration(db_schema_get_took)
+                .duration(file_stats_cache_took)
                 .build()
         )
     );
