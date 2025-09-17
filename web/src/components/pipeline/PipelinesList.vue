@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         </template>
 
-        <template v-slot:header="props">
+        <template v-slot:header="props: any">
             <q-tr :props="props">
               <!-- Adding this block to render the select-all checkbox -->
               <q-th auto-width>
