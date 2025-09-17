@@ -411,9 +411,14 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickVrlEditor();
     await page.waitForLoadState('domcontentloaded'); // Replace hard wait
     await pm.logsPage.clickRefreshButton();
+    // Wait for VRL function to be applied and data to load
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
     await pm.logsPage.clickMenuLinkMetricsItem();
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.clickMenuLinkLogsItem();
+    // Wait for page to stabilize after navigation
+    await page.waitForLoadState('networkidle');
     await pm.logsPage.expectPageContainsText(".a=2");
     
     testLogger.info('Function persistence test completed');
