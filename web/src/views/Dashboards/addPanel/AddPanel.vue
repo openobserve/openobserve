@@ -639,7 +639,7 @@ import {
   outlinedRunningWithErrors,
 } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
-import { getFunctionErrorMessage, errorMsgSet } from "@/utils/zincutils";
+import { processQueryMetadataErrors } from "@/utils/zincutils";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -1358,58 +1358,10 @@ export default defineComponent({
     };
 
     const handleResultMetadataUpdate = (metadata: any) => {
-      if (metadata && metadata.length > 0 && Array.isArray(metadata[0])) {
-        const combinedWarnings: any[] = [];
-        const errorDedup = errorMsgSet();
-
-        metadata[0].forEach((query: any) => {
-          if (
-            query?.function_error &&
-            query?.new_start_time &&
-            query?.new_end_time
-          ) {
-            const combinedMessage = getFunctionErrorMessage(
-              query.function_error,
-              query.new_start_time,
-              query.new_end_time,
-              store.state.timezone,
-            );
-            combinedWarnings.push(combinedMessage);
-          } else if (query?.function_error) {
-            combinedWarnings.push(query.function_error);
-          }
-        });
-
-        // Deduplicate warnings
-        const dedupedWarnings = errorDedup(combinedWarnings);
-
-        // NOTE: for multi query, just show the first query warning
-        maxQueryRangeWarning.value =
-          dedupedWarnings.length > 0 ? dedupedWarnings.join(", ") : "";
-      } else if (metadata && metadata.length > 0) {
-        // Backward compatibility - handle old format
-        const query = metadata[0];
-        const combinedWarnings: any[] = [];
-
-        if (
-          query?.function_error &&
-          query?.new_start_time &&
-          query?.new_end_time
-        ) {
-          const combinedMessage = getFunctionErrorMessage(
-            query.function_error,
-            query.new_start_time,
-            query.new_end_time,
-            store.state.timezone,
-          );
-          combinedWarnings.push(combinedMessage);
-        } else if (query?.function_error) {
-          combinedWarnings.push(query.function_error);
-        }
-
-        maxQueryRangeWarning.value =
-          combinedWarnings.length > 0 ? combinedWarnings[0] : "";
-      }
+      maxQueryRangeWarning.value = processQueryMetadataErrors(
+        metadata,
+        store.state.timezone,
+      );
     };
 
     const onDataZoom = (event: any) => {
