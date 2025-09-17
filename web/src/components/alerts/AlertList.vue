@@ -478,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon="pause"
                   :label="'Pause'"
                   no-caps
-                  @click="bulkPauseAlerts"
+                  @click="bulkToggleAlerts('pause')"
                 />
                 <q-btn
                   v-if="selectedAlerts.length > 0"
@@ -488,7 +488,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon="play_arrow"
                   :label="'Resume'"
                   no-caps
-                  @click="bulkUnpauseAlerts"
+                  @click="bulkToggleAlerts('resume')"
                 />
                 <QTablePagination
                   :scope="scope"
@@ -1816,115 +1816,74 @@ export default defineComponent({
     const updateFolderIdToBeCloned = (folderId: any) => {
       folderIdToBeCloned.value = folderId.value;
     };
-    //here we need to bulk pause the alerts
-    //so before sending the request in the payload we need to send additional field called names which is an array of alert names
-    //those are corresponding to the selectedIds
-    //and also before sending the request we need to filter out the alerts which are already paused
+    const bulkToggleAlerts = async (action: "pause" | "resume") => {
 
-    const bulkPauseAlerts = async () => {
-      try{
-        //here we will filter out the alerts which are already paused
-        const toBePausedAlerts = selectedAlerts.value.filter((alert: any) => alert.enabled);
-        if(toBePausedAlerts.length === 0){
-          $q.notify({
-            type: "negative",
-            message: "No alerts to pause",
-            timeout: 2000,
-          });
-          return;
-        }
-        const dismiss = $q.notify({
-          spinner: true,
-          message: "Pausing alerts...",
-          timeout: 0,
-        });
-        //make sure that ids and names are in the same order
-        const alertIds = toBePausedAlerts.map((alert: any) => alert.alert_id);
-        const alertNames = toBePausedAlerts.map((alert: any) => alert.name);
-        const payload = {
-          names: alertNames,
-          ids: alertIds,
-        };
-        const response = await alertsService.bulkToggleState(store.state.selectedOrganization.identifier, false, payload);
-        if (response) {
-          dismiss();
-          $q.notify({
-            type: "positive",
-            message: "Alerts paused successfully",
-            timeout: 2000,
-          });
-        }
-        await getAlertsFn(store, activeFolderId.value);
-        //this is done because we need to trigger again the filterQuery watch
-        //so that the filterQuery is set to the searchQuery and we see only the filtered results
-          if(filterQuery.value){
-          let tempQuery = filterQuery.value;
-          filterQuery.value = null;
-          await nextTick();
-          filterQuery.value = tempQuery;
-        }
-      } catch (error) {
-        console.error("Error pausing alerts:", error);
-        $q.notify({
-          type: "negative",
-          message: "Error pausing alerts. Please try again.",
-          timeout: 2000,
-        });
-      }
+    const dismiss = $q.notify({
+      spinner: true,
+      message: `${action === "resume" ? "Resuming" : "Pausing"} alerts...`,
+      timeout: 0,
+    });
+  try {
+    const isResuming = action === "resume";
+
+    // Filter alerts based on action
+    const alertsToToggle = selectedAlerts.value.filter((alert: any) =>
+      isResuming ? !alert.enabled : alert.enabled
+    );
+
+    if (alertsToToggle.length === 0) {
+      $q.notify({
+        type: "negative",
+        message: `No alerts to ${action}`,
+        timeout: 2000,
+      });
+      dismiss();
+      return;
+    }
+
+    // Collect IDs and names
+    const payload = {
+      ids: alertsToToggle.map((a: any) => a.alert_id),
+      names: alertsToToggle.map((a: any) => a.name),
     };
-//here we need to bulk unpause the alerts
-    //so before sending the request in the payload we need to send additional field called names which is an array of alert names
-    //those are corresponding to the selectedIds
-    //and also before sending the request we need to filter out the alerts which are already unpaused
-    const bulkUnpauseAlerts = async () => {
-      try {
-      //here we will filter out the alerts which are already unpaused
-      const toBeUnpausedAlerts = selectedAlerts.value.filter((alert: any) => !alert.enabled);
-      if(toBeUnpausedAlerts.length === 0){
-        $q.notify({
-          type: "negative",
-          message: "No alerts to resume",
-          timeout: 2000,
-        });
-        return;
-      }
-      const dismiss = $q.notify({
-          spinner: true,
-          message: "Resuming alerts...",
-          timeout: 0,
-        });
-      //make sure that ids and names are in the same order
-      const alertIds = toBeUnpausedAlerts.map((alert: any) => alert.alert_id);
-      const alertNames = toBeUnpausedAlerts.map((alert: any) => alert.name);
-      const payload = {
-        names: alertNames,
-        ids: alertIds,
-      };
-      const response = await alertsService.bulkToggleState(store.state.selectedOrganization.identifier, true, payload);
-      if(response){
-        dismiss();
-        $q.notify({
-          type: "positive",
-          message: "Alerts resumed successfully",
-          timeout: 2000,
-        });
-      }
-      await getAlertsFn(store, activeFolderId.value);
-      if(filterQuery.value){
-        let tempQuery = filterQuery.value;
-        filterQuery.value = null;
-        await nextTick();
-        filterQuery.value = tempQuery;
-      }
-      } catch (error) {
-        console.error("Error resuming alerts:", error);
-        $q.notify({
-          type: "negative",
-          message: "Error resuming alerts. Please try again.",
-          timeout: 2000,
-        });
-      }
-    };
+
+    // Toggle (true = resume, false = pause)
+    const response = await alertsService.bulkToggleState(
+      store.state.selectedOrganization.identifier,
+      isResuming,
+      payload
+    );
+
+    if (response) {
+      dismiss();
+      $q.notify({
+        type: "positive",
+        message: `Alerts ${action}d successfully`,
+        timeout: 2000,
+      });
+    }
+
+    // Refresh alerts
+    await getAlertsFn(store, activeFolderId.value);
+
+    // Trigger filterQuery re-evaluation
+    if (filterQuery.value) {
+      let tempQuery = filterQuery.value;
+      filterQuery.value = null;
+      await nextTick();
+      filterQuery.value = tempQuery;
+    }
+  } catch (error) {
+    dismiss();
+    console.error(`Error ${action}ing alerts:`, error);
+    $q.notify({
+      type: "negative",
+      message: `Error ${action}ing alerts. Please try again.`,
+      timeout: 2000,
+    });
+  }
+};
+
 
 
     return {
@@ -2029,8 +1988,7 @@ export default defineComponent({
       refreshImportedAlerts,
       folderIdToBeCloned,
       updateFolderIdToBeCloned,
-      bulkPauseAlerts,
-      bulkUnpauseAlerts,
+      bulkToggleAlerts,
     };
   },
 });

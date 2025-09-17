@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="pause"
               :label="'Pause'"
               no-caps
-              @click="bulkPausePipelines"
+              @click="bulkTogglePipelines('pause')"
             />
             <q-btn
               v-if="selectedPipelines.length > 0"
@@ -260,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="play_arrow"
               :label="'Resume'"
               no-caps
-              @click="bulkResumePipelines"
+              @click="bulkTogglePipelines('resume')"
             />
           <q-table-pagination
             :scope="scope"
@@ -791,100 +791,65 @@ const exportBulkPipelines = () => {
   });
 };
 
-//here we need to bulk pause the pipelines
-//so before sending the request in the payload we need to send additional field called names which is an array of pipeline names
-//those are corresponding to the selectedIds
-//and also before sending the request we need to filter out the pipelines which are already paused
-const bulkPausePipelines = async () => {
-      try{
-        //here we will filter out the alerts which are already paused
-        const toBePausedPipelines = selectedPipelines.value.filter((pipeline: any) => pipeline.enabled);
-        if(toBePausedPipelines.length === 0){
-          q.notify({
-            type: "negative",
-            message: "No pipelines to pause",
-            timeout: 2000,
-          });
-          return;
-        }
-        const dismiss = q.notify({
-          spinner: true,
-          message: "Pausing pipelines...",
-          timeout: 0,
-        });
-        //make sure that ids and names are in the same order
-        const pipelineIds = toBePausedPipelines.map((pipeline: any) => pipeline.pipeline_id);
-        const pipelineNames = toBePausedPipelines.map((pipeline: any) => pipeline.name);
-        const payload = {
-          names: pipelineNames,
-          ids: pipelineIds,
-        };
-        const response = await pipelineService.bulkToggleState(store.state.selectedOrganization.identifier, false, payload);
-        if (response) {
-          dismiss();
-          q.notify({
-            type: "positive",
-            message: "Pipelines paused successfully",
-            timeout: 2000,
-          });
-        }
-        selectedPipelines.value = [];
-        await getPipelines();
-        updateActiveTab();
-      } catch (error) {
-        console.error("Error pausing pipelines:", error);
-        q.notify({
-          type: "negative",
-          message: "Error pausing pipelines. Please try again.",
-          timeout: 2000,
-        });
-      }
-  };
-const bulkResumePipelines = async () => {
-    try{
-      //here we will filter out the pipelines which are already paused
-      const toBeResumedPipelines = selectedPipelines.value.filter((pipeline: any) => !pipeline.enabled);
-      if(toBeResumedPipelines.length === 0){
-        q.notify({
-          type: "negative",
-          message: "No pipelines to resume",
-          timeout: 2000,
-        });
-        return;
-      }
-      const dismiss =  q.notify({
-        spinner: true,
-        message: "Resuming pipelines...",
-        timeout: 0,
-      });
-      //make sure that ids and names are in the same order
-      const pipelineIds = toBeResumedPipelines.map((pipeline: any) => pipeline.pipeline_id);
-      const pipelineNames = toBeResumedPipelines.map((pipeline: any) => pipeline.name);
-      const payload = {
-        names: pipelineNames,
-        ids: pipelineIds,
-      };
-      const response = await pipelineService.bulkToggleState(store.state.selectedOrganization.identifier, true, payload);
-      if (response) {
-        dismiss();
-        q.notify({
-          type: "positive",
-          message: "Pipelines resumed successfully",
-          timeout: 2000,
-        });
-      }
-      selectedPipelines.value = [];
-      await getPipelines();
-      updateActiveTab();
-    } catch (error) {
-      console.error("Error resuming pipelines:", error);
+  const bulkTogglePipelines = async (action: "pause" | "resume") => {
+    const dismiss = q.notify({
+      spinner: true,
+      message: `${action === "resume" ? "Resuming" : "Pausing"} pipelines...`,
+      timeout: 0,
+    });
+  try {
+    const isResuming = action === "resume";
+
+    // Filter pipelines based on action
+    const pipelinesToToggle = selectedPipelines.value.filter((pipeline: any) =>
+      isResuming ? !pipeline.enabled : pipeline.enabled
+    );
+
+    if (pipelinesToToggle.length === 0) {
       q.notify({
         type: "negative",
-        message: "Error resuming pipelines. Please try again.",
+        message: `No pipelines to ${action}`,
+        timeout: 2000,
+      });
+      dismiss();
+      return;
+    }
+    // Extract ids & names
+    const payload = {
+      ids: pipelinesToToggle.map((p: any) => p.pipeline_id),
+      names: pipelinesToToggle.map((p: any) => p.name),
+    };
+
+    // Toggle state (true = resume, false = pause)
+    const response = await pipelineService.bulkToggleState(
+      store.state.selectedOrganization.identifier,
+      isResuming,
+      payload
+    );
+
+    if (response) {
+      dismiss();
+      q.notify({
+        type: "positive",
+        message: `Pipelines ${action}d successfully`,
         timeout: 2000,
       });
     }
+
+    selectedPipelines.value = [];
+    await getPipelines();
+    updateActiveTab();
+  } catch (error) {
+    dismiss();
+    console.error(`Error ${action}ing pipelines:`, error);
+    q.notify({
+      type: "negative",
+      message: `Error ${action}ing pipelines. Please try again.`,
+      timeout: 2000,
+    });
+  }
   };
+
 </script>
 <style lang="scss" scoped>
 .pipeline-list-table {
