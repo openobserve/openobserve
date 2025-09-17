@@ -28,15 +28,13 @@ pub static GLOBAL_CACHE: Lazy<Arc<FileStatisticsCache>> =
 pub struct FileStatisticsCache {
     statistics: DashMap<String, (ObjectMeta, Arc<Statistics>)>,
     cacher: parking_lot::Mutex<VecDeque<String>>,
-    max_entries: usize,
 }
 
 impl FileStatisticsCache {
-    pub fn new(max_entries: usize) -> Self {
+    pub fn new() -> Self {
         Self {
             statistics: DashMap::new(),
             cacher: parking_lot::Mutex::new(VecDeque::new()),
-            max_entries,
         }
     }
 
@@ -58,11 +56,7 @@ impl FileStatisticsCache {
 
 impl Default for FileStatisticsCache {
     fn default() -> Self {
-        Self::new(
-            config::get_config()
-                .limit
-                .datafusion_file_stat_cache_max_entries,
-        )
+        Self::new()
     }
 }
 
@@ -108,10 +102,14 @@ impl CacheAccessor<Path, Arc<Statistics>> for FileStatisticsCache {
     ) -> Option<Arc<Statistics>> {
         let k = self.format_key(k);
         let mut w = self.cacher.lock();
-        if w.len() >= self.max_entries {
+
+        let max_entries = config::get_config()
+            .limit
+            .datafusion_file_stat_cache_max_entries;
+        if w.len() >= max_entries {
             // release 10% of the cache
             log::warn!("FileStatisticsCache is full, releasing 10% of the cache");
-            for _ in 0..(self.max_entries / 10) {
+            for _ in 0..(max_entries / 10) {
                 if let Some(k) = w.pop_front() {
                     self.statistics.remove(&k);
                 } else {

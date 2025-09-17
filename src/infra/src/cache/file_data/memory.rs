@@ -46,7 +46,6 @@ static DATA: Lazy<Vec<RwHashMap<String, Bytes>>> = Lazy::new(|| {
 });
 
 pub struct FileData {
-    max_size: usize,
     cur_size: usize,
     data: CacheStrategy,
 }
@@ -60,15 +59,11 @@ impl Default for FileData {
 impl FileData {
     pub fn new() -> FileData {
         let cfg = get_config();
-        FileData::with_capacity_and_cache_strategy(
-            cfg.memory_cache.max_size,
-            &cfg.memory_cache.cache_strategy,
-        )
+        FileData::with_cache_strategy(&cfg.memory_cache.cache_strategy)
     }
 
-    pub fn with_capacity_and_cache_strategy(max_size: usize, strategy: &str) -> FileData {
+    pub fn with_cache_strategy(strategy: &str) -> FileData {
         FileData {
-            max_size,
             cur_size: 0,
             data: CacheStrategy::new(strategy),
         }
@@ -96,7 +91,8 @@ impl FileData {
 
     async fn set(&mut self, trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         let data_size = file.len() + data.len();
-        if self.cur_size + data_size >= self.max_size {
+        let max_size = get_config().memory_cache.max_size;
+        if self.cur_size + data_size >= max_size {
             log::info!(
                 "[trace_id {trace_id}] File memory cache is full, can't cache extra {} bytes",
                 data_size
@@ -131,7 +127,7 @@ impl FileData {
         log::info!(
             "[trace_id {trace_id}] File memory cache start gc {}/{}, need to release {} bytes",
             self.cur_size,
-            self.max_size,
+            get_config().memory_cache.max_size,
             need_release_size
         );
         let mut release_size = 0;
@@ -202,8 +198,8 @@ impl FileData {
         Ok(())
     }
 
-    fn size(&self) -> (usize, usize) {
-        (self.max_size, self.cur_size)
+    fn size(&self) -> usize {
+        self.cur_size
     }
 
     fn len(&self) -> usize {
@@ -289,7 +285,7 @@ async fn gc() -> Result<(), anyhow::Error> {
 
     for file in FILES.iter() {
         let r = file.read().await;
-        if r.cur_size + cfg.memory_cache.release_size < r.max_size {
+        if r.cur_size + cfg.memory_cache.release_size < cfg.memory_cache.max_size {
             continue;
         }
         drop(r);
@@ -307,8 +303,8 @@ pub async fn stats() -> (usize, usize) {
     let mut used_size = 0;
     for file in FILES.iter() {
         let r = file.read().await;
-        let (max_size, cur_size) = r.size();
-        total_size += max_size;
+        let cur_size = r.size();
+        total_size += get_config().memory_cache.max_size;
         used_size += cur_size;
     }
     (total_size, used_size)
@@ -368,7 +364,7 @@ mod tests {
     #[tokio::test]
     async fn test_lru_cache_set_file() {
         let trace_id = "session_1";
-        let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "lru");
+        let mut file_data = FileData::with_cache_strategy("lru");
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..50 {
             let file_key = format!(
@@ -383,8 +379,7 @@ mod tests {
     #[tokio::test]
     async fn test_lru_cache_get_file() {
         let trace_id = "session_2";
-        let mut file_data =
-            FileData::with_capacity_and_cache_strategy(get_config().memory_cache.max_size, "lru");
+        let mut file_data = FileData::with_cache_strategy("lru");
         let file_key = "files/default/logs/memory/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
@@ -406,7 +401,7 @@ mod tests {
     #[tokio::test]
     async fn test_lru_cache_miss() {
         let trace_id = "session_3";
-        let mut file_data = FileData::with_capacity_and_cache_strategy(100, "lru");
+        let mut file_data = FileData::with_cache_strategy("lru");
         let file_key1 = "files/default/logs/memory/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/memory/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
@@ -429,7 +424,7 @@ mod tests {
     #[tokio::test]
     async fn test_fifo_cache_set_file() {
         let trace_id = "session_4";
-        let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "fifo");
+        let mut file_data = FileData::with_cache_strategy("fifo");
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..50 {
             let file_key = format!(
@@ -444,8 +439,7 @@ mod tests {
     #[tokio::test]
     async fn test_fifo_cache_get_file() {
         let trace_id = "session_5";
-        let mut file_data =
-            FileData::with_capacity_and_cache_strategy(get_config().memory_cache.max_size, "fifo");
+        let mut file_data = FileData::with_cache_strategy("fifo");
         let file_key = "files/default/logs/memory/2022/10/03/10/6982652937134804993_5_1.parquet";
         let content = Bytes::from("Some text");
 
@@ -467,7 +461,7 @@ mod tests {
     #[tokio::test]
     async fn test_fifo_cache_miss() {
         let trace_id = "session_6";
-        let mut file_data = FileData::with_capacity_and_cache_strategy(100, "fifo");
+        let mut file_data = FileData::with_cache_strategy("fifo");
         let file_key1 = "files/default/logs/memory/2022/10/03/10/6982652937134804993_6_1.parquet";
         let file_key2 = "files/default/logs/memory/2022/10/03/10/6982652937134804993_6_2.parquet";
         let content = Bytes::from("Some text");

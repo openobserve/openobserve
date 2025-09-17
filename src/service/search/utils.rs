@@ -231,7 +231,7 @@ pub fn check_query_default_limit_exceeded(num_rows: usize, partial_err: &mut Str
         let capped_err = format!("{} limit: {query_default_limit}", CAPPED_RESULTS_MSG);
         if num_rows > query_default_limit {
             if !partial_err.is_empty() {
-                partial_err.push_str("\n");
+                partial_err.push('\n');
                 partial_err.push_str(&capped_err);
             } else {
                 *partial_err = capped_err;
