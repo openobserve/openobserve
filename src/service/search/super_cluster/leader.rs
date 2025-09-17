@@ -48,7 +48,7 @@ use crate::service::search::{
     is_use_inverted_index,
     request::Request,
     sql::Sql,
-    utils::{AsyncDefer, ScanStatsVisitor},
+    utils::{AsyncDefer, ScanStatsVisitor, check_query_default_limit_exceeded},
 };
 
 #[async_recursion]
@@ -393,7 +393,14 @@ async fn run_datafusion(
             )
         );
         visit.scan_stats.aggs_cache_ratio = aggs_cache_ratio;
-        ret.map(|data| (data, visit.scan_stats, visit.partial_err))
-            .map_err(|e| e.into())
+        ret.map(|data| {
+            check_query_default_limit_exceeded(
+                data.iter().fold(0, |acc, batch| acc + batch.num_rows()),
+                &mut visit.partial_err,
+                &sql,
+            );
+            (data, visit.scan_stats, visit.partial_err)
+        })
+        .map_err(|e| e.into())
     }
 }

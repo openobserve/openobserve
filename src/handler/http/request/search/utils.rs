@@ -20,7 +20,6 @@ use {
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::auth::{AuthExtractor, is_root_user},
     },
-
     actix_web::HttpResponse,
     config::meta::stream::StreamType,
     o2_openfga::meta::mapping::OFGA_MODELS,
