@@ -37,9 +37,10 @@ export default class DashboardFilter {
 
     // Step 3: Open the condition selector
     if (operator || value) {
-      const conditionLocator = this.page.locator(
-        `[data-test="dashboard-add-condition-condition-${idx}"]`
-      );
+      // Target the most recent (last) visible portal to avoid strict mode violation
+      const conditionLocator = this.page
+        .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
+        .last();
       await conditionLocator.waitFor({ state: "visible" });
       await conditionLocator.click(); // double click for stability
     }
@@ -148,22 +149,6 @@ export default class DashboardFilter {
     );
     await fieldLabelLocator.click();
 
-    // Step 2: Handle multiple matching elements for column dropdown
-    const allColumnLocators = this.page.locator(
-      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
-    );
-    const count = await allColumnLocators.count();
-
-    const columnLocator =
-      count === 1
-        ? allColumnLocators.first()
-        : index === 0
-        ? allColumnLocators.first()
-        : allColumnLocators.last();
-
-    await columnLocator.click();
-    await columnLocator.fill(newFieldName);
-
     // await this.page
     //   .getByRole("option", { name: newFieldName, exact: true })
     //   .first()
@@ -180,22 +165,14 @@ export default class DashboardFilter {
     //   .first()
     //   .click();
 
-    // Wait for the suggestion list to appear and select the first suggestion
-    const suggestion = await this.page.locator(
-      'div.q-menu[role="listbox"] div.q-item'
-    );
-    await suggestion.waitFor({ state: "visible", timeout: 10000 });
-    const firstSuggestion = suggestion.first();
-    await firstSuggestion.waitFor({ state: "visible", timeout: 10000 });
-    await firstSuggestion.click();
-
-    // Step 3: Condition dropdown
+    // Step 3: Open the condition selector
     if (operator || value) {
-      const conditionLocator = this.page.locator(
-        `[data-test="dashboard-add-condition-condition-${idx}"]`
-      );
-      await conditionLocator.click();
-      await conditionLocator.click(); // safety click
+      // Target the most recent (last) visible portal to avoid strict mode violation
+      const conditionLocator = this.page
+        .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
+        .last();
+      await conditionLocator.waitFor({ state: "visible" });
+      await conditionLocator.click(); // double click for stability
     }
 
     // Step 4: Operator dropdown
@@ -209,11 +186,17 @@ export default class DashboardFilter {
               .locator('[data-test="dashboard-add-condition-operator"]')
               .last();
 
+      // Wait until operator dropdown is visible
+      await operatorLocator.waitFor({ state: "visible", timeout: 5000 });
       await operatorLocator.click();
-      await this.page
+
+      const optionLocator = this.page
         .getByRole("option", { name: operator, exact: true })
-        .first()
-        .click();
+        .first();
+
+      // Wait until option is visible
+      await optionLocator.waitFor({ state: "visible", timeout: 5000 });
+      await optionLocator.click();
     }
 
     // Step 5: Fill value field
@@ -223,12 +206,17 @@ export default class DashboardFilter {
           ? this.page.locator('[data-test="common-auto-complete"]').first()
           : this.page.locator('[data-test="common-auto-complete"]').last();
 
+      // Wait until input is visible
+      await valueInput.waitFor({ state: "visible", timeout: 5000 });
       await valueInput.click();
       await valueInput.fill(value);
 
       const suggestion = this.page
         .locator('[data-test="common-auto-complete-option"]')
         .first();
+
+      // Wait until suggestion is visible
+      await suggestion.waitFor({ state: "visible", timeout: 5000 });
       await suggestion.click();
     } else if (operator && newFieldName) {
       const expectedError = `Filter: ${newFieldName}: Condition value required`;
@@ -237,5 +225,28 @@ export default class DashboardFilter {
         .filter({ hasText: expectedError });
       // Optional: Assert here if needed
     }
+
+    // Step 2: Handle multiple matching elements for column dropdown
+    const allColumnLocators = this.page.locator(
+      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
+    );
+    const count = await allColumnLocators.count();
+
+    const columnLocator =
+      count === 1
+        ? allColumnLocators.first()
+        : index === 0
+        ? allColumnLocators.first()
+        : allColumnLocators.last();
+
+    await columnLocator.click();
+    await columnLocator.fill(newFieldName);
+
+    // Wait for dropdown to appear after filling the value
+    // await this.page
+    //   .locator('div.q-menu[role="listbox"]')
+    //   .waitFor({ state: "visible", timeout: 5000 });
+    await columnLocator.press("ArrowDown");
+    await columnLocator.press("Enter");
   }
 }
