@@ -257,10 +257,7 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
 import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
-import {
-  outlinedWarning,
-  outlinedRunningWithErrors,
-} from "@quasar/extras/material-icons-outlined";
+import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 
 export default defineComponent({
@@ -755,7 +752,6 @@ export default defineComponent({
       errorMessage,
       outlinedWarning,
       symOutlinedDataInfoAlert,
-      outlinedRunningWithErrors,
     };
   },
 });
