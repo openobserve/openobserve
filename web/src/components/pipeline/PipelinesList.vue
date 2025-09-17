@@ -829,11 +829,20 @@ const exportBulkPipelines = () => {
 
     if (response) {
       dismiss();
-      q.notify({
-        type: "positive",
-        message: `Pipelines ${action}d successfully`,
-        timeout: 2000,
-      });
+      if(response?.data.hasOwnProperty("err") && (response?.data.err !== null)){
+        q.notify({
+          type: "negative",
+          message: `Error ${action}ing pipelines: ${response?.data.err}`,
+          timeout: 2000,
+        });
+      }
+      else{
+        q.notify({
+          type: "positive",
+          message: `Pipelines ${action}d successfully`,
+          timeout: 2000,
+        });
+      }
     }
 
     selectedPipelines.value = [];

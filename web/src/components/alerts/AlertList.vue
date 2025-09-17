@@ -1848,7 +1848,7 @@ export default defineComponent({
     };
 
     // Toggle (true = resume, false = pause)
-    const response = await alertsService.bulkToggleState(
+    const response: any = await alertsService.bulkToggleState(
       store.state.selectedOrganization.identifier,
       isResuming,
       payload
@@ -1856,11 +1856,20 @@ export default defineComponent({
 
     if (response) {
       dismiss();
-      $q.notify({
+      if(response?.data.hasOwnProperty("err") && (response?.data.err !== null)){
+        $q.notify({
+          type: "negative",
+          message: `Error ${action}ing alerts: ${response?.data.err}`,
+          timeout: 2000,
+        });
+      }
+      else{
+        $q.notify({
         type: "positive",
         message: `Alerts ${action}d successfully`,
         timeout: 2000,
       });
+      }
     }
 
     // Refresh alerts
