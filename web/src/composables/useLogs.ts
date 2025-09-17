@@ -54,8 +54,7 @@ import {
   arraysMatch,
   isWebSocketEnabled,
   isStreamingEnabled,
-  addSpacesToOperators,
-  mergeAndRemoveDuplicates
+  addSpacesToOperators
 } from "@/utils/zincutils";
 import {
   convertDateToTimestamp,
@@ -254,7 +253,6 @@ const defaultObject = {
     isOperationCancelled: false,
     searchRetriesCount: <{ [key: string]: number }>{},
     actionId: null,
-    histogram_function_error: <string[]>[],
   },
 };
 
@@ -1675,7 +1673,6 @@ const useLogs = () => {
       searchObj.meta.showDetailTab = false;
       searchObj.meta.searchApplied = true;
       searchObj.data.functionError = "";
-      searchObj.data.histogram_function_error = [];
       if (
         !searchObj.data.stream.streamLists?.length ||
         searchObj.data.stream.selectedStream.length == 0
@@ -2964,9 +2961,6 @@ const useLogs = () => {
             "ui",
           )
           .then(async (res: any) => {
-            if(res.data.hasOwnProperty("function_error")) {
-              searchObj.data.histogram_function_error = mergeAndRemoveDuplicates(searchObj.data.histogram_function_error, res.data.function_error);
-            }
             removeTraceId(traceId);
             searchObjDebug["histogramProcessingStartTime"] = performance.now();
 
@@ -4053,7 +4047,6 @@ const useLogs = () => {
       searchObj.loading = true;
       searchObj.data.errorCode = 0;
       searchObj.data.functionError = "";
-      searchObj.data.histogram_function_error = [];
       const sqlContext: any = [];
       let query_context: any = "";
       const query = searchObj.data.query;
@@ -5252,7 +5245,6 @@ const useLogs = () => {
       searchObj.meta.showDetailTab = false;
       searchObj.meta.searchApplied = true;
       searchObj.data.functionError = "";
-      searchObj.data.histogram_function_error = [];
       if (
         !searchObj.data.stream.streamLists?.length ||
         searchObj.data.stream.selectedStream.length == 0
@@ -5500,7 +5492,6 @@ const useLogs = () => {
         searchObj.meta.showDetailTab = false;
         searchObj.meta.searchApplied = true;
         searchObj.data.functionError = "";
-        searchObj.data.histogram_function_error = [];
       
         searchObj.data.errorCode = 0;
       
@@ -5882,12 +5873,6 @@ const useLogs = () => {
     ) {
       searchObj.data.queryResults.visualization_histogram_interval  =
         response.content?.results?.histogram_interval;
-    }
-
-    //here we will check if the function_error is present in the response this is for histogram only so we will check in histogram streaming meta data only
-    //if present, we are adding it to the searchObj.data.histogram_function_error
-    if(response.content?.results?.hasOwnProperty("function_error")) {
-      searchObj.data.histogram_function_error = mergeAndRemoveDuplicates(searchObj.data.histogram_function_error, response.content.results.function_error);
     }
   }
 
