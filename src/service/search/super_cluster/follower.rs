@@ -175,7 +175,7 @@ pub async fn search(
     let file_id_list = get_file_id_lists(&req.org_id, stream_type, &stream, req.time_range).await?;
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_num = file_id_list_vec.len();
-    let file_id_list_took = decode_physical_plan_instant.elapsed();
+    let file_id_list_took = decode_physical_plan_instant.elapsed().as_millis() as usize;
     log::info!(
         "{}",
         search_inspector_fields(
@@ -183,13 +183,13 @@ pub async fn search(
                 "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, files: {}, took: {} ms",
                 req.time_range,
                 file_id_list_num,
-                file_id_list_took.as_millis(),
+                file_id_list_took,
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("search::super_cluster::follower get file id".to_string())
                 .search_role("leader".to_string())
-                .duration(file_id_list_took.as_millis())
+                .duration(file_id_list_took)
                 .desc(format!("get files {file_id_list_num} ids"))
                 .build()
         )
@@ -198,7 +198,7 @@ pub async fn search(
     let mut scan_stats = ScanStats {
         files: file_id_list_num as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
-        file_list_took: file_id_list_took.as_millis() as i64,
+        file_list_took: file_id_list_took as i64,
         ..Default::default()
     };
 
@@ -263,7 +263,7 @@ pub async fn search(
         &nodes,
         &file_id_list_vec,
         start,
-        file_id_list_took.as_millis() as usize,
+        file_id_list_took as usize,
         "leader".to_string(),
     )
     .await?;
