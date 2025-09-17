@@ -608,6 +608,7 @@ pub fn merge_response(
         as usize;
     if !fn_error.is_empty() {
         cache_response.function_error.extend(fn_error);
+        cache_response.is_partial = true;
     }
     cache_response
 }
