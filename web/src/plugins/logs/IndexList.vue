@@ -1709,6 +1709,12 @@ export default defineComponent({
     };
 
     const toggleInterestingFields = () => {
+      if(showOnlyInterestingFields.value) {
+        searchObj.meta.useUserDefinedSchemas = "interesting_fields";
+      } else {
+        searchObj.meta.useUserDefinedSchemas = "all_fields";
+      }
+
       resetFields();
     };
 
