@@ -13,33 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use core::fmt;
-use std::fmt::{Debug, Formatter};
+use std::{
+    fmt::{Debug, Formatter},
+    time::Duration,
+};
 
-use async_trait::async_trait;
-use config::meta::otlp::OtlpRequestType;
-use opentelemetry::metrics::Result;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
-use opentelemetry_sdk::metrics::{
-    InstrumentKind,
-    data::{ResourceMetrics, Temporality},
-    exporter::PushMetricsExporter,
-    reader::TemporalitySelector,
+use opentelemetry_sdk::{
+    error::OTelSdkResult,
+    metrics::{Temporality, data::ResourceMetrics, exporter::PushMetricExporter},
 };
 
 use crate::service::metrics::otlp::handle_otlp_request;
 
-/// An interface for OTLP metrics clients
-#[async_trait]
-pub trait MetricsClient: fmt::Debug + Send + Sync + 'static {
-    async fn export(&self, metrics: &mut ResourceMetrics) -> Result<()>;
-    fn shutdown(&self) -> Result<()>;
-}
-
 /// Export metrics in OTEL format.
 pub struct O2MetricsExporter {
-    client: Box<dyn MetricsClient>,
-    temporality_selector: Box<dyn TemporalitySelector>,
+    temporality_selector: Temporality,
 }
 
 impl Debug for O2MetricsExporter {
@@ -48,72 +37,50 @@ impl Debug for O2MetricsExporter {
     }
 }
 
-impl TemporalitySelector for O2MetricsExporter {
-    fn temporality(&self, kind: InstrumentKind) -> Temporality {
-        self.temporality_selector.temporality(kind)
+impl PushMetricExporter for O2MetricsExporter {
+    fn export(
+        &self,
+        metrics: &ResourceMetrics,
+    ) -> impl std::future::Future<Output = OTelSdkResult> + Send {
+        // Convert to ExportMetricsServiceRequest immediately to avoid lifetime issues
+        let request = ExportMetricsServiceRequest::from(metrics);
+        async move {
+            if let Err(e) = handle_otlp_request(
+                "default",
+                request,
+                config::meta::otlp::OtlpRequestType::Grpc,
+            )
+            .await
+            {
+                log::error!("o2 metrics export fail : {e}");
+            }
+            Ok(())
+        }
     }
-}
 
-#[async_trait]
-impl PushMetricsExporter for O2MetricsExporter {
-    async fn export(&self, metrics: &mut ResourceMetrics) -> Result<()> {
-        self.client.export(metrics).await
+    fn temporality(&self) -> Temporality {
+        self.temporality_selector
     }
 
-    async fn force_flush(&self) -> Result<()> {
+    fn force_flush(&self) -> OTelSdkResult {
         // this component is stateless
         Ok(())
     }
 
-    fn shutdown(&self) -> Result<()> {
-        self.client.shutdown()
+    fn shutdown(&self) -> OTelSdkResult {
+        Ok(())
+    }
+
+    fn shutdown_with_timeout(&self, _timeout: Duration) -> OTelSdkResult {
+        Ok(())
     }
 }
 
 impl O2MetricsExporter {
     /// Create a new metrics exporter
-    pub fn new(
-        client: impl MetricsClient,
-        temporality_selector: Box<dyn TemporalitySelector>,
-    ) -> O2MetricsExporter {
+    pub fn new(temporality_selector: Temporality) -> O2MetricsExporter {
         O2MetricsExporter {
-            client: Box::new(client),
             temporality_selector,
         }
-    }
-}
-
-pub(crate) struct O2MetricsClient {}
-
-impl fmt::Debug for O2MetricsClient {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("O2MetricsClient")
-    }
-}
-
-impl O2MetricsClient {
-    pub fn new() -> Self {
-        O2MetricsClient {}
-    }
-}
-
-#[async_trait]
-impl MetricsClient for O2MetricsClient {
-    async fn export(&self, metrics: &mut ResourceMetrics) -> Result<()> {
-        if let Err(e) = handle_otlp_request(
-            "default",
-            ExportMetricsServiceRequest::from(&*metrics),
-            OtlpRequestType::Grpc,
-        )
-        .await
-        {
-            log::error!("o2 metrics export fail : {e}")
-        }
-
-        Ok(())
-    }
-
-    fn shutdown(&self) -> Result<()> {
-        Ok(())
     }
 }

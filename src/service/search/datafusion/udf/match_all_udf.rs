@@ -31,7 +31,7 @@ pub(crate) static MATCH_ALL_UDF: Lazy<ScalarUDF> =
 pub(crate) static FUZZY_MATCH_ALL_UDF: Lazy<ScalarUDF> =
     Lazy::new(|| ScalarUDF::from(FuzzyMatchAllUdf::new()));
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 struct MatchAllUdf {
     signature: Signature,
 }
@@ -71,7 +71,7 @@ impl ScalarUDFImpl for MatchAllUdf {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 struct FuzzyMatchAllUdf {
     signature: Signature,
 }

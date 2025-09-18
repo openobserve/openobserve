@@ -86,20 +86,20 @@ impl VisitorMut for TrackTotalHitsVisitor {
                         window_before_qualify: false,
                         connect_by: None,
                         value_table_mode: None,
+                        exclude: None,
                         flavor: SelectFlavor::Standard,
                     })));
                     *query = Query {
                         with: None,
                         body: subquery,
                         order_by: None,
-                        limit: None,
-                        offset: None,
+                        limit_clause: None,
                         fetch: None,
-                        limit_by: vec![],
                         for_clause: None,
                         locks: vec![],
                         settings: None,
                         format_clause: None,
+                        pipe_operators: vec![],
                     };
                 } else {
                     // For non-DISTINCT queries, use the original approach
@@ -171,20 +171,20 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     window_before_qualify: false,
                     connect_by: None,
                     value_table_mode: None,
+                    exclude: None,
                     flavor: SelectFlavor::Standard,
                 })));
                 *query = Query {
                     with: None,
                     body: select,
                     order_by: None,
-                    limit: None,
-                    offset: None,
+                    limit_clause: None,
                     fetch: None,
-                    limit_by: vec![],
                     for_clause: None,
                     locks: vec![],
                     settings: None,
                     format_clause: None,
+                    pipe_operators: vec![],
                 };
             }
             _ => {}

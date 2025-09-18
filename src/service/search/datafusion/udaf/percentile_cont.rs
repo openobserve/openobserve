@@ -41,6 +41,7 @@ use super::NUMERICS;
 
 const PERCENTILE_CONT: &str = "percentile_cont";
 
+#[derive(Debug, Hash, Eq, PartialEq)]
 pub(crate) struct PercentileCont(Signature);
 
 impl PercentileCont {
@@ -51,15 +52,6 @@ impl PercentileCont {
             variants.push(TypeSignature::Exact(vec![num.clone(), DataType::Float64]));
         }
         Self(Signature::one_of(variants, Volatility::Immutable))
-    }
-}
-
-impl std::fmt::Debug for PercentileCont {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        f.debug_struct("PercentileCont")
-            .field("name", &self.name())
-            .field("signature", &self.0)
-            .finish()
     }
 }
 

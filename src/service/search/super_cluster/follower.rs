@@ -87,7 +87,7 @@ pub async fn search(
 
     // register udf
     register_udf(&ctx, &req.org_id)?;
-    datafusion_functions_json::register_all(&mut ctx)?;
+    // datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes
     let proto = get_physical_extension_codec();

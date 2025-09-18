@@ -27,11 +27,7 @@ use once_cell::sync::Lazy;
 use opentelemetry::{KeyValue, global, metrics::Histogram};
 use opentelemetry_sdk::{
     Resource,
-    metrics::{
-        Aggregation, Instrument, PeriodicReader, SdkMeterProvider, Stream, new_view,
-        reader::DefaultTemporalitySelector,
-    },
-    runtime,
+    metrics::{Aggregation, Instrument, PeriodicReader, SdkMeterProvider, Stream, Temporality},
 };
 use tokio::{sync::Mutex, time};
 
@@ -40,10 +36,7 @@ use crate::{
         cluster::get_cached_online_nodes,
         config::{ORG_USERS, USERS},
     },
-    service::{
-        db,
-        exporter::otlp_metrics_exporter::{O2MetricsClient, O2MetricsExporter},
-    },
+    service::{db, exporter::otlp_metrics_exporter::O2MetricsExporter},
 };
 
 #[derive(Debug)]
@@ -75,7 +68,7 @@ pub static TRACE_METRICS_SPAN_HISTOGRAM: Lazy<Histogram<f64>> = Lazy::new(|| {
         .f64_histogram(format!("{NAMESPACE}_span_duration_milliseconds"))
         .with_unit("ms")
         .with_description("span duration milliseconds")
-        .init()
+        .build()
 });
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -321,28 +314,38 @@ async fn update_parquet_metrics() -> Result<(), anyhow::Error> {
 }
 
 pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
-    let exporter = O2MetricsExporter::new(
-        O2MetricsClient::new(),
-        Box::new(DefaultTemporalitySelector::new()),
-    );
-    let reader = PeriodicReader::builder(exporter, runtime::Tokio)
+    let exporter = O2MetricsExporter::new(Temporality::Cumulative);
+    // TODO: do this place need runtime?
+    let reader = PeriodicReader::builder(exporter)
         .with_interval(Duration::from_secs(
             get_config().common.traces_span_metrics_export_interval,
         ))
         .build();
+
+    let view = |i: &Instrument| {
+        if i.name() == format!("{NAMESPACE}_span_duration_milliseconds") {
+            Some(
+                Stream::builder()
+                    .with_aggregation(Aggregation::ExplicitBucketHistogram {
+                        boundaries: SPAN_METRICS_BUCKET.to_vec(),
+                        record_min_max: false,
+                    })
+                    .build()
+                    .unwrap(),
+            )
+        } else {
+            None
+        }
+    };
+
     let provider = SdkMeterProvider::builder()
         .with_reader(reader)
-        .with_resource(Resource::new(vec![KeyValue::new(
-            "service.name",
-            "openobserve",
-        )]))
-        .with_view(new_view(
-            Instrument::new().name(format!("{NAMESPACE}_span_duration_milliseconds")),
-            Stream::new().aggregation(Aggregation::ExplicitBucketHistogram {
-                boundaries: SPAN_METRICS_BUCKET.to_vec(),
-                record_min_max: false,
-            }),
-        )?)
+        .with_resource(
+            Resource::builder()
+                .with_attribute(KeyValue::new("service.name", "openobserve"))
+                .build(),
+        )
+        .with_view(view)
         .build();
     global::set_meter_provider(provider.clone());
     Ok(provider)

@@ -215,11 +215,15 @@ pub fn is_simple_topn_query(query: &Query) -> Option<(String, usize, bool)> {
     }
 
     // check if limit is present
-    let limit = match &query.limit {
-        Some(Expr::Value(ValueWithSpan {
-            value: Value::Number(v, _b),
+    let limit = match &query.limit_clause {
+        Some(sqlparser::ast::LimitClause::LimitOffset {
+            limit:
+                Some(Expr::Value(ValueWithSpan {
+                    value: Value::Number(v, _b),
+                    ..
+                })),
             ..
-        })) => {
+        }) => {
             let v: i64 = v.parse().unwrap_or(0);
             std::cmp::min(v, MAX_LIMIT) as usize
         }
@@ -323,11 +327,15 @@ pub fn is_simple_distinct_query(query: &Query) -> Option<(String, usize, bool)> 
     }
 
     // check if limit is present
-    let limit = match &query.limit {
-        Some(Expr::Value(ValueWithSpan {
-            value: Value::Number(v, _b),
+    let limit = match &query.limit_clause {
+        Some(sqlparser::ast::LimitClause::LimitOffset {
+            limit:
+                Some(Expr::Value(ValueWithSpan {
+                    value: Value::Number(v, _b),
+                    ..
+                })),
             ..
-        })) => {
+        }) => {
             let v: i64 = v.parse().unwrap_or(0);
             std::cmp::min(v, MAX_LIMIT) as usize
         }
