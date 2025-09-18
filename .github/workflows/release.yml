@@ -4,7 +4,7 @@ on:
       - "v*.*.*"
 name: Release
 env:
-  RUST_TOOLCHAIN: nightly-2025-05-20
+  RUST_TOOLCHAIN: nightly-2025-07-20
 jobs:
   build:
     name: Build binary
@@ -234,19 +234,18 @@ jobs:
               tag: tag
             });      
             function cleanChangelog(changelog) {
-              if (!changelog) return '';
-              return changelog
-                .split(/\r?\n/)
-                .map(line => {
-                  if (line.toLowerCase().includes('full changelog')) return '';
-                  line = line.replace(/by\s+@[\w-]+.*$/i, '');
-                  line = line.replace(/@\w+/g, '');
-                  line = line.replace(/\bhttps?:\/\/\Spull\S/gi, '');
-                  return line.trim();
-                })
-                .filter(line => line.length > 0)
-                .join('\n');
-            }
+                    if (!changelog) return '';
+                    const lines = changelog.split(/\r?\n/);
+                    const result = [];
+                    for (const line of lines) {
+                      if (line.toLowerCase().includes('new contributors')) break;
+                      if (line.toLowerCase().includes('full changelog')) continue;
+                      if (line.toLowerCase().includes('download binaries from')) continue;
+                      const cleanedLine = line.replace(/by\s+@[\w-]+.*$/i, '').replace(/@\w+/g, '').replace(/\bhttps?:\/\/\S+/gi, '').trim();
+                      if (cleanedLine.length > 0) result.push(cleanedLine);
+                    }
+                    return result.join('\n');
+                  }
 
             const cleanedBody = cleanChangelog(release.body);
             const payload = {
@@ -258,7 +257,7 @@ jobs:
               date: release.published_at
             };
             try {
-              const response = await fetch(`${process.env.STRAPI_WEBHOOK_URL}/api/github-releases?status=draft`, {
+              const response = await fetch(`${process.env.STRAPI_WEBHOOK_URL}/api/github-releases?status=published`, {
                 method: 'POST',
                 headers: {
                   'Authorization': `Bearer ${process.env.STRAPI_API_TOKEN}`,

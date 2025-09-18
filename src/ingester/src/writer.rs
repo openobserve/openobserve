@@ -159,7 +159,7 @@ pub async fn read_from_memtable(
     let cfg = get_config();
     let key = WriterKey::new(org_id, stream_type);
     // fast past
-    if !cfg.common.feature_per_thread_lock {
+    if cfg.limit.mem_table_bucket_num <= 1 {
         let idx = get_table_idx(0, stream_name);
         let w = WRITERS[idx].read().await;
         return match w.get(&key) {
@@ -277,7 +277,7 @@ impl Writer {
                     },
                 }
                 total += 1;
-                if total % 1000 == 0 {
+                if total.is_multiple_of(1000) {
                     log::info!(
                         "[INGESTER:MEM:{idx}] writer queue consuming, total: {}, in queue: {}",
                         total,

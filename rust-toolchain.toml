@@ -1,3 +1,3 @@
 [toolchain]
-channel = "nightly-2025-05-20"
+channel = "nightly-2025-07-20"
 components = ["rustfmt", "clippy", "llvm-tools"]

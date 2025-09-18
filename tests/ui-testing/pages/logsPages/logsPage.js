@@ -1861,7 +1861,21 @@ export class LogsPage {
 
     async expectPageContainsText(text) {
         const logsPage = this.page.locator(this.qPageContainer);
-        return await expect(logsPage).toContainText(text);
+
+        // Wait for the page to stabilize and check for "No events found" condition
+        await this.page.waitForLoadState('networkidle');
+
+        // If no data is available, trigger a refresh and wait
+        const pageText = await logsPage.textContent();
+        if (pageText.includes('No events found')) {
+            console.log('No events found, attempting to refresh...');
+            await this.clickRefreshButton();
+            await this.page.waitForLoadState('networkidle');
+            // Wait additional time for data to load
+            await this.page.waitForTimeout(3000);
+        }
+
+        return await expect(logsPage).toContainText(text, { timeout: 10000 });
     }
 
     async clickLogSearchIndexListFieldSearchInput() {

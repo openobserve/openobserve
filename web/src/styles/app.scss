@@ -609,7 +609,7 @@
 
 
 .o2-primary-button{
-  font-size: 13px !important;
+  font-size: 13px ;
   font-weight: 500 !important;
   line-height: 16px !important;
   padding: 0px 12px !important;
@@ -759,6 +759,115 @@
 }
 
 .o2-toggle-button-lg-dark{
+  .q-toggle__track{
+    background-color: #2f415e;
+    border: 1px solid #6F737A !important;
+    opacity: 100%;
+  }
+  .q-toggle__inner--truthy{
+    color: #ffffff;
+    .q-toggle__track{
+      background-color: #6B76E3;
+    }
+    }
+}
+
+
+//o2 in xs size
+.o2-toggle-button-xs{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 100% !important;
+  width: auto !important;
+  min-width: 40px !important;
+  
+  // Target the inner toggle elements specifically
+  .q-toggle {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 100% !important;
+    width: auto !important;
+  }
+  
+  .q-toggle__inner {
+    display: flex !important;
+    align-items: center !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    width: 40px !important;
+  }
+  
+  .q-toggle__track{
+    height: 20px;
+    padding-bottom: 16px;
+    border-radius: 16px;
+    width: 32px;
+    background-color: #EBECF0;
+    opacity: 100%;
+  }
+  .q-toggle__thumb:after{
+    top: 0.5px;
+    left: -0.5px;
+    height: 14px;
+    width: 14px;
+  }
+  .q-toggle__thumb{
+    &:before {
+      display: none !important;
+    }
+    &:hover:before {
+      display: none !important;
+    }
+    .q-icon{
+      right: 1px
+    }
+  }
+
+  .q-toggle__inner--truthy{
+    .q-toggle__thumb:after{
+      top: 0.5px;
+      left: 1.2px;
+    }
+    .q-toggle__thumb{
+      &:before {
+        display: none !important;
+      }
+      &:hover:before {
+        display: none !important;
+      }
+      .q-icon{
+        left: 1px;
+        color: black;
+      }
+    }
+  }
+}
+
+// Additional centering for the toggle button when used with flex classes
+.tw-flex.tw-items-center.tw-justify-center.o2-toggle-button-xs {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 32px;
+}
+
+.o2-toggle-button-xs-light{
+  .q-toggle__track{
+    background-color: #acbbf3;
+    border: 1px solid #D3D5DB !important;
+    opacity: 100%;
+  }
+  .q-toggle__inner--truthy{
+    color: #ffffff;
+    .q-toggle__track{
+      background-color: #575FC5;
+    }
+    }
+}
+
+.o2-toggle-button-xs-dark{
   .q-toggle__track{
     background-color: #2f415e;
     border: 1px solid #6F737A !important;

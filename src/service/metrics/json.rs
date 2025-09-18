@@ -232,6 +232,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                         if stream_params.stream_type != StreamType::Metrics {
                             continue;
                         }
+
                         // add partition keys
                         if !stream_partitioning_map.contains_key(stream_params.stream_name.as_str())
                         {
@@ -502,7 +503,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         ])
         .inc();
 
-    // only one trigger per request, as it updates etcd
+    // only one trigger per request
     for (_, entry) in stream_trigger_map {
         if let Some(entry) = entry {
             evaluate_trigger(entry).await;

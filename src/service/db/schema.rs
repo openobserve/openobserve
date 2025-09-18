@@ -492,7 +492,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let start_dt: i64 = columns[3].parse().unwrap();
         let entry = schemas.entry(item_key).or_insert(Vec::new());
         entry.push((start_dt, val));
-        if i % 1000 == 0 {
+        if i.is_multiple_of(1000) {
             log::info!("Cache schema progress: {i}/{items_num}");
         }
     }
@@ -549,7 +549,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let mut w = STREAM_SCHEMAS.write().await;
         w.insert(item_key.to_string(), schema_versions);
         drop(w);
-        if i % 1000 == 0 {
+        if i.is_multiple_of(1000) {
             log::info!("Stream schemas Cached progress: {}/{}", i, keys.len());
         }
     }

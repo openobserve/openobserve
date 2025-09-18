@@ -19,6 +19,7 @@ use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
     cluster::LOCAL_NODE,
+    datafusion::request::Request,
     get_config,
     meta::{
         cluster::{IntoArcVec, Node, Role, RoleGroup},
@@ -63,7 +64,6 @@ use crate::{
                 table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
             },
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-            request::Request,
             sql::Sql,
             utils::{AsyncDefer, ScanStatsVisitor},
         },
@@ -127,9 +127,6 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
                 .build()
         )
     );
-
-    let use_inverted_index = super::super::is_use_inverted_index(&sql);
-    req.set_use_inverted_index(use_inverted_index);
 
     #[cfg(feature = "enterprise")]
     let scan_stats = ScanStats {

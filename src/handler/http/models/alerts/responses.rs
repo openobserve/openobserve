@@ -107,3 +107,11 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
         })
     }
 }
+#[derive(Default, Serialize, ToSchema)]
+pub struct AlertBulkEnableResponse {
+    #[schema(value_type = Vec<String>)]
+    pub successful: Vec<Ksuid>,
+    #[schema(value_type = Vec<String>)]
+    pub unsuccessful: Vec<Ksuid>,
+    pub err: Option<String>,
+}

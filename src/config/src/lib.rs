@@ -12,9 +12,11 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#![feature(macro_metavar_expr_concat)]
 
 pub mod cluster;
 pub mod config;
+pub mod datafusion;
 pub mod ider;
 pub mod meta;
 pub mod metrics;

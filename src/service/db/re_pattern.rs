@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use config::meta::stream::{PatternAssociation, StreamType, UpdateSettingsWrapper};
 use infra::{
-    cluster_coordinator::get_coordinator,
+    coordinator::get_coordinator,
     db::Event,
     errors::{self, DbError},
     table::{

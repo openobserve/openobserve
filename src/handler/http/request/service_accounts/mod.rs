@@ -282,7 +282,6 @@ pub async fn delete(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("org_id" = String, Path, description = "Organization name"),
         ("email_id" = String, Path, description = "Service Account email id"),
       ),
     responses(

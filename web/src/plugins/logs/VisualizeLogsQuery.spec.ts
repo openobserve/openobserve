@@ -5,8 +5,18 @@ import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { ref } from "vue";
+import { createRouter, createWebHistory } from "vue-router";
 
 installQuasar();
+
+// Create a mock router
+const mockRouter = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/', name: 'home', component: { template: '<div>Home</div>' } },
+    { path: '/logs', name: 'logs', component: { template: '<div>Logs</div>' } }
+  ]
+});
 
 // Mock codemirror to prevent import errors
 vi.mock("codemirror", () => ({
@@ -18,6 +28,33 @@ vi.mock("codemirror", () => ({
 // Mock CodeQueryEditor component
 vi.mock("@/components/CodeQueryEditor.vue", () => ({
   default: { name: "CodeQueryEditor", template: "<div>CodeQueryEditor</div>" },
+}));
+
+// Mock useLogs composable to avoid lifecycle hook issues
+vi.mock("@/composables/useLogs", () => ({
+  default: vi.fn(() => ({
+    searchObj: {
+      data: {
+        stream: {
+          selectedStreamFields: [],
+          selectedFields: [],
+        },
+        query: "",
+        queryResults: [],
+      },
+    },
+    buildSearch: vi.fn(),
+  })),
+}));
+
+// Mock useWebSocket to avoid onBeforeUnmount issues
+vi.mock("@/composables/useWebSocket", () => ({
+  default: vi.fn(() => ({
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    send: vi.fn(),
+    onMessage: vi.fn(),
+  })),
 }));
 
 // Mock composables
@@ -72,6 +109,17 @@ vi.mock("@/composables/useDashboardPanel", () => ({
     dashboardPanelData: mockDashboardPanelData,
     resetAggregationFunction: mockResetAggregationFunction,
     validatePanel: mockValidatePanel,
+    isOutDated: false,
+    onActivated: vi.fn(),
+  })),
+}));
+
+// Mock useDashboardPanelData to avoid lifecycle issues
+vi.mock("@/composables/useDashboardPanelData", () => ({
+  default: vi.fn(() => ({
+    dashboardPanelData: mockDashboardPanelData,
+    resetAggregationFunction: mockResetAggregationFunction,
+    validatePanel: mockValidatePanel,
   })),
 }));
 
@@ -98,6 +146,24 @@ vi.mock("lodash-es", () => ({
   }),
 }));
 
+// Mock sqlUtils with isSimpleSelectAllQuery function
+vi.mock("@/utils/query/sqlUtils", () => {
+  return {
+    isSimpleSelectAllQuery: vi.fn((query: string) => {
+      if (!query || typeof query !== 'string') return false;
+      const normalizedQuery = query.trim().replace(/\s+/g, ' ');
+      const selectAllPattern = /^select\s+\*\s+from\s+/i;
+      return selectAllPattern.test(normalizedQuery);
+    }),
+    // Add other functions that might be needed
+    buildSqlQuery: vi.fn(),
+    getFieldsFromQuery: vi.fn(),
+    extractFields: vi.fn(),
+    addLabelsToSQlQuery: vi.fn(),
+    getStreamFromQuery: vi.fn(),
+  };
+});
+
 describe("VisualizeLogsQuery Component", () => {
   let wrapper: VueWrapper<any>;
   const defaultProps = {
@@ -122,7 +188,7 @@ describe("VisualizeLogsQuery Component", () => {
     wrapper = mount(VisualizeLogsQuery, {
       props: defaultProps,
       global: {
-        plugins: [i18n],
+        plugins: [i18n, mockRouter],
         provide: {
           store,
           dashboardPanelDataPageKey: "logs",
@@ -179,7 +245,7 @@ describe("VisualizeLogsQuery Component", () => {
           errorData: defaultProps.errorData,
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, mockRouter],
           provide: {
             store,
             dashboardPanelDataPageKey: "logs",
@@ -431,7 +497,7 @@ describe("VisualizeLogsQuery Component", () => {
           is_ui_histogram: true,
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, mockRouter],
           provide: {
             store,
             dashboardPanelDataPageKey: "logs",

@@ -20,8 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     :style="computedStyleForFunction"
   >
-    <div class="stream-routing-title q-pb-sm q-pl-md">
+    <div class="stream-routing-title q-pb-sm q-pl-md tw-flex tw-items-center tw-justify-between">
       {{ t("pipeline.associateFunction") }}
+      <div>
+          <q-btn v-close-popup="true" round flat icon="cancel" >
+          </q-btn>
+        </div>
     </div>
     <q-separator />
 
@@ -395,7 +399,7 @@ const filterFunctions = (val: any, update: any) => {
 
 <style scoped lang="scss">
 .stream-routing-title {
-  font-size: 20px;
+  font-size: 18px;
   padding-top: 16px;
 }
 .stream-routing-container {

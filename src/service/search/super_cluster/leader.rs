@@ -19,6 +19,7 @@ use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
     cluster::LOCAL_NODE,
+    datafusion::request::Request,
     get_config,
     meta::{
         cluster::{NodeInfo, RoleGroup},
@@ -46,7 +47,6 @@ use crate::service::search::{
         create_physical_plan,
     },
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    request::Request,
     sql::Sql,
     utils::{AsyncDefer, ScanStatsVisitor},
 };
@@ -83,9 +83,6 @@ pub async fn search(
     {
         return Ok((vec![], ScanStats::new(), 0, false, "".to_string()));
     }
-
-    let use_inverted_index = super::super::is_use_inverted_index(&sql);
-    req.set_use_inverted_index(use_inverted_index);
 
     // 2. get nodes
     let get_node_start = std::time::Instant::now();

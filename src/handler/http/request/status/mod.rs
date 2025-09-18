@@ -140,6 +140,7 @@ struct ConfigResponse<'a> {
     ingest_flatten_level: u32,
     #[cfg(feature = "enterprise")]
     license_expiry: i64,
+    log_page_default_field_list: String,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -365,6 +366,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         ingest_flatten_level: cfg.limit.ingest_flatten_level,
         #[cfg(feature = "enterprise")]
         license_expiry: expiry_time,
+        log_page_default_field_list: cfg.common.log_page_default_field_list.clone(),
     }))
 }
 

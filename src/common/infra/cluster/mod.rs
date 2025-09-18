@@ -40,7 +40,6 @@ use infra::{
 };
 use once_cell::sync::Lazy;
 
-mod etcd;
 mod nats;
 mod scheduler;
 
@@ -200,7 +199,7 @@ pub async fn register_and_keep_alive() -> Result<()> {
 
     match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::register_and_keep_alive().await?,
-        _ => etcd::register_and_keep_alive().await?,
+        _ => nats::register_and_keep_alive().await?,
     };
 
     // check node heatbeat
@@ -222,7 +221,7 @@ pub async fn register_and_keep_alive() -> Result<()> {
     Ok(())
 }
 
-pub async fn set_online(new_lease_id: bool) -> Result<()> {
+pub async fn set_online() -> Result<()> {
     let cfg = get_config();
     if cfg.common.local_mode {
         return Ok(());
@@ -230,11 +229,11 @@ pub async fn set_online(new_lease_id: bool) -> Result<()> {
 
     match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::set_online().await,
-        _ => etcd::set_online(new_lease_id).await,
+        _ => nats::set_online().await,
     }
 }
 
-pub async fn set_offline(new_lease_id: bool) -> Result<()> {
+pub async fn set_offline() -> Result<()> {
     let cfg = get_config();
     if cfg.common.local_mode {
         return Ok(());
@@ -242,7 +241,7 @@ pub async fn set_offline(new_lease_id: bool) -> Result<()> {
 
     match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::set_offline().await,
-        _ => etcd::set_offline(new_lease_id).await,
+        _ => nats::set_offline().await,
     }
 }
 
@@ -254,7 +253,7 @@ pub async fn update_local_node(node: &Node) -> Result<()> {
 
     match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::update_local_node(node).await,
-        _ => etcd::update_local_node(node).await,
+        _ => nats::update_local_node(node).await,
     }
 }
 
@@ -286,7 +285,7 @@ pub async fn leave() -> Result<()> {
 
     match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::leave().await,
-        _ => etcd::leave().await,
+        _ => nats::leave().await,
     }
 }
 
@@ -745,14 +744,14 @@ mod tests {
     #[tokio::test]
     async fn test_set_online() {
         register_and_keep_alive().await.unwrap();
-        set_online(true).await.unwrap();
+        set_online().await.unwrap();
         assert!(get_cached_online_nodes().await.is_some());
     }
 
     #[tokio::test]
     async fn test_set_offline() {
         register_and_keep_alive().await.unwrap();
-        set_offline(true).await.unwrap();
+        set_offline().await.unwrap();
         // doesn't work for local mode
         assert!(get_cached_online_nodes().await.is_some());
     }
@@ -804,7 +803,7 @@ mod tests {
     #[tokio::test]
     async fn test_cluster() {
         register_and_keep_alive().await.unwrap();
-        set_online(false).await.unwrap();
+        set_online().await.unwrap();
         leave().await.unwrap();
         assert!(get_cached_online_nodes().await.is_some());
         assert!(get_cached_online_query_nodes(None).await.is_some());

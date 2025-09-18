@@ -392,7 +392,7 @@ export default defineComponent({
 
     customText.value = store.state.zoConfig.custom_logo_text;
 
-    onActivated(() => {
+    const updateFromStore = () => {
       scrapeIntereval.value =
         store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15;
@@ -408,7 +408,19 @@ export default defineComponent({
       enableStreamingAggregation.value =
         store.state?.organizationData?.organizationSettings
           ?.streaming_aggregation_enabled ?? false;
+    };
+
+    onActivated(() => {
+      updateFromStore();
     });
+
+    watch(
+      () => store.state.organizationData?.organizationSettings,
+      () => {
+        updateFromStore();
+      },
+      { deep: true, immediate: true }
+    );
 
     watch(
       () => editingText.value,

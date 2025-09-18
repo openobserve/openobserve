@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "lowercase")]
 pub enum MetaStore {
     Sqlite,
-    Etcd,
     Nats,
     MySQL,
     PostgreSQL,
@@ -29,7 +28,6 @@ impl From<&str> for MetaStore {
     fn from(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "sqlite" => Self::Sqlite,
-            "etcd" => Self::Etcd,
             "nats" => Self::Nats,
             "mysql" => Self::MySQL,
             "postgres" | "postgresql" => Self::PostgreSQL,
@@ -48,7 +46,6 @@ impl std::fmt::Display for MetaStore {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::Sqlite => write!(f, "sqlite"),
-            Self::Etcd => write!(f, "etcd"),
             Self::Nats => write!(f, "nats"),
             Self::MySQL => write!(f, "mysql"),
             Self::PostgreSQL => write!(f, "postgresql"),
@@ -63,7 +60,6 @@ mod tests {
     #[test]
     fn test_metastore_from_str() {
         assert_eq!(MetaStore::from("sqlite"), MetaStore::Sqlite);
-        assert_eq!(MetaStore::from("etcd"), MetaStore::Etcd);
         assert_eq!(MetaStore::from("nats"), MetaStore::Nats);
         assert_eq!(MetaStore::from("mysql"), MetaStore::MySQL);
         assert_eq!(MetaStore::from("postgres"), MetaStore::PostgreSQL);
@@ -71,7 +67,6 @@ mod tests {
 
         // Case insensitive
         assert_eq!(MetaStore::from("SQLITE"), MetaStore::Sqlite);
-        assert_eq!(MetaStore::from("ETCD"), MetaStore::Etcd);
 
         // Unknown values default to Sqlite
         assert_eq!(MetaStore::from("unknown"), MetaStore::Sqlite);
@@ -80,13 +75,11 @@ mod tests {
     #[test]
     fn test_metastore_from_string() {
         assert_eq!(MetaStore::from("sqlite".to_string()), MetaStore::Sqlite);
-        assert_eq!(MetaStore::from("etcd".to_string()), MetaStore::Etcd);
     }
 
     #[test]
     fn test_metastore_display() {
         assert_eq!(MetaStore::Sqlite.to_string(), "sqlite");
-        assert_eq!(MetaStore::Etcd.to_string(), "etcd");
         assert_eq!(MetaStore::Nats.to_string(), "nats");
         assert_eq!(MetaStore::MySQL.to_string(), "mysql");
         assert_eq!(MetaStore::PostgreSQL.to_string(), "postgresql");
@@ -94,11 +87,11 @@ mod tests {
 
     #[test]
     fn test_metastore_serialization() {
-        let metastore = MetaStore::Etcd;
+        let metastore = MetaStore::Nats;
         let serialized = serde_json::to_string(&metastore).unwrap();
-        assert_eq!(serialized, "\"etcd\"");
+        assert_eq!(serialized, "\"nats\"");
 
         let deserialized: MetaStore = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(deserialized, MetaStore::Etcd);
+        assert_eq!(deserialized, MetaStore::Nats);
     }
 }

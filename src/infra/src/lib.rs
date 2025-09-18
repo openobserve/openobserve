@@ -16,7 +16,8 @@
 #![feature(btree_extract_if)]
 
 pub mod cache;
-pub mod cluster_coordinator;
+pub mod client;
+pub mod coordinator;
 pub mod db;
 pub mod dist_lock;
 pub mod errors;

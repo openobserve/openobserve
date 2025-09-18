@@ -565,7 +565,7 @@ pub async fn handle_otlp_request(
         .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str(), "", ""])
         .inc();
 
-    // only one trigger per request, as it updates etcd
+    // only one trigger per request
     for (_, entry) in stream_trigger_map {
         if let Some(entry) = entry {
             evaluate_trigger(entry).await;
