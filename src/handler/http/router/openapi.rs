@@ -240,7 +240,6 @@ use crate::{common::meta, handler::http::request};
             config::meta::timed_annotations::TimedAnnotationDelete,
             config::meta::timed_annotations::TimedAnnotationUpdate,
             // Dashboards
-            crate::handler::http::models::dashboards::CreateDashboardRequestBody,
             crate::handler::http::models::dashboards::CreateDashboardResponseBody,
             crate::handler::http::models::dashboards::GetDashboardResponseBody,
             crate::handler::http::models::dashboards::UpdateDashboardRequestBody,
