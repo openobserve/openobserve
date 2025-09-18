@@ -332,6 +332,7 @@ rustls = { version = "0.23.20", default-features = false, features = [
     "std",
     "tls12",
 ] }
+scc = { version = "3.0.7", features = ["equivalent"] }
 sea-orm = { version = "1.1.8", features = [
     "sqlx-all",
     "runtime-tokio-rustls",
