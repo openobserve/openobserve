@@ -93,9 +93,7 @@ impl FileData {
         let data_size = file.len() + data.len();
         let max_size = get_config().memory_cache.max_size;
         if self.cur_size + data_size >= max_size {
-            log::info!(
-                "[trace_id {trace_id}] File memory cache is full, can't cache extra {data_size} bytes"
-            );
+            log::info!("File memory cache is full, can't cache extra {data_size} bytes");
             // cache is full, need release some space
             let need_release_size = min(
                 self.cur_size,
