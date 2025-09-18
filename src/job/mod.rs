@@ -89,7 +89,6 @@ async fn get_license_check_lock() -> Result<bool, anyhow::Error> {
             .await;
         dist_lock::unlock(&locker).await?;
         log::info!("[o2::ENT] License check lock acquired");
-        drop(locker);
         ret?;
     }
     Ok(true)

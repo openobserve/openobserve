@@ -2392,7 +2392,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.usage_publish_interval < 1 {
         cfg.common.usage_publish_interval = 60;
     }
-    
+
     cfg.common.log_page_default_field_list = cfg.common.log_page_default_field_list.to_lowercase();
     if !matches!(
         cfg.common.log_page_default_field_list.as_str(),

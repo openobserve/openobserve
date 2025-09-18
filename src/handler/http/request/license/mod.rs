@@ -1,3 +1,18 @@
+// Copyright 2025 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 use actix_web::{HttpResponse, get, post, web};
 use o2_enterprise::enterprise::license::{
     LICENSE_DB_KEY, License, check_license, get_license, ingestion_used, license_expired,
@@ -34,7 +49,7 @@ pub async fn get_license_info() -> HttpResponse {
         installation_id: config::get_instance_id(),
         expired: license_expired().await,
         search_used: search_used() * 100.0, // convert to percentage
-        ingestion_used: ingestion_used() * 100.0, // convert tot percentage
+        ingestion_used: ingestion_used() * 100.0, // convert to percentage
     };
     HttpResponse::Ok().json(res)
 }
