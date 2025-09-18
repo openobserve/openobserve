@@ -716,8 +716,7 @@ pub async fn do_partitioned_search(
             );
         }
 
-        curr_res_size += total_hits;
-        if req_size > 0 && curr_res_size >= req_size {
+        if req_size > 0 && total_hits >= req_size {
             log::info!(
                 "[HTTP2_STREAM trace_id {}] Reached requested result size ({}), truncating results",
                 trace_id,
@@ -726,6 +725,8 @@ pub async fn do_partitioned_search(
             search_res.hits.truncate(req_size as usize);
             curr_res_size += req_size;
             search_res.total = search_res.hits.len();
+        } else {
+            curr_res_size += total_hits;
         }
 
         search_res = order_search_results(search_res, fallback_order_by_col.clone());
@@ -1245,8 +1246,7 @@ async fn process_delta(
 
         let total_hits = search_res.total as i64;
 
-        *curr_res_size += total_hits;
-        if req.query.size > 0 && *curr_res_size >= req.query.size {
+        if req.query.size > 0 && total_hits >= req.query.size {
             log::info!(
                 "[HTTP2_STREAM trace_id {}] Reached requested result size ({}), truncating results",
                 trace_id,
@@ -1255,6 +1255,8 @@ async fn process_delta(
             search_res.hits.truncate(req.query.size as usize);
             *curr_res_size += req.query.size;
             search_res.total = search_res.hits.len();
+        } else {
+            *curr_res_size += total_hits;
         }
 
         log::info!(
