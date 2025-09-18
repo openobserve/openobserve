@@ -79,7 +79,7 @@ export const convertMultiSQLData = async (
         store,
         chartPanelRef,
         hoveredSeriesState,
-        [resultMetaData.value[i]],
+        [resultMetaData.value[i][0]],
         { queries: [metadata.queries[i]] },
         chartPanelStyle,
         annotations,
