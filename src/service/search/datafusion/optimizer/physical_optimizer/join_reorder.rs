@@ -22,11 +22,10 @@ use datafusion::{
     },
     config::ConfigOptions,
     physical_optimizer::PhysicalOptimizerRule,
-    physical_plan::{
-        ExecutionPlan, ExecutionPlanVisitor, aggregates::AggregateExec, joins::HashJoinExec,
-        visit_execution_plan,
-    },
+    physical_plan::{ExecutionPlan, joins::HashJoinExec},
 };
+
+use crate::service::search::datafusion::optimizer::physical_optimizer::utils::is_aggregate_exec;
 
 #[derive(Default, Debug)]
 pub struct JoinReorderRule;
@@ -59,7 +58,10 @@ fn swap_join_order(plan: Arc<dyn ExecutionPlan>) -> Result<Transformed<Arc<dyn E
     if let Some(hash_join) = plan.as_any().downcast_ref::<HashJoinExec>() {
         let left = hash_join.left();
         let right = hash_join.right();
-        if !is_agg_exec(left) && is_agg_exec(right) {
+        if !is_aggregate_exec(left)
+            && is_aggregate_exec(right)
+            && hash_join.join_type().supports_swap()
+        {
             return Ok(Transformed::yes(HashJoinExec::swap_inputs(
                 hash_join,
                 hash_join.mode,
@@ -67,38 +69,6 @@ fn swap_join_order(plan: Arc<dyn ExecutionPlan>) -> Result<Transformed<Arc<dyn E
         }
     }
     Ok(Transformed::no(plan))
-}
-
-// check if the plan and it subplan is aggregate execution plan
-fn is_agg_exec(plan: &Arc<dyn ExecutionPlan>) -> bool {
-    let mut visitor = PlanVisitor::new();
-    let _ = visit_execution_plan(plan.as_ref(), &mut visitor);
-    visitor.is_agg
-}
-
-// visitor to check if the plan is aggregate execution plan
-#[derive(Debug)]
-struct PlanVisitor {
-    is_agg: bool,
-}
-
-impl PlanVisitor {
-    pub fn new() -> Self {
-        PlanVisitor { is_agg: false }
-    }
-}
-
-impl ExecutionPlanVisitor for PlanVisitor {
-    type Error = datafusion::common::DataFusionError;
-
-    fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> Result<bool, Self::Error> {
-        let mayby_agg_exec = plan.as_any().downcast_ref::<AggregateExec>();
-        if mayby_agg_exec.is_some() {
-            self.is_agg = true;
-            return Ok(false);
-        }
-        Ok(true)
-    }
 }
 
 #[cfg(test)]

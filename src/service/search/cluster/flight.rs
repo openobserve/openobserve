@@ -19,6 +19,7 @@ use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
     cluster::LOCAL_NODE,
+    datafusion::request::Request,
     get_config,
     meta::{
         cluster::{IntoArcVec, Node, Role, RoleGroup},
@@ -63,7 +64,6 @@ use crate::{
                 table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
             },
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-            request::Request,
             sql::Sql,
             utils::{AsyncDefer, ScanStatsVisitor},
         },

@@ -17,6 +17,7 @@ service Search {
     rpc SearchPartition(SearchPartitionRequest) returns (SearchPartitionResponse) {}
     rpc GetResult(GetResultRequest) returns (GetResultResponse) {}
     rpc DeleteResult(DeleteResultRequest) returns (DeleteResultResponse) {}
+    rpc GetTable(GetTableRequest) returns (GetTableResponse) {}
 }
 
 message QueryStatusRequest {}
@@ -125,4 +126,12 @@ message Query {
     string       sql = 1;
     int64 start_time = 2;
     int64   end_time = 3;
+}
+
+message GetTableRequest {
+    string           path = 1;
+}
+
+message GetTableResponse {
+    bytes            data = 1;
 }
