@@ -166,7 +166,7 @@ pub async fn search(
                     limit: v.limit,
                     file_path: file_path.clone(),
                     cache_query_response,
-                    clear_cache: true,
+                    clear_cache: true && !is_streaming,
                     ..Default::default()
                 }
             }
