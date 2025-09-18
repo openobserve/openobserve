@@ -25,7 +25,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         log::debug!("[STATS] job not started as not a compactor");
     }
 
-    if cache_stream_stats().is_none() {
+    if cache_stream_stats().await.is_none() {
         log::debug!("[STATS] job not started as not a compactor");
     }
 
@@ -58,7 +58,7 @@ fn file_list_update_stats() -> Option<tokio::task::JoinHandle<()>> {
     ))
 }
 
-fn cache_stream_stats() -> Option<tokio::task::JoinHandle<()>> {
+async fn cache_stream_stats() -> Option<tokio::task::JoinHandle<()>> {
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_compactor() {
         return None;
     }
@@ -71,19 +71,19 @@ fn cache_stream_stats() -> Option<tokio::task::JoinHandle<()>> {
     #[cfg(not(feature = "enterprise"))]
     let need_wait_one_around = false;
 
+    // wait one around to make sure the dependent models are ready
+    if need_wait_one_around {
+        tokio::time::sleep(time::Duration::from_secs(std::cmp::max(
+            60,
+            get_config().limit.calculate_stats_interval,
+        )))
+        .await;
+    }
+
     Some(spawn_pausable_job!(
         "cache_stream_stats",
         std::cmp::max(60, get_config().limit.calculate_stats_interval),
         {
-            // wait one around to make sure the dependent models are ready
-            if need_wait_one_around {
-                tokio::time::sleep(time::Duration::from_secs(std::cmp::max(
-                    60,
-                    get_config().limit.calculate_stats_interval,
-                )))
-                .await;
-            }
-
             if let Err(e) = db::file_list::cache_stats().await {
                 log::error!("[STATS] run cached stream stats error: {e}");
             } else {
