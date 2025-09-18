@@ -157,6 +157,7 @@ pub async fn search(
                     ts_column,
                     is_descending,
                     order_by,
+                    cache_query_response: true,
                     ..Default::default()
                 }
             }
@@ -1021,6 +1022,7 @@ pub async fn check_cache_v2(
                 MultiCachedQueryResponse {
                     ts_column,
                     is_descending,
+                    cache_query_response: true,
                     file_path,
                     ..Default::default()
                 }
