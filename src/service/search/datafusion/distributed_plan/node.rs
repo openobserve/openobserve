@@ -15,12 +15,13 @@
 
 use std::sync::Arc;
 
-use config::meta::{cluster::NodeInfo, sql::TableReferenceExt};
+use config::{
+    datafusion::request::{FlightSearchRequest, Request},
+    meta::{cluster::NodeInfo, sql::TableReferenceExt},
+};
 use datafusion::common::TableReference;
 use hashbrown::HashMap;
 use proto::cluster_rpc::{IndexInfo, KvItem, QueryIdentifier, SearchInfo, SuperClusterInfo};
-
-use crate::service::search::request::{FlightSearchRequest, Request};
 
 #[derive(Debug, Clone)]
 pub struct RemoteScanNodes {

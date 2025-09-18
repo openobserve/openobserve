@@ -307,17 +307,17 @@ fn generate_table_source_with_sorted_by_time(
 
 pub fn is_contain_deduplication_plan(plan: &LogicalPlan) -> bool {
     plan.exists(|plan| Ok(matches!(plan, LogicalPlan::Extension(_))))
-        .unwrap()
+        .unwrap_or(true)
 }
 
 // avoid add new plan when the plan is empty relation
 // for example: select * from default where false
 pub fn is_empty_relation(plan: &LogicalPlan) -> bool {
     plan.exists(|plan| Ok(matches!(plan, LogicalPlan::EmptyRelation(_))))
-        .unwrap()
+        .unwrap_or(true)
 }
 
 pub fn is_place_holder_or_empty(plan: &Arc<dyn ExecutionPlan>) -> bool {
     plan.exists(|plan| Ok(plan.name() == "PlaceholderRowExec" || plan.name() == "EmptyExec"))
-        .unwrap()
+        .unwrap_or(true)
 }

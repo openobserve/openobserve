@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::meta::cluster::NodeInfo;
+use config::{datafusion::request::Request, meta::cluster::NodeInfo};
 use datafusion::sql::TableReference;
 use hashbrown::HashMap;
 use infra::errors::Error;
@@ -25,8 +25,6 @@ use {
     datafusion::physical_optimizer::PhysicalOptimizerRule,
     o2_enterprise::enterprise::search::datafusion::optimizer::stream_aggregate::StreamingAggsRule,
 };
-
-use crate::service::search::request::Request;
 
 pub enum PhysicalOptimizerContext {
     RemoteScan(RemoteScanContext),
