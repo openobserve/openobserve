@@ -18,14 +18,11 @@ use infra::{
     client::grpc::get_cached_channel,
     errors::{Error, ErrorCodes},
 };
-use proto::cluster_rpc::{self, DeleteResultCacheRequest, QueryCacheRequest};
+use proto::cluster_rpc;
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 use tracing::{Instrument, info_span};
 
-use crate::{
-    common::meta::search::{CacheQueryRequest, CachedQueryResponse},
-    service::search::{infra_cluster, server_internal_error},
-};
+use crate::service::search::{infra_cluster, server_internal_error};
 
 pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
     let trace_id = path.clone();
