@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn test_memory_size_calculation() {
-        let cache = FileStatisticsCache::new(100);
+        let cache = FileStatisticsCache::new();
 
         // Empty cache should have some base size
         let empty_size = cache.memory_size();
