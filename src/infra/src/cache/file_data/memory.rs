@@ -358,8 +358,7 @@ mod tests {
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..50 {
             let file_key = format!(
-                "files/default/logs/memory/2022/10/03/10/6982652937134804993_1_{}.parquet",
-                i
+                "files/default/logs/memory/2022/10/03/10/6982652937134804993_1_{i}.parquet"
             );
             let resp = file_data.set(&file_key, content.clone()).await;
             assert!(resp.is_ok());
@@ -403,8 +402,7 @@ mod tests {
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..50 {
             let file_key = format!(
-                "files/default/logs/memory/2022/10/03/10/6982652937134804993_4_{}.parquet",
-                i
+                "files/default/logs/memory/2022/10/03/10/6982652937134804993_4_{i}.parquet"
             );
             let resp = file_data.set(&file_key, content.clone()).await;
             assert!(resp.is_ok());
