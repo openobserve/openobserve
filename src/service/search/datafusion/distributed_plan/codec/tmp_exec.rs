@@ -57,7 +57,7 @@ pub(crate) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Res
     };
     proto.encode(buf).map_err(|e| {
         DataFusionError::Internal(format!(
-            "failed to encode NewEmptyExecNode writer execution plan: {e:?}"
+            "failed to encode TmpExecNode writer execution plan: {e:?}"
         ))
     })?;
     Ok(())
