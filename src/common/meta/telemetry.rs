@@ -93,6 +93,66 @@ impl Telemetry {
     pub async fn heart_beat(&mut self, event: &str, data: Option<HashMap<String, json::Value>>) {
         self.send_track_event(event, data, true, true).await;
     }
+
+    pub async fn send_keyevent_track_event(
+        &mut self,
+        event: &str,
+        data: Option<HashMap<String, json::Value>>,
+        send_base_info: bool,
+        send_zo_data: bool,
+    ) {
+        let cfg = get_config();
+        if cfg.common.keyevent_telemetry_url.is_empty() {
+            log::debug!("Keyevent telemetry URL not configured, skipping keyevent track event");
+            return;
+        }
+
+        #[cfg(not(feature = "cloud"))]
+        if !cfg.common.telemetry_enabled {
+            return;
+        }
+
+        log::info!("sending a keyevent track event {event}");
+        let mut props = if send_base_info {
+            self.base_info.clone()
+        } else {
+            HashMap::new()
+        };
+
+        if let Some(data) = data {
+            props.extend(data);
+        }
+
+        if send_zo_data {
+            add_zo_info(&mut props).await;
+        }
+
+        let payload = json::json!({
+            "user_id": get_instance_id(),
+            "event": event,
+            "properties": props,
+            "timestamp": time::OffsetDateTime::now_utc().format(&time::format_description::well_known::Rfc3339).unwrap()
+        });
+
+        let client = reqwest::Client::new();
+        let res = client
+            .post(&cfg.common.keyevent_telemetry_url)
+            .header("Content-Type", "application/json")
+            .json(&payload)
+            .send()
+            .await;
+
+        match res {
+            Ok(response) => {
+                if !response.status().is_success() {
+                    log::error!("Error sending keyevent {event}, status: {}", response.status());
+                }
+            }
+            Err(e) => {
+                log::error!("Error sending keyevent {event}, {e:?}");
+            }
+        }
+    }
 }
 
 pub fn get_base_info(data: &mut HashMap<String, json::Value>) -> HashMap<String, json::Value> {
