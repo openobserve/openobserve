@@ -14,12 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use std::{collections::HashMap, sync::Arc};
 
-use config::meta::projections::ProjectionColumnMapping;
+use config::{datafusion::request::Request, meta::projections::ProjectionColumnMapping};
 use datafusion::common::tree_node::TreeNode;
 
 use crate::service::search::{
     cluster::flight::{SearchContextBuilder, register_table},
-    request::Request,
     sql::Sql,
 };
 

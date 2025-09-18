@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::cluster::get_internal_grpc_token;
+use infra::client::grpc::MetadataMap;
 use opentelemetry_proto::tonic::collector::metrics::v1::{
     ExportMetricsServiceRequest, ExportMetricsServiceResponse,
     metrics_service_client::MetricsServiceClient, metrics_service_server::MetricsService,
@@ -21,7 +22,7 @@ use opentelemetry_proto::tonic::collector::metrics::v1::{
 use tonic::{Request, Response, Status, codec::CompressionEncoding, metadata::MetadataValue};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::service::{grpc::get_ingester_channel, search::MetadataMap};
+use crate::service::grpc::get_ingester_channel;
 
 #[derive(Default)]
 pub struct MetricsServer;

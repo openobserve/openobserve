@@ -22,6 +22,7 @@ use ::datafusion::{
 use arrow_schema::Schema;
 use config::{
     cluster::LOCAL_NODE,
+    datafusion::request::FlightSearchRequest,
     get_config,
     meta::{
         inverted_index::IndexOptimizeMode,
@@ -63,7 +64,6 @@ use crate::service::{
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         match_file,
-        request::FlightSearchRequest,
     },
 };
 

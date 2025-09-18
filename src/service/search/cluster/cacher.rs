@@ -14,14 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{cluster::LOCAL_NODE, meta::cluster::get_internal_grpc_token};
-use infra::errors::{Error, ErrorCodes};
-use proto::cluster_rpc;
+use infra::{
+    client::grpc::get_cached_channel,
+    errors::{Error, ErrorCodes},
+};
+use proto::cluster_rpc::{self, DeleteResultCacheRequest, QueryCacheRequest};
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 use tracing::{Instrument, info_span};
 
-use crate::service::{
-    grpc::get_cached_channel,
-    search::{infra_cluster, server_internal_error},
+use crate::{
+    common::meta::search::{CacheQueryRequest, CachedQueryResponse},
+    service::search::{infra_cluster, server_internal_error},
 };
 
 pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {

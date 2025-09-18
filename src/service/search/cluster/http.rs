@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use ::datafusion::arrow::record_batch::RecordBatch;
 use config::{
+    datafusion::request::Request,
     meta::{function::VRLResultResolver, search, sql::TableReferenceExt},
     metrics::QUERY_PARQUET_CACHE_RATIO,
     utils::{
@@ -35,7 +36,7 @@ use o2_enterprise::enterprise::actions::{
 use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
-use crate::service::search::{cluster::flight, request::Request, sql::Sql};
+use crate::service::search::{cluster::flight, sql::Sql};
 
 #[tracing::instrument(name = "service:search:cluster", skip_all)]
 pub async fn search(

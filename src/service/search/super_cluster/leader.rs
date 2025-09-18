@@ -19,6 +19,7 @@ use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
     cluster::LOCAL_NODE,
+    datafusion::request::Request,
     get_config,
     meta::{
         cluster::{NodeInfo, RoleGroup},
@@ -46,7 +47,6 @@ use crate::service::search::{
         create_physical_plan,
     },
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    request::Request,
     sql::Sql,
     utils::{AsyncDefer, ScanStatsVisitor},
 };

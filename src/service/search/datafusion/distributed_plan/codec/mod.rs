@@ -27,6 +27,8 @@ mod empty_exec;
 mod physical_plan_node;
 #[cfg(feature = "enterprise")]
 mod streaming_aggs_exec;
+#[cfg(feature = "enterprise")]
+mod tmp_exec;
 
 pub fn get_physical_extension_codec() -> ComposedPhysicalExtensionCodec {
     ComposedPhysicalExtensionCodec {
