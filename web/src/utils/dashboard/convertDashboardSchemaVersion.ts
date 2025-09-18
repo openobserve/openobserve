@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export const CURRENT_DASHBOARD_SCHEMA_VERSION = 5;
+export const CURRENT_DASHBOARD_SCHEMA_VERSION = 6;
 
 const convertPanelSchemaVersion = (data: any) => {
   if (!data || (typeof data === "object" && Object.keys(data).length === 0)) {
@@ -171,6 +171,20 @@ export function convertDashboardSchemaVersion(data: any) {
       });
       // update the version
       data.version = 5;
+    }
+    case 5: {
+      // layout width migration from 48 col number to 192 col number
+      // layout height migration from 34px per row to 17px per row -> height will be doubled
+      data.tabs.forEach((tabItem: any) => {
+        tabItem.panels.forEach((panelItem: any) => {
+          panelItem.layout.w = panelItem.layout.w * 4;
+          panelItem.layout.x = panelItem.layout.x * 4;
+          panelItem.layout.h = panelItem.layout.h * 2;
+        });
+      });
+
+      // update the version
+      data.version = 6;
     }
   }
 
