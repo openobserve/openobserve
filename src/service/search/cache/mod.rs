@@ -616,7 +616,6 @@ pub fn merge_response(
         }
 
         cache_response.hits.extend(res.hits.clone());
-        cache_response.order_by_metadata = res.order_by_metadata;
     }
     sort_response(is_descending, &mut cache_response, ts_column, &order_by);
 
@@ -640,6 +639,10 @@ pub fn merge_response(
     cache_response.order_by = search_response
         .first()
         .map(|res| res.order_by)
+        .unwrap_or_default();
+    cache_response.order_by_metadata = search_response
+        .first()
+        .map(|res| res.order_by_metadata.clone())
         .unwrap_or_default();
     cache_response.result_cache_ratio = (((cache_hits_len as f64) * 100_f64)
         / ((result_cache_len + cache_hits_len) as f64))
