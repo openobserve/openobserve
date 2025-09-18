@@ -616,6 +616,7 @@ pub fn merge_response(
         }
 
         cache_response.hits.extend(res.hits.clone());
+        cache_response.order_by_metadata = res.order_by_metadata;
     }
     sort_response(is_descending, &mut cache_response, ts_column, &order_by);
 
