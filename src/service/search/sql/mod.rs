@@ -18,7 +18,9 @@ use std::sync::Arc;
 
 use arrow_schema::{DataType, Field};
 use config::{
-    TIMESTAMP_COL_NAME, get_config,
+    TIMESTAMP_COL_NAME,
+    datafusion::request::Request,
+    get_config,
     meta::{
         search::SearchEventType,
         sql::{OrderBy, TableReferenceExt, resolve_stream_names_with_type},
@@ -36,7 +38,6 @@ use proto::cluster_rpc::SearchQuery;
 use regex::Regex;
 use sqlparser::{ast::VisitMut, dialect::PostgreSqlDialect, parser::Parser};
 
-use super::request::Request;
 use crate::service::search::sql::{
     rewriter::{
         add_o2_id::AddO2IdVisitor, add_timestamp::AddTimestampVisitor,

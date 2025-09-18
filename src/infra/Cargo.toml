@@ -43,6 +43,10 @@ tracing.workspace = true
 sea-orm.workspace = true
 sea-orm-migration.workspace = true
 reqwest.workspace = true
+tonic.workspace = true
+opentelemetry.workspace = true
+tracing-opentelemetry.workspace = true
+proto.workspace = true
 
 [dev-dependencies]
 collapse.workspace = true

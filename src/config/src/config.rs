@@ -779,6 +779,24 @@ pub struct Common {
     )]
     pub feature_join_right_side_max_rows: usize,
     #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_ENABLED",
+        default = false,
+        help = "Enable broadcast join"
+    )]
+    pub feature_broadcast_join_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_ROWS",
+        default = 0,
+        help = "Max rows for left side of broadcast join, default to 10_000 rows"
+    )]
+    pub feature_broadcast_join_left_side_max_rows: usize,
+    #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_SIZE",
+        default = 0,
+        help = "Max size for left side of broadcast join, default to 10 MB"
+    )]
+    pub feature_broadcast_join_left_side_max_size: usize, // MB
+    #[env_config(
         name = "ZO_FEATURE_QUERY_SKIP_WAL",
         default = false,
         help = "Skip WAL for query"
@@ -2339,6 +2357,19 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows == 0
     {
         cfg.common.feature_join_right_side_max_rows = 50_000;
+    }
+
+    // check for broadcast join left side max rows
+    if cfg.common.feature_broadcast_join_enabled
+        && cfg.common.feature_broadcast_join_left_side_max_rows == 0
+    {
+        cfg.common.feature_broadcast_join_left_side_max_rows = 10_000;
+    }
+
+    if cfg.common.feature_broadcast_join_enabled
+        && cfg.common.feature_broadcast_join_left_side_max_size == 0
+    {
+        cfg.common.feature_broadcast_join_left_side_max_size = 10; // 10 MB
     }
 
     // debug check is useful only when dual write is enabled. Otherwise it will raise error

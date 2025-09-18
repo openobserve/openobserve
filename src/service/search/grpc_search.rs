@@ -19,14 +19,14 @@ use config::{
     meta::{cluster::RoleGroup, search, stream::StreamType},
     utils::json,
 };
-use infra::errors::{Error, ErrorCodes};
+use infra::{
+    client::grpc::make_grpc_search_client,
+    errors::{Error, ErrorCodes},
+};
 use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 use tracing::{Instrument, info_span};
 
-use crate::{
-    common::infra::cluster as infra_cluster,
-    service::{grpc::make_grpc_search_client, search::server_internal_error},
-};
+use crate::{common::infra::cluster as infra_cluster, service::search::server_internal_error};
 
 #[tracing::instrument(name = "service:search:grpc_search", skip_all)]
 pub async fn grpc_search(

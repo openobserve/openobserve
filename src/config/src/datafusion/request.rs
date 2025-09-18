@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::{search::default_use_cache, stream::StreamType};
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier, SearchInfo, SuperClusterInfo};
+
+use crate::meta::{search::default_use_cache, stream::StreamType};
 
 #[derive(Debug, Clone)]
 pub struct Request {

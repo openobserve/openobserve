@@ -25,6 +25,7 @@ use datafusion_proto::physical_plan::PhysicalExtensionCodec;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::datafusion::distributed_plan::{
     aggregate_topk_exec::AggregateTopkExec, streaming_aggs_exec::StreamingAggsExec,
+    tmp_exec::TmpExec,
 };
 use prost::Message;
 use proto::cluster_rpc;
@@ -59,6 +60,10 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             Some(cluster_rpc::physical_plan_node::Plan::StreamingAggs(node)) => {
                 super::streaming_aggs_exec::try_decode(node, inputs, registry)
             }
+            #[cfg(feature = "enterprise")]
+            Some(cluster_rpc::physical_plan_node::Plan::TmpExec(node)) => {
+                super::tmp_exec::try_decode(node, inputs, registry)
+            }
             #[cfg(not(feature = "enterprise"))]
             Some(_) => {
                 internal_err!("Not supported")
@@ -77,6 +82,8 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             super::aggregate_topk_exec::try_encode(node, buf)
         } else if node.as_any().downcast_ref::<StreamingAggsExec>().is_some() {
             super::streaming_aggs_exec::try_encode(node, buf)
+        } else if node.as_any().downcast_ref::<TmpExec>().is_some() {
+            super::tmp_exec::try_encode(node, buf)
         } else {
             internal_err!("Not supported")
         }

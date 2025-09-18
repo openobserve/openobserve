@@ -21,7 +21,10 @@ use arrow_flight::{
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
     flight_service_server::FlightService,
 };
-use config::{PARQUET_BATCH_SIZE, cluster::LOCAL_NODE, meta::search::ScanStats};
+use config::{
+    PARQUET_BATCH_SIZE, cluster::LOCAL_NODE, datafusion::request::FlightSearchRequest,
+    meta::search::ScanStats,
+};
 use datafusion::{
     common::{DataFusionError, Result},
     physical_plan::{coalesce_batches::CoalesceBatchesExec, execute_stream},
@@ -50,7 +53,6 @@ use crate::{
     service::search::{
         grpc::flight as grpcFlight,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        request::FlightSearchRequest,
         utils::AsyncDefer,
     },
 };

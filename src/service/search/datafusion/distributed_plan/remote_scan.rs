@@ -114,6 +114,21 @@ impl RemoteScanExec {
         self.cluster_metrics.clone()
     }
 
+    pub fn with_scan_stats(mut self, scan_stats: Arc<Mutex<ScanStats>>) -> Self {
+        self.scan_stats = scan_stats;
+        self
+    }
+
+    pub fn with_partial_err(mut self, partial_err: Arc<Mutex<String>>) -> Self {
+        self.partial_err = partial_err;
+        self
+    }
+
+    pub fn with_cluster_metrics(mut self, cluster_metrics: Arc<Mutex<Vec<Metrics>>>) -> Self {
+        self.cluster_metrics = cluster_metrics;
+        self
+    }
+
     fn output_partitioning_helper(n_partitions: usize) -> Partitioning {
         Partitioning::UnknownPartitioning(n_partitions)
     }
@@ -188,10 +203,11 @@ impl ExecutionPlan for RemoteScanExec {
         if children.is_empty() {
             return Ok(self);
         }
-        Ok(Arc::new(Self::new(
-            children[0].clone(),
-            self.remote_scan_node.clone(),
-        )?))
+        let remote_scan = Self::new(children[0].clone(), self.remote_scan_node.clone())?
+            .with_scan_stats(self.scan_stats.clone())
+            .with_partial_err(self.partial_err.clone())
+            .with_cluster_metrics(self.cluster_metrics.clone());
+        Ok(Arc::new(remote_scan))
     }
 
     fn execute(

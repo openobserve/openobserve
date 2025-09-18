@@ -16,8 +16,9 @@
 use std::sync::Arc;
 
 use arrow_flight::{Ticket, flight_service_client::FlightServiceClient};
-use config::meta::cluster::NodeInfo;
+use config::{datafusion::request::FlightSearchRequest, meta::cluster::NodeInfo};
 use datafusion::common::Result;
+use infra::client::grpc::{MetadataMap, get_cached_channel};
 use prost::Message;
 use proto::cluster_rpc;
 use tonic::{
@@ -26,11 +27,6 @@ use tonic::{
     metadata::{MetadataKey, MetadataValue},
     service::interceptor::InterceptedService,
     transport::Channel,
-};
-
-use crate::service::{
-    grpc::get_cached_channel,
-    search::{MetadataMap, request::FlightSearchRequest},
 };
 
 pub async fn make_flight_client(

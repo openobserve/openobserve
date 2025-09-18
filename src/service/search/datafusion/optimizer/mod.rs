@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME};
+use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, datafusion::request::Request};
 use datafusion::{
     common::Result,
     optimizer::{
@@ -33,7 +33,7 @@ use datafusion::{
         scalar_subquery_to_join::ScalarSubqueryToJoin, simplify_expressions::SimplifyExpressions,
         single_distinct_to_groupby::SingleDistinctToGroupBy,
     },
-    physical_optimizer::PhysicalOptimizerRule,
+    physical_optimizer::{PhysicalOptimizerRule, limit_pushdown::LimitPushdown},
     physical_plan::ExecutionPlan,
     prelude::SessionContext,
 };
@@ -62,7 +62,6 @@ use crate::service::search::{
             remote_scan::generate_remote_scan_rules,
         },
     },
-    request::Request,
     sql::Sql,
 };
 
@@ -212,6 +211,8 @@ pub fn generate_physical_optimizer_rules(
             .collect();
         rules.push(Arc::new(LeaderIndexOptimizerRule::new(index_fields)) as _);
     }
+
+    rules.push(Arc::new(LimitPushdown::new()) as _);
 
     rules
 }
