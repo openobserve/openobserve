@@ -19,9 +19,9 @@ use config::{
 };
 use proto::cluster_rpc::{
     CancelQueryRequest, CancelQueryResponse, DeleteResultRequest, DeleteResultResponse,
-    GetResultRequest, GetResultResponse, QueryStatusRequest, QueryStatusResponse,
-    SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse,
-    search_server::Search,
+    GetResultRequest, GetResultResponse, GetTableRequest, GetTableResponse, QueryStatusRequest,
+    QueryStatusResponse, SearchPartitionRequest, SearchPartitionResponse, SearchRequest,
+    SearchResponse, search_server::Search,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -254,6 +254,17 @@ impl Search for Searcher {
             }
             Err(e) => Err(Status::internal(format!("search partition failed: {e}"))),
         }
+    }
+
+    async fn get_table(
+        &self,
+        req: Request<GetTableRequest>,
+    ) -> Result<Response<GetTableResponse>, Status> {
+        let path = req.into_inner().path;
+        let res = infra::storage::get_bytes("", &path)
+            .await
+            .map_err(|e| Status::internal(format!("failed to get table: {e}")))?;
+        Ok(Response::new(GetTableResponse { data: res.to_vec() }))
     }
 
     #[cfg(feature = "enterprise")]

@@ -20,8 +20,8 @@ use config::{TIMESTAMP_COL_NAME, utils::json};
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use {
-    super::request::Request,
     crate::service::search::SEARCH_SERVER,
+    config::datafusion::request::Request,
     config::metrics,
     infra::dist_lock,
     infra::errors::{Error, ErrorCodes, Result},

@@ -47,7 +47,7 @@ use itertools::Itertools;
 pub struct DeduplicationExec {
     input: Arc<dyn ExecutionPlan>,
     deduplication_columns: Vec<Column>,
-    max_rows: usize,
+    max_rows: usize, // current unused
     cache: PlanProperties,
     metrics: ExecutionPlanMetricsSet,
 }
@@ -88,6 +88,9 @@ impl DisplayAs for DeduplicationExec {
             f,
             "DeduplicationExec: columns: {:?}",
             self.deduplication_columns
+                .iter()
+                .map(|column| column.name())
+                .collect_vec()
         )
     }
 }
@@ -121,6 +124,10 @@ impl ExecutionPlan for DeduplicationExec {
         )))
     }
 
+    fn supports_limit_pushdown(&self) -> bool {
+        true
+    }
+
     fn execute(
         &self,
         partition: usize,
@@ -143,8 +150,8 @@ impl ExecutionPlan for DeduplicationExec {
         )))
     }
 
-    fn statistics(&self) -> Result<Statistics> {
-        self.input.partition_statistics(None)
+    fn partition_statistics(&self, partition: Option<usize>) -> Result<Statistics> {
+        self.input.partition_statistics(partition)
     }
 
     // if don't have this, the optimizer will not merge the SortExec
@@ -261,6 +268,7 @@ impl RecordBatchStream for DeduplicationStream {
         Arc::clone(&self.stream.schema())
     }
 }
+
 #[derive(Debug, Clone)]
 struct DeduplicationArrays {
     pub arrays: Vec<Array>,

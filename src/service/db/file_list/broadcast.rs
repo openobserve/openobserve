@@ -24,12 +24,13 @@ use config::{
     },
 };
 use hashbrown::HashMap;
+use infra::client::grpc::get_cached_channel;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use tokio::sync::{RwLock, mpsc};
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 
-use crate::{common::infra::cluster, service::grpc::get_cached_channel};
+use crate::common::infra::cluster;
 
 /// use queue to batch send broadcast to other nodes
 pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =

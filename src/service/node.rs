@@ -185,7 +185,7 @@ pub async fn get_node_list(
             let empty_request = EmptyRequest {};
             let mut request = Request::new(empty_request.clone());
             let mut client =
-                super::grpc::make_grpc_node_client(&trace_id, &mut request, &node).await?;
+                infra::client::grpc::make_grpc_node_client(&trace_id, &mut request, &node).await?;
             let nodes = match client.get_nodes(Request::new(empty_request)).await {
                 Ok(remote_nodes) => remote_nodes.into_inner().nodes,
                 Err(err) => {

@@ -165,6 +165,7 @@ fn generate_deduplication_plan(
         });
     }
 
+    // TODO: if the input already has sort with same columns, we should not add sort again
     let sort = LogicalPlan::Sort(Sort {
         expr: sort_columns,
         input: node,
