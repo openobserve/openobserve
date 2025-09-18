@@ -123,7 +123,7 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
     let pending_delete_files = db::file_list::local::get_pending_delete().await;
     let files_num = pending_delete_files.len();
     for file_key in pending_delete_files {
-        if wal::lock_files_exists(&file_key) {
+        if wal::lock_files_exists(&file_key).await {
             continue;
         }
         log::warn!("[INGESTER:JOB] the file was released, delete it: {file_key}");
@@ -523,7 +523,7 @@ async fn move_files(
 
         // check if allowed to delete the file
         for file in new_file_list.iter() {
-            let can_delete = if wal::lock_files_exists(&file.key) {
+            let can_delete = if wal::lock_files_exists(&file.key).await {
                 log::warn!(
                     "[INGESTER:JOB:{thread_id}] the file is in use, set to pending delete list: {}",
                     file.key

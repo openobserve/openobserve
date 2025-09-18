@@ -902,7 +902,7 @@ async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
     node.scheduled = enable;
     if !node.scheduled {
         // release all the searching files
-        crate::common::infra::wal::clean_lock_files();
+        crate::common::infra::wal::clean_lock_files().await;
     }
     match cluster::update_local_node(&node).await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
@@ -917,7 +917,7 @@ async fn flush_node() -> Result<HttpResponse, Error> {
     };
 
     // release all the searching files
-    crate::common::infra::wal::clean_lock_files();
+    crate::common::infra::wal::clean_lock_files().await;
 
     match ingester::flush_all().await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
