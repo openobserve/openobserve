@@ -54,7 +54,7 @@ impl From<PipelineError> for HttpResponse {
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Object, description = "Pipeline data", content_type = "application/json"),
+    request_body(content = Pipeline, description = "Pipeline data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
@@ -238,7 +238,7 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Object, description = "Pipeline data", content_type = "application/json"),
+    request_body(content = Pipeline, description = "Pipeline data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
