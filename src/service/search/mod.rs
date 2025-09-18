@@ -56,10 +56,9 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::{
-        grpc::make_grpc_search_client, search::sql::visitor::group_by::get_group_by_fields,
-    },
+    crate::service::search::sql::visitor::group_by::get_group_by_fields,
     config::utils::sql::is_simple_aggregate_query,
+    infra::client::grpc::make_grpc_search_client,
     o2_enterprise::enterprise::{
         common::config::get_config as get_o2_config,
         search::{
@@ -110,7 +109,6 @@ pub(crate) mod grpc_search;
 pub(crate) mod index;
 pub(crate) mod inspector;
 pub(crate) mod partition;
-pub(crate) mod request;
 pub(crate) mod sql;
 pub(crate) mod streaming;
 #[cfg(feature = "enterprise")]
@@ -170,7 +168,7 @@ pub async fn search(
 
     let query: SearchQuery = in_req.query.clone().into();
     let req_query = query.clone();
-    let mut request = crate::service::search::request::Request::new(
+    let mut request = config::datafusion::request::Request::new(
         trace_id.clone(),
         org_id.to_string(),
         stream_type,
@@ -1462,20 +1460,6 @@ pub async fn search_partition_multi(
     res.records = total_rec;
     res.is_histogram_eligible = is_histogram_eligible;
     Ok(res)
-}
-
-pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);
-
-impl opentelemetry::propagation::Injector for MetadataMap<'_> {
-    /// Set a key and value in the MetadataMap.  Does nothing if the key or
-    /// value are not valid inputs
-    fn set(&mut self, key: &str, value: String) {
-        if let Ok(key) = tonic::metadata::MetadataKey::from_bytes(key.as_bytes())
-            && let Ok(val) = tonic::metadata::MetadataValue::try_from(&value)
-        {
-            self.0.insert(key, val);
-        }
-    }
 }
 
 // generate parquet file search schema

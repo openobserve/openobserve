@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use config::{
     cluster::LOCAL_NODE,
+    datafusion::request::{FlightSearchRequest, Request},
     meta::{
         cluster::{IntoArcVec, RoleGroup},
         search::{ScanStats, SearchEventType},
@@ -51,7 +52,6 @@ use crate::service::{
             exec::{DataFusionContextBuilder, register_udf},
         },
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        request::{FlightSearchRequest, Request},
         utils::AsyncDefer,
     },
 };

@@ -47,7 +47,7 @@ use itertools::Itertools;
 pub struct DeduplicationExec {
     input: Arc<dyn ExecutionPlan>,
     deduplication_columns: Vec<Column>,
-    max_rows: usize,
+    max_rows: usize, // current unused
     cache: PlanProperties,
     metrics: ExecutionPlanMetricsSet,
 }
@@ -86,8 +86,12 @@ impl DisplayAs for DeduplicationExec {
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "DeduplicationExec: columns: {:?}",
+            "DeduplicationExec: columns: [{}]",
             self.deduplication_columns
+                .iter()
+                .map(|c| format!("{c}"))
+                .collect::<Vec<_>>()
+                .join(", ")
         )
     }
 }
@@ -121,6 +125,10 @@ impl ExecutionPlan for DeduplicationExec {
         )))
     }
 
+    fn supports_limit_pushdown(&self) -> bool {
+        true
+    }
+
     fn execute(
         &self,
         partition: usize,
@@ -143,8 +151,8 @@ impl ExecutionPlan for DeduplicationExec {
         )))
     }
 
-    fn statistics(&self) -> Result<Statistics> {
-        self.input.partition_statistics(None)
+    fn partition_statistics(&self, partition: Option<usize>) -> Result<Statistics> {
+        self.input.partition_statistics(partition)
     }
 
     // if don't have this, the optimizer will not merge the SortExec
@@ -261,6 +269,7 @@ impl RecordBatchStream for DeduplicationStream {
         Arc::clone(&self.stream.schema())
     }
 }
+
 #[derive(Debug, Clone)]
 struct DeduplicationArrays {
     pub arrays: Vec<Array>,

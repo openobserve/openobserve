@@ -375,7 +375,7 @@ pub async fn download_from_node(
         .parse()
         .map_err(|_| anyhow::anyhow!("Invalid token"))?;
 
-    let channel = crate::service::grpc::get_cached_channel(addr).await?;
+    let channel = infra::client::grpc::get_cached_channel(addr).await?;
     let client = EventClient::with_interceptor(channel, move |mut req: tonic::Request<()>| {
         req.metadata_mut().insert("authorization", token.clone());
         Ok(req)

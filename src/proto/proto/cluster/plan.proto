@@ -15,6 +15,7 @@ message PhysicalPlanNode {
     NewEmptyExecNode          empty_exec = 1;
     AggregateTopkExecNode aggregate_topk = 2;
     StreamingAggsExecNode streaming_aggs = 3;
+    TmpExecNode                 tmp_exec = 4;
   }
 }
 
@@ -26,6 +27,14 @@ message NewEmptyExecNode {
     optional uint64                       limit = 5;
     bool                         sorted_by_time = 6;
     datafusion_common.Schema        full_schema = 7;
+}
+
+message TmpExecNode {
+  string                   trace_id = 1;
+  string                    cluster = 2;
+  string                       path = 3;
+  optional bytes               data = 4;
+  datafusion_common.Schema   schema = 5;
 }
 
 message AggregateTopkExecNode {

@@ -165,6 +165,7 @@ fn generate_deduplication_plan(
         });
     }
 
+    // TODO: if the input already has sort with same columns, we should not add sort again
     let sort = LogicalPlan::Sort(Sort {
         expr: sort_columns,
         input: node,
@@ -248,7 +249,7 @@ mod tests {
             "            HashJoinExec: mode=CollectLeft, join_type=LeftSemi, on=[(name@0, name@0)]",
             "              DataSourceExec: partitions=1, partition_sizes=[1]",
             "              RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
-            "                DeduplicationExec: columns: [Column { name: \"name\", index: 0 }]",
+            "                DeduplicationExec: columns: [name@0]",
             "                  SortExec: TopK(fetch=50000), expr=[name@0 DESC NULLS LAST], preserve_partitioning=[false]",
             "                    CoalescePartitionsExec",
             "                      AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[], lim=[50000]",
@@ -311,15 +312,14 @@ mod tests {
 
         let expected = vec![
             "CoalesceBatchesExec: target_batch_size=8192",
-            "  HashJoinExec: mode=CollectLeft, join_type=Inner, on=[(id@0, id@0)], projection=[id@0]",
+            "  HashJoinExec: mode=CollectLeft, join_type=Inner, on=[(id@0, id@0)], projection=[id@1]",
+            "    ProjectionExec: expr=[id@0 as id]",
+            "      DeduplicationExec: columns: [id@0]",
+            "        SortExec: expr=[id@0 DESC NULLS LAST, _timestamp@1 DESC NULLS LAST], preserve_partitioning=[false]",
+            "          SortPreservingMergeExec: [_timestamp@1 DESC NULLS LAST], fetch=50000",
+            "            SortExec: TopK(fetch=50000), expr=[_timestamp@1 DESC NULLS LAST], preserve_partitioning=[true]",
+            "              DataSourceExec: partitions=2, partition_sizes=[1, 1]",
             "    DataSourceExec: partitions=1, partition_sizes=[1]",
-            "    RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
-            "      ProjectionExec: expr=[id@0 as id]",
-            "        DeduplicationExec: columns: [Column { name: \"id\", index: 0 }]",
-            "          SortExec: expr=[id@0 DESC NULLS LAST, _timestamp@1 DESC NULLS LAST], preserve_partitioning=[false]",
-            "            SortPreservingMergeExec: [_timestamp@1 DESC NULLS LAST], fetch=50000",
-            "              SortExec: TopK(fetch=50000), expr=[_timestamp@1 DESC NULLS LAST], preserve_partitioning=[true]",
-            "                DataSourceExec: partitions=2, partition_sizes=[1, 1]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));
@@ -386,28 +386,24 @@ mod tests {
 
         let expected = vec![
             "CoalesceBatchesExec: target_batch_size=8192",
-            "  HashJoinExec: mode=Partitioned, join_type=Inner, on=[(prod_id@1, prod_id@0)], projection=[usr_id@0, prod_id@1]",
-            "    CoalesceBatchesExec: target_batch_size=8192",
-            "      RepartitionExec: partitioning=Hash([prod_id@1], 12), input_partitions=12",
+            "  HashJoinExec: mode=CollectLeft, join_type=Inner, on=[(prod_id@0, prod_id@1)], projection=[usr_id@1, prod_id@2]",
+            "    ProjectionExec: expr=[prod_id@0 as prod_id]",
+            "      DeduplicationExec: columns: [prod_id@0]",
+            "        SortExec: expr=[prod_id@0 DESC NULLS LAST, _timestamp@1 DESC NULLS LAST], preserve_partitioning=[false]",
+            "          SortPreservingMergeExec: [_timestamp@1 DESC NULLS LAST], fetch=50000",
+            "            SortExec: TopK(fetch=50000), expr=[_timestamp@1 DESC NULLS LAST], preserve_partitioning=[true]",
+            "              DataSourceExec: partitions=3, partition_sizes=[1, 1, 1]",
+            "    RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
+            "      ProjectionExec: expr=[usr_id@1 as usr_id, prod_id@0 as prod_id]",
             "        CoalesceBatchesExec: target_batch_size=8192",
-            "          HashJoinExec: mode=CollectLeft, join_type=Inner, on=[(usr_id@0, usr_id@0)], projection=[usr_id@0, prod_id@2]",
+            "          HashJoinExec: mode=CollectLeft, join_type=Inner, on=[(usr_id@0, usr_id@0)], projection=[prod_id@1, usr_id@2]",
+            "            ProjectionExec: expr=[usr_id@0 as usr_id, prod_id@1 as prod_id]",
+            "              DeduplicationExec: columns: [usr_id@0]",
+            "                SortExec: expr=[usr_id@0 DESC NULLS LAST, _timestamp@2 DESC NULLS LAST], preserve_partitioning=[false]",
+            "                  SortPreservingMergeExec: [_timestamp@2 DESC NULLS LAST], fetch=50000",
+            "                    SortExec: TopK(fetch=50000), expr=[_timestamp@2 DESC NULLS LAST], preserve_partitioning=[true]",
+            "                      DataSourceExec: partitions=2, partition_sizes=[1, 1]",
             "            DataSourceExec: partitions=1, partition_sizes=[1]",
-            "            RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
-            "              ProjectionExec: expr=[usr_id@0 as usr_id, prod_id@1 as prod_id]",
-            "                DeduplicationExec: columns: [Column { name: \"usr_id\", index: 0 }]",
-            "                  SortExec: expr=[usr_id@0 DESC NULLS LAST, _timestamp@2 DESC NULLS LAST], preserve_partitioning=[false]",
-            "                    SortPreservingMergeExec: [_timestamp@2 DESC NULLS LAST], fetch=50000",
-            "                      SortExec: TopK(fetch=50000), expr=[_timestamp@2 DESC NULLS LAST], preserve_partitioning=[true]",
-            "                        DataSourceExec: partitions=2, partition_sizes=[1, 1]",
-            "    CoalesceBatchesExec: target_batch_size=8192",
-            "      RepartitionExec: partitioning=Hash([prod_id@0], 12), input_partitions=12",
-            "        RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1",
-            "          ProjectionExec: expr=[prod_id@0 as prod_id]",
-            "            DeduplicationExec: columns: [Column { name: \"prod_id\", index: 0 }]",
-            "              SortExec: expr=[prod_id@0 DESC NULLS LAST, _timestamp@1 DESC NULLS LAST], preserve_partitioning=[false]",
-            "                SortPreservingMergeExec: [_timestamp@1 DESC NULLS LAST], fetch=50000",
-            "                  SortExec: TopK(fetch=50000), expr=[_timestamp@1 DESC NULLS LAST], preserve_partitioning=[true]",
-            "                    DataSourceExec: partitions=3, partition_sizes=[1, 1, 1]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));

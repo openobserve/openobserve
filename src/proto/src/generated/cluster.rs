@@ -1058,6 +1058,18 @@ pub struct Query {
     #[prost(int64, tag = "3")]
     pub end_time: i64,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetTableRequest {
+    #[prost(string, tag = "1")]
+    pub path: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetTableResponse {
+    #[prost(bytes = "vec", tag = "1")]
+    pub data: ::prost::alloc::vec::Vec<u8>,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum WorkGroup {
@@ -1357,6 +1369,28 @@ pub mod search_client {
                 .insert(GrpcMethod::new("cluster.Search", "DeleteResult"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn get_table(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetTableRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetTableResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/cluster.Search/GetTable");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Search", "GetTable"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -1414,6 +1448,13 @@ pub mod search_server {
             request: tonic::Request<super::DeleteResultRequest>,
         ) -> std::result::Result<
             tonic::Response<super::DeleteResultResponse>,
+            tonic::Status,
+        >;
+        async fn get_table(
+            &self,
+            request: tonic::Request<super::GetTableRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetTableResponse>,
             tonic::Status,
         >;
     }
@@ -1843,6 +1884,50 @@ pub mod search_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = DeleteResultSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Search/GetTable" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetTableSvc<T: Search>(pub Arc<T>);
+                    impl<T: Search> tonic::server::UnaryService<super::GetTableRequest>
+                    for GetTableSvc<T> {
+                        type Response = super::GetTableResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetTableRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Search>::get_table(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetTableSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -2803,7 +2888,7 @@ pub mod query_cache_server {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PhysicalPlanNode {
-    #[prost(oneof = "physical_plan_node::Plan", tags = "1, 2, 3")]
+    #[prost(oneof = "physical_plan_node::Plan", tags = "1, 2, 3, 4")]
     pub plan: ::core::option::Option<physical_plan_node::Plan>,
 }
 /// Nested message and enum types in `PhysicalPlanNode`.
@@ -2818,6 +2903,8 @@ pub mod physical_plan_node {
         AggregateTopk(super::AggregateTopkExecNode),
         #[prost(message, tag = "3")]
         StreamingAggs(super::StreamingAggsExecNode),
+        #[prost(message, tag = "4")]
+        TmpExec(super::TmpExecNode),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2837,6 +2924,20 @@ pub struct NewEmptyExecNode {
     pub sorted_by_time: bool,
     #[prost(message, optional, tag = "7")]
     pub full_schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TmpExecNode {
+    #[prost(string, tag = "1")]
+    pub trace_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub cluster: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub path: ::prost::alloc::string::String,
+    #[prost(bytes = "vec", optional, tag = "4")]
+    pub data: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
+    #[prost(message, optional, tag = "5")]
+    pub schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
