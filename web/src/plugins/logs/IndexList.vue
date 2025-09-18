@@ -1034,8 +1034,11 @@ export default defineComponent({
      * As when user selects stream defineSchema flag is set and there is no any event to identify that
      * so we are using this watcher to set default field tab as per the stream settings
      */
-    watch(showUserDefinedSchemaToggle, () => {
+    watch(() => showUserDefinedSchemaToggle.value, () => {
       setDefaultFieldTab();
+    },
+    {
+      immediate: true,
     });
 
     const filterStreamFn = (val: string, update: any) => {
@@ -1054,13 +1057,33 @@ export default defineComponent({
     // otherwise set default tab as user defined schema
     // store.state.zoConfig.interesting_field_enabled was set as interesting fields was getting set by default with _timestamp field
     function setDefaultFieldTab() {
-      if (store.state.zoConfig.log_page_default_field_list === "uds") {
+      if (store.state.zoConfig.log_page_default_field_list === "uds" && showUserDefinedSchemaToggle.value) {
         searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
         showOnlyInterestingFields.value = false;
-      } else {
+        return;
+      }
+
+      if(store.state.zoConfig.log_page_default_field_list === "all") {
+        searchObj.meta.useUserDefinedSchemas = "all_fields";
+        showOnlyInterestingFields.value = false;
+        return;
+      }
+      
+      if(store.state.zoConfig.log_page_default_field_list === "interesting" && searchObj.meta.quickMode) {
         searchObj.meta.useUserDefinedSchemas = "interesting_fields";
         showOnlyInterestingFields.value = true;
+        return;
       }
+
+
+      // if no default field list is set, then set default tab as all fields
+      if(showUserDefinedSchemaToggle.value){
+        searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
+      } else {
+        searchObj.meta.useUserDefinedSchemas = "all_fields";
+      }
+
+      showOnlyInterestingFields.value = false;
     }
 
     const filterFieldFn = (rows: any, terms: any) => {
