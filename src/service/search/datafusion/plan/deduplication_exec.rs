@@ -86,11 +86,12 @@ impl DisplayAs for DeduplicationExec {
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "DeduplicationExec: columns: {:?}",
+            "DeduplicationExec: columns: [{}]",
             self.deduplication_columns
                 .iter()
-                .map(|column| column.name())
-                .collect_vec()
+                .map(|c| format!("{c}"))
+                .collect::<Vec<_>>()
+                .join(", ")
         )
     }
 }
