@@ -296,7 +296,16 @@ pub async fn check_cache(
                 {
                     Ok(responses) => {
                         // single cached query response is expected
-                        cached_resp = responses[0].clone();
+                        cached_resp = match responses.first() {
+                            Some(v) => v.clone(),
+                            None => {
+                                log::error!("No cached response found after validation");
+                                CachedQueryResponse {
+                                    is_descending,
+                                    ..Default::default()
+                                }
+                            }
+                        };
                     }
                     Err(e) => {
                         log::error!("Error invalidating cached response by stream min ts: {e:?}")
