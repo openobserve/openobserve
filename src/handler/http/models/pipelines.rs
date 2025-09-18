@@ -91,3 +91,15 @@ impl PipelineList {
         PipelineList { list }
     }
 }
+
+#[derive(Deserialize, ToSchema)]
+pub struct PipelineBulkEnableRequest {
+    pub ids: Vec<String>,
+}
+
+#[derive(Default, Serialize, ToSchema)]
+pub struct PipelineBulkEnableResponse {
+    pub successful: Vec<String>,
+    pub unsuccessful: Vec<String>,
+    pub err: Option<String>,
+}
