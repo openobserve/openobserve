@@ -31,6 +31,7 @@ use {
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
+#[cfg(feature = "enterprise")]
 /// Store a key credential in db
 #[utoipa::path(
     post,
@@ -41,7 +42,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
                    and validated before being made available for use. Key names cannot contain ':' characters. Only \
                    available in enterprise deployments for enhanced data security and compliance requirements.",
     request_body(
-        content = Object,
+        content = KeyAddRequest,
         description = "Key data to add",
         content_type = "application/json",
     ),
@@ -59,73 +60,83 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 #[post("/{org_id}/cipher_keys")]
 pub async fn save(
     org_id: web::Path<String>,
-    body: web::Bytes,
+    body: web::Json<KeyAddRequest>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    #[cfg(feature = "enterprise")]
+    let req = body.into_inner();
+
+    let user_id = match in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
     {
-        let req: KeyAddRequest = match serde_json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
+        Some(id) => id,
+        None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
+    };
 
-        let user_id = match in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-        {
-            Some(id) => id,
-            None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
-        };
-
-        if req.name.contains(":") {
-            return Ok(MetaHttpResponse::bad_request(
-                "Key name cannot have ':' in it",
-            ));
-        }
-
-        let cd: CipherData = match req.key.try_into() {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
-
-        match cd.get_key().await {
-            // here we are just checking that the key can encrypt a string, i.e.
-            // it is set up correctly. We don't care what the actual entrypted string is.
-            Ok(mut k) => match k.encrypt("hello world") {
-                Ok(_) => {}
-                Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-            },
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        }
-
-        match crate::service::db::keys::add(CipherEntry {
-            org: org_id.to_string(),
-            created_at: now_micros(),
-            created_by: user_id.to_string(),
-            name: req.name.clone(),
-            data: serde_json::to_string(&cd).unwrap(),
-            kind: infra::table::cipher::EntryKind::CipherKey,
-        })
-        .await
-        {
-            Ok(_) => {
-                set_ownership(&org_id, "cipher_keys", Authz::new(&req.name)).await;
-                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                    http::StatusCode::OK,
-                    "Key created successfully",
-                )))
-            }
-            Err(e) => Ok(MetaHttpResponse::bad_request(e)),
-        }
+    if req.name.contains(":") {
+        return Ok(MetaHttpResponse::bad_request(
+            "Key name cannot have ':' in it",
+        ));
     }
-    #[cfg(not(feature = "enterprise"))]
+
+    let cd: CipherData = match req.key.try_into() {
+        Ok(v) => v,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
+    match cd.get_key().await {
+        // here we are just checking that the key can encrypt a string, i.e.
+        // it is set up correctly. We don't care what the actual entrypted string is.
+        Ok(mut k) => match k.encrypt("hello world") {
+            Ok(_) => {}
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        },
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    }
+
+    match crate::service::db::keys::add(CipherEntry {
+        org: org_id.to_string(),
+        created_at: now_micros(),
+        created_by: user_id.to_string(),
+        name: req.name.clone(),
+        data: serde_json::to_string(&cd).unwrap(),
+        kind: infra::table::cipher::EntryKind::CipherKey,
+    })
+    .await
     {
-        drop(org_id);
-        drop(in_req);
-        drop(body);
-        Ok(MetaHttpResponse::forbidden("not supported"))
+        Ok(_) => {
+            set_ownership(&org_id, "cipher_keys", Authz::new(&req.name)).await;
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK,
+                "Key created successfully",
+            )))
+        }
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
+}
+
+#[cfg(not(feature = "enterprise"))]
+/// Store a key credential in db
+#[utoipa::path(
+    post,
+    context_path = "/api",
+    operation_id = "CreateCipherKey",
+    summary = "Create encryption key",
+    description = "Creates a new encryption key for data encryption and decryption operations. This feature is only \
+                   available in enterprise deployments.",
+    responses(
+        (status = 403, description = "Feature not supported", content_type = "application/json")
+    ),
+    tag = "Keys"
+)]
+#[post("/{org_id}/cipher_keys")]
+pub async fn save(
+    _org_id: web::Path<String>,
+    mut _body: web::Payload,
+    _in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    Ok(MetaHttpResponse::forbidden("not supported"))
 }
 
 /// get key with given name if present
@@ -299,6 +310,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
     }
 }
 
+#[cfg(feature = "enterprise")]
 /// update the credentials for given key
 #[utoipa::path(
     post,
@@ -310,10 +322,11 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
                    applied atomically to maintain data security and consistency. Only available in enterprise \
                    deployments for enhanced security management.",
     params(
+        ("org_id" = String, Path, description = "Organization name"),
         ("key_name" = String, Path, description = "name of the key to update", example = "test_key")
     ),
     request_body(
-        content = Object,
+        content = KeyAddRequest,
         description = "updated key data",
         content_type = "application/json",
     ),
@@ -328,98 +341,111 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
     ),
     tag = "Key"
 )]
-#[put("/{org_id}/cipher_keys/{name}")]
+#[put("/{org_id}/cipher_keys/{key_name}")]
 pub async fn update(
     path: web::Path<(String, String)>,
-    body: web::Bytes,
+    body: web::Json<KeyAddRequest>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    #[cfg(feature = "enterprise")]
-    {
-        let (org_id, key_name) = path.into_inner();
-        let req: KeyAddRequest = match serde_json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
-        if key_name != req.name {
-            return Ok(MetaHttpResponse::bad_request(
-                "Key name from request does not match path",
-            ));
-        }
-
-        let user_id = match in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-        {
-            Some(id) => id,
-            None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
-        };
-
-        if req.name.contains(":") {
-            return Ok(MetaHttpResponse::bad_request(
-                "Key name cannot have ':' in it",
-            ));
-        }
-
-        let incoming: CipherData = match req.key.try_into() {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
-
-        let kdata = match infra::table::cipher::get_data(
-            &org_id,
-            infra::table::cipher::EntryKind::CipherKey,
-            &key_name,
-        )
-        .await
-        {
-            Ok(Some(k)) => k,
-            Ok(None) => {
-                return Ok(MetaHttpResponse::not_found(format!(
-                    "Key {key_name} not found"
-                )));
-            }
-            Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
-        };
-
-        // we can be fairly certain that in db we have proper json
-        let existing: CipherData = serde_json::from_str(&kdata).unwrap();
-
-        let cd = merge_updates(existing, incoming);
-
-        match cd.get_key().await {
-            // here we are just checking that the key can encrypt a string, i.e.
-            // it is set up correctly. We don't care what the actual entrypted string is.
-            Ok(mut k) => match k.encrypt("hello world") {
-                Ok(_) => {}
-                Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-            },
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        }
-
-        match crate::service::db::keys::update(CipherEntry {
-            org: org_id.to_string(),
-            created_at: now_micros(),
-            created_by: user_id.to_string(),
-            name: req.name,
-            data: serde_json::to_string(&cd).unwrap(),
-            kind: infra::table::cipher::EntryKind::CipherKey,
-        })
-        .await
-        {
-            Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK,
-                "key updated successfully",
-            ))),
-            Err(e) => Ok(MetaHttpResponse::bad_request(e)),
-        }
+    let (org_id, key_name) = path.into_inner();
+    let req = body.into_inner();
+    if key_name != req.name {
+        return Ok(MetaHttpResponse::bad_request(
+            "Key name from request does not match path",
+        ));
     }
-    #[cfg(not(feature = "enterprise"))]
+
+    let user_id = match in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
     {
-        drop(in_req);
-        drop(path);
-        drop(body);
-        Ok(MetaHttpResponse::forbidden("not supported"))
+        Some(id) => id,
+        None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
+    };
+
+    if req.name.contains(":") {
+        return Ok(MetaHttpResponse::bad_request(
+            "Key name cannot have ':' in it",
+        ));
     }
+
+    let incoming: CipherData = match req.key.try_into() {
+        Ok(v) => v,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
+    let kdata = match infra::table::cipher::get_data(
+        &org_id,
+        infra::table::cipher::EntryKind::CipherKey,
+        &key_name,
+    )
+    .await
+    {
+        Ok(Some(k)) => k,
+        Ok(None) => {
+            return Ok(MetaHttpResponse::not_found(format!(
+                "Key {key_name} not found"
+            )));
+        }
+        Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
+    };
+
+    // we can be fairly certain that in db we have proper json
+    let existing: CipherData = serde_json::from_str(&kdata).unwrap();
+
+    let cd = merge_updates(existing, incoming);
+
+    match cd.get_key().await {
+        // here we are just checking that the key can encrypt a string, i.e.
+        // it is set up correctly. We don't care what the actual entrypted string is.
+        Ok(mut k) => match k.encrypt("hello world") {
+            Ok(_) => {}
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        },
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    }
+
+    match crate::service::db::keys::update(CipherEntry {
+        org: org_id.to_string(),
+        created_at: now_micros(),
+        created_by: user_id.to_string(),
+        name: req.name,
+        data: serde_json::to_string(&cd).unwrap(),
+        kind: infra::table::cipher::EntryKind::CipherKey,
+    })
+    .await
+    {
+        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK,
+            "key updated successfully",
+        ))),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+/// update the credentials for given key
+#[utoipa::path(
+    put,
+    context_path = "/api",
+    operation_id = "UpdateCipherKey",
+    summary = "Update encryption key",
+    description = "Updates the configuration and parameters of an existing encryption key. This feature is only \
+                   available in enterprise deployments.",
+    params(
+        ("key_name" = String, Path, description = "name of the key to update", example = "test_key")
+    ),
+    responses(
+        (status = 403, description = "Feature not supported", content_type = "application/json")
+    ),
+    tag = "Keys"
+)]
+#[put("/{org_id}/cipher_keys/{key_name}")]
+pub async fn update(
+    _path: web::Path<(String, String)>,
+    _body: web::Payload,
+    _in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    Ok(MetaHttpResponse::forbidden("not supported"))
 }

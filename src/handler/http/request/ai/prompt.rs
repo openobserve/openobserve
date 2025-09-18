@@ -116,7 +116,7 @@ pub async fn get_prompt(path: web::Path<(String, PromptType)>) -> Result<HttpRes
         ("org_id" = String, Path, description = "Organization name")
     ),
     request_body(
-        content = Object,
+        content = UpdatePromptRequest,
         description = "Prompt details", 
         example = json!({
             "content": "Write a SQL query to get the top 10 users by response time in the default stream"
