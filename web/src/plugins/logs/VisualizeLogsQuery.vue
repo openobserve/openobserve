@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         title="Add To Dashboard"
                         :disabled="
                           errorData?.errors?.length > 0 ||
-                          errorData?.value?.message !== ''
+                          errorData?.value !== ''
                         "
                         >Add To Dashboard</q-btn
                       >
