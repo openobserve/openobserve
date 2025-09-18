@@ -353,8 +353,8 @@ bordered class="my-card q-py-md">
         </div>
       </div>
     </div>
-    <div v-if="isLoadingSummary" style="height: calc(100vh - 200px);" class=" tw-w-full tw-h-full q-mt-lg tw-flex tw-justify-center tw-items-center">
-      <q-spinner-hourglass color="primary" size="lg" />
+    <div v-if="isLoadingSummary" class="column q-pt-md" style="height: auto; overflow-y: auto;">
+      <HomeViewSkeleton />
     </div>
   </q-page>
 
@@ -373,6 +373,7 @@ import useStreams from "@/composables/useStreams";
 import pipelines from "@/services/pipelines";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
+import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 
 export default defineComponent({
   name: "PageHome",
@@ -699,6 +700,7 @@ export default defineComponent({
   components: {
     CustomChartRenderer,
     TrialPeriod,
+    HomeViewSkeleton,
   },
 });
 </script>
