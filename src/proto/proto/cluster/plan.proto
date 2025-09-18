@@ -15,7 +15,7 @@ message PhysicalPlanNode {
     NewEmptyExecNode          empty_exec = 1;
     AggregateTopkExecNode aggregate_topk = 2;
     StreamingAggsExecNode streaming_aggs = 3;
-    TmpExecNode  tmp_exec = 4;
+    TmpExecNode                 tmp_exec = 4;
   }
 }
 
