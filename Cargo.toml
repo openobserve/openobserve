@@ -129,6 +129,7 @@ reqwest.workspace = true
 rust-embed-for-web = "11.2.1"
 rustls.workspace = true
 rustls-pemfile.workspace = true
+scc.workspace = true
 sea-orm.workspace = true
 segment.workspace = true
 serde.workspace = true

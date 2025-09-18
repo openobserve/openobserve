@@ -13,106 +13,79 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use hashbrown::HashMap;
+use std::sync::atomic::AtomicIsize;
+
 use once_cell::sync::Lazy;
+use scc::HashMap;
 
 // SEARCHING_FILES for searching files, in use, should not move to s3
-static SEARCHING_FILES: Lazy<parking_lot::RwLock<SearchingFileLocker>> =
-    Lazy::new(|| parking_lot::RwLock::new(SearchingFileLocker::new()));
+static SEARCHING_FILES: Lazy<HashMap<String, AtomicIsize>> = Lazy::new(HashMap::new);
 
 // SEARCHING_REQUESTS for searching requests, in use, should not move to s3
-static SEARCHING_REQUESTS: Lazy<parking_lot::RwLock<HashMap<String, Vec<String>>>> =
-    Lazy::new(Default::default);
+static SEARCHING_REQUESTS: Lazy<HashMap<String, Vec<String>>> = Lazy::new(HashMap::new);
 
-struct SearchingFileLocker {
-    inner: HashMap<String, usize>,
-}
-
-impl SearchingFileLocker {
-    pub fn new() -> Self {
-        Self {
-            inner: Default::default(),
-        }
-    }
-
-    pub fn lock(&mut self, file: String) {
-        let entry = self.inner.entry(file).or_insert(0);
-        *entry += 1;
-    }
-
-    pub fn release(&mut self, file: &str) {
-        if let Some(entry) = self.inner.get_mut(file) {
-            *entry -= 1;
-            if *entry == 0 {
-                self.inner.remove(file);
-            }
-        }
-    }
-
-    pub fn shrink_to_fit(&mut self) {
-        self.inner.shrink_to_fit()
-    }
-
-    pub fn len(&self) -> usize {
-        self.inner.len()
-    }
-
-    pub fn exist(&self, file: &str) -> bool {
-        self.inner.contains_key(file)
-    }
-
-    pub fn clean(&mut self) {
-        self.inner.clear();
-        self.inner.shrink_to_fit();
-    }
-}
-
-pub fn init() -> Result<(), anyhow::Error> {
-    _ = SEARCHING_FILES.read().len();
+pub async fn init() -> Result<(), anyhow::Error> {
+    _ = SEARCHING_FILES.clear_async().await;
     Ok(())
 }
 
-pub fn lock_files(files: &[String]) {
-    let mut locker = SEARCHING_FILES.write();
-    for file in files.iter() {
-        locker.lock(file.clone());
-    }
+pub async fn lock_files(files: &[String]) {
+    futures::future::join_all(files.iter().map(|file| {
+        Box::pin(async {
+            SEARCHING_FILES
+                .entry_async(file.clone())
+                .await
+                .or_insert(0.into())
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+        })
+    }))
+    .await;
 }
 
-pub fn release_files(files: &[String]) {
-    let mut locker = SEARCHING_FILES.write();
-    for file in files.iter() {
-        locker.release(file);
-    }
-    locker.shrink_to_fit();
+pub async fn release_files(files: &[String]) {
+    // Process files sequentially to avoid Send issues with complex futures
+    let futures = files.iter().map(|file| {
+        Box::pin(SEARCHING_FILES.remove_if_async(file, |e| {
+            e.fetch_add(-1, std::sync::atomic::Ordering::SeqCst) <= 1
+        }))
+    });
+    futures::future::join_all(futures).await;
 }
 
-pub fn lock_files_exists(file: &str) -> bool {
-    SEARCHING_FILES.read().exist(file)
+pub async fn lock_files_exists(file: &str) -> bool {
+    SEARCHING_FILES.contains_async(file).await
 }
 
-pub fn clean_lock_files() {
-    let mut locker = SEARCHING_FILES.write();
-    locker.clean();
+pub async fn clean_lock_files() {
+    let _ = init().await.inspect_err(|e| {
+        log::error!(
+            "Error clearing all the locks under SEARCHING_FILES: e={:?}",
+            e
+        );
+    });
 }
 
-pub fn lock_request(trace_id: &str, files: &[String]) {
+pub async fn lock_request(trace_id: &str, files: &[String]) {
     log::info!("[trace_id: {trace_id}] lock_request for wal files");
-    let mut locker = SEARCHING_REQUESTS.write();
-    locker.insert(trace_id.to_string(), files.to_vec());
+    let _ = SEARCHING_REQUESTS
+        .insert_async(trace_id.to_string(), files.to_vec())
+        .await
+        .inspect_err(|e| {
+            log::error!(
+                "Error inserting {trace_id} into SEARCHING_REQUESTS. e={:?}",
+                e
+            );
+        });
 }
 
-pub fn release_request(trace_id: &str) {
+pub async fn release_request(trace_id: &str) {
     if !config::cluster::LOCAL_NODE.is_ingester() {
         return;
     }
     log::info!("[trace_id: {trace_id}] release_request for wal files");
-    let mut locker = SEARCHING_REQUESTS.write();
-    let files = locker.remove(trace_id);
-    locker.shrink_to_fit();
-    drop(locker);
-    if let Some(files) = files {
-        release_files(&files);
+    let files = SEARCHING_REQUESTS.remove_async(trace_id).await;
+    if let Some((_, files)) = files {
+        release_files(&files).await;
     }
 }
 
@@ -129,14 +102,14 @@ mod tests {
         ];
 
         // Test locking files
-        lock_files(&files);
-        assert!(lock_files_exists(&files[0]));
-        assert!(lock_files_exists(&files[1]));
+        lock_files(&files).await;
+        assert!(lock_files_exists(&files[0]).await);
+        assert!(lock_files_exists(&files[1]).await);
 
         // Test releasing files
-        release_files(&files);
-        assert!(!lock_files_exists(&files[0]));
-        assert!(!lock_files_exists(&files[1]));
+        release_files(&files).await;
+        assert!(!lock_files_exists(&files[0]).await);
+        assert!(!lock_files_exists(&files[1]).await);
     }
 
     #[tokio::test]
@@ -148,14 +121,14 @@ mod tests {
         ];
 
         // Test locking request
-        lock_files(&files);
-        lock_request(trace_id, &files);
-        assert!(lock_files_exists(&files[0]));
-        assert!(lock_files_exists(&files[1]));
+        lock_files(&files).await;
+        let _ = lock_request(trace_id, &files).await;
+        assert!(lock_files_exists(&files[0]).await);
+        assert!(lock_files_exists(&files[1]).await);
 
         // Test releasing request
-        release_request(trace_id);
-        assert!(!lock_files_exists(&files[0]));
-        assert!(!lock_files_exists(&files[1]));
+        release_request(trace_id).await;
+        assert!(!lock_files_exists(&files[0]).await);
+        assert!(!lock_files_exists(&files[1]).await);
     }
 }
