@@ -17,16 +17,24 @@ use std::sync::Arc;
 
 use config::{TIMESTAMP_COL_NAME, meta::inverted_index::UNKNOWN_NAME};
 use datafusion::{
-    common::Result,
+    common::{Result, tree_node::TreeNode},
     error::DataFusionError,
     logical_expr::Operator,
     physical_expr::{
         PhysicalExpr,
         expressions::{Column, Literal},
     },
-    physical_plan::expressions::{BinaryExpr, CastExpr, lit},
+    physical_plan::{
+        ExecutionPlan,
+        expressions::{BinaryExpr, CastExpr, lit},
+    },
     scalar::ScalarValue,
 };
+
+pub fn is_aggregate_exec(plan: &Arc<dyn ExecutionPlan>) -> bool {
+    plan.exists(|plan| Ok(plan.name() == "AggregateExec"))
+        .unwrap_or(false)
+}
 
 pub fn extract_string_literal(expr: &Arc<dyn PhysicalExpr>) -> Result<String> {
     if let Some(literal) = expr.as_any().downcast_ref::<Literal>() {

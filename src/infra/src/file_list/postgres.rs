@@ -1059,19 +1059,21 @@ INSERT INTO stream_stats
                 r#"
 UPDATE stream_stats
     SET file_num = file_num + $1, 
-        min_ts = CASE WHEN $2 = 0 THEN min_ts ELSE $3 END,
-        max_ts = CASE WHEN $4 = 0 THEN max_ts ELSE $5 END,
-        records = records + $6, 
-        original_size = original_size + $7, 
-        compressed_size = compressed_size + $8, 
-        index_size = index_size + $9
-    WHERE stream = $10;
+        min_ts = CASE WHEN $2 = 0 THEN min_ts 
+                     WHEN min_ts = 0 OR $2 < min_ts THEN $2 
+                     ELSE min_ts END,
+        max_ts = CASE WHEN $3 = 0 THEN max_ts 
+                     WHEN max_ts = 0 OR $3 > max_ts THEN $3 
+                     ELSE max_ts END,
+        records = records + $4, 
+        original_size = original_size + $5, 
+        compressed_size = compressed_size + $6, 
+        index_size = index_size + $7
+    WHERE stream = $8;
                 "#,
             )
             .bind(stats.file_num)
             .bind(stats.doc_time_min)
-            .bind(stats.doc_time_min)
-            .bind(stats.doc_time_max)
             .bind(stats.doc_time_max)
             .bind(stats.doc_num)
             .bind(stats.storage_size as i64)

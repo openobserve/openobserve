@@ -23,6 +23,7 @@ use config::{
     utils::json,
 };
 use infra::{
+    client::grpc::make_grpc_search_client,
     errors::{Error, ErrorCodes},
     storage,
     table::entity::{search_job_partitions::Model as PartitionJob, search_jobs::Model as Job},
@@ -36,7 +37,6 @@ use o2_enterprise::enterprise::{
 };
 use tokio::sync::mpsc;
 
-use super::grpc::make_grpc_search_client;
 use crate::service::{
     db::search_job::{search_job_partitions::*, search_job_results::*, search_jobs::*},
     search::grpc_search::{grpc_search, grpc_search_partition},

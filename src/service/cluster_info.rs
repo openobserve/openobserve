@@ -96,7 +96,7 @@ pub async fn get_super_cluster_info(
     let empty_request = EmptyRequest {};
     let mut request = Request::new(empty_request.clone());
     let mut client =
-        super::grpc::make_grpc_cluster_info_client(trace_id, &mut request, &node).await?;
+        infra::client::grpc::make_grpc_cluster_info_client(trace_id, &mut request, &node).await?;
     let response = match client.get_cluster_info(Request::new(empty_request)).await {
         Ok(r) => convert_response_to_cluster_info(r.into_inner()),
         Err(e) => {
@@ -124,7 +124,8 @@ pub async fn get_super_cluster_delete_job_status(
     };
     let mut grpc_request = Request::new(request.clone());
     let mut client =
-        super::grpc::make_grpc_cluster_info_client(trace_id, &mut grpc_request, &node).await?;
+        infra::client::grpc::make_grpc_cluster_info_client(trace_id, &mut grpc_request, &node)
+            .await?;
     let response = match client.get_delete_job_status(Request::new(request)).await {
         Ok(response) => response.into_inner(),
         Err(err) => {
