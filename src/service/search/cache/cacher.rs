@@ -586,8 +586,25 @@ pub async fn cache_results_to_disk(
     file_path: &str,
     file_name: &str,
     data: String,
+    clear_cache: bool,
 ) -> std::io::Result<()> {
+    if clear_cache {
+        log::info!(
+            "Clearing cache for file path as use_cache is false: {}",
+            file_path
+        );
+        let _ = delete_cache(file_path, 0).await;
+    }
     let file = format!("results/{}/{}", file_path, file_name);
+    if disk::exist(&file).await {
+        log::info!("cached file already exists on disk, removing it: {}", file);
+        match disk::remove(trace_id, &file).await {
+            Ok(_) => (),
+            Err(e) => {
+                log::error!("Error removing cached results from disk: {:?}", e);
+            }
+        }
+    };
     match disk::set(trace_id, &file, Bytes::from(data)).await {
         Ok(_) => (),
         Err(e) => {
