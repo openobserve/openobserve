@@ -583,7 +583,7 @@ pub fn merge_response(
     }
     sort_response(is_descending, &mut cache_response, ts_column, &order_by);
 
-    if cache_response.hits.len() > (limit as usize) {
+    if cache_response.hits.len() > (limit as usize) && limit != -1 {
         cache_response.hits.truncate(limit as usize);
     }
     if limit > 0 {
@@ -1024,6 +1024,7 @@ pub async fn check_cache_v2(
                     is_descending,
                     cache_query_response: true,
                     file_path,
+                    limit: v.limit as i64,
                     ..Default::default()
                 }
             }
