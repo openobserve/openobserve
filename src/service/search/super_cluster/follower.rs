@@ -79,7 +79,7 @@ pub async fn search(
     let trace_id = trace_id.to_string();
 
     // create datafusion context, just used for decode plan, the params can use default
-    let mut ctx = DataFusionContextBuilder::new()
+    let ctx = DataFusionContextBuilder::new()
         .trace_id(&trace_id)
         .work_group(req.work_group.clone())
         .build(cfg.limit.cpu_num)
