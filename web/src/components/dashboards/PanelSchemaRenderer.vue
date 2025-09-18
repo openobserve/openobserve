@@ -1090,7 +1090,7 @@ export default defineComponent({
 
     // get interval from resultMetaData if it exists
     const interval = computed(
-      () => resultMetaData?.value?.[0]?.histogram_interval,
+      () => resultMetaData?.value?.[0]?.[0]?.histogram_interval,
     );
 
     // get interval in micro seconds

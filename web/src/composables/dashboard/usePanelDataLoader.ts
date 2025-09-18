@@ -559,7 +559,7 @@ export const usePanelDataLoader = (
           if (res?.data?.streaming_aggs) {
             // handle empty hits case
             if (searchRes?.data?.hits?.length > 0) {
-            state.data[currentQueryIndex] = [...searchRes.data.hits];
+              state.data[currentQueryIndex] = [...searchRes.data.hits];
             }
           }
           // if order by is desc, append new partition response at end
@@ -587,9 +587,11 @@ export const usePanelDataLoader = (
           ) {
             // set the new start time as the start time of query
             // Update the last partition result
-            const lastPartitionIndex = state.resultMetaData[currentQueryIndex].length - 1;
-            state.resultMetaData[currentQueryIndex][lastPartitionIndex].new_end_time =
-              endISOTimestamp;
+            const lastPartitionIndex =
+              state.resultMetaData[currentQueryIndex].length - 1;
+            state.resultMetaData[currentQueryIndex][
+              lastPartitionIndex
+            ].new_end_time = endISOTimestamp;
 
             // need to break the loop, save the cache
             // this is async task, which will be executed in background(await is not required)
@@ -622,18 +624,25 @@ export const usePanelDataLoader = (
               if (i != 0) {
                 // set that is_partial to true
                 // Update the last partition result
-                const lastPartitionIndex = state.resultMetaData[currentQueryIndex].length - 1;
-                state.resultMetaData[currentQueryIndex][lastPartitionIndex].is_partial = true;
+                const lastPartitionIndex =
+                  state.resultMetaData[currentQueryIndex].length - 1;
+                state.resultMetaData[currentQueryIndex][
+                  lastPartitionIndex
+                ].is_partial = true;
                 // set function error
-                state.resultMetaData[currentQueryIndex][lastPartitionIndex].function_error =
+                state.resultMetaData[currentQueryIndex][
+                  lastPartitionIndex
+                ].function_error =
                   `Query duration is modified due to query range restriction of ${max_query_range} hours`;
                 // set the new start time and end time
-                state.resultMetaData[currentQueryIndex][lastPartitionIndex].new_end_time =
-                  endISOTimestamp;
+                state.resultMetaData[currentQueryIndex][
+                  lastPartitionIndex
+                ].new_end_time = endISOTimestamp;
 
                 // set the new start time as the start time of query
-                state.resultMetaData[currentQueryIndex][lastPartitionIndex].new_start_time =
-                  partition[0];
+                state.resultMetaData[currentQueryIndex][
+                  lastPartitionIndex
+                ].new_start_time = partition[0];
 
                 // need to break the loop, save the cache
                 // this is async task, which will be executed in background(await is not required)
@@ -725,10 +734,15 @@ export const usePanelDataLoader = (
       code: "",
     };
 
+    const lastPartitionIndex =
+      state.resultMetaData[payload?.meta?.currentQueryIndex][
+        state.resultMetaData[payload?.meta?.currentQueryIndex].length - 1
+      ].length - 1;
     // is streaming aggs
     const streaming_aggs =
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]
-        ?.streaming_aggs ?? false;
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex][
+        lastPartitionIndex
+      ]?.streaming_aggs ?? false;
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
@@ -741,8 +755,8 @@ export const usePanelDataLoader = (
     }
     // if order by is desc, append new partition response at end
     else if (
-      state?.resultMetaData?.[
-        payload?.meta?.currentQueryIndex
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
+        lastPartitionIndex
       ]?.order_by?.toLowerCase() === "asc"
     ) {
       // else append new partition response at start
@@ -758,9 +772,14 @@ export const usePanelDataLoader = (
     }
 
     // update result metadata - update the first partition result
-    if (state.resultMetaData[payload?.meta?.currentQueryIndex]?.[0]) {
-      state.resultMetaData[payload?.meta?.currentQueryIndex][0].hits =
-        searchRes?.content?.results?.hits ?? {};
+    if (
+      state.resultMetaData[payload?.meta?.currentQueryIndex]?.[
+        lastPartitionIndex
+      ]
+    ) {
+      state.resultMetaData[payload?.meta?.currentQueryIndex][
+        lastPartitionIndex
+      ].hits = searchRes?.content?.results?.hits ?? {};
     }
   };
 
