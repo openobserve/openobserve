@@ -496,7 +496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="selectedAlerts.length > 0"
                   data-test="alert-list-move-across-folders-btn"
-                  class="flex items-center q-mr-md no-border o2-secondary-button tw-h-[36px]"
+                  class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   no-caps
                   dense
@@ -508,7 +508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="selectedAlerts.length > 0"
                   data-test="alert-list-export-alerts-btn"
-                  class="flex items-center no-border o2-secondary-button tw-h-[36px]"
+                  class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   no-caps
                   dense
@@ -516,6 +516,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <q-icon name="download" size="16px" />
                   <span class="tw-ml-2">Export</span>
+              </q-btn>
+              <q-btn
+                  v-if="selectedAlerts.length > 0"
+                  data-test="alert-list-pause-alerts-btn"
+                  class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  no-caps
+                  dense
+                  @click="bulkToggleAlerts('pause')"
+                >
+                  <q-icon name="pause" size="16px" />
+                  <span class="tw-ml-2">Pause</span>
+              </q-btn>
+              <q-btn
+                  v-if="selectedAlerts.length > 0"
+                  data-test="alert-list-unpause-alerts-btn"
+                  class="tw-flex items-center no-border o2-secondary-button tw-h-[36px] tw-ml-md tw-w-[141px]"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  no-caps
+                  dense
+                  @click="bulkToggleAlerts('resume')"
+                >
+                  <q-icon name="play_arrow" size="16px" />
+                  <span class="tw-ml-2">Resume</span>
               </q-btn>
                 <QTablePagination
                   :scope="scope"
@@ -1962,6 +1986,67 @@ export default defineComponent({
         })
     }
 
+  const bulkToggleAlerts = async (action: "pause" | "resume") => {
+      const dismiss = $q.notify({
+        spinner: true,
+        message: `${action === "resume" ? "Resuming" : "Pausing"} alerts...`,
+        timeout: 0,
+      });
+      try {
+        const isResuming = action === "resume";
+
+        // Filter alerts based on action
+        const alertsToToggle = selectedAlerts.value.filter((alert: any) =>
+          isResuming ? !alert.enabled : alert.enabled
+        );
+
+        if (alertsToToggle.length === 0) {
+          $q.notify({
+            type: "negative",
+            message: `No alerts to ${action}`,
+            timeout: 2000,
+          });
+          dismiss();
+          return;
+        }
+
+        // Collect IDs and names
+        const payload = {
+          ids: alertsToToggle.map((a: any) => a.alert_id),
+          names: alertsToToggle.map((a: any) => a.name),
+        };
+
+        // Toggle (true = resume, false = pause)
+        const response = await alertsService.bulkToggleState(
+          store.state.selectedOrganization.identifier,
+          isResuming,
+          payload
+        );
+
+        if (response) {
+          dismiss();
+          $q.notify({
+            type: "positive",
+            message: `Alerts ${action}d successfully`,
+            timeout: 2000,
+          });
+        }
+        // Refresh alerts
+        await getAlertsFn(store, activeFolderId.value);
+
+        if (filterQuery.value) {
+            filterAlertsByQuery(filterQuery.value);
+          };
+      } catch (error) {
+        dismiss();
+        console.error(`Error ${action}ing alerts:`, error);
+        $q.notify({
+          type: "negative",
+          message: `Error ${action}ing alerts. Please try again.`,
+          timeout: 2000,
+        });
+      }
+    };
 
 
 
@@ -2069,6 +2154,7 @@ export default defineComponent({
       updateFolderIdToBeCloned,
       transformToExpression,
       filterAlertsByQuery,
+      bulkToggleAlerts,
     };
   },
 });
