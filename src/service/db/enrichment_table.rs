@@ -347,7 +347,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         vec![]
                     }
                 };
-                log::debug!(
+                log::info!(
                     "enrichment table: {} cache data length: {}",
                     item_key,
                     data.len()
