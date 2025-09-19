@@ -2031,7 +2031,8 @@ export class LogsPage {
         return downloadPath;
     }
 
-    async verifyJsonDownload(download, expectedFileName, downloadDir) {
+    // Helper method for common file validation logic (lines 2037-2046)
+    async _saveAndValidateDownloadFile(download, expectedFileName, downloadDir) {
         const downloadPath = path.join(downloadDir, expectedFileName);
 
         // Save the download
@@ -2044,6 +2045,12 @@ export class LogsPage {
         expect(fs.existsSync(downloadPath)).toBe(true);
         const stats = fs.statSync(downloadPath);
         expect(stats.size).toBeGreaterThan(0);
+
+        return downloadPath;
+    }
+
+    async verifyJsonDownload(download, expectedFileName, downloadDir) {
+        const downloadPath = await this._saveAndValidateDownloadFile(download, expectedFileName, downloadDir);
 
         // Verify it's a JSON file
         const content = fs.readFileSync(downloadPath, 'utf8');
@@ -2070,18 +2077,7 @@ export class LogsPage {
     }
 
     async verifyJsonDownloadWithCount(download, expectedFileName, downloadDir, expectedCount) {
-        const downloadPath = path.join(downloadDir, expectedFileName);
-
-        // Save the download
-        await download.saveAs(downloadPath);
-
-        // Wait for file system to sync
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Verify file exists and has content
-        expect(fs.existsSync(downloadPath)).toBe(true);
-        const stats = fs.statSync(downloadPath);
-        expect(stats.size).toBeGreaterThan(0);
+        const downloadPath = await this._saveAndValidateDownloadFile(download, expectedFileName, downloadDir);
 
         // Verify it's a JSON file
         const content = fs.readFileSync(downloadPath, 'utf8');
