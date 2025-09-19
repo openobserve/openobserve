@@ -73,6 +73,10 @@ impl PhysicalOptimizerRule for FollowerIndexOptimizerRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+        if !config::get_config().common.inverted_index_enabled {
+            return Ok(plan);
+        }
+
         let mut rewriter =
             FollowerIndexOptimizer::new(self.time_range, self.index_optimizer_mode.clone());
         let plan = plan.rewrite(&mut rewriter)?.data;
@@ -159,15 +163,12 @@ impl PhysicalOptimizerRule for LeaderIndexOptimizerRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        let mut rewriter = LeaderIndexOptimizer::new(self.index_fields.clone());
-        let mut plan = plan.rewrite(&mut rewriter)?.data;
-
-        // set index_optimizer_mode to the remotescan
-        if let Some(index_optimizer_mode) = rewriter.index_optimizer_mode {
-            let mut rewriter = IndexOptimizerRewrite::new(index_optimizer_mode);
-            plan = plan.rewrite(&mut rewriter)?.data;
+        if !config::get_config().common.inverted_index_enabled {
+            return Ok(plan);
         }
 
+        let mut rewriter = LeaderIndexOptimizer::new(self.index_fields.clone());
+        let plan = plan.rewrite(&mut rewriter)?.data;
         Ok(plan)
     }
 
@@ -182,15 +183,11 @@ impl PhysicalOptimizerRule for LeaderIndexOptimizerRule {
 
 struct LeaderIndexOptimizer {
     index_fields: HashSet<String>,
-    pub index_optimizer_mode: Option<IndexOptimizeMode>,
 }
 
 impl LeaderIndexOptimizer {
     pub fn new(index_fields: HashSet<String>) -> Self {
-        Self {
-            index_fields,
-            index_optimizer_mode: None,
-        }
+        Self { index_fields }
     }
 }
 
@@ -207,14 +204,16 @@ impl TreeNodeRewriter for LeaderIndexOptimizer {
             if let Some(index_optimize_mode) =
                 is_simple_topn(Arc::clone(&plan), self.index_fields.clone())
             {
-                self.index_optimizer_mode = Some(index_optimize_mode);
+                let mut rewriter = IndexOptimizerRewrite::new(index_optimize_mode);
+                let plan = plan.rewrite(&mut rewriter)?.data;
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
             }
             // Check for SimpleDistinct
             if let Some(index_optimize_mode) =
                 is_simple_distinct(Arc::clone(&plan), self.index_fields.clone())
             {
-                self.index_optimizer_mode = Some(index_optimize_mode);
+                let mut rewriter = IndexOptimizerRewrite::new(index_optimize_mode);
+                let plan = plan.rewrite(&mut rewriter)?.data;
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
             }
             return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
@@ -246,7 +245,7 @@ impl TreeNodeRewriter for IndexOptimizerRewrite {
                     .clone()
                     .set_index_optimize_mode(self.index_optimizer_mode.clone()),
             ) as Arc<dyn ExecutionPlan>;
-            return Ok(Transformed::yes(remote));
+            return Ok(Transformed::new(remote, true, TreeNodeRecursion::Stop));
         }
         Ok(Transformed::no(node))
     }
