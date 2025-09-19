@@ -58,7 +58,7 @@ use crate::service::organization::is_org_in_free_trial_period;
 #[utoipa::path(
     context_path = "/api",
     tag = "Search Jobs",
-    operation_id = "SearchSQL",
+    operation_id = "SubmitSearchJob",
     summary = "Submit search job",
     description = "Submits a new asynchronous search job for execution. Search jobs are useful for long-running queries that \
                    might exceed normal timeout limits or for scheduling queries to run in the background. The job is \
@@ -69,7 +69,7 @@ use crate::service::organization::is_org_in_free_trial_period;
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Object, description = "Search query", content_type = "application/json", example = json!({
+    request_body(content = config::meta::search::Request, description = "Search query", content_type = "application/json", example = json!({
         "query": {
             "sql": "select * from k8s ",
             "start_time": 1675182660872049i64,

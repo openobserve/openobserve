@@ -14,6 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, patch, post, put, web};
+use config::meta::dashboards::{
+    Dashboard, v1::Dashboard as DashboardV1, v2::Dashboard as DashboardV2,
+    v3::Dashboard as DashboardV3, v4::Dashboard as DashboardV4, v5::Dashboard as DashboardV5,
+};
 use hashbrown::HashMap;
 
 use crate::{
@@ -82,7 +86,7 @@ impl From<DashboardError> for HttpResponse {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(
-        content = CreateDashboardRequestBody,
+        content((DashboardV1), (DashboardV2), (DashboardV3), (DashboardV4), (DashboardV5)),
         description = "Dashboard details",
         example = json!({
             "title": "Network Traffic Overview",
@@ -106,8 +110,7 @@ pub async fn create_dashboard(
 ) -> impl Responder {
     let org_id = path.into_inner();
     let folder = get_folder(req.query_string());
-    let mut dashboard: config::meta::dashboards::Dashboard = match req_body.into_inner().try_into()
-    {
+    let mut dashboard: Dashboard = match req_body.into_inner().try_into() {
         Ok(dashboard) => dashboard,
         Err(_) => return MetaHttpResponse::bad_request("Error parsing request body"),
     };
@@ -137,7 +140,7 @@ pub async fn create_dashboard(
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
     request_body(
-        content = UpdateDashboardRequestBody,
+        content((DashboardV1), (DashboardV2), (DashboardV3), (DashboardV4), (DashboardV5)),
         description = "Dashboard details",
     ),
     responses(
@@ -161,8 +164,7 @@ async fn update_dashboard(
     let folder = crate::common::utils::http::get_folder(&query);
     let hash = query.get("hash").map(|h| h.as_str());
 
-    let mut dashboard: config::meta::dashboards::Dashboard = match req_body.into_inner().try_into()
-    {
+    let mut dashboard: Dashboard = match req_body.into_inner().try_into() {
         Ok(dashboard) => dashboard,
         Err(_) => return MetaHttpResponse::bad_request("Error parsing request body"),
     };

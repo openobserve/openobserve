@@ -1327,7 +1327,7 @@ async fn values_v1(
         ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Object, description = "Search query", content_type = "application/json", example = json!({
+    request_body(content = config::meta::search::SearchPartitionRequest, description = "Search query", content_type = "application/json", example = json!({
         "sql": "select * from k8s ",
         "start_time": 1675182660872049i64,
         "end_time": 1675185660872049i64
@@ -1469,7 +1469,7 @@ pub async fn search_partition(
         ("org_id" = String, Path, description = "Organization ID"),
     ),
     request_body(
-        content = Object,
+        content = config::meta::search::SearchHistoryRequest,
         description = "Search history request parameters",
         content_type = "application/json",
         example = json!({
@@ -1673,7 +1673,7 @@ pub async fn search_history(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Object, description = "Search query", content_type = "application/json", example = json!({
+    request_body(content = config::meta::search::Request, description = "Search query", content_type = "application/json", example = json!({
         "query": {
             "sql": "select k8s_namespace_name as ns, histogram(_timestamp) from k8s group by k8s_namespace_name, histogram(_timestamp)",
             "start_time": 1675182660872049i64,

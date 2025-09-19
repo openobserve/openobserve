@@ -58,12 +58,12 @@ use crate::{
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
-    operation_id = "SearchSQL",
+    operation_id = "SearchSQLMultiStream",
     summary = "Search across multiple streams",
     description = "Executes SQL queries that can span across multiple data streams within the organization. This enables cross-stream analytics, joins, and aggregations to analyze data relationships and patterns across different log streams, metrics, or traces. The query engine automatically handles data from different streams and returns unified results.",
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(
-        content = Object,
+        content = search::MultiStreamRequest,
         description = "Search query",
         content_type = "application/json",
         example = json!({
@@ -654,7 +654,7 @@ pub async fn search_multi(
         ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
     ),
     request_body(
-        content = Object,
+        content = search::MultiSearchPartitionRequest,
         description = "Search query",
         content_type = "application/json",
         example = json!({
