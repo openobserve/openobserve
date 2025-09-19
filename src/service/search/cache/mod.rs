@@ -156,8 +156,6 @@ pub async fn search(
                 }
                 let order_by = v.order_by;
 
-                let cache_query_response = is_streaming;
-
                 MultiCachedQueryResponse {
                     ts_column,
                     is_descending,
@@ -165,7 +163,7 @@ pub async fn search(
                     is_aggregate,
                     limit: v.limit,
                     file_path: file_path.clone(),
-                    cache_query_response,
+                    cache_query_response: true,
                     clear_cache: !is_streaming,
                     ..Default::default()
                 }
