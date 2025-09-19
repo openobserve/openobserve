@@ -32,3 +32,4 @@ CLAUDE.md
 /test-logs
 test-results/.last-run.json
 tests/ui-testing/playwright-tests/utils/auth/user.json
+/tests/ui-testing/utils/test-mapping/archived-utils
