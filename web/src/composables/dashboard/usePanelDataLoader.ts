@@ -466,7 +466,7 @@ export const usePanelDataLoader = (
 
       // Add empty arrays to state.resultMetaData for the partition results of this query
       state.data.push([]);
-      state.resultMetaData.push([]); // Now each query has an array of partition results
+      state?.resultMetaData?.push([]); // Now each query has an array of partition results
 
       const currentQueryIndex = state.data.length - 1;
 
@@ -578,7 +578,7 @@ export const usePanelDataLoader = (
 
           // update result metadata - add to partition results array
           // Store each partition's result metadata
-          state.resultMetaData[currentQueryIndex].push(searchRes.data ?? {});
+          state?.resultMetaData?.[currentQueryIndex]?.push(searchRes?.data ?? {});
 
           if (
             searchRes.data.is_partial == true &&
@@ -588,7 +588,7 @@ export const usePanelDataLoader = (
             // set the new start time as the start time of query
             // Update the last partition result
             const lastPartitionIndex = Math.max(
-              state.resultMetaData[currentQueryIndex].length - 1,
+              state?.resultMetaData?.[currentQueryIndex]?.length - 1,
               0,
             );
             state.resultMetaData[currentQueryIndex][
@@ -627,7 +627,7 @@ export const usePanelDataLoader = (
                 // set that is_partial to true
                 // Update the last partition result
                 const lastPartitionIndex = Math.max(
-                  state.resultMetaData[currentQueryIndex].length - 1,
+                  state?.resultMetaData?.[currentQueryIndex]?.length - 1,
                   0,
                 );
                 state.resultMetaData[currentQueryIndex][
@@ -739,7 +739,7 @@ export const usePanelDataLoader = (
     };
 
     const lastPartitionIndex = Math.max(
-      state.resultMetaData[payload?.meta?.currentQueryIndex].length - 1,
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.length - 1,
       0,
     );
     // is streaming aggs
@@ -1500,7 +1500,7 @@ export const usePanelDataLoader = (
                   ) {
                     state.data.push([]);
                     state.metadata.queries.push({});
-                    state.resultMetaData.push([{}]); // Initialize as array with one element
+                    state?.resultMetaData?.push([{}]); // Initialize as array with one element
 
                     if (
                       searchRes?.data?.hits &&
@@ -1591,7 +1591,7 @@ export const usePanelDataLoader = (
               if (searchResponse?.value?.hits?.length > 0) {
                 // Add empty objects to state.resultMetaData for the results of this query
                 state.data.push([]);
-                state.resultMetaData.push([{}]); // Initialize as array with one element
+                state?.resultMetaData?.push([{}]); // Initialize as array with one element
 
                 const currentQueryIndex = state.data.length - 1;
 
