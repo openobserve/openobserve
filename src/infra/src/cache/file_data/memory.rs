@@ -395,7 +395,7 @@ mod tests {
             .unwrap();
         assert!(file_data.exist(file_key).await);
         assert_eq!(file_data.get(file_key, None).await.unwrap(), content);
-        assert!(file_data.size().0 > 0);
+        assert!(file_data.size() > 0);
     }
 
     #[tokio::test]
@@ -455,7 +455,7 @@ mod tests {
             .unwrap();
         assert!(file_data.exist(file_key).await);
         assert_eq!(file_data.get(file_key, None).await.unwrap(), content);
-        assert!(file_data.size().0 > 0);
+        assert!(file_data.size() > 0);
     }
 
     #[tokio::test]
