@@ -888,10 +888,6 @@ pub async fn write_results_v2(
     }
 
     if local_resp.hits.is_empty() {
-        log::info!(
-            "[trace_id {trace_id}] No hits found for caching, skipping caching",
-            trace_id = trace_id
-        );
         return;
     }
 

@@ -590,12 +590,26 @@ pub async fn cache_results_to_disk(
     clean_start_ts: Option<i64>,
     clean_end_ts: Option<i64>,
 ) -> std::io::Result<()> {
+    let start = std::time::Instant::now();
+    log::info!("[trace_id {trace_id}] Caching results to disk");
     if clear_cache {
         log::info!(
-            "Clearing cache for file path as use_cache is false: {}",
-            file_path
+            "[trace_id {trace_id}] Clearing cache for file path as use_cache is {clear_cache}, start: {},  {file_path}",
+            start.elapsed().as_millis(),
         );
-        let _ = delete_cache(file_path, 0, clean_start_ts, clean_end_ts).await;
+        let _ = delete_cache(file_path, 0, clean_start_ts, clean_end_ts)
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[trace_id {trace_id}] Clearing cache for file path error: {}",
+                    e
+                );
+                e
+            });
+        log::info!(
+            "[trace_id {trace_id}] Clearing cache for file path as use_cache is {clear_cache} completed, took: {} ms, {file_path}",
+            start.elapsed().as_millis(),
+        );
     }
     let file = format!("results/{}/{}", file_path, file_name);
     if disk::exist(&file).await {
@@ -603,20 +617,31 @@ pub async fn cache_results_to_disk(
         match disk::remove(trace_id, &file).await {
             Ok(_) => (),
             Err(e) => {
-                log::error!("Error removing cached results from disk: {:?}", e);
+                log::error!(
+                    "[trace_id {trace_id}] Error removing cached results from disk: {:?}",
+                    e
+                );
             }
         }
     };
     match disk::set(trace_id, &file, Bytes::from(data)).await {
         Ok(_) => (),
         Err(e) => {
-            log::error!("Error caching results to disk: {:?}", e);
+            log::error!(
+                "[trace_id {trace_id}] Error caching results to disk: {:?}",
+                e
+            );
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Error caching results to disk",
             ));
         }
     }
+
+    log::info!(
+        "[trace_id {trace_id}] Cached results to disk completed, took: {} ms",
+        start.elapsed().as_millis()
+    );
     Ok(())
 }
 
@@ -734,6 +759,9 @@ pub async fn delete_cache(
     clean_start_ts: Option<i64>,
     clean_end_ts: Option<i64>,
 ) -> std::io::Result<bool> {
+    let start = std::time::Instant::now();
+    log::info!("Deleting cache for path start: {path}");
+
     let root_dir = disk::get_dir().await;
     let pattern = format!("{}/results/{}", root_dir, path);
     let prefix = format!("{}/", root_dir);
@@ -779,6 +807,10 @@ pub async fn delete_cache(
         let mut r = QUERY_RESULT_CACHE.write().await;
         r.remove(&query_key);
     }
+    log::info!(
+        "Deleting cache for path end, took: {} ms, {path}",
+        start.elapsed().as_millis()
+    );
     Ok(true)
 }
 
