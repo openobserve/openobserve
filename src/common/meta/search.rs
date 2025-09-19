@@ -66,6 +66,7 @@ pub struct MultiCachedQueryResponse {
     pub file_path: String,
     pub trace_id: String,
     pub order_by: Vec<(String, OrderBy)>,
+    pub clear_cache: bool,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
