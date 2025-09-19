@@ -14,18 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, patch, post, put, web};
-use config::meta::dashboards::{
-    Dashboard, v1::Dashboard as DashboardV1, v2::Dashboard as DashboardV2,
-    v3::Dashboard as DashboardV3, v4::Dashboard as DashboardV4, v5::Dashboard as DashboardV5,
-};
+use config::meta::dashboards::Dashboard;
 use hashbrown::HashMap;
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::models::dashboards::{
-        CreateDashboardRequestBody, CreateDashboardResponseBody, GetDashboardResponseBody,
-        ListDashboardsQuery, ListDashboardsResponseBody, MoveDashboardRequestBody,
-        MoveDashboardsRequestBody, UpdateDashboardRequestBody, UpdateDashboardResponseBody,
+        DashboardRequestBody,
+        DashboardResponseBody,
+        ListDashboardsQuery,
+        ListDashboardsResponseBody,
+        MoveDashboardRequestBody,
+        MoveDashboardsRequestBody, // UpdateDashboardRequestBody, UpdateDashboardResponseBody,
     },
     service::dashboards::{self, DashboardError},
 };
@@ -86,7 +86,7 @@ impl From<DashboardError> for HttpResponse {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(
-        content((DashboardV1), (DashboardV2), (DashboardV3), (DashboardV4), (DashboardV5)),
+        content = DashboardRequestBody,
         description = "Dashboard details",
         example = json!({
             "title": "Network Traffic Overview",
@@ -94,7 +94,7 @@ impl From<DashboardError> for HttpResponse {
         }),
     ),
     responses(
-        (status = StatusCode::CREATED, description = "Dashboard created", body = CreateDashboardResponseBody),
+        (status = StatusCode::CREATED, description = "Dashboard created", body = DashboardResponseBody),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
@@ -104,16 +104,14 @@ impl From<DashboardError> for HttpResponse {
 #[post("/{org_id}/dashboards")]
 pub async fn create_dashboard(
     path: web::Path<String>,
-    req_body: web::Json<CreateDashboardRequestBody>,
+    req_body: web::Json<DashboardRequestBody>,
     req: HttpRequest,
     user_email: UserEmail,
 ) -> impl Responder {
     let org_id = path.into_inner();
     let folder = get_folder(req.query_string());
-    let mut dashboard: Dashboard = match req_body.into_inner().try_into() {
-        Ok(dashboard) => dashboard,
-        Err(_) => return MetaHttpResponse::bad_request("Error parsing request body"),
-    };
+
+    let mut dashboard: Dashboard = req_body.0.into();
 
     set_dashboard_owner_if_empty(&mut dashboard, &user_email.user_id);
 
@@ -121,7 +119,7 @@ pub async fn create_dashboard(
         Ok(saved) => saved,
         Err(err) => return err.into(),
     };
-    let resp_body: CreateDashboardResponseBody = saved.into();
+    let resp_body: DashboardResponseBody = saved.into();
     MetaHttpResponse::json(resp_body)
 }
 
@@ -139,12 +137,9 @@ pub async fn create_dashboard(
         ("org_id" = String, Path, description = "Organization name"),
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
-    request_body(
-        content((DashboardV1), (DashboardV2), (DashboardV3), (DashboardV4), (DashboardV5)),
-        description = "Dashboard details",
-    ),
+    request_body(content = DashboardRequestBody, description = "Dashboard details"),
     responses(
-        (status = StatusCode::OK, description = "Dashboard updated", body = UpdateDashboardResponseBody),
+        (status = StatusCode::OK, description = "Dashboard updated", body = DashboardResponseBody),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the dashboard", body = ()),
     ),
@@ -155,7 +150,7 @@ pub async fn create_dashboard(
 #[put("/{org_id}/dashboards/{dashboard_id}")]
 async fn update_dashboard(
     path: web::Path<(String, String)>,
-    req_body: web::Json<UpdateDashboardRequestBody>,
+    req_body: web::Json<DashboardRequestBody>,
     req: HttpRequest,
     user_email: UserEmail,
 ) -> impl Responder {
@@ -164,10 +159,7 @@ async fn update_dashboard(
     let folder = crate::common::utils::http::get_folder(&query);
     let hash = query.get("hash").map(|h| h.as_str());
 
-    let mut dashboard: Dashboard = match req_body.into_inner().try_into() {
-        Ok(dashboard) => dashboard,
-        Err(_) => return MetaHttpResponse::bad_request("Error parsing request body"),
-    };
+    let mut dashboard: Dashboard = req_body.0.into();
 
     set_dashboard_owner_if_empty(&mut dashboard, &user_email.user_id);
 
@@ -177,7 +169,7 @@ async fn update_dashboard(
         Ok(saved) => saved,
         Err(err) => return err.into(),
     };
-    let resp_body: UpdateDashboardResponseBody = saved.into();
+    let resp_body: DashboardResponseBody = saved.into();
     MetaHttpResponse::json(resp_body)
 }
 
@@ -203,11 +195,12 @@ async fn update_dashboard(
     )
 )]
 #[get("/{org_id}/dashboards")]
-async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
-    let Ok(query) = web::Query::<ListDashboardsQuery>::from_query(req.query_string()) else {
-        return MetaHttpResponse::bad_request("Error parsing query parameters");
-    };
-    let params = query.into_inner().into(&org_id.into_inner());
+async fn list_dashboards(
+    org_id: web::Path<String>,
+    web::Query(query): web::Query<ListDashboardsQuery>,
+    req: HttpRequest,
+) -> impl Responder {
+    let params = query.into(&org_id.into_inner());
     let Some(user_id) = get_user_id(req) else {
         return MetaHttpResponse::unauthorized("User ID not found in request headers");
     };
@@ -234,7 +227,7 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
     responses(
-        (status = StatusCode::OK, body = GetDashboardResponseBody),
+        (status = StatusCode::OK, body = DashboardResponseBody),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
     extensions(
@@ -248,7 +241,7 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         Ok(dashboard) => dashboard,
         Err(err) => return err.into(),
     };
-    let resp_body: GetDashboardResponseBody = dashboard.into();
+    let resp_body: DashboardResponseBody = dashboard.into();
     MetaHttpResponse::json(resp_body)
 }
 
@@ -267,7 +260,7 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
     responses(
-        (status = StatusCode::OK, body = GetDashboardResponseBody),
+        (status = StatusCode::OK, body = DashboardResponseBody),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
     extensions(
@@ -281,7 +274,7 @@ pub async fn export_dashboard(path: web::Path<(String, String)>) -> impl Respond
         Ok(dashboard) => dashboard,
         Err(err) => return err.into(),
     };
-    let resp_body: GetDashboardResponseBody = dashboard.into();
+    let resp_body: DashboardResponseBody = dashboard.into();
     MetaHttpResponse::json(resp_body)
 }
 
@@ -453,14 +446,7 @@ fn set_dashboard_owner_if_empty(
     dashboard: &mut config::meta::dashboards::Dashboard,
     user_email: &str,
 ) {
-    match dashboard.owner() {
-        Some(owner) => {
-            if owner.is_empty() {
-                dashboard.set_owner(user_email.to_string());
-            }
-        }
-        None => {
-            dashboard.set_owner(user_email.to_string());
-        }
+    if dashboard.owner().filter(|v| !v.is_empty()).is_none() {
+        dashboard.set_owner(user_email.to_string());
     }
 }
