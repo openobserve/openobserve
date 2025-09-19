@@ -587,8 +587,10 @@ export const usePanelDataLoader = (
           ) {
             // set the new start time as the start time of query
             // Update the last partition result
-            const lastPartitionIndex =
-              state.resultMetaData[currentQueryIndex].length - 1;
+            const lastPartitionIndex = Math.max(
+              state.resultMetaData[currentQueryIndex].length - 1,
+              0,
+            );
             state.resultMetaData[currentQueryIndex][
               lastPartitionIndex
             ].new_end_time = endISOTimestamp;
@@ -624,8 +626,10 @@ export const usePanelDataLoader = (
               if (i != 0) {
                 // set that is_partial to true
                 // Update the last partition result
-                const lastPartitionIndex =
-                  state.resultMetaData[currentQueryIndex].length - 1;
+                const lastPartitionIndex = Math.max(
+                  state.resultMetaData[currentQueryIndex].length - 1,
+                  0,
+                );
                 state.resultMetaData[currentQueryIndex][
                   lastPartitionIndex
                 ].is_partial = true;
@@ -705,7 +709,7 @@ export const usePanelDataLoader = (
 
     // update result metadata - for streaming, we replace instead of append
     state.resultMetaData[payload?.meta?.currentQueryIndex] = [
-      searchRes?.content?.results ?? {}
+      searchRes?.content?.results ?? {},
     ];
 
     // If we have data and loading is complete, set isPartialData to false
@@ -734,10 +738,10 @@ export const usePanelDataLoader = (
       code: "",
     };
 
-    const lastPartitionIndex =
-      state.resultMetaData[payload?.meta?.currentQueryIndex][
-        state.resultMetaData[payload?.meta?.currentQueryIndex].length - 1
-      ].length - 1;
+    const lastPartitionIndex = Math.max(
+      state.resultMetaData[payload?.meta?.currentQueryIndex].length - 1,
+      0,
+    );
     // is streaming aggs
     const streaming_aggs =
       state?.resultMetaData?.[payload?.meta?.currentQueryIndex][
