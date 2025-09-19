@@ -31,7 +31,10 @@ use config::{
         stream::{FileKey, StreamType},
     },
 };
-use datafusion::{common::TableReference, physical_optimizer::PhysicalOptimizerRule};
+use datafusion::{
+    common::TableReference,
+    physical_optimizer::{PhysicalOptimizerRule, filter_pushdown::FilterPushdown},
+};
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use hashbrown::HashMap;
 use infra::{
@@ -196,7 +199,8 @@ pub async fn search(
         work_group: work_group.clone(),
         use_inverted_index: index_condition.is_some()
             && cfg.common.inverted_index_enabled
-            && !index_condition.as_ref().unwrap().is_condition_all(),
+            && (!index_condition.as_ref().unwrap().is_condition_all()
+                || idx_optimize_rule.is_some()),
     });
 
     log::info!(
@@ -441,6 +445,12 @@ pub async fn search(
         )
     );
 
+    if cfg.common.feature_dynamic_pushdown_filter_enabled {
+        // pushdown filter
+        let pushdown_filter = FilterPushdown::new_post_optimization();
+        physical_plan = pushdown_filter.optimize(physical_plan, ctx.state().config_options())?;
+    }
+
     if !tantivy_file_list.is_empty() {
         let tantivy_start = std::time::Instant::now();
         scan_stats.add(&collect_stats(&tantivy_file_list));
@@ -528,6 +538,15 @@ fn optimizer_physical_plan(
             .collect(),
     );
     let plan = rewrite_match_rule.optimize(plan, ctx.state().config_options())?;
+
+    // reset the index_condition if index_optimizer_rule is none and index_condition is all
+    let index_condition = index_condition_ref.lock().clone();
+    if index_condition.is_some()
+        && index_condition.as_ref().unwrap().is_condition_all()
+        && index_optimizer_rule_ref.lock().is_none()
+    {
+        index_condition_ref.lock().take();
+    }
 
     Ok(plan)
 }
