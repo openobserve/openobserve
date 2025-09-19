@@ -246,8 +246,7 @@ async fn handle_diff_schema(
 
     // acquire a local_lock to ensure only one thread can update schema
     let cache_key = format!("{org_id}/{stream_type}/{stream_name}");
-    let local_lock = infra::local_lock::lock(&cache_key).await?;
-    let _guard = local_lock.lock().await;
+    let _guard = infra::local_lock::lock(&cache_key).await;
 
     // check if the schema has been updated by another thread
     let read_cache = STREAM_SCHEMAS_LATEST.read().await;
