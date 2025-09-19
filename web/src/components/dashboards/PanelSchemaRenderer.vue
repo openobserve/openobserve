@@ -747,10 +747,50 @@ export default defineComponent({
       { deep: true },
     );
 
-    watch(panelData, () => {
-      emit("series-data-update", panelData.value);
-    },
-    { deep: true });
+    // Watch for layout changes (config panel open/close) and re-trigger conversion
+    // This ensures legend calculations use fresh dimensions after layout changes
+    let resizeTimeout: any = null;
+    const handleResizeEvent = async () => {
+      // Clear any existing timeout to debounce resize events
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+
+      // Wait for DOM to update with new dimensions before recalculating
+      resizeTimeout = setTimeout(async () => {
+        if (
+          !errorDetail?.value?.message &&
+          validatePanelData?.value?.length === 0 &&
+          data.value?.length &&
+          chartPanelRef.value
+        ) {
+          // Wait for next tick to ensure DOM has updated
+          await nextTick();
+          // Re-trigger conversion to recalculate legend sizing with fresh dimensions
+          await convertPanelDataCommon();
+        }
+      }, 50); // Small delay to ensure layout has stabilized
+    };
+
+    // Listen for resize events (dispatched when config panel opens/closes)
+    onMounted(() => {
+      window.addEventListener("resize", handleResizeEvent);
+    });
+
+    onUnmounted(() => {
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+      window.removeEventListener("resize", handleResizeEvent);
+    });
+
+    watch(
+      panelData,
+      () => {
+        emit("series-data-update", panelData.value);
+      },
+      { deep: true },
+    );
 
     // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
     watch(
@@ -1241,7 +1281,11 @@ export default defineComponent({
           variableValue =
             variable.value === null
               ? ""
-              : `${variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value}`;
+              : `${
+                  variable.escapeSingleQuotes
+                    ? escapeSingleQuotes(variable.value)
+                    : variable.value
+                }`;
           // if (query.includes(variableName)) {
           //   metadata.push({
           //     type: "variable",
