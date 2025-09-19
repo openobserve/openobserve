@@ -136,7 +136,7 @@ impl From<DashboardRequestBody> for MetaDashboard {
 
 impl From<MetaDashboard> for DashboardResponseBody {
     fn from(value: MetaDashboard) -> Self {
-        Self(value.into())
+        Self(value)
     }
 }
 
