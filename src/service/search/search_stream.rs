@@ -787,6 +787,7 @@ async fn do_search(
         Some(user_id.to_string()),
         &req,
         "".to_string(),
+        true,
     )
     .await;
 
