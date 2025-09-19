@@ -134,7 +134,11 @@ impl PhysicalOptimizerRule for RemoteScanRule {
         }
 
         // if single node and can optimize, add remote scan to top
-        if is_single_node_optimize(&plan) {
+        if config::get_config()
+            .common
+            .feature_single_node_optimize_enabled
+            && is_single_node_optimize(&plan)
+        {
             return remote_scan_to_top_if_needed(plan, self.remote_scan_nodes.clone());
         }
 

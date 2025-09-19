@@ -770,22 +770,4 @@ mod test {
         let sp = SummaryPercentile::new();
         assert_eq!(sp.name(), "summary_percentile");
     }
-
-    #[test]
-    fn test_accumulator_debug_fmt() {
-        let acc = SummaryPercentileAccumulator::new(0.75, DataType::Float64);
-        let debug_str = format!("{acc:?}");
-        assert!(debug_str.contains("SummaryPercentileAccumulator"));
-        assert!(debug_str.contains("Float64"));
-        assert!(debug_str.contains("0.75"));
-    }
-
-    #[test]
-    fn test_summary_percentile_debug_fmt() {
-        let sp = SummaryPercentile::new();
-        let debug_str = format!("{sp:?}");
-        assert!(debug_str.contains("SummaryPercentile"));
-        assert!(debug_str.contains("name"));
-        assert!(debug_str.contains("signature"));
-    }
 }

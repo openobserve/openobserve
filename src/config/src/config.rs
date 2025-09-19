@@ -803,6 +803,12 @@ pub struct Common {
     )]
     pub feature_dynamic_pushdown_filter_enabled: bool,
     #[env_config(
+        name = "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED",
+        default = true,
+        help = "Enable single node optimize(used for debug, not document)"
+    )]
+    pub feature_single_node_optimize_enabled: bool,
+    #[env_config(
         name = "ZO_FEATURE_QUERY_SKIP_WAL",
         default = false,
         help = "Skip WAL for query"

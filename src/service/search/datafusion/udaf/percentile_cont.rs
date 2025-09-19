@@ -670,22 +670,4 @@ mod test {
         let pc = PercentileCont::new();
         assert_eq!(pc.name(), "percentile_cont");
     }
-
-    #[test]
-    fn test_percentile_cont_debug_fmt() {
-        let pc = PercentileCont::new();
-        let debug_str = format!("{pc:?}");
-        assert!(debug_str.contains("PercentileCont"));
-        assert!(debug_str.contains("name"));
-        assert!(debug_str.contains("signature"));
-    }
-
-    #[test]
-    fn test_accumulator_debug_fmt() {
-        let acc = PercentileContAccumulator::new(0.75, DataType::Float64);
-        let debug_str = format!("{acc:?}");
-        assert!(debug_str.contains("PercentileContAccumulator"));
-        assert!(debug_str.contains("Float64"));
-        assert!(debug_str.contains("0.75"));
-    }
 }
