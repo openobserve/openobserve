@@ -1425,7 +1425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="
           !['html', 'markdown', 'geomap', 'maps'].includes(
             dashboardPanelData.data.type,
-          )
+          ) && dashboardPanelDataPageKey !== 'logs'
         "
         :variablesData="variablesData"
       />
@@ -1461,7 +1461,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           'scatter',
           'area-stacked',
           'stacked',
-        ].includes(dashboardPanelData.data.type) && !promqlMode
+        ].includes(dashboardPanelData.data.type) &&
+        !promqlMode &&
+        dashboardPanelDataPageKey !== 'logs'
       "
     >
       <div class="flex items-center q-mr-sm">
@@ -2136,6 +2138,7 @@ export default defineComponent({
       showTrellisConfig,
       isBreakdownFieldEmpty,
       hasTimeShifts,
+      dashboardPanelDataPageKey,
     };
   },
 });
