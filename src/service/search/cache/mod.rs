@@ -325,15 +325,15 @@ pub async fn search(
                 c_resp.order_by,
             )
         } else {
-            // let mut reps = results[0].clone();
-            // sort_response(
-            //     c_resp.is_descending,
-            //     &mut reps,
-            //     &c_resp.ts_column,
-            //     &c_resp.order_by,
-            // );
-            // reps
-            results[0].clone()
+            let mut reps = results[0].clone();
+            sort_response(
+                c_resp.is_descending,
+                &mut reps,
+                &c_resp.ts_column,
+                &c_resp.order_by,
+            );
+            reps
+            // results[0].clone()
         }
     };
 
@@ -656,14 +656,23 @@ pub fn merge_response(
 }
 
 fn sort_response(
-    _is_descending: bool,
+    is_descending: bool,
     cache_response: &mut search::Response,
     ts_column: &str,
-    order_by: &Vec<(String, OrderBy)>,
+    in_order_by: &Vec<(String, OrderBy)>,
 ) {
-    if order_by.is_empty() {
-        return;
-    }
+    let order_by = if in_order_by.is_empty() {
+        &vec![(
+            ts_column.to_string(),
+            if is_descending {
+                OrderBy::Desc
+            } else {
+                OrderBy::Asc
+            },
+        )]
+    } else {
+        in_order_by
+    };
 
     cache_response.hits.sort_by(|a, b| {
         for (field, order) in order_by {
