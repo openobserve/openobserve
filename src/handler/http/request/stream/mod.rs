@@ -561,11 +561,7 @@ async fn delete_stream_cache(
         format!("{}/{}/{}", org_id, stream_type, stream_name)
     };
 
-    match crate::service::search::cluster::cacher::delete_cached_results(
-        path, delete_ts
-    )
-    .await
-    {
+    match crate::service::search::cluster::cacher::delete_cached_results(path, delete_ts).await {
         true => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
             "cache deleted".to_string(),

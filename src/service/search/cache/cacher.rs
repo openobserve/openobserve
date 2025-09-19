@@ -595,7 +595,7 @@ pub async fn cache_results_to_disk(
             "Clearing cache for file path as use_cache is false: {}",
             file_path
         );
-        let _ = delete_cache(file_path, 0,clean_start_ts,clean_end_ts).await;
+        let _ = delete_cache(file_path, 0, clean_start_ts, clean_end_ts).await;
     }
     let file = format!("results/{}/{}", file_path, file_name);
     if disk::exist(&file).await {
@@ -685,6 +685,52 @@ pub fn get_ts_col_order_by(
     }
 }
 
+enum DeletionCriteria {
+    TimeRange(i64, i64),
+    ThresholdTimestamp(i64),
+    DeleteAll,
+}
+
+fn parse_cache_file_timestamps(file_path: &str) -> Option<(i64, i64)> {
+    let file_name = file_path.split('/').next_back()?;
+    let parts: Vec<&str> = file_name.split('_').collect();
+    if parts.len() >= 2 {
+        if let (Ok(start_ts), Ok(end_ts)) = (parts[0].parse::<i64>(), parts[1].parse::<i64>()) {
+            return Some((start_ts, end_ts));
+        }
+    }
+    None
+}
+
+fn time_ranges_overlap(start1: i64, end1: i64, start2: i64, end2: i64) -> bool {
+    // Check if file data range overlaps with clean range
+    // File overlaps if: file_start < clean_end AND file_end > clean_start
+    // 10 - 12 cache file
+    // 9 - 12 cache file
+    // 10 - 14 clearn st, end
+    // 10 < 14 && 12 > 10
+    // 9 < 14 && 12 > 10
+    start1 < end2 && end1 > start2
+}
+
+fn should_delete_cache_file(file_path: &str, criteria: &DeletionCriteria) -> bool {
+    let Some((file_start_ts, file_end_ts)) = parse_cache_file_timestamps(file_path) else {
+        return false;
+    };
+
+    match criteria {
+        // First check for time range overlapping files
+        DeletionCriteria::TimeRange(clean_start, clean_end) => {
+            time_ranges_overlap(file_start_ts, file_end_ts, *clean_start, *clean_end)
+        }
+        // Second check for threshold timestamp
+        // Only delete if start_time <= delete_ts (keep cache from delete_ts onwards)
+        DeletionCriteria::ThresholdTimestamp(delete_ts) => file_start_ts <= *delete_ts,
+        // Last check for delete all
+        DeletionCriteria::DeleteAll => true,
+    }
+}
+
 #[tracing::instrument]
 pub async fn delete_cache(
     path: &str,
@@ -697,41 +743,19 @@ pub async fn delete_cache(
     let prefix = format!("{}/", root_dir);
     let files = scan_files(&pattern, "json", None).unwrap_or_default();
     let mut remove_files: Vec<String> = vec![];
+
+    let criteria = match (clean_start_ts, clean_end_ts, delete_ts) {
+        // First check for time range
+        (Some(start), Some(end), _) => DeletionCriteria::TimeRange(start, end),
+        // Second check for threshold timestamp
+        (_, _, ts) if ts > 0 => DeletionCriteria::ThresholdTimestamp(ts),
+        // Last check for delete all
+        _ => DeletionCriteria::DeleteAll,
+    };
+
     for file in files {
-        // If clean_start_ts and clean_end_ts are provided, only delete files that overlap with the
-        // range
-        if let (Some(clean_start), Some(clean_end)) = (clean_start_ts, clean_end_ts) {
-            // Parse the start_time and end_time from filename:
-            // {start_time}_{end_time}_{is_aggregate}_{is_descending}.json
-            if let Some(file_name) = file.split('/').next_back() {
-                let parts: Vec<&str> = file_name.split('_').collect();
-                if parts.len() >= 2 {
-                    if let (Ok(file_start_ts), Ok(file_end_ts)) =
-                        (parts[0].parse::<i64>(), parts[1].parse::<i64>())
-                    {
-                        // Check if file data range overlaps with clean range
-                        // File overlaps if: file_start < clean_end AND file_end > clean_start
-                        if !(file_start_ts < clean_end && file_end_ts > clean_start) {
-                            continue; // Skip this file, no overlap
-                        }
-                    }
-                }
-            }
-        }
-        // If timestamp is provided, check if we should delete this file
-        else if delete_ts > 0 {
-            // Parse the start_time from filename:
-            // {start_time}_{end_time}_{is_aggregate}_{is_descending}.json
-            if let Some(file_name) = file.split('/').next_back() {
-                if let Some(start_time_str) = file_name.split('_').next() {
-                    if let Ok(start_time) = start_time_str.parse::<i64>() {
-                        // Only delete if start_time < delete_ts (keep cache from delete_ts onwards)
-                        if start_time > delete_ts {
-                            continue; // Skip this file, keep it
-                        }
-                    }
-                }
-            }
+        if !should_delete_cache_file(&file, &criteria) {
+            continue;
         }
 
         match disk::remove("", file.strip_prefix(&prefix).unwrap()).await {
@@ -881,6 +905,22 @@ mod tests {
 
     use super::*;
     use crate::common::meta::search::CachedQueryResponse;
+
+    #[test]
+    fn test_time_ranges_overlap() {
+        // Complete overlap: Clean range (10-14) completely contains cache file (11-13)
+        assert!(time_ranges_overlap(11, 13, 10, 14));
+
+        // Partial overlap: Cache file (9-12) starts before clean range (10-14) but overlaps
+        assert!(time_ranges_overlap(9, 12, 10, 14)); // upper bound
+        assert!(time_ranges_overlap(11, 15, 10, 14)); // lower bound
+
+        // No overlap: Cache file (5-8) ends before clean range (10-14) starts
+        assert!(!time_ranges_overlap(5, 8, 10, 14));
+
+        // Touching boundary: Cache file (10-15) touches clean range (15-20) at boundary
+        assert!(!time_ranges_overlap(10, 15, 15, 20));
+    }
 
     #[test]
     fn test_calculate_deltas_multi_expected_intervals() {
