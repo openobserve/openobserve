@@ -534,7 +534,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="tw-text-sm tw-w-full tw-flex tw-justify-">
                       </div>
                       <QTablePagination
-                      style="padding: 0px !important; padding-left: 50px !important;"
+                      class="tw-pr-0 tw-py-0  2xl:tw-pl-[230px] lg:tw-pl-[50px]"
                       :scope="scope"
                       :position="'bottom'"
                       :resultTotal="resultTotal"
