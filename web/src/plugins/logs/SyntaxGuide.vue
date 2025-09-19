@@ -42,6 +42,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   in query editor. Search terms are case-insensitive.
                 </li>
                 <li>
+                  For prefix search use
+                  <span class="bg-highlight">match_all('error*')</span>
+                  to find all terms starting with 'error'.
+                </li>
+                <li>
+                  For phrase prefix search use
+                  <span class="bg-highlight">match_all('error code*')</span>
+                  to find phrases starting with 'error code'.
+                </li>
+                <li>
+                  For case sensitive search use
+                  <span class="bg-highlight">match_all('traceHits')</span>
+                  with exact case matching.
+                </li>
+                <li>
+                  For postfix search use
+                  <span class="bg-highlight">match_all('*failed')</span>
+                  to find all terms ending with 'failed'.
+                </li>
+                <li>
                   For column search of value 'error' use
                   <span class="bg-highlight"
                     >str_match(<b>fieldname</b>, 'error')</span
@@ -99,6 +119,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                   in query editor. Search terms are case-insensitive.
+                </li>
+                <li>
+                  For prefix search use
+                  <span class="bg-highlight"
+                    >SELECT * FROM <b>stream</b> WHERE match_all('error*')</span
+                  >
+                  to find all terms starting with 'error'.
+                </li>
+                <li>
+                  For phrase prefix search use
+                  <span class="bg-highlight"
+                    >SELECT * FROM <b>stream</b> WHERE match_all('error code*')</span
+                  >
+                  to find phrases starting with 'error code'.
+                </li>
+                <li>
+                  For case sensitive search use
+                  <span class="bg-highlight"
+                    >SELECT * FROM <b>stream</b> WHERE match_all('traceHits')</span
+                  >
+                  with exact case matching.
+                </li>
+                <li>
+                  For postfix search use
+                  <span class="bg-highlight"
+                    >SELECT * FROM <b>stream</b> WHERE match_all('*failed')</span
+                  >
+                  to find all terms ending with 'failed'.
                 </li>
                 <li>
                   For column search of value 'error' use

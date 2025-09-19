@@ -131,7 +131,7 @@ pub async fn search(
 
     let mut idx_took = 0;
     let mut is_add_filter_back = false;
-    if query.use_inverted_index {
+    if query.use_inverted_index && !index_condition.as_ref().unwrap().is_condition_all() {
         (idx_took, is_add_filter_back, ..) = tantivy_search(
             query.clone(),
             &mut files,
