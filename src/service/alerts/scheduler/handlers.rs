@@ -1013,7 +1013,7 @@ async fn handle_derived_stream_triggers(
         match get_pipeline_info_from_module_key(&trigger.module_key) {
             Ok(info) => info,
             Err(e) => {
-                log::warn!("[SCHEDULER trace_id {trace_id}] {e}");
+                log::error!("[SCHEDULER trace_id {trace_id}] error getting pipeline module key {e}");
                 return Err(anyhow::anyhow!("[SCHEDULER trace_id {trace_id}] {e}"));
             }
         };
