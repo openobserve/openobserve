@@ -74,7 +74,9 @@ impl QueryCache for QueryCacheServerImpl {
         request: Request<DeleteResultCacheRequest>,
     ) -> Result<Response<DeleteResultCacheResponse>, Status> {
         let req: DeleteResultCacheRequest = request.into_inner();
-        let deleted = cacher::delete_cache(&req.path, req.ts).await.is_ok();
+        let deleted = cacher::delete_cache(&req.path, req.ts, None, None)
+            .await
+            .is_ok();
 
         Ok(Response::new(DeleteResultCacheResponse { deleted }))
     }

@@ -69,6 +69,7 @@ pub async fn search(
     user_id: Option<String>,
     in_req: &search::Request,
     range_error: String,
+    is_streaming: bool,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
@@ -150,13 +151,22 @@ pub async fn search(
                 let (ts_column, is_descending) =
                     cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
-
+                if let Some(interval) = v.histogram_interval {
+                    file_path = format!("{}_{}_{}", file_path, interval, ts_column);
+                }
                 let order_by = v.order_by;
+
+                let cache_query_response = is_streaming;
 
                 MultiCachedQueryResponse {
                     ts_column,
                     is_descending,
                     order_by,
+                    is_aggregate,
+                    limit: v.limit,
+                    file_path: file_path.clone(),
+                    cache_query_response,
+                    clear_cache: !is_streaming,
                     ..Default::default()
                 }
             }
@@ -473,6 +483,7 @@ pub async fn search(
             file_path,
             is_aggregate,
             c_resp.is_descending,
+            c_resp.clear_cache,
         )
         .await;
     }
@@ -582,7 +593,7 @@ pub fn merge_response(
     }
     sort_response(is_descending, &mut cache_response, ts_column, &order_by);
 
-    if cache_response.hits.len() > (limit as usize) {
+    if cache_response.hits.len() > (limit as usize) && limit != -1 {
         cache_response.hits.truncate(limit as usize);
     }
     if limit > 0 {
@@ -768,6 +779,9 @@ pub async fn _write_results(
             &file_path_local,
             &file_name,
             res_cache,
+            false,
+            Some(cache_start_time),
+            Some(cache_end_time),
         )
         .await
         {
@@ -834,6 +848,7 @@ pub async fn write_results_v2(
     file_path: String,
     is_aggregate: bool,
     is_descending: bool,
+    clear_cache: bool,
 ) {
     let mut local_resp = res.clone();
     let remove_hit = if is_descending {
@@ -873,10 +888,6 @@ pub async fn write_results_v2(
     }
 
     if local_resp.hits.is_empty() {
-        log::info!(
-            "[trace_id {trace_id}] No hits found for caching, skipping caching",
-            trace_id = trace_id
-        );
         return;
     }
 
@@ -925,6 +936,9 @@ pub async fn write_results_v2(
             &file_path_local,
             &file_name,
             res_cache,
+            clear_cache,
+            Some(cache_start_time),
+            Some(cache_end_time),
         )
         .await
         {
@@ -1018,10 +1032,18 @@ pub async fn check_cache_v2(
                     cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
 
+                if let Some(interval) = v.histogram_interval {
+                    file_path = format!("{}_{}_{}", file_path, interval, ts_column);
+                }
+
                 MultiCachedQueryResponse {
                     ts_column,
                     is_descending,
-                    file_path,
+                    file_path: file_path.clone(),
+                    cache_query_response: true,
+                    limit: v.limit,
+                    is_aggregate,
+                    clear_cache: true,
                     ..Default::default()
                 }
             }
