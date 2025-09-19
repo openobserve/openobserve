@@ -990,8 +990,10 @@ export default defineComponent({
               slot: "interesting_fields_slot",
             });
           }
-
-          setDefaultFieldTab();
+          
+          if(store.state.zoConfig.log_page_default_field_list === "interesting"){
+            setDefaultFieldTab();
+          }
         } else {
           userDefinedSchemaBtnGroupOption.value =
             userDefinedSchemaBtnGroupOption.value.filter(
@@ -999,8 +1001,9 @@ export default defineComponent({
             );
 
           if (searchObj.meta.useUserDefinedSchemas === "interesting_fields") {
-            searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
+            setDefaultFieldTab();
           }
+
           showOnlyInterestingFields.value = false;
         }
       },
