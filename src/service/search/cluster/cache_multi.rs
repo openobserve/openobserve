@@ -13,17 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster::LOCAL_NODE, meta::cluster::get_internal_grpc_token};
+use std::str::FromStr;
+
+use config::{cluster::LOCAL_NODE, get_config, meta::cluster::get_internal_grpc_token};
 use infra::{
     client::grpc::get_cached_channel,
     errors::{Error, ErrorCodes},
 };
-use proto::cluster_rpc::{self, DeleteResultCacheRequest, QueryCacheRequest};
+use proto::cluster_rpc::{self, QueryCacheRequest};
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 use tracing::{Instrument, info_span};
 
 use crate::{
-    common::meta::search::{CacheQueryRequest, CachedQueryResponse},
+    common::meta::search::{CacheQueryRequest, CachedQueryResponse, ResultCacheSelectionStrategy},
     service::search::{infra_cluster, server_internal_error},
 };
 
@@ -33,14 +35,13 @@ pub async fn get_cached_results(
     file_path: String,
     trace_id: String,
     cache_req: CacheQueryRequest,
-) -> Option<CachedQueryResponse> {
-    let start = std::time::Instant::now();
+) -> Vec<CachedQueryResponse> {
     // get nodes from cluster
     let mut nodes = match infra_cluster::get_cached_online_querier_nodes(None).await {
         Some(nodes) => nodes,
         None => {
             log::error!("[trace_id {trace_id}] get_cached_results: no querier node online");
-            return None;
+            return vec![];
         }
     };
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
@@ -54,10 +55,10 @@ pub async fn get_cached_results(
     let querier_num = nodes.len();
     if querier_num == 0 && local_node.is_none() {
         log::error!("no querier node online");
-        return None;
+        return vec![];
     };
 
-    let ts_column = cache_req.ts_column;
+    let ts_column = &cache_req.ts_column;
     let mut tasks = Vec::new();
     for node in nodes {
         let cfg = config::get_config();
@@ -87,7 +88,6 @@ pub async fn get_cached_results(
 
                 let mut request = tonic::Request::new(req);
                 request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
-
                 log::info!(
                     "[trace_id {trace_id}] get_cached_results->grpc: request node: {}",
                     &node_addr
@@ -118,7 +118,7 @@ pub async fn get_cached_results(
                     .accept_compressed(CompressionEncoding::Gzip)
                     .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
                     .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-                let response = match client.get_cached_result(request).await {
+                let response = match client.get_multiple_cached_result(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
@@ -143,8 +143,10 @@ pub async fn get_cached_results(
     for task in tasks {
         match task.await {
             Ok(res) => match res {
-                Ok((node, node_res)) => match node_res.response {
-                    Some(res) => {
+                Ok((node, node_res)) => {
+                    let remote_responses = node_res.response;
+                    let mut node_responses = vec![];
+                    for res in remote_responses {
                         let cached_res: config::meta::search::Response = match res.cached_response {
                             Some(cached_response) => {
                                 match serde_json::from_slice(&cached_response.data) {
@@ -167,10 +169,8 @@ pub async fn get_cached_results(
                                 config::meta::search::Response::default()
                             }
                         };
-
-                        results.push((
-                            node,
-                            CachedQueryResponse {
+                        if !cached_res.hits.is_empty() {
+                            node_responses.push(CachedQueryResponse {
                                 cached_response: cached_res,
                                 deltas: vec![],
                                 has_cached_data: res.has_cached_data,
@@ -180,16 +180,12 @@ pub async fn get_cached_results(
                                 ts_column: ts_column.clone(),
                                 is_descending: res.is_descending,
                                 limit: -1,
-                            },
-                        ));
+                            });
+                        }
                     }
-                    None => {
-                        log::info!(
-                            "[trace_id {trace_id}] get_cached_results->grpc: node: {}, no cached data",
-                            &node.grpc_addr
-                        );
-                    }
-                },
+
+                    results.push((node, node_responses));
+                }
                 Err(err) => {
                     log::error!(
                         "[trace_id {trace_id}] get_cached_results->grpc: node search error: {err}"
@@ -204,195 +200,107 @@ pub async fn get_cached_results(
         }
     }
 
-    if let Some(local_resp) = crate::service::search::cache::cacher::get_cached_results(
+    let local_results = crate::service::search::cache::multi::get_cached_results(
         &file_path,
         &trace_id,
         CacheQueryRequest {
             q_start_time: cache_req.q_start_time,
             q_end_time: cache_req.q_end_time,
             is_aggregate: cache_req.is_aggregate,
-            ts_column,
+            ts_column: ts_column.to_string(),
             discard_interval: cache_req.discard_interval,
             is_descending: cache_req.is_descending,
         },
     )
-    .await
+    .await;
+
     {
-        results.push((local_node.unwrap(), local_resp));
+        results.push((local_node.unwrap(), local_results));
     }
 
-    match results
-        .iter()
-        .filter(|(_, cache_meta)| {
-            // to make sure there is overlap between cache time range and query time range &
-            log::info!(
-                "[CACHE CANDIDATES {trace_id}] get_cached_results->grpc: cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
-                cache_meta.response_start_time,
-                cache_meta.response_end_time);
+    let mut all_results = Vec::new();
+    for (_, res) in results {
+        all_results.extend(res);
+    }
+    let mut results = Vec::new();
+    recursive_process_multiple_metas(&all_results, cache_req.clone(), &mut results);
+    results
+}
 
-            cache_meta.response_start_time <= cache_req.q_end_time
-                && cache_meta.response_end_time >= cache_req.q_start_time
+fn recursive_process_multiple_metas(
+    cache_metas: &[CachedQueryResponse],
+    cache_req: CacheQueryRequest,
+    results: &mut Vec<CachedQueryResponse>,
+) {
+    if cache_metas.is_empty() {
+        return;
+    }
+    let selection_strategy: ResultCacheSelectionStrategy = ResultCacheSelectionStrategy::from_str(
+        &get_config().common.result_cache_selection_strategy,
+    )
+    .unwrap_or_default();
+
+    // Filter relevant metas that are within the overall query range
+    let relevant_metas: Vec<_> = cache_metas
+        .iter()
+        .filter(|m| {
+            m.response_start_time <= cache_req.q_end_time
+                && m.response_end_time >= cache_req.q_start_time
         })
-        .max_by_key(|(_, result)| {
-            result.response_end_time -result.response_start_time
-        }) {
-        Some((node, result)) => {
-            log::info!(
-                "[CACHE SELECTED {trace_id}] get_cached_results->cluster: node: {}, get cached result took {} ms selected cache cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
-                &node.grpc_addr,
-                start.elapsed().as_millis(),
-                result.response_start_time,
-                result.response_end_time
-            );
-            Some(result.clone())
+        .cloned()
+        .collect();
+
+    // Sort by start time to process them in sequence
+    let mut sorted_metas = relevant_metas;
+    sorted_metas.sort_by_key(|m| m.response_start_time);
+
+    // Find the largest overlapping meta within the query time range
+    if let Some(largest_meta) = sorted_metas
+        .clone()
+        .iter()
+        .max_by_key(|meta| select_cache_meta(meta, &cache_req, &selection_strategy))
+    {
+        results.push(largest_meta.clone());
+
+        // Filter out the largest meta and call recursively with non-overlapping metas
+        let remaining_metas: Vec<_> = sorted_metas
+            .into_iter()
+            .filter(|meta| {
+                !(largest_meta.response_start_time == meta.response_start_time
+                    && meta.response_end_time <= largest_meta.response_end_time)
+                    && (meta.response_end_time <= largest_meta.response_start_time
+                        || meta.response_start_time >= largest_meta.response_end_time)
+            })
+            .collect();
+        if remaining_metas.is_empty() {
+            return;
         }
-        None => None,
+        recursive_process_multiple_metas(&remaining_metas, cache_req, results);
     }
 }
 
-pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
-    let trace_id = path.clone();
-    let mut delete_response = true;
-    // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_querier_nodes(None).await {
-        Some(nodes) => nodes,
-        None => {
-            log::error!("[trace_id {trace_id}] delete_cached_results: no querier node online");
-            return false;
+fn select_cache_meta(
+    meta: &CachedQueryResponse,
+    req: &CacheQueryRequest,
+    strategy: &ResultCacheSelectionStrategy,
+) -> i64 {
+    match strategy {
+        ResultCacheSelectionStrategy::Overlap => {
+            let overlap_start = meta.response_start_time.max(req.q_start_time);
+            let overlap_end = meta.response_end_time.min(req.q_end_time);
+            overlap_end - overlap_start
         }
-    };
-    nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
-    nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
-
-    nodes.sort_by_key(|x| x.id);
-
-    let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
-    nodes.retain(|node| node.is_querier() && !node.uuid.eq(LOCAL_NODE.uuid.as_str()));
-
-    let querier_num = nodes.len();
-    if querier_num == 0 && local_node.is_none() {
-        log::error!("no querier node online");
-        return false;
-    };
-
-    let mut tasks = Vec::new();
-
-    for node in nodes {
-        let cfg = config::get_config();
-        let node_addr = node.grpc_addr.clone();
-
-        let grpc_span = info_span!(
-            "service:search:cluster:cacher:delete_cached_results",
-            node_id = node.id,
-            node_addr = node_addr.as_str(),
-        );
-
-        let trace_id = trace_id.clone();
-        let local_path = path.clone();
-        let task = tokio::task::spawn(
-            async move {
-                let req = DeleteResultCacheRequest {
-                   path: local_path.clone(),
-                   ts: delete_ts,
-                };
-
-                let request = tonic::Request::new(req);
-
-                log::info!(
-                    "[trace_id {trace_id}] delete_cached_results->grpc: request node: {}",
-                    &node_addr
-                );
-
-                let token: MetadataValue<_> = get_internal_grpc_token()
-                    .parse()
-                    .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
-                    log::error!(
-                        "[trace_id {trace_id}] delete_cached_results->grpc: node: {}, connect err: {:?}",
-                        &node.grpc_addr,
-                        err
-                    );
-                    server_internal_error("connect search node error")
-                })?;
-                let mut client =
-                    cluster_rpc::query_cache_client::QueryCacheClient::with_interceptor(
-                        channel,
-                        move |mut req: Request<()>| {
-                            req.metadata_mut().insert("authorization", token.clone());
-
-                            Ok(req)
-                        },
-                    );
-                client = client
-                    .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-                let response = match client.delete_result_cache(request).await {
-                    Ok(res) => res.into_inner(),
-                    Err(err) => {
-                        log::error!(
-                            "[trace_id {trace_id}] delete_cached_results->grpc: node: {}, get_cached_results err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
-                    }
-                };
-
-                Ok((node.clone(), response))
-            }
-            .instrument(grpc_span),
-        );
-        tasks.push(task);
-    }
-    match crate::service::search::cache::cacher::delete_cache(&path, delete_ts).await {
-        Ok(_) => {
-            log::info!(
-                "[trace_id {trace_id}] delete_cached_results->grpc: local node delete success"
-            );
-        }
-        Err(e) => {
-            delete_response = false;
-            log::error!(
-                "[trace_id {trace_id}] delete_cached_results->grpc: local node delete error: {e}"
-            );
-        }
-    };
-
-    for task in tasks {
-        match task.await {
-            Ok(res) => match res {
-                Ok((node, node_res)) => match node_res.deleted {
-                    true => {
-                        log::debug!(
-                            "[trace_id {trace_id}] delete_cached_results->grpc: node: {}, delete success",
-                            &node.grpc_addr
-                        );
-                    }
-                    false => {
-                        delete_response = false;
-                        log::error!(
-                            "[trace_id {trace_id}] delete_cached_results->grpc: node delete error: node: {}",
-                            &node.grpc_addr
-                        );
-                    }
-                },
-                Err(err) => {
-                    delete_response = false;
-                    log::error!(
-                        "[trace_id {trace_id}] delete_cached_results->grpc: node delete error: {err}"
-                    );
-                }
-            },
-            Err(e) => {
-                delete_response = false;
-                log::error!(
-                    "[trace_id {trace_id}] delete_cached_results-> grpc: node delete error: {e}"
-                );
+        ResultCacheSelectionStrategy::Duration => meta.response_end_time - meta.response_start_time,
+        ResultCacheSelectionStrategy::Both => {
+            let overlap_start = req.q_start_time.max(meta.response_start_time);
+            let overlap_end = req.q_end_time.min(meta.response_end_time);
+            let overlap_duration = overlap_end - overlap_start;
+            let cache_duration = meta.response_end_time - meta.response_start_time;
+            if cache_duration > 0 {
+                (overlap_duration * 100) / cache_duration
+            } else {
+                0
             }
         }
     }
-    delete_response
 }
