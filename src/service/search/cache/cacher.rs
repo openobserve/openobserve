@@ -393,7 +393,7 @@ pub async fn get_cached_results(
     );
 
     // get the best matching cache meta
-    let mut matching_meta= match cache_metas
+    let mut matching_meta = match cache_metas
         .iter()
         .filter(|m| {
             // to make sure there is overlap between cache time range and query time range
