@@ -911,6 +911,7 @@ export default defineComponent({
             await getRegionInfo();
           }
 
+          searchObj.loading = true;
           loadLogsData();
 
           store.dispatch("logs/setIsInitialized", true);
