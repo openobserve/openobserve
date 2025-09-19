@@ -18,14 +18,36 @@ use scc::{HashMap, hash_map::OccupiedEntry};
 
 static LOCAL_LOCKER: Lazy<HashMap<String, ()>> = Lazy::new(HashMap::new);
 
-#[derive(Clone)]
-pub struct LockHolder;
-
+// Use this when you absolutely definitely want to async block on the securing this one key!
+// !!! This method shouldn't be used in an iterative loop - it WILL cause a deadlock!!!
+// Use the fallible lock_multi to secure multiple locks at once, and plan for fallibility!
 pub async fn lock(key: &str) -> OccupiedEntry<'_, String, ()> {
     LOCAL_LOCKER
         .entry_async(key.to_string())
         .await
         .or_insert_with(|| ())
+}
+
+// The unlock() operation doesn't exist because dropping the OccupiedEntry will free the access
+// of this entry for other callers.
+// TODO: Eventually this table will gather dead keys that'll cost memory
+// (O(N*Sizeof(String))) but not necessarily perf! This issue should be addressed along with the
+// global variable anti-pattern refactoring.
+
+// Better sync utility to secure
+pub fn lock_multi<T: Iterator<Item = impl AsRef<str>>>(
+    keys: T,
+) -> impl Iterator<Item = Option<OccupiedEntry<'static, String, ()>>> {
+    keys.map(|key| {
+        // We'll avoid spinlocking that comes with entry_sync() - we'll rather fail fast
+        // than waste precious CPU time. This also prevents deadlocking if the caller is
+        // also cautious about the implementation. A partially acquired lock_multi() will
+        // be seen undesirable and may chose to retry - thereby the current Iterator of
+        // occupied entries will be dropped - effectively freeing the locks implicitly.
+        LOCAL_LOCKER
+            .try_entry(key.as_ref().to_string())
+            .map(|entry| entry.or_insert(()))
+    })
 }
 
 #[cfg(test)]
