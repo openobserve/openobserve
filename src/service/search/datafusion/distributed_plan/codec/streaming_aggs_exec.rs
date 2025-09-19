@@ -20,6 +20,7 @@ use datafusion::{
     error::DataFusionError,
     execution::{FunctionRegistry, runtime_env::RuntimeEnvBuilder},
     physical_plan::{ExecutionPlan, aggregates::AggregateExec},
+    prelude::SessionContext,
 };
 use datafusion_proto::{physical_plan::AsExecutionPlan, protobuf::PhysicalPlanNode};
 #[cfg(feature = "enterprise")]
@@ -30,15 +31,16 @@ use proto::cluster_rpc;
 pub(crate) fn try_decode(
     node: cluster_rpc::StreamingAggsExecNode,
     inputs: &[Arc<dyn ExecutionPlan>],
-    registry: &dyn FunctionRegistry,
+    _registry: &dyn FunctionRegistry,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     let Some(aggregate_plan) = node.aggregate_plan else {
         return internal_err!("aggregate_plan is required");
     };
     let extension_codec = super::get_physical_extension_codec();
+    // TODO: check if we need register udf
+    let ctx = SessionContext::new();
     let runtime = RuntimeEnvBuilder::default().build()?;
-    let aggregate_plan =
-        aggregate_plan.try_into_physical_plan(registry, &runtime, &extension_codec)?;
+    let aggregate_plan = aggregate_plan.try_into_physical_plan(&ctx, &runtime, &extension_codec)?;
     let Some(aggregate_plan) = aggregate_plan.as_any().downcast_ref::<AggregateExec>() else {
         return internal_err!("aggregate_plan is not an AggregateExec");
     };

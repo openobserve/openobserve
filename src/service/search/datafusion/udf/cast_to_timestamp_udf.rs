@@ -34,7 +34,7 @@ pub const CAST_TO_TIMESTAMP_UDF_NAME: &str = "cast_to_timestamp";
 pub(crate) static CAST_TO_TIMESTAMP_UDF: Lazy<ScalarUDF> =
     Lazy::new(|| ScalarUDF::from(CastToTimestampUdf::new()));
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 struct CastToTimestampUdf {
     signature: Signature,
 }

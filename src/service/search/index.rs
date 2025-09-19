@@ -25,6 +25,7 @@ use config::{
 };
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
+    config::ConfigOptions,
     logical_expr::Operator,
     physical_expr::ScalarFunctionExpr,
     physical_plan::{
@@ -772,6 +773,7 @@ impl Condition {
                             distance.clone(),
                         ],
                         schema,
+                        Arc::new(ConfigOptions::default()),
                     )?);
                     expr_list.push(new_expr);
                 }
@@ -1052,6 +1054,7 @@ fn create_str_match_expr(
         udf.clone(),
         vec![left, right],
         schema,
+        Arc::new(ConfigOptions::default()),
     )?);
     Ok(udf_expr)
 }

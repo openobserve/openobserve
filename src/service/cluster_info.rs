@@ -94,7 +94,7 @@ pub async fn get_super_cluster_info(
     node: Arc<dyn NodeInfo>,
 ) -> Result<ClusterInfo, anyhow::Error> {
     let empty_request = EmptyRequest {};
-    let mut request = Request::new(empty_request.clone());
+    let mut request = Request::new(empty_request);
     let mut client =
         infra::client::grpc::make_grpc_cluster_info_client(trace_id, &mut request, &node).await?;
     let response = match client.get_cluster_info(Request::new(empty_request)).await {
