@@ -20,7 +20,9 @@ use config::{
     utils::json,
 };
 use infra::{
-    db::{connect_to_orm, ORM_CLIENT}, errors::{Error, Result}, scheduler
+    db::{ORM_CLIENT, connect_to_orm},
+    errors::{Error, Result},
+    scheduler,
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
@@ -75,85 +77,100 @@ async fn update(msg: Message) -> Result<()> {
         trigger_modify_module_key(&mut trigger).await?;
     }
     // check if the scheduled job exists
-    if scheduler::get(&trigger.org, trigger.module.clone(), &trigger.module_key).await.is_ok() && 
+    if scheduler::get(&trigger.org, trigger.module.clone(), &trigger.module_key)
+        .await
+        .is_ok()
+    {
         // Update trigger in super cluster with clone = true, so that it copies everything
-        let Err(e) = scheduler::update_trigger(trigger.clone(), true).await {
-            log::error!(
-                "[SUPER_CLUSTER:sync] Failed to update scheduler: {}/{:?}/{}, error: {}",
-                trigger.org,
-                trigger.module,
-                trigger.module_key,
-                e
-            );
-            return Err(e);
-    } else {
-        // First check if the module record exists in this region, to verify that the module record is not deleted.
-        let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-        match trigger.module {
-            TriggerModule::Alert => {
-                let Ok(alert_id) = svix_ksuid::Ksuid::from_str(&trigger.module_key) else {
-                    log::error!(
-                        "[SUPER_CLUSTER:sync] Invalid module_key format for alert: {}. No need to sync this trigger",
-                        trigger.module_key
+        scheduler::update_trigger(trigger.clone(), true)
+            .await
+            .map_err(|e| {
+                let error_msg = format!(
+                    "[SUPER_CLUSTER:sync] Failed to update scheduler: {}/{:?}/{}, error: {}",
+                    trigger.org, trigger.module, trigger.module_key, e
+                );
+                log::error!("{error_msg}");
+                anyhow::anyhow!(error_msg)
+            })?;
+        return Ok(());
+    }
+    // First check if the module record exists in this region, to verify that the module record
+    // is not deleted.
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match trigger.module {
+        TriggerModule::Alert => {
+            let Ok(alert_id) = svix_ksuid::Ksuid::from_str(&trigger.module_key) else {
+                log::error!(
+                    "[SUPER_CLUSTER:sync] Invalid module_key format for alert: {}. No need to sync this trigger",
+                    trigger.module_key
+                );
+                return Ok(());
+            };
+            if let Ok(Some(_)) = db::alerts::alert::get_by_id(conn, &trigger.org, alert_id).await {
+                // We need to add this trigger to the db in this region
+                scheduler::push(trigger.clone()).await.map_err(|e| {
+                    let error_msg = format!(
+                        "[SUPER_CLUSTER:sync] Failed to push scheduler: {}/{:?}/{}, error: {}",
+                        trigger.org, trigger.module, trigger.module_key, e
                     );
-                    return Ok(());
-                };
-                if let Ok(Some(_)) = db::alerts::alert::get_by_id(conn, &trigger.org, alert_id).await {
-                    // We need to add this trigger to the db in this region
-                    if let Err(e) = scheduler::push(trigger.clone()).await {
-                        log::error!(
-                            "[SUPER_CLUSTER:sync] Failed to push scheduler: {}/{:?}/{}, error: {}",
-                            trigger.org,
-                            trigger.module,
-                            trigger.module_key,
-                            e
-                        );
-                        return Err(e);
-                    }
-                } else {
-                    log::warn!("[SUPER_CLUSTER:sync] Alert not found for module_key: {}. No need to sync this trigger", trigger.module_key);
-                }
+                    log::error!("{error_msg}");
+                    anyhow::anyhow!(error_msg)
+                })?;
+            } else {
+                log::warn!(
+                    "[SUPER_CLUSTER:sync] Alert not found for module_key: {}. No need to sync this trigger",
+                    trigger.module_key
+                );
             }
-            TriggerModule::Report => {
-                if db::dashboards::reports::get_by_id(conn, &trigger.module_key).await.is_ok() {
-                    // We need to add this trigger to the db in this region
-                    if let Err(e) = scheduler::push(trigger.clone()).await {
-                        log::error!(
-                            "[SUPER_CLUSTER:sync] Failed to push scheduler: {}/{:?}/{}, error: {}",
-                            trigger.org,
-                            trigger.module,
-                            trigger.module_key,
-                            e
-                        );
-                        return Err(e);
-                    }
-                } else {
-                    log::warn!("[SUPER_CLUSTER:sync] Report not found for module_key: {}. No need to sync this trigger", trigger.module_key);
-                }
-            }
-            TriggerModule::DerivedStream => {
-                let Ok((_, _, _, pipeline_id)) = crate::service::alerts::scheduler::handlers::get_pipeline_info_from_module_key(&trigger.module_key) else {
-                    log::error!(
-                        "[SUPER_CLUSTER:sync] Invalid module_key format for derived stream: {}. No need to sync this trigger",
-                        trigger.module_key
+        }
+        TriggerModule::Report => {
+            if db::dashboards::reports::get_by_id(conn, &trigger.module_key)
+                .await
+                .is_ok()
+            {
+                // We need to add this trigger to the db in this region
+                scheduler::push(trigger.clone()).await.map_err(|e| {
+                    let error_msg = format!(
+                        "[SUPER_CLUSTER:sync] Failed to push scheduler: {}/{:?}/{}, error: {}",
+                        trigger.org, trigger.module, trigger.module_key, e
                     );
-                    return Ok(());
-                };
-                if db::pipeline::get_by_id(&pipeline_id).await.is_ok() {
-                    // We need to add this trigger to the db in this region
-                    if let Err(e) = scheduler::push(trigger.clone()).await {
-                        log::error!(
-                            "[SUPER_CLUSTER:sync] Failed to push scheduler: {}/{:?}/{}, error: {}",
-                            trigger.org,
-                            trigger.module,
-                            trigger.module_key,
-                            e
-                        );
-                        return Err(e);
-                    }
-                } else {
-                    log::warn!("[SUPER_CLUSTER:sync] Derived stream not found for module_key: {}. No need to sync this trigger", trigger.module_key);
-                }
+                    log::error!("{error_msg}");
+                    anyhow::anyhow!(error_msg)
+                })?;
+            } else {
+                log::warn!(
+                    "[SUPER_CLUSTER:sync] Report not found for module_key: {}. No need to sync this trigger",
+                    trigger.module_key
+                );
+            }
+        }
+        TriggerModule::DerivedStream => {
+            let Ok((_, _, _, pipeline_id)) =
+                crate::service::alerts::scheduler::handlers::get_pipeline_info_from_module_key(
+                    &trigger.module_key,
+                )
+            else {
+                log::error!(
+                    "[SUPER_CLUSTER:sync] Invalid module_key format for derived stream: {}. No need to sync this trigger",
+                    trigger.module_key
+                );
+                return Ok(());
+            };
+            if db::pipeline::get_by_id(&pipeline_id).await.is_ok() {
+                // We need to add this trigger to the db in this region
+                scheduler::push(trigger.clone()).await.map_err(|e| {
+                    let error_msg = format!(
+                        "[SUPER_CLUSTER:sync] Failed to push scheduler: {}/{:?}/{}, error: {}",
+                        trigger.org, trigger.module, trigger.module_key, e
+                    );
+                    log::error!("{error_msg}");
+                    anyhow::anyhow!(error_msg)
+                })?;
+            } else {
+                log::warn!(
+                    "[SUPER_CLUSTER:sync] Derived stream not found for module_key: {}. No need to sync this trigger",
+                    trigger.module_key
+                );
             }
         }
     }
@@ -231,7 +248,8 @@ async fn trigger_modify_module_key(trigger: &mut Trigger) -> Result<()> {
 
     // get alert id from alert name
     if let Some(alert) =
-        db::alerts::alert::get_by_name(&trigger.org, stream_type.into(), stream_name, alert_name).await?
+        db::alerts::alert::get_by_name(&trigger.org, stream_type.into(), stream_name, alert_name)
+            .await?
     {
         trigger.module_key = alert.get_unique_key();
     }
