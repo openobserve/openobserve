@@ -30,6 +30,8 @@ pub mod folders;
 pub mod functions;
 pub mod keys;
 pub mod kv;
+#[cfg(feature = "enterprise")]
+pub mod license;
 pub mod logs;
 pub mod metrics;
 pub mod organization;

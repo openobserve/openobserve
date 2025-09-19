@@ -32,6 +32,8 @@ pub mod functions;
 #[cfg(feature = "enterprise")]
 pub mod keys;
 pub mod kv;
+#[cfg(feature = "enterprise")]
+pub mod license;
 pub mod metas;
 pub mod metrics;
 #[cfg(feature = "enterprise")]

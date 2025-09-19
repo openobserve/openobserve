@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, get, post, web};
+use actix_web::{HttpRequest, HttpResponse, get, http::StatusCode, post, web};
 use arrow_schema::Schema;
 use chrono::Utc;
 use config::{
@@ -35,9 +35,9 @@ use hashbrown::HashMap;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use utils::check_stream_permissions;
-#[cfg(feature = "cloud")]
-use {crate::service::organization::is_org_in_free_trial_period, actix_web::http::StatusCode};
 
+#[cfg(feature = "cloud")]
+use crate::service::organization::is_org_in_free_trial_period;
 #[cfg(feature = "enterprise")]
 use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
@@ -226,6 +226,16 @@ pub async fn search(
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
 
+    #[cfg(feature = "enterprise")]
+    {
+        if crate::service::search::check_search_allowed().is_err() {
+            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                StatusCode::FORBIDDEN,
+                "installation has exceeded the search quota".to_string(),
+            )));
+        }
+    }
+
     #[cfg(feature = "cloud")]
     {
         match is_org_in_free_trial_period(&org_id).await {
@@ -349,8 +359,6 @@ pub async fn search(
 
     #[cfg(feature = "enterprise")]
     {
-        use actix_http::StatusCode;
-
         use crate::common::meta;
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
@@ -506,6 +514,16 @@ pub async fn around_v1(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
+    #[cfg(feature = "enterprise")]
+    {
+        if crate::service::search::check_search_allowed().is_err() {
+            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                StatusCode::FORBIDDEN,
+                "installation has exceeded the search quota".to_string(),
+            )));
+        }
+    }
+
     let (org_id, stream_name) = path.into_inner();
     let http_span = if get_config().common.tracing_search_enabled {
         tracing::info_span!(
@@ -619,6 +637,16 @@ pub async fn around_v2(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
+    #[cfg(feature = "enterprise")]
+    {
+        if crate::service::search::check_search_allowed().is_err() {
+            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                StatusCode::FORBIDDEN,
+                "installation has exceeded the search quota".to_string(),
+            )));
+        }
+    }
+
     let (org_id, stream_name) = path.into_inner();
     let http_span = if get_config().common.tracing_search_enabled {
         tracing::info_span!(
@@ -714,6 +742,16 @@ pub async fn values(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+
+    #[cfg(feature = "enterprise")]
+    {
+        if crate::service::search::check_search_allowed().is_err() {
+            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                StatusCode::FORBIDDEN,
+                "installation has exceeded the search quota".to_string(),
+            )));
+        }
+    }
 
     let user_id = in_req
         .headers()
@@ -1359,6 +1397,16 @@ pub async fn search_partition(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
+    #[cfg(feature = "enterprise")]
+    {
+        if crate::service::search::check_search_allowed().is_err() {
+            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                StatusCode::FORBIDDEN,
+                "installation has exceeded the search quota".to_string(),
+            )));
+        }
+    }
+
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!("/api/{org_id}/_search_partition", org_id = org_id.clone())
     } else {
@@ -1794,8 +1842,6 @@ pub async fn result_schema(
 
     #[cfg(feature = "enterprise")]
     {
-        use actix_http::StatusCode;
-
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
@@ -1854,20 +1900,16 @@ pub async fn result_schema(
             Ok(v) => v,
             Err(e) => {
                 log::error!("Error parsing sql: {e}");
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    actix_web::http::StatusCode::BAD_REQUEST,
-                    e,
-                )));
+                return Ok(HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
             }
         };
 
     let res_schema = match get_result_schema(sql, is_streaming, use_cache).await {
         Ok(v) => v,
         Err(e) => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                actix_web::http::StatusCode::BAD_REQUEST,
-                e,
-            )));
+            return Ok(HttpResponse::BadRequest()
+                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
         }
     };
 

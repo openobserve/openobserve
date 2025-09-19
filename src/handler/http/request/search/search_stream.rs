@@ -93,6 +93,16 @@ pub async fn search_http2_stream(
     let cfg = get_config();
     let org_id = org_id.into_inner();
 
+    #[cfg(feature = "enterprise")]
+    {
+        if crate::service::search::check_search_allowed().is_err() {
+            return HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::FORBIDDEN,
+                "installation has exceeded the search quota".to_string(),
+            ));
+        }
+    }
+
     // Create a tracing span
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!("/api/{org_id}/_search_stream", org_id = org_id.clone())
@@ -540,6 +550,16 @@ pub async fn values_http2_stream(
 ) -> HttpResponse {
     let cfg = get_config();
     let org_id = org_id.into_inner();
+
+    #[cfg(feature = "enterprise")]
+    {
+        if crate::service::search::check_search_allowed().is_err() {
+            return HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::FORBIDDEN,
+                "installation has exceeded the search quota".to_string(),
+            ));
+        }
+    }
 
     // Create a tracing span
     let http_span = if cfg.common.tracing_search_enabled {

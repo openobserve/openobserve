@@ -145,6 +145,8 @@ struct ConfigResponse<'a> {
     dashboard_placeholder: String,
     dashboard_show_symbol_enabled: bool,
     ingest_flatten_level: u32,
+    #[cfg(feature = "enterprise")]
+    license_expiry: i64,
     log_page_default_field_list: String,
 }
 
@@ -298,6 +300,9 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
     let build_type = "opensource";
 
+    #[cfg(feature = "enterprise")]
+    let expiry_time = o2_enterprise::enterprise::license::get_expiry_time().await;
+
     let cfg = get_config();
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: config::VERSION.to_string(),
@@ -350,7 +355,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
         user_defined_schema_max_fields: cfg.limit.user_defined_schema_max_fields,
         all_fields_name: cfg.common.column_all.to_string(),
-        usage_enabled: cfg.common.usage_enabled,
+        usage_enabled: true,
         usage_publish_interval: cfg.common.usage_publish_interval,
         ingestion_url: cfg.common.ingestion_url.to_string(),
         #[cfg(feature = "enterprise")]
@@ -366,6 +371,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
         ingest_flatten_level: cfg.limit.ingest_flatten_level,
+        #[cfg(feature = "enterprise")]
+        license_expiry: expiry_time,
         log_page_default_field_list: cfg.common.log_page_default_field_list.clone(),
     }))
 }
