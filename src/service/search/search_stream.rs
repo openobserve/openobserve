@@ -716,14 +716,25 @@ pub async fn do_partitioned_search(
             );
         }
 
-        if req_size > 0 && total_hits >= req_size {
+        let remaining_limit = if req_size > 0 {
+            req_size - curr_res_size
+        } else {
+            total_hits
+        };
+
+        if req_size > 0 && remaining_limit <= 0 {
+            // Already reached the limit, skip this partition
+            search_res.hits.clear();
+            search_res.total = 0;
+        } else if req_size > 0 && total_hits > remaining_limit {
             log::info!(
-                "[HTTP2_STREAM trace_id {}] Reached requested result size ({}), truncating results",
+                "[HTTP2_STREAM trace_id {}] Truncating results to stay within limit: remaining={}, total_hits={}",
                 trace_id,
-                req_size
+                remaining_limit,
+                total_hits
             );
-            search_res.hits.truncate(req_size as usize);
-            curr_res_size += req_size;
+            search_res.hits.truncate(remaining_limit as usize);
+            curr_res_size += remaining_limit;
             search_res.total = search_res.hits.len();
         } else {
             curr_res_size += total_hits;
@@ -1246,14 +1257,25 @@ async fn process_delta(
 
         let total_hits = search_res.total as i64;
 
-        if req.query.size > 0 && total_hits >= req.query.size {
+        let remaining_limit = if req_size > 0 {
+            req_size - *curr_res_size
+        } else {
+            total_hits
+        };
+
+        if req_size > 0 && remaining_limit <= 0 {
+            // Already reached the limit, skip this partition
+            search_res.hits.clear();
+            search_res.total = 0;
+        } else if req_size > 0 && total_hits > remaining_limit {
             log::info!(
-                "[HTTP2_STREAM trace_id {}] Reached requested result size ({}), truncating results",
+                "[HTTP2_STREAM trace_id {}] Truncating results to stay within limit: remaining={}, total_hits={}",
                 trace_id,
-                req.query.size
+                remaining_limit,
+                total_hits
             );
-            search_res.hits.truncate(req.query.size as usize);
-            *curr_res_size += req.query.size;
+            search_res.hits.truncate(remaining_limit as usize);
+            *curr_res_size += remaining_limit;
             search_res.total = search_res.hits.len();
         } else {
             *curr_res_size += total_hits;
