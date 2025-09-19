@@ -106,6 +106,22 @@ export default defineComponent({
     };
 
     const seriesOptions = computed(() => {
+      const panelType = dashboardPanelData.data.type;
+      const chartOptions = props.colorBySeriesData?.options;
+      // For pie and donut charts, extract series names from data[].name
+      if (
+        (panelType === "pie" || panelType === "donut") &&
+        chartOptions?.series?.[0]?.data
+      ) {
+        const pieDonutSeriesNames = chartOptions.series[0].data
+          .filter((item: any) => item && item.name) // Filter out invalid items
+          .map((item: any) => ({  
+            name: item.name,
+          }));
+        return { series: pieDonutSeriesNames };
+      }
+
+      // For other chart types, use the existing logic
       return props.colorBySeriesData?.options || { series: [] };
     });
 
