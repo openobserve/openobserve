@@ -705,11 +705,7 @@ fn parse_cache_file_timestamps(file_path: &str) -> Option<(i64, i64)> {
 fn time_ranges_overlap(start1: i64, end1: i64, start2: i64, end2: i64) -> bool {
     // Check if file data range overlaps with clean range
     // File overlaps if: file_start < clean_end AND file_end > clean_start
-    // 10 - 12 cache file
-    // 9 - 12 cache file
-    // 10 - 14 clearn st, end
-    // 10 < 14 && 12 > 10
-    // 9 < 14 && 12 > 10
+    // NOTE: Partial overlap is considered an overlap
     start1 < end2 && end1 > start2
 }
 
