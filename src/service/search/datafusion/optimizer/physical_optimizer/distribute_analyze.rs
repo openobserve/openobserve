@@ -102,6 +102,6 @@ mod tests {
         let mut rewriter = AnalyzeRewrite::new();
         let plan = plan.rewrite(&mut rewriter).unwrap().data;
         let remote_scan = plan.as_any().downcast_ref::<RemoteScanExec>().unwrap();
-        assert_eq!(remote_scan.analyze(), true);
+        assert!(remote_scan.analyze());
     }
 }

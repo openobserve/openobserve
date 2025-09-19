@@ -262,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="selectedPipelines.length > 0"
               data-test="pipeline-list-export-pipelines-btn"
-              class="flex items-center no-border o2-secondary-button tw-h-[36px]"
+              class="flex  q-mr-sm items-center no-border o2-secondary-button tw-h-[36px]"
               no-caps
               dense
               :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
@@ -270,6 +270,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-icon name="download" size="16px" />
               <span class="tw-ml-2">Export</span>
+            </q-btn>
+            <q-btn
+              v-if="selectedPipelines.length > 0"
+              data-test="pipeline-list-pause-pipelines-btn"
+              class="flex q-mr-sm items-center no-border o2-secondary-button tw-h-[36px]"
+              no-caps
+              dense
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              @click="bulkTogglePipelines('pause')"
+            >
+              <q-icon name="pause" size="16px" />
+              <span class="tw-ml-2">Pause</span>
+            </q-btn>
+            <q-btn
+              v-if="selectedPipelines.length > 0"
+              data-test="pipeline-list-resume-pipelines-btn"
+              class="flex items-center no-border o2-secondary-button tw-h-[36px] tw-w-[141px]"
+              no-caps
+              dense
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              @click="bulkTogglePipelines('resume')"
+            >
+              <q-icon name="play_arrow" size="16px" />
+              <span class="tw-ml-2">Resume</span>
             </q-btn>
             <QTablePagination
               :scope="scope"
@@ -928,6 +952,64 @@ const visibleRows = computed(() => {
   });
 
 const hasVisibleRows = computed(() => visibleRows.value.length > 0);
+
+const bulkTogglePipelines = async (action: "pause" | "resume") => {
+    const dismiss = q.notify({
+      spinner: true,
+      message: `${action === "resume" ? "Resuming" : "Pausing"} pipelines...`,
+      timeout: 0,
+    });
+  try {
+    const isResuming = action === "resume";
+    // Filter pipelines based on action
+    const pipelinesToToggle = selectedPipelines.value.filter((pipeline: any) =>
+      isResuming ? !pipeline.enabled : pipeline.enabled
+    );
+
+    if (pipelinesToToggle.length === 0) {
+      q.notify({
+        type: "negative",
+        message: `No pipelines to ${action}`,
+        timeout: 2000,
+      });
+      dismiss();
+      return;
+    }
+    // Extract ids & names
+    const payload = {
+      ids: pipelinesToToggle.map((p: any) => p.pipeline_id),
+      names: pipelinesToToggle.map((p: any) => p.name),
+    };
+
+    // Toggle state (true = resume, false = pause)
+    const response = await pipelineService.bulkToggleState(
+      store.state.selectedOrganization.identifier,
+      isResuming,
+      payload
+    );
+
+    if (response) {
+      dismiss();
+      q.notify({
+        type: "positive",
+        message: `Pipelines ${action}d successfully`,
+        timeout: 2000,
+      });
+    }
+
+    selectedPipelines.value = [];
+    await getPipelines();
+    updateActiveTab();
+  } catch (error) {
+    dismiss();
+    console.error(`Error ${action}ing pipelines:`, error);
+    q.notify({
+      type: "negative",
+      message: `Error ${action}ing pipelines. Please try again.`,
+      timeout: 2000,
+    });
+  }
+  };
 </script>
 <style lang="scss" scoped>
 .dark-mode {

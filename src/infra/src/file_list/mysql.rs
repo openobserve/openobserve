@@ -1115,8 +1115,12 @@ INSERT INTO stream_stats
                 r#"
 UPDATE stream_stats
     SET file_num = file_num + ?, 
-        min_ts = CASE WHEN ? = 0 THEN min_ts ELSE ? END,
-        max_ts = CASE WHEN ? = 0 THEN max_ts ELSE ? END,
+        min_ts = CASE WHEN ? = 0 THEN min_ts 
+                     WHEN min_ts = 0 OR ? < min_ts THEN ? 
+                     ELSE min_ts END,
+        max_ts = CASE WHEN ? = 0 THEN max_ts 
+                     WHEN max_ts = 0 OR ? > max_ts THEN ? 
+                     ELSE max_ts END,
         records = records + ?, 
         original_size = original_size + ?, 
         compressed_size = compressed_size + ?, 
@@ -1127,6 +1131,8 @@ UPDATE stream_stats
             .bind(stats.file_num)
             .bind(stats.doc_time_min)
             .bind(stats.doc_time_min)
+            .bind(stats.doc_time_min)
+            .bind(stats.doc_time_max)
             .bind(stats.doc_time_max)
             .bind(stats.doc_time_max)
             .bind(stats.doc_num)

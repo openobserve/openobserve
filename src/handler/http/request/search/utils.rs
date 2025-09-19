@@ -65,3 +65,41 @@ pub async fn check_stream_permissions(
     }
     None
 }
+
+#[cfg(feature = "enterprise")]
+pub async fn check_resource_permissions(
+    org_id: &str,
+    user_id: &str,
+    resource_type: &str,
+    resource_id: &str,
+    method: &str,
+) -> Option<HttpResponse> {
+    if !is_root_user(user_id) {
+        let user: User = get_user(Some(org_id), user_id).await.unwrap();
+
+        if !crate::handler::http::auth::validator::check_permissions(
+            user_id,
+            AuthExtractor {
+                auth: "".to_string(),
+                method: method.to_string(),
+                o2_type: format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(resource_type)
+                        .map_or(resource_type, |model| model.key),
+                    resource_id
+                ),
+                org_id: org_id.to_string(),
+                bypass_check: false,
+                parent_id: "".to_string(),
+            },
+            user.role,
+            user.is_external,
+        )
+        .await
+        {
+            return Some(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+    None
+}

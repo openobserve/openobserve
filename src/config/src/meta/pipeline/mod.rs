@@ -40,7 +40,7 @@ pub type PipelineExecDFS = (
     HashMap<String, VRLResultResolver>,
 );
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct Pipeline {
     #[serde(rename = "pipeline_id", default)]
     pub id: String,
