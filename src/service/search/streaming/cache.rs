@@ -80,12 +80,12 @@ pub async fn write_results_to_cache(
         && !merged_response.hits.is_empty();
 
     if cfg.common.result_cache_enabled && should_cache_results {
-        cache::write_results_v2(
+        cache::write_results(
             &c_resp.trace_id,
             &c_resp.ts_column,
             start_time,
             end_time,
-            &merged_response,
+            merged_response,
             c_resp.file_path.clone(),
             c_resp.is_aggregate,
             c_resp.is_descending,

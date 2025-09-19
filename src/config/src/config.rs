@@ -1061,7 +1061,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_RESULT_CACHE_SELECTION_STRATEGY",
         default = "overlap",
-        help = "Strategy to use for result cache, default is both , possible value - both,overlap , duration"
+        help = "Strategy to use for result cache, default is both, possible value - both, overlap, duration"
     )]
     pub result_cache_selection_strategy: String,
     #[env_config(
