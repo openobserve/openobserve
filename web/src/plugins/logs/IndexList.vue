@@ -1347,6 +1347,7 @@ export default defineComponent({
                     searchObj.meta.clusters.length > 0
                       ? searchObj.meta.clusters.join(",")
                       : "",
+                  traceparent: generateTraceContext().traceId,
                 });
 
                 if (res.data.hits.length) {
