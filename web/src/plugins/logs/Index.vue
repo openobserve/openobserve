@@ -864,6 +864,7 @@ export default defineComponent({
         }
 
         if (isLogsTab()) {
+          searchObj.loading = true;
           loadLogsData();
         } else {
           loadVisualizeData();
