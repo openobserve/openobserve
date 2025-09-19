@@ -466,7 +466,7 @@ export const usePanelDataLoader = (
 
       // Add empty arrays to state.resultMetaData for the partition results of this query
       state.data.push([]);
-      state.resultMetaData.push([]); // Now each query has an array of partition results
+      state?.resultMetaData?.push([]); // Now each query has an array of partition results
 
       const currentQueryIndex = state.data.length - 1;
 
@@ -578,7 +578,7 @@ export const usePanelDataLoader = (
 
           // update result metadata - add to partition results array
           // Store each partition's result metadata
-          state.resultMetaData[currentQueryIndex].push(searchRes.data ?? {});
+          state?.resultMetaData?.[currentQueryIndex]?.push(searchRes?.data ?? {});
 
           if (
             searchRes.data.is_partial == true &&
@@ -587,8 +587,10 @@ export const usePanelDataLoader = (
           ) {
             // set the new start time as the start time of query
             // Update the last partition result
-            const lastPartitionIndex =
-              state.resultMetaData[currentQueryIndex].length - 1;
+            const lastPartitionIndex = Math.max(
+              state?.resultMetaData?.[currentQueryIndex]?.length - 1,
+              0,
+            );
             state.resultMetaData[currentQueryIndex][
               lastPartitionIndex
             ].new_end_time = endISOTimestamp;
@@ -624,8 +626,10 @@ export const usePanelDataLoader = (
               if (i != 0) {
                 // set that is_partial to true
                 // Update the last partition result
-                const lastPartitionIndex =
-                  state.resultMetaData[currentQueryIndex].length - 1;
+                const lastPartitionIndex = Math.max(
+                  state?.resultMetaData?.[currentQueryIndex]?.length - 1,
+                  0,
+                );
                 state.resultMetaData[currentQueryIndex][
                   lastPartitionIndex
                 ].is_partial = true;
@@ -705,7 +709,7 @@ export const usePanelDataLoader = (
 
     // update result metadata - for streaming, we replace instead of append
     state.resultMetaData[payload?.meta?.currentQueryIndex] = [
-      searchRes?.content?.results ?? {}
+      searchRes?.content?.results ?? {},
     ];
 
     // If we have data and loading is complete, set isPartialData to false
@@ -734,10 +738,10 @@ export const usePanelDataLoader = (
       code: "",
     };
 
-    const lastPartitionIndex =
-      state.resultMetaData[payload?.meta?.currentQueryIndex][
-        state.resultMetaData[payload?.meta?.currentQueryIndex].length - 1
-      ].length - 1;
+    const lastPartitionIndex = Math.max(
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.length - 1,
+      0,
+    );
     // is streaming aggs
     const streaming_aggs =
       state?.resultMetaData?.[payload?.meta?.currentQueryIndex][
@@ -1496,7 +1500,7 @@ export const usePanelDataLoader = (
                   ) {
                     state.data.push([]);
                     state.metadata.queries.push({});
-                    state.resultMetaData.push([{}]); // Initialize as array with one element
+                    state?.resultMetaData?.push([{}]); // Initialize as array with one element
 
                     if (
                       searchRes?.data?.hits &&
@@ -1587,7 +1591,7 @@ export const usePanelDataLoader = (
               if (searchResponse?.value?.hits?.length > 0) {
                 // Add empty objects to state.resultMetaData for the results of this query
                 state.data.push([]);
-                state.resultMetaData.push([{}]); // Initialize as array with one element
+                state?.resultMetaData?.push([{}]); // Initialize as array with one element
 
                 const currentQueryIndex = state.data.length - 1;
 
