@@ -1,0 +1,86 @@
+{
+  "moduleLog": "Logs",
+  "logsUrl": "/web/logs",
+  "vrlFunctionValue": "abc",
+  "expandedFieldValue": {
+    "field": "code",
+    "field1": "stream"
+  },
+  "addEditorFieldValue": {
+    "field": "code",
+    "value": 200,
+    "field1": "stream",
+    "value1": "stdout"
+  },
+  "addEditorFieldValueWithSqlMode": {
+    "field": "code",
+    "value": 200,
+    "field1": "kubernetes_container_hash",
+    "value1": null
+  },
+  "addFieldAndSubFieldValueWithEqual": {
+    "field": "code",
+    "subFieldValue": 200,
+    "field1": "stream",
+    "subFieldValue1": "stdout"
+  },
+  "addFieldAndSubFieldValueWithEqualInSqlMode": {
+    "field": "code",
+    "subFieldValue": 200,
+    "field1": "kubernetes_host",
+    "subFieldValue1": null
+  },
+  "addFieldAndSubFieldValueWithNotEqual": {
+    "field": "code",
+    "subFieldValue": 200,
+    "field1": "stream",
+    "subFieldValue1": "stdout"
+  },
+  "addFieldAndSubFieldValueWithNotEqualInSqlMode": {
+    "field": "code",
+    "subFieldValue": 200,
+    "field1": "kubernetes_container_hash",
+    "subFieldValue1": null
+  },
+  "tableHead": {
+    "column1": "timestamp",
+    "column2": "source"
+  },
+  "addNewColumntableHead": {
+    "column1": "timestamp",
+    "column2": "source",
+    "column3": "code",
+    "column4": "kubernetes_host"
+  },
+  "addFieldWithtableColumn": {
+    "field": "stream",
+    "value": "stderr",
+    "timestamp": "1688027463454670"
+  },
+  "addFieldWithExpandMenu": {
+    "field": "kubernetes_container_name",
+    "value": "ziox",
+    "field1": "stream",
+    "value2": "stderr"
+  },
+  "addFieldwithSidebarDialogbox": {
+    "field": "kubernetes_container_name",
+    "value": "ziox",
+    "field1": "stream",
+    "value2": "stderr"
+  },
+  "preAndNextButton": {
+    "field": "_timastamp",
+    "value": "1688384484522054",
+    "field1": "_timestamp",
+    "value1": "1688384484516933"
+  },
+  "queryValue": "code",
+  "ValueQuery": "/api/**/_values*",
+  "SearchQuery": "/api/**/_around*",
+  "applyQuery": "/api/**/_search*",
+  "Stream": "e2e_automate",
+  "StreamType": "logs",
+  "functionUrl" : "/web/functions/",
+  "alertUrl" : "/web/alerts/"
+}

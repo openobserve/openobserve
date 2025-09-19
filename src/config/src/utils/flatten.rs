@@ -175,6 +175,12 @@ pub fn format_key(key: &mut String) {
     }
 }
 
+pub fn format_label_name(label_name: &str) -> String {
+    let mut key = label_name.to_string();
+    format_key(&mut key);
+    key
+}
+
 fn check_key(key: &str) -> bool {
     key.chars()
         .all(|c| c.is_lowercase() || c.is_numeric() || c == '_')
@@ -232,7 +238,7 @@ mod tests {
         assert_eq!(
             flatten(obj).unwrap(),
             json!({
-                format!("s{k}a", k = KEY_SEPARATOR): "[1,2.0,\"b\",null,true]",
+                format!("s{KEY_SEPARATOR}a"): "[1,2.0,\"b\",null,true]",
             })
         );
     }

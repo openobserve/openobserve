@@ -32,6 +32,7 @@ pub use immutable::read_from_immutable;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
+pub use wal::collect_wal_parquet_metrics;
 pub use writer::{
     Writer, check_memory_circuit_breaker, check_memtable_size, flush_all, get_writer,
     read_from_memtable,
@@ -120,15 +121,14 @@ async fn run() -> errors::Result<()> {
     }
 
     // start a job to dump immutable data to disk
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
-        config::get_config().limit.mem_persist_interval,
-    ));
-    interval.tick().await; // the first tick is immediate
     loop {
         if config::cluster::is_offline() {
             break;
         }
-        interval.tick().await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            config::get_config().limit.mem_persist_interval,
+        ))
+        .await;
         // persist immutable data to disk
         if let Err(e) = immutable::persist(tx.clone()).await {
             log::error!("immutable persist error: {e}");

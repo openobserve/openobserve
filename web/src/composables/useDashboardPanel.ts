@@ -17,10 +17,16 @@ import { reactive, computed, watch, onBeforeMount, onUnmounted } from "vue";
 import StreamService from "@/services/stream";
 import { useStore } from "vuex";
 import useNotifications from "./useNotifications";
-import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
-import { extractFields } from "@/utils/query/sqlUtils";
+import {
+  splitQuotedString,
+  escapeSingleQuotes,
+  b64EncodeUnicode,
+  isStreamingEnabled,
+} from "@/utils/zincutils";
+import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
 import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useValuesWebSocket from "./dashboard/useValuesWebSocket";
+import queryService from "@/services/search";
 
 const colors = [
   "#5960b2",
@@ -102,10 +108,12 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
       wrap_table_cells: false,
       table_transpose: false,
       table_dynamic_columns: false,
+      mappings: [],
       color: {
         mode: "palette-classic-by-series",
         fixedColor: ["#53ca53"],
         seriesBy: "last",
+        colorBySeries: [],
       },
       background: null,
     },
@@ -842,6 +850,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           query.fields.source = null;
           query.fields.target = null;
           query.fields.value = null;
+
+          // make sure that x axis should not have more than one field
+          if (query.fields.x.length > 1) {
+            query.fields.x = [query.fields.x[0]];
+          }
+
+          // make sure that y axis should not have more than one field
+          if (query.fields.y.length > 1) {
+            query.fields.y = [query.fields.y[0]];
+          }
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
@@ -886,6 +904,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           query.fields.source = null;
           query.fields.target = null;
           query.fields.value = null;
+
+          // make sure that x axis should not have more than one field
+          if (query.fields.x.length > 1) {
+            // if breakdown is empty, then take 2nd x axis field on breakdown and remove all other x axis
+            if (query.fields.breakdown.length === 0) {
+              query.fields.breakdown = [query.fields.x[1]];
+              query.fields.x = [query.fields.x[0]];
+            } else {
+              query.fields.x = [query.fields.x[0]];
+            }
+          }
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
@@ -898,10 +927,148 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           getDefaultCustomChartText();
         break;
       case "table":
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y.forEach((itemY: any) => {
+          if (itemY.aggregationFunction === null && !itemY.isDerived) {
+            itemY.aggregationFunction = "count";
+          }
+        });
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown = [];
+        // we have multiple queries for geomap, so if we are moving away, we need to reset
+        // the values of lat, lng and weight in all the queries
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+        });
+        if (dashboardPanelData.data.queryType === "sql") {
+          dashboardPanelData.layout.currentQueryIndex = 0;
+          dashboardPanelData.data.queries =
+            dashboardPanelData.data.queries.slice(0, 1);
+        }
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
+
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
+        break;
       case "pie":
       case "donut":
-      case "metric":
       case "gauge":
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y.forEach((itemY: any) => {
+          if (itemY.aggregationFunction === null && !itemY.isDerived) {
+            itemY.aggregationFunction = "count";
+          }
+        });
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown = [];
+        // we have multiple queries for geomap, so if we are moving away, we need to reset
+        // the values of lat, lng and weight in all the queries
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+
+          // make sure that x axis should not have more than one field
+          if (query.fields.x.length > 1) {
+            query.fields.x = [query.fields.x[0]];
+          }
+
+          // make sure that y axis should not have more than one field
+          if (query.fields.y.length > 1) {
+            query.fields.y = [query.fields.y[0]];
+          }
+        });
+        if (dashboardPanelData.data.queryType === "sql") {
+          dashboardPanelData.layout.currentQueryIndex = 0;
+          dashboardPanelData.data.queries =
+            dashboardPanelData.data.queries.slice(0, 1);
+        }
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
+
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
+        break;
+      case "metric":
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y.forEach((itemY: any) => {
+          if (itemY.aggregationFunction === null && !itemY.isDerived) {
+            itemY.aggregationFunction = "count";
+          }
+        });
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown = [];
+        // we have multiple queries for geomap, so if we are moving away, we need to reset
+        // the values of lat, lng and weight in all the queries
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+
+          // remove all x axis fields
+          query.fields.x = [];
+          // make sure that y axis should not have more than one field
+          if (query.fields.y.length > 1) {
+            query.fields.y = [query.fields.y[0]];
+          }
+        });
+        if (dashboardPanelData.data.queryType === "sql") {
+          dashboardPanelData.layout.currentQueryIndex = 0;
+          dashboardPanelData.data.queries =
+            dashboardPanelData.data.queries.slice(0, 1);
+        }
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
+
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
+        break;
+      case "metric":
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x = [];
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y.forEach((itemY: any) => {
@@ -1911,7 +2078,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const { sqlParser }: any = useSqlParser.default();
     parser = await sqlParser();
 
-    updateQueryValue();
+    // do not allow to modify custom query fields for logs page
+    updateQueryValue(pageKey == "logs" ? true : false);
   };
 
   /**
@@ -2032,7 +2200,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           )})`;
         } else if (condition.operator === "match_all") {
           selectFilter += `match_all(${formatValue(condition.value, condition.column)})`;
-        } else if (condition.operator === "str_match") {
+        } else if (
+          condition.operator === "str_match" ||
+          condition.operator === "Contains"
+        ) {
           selectFilter += `str_match(${condition.column}, ${formatValue(
             condition.value,
             condition.column,
@@ -2065,12 +2236,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
                 condition.column,
               )}`;
               break;
-            case "Contains":
-              selectFilter +=
-                columnType === "Utf8"
-                  ? `LIKE '%${condition.value}%'`
-                  : `LIKE %${condition.value}%`;
-              break;
+            // case "Contains":
+            //   selectFilter +=
+            //     columnType === "Utf8"
+            //       ? `LIKE '%${condition.value}%'`
+            //       : `LIKE %${condition.value}%`;
+            //   break;
             case "Not Contains":
               selectFilter +=
                 columnType === "Utf8"
@@ -2821,7 +2992,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
       ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
       ...dashboardPanelData.meta.stream.customQueryFields,
-    ]);
+    ], pageKey);
   };
 
   const VARIABLE_PLACEHOLDER = "substituteValue";
@@ -2883,7 +3054,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   }
 
   // This function parses the custom query and generates the errors and custom fields
-  const updateQueryValue = () => {
+  const updateQueryValue = async (shouldSkipCustomQueryFields: boolean = false) => {
     // store the query in the dashboard panel data
     // dashboardPanelData.meta.editorValue = value;
     // dashboardPanelData.data.query = value;
@@ -2953,7 +3124,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       // get the columns first
       if (
         Array.isArray(dashboardPanelData.meta.parsedQuery?.columns) &&
-        dashboardPanelData.meta.parsedQuery?.columns?.length > 0
+        dashboardPanelData.meta.parsedQuery?.columns?.length > 0 &&
+        !shouldSkipCustomQueryFields
       ) {
         const oldCustomQueryFields = JSON.parse(
           JSON.stringify(dashboardPanelData.meta.stream.customQueryFields),
@@ -2983,22 +3155,22 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
         // update the existing x and y axis fields
         updateXYFieldsOnCustomQueryChange(oldCustomQueryFields);
-      } else {
+      } else if (!shouldSkipCustomQueryFields) {
         dashboardPanelData.meta.errors.queryErrors.push("Invalid Columns");
       }
 
-      if (dashboardPanelData.meta.parsedQuery.from?.length > 0) {
+      const currentQuery =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ];
+
+      const tableName = await getStreamNameFromQuery(currentQuery?.query ?? "");
+
+      if (tableName) {
         const streamFound = dashboardPanelData.meta.stream.streamResults.find(
           (it: any) =>
-            it.name == dashboardPanelData.meta.parsedQuery.from[0].table,
+            it.name == tableName,
         );
-
-        const currentQuery =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ];
-
-        const tableName = dashboardPanelData.meta.parsedQuery.from?.[0]?.table;
 
         if (streamFound) {
           if (currentQuery.fields.stream != streamFound.name) {
@@ -3006,14 +3178,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           }
         } else if (isDummyStreamName(tableName)) {
           // nothing to do as the stream is dummy
-        } else {
-          let parsedQuery;
-          try {
-            parsedQuery = parser.astify(currentQuery?.query);
-          } catch (e) {
-            // exit if not able to parse query
-            return;
-          }
         }
       }
     }
@@ -3029,7 +3193,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ].customQuery, // Only watch for custom query mode changes
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
-    (newVal, oldVal) => {
+    async (newVal, oldVal) => {
+
+      // if pageKey is logs, then return
+      // because custom query fields will be extracted from the query using the result schema api
+      // NOW: we need to only skip custom query fields for logs page
+      // not stream selection, so commented below code and in updateQueryValue function will skip custom query fields extraction
+      // if (pageKey == "logs") {
+      //   return;
+      // }
+
       // Check if customQuery mode has changed
       const customQueryChanged = newVal[1] !== oldVal[1];
 
@@ -3041,7 +3214,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.queryType == "sql"
       ) {
         // Call the updateQueryValue function
-        if (parser) updateQueryValue();
+        // will skip custom query fields extraction for logs page
+        if (parser) await updateQueryValue(pageKey == "logs" ? true : false);
       } else if (customQueryChanged) {
         // Only clear lists when switching modes
         // auto query mode selected
@@ -3071,6 +3245,282 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ? "X-Axis"
         : "Y-Axis";
   });
+
+  const resetFields = () => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields = {
+      stream: "",
+      stream_type: "logs",
+      x: [],
+      y: [],
+      z: [],
+      breakdown: [],
+      filter: {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [],
+      },
+      latitude: null,
+      longitude: null,
+      weight: null,
+      name: null,
+      value_for_maps: null,
+      source: null,
+      target: null,
+      value: null,
+    };
+  };
+
+  const setFieldsBasedOnChartTypeValidation = (
+    fields: any,
+    chartType: string,
+  ) => {
+    // First reset all existing fields in dashboardPanelData
+    resetFields();
+
+    // For table chart type, merge breakdown fields into x fields
+    const fieldsToProcess = { ...fields };
+    if (chartType === "table") {
+      fieldsToProcess.x = [...(fields.x || []), ...(fields.breakdown || [])];
+      fieldsToProcess.breakdown = [];
+    }
+
+    // The add functions will automatically apply validation based on current chart type
+    // Add X-axis fields
+    fieldsToProcess.x?.forEach((field: any) => {
+      const fieldName =
+        typeof field === "string" ? field : field.name || field.column;
+      if (fieldName) {
+        addXAxisItem({ name: fieldName });
+      }
+    });
+
+    // Add Y-axis fields
+    fieldsToProcess.y?.forEach((field: any) => {
+      const fieldName =
+        typeof field === "string" ? field : field.name || field.column;
+      if (fieldName) {
+        addYAxisItem({ name: fieldName });
+      }
+    });
+
+    // Add Z-axis fields
+    fieldsToProcess.z?.forEach((field: any) => {
+      const fieldName =
+        typeof field === "string" ? field : field.name || field.column;
+      if (fieldName) {
+        addZAxisItem({ name: fieldName });
+      }
+    });
+
+    // Add breakdown fields
+    fieldsToProcess.breakdown?.forEach((field: any) => {
+      const fieldName =
+        typeof field === "string" ? field : field.name || field.column;
+      if (fieldName) {
+        addBreakDownAxisItem({ name: fieldName });
+      }
+    });
+  };
+
+  // Function to get result schema
+  const getResultSchema = async (
+    query: string,
+    abortSignal?: AbortSignal,
+    startISOTimestamp?: number,
+    endISOTimestamp?: number,
+  ): Promise<{
+    group_by: string[];
+    projections: string[];
+    timeseries_field: string | null;
+  }> => {
+    // get extracted fields from the query
+    const schemaRes = await queryService.result_schema(
+      {
+        org_identifier: store.state.selectedOrganization.identifier,
+        query: {
+          query: {
+            sql: store.state.zoConfig.sql_base64_enabled
+              ? b64EncodeUnicode(query)
+              : query,
+            query_fn: null,
+            start_time: startISOTimestamp,
+            end_time: endISOTimestamp,
+            size: -1,
+            histogram_interval: undefined,
+            streaming_output: false,
+            streaming_id: null,
+          },
+          ...(store.state.zoConfig.sql_base64_enabled
+            ? { encoding: "base64" }
+            : {}),
+        },
+        page_type: "dashboards",
+        is_streaming: isStreamingEnabled(store.state),
+      },
+      "dashboards",
+    );
+
+    // if abort signal is received, throw an error
+    if (abortSignal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
+    return schemaRes.data;
+  };
+
+  // Function to determine chart type based on extracted fields
+  const determineChartType = (
+    extractedFields: {
+      group_by: string[];
+      projections: string[];
+      timeseries_field: string | null;
+    }
+  ): string => {
+    if (
+      extractedFields.timeseries_field &&
+      extractedFields.group_by.length <= 2
+    ) {
+      return "line";
+    } else {
+      return "table";
+    }
+  };
+
+  // Function to convert result schema to x, y, breakdown fields
+  const convertSchemaToFields = (extractedFields: {
+    group_by: string[];
+    projections: string[];
+    timeseries_field: string | null;
+  }, chartType: string): {
+    x: string[];
+    y: string[];
+    breakdown: string[];
+  } => {
+    // For table charts, add all projections to x-axis since tables display all fields as columns
+    if (chartType === "table") {
+      return {
+        x: [...extractedFields.projections],
+        y: [],
+        breakdown: [],
+      };
+    }
+
+    // For non-table charts, use the original logic
+    // remove group by and timeseries field from projections, while using it on y axis
+    const yAxisFields = extractedFields.projections.filter(
+      (field) =>
+        !extractedFields.group_by.includes(field) &&
+        field !== extractedFields.timeseries_field,
+    );
+
+    const fields = {
+      x: [] as string[],
+      y: yAxisFields,
+      breakdown: [] as string[],
+    };
+
+    // add timestamp as x axis
+    if (extractedFields.timeseries_field) {
+      fields.x.push(extractedFields.timeseries_field);
+    }
+
+    extractedFields.group_by.forEach((field: any) => {
+      if (field != extractedFields.timeseries_field) {
+        // if x axis is empty then first add group by as x axis
+        if (fields.x.length == 0) {
+          fields.x.push(field);
+        } else {
+          fields.breakdown.push(field);
+        }
+      }
+    });
+
+    return fields;
+  };
+
+  // For visualization, we need to set the custom query fields
+  const setCustomQueryFields = async (
+    extractedFieldsParam?: {
+      group_by: string[];
+      projections: string[];
+      timeseries_field: string | null;
+    },
+    autoSelectChartType: boolean = true,
+    abortSignal?: AbortSignal,
+  ) => {
+    resetFields();
+
+    // Helper function to process extracted fields and populate axes
+    const processExtractedFields = (
+      extractedFields: {
+        group_by: string[];
+        projections: string[];
+        timeseries_field: string | null;
+      },
+      autoSelectChartType: boolean = true,
+    ) => {
+      // remove all fields from custom query fields
+      dashboardPanelData.meta.stream.customQueryFields = [];
+
+      // add all fields to custom query fields
+      extractedFields.projections.forEach((field: any) => {
+        dashboardPanelData.meta.stream.customQueryFields.push({
+          name: field,
+          type: "",
+        });
+      });
+
+      // Determine chart type
+      const chartType = autoSelectChartType
+        ? determineChartType(extractedFields)
+        : dashboardPanelData.data.type;
+      dashboardPanelData.data.type = chartType;
+
+      // Convert schema to fields
+      const fields = convertSchemaToFields(extractedFields, chartType);
+
+      // Set fields using existing validation function
+      setFieldsBasedOnChartTypeValidation(fields, chartType);
+    };
+
+    // If extractedFieldsParam is provided, use it directly to avoid duplicate API call
+    if (extractedFieldsParam) {
+      processExtractedFields(extractedFieldsParam, autoSelectChartType);
+      return;
+    }
+
+    const timestamps = dashboardPanelData.meta.dateTime;
+    let startISOTimestamp: any;
+    let endISOTimestamp: any;
+    if (
+      timestamps?.start_time &&
+      timestamps?.end_time &&
+      timestamps.start_time != "Invalid Date" &&
+      timestamps.end_time != "Invalid Date"
+    ) {
+      startISOTimestamp = new Date(
+        timestamps.start_time.toISOString(),
+      ).getTime();
+      endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
+    } else {
+      return;
+    }
+
+    const currentQuery =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].query;
+
+    const extractedFields = await getResultSchema(
+      currentQuery,
+      abortSignal,
+      startISOTimestamp,
+      endISOTimestamp,
+    );
+    processExtractedFields(extractedFields, autoSelectChartType);
+  };
 
   return {
     dashboardPanelData,
@@ -3122,6 +3572,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     currentYLabel,
     generateLabelFromName,
     selectedStreamFieldsBasedOnUserDefinedSchema,
+    setCustomQueryFields,
+    getResultSchema,
+    determineChartType,
+    convertSchemaToFields,
+    setFieldsBasedOnChartTypeValidation,
   };
 };
 export default useDashboardPanelData;

@@ -23,24 +23,41 @@ use datafusion::{
     physical_plan::ExecutionPlan,
 };
 
+use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyExec;
+
 pub mod codec;
+mod common;
+mod decoder_stream;
+pub mod display;
+pub mod distribute_analyze;
 pub mod empty_exec;
 pub mod enrich_exec;
 pub mod node;
 pub mod remote_scan;
 pub mod rewrite;
+mod utils;
 
 pub struct NewEmptyExecVisitor {
-    data: Option<Arc<dyn ExecutionPlan>>,
+    plan: Option<Arc<dyn ExecutionPlan>>,
 }
 
 impl NewEmptyExecVisitor {
     pub fn new() -> Self {
-        Self { data: None }
+        Self { plan: None }
     }
 
-    pub fn get_data(&self) -> Option<&Arc<dyn ExecutionPlan>> {
-        self.data.as_ref()
+    // should call after has_empty_exec is true
+    pub fn plan(&self) -> &NewEmptyExec {
+        self.plan
+            .as_ref()
+            .unwrap()
+            .as_any()
+            .downcast_ref::<NewEmptyExec>()
+            .unwrap()
+    }
+
+    pub fn has_empty_exec(&self) -> bool {
+        self.plan.is_some()
     }
 }
 
@@ -55,71 +72,7 @@ impl<'n> TreeNodeVisitor<'n> for NewEmptyExecVisitor {
 
     fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
         if node.name() == "NewEmptyExec" {
-            self.data = Some(node.clone());
-            Ok(TreeNodeRecursion::Stop)
-        } else {
-            Ok(TreeNodeRecursion::Continue)
-        }
-    }
-}
-
-pub struct NewEmptyExecCountVisitor {
-    count: usize,
-}
-
-impl NewEmptyExecCountVisitor {
-    pub fn new() -> Self {
-        Self { count: 0 }
-    }
-
-    pub fn get_count(&self) -> usize {
-        self.count
-    }
-}
-
-impl Default for NewEmptyExecCountVisitor {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<'n> TreeNodeVisitor<'n> for NewEmptyExecCountVisitor {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        if node.name() == "NewEmptyExec" {
-            self.count += 1;
-        }
-        Ok(TreeNodeRecursion::Continue)
-    }
-}
-
-pub struct EmptyExecVisitor {
-    data: Option<Arc<dyn ExecutionPlan>>,
-}
-
-impl EmptyExecVisitor {
-    pub fn new() -> Self {
-        Self { data: None }
-    }
-
-    pub fn get_data(&self) -> Option<&Arc<dyn ExecutionPlan>> {
-        self.data.as_ref()
-    }
-}
-
-impl Default for EmptyExecVisitor {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<'n> TreeNodeVisitor<'n> for EmptyExecVisitor {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        if node.name() == "EmptyExec" {
-            self.data = Some(node.clone());
+            self.plan = Some(node.clone());
             Ok(TreeNodeRecursion::Stop)
         } else {
             Ok(TreeNodeRecursion::Continue)
@@ -141,18 +94,11 @@ impl TreeNodeRewriter for ReplaceTableScanExec {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, node: Self::Node) -> Result<Transformed<Self::Node>> {
-        let name = node.name().to_string();
-        let mut transformed = if name == "NewEmptyExec" {
-            Transformed::yes(self.input.clone())
+        Ok(if node.name() == "NewEmptyExec" {
+            Transformed::new(self.input.clone(), true, TreeNodeRecursion::Stop)
         } else {
-            Transformed::no(node)
-        };
-        if name == "NewEmptyExec" {
-            transformed.tnr = TreeNodeRecursion::Stop;
-        } else {
-            transformed.tnr = TreeNodeRecursion::Continue;
-        }
-        Ok(transformed)
+            Transformed::new(node, false, TreeNodeRecursion::Continue)
+        })
     }
 }
 
@@ -253,15 +199,7 @@ mod tests {
         let plan = Arc::new(MockExecPlan) as Arc<dyn ExecutionPlan>;
         let mut visitor = NewEmptyExecVisitor::new();
         let _ = visitor.f_up(&plan);
-        assert!(visitor.get_data().is_some());
-    }
-
-    #[test]
-    fn test_empty_exec_visitor() {
-        let plan = Arc::new(MockEmptyExecPlan) as Arc<dyn ExecutionPlan>;
-        let mut visitor = EmptyExecVisitor::new();
-        let _ = visitor.f_up(&plan);
-        assert!(visitor.get_data().is_some());
+        assert!(visitor.has_empty_exec());
     }
 
     #[test]

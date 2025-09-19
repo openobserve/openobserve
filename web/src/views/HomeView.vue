@@ -110,7 +110,7 @@ flat
         </div>
       </div>
 
-      <div align="center" class="q-w-sm my-card card-container">
+      <div align="center" class="q-w-sm my-card card-container q-mr-lg">
         <div align="center" flat
 bordered class="q-w-sm my-card q-py-md">
           <div class="text-subtitle1">{{ t("home.pipelineTitle") }}</div>
@@ -145,7 +145,7 @@ flat
         </div>
       </div>
 
-      <div class="q-w-sm my-card card-container">
+      <div class="q-w-sm my-card card-container q-mr-lg">
         <div align="center" flat
 bordered class="q-w-sm my-card q-py-md">
           <div class="text-subtitle1">{{ t("home.alertTitle") }}</div>
@@ -180,7 +180,7 @@ flat
         </div>
       </div>
 
-      <div class="q-w-sm my-card card-container">
+      <div class="q-w-sm my-card card-container q-mr-lg">
         <div align="center" flat
 bordered class="q-w-sm my-card q-py-md">
           <div class="row justify-center">

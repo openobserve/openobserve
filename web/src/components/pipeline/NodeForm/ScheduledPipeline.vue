@@ -1252,7 +1252,7 @@ const emits = defineEmits([
 ]);
 const {  pipelineObj } = useDragAndDrop();
 const { searchObj } = useLogs();
-const { getStream, getStreams } = useStreams ();
+const { getStream, getStreams } = useStreams();
 const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 let parser: any;
 
@@ -1403,7 +1403,7 @@ onMounted(async ()=>{
   setTimeout(() => {
     if(tab.value === 'sql' && query.value != ""){
     const parsedQuery = parser?.parse(query.value);
-    selectedStreamName.value = parsedQuery.ast.from[0].table;
+    selectedStreamName.value = parsedQuery?.ast.from[0].table;
 
     getStreamFields();
   }

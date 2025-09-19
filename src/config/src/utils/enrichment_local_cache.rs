@@ -91,3 +91,70 @@ pub async fn get_metadata_content() -> Result<HashMap<String, i64>> {
         Ok(HashMap::new())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_key() {
+        let key = get_key("org123", "table456");
+        assert_eq!(key, "org123/table456");
+
+        let key2 = get_key("test_org", "my_table");
+        assert_eq!(key2, "test_org/my_table");
+
+        // Test with special characters
+        let key3 = get_key("test-org@123", "table_name_with_spaces");
+        assert_eq!(key3, "test-org@123/table_name_with_spaces");
+
+        // Test with empty strings
+        let key4 = get_key("", "");
+        assert_eq!(key4, "/");
+    }
+
+    #[test]
+    fn test_get_table_path() {
+        let table_dir = "/tmp/test_cache/org123/table456";
+        let created_at = 1640995200; // 2022-01-01 00:00:00 UTC
+
+        let table_path = get_table_path(table_dir, created_at);
+        let expected_path = format!("{table_dir}/{created_at}.json");
+        assert_eq!(table_path.to_string_lossy(), expected_path);
+
+        // Test with different timestamp
+        let table_path2 = get_table_path(table_dir, 1640995300);
+        let expected_path2 = format!("{}/{}.json", table_dir, 1640995300);
+        assert_eq!(table_path2.to_string_lossy(), expected_path2);
+    }
+
+    #[test]
+    fn test_get_table_dir_and_metadata_path() {
+        // Test that the functions return valid paths
+        let table_dir = get_table_dir("org123/table456");
+        assert!(
+            table_dir
+                .to_string_lossy()
+                .contains("enrichment_table_cache")
+        );
+        assert!(table_dir.to_string_lossy().contains("org123/table456"));
+
+        let metadata_path = get_metadata_path();
+        assert!(
+            metadata_path
+                .to_string_lossy()
+                .contains("enrichment_table_cache")
+        );
+        assert!(metadata_path.to_string_lossy().contains("metadata.json"));
+    }
+
+    #[test]
+    fn test_get_table_dir_with_custom_cache_dir() {
+        // Test that the functions return valid paths with custom cache dir
+        let table_dir = get_table_dir("org123/table456");
+        assert!(table_dir.to_string_lossy().contains("org123/table456"));
+
+        let metadata_path = get_metadata_path();
+        assert!(metadata_path.to_string_lossy().contains("metadata.json"));
+    }
+}

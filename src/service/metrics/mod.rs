@@ -18,8 +18,6 @@ use config::{
     utils::hash::{Sum64, gxhash},
 };
 use datafusion::arrow::datatypes::Schema;
-use once_cell::sync::Lazy;
-use regex::Regex;
 
 pub mod json;
 pub mod otlp;
@@ -34,8 +32,6 @@ const EXCLUDE_LABELS: [&str; 7] = [
     "span_id",
     "_timestamp",
 ];
-
-static RE_CORRECT_LABEL_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_]+").unwrap());
 
 pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
     let metadata = schema.metadata.get(METADATA_LABEL)?;
@@ -71,12 +67,4 @@ fn get_exclude_labels() -> Vec<&'static str> {
     // let column_timestamp = config::TIMESTAMP_COL_NAME.as_str();
     // vec.push(column_timestamp);
     vec
-}
-
-// format stream name
-pub fn format_label_name(label: &str) -> String {
-    RE_CORRECT_LABEL_NAME
-        .replace_all(label, "_")
-        .to_string()
-        .to_lowercase()
 }

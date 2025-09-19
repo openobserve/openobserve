@@ -10,6 +10,14 @@ import "datafusion_common/datafusion_common.proto";
 import "datafusion/datafusion.proto";
 import "cluster/common.proto";
 
+message PhysicalPlanNode {
+  oneof plan {
+    NewEmptyExecNode          empty_exec = 1;
+    AggregateTopkExecNode aggregate_topk = 2;
+    StreamingAggsExecNode streaming_aggs = 3;
+  }
+}
+
 message NewEmptyExecNode {
     string                                 name = 1;
     datafusion_common.Schema             schema = 2;
@@ -21,9 +29,19 @@ message NewEmptyExecNode {
 }
 
 message AggregateTopkExecNode {
-    string  sort_field = 1;
-    bool    descending = 2;
-    uint64       limit = 3;
+  string  sort_field = 1;
+  bool    descending = 2;
+  uint64       limit = 3;
+}
+
+message StreamingAggsExecNode {
+  string                                  id = 1;
+  int64                           start_time = 2;
+  int64                             end_time = 3;
+  uint64                   target_partitions = 4;
+  bool                 is_complete_cache_hit = 5;
+  repeated string               cached_files = 6;
+  datafusion.PhysicalPlanNode aggregate_plan = 7;
 }
 
 // Search request
@@ -51,13 +69,13 @@ message SearchInfo {
     int64                         timeout = 6;
     bool                        use_cache = 7;
     int64              histogram_interval = 8;
+    bool                       is_analyze = 9;
 }
 
 message IndexInfo {
     bool                   use_inverted_index = 1;
     string                    index_condition = 2;
     repeated KvItem                equal_keys = 3;
-    repeated string            match_all_keys = 4;
     IdxOptimizeMode       index_optimize_mode = 5;
 }
 

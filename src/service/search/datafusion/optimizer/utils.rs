@@ -25,6 +25,7 @@ use datafusion::{
     },
     datasource::DefaultTableSource,
     logical_expr::{Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan, TableSource, col},
+    physical_plan::ExecutionPlan,
     prelude::Expr,
     scalar::ScalarValue,
 };
@@ -68,7 +69,10 @@ impl TreeNodeRewriter for AddSortAndLimit {
         let is_complex = node.exists(|plan| Ok(is_complex_query(plan)))?;
         let mut is_stop = true;
         let (mut transformed, schema) = match node {
-            LogicalPlan::Projection(_) | LogicalPlan::SubqueryAlias(_) => {
+            // skip projection,subqueryalias, analyze, that we can add limit/sort after them
+            LogicalPlan::Projection(_)
+            | LogicalPlan::SubqueryAlias(_)
+            | LogicalPlan::Analyze(_) => {
                 is_stop = false;
                 (Transformed::no(node), None)
             }
@@ -132,12 +136,14 @@ impl TreeNodeRewriter for AddSortAndLimit {
 
 fn generate_limit_plan(input: Arc<LogicalPlan>, limit: usize, skip: usize) -> LogicalPlan {
     LogicalPlan::Limit(Limit {
-        skip: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
-            skip as i64,
-        ))))),
-        fetch: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
-            limit as i64,
-        ))))),
+        skip: Some(Box::new(Expr::Literal(
+            ScalarValue::Int64(Some(skip as i64)),
+            None,
+        ))),
+        fetch: Some(Box::new(Expr::Literal(
+            ScalarValue::Int64(Some(limit as i64)),
+            None,
+        ))),
         input,
     })
 }
@@ -188,12 +194,14 @@ fn generate_limit_and_sort_plan(
     let (sort, schema) = generate_sort_plan(input, limit + skip);
     (
         LogicalPlan::Limit(Limit {
-            skip: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
-                skip as i64,
-            ))))),
-            fetch: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
-                limit as i64,
-            ))))),
+            skip: Some(Box::new(Expr::Literal(
+                ScalarValue::Int64(Some(skip as i64)),
+                None,
+            ))),
+            fetch: Some(Box::new(Expr::Literal(
+                ScalarValue::Int64(Some(limit as i64)),
+                None,
+            ))),
             input: Arc::new(sort),
         }),
         schema,
@@ -203,7 +211,7 @@ fn generate_limit_and_sort_plan(
 fn get_int_from_expr(expr: &Option<Box<Expr>>) -> usize {
     match expr {
         Some(expr) => match expr.as_ref() {
-            Expr::Literal(ScalarValue::Int64(Some(value))) => *value as usize,
+            Expr::Literal(ScalarValue::Int64(Some(value)), _) => *value as usize,
             _ => 0,
         },
         _ => 0,
@@ -306,5 +314,10 @@ pub fn is_contain_deduplication_plan(plan: &LogicalPlan) -> bool {
 // for example: select * from default where false
 pub fn is_empty_relation(plan: &LogicalPlan) -> bool {
     plan.exists(|plan| Ok(matches!(plan, LogicalPlan::EmptyRelation(_))))
+        .unwrap()
+}
+
+pub fn is_place_holder_or_empty(plan: &Arc<dyn ExecutionPlan>) -> bool {
+    plan.exists(|plan| Ok(plan.name() == "PlaceholderRowExec" || plan.name() == "EmptyExec"))
         .unwrap()
 }

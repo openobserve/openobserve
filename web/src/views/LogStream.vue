@@ -435,7 +435,6 @@ export default defineComponent({
       { label: t("logStream.labelMetrics"), value: "metrics" },
       { label: t("logStream.labelTraces"), value: "traces" },
       { label: t("logStream.labelMetadata"), value: "metadata" },
-      { label: t("logStream.labelIndex"), value: "index" },
     ];
     const {
       getStreams,
@@ -632,7 +631,6 @@ export default defineComponent({
                 listSchema({ row: element });
               }
             });
-            // onChangeStreamFilter(selectedStreamType.value);
             loadingState.value = false;
 
             addNewStreams(selectedStreamType.value, res.list);
@@ -850,7 +848,6 @@ export default defineComponent({
             }
           })
           .catch((err) => {
-            console.error(err);
             dateTime["period"] = "15m";
           })
           .finally(() => {

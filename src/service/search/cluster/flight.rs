@@ -30,9 +30,7 @@ use config::{
     utils::{json, time::now_micros},
 };
 use datafusion::{
-    common::{TableReference, tree_node::TreeNode},
-    physical_plan::{ExecutionPlan, visit_execution_plan},
-    prelude::SessionContext,
+    common::TableReference, physical_plan::visit_execution_plan, prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -41,10 +39,12 @@ use infra::{
     file_list::FileId,
 };
 use itertools::Itertools;
-use proto::cluster_rpc;
+use parking_lot::Mutex;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
+#[cfg(feature = "enterprise")]
+use crate::service::search::SEARCH_SERVER;
 use crate::{
     common::infra::cluster as infra_cluster,
     service::{
@@ -52,12 +52,14 @@ use crate::{
         search::{
             DATAFUSION_RUNTIME, SearchResult,
             datafusion::{
-                distributed_plan::{
-                    EmptyExecVisitor, NewEmptyExecCountVisitor, remote_scan::RemoteScanExec,
-                    rewrite::RemoteScanRewriter,
+                exec::{DataFusionContextBuilder, register_udf},
+                optimizer::{
+                    context::{
+                        PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext,
+                    },
+                    create_physical_plan, generate_analyzer_rules, generate_optimizer_rules,
+                    generate_physical_optimizer_rules,
                 },
-                exec::{prepare_datafusion_context, register_udf},
-                optimizer::{generate_analyzer_rules, generate_optimizer_rules},
                 table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
             },
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -133,6 +135,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     let scan_stats = ScanStats {
         files: file_id_list_num as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
+        file_list_took: file_id_list_took as i64,
         ..Default::default()
     };
 
@@ -223,9 +226,13 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
 
     // release lock when search done or get error
     let trace_id_move = trace_id.to_string();
+    let org_id_move = sql.org_id.clone();
     #[cfg(not(feature = "enterprise"))]
     let _defer = AsyncDefer::new({
         async move {
+            metrics::QUERY_RUNNING_NUMS
+                .with_label_values(&[&org_id_move])
+                .dec();
             // search done, release lock
             let _ = dist_lock::unlock_with_trace_id(&trace_id_move, &locker)
                 .await
@@ -244,6 +251,9 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     #[cfg(feature = "enterprise")]
     let _defer = AsyncDefer::new({
         async move {
+            metrics::QUERY_RUNNING_NUMS
+                .with_label_values(&[&org_id_move])
+                .dec();
             // search done, release lock
             let _ = work_group
                 .as_ref()
@@ -282,20 +292,12 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     );
 
     #[cfg(feature = "enterprise")]
-    super::super::SEARCH_SERVER
-        .add_file_stats(
-            trace_id,
-            scan_stats.files,
-            scan_stats.records,
-            scan_stats.original_size + scan_stats.idx_scan_size,
-            scan_stats.compressed_size,
-        )
-        .await;
+    SEARCH_SERVER.add_file_stats(trace_id, &scan_stats).await;
 
     #[cfg(feature = "enterprise")]
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     #[cfg(feature = "enterprise")]
-    if super::super::SEARCH_SERVER
+    if SEARCH_SERVER
         .insert_sender(trace_id, abort_sender, true)
         .await
         .is_err()
@@ -392,171 +394,46 @@ pub async fn run_datafusion(
     partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
-    let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
+
+    let is_complete_cache_hit = Arc::new(Mutex::new(false));
+    let ctx = SearchContextBuilder::new()
+        .target_partitions(cfg.limit.cpu_num)
+        .add_context(PhysicalOptimizerContext::RemoteScan(RemoteScanContext {
+            nodes: nodes.into_arc_vec(),
+            partitioned_file_lists,
+            context: tracing::Span::current().context(),
+            is_leader: false,
+        }))
+        .add_context(PhysicalOptimizerContext::StreamingAggregation(
+            StreamingAggregationContext::new(&req, is_complete_cache_hit.clone()).await?,
+        ))
+        .add_context(PhysicalOptimizerContext::AggregateTopk)
+        .build(&req, &sql)
+        .await?;
+
     log::info!(
         "[trace_id {trace_id}] flight->search: datafusion context created with target_partitions: {}",
         ctx.state().config().target_partitions(),
     );
 
+    // register table
     register_table(&ctx, &sql).await?;
 
-    let plan = ctx.state().create_logical_plan(&sql.sql).await?;
-
-    let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
+    // create physical plan
+    let physical_plan = create_physical_plan(&ctx, &sql.sql).await?;
 
     if cfg.common.print_key_sql {
-        print_plan(&trace_id, &physical_plan, "before");
+        log::info!("[trace_id {trace_id}] leader physical plan");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+        );
     }
 
-    // 7. rewrite physical plan
-    let match_all_keys = sql.match_items.clone().unwrap_or_default();
-    let mut equal_keys = sql
-        .equal_items
-        .iter()
-        .map(|(stream_name, fields)| {
-            (
-                stream_name.clone(),
-                fields
-                    .iter()
-                    .map(|(k, v)| cluster_rpc::KvItem::new(k, v))
-                    .collect::<Vec<_>>(),
-            )
-        })
-        .collect::<HashMap<_, _>>();
-
-    // check inverted index prefix search
-    #[allow(deprecated)]
-    if sql.stream_type == StreamType::Index
-        && cfg.common.full_text_search_type.to_lowercase() != "contains"
-    {
-        for (stream, items) in sql.prefix_items.iter() {
-            equal_keys
-                .entry(stream.clone())
-                .or_insert_with(Vec::new)
-                .extend(items.iter().map(|(k, v)| cluster_rpc::KvItem::new(k, v)));
-        }
-    }
-
-    #[cfg(feature = "enterprise")]
-    let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
-    #[cfg(feature = "enterprise")]
-    let streaming_output = req.streaming_output;
-    #[cfg(feature = "enterprise")]
-    let streaming_id = req.streaming_id.clone();
-    #[cfg(feature = "enterprise")]
-    let use_cache = req.use_cache;
-    #[cfg(feature = "enterprise")]
-    let org_id = req.org_id.clone();
-
-    let context = tracing::Span::current().context();
-
-    // rewrite physical plan
-    let mut rewrite = RemoteScanRewriter::new(
-        req,
-        nodes.into_arc_vec(),
-        partitioned_file_lists,
-        equal_keys,
-        match_all_keys,
-        sql.index_condition.clone(),
-        sql.index_optimize_mode.clone(),
-        false, // for super cluster
-        context,
-    );
-
-    // TODO: if there is only one table and single node, we can skip the remote scan rewrite
-    let mut empty_exec_count_visitor = NewEmptyExecCountVisitor::default();
-    physical_plan.visit(&mut empty_exec_count_visitor)?;
-    let _empty_exec_count = empty_exec_count_visitor.get_count();
-    physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
-
-    // add remote scan exec to top if physical plan is not changed
-    if !rewrite.is_changed {
-        let table_name = sql.stream_names.first().unwrap();
-        physical_plan = Arc::new(RemoteScanExec::new(
-            physical_plan,
-            rewrite.remote_scan_nodes.get_remote_node(table_name),
-        )?);
-    }
-
-    // check for streaming aggregation query
-    #[allow(unused_mut)]
-    let mut skip_empty_exec_visitor = false;
-    #[allow(unused_mut)]
     let mut aggs_cache_ratio = 0;
-    #[cfg(feature = "enterprise")]
-    if streaming_output {
-        let Some(streaming_id) = streaming_id else {
-            return Err(Error::Message(
-                "streaming_id is required for streaming aggregation query".to_string(),
-            ));
-        };
-
-        // NOTE: temporary check
-        let org_settings = crate::service::db::organization::get_org_setting(&org_id)
-            .await
-            .unwrap_or_default();
-        let use_cache = use_cache && org_settings.aggregation_cache_enabled;
-        let target_partitions = ctx.state().config().target_partitions();
-        let (plan, is_complete_cache_hit, is_complete_cache_hit_with_no_data) =
-            o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_streaming_agg_plan(
-                streaming_id,
-                start_time,
-                end_time,
-                use_cache,
-                target_partitions,
-                physical_plan,
-            )
-            .await?;
-        physical_plan = plan;
-        // Check for aggs cache hit
-        if is_complete_cache_hit {
-            aggs_cache_ratio = 100;
-            // skip empty exec visitor for streaming aggregation query
-            // since the new plan after rewrite will have a `EmptyExec` for a complete cache
-            // hit
-            skip_empty_exec_visitor = true;
-        }
-
-        // no need to run datafusion, return empty result
-        if is_complete_cache_hit_with_no_data {
-            let scan_stats = ScanStats {
-                aggs_cache_ratio,
-                ..Default::default()
-            };
-            return Ok((vec![], scan_stats, "".to_string()));
-        }
+    if *is_complete_cache_hit.lock() {
+        aggs_cache_ratio = 100;
     }
-
-    // rewrite physical plan for merge aggregation and get topk
-    #[cfg(feature = "enterprise")]
-    {
-        let plan = o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_topk_agg_plan(
-            sql.limit,
-            physical_plan,
-        )
-        .await?;
-        physical_plan = plan;
-    }
-
-    if !skip_empty_exec_visitor {
-        let mut visitor = EmptyExecVisitor::default();
-        if physical_plan.visit(&mut visitor).is_err() {
-            log::error!(
-                "[trace_id {trace_id}] flight->search: physical plan visit error: there is no EmptyTable"
-            );
-            return Err(Error::Message(
-                "flight->search: physical plan visit error: there is no EmptyTable".to_string(),
-            ));
-        }
-        if visitor.get_data().is_some() {
-            return Ok((vec![], ScanStats::default(), "".to_string()));
-        }
-    }
-
-    if cfg.common.print_key_sql {
-        print_plan(&trace_id, &physical_plan, "after");
-    }
-
     // run datafusion
     let datafusion_start = std::time::Instant::now();
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
@@ -682,7 +559,7 @@ pub async fn check_work_group(
         o2_enterprise::enterprise::search::work_group::predict(nodes, file_id_list_vec),
     );
 
-    super::super::SEARCH_SERVER
+    SEARCH_SERVER
         .add_work_group(trace_id, work_group.clone())
         .await;
 
@@ -777,8 +654,7 @@ pub async fn partition_filt_list(
 ) -> Result<Vec<Vec<i64>>> {
     let cfg = get_config();
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
-    let mut partition_strategy =
-        QueryPartitionStrategy::from(&cfg.common.feature_query_partition_strategy);
+    let mut partition_strategy = cfg.common.feature_query_partition_strategy.clone();
     if cfg.cache_latest_files.enabled {
         partition_strategy = QueryPartitionStrategy::FileHash;
     }
@@ -872,12 +748,20 @@ pub(crate) async fn partition_file_by_hash(
     for fk in file_id_list {
         let node_name =
             infra_cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group)
-                .await
-                .expect("there is no querier node in consistent hash ring");
-        let idx = match node_idx.get(&node_name) {
-            Some(idx) => *idx,
+                .await;
+        let idx = match node_name {
+            Some(node_name) => match node_idx.get(&node_name) {
+                Some(idx) => *idx,
+                None => {
+                    log::warn!("partition_file_by_hash: {node_name} not found in node_idx");
+                    0
+                }
+            },
             None => {
-                log::error!("partition_file_by_hash: {node_name} not found in node_idx");
+                log::warn!(
+                    "partition_file_by_hash: {} can't get a node from consistent hashing",
+                    fk.id
+                );
                 0
             }
         };
@@ -886,28 +770,49 @@ pub(crate) async fn partition_file_by_hash(
     partitions
 }
 
-pub async fn generate_context(
-    req: &Request,
-    sql: &Arc<Sql>,
-    target_partitions: usize,
-) -> Result<SessionContext> {
-    let analyzer_rules = generate_analyzer_rules(sql);
-    let optimizer_rules = generate_optimizer_rules(sql);
-    let mut ctx = prepare_datafusion_context(
-        &req.trace_id,
-        req.work_group.clone(),
-        analyzer_rules,
-        optimizer_rules,
-        sql.sorted_by_time,
-        target_partitions,
-    )
-    .await?;
+pub struct SearchContextBuilder {
+    pub target_partitions: usize,
+    pub contexts: Vec<PhysicalOptimizerContext>,
+}
 
-    // register udf
-    register_udf(&ctx, &req.org_id)?;
-    datafusion_functions_json::register_all(&mut ctx)?;
+impl SearchContextBuilder {
+    pub fn new() -> Self {
+        Self {
+            target_partitions: 0,
+            contexts: vec![],
+        }
+    }
 
-    Ok(ctx)
+    pub fn target_partitions(mut self, target_partitions: usize) -> Self {
+        self.target_partitions = target_partitions;
+        self
+    }
+
+    pub fn add_context(mut self, context: PhysicalOptimizerContext) -> Self {
+        self.contexts.push(context);
+        self
+    }
+
+    pub async fn build(self, req: &Request, sql: &Arc<Sql>) -> Result<SessionContext> {
+        let analyzer_rules = generate_analyzer_rules(sql);
+        let optimizer_rules = generate_optimizer_rules(sql);
+        let physical_optimizer_rules = generate_physical_optimizer_rules(req, sql, self.contexts);
+        let mut ctx = DataFusionContextBuilder::new()
+            .trace_id(&req.trace_id)
+            .work_group(req.work_group.clone())
+            .analyzer_rules(analyzer_rules)
+            .optimizer_rules(optimizer_rules)
+            .physical_optimizer_rules(physical_optimizer_rules)
+            .sorted_by_time(sql.sorted_by_time)
+            .build(self.target_partitions)
+            .await?;
+
+        // register udf
+        register_udf(&ctx, &req.org_id)?;
+        datafusion_functions_json::register_all(&mut ctx)?;
+
+        Ok(ctx)
+    }
 }
 
 pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
@@ -974,12 +879,4 @@ pub async fn get_file_id_lists(
         file_lists.insert(stream.clone(), file_id_list);
     }
     Ok(file_lists)
-}
-
-pub fn print_plan(trace_id: &str, physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
-    log::info!("[trace_id {trace_id}] leader physical plan {stage} rewrite");
-    log::info!(
-        "{}",
-        config::meta::plan::generate_plan_string(trace_id, physical_plan.as_ref())
-    );
 }

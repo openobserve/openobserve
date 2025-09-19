@@ -199,84 +199,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-separator v-if="!disableRelative" class="q-my-sm" />
 
               <table v-if="!hideRelativeTime" class="q-px-md startEndTime">
-                <tr>
-                  <td class="label tw-px-2">Start time</td>
-                  <td class="label tw-px-2">End time</td>
-                </tr>
-                <tr>
-                  <td>
-                    <q-input
-                      v-model="selectedTime.startTime"
-                      dense
-                      filled
-                      mask="fulltime"
-                      :rules="['fulltime']"
-                      @blur="
-                        resetTime(selectedTime.startTime, selectedTime.endTime)
-                      "
-                    >
-                      <template #append>
-                        <q-icon name="access_time" class="cursor-pointer">
-                          <q-popup-proxy
-                            transition-show="scale"
-                            transition-hide="scale"
-                            style="z-index: 10002"
-                          >
-                            <q-time
-                              v-model="selectedTime.startTime"
-                              with-seconds
+                <tbody>
+                  <tr>
+                    <td class="label tw-px-2">Start time</td>
+                    <td class="label tw-px-2">End time</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <q-input
+                        v-model="selectedTime.startTime"
+                        dense
+                        filled
+                        mask="fulltime"
+                        :rules="['fulltime']"
+                        @blur="
+                          resetTime(selectedTime.startTime, selectedTime.endTime)
+                        "
+                      >
+                        <template #append>
+                          <q-icon name="access_time" class="cursor-pointer">
+                            <q-popup-proxy
+                              transition-show="scale"
+                              transition-hide="scale"
+                              style="z-index: 10002"
                             >
-                              <div class="row items-center justify-end">
-                                <q-btn
-                                  v-close-popup
-                                  label="Close"
-                                  color="primary"
-                                  flat
-                                />
-                              </div>
-                            </q-time>
-                          </q-popup-proxy>
-                        </q-icon>
-                      </template>
-                    </q-input>
-                  </td>
-                  <td>
-                    <q-input
-                      v-model="selectedTime.endTime"
-                      dense
-                      filled
-                      mask="fulltime"
-                      :rules="['fulltime']"
-                      @blur="
-                        resetTime(selectedTime.startTime, selectedTime.endTime)
-                      "
-                    >
-                      <template #append>
-                        <q-icon name="access_time" class="cursor-pointer">
-                          <q-popup-proxy
-                            transition-show="scale"
-                            transition-hide="scale"
-                            style="z-index: 10002"
-                          >
-                            <q-time
-                              v-model="selectedTime.endTime"
-                              :with-seconds="true"
+                              <q-time
+                                v-model="selectedTime.startTime"
+                                with-seconds
+                              >
+                                <div class="row items-center justify-end">
+                                  <q-btn
+                                    v-close-popup
+                                    label="Close"
+                                    color="primary"
+                                    flat
+                                  />
+                                </div>
+                              </q-time>
+                            </q-popup-proxy>
+                          </q-icon>
+                        </template>
+                      </q-input>
+                    </td>
+                    <td>
+                      <q-input
+                        v-model="selectedTime.endTime"
+                        dense
+                        filled
+                        mask="fulltime"
+                        :rules="['fulltime']"
+                        @blur="
+                          resetTime(selectedTime.startTime, selectedTime.endTime)
+                        "
+                      >
+                        <template #append>
+                          <q-icon name="access_time" class="cursor-pointer">
+                            <q-popup-proxy
+                              transition-show="scale"
+                              transition-hide="scale"
+                              style="z-index: 10002"
                             >
-                              <div class="row items-center justify-end">
-                                <q-btn
-                                  v-close-popup
-                                  label="Close"
-                                  color="primary"
-                                  flat
-                                />
-                              </div>
-                            </q-time>
-                          </q-popup-proxy>
-                        </q-icon>
-                      </template>
-                    </q-input>
-                  </td>
-                </tr>
+                              <q-time
+                                v-model="selectedTime.endTime"
+                                :with-seconds="true"
+                              >
+                                <div class="row items-center justify-end">
+                                  <q-btn
+                                    v-close-popup
+                                    label="Close"
+                                    color="primary"
+                                    flat
+                                  />
+                                </div>
+                              </q-time>
+                            </q-popup-proxy>
+                          </q-icon>
+                        </template>
+                      </q-input>
+                    </td>
+                  </tr>
+                </tbody>
               </table>
             </div>
           </q-tab-panel>
@@ -854,7 +856,6 @@ export default defineComponent({
           selectedDate: JSON.parse(JSON.stringify(selectedDate.value)),
           selectedTime: JSON.parse(JSON.stringify(selectedTime.value)),
         };
-        // console.log(rVal)
         return rVal;
       }
     };

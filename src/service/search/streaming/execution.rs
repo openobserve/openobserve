@@ -62,6 +62,7 @@ pub async fn do_partitioned_search(
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
     stream_name: &str,
+    is_multi_stream_search: bool,
 ) -> Result<(), infra::errors::Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -148,8 +149,16 @@ pub async fn do_partitioned_search(
         } else {
             format!("{trace_id}-{idx}")
         };
-        let mut search_res =
-            do_search(&trace_id, org_id, stream_type, &req, user_id, use_cache).await?;
+        let mut search_res = do_search(
+            &trace_id,
+            org_id,
+            stream_type,
+            &req,
+            user_id,
+            use_cache,
+            is_multi_stream_search,
+        )
+        .await?;
 
         let mut total_hits = search_res.total as i64;
 
@@ -171,86 +180,94 @@ pub async fn do_partitioned_search(
                 "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), truncating results",
             );
             search_res.hits.truncate(req_size as usize);
+            search_res.total = search_res.hits.len();
         }
 
-        if !search_res.hits.is_empty() {
-            search_res = order_search_results(search_res, fallback_order_by_col.clone());
+        search_res = order_search_results(search_res, fallback_order_by_col.clone());
 
-            // set took
-            search_res.set_took(start_timer.elapsed().as_millis() as usize);
-            // reset start time
-            *start_timer = Instant::now();
+        // set took
+        search_res.set_took(start_timer.elapsed().as_millis() as usize);
+        // reset start time
+        *start_timer = Instant::now();
 
-            // check range error
-            if !range_error.is_empty() {
-                search_res.is_partial = true;
-                search_res.function_error = if search_res.function_error.is_empty() {
-                    vec![range_error.clone()]
-                } else {
-                    search_res.function_error.push(range_error.clone());
-                    search_res.function_error
-                };
-                search_res.new_start_time = Some(modified_start_time);
-                search_res.new_end_time = Some(modified_end_time);
-            }
-
-            // Accumulate the result
-            if is_streaming_aggs {
-                // Only accumulate the results of the last partition
-                if idx == partitions.len() - 1 {
-                    accumulated_results.push(SearchResultType::Search(search_res.clone()));
-                }
+        // check range error
+        if !range_error.is_empty() {
+            search_res.is_partial = true;
+            search_res.function_error = if search_res.function_error.is_empty() {
+                vec![range_error.clone()]
             } else {
+                search_res.function_error.push(range_error.clone());
+                search_res.function_error
+            };
+            search_res.new_start_time = Some(modified_start_time);
+            search_res.new_end_time = Some(modified_end_time);
+        }
+
+        // Accumulate the result
+        if is_streaming_aggs {
+            // Only accumulate the results of the last partition
+            if idx == partitions.len() - 1 {
                 accumulated_results.push(SearchResultType::Search(search_res.clone()));
             }
+        } else {
+            accumulated_results.push(SearchResultType::Search(search_res.clone()));
+        }
 
-            // add top k values for values search
-            if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
-                let search_stream_span = tracing::info_span!(
-                    "src::service::search::stream_execution::do_partitioned_search::get_top_k_values",
-                    org_id = %org_id,
-                );
-                let instant = Instant::now();
-                let field = values_ctx.as_ref().unwrap().field.clone();
-                let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
-                let no_count = values_ctx.as_ref().unwrap().no_count;
-                let (top_k_values, hit_count) = tokio::task::spawn_blocking(move || {
-                    get_top_k_values(&search_res.hits, &field, top_k, no_count)
-                })
-                .instrument(search_stream_span.clone())
-                .await
-                .unwrap()?;
-                search_res.total = hit_count as usize;
-                search_res.hits = top_k_values;
-                let duration = instant.elapsed();
-                log::debug!("Top k values for partition {idx} took {duration:?}");
-            }
+        // add top k values for values search
+        if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
+            let search_stream_span = tracing::info_span!(
+                "src::service::search::stream_execution::do_partitioned_search::get_top_k_values",
+                org_id = %org_id,
+            );
+            let instant = Instant::now();
+            let field = values_ctx.as_ref().unwrap().field.clone();
+            let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
+            let no_count = values_ctx.as_ref().unwrap().no_count;
+            let (top_k_values, hit_count) = tokio::task::spawn_blocking(move || {
+                get_top_k_values(&search_res.hits, &field, top_k, no_count)
+            })
+            .instrument(search_stream_span.clone())
+            .await
+            .unwrap()?;
+            search_res.total = hit_count as usize;
+            search_res.hits = top_k_values;
+            let duration = instant.elapsed();
+            log::debug!("Top k values for partition {idx} took {duration:?}");
+        }
+        #[cfg(feature = "enterprise")]
+        crate::service::search::cache::apply_regex_to_response(
+            &req,
+            org_id,
+            stream_name,
+            stream_type,
+            &mut search_res,
+        )
+        .await?;
 
-            if is_result_array_skip_vrl {
-                search_res.hits = crate::service::search::cache::apply_vrl_to_response(
-                    backup_query_fn.clone(),
-                    &mut search_res,
-                    org_id,
-                    stream_name,
-                    &trace_id,
-                );
-            }
+        if is_result_array_skip_vrl {
+            search_res.hits = crate::service::search::cache::apply_vrl_to_response(
+                backup_query_fn.clone(),
+                &mut search_res,
+                org_id,
+                stream_name,
+                &trace_id,
+            );
+        }
 
-            // Send the cached response
-            let response = StreamResponses::SearchResponse {
-                results: search_res.clone(),
-                streaming_aggs: is_streaming_aggs,
-                streaming_id: partition_resp.streaming_id.clone(),
-                time_offset: TimeOffset {
-                    start_time,
-                    end_time,
-                },
-            };
+        // Send the cached response
+        let response = StreamResponses::SearchResponse {
+            results: search_res.clone(),
+            streaming_aggs: is_streaming_aggs,
+            streaming_id: partition_resp.streaming_id.clone(),
+            time_offset: TimeOffset {
+                start_time,
+                end_time,
+            },
+        };
 
-            if sender.send(Ok(response)).await.is_err() {
-                log::warn!("[trace_id {trace_id}] Sender is closed, stop sending response");
-                return Ok(());
-            }
+        if sender.send(Ok(response)).await.is_err() {
+            log::warn!("[trace_id {trace_id}] Sender is closed, stop sending response");
+            return Ok(());
         }
 
         // Send progress update
@@ -327,6 +344,7 @@ pub async fn get_partitions(
         &search_partition_req,
         false,
         false,
+        false,
     )
     .instrument(tracing::info_span!(
         "src::service::search::stream_execution::get_partitions"
@@ -345,6 +363,7 @@ pub async fn do_search(
     req: &config::meta::search::Request,
     user_id: &str,
     use_cache: bool,
+    is_multi_stream_search: bool,
 ) -> Result<Response, infra::errors::Error> {
     let mut req = req.clone();
 
@@ -357,6 +376,8 @@ pub async fn do_search(
         &req,
         "".to_string(),
         true,
+        None,
+        is_multi_stream_search,
     )
     .await;
 
@@ -398,6 +419,7 @@ pub async fn process_delta(
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
     stream_name: &str,
+    is_multi_stream_search: bool,
 ) -> Result<(), infra::errors::Error> {
     log::info!("[HTTP2_STREAM]: Processing delta for trace_id: {trace_id}, delta: {delta:?}");
     let mut req = req.clone();
@@ -445,7 +467,16 @@ pub async fn process_delta(
         }
 
         // use cache for delta search
-        let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, true).await?;
+        let mut search_res = do_search(
+            trace_id,
+            org_id,
+            stream_type,
+            &req,
+            user_id,
+            true,
+            is_multi_stream_search,
+        )
+        .await?;
 
         let total_hits = search_res.total as i64;
 
@@ -460,6 +491,7 @@ pub async fn process_delta(
                 search_res
                     .hits
                     .truncate((total_hits - excess_hits) as usize);
+                search_res.total = search_res.hits.len();
             }
         }
 
@@ -468,97 +500,104 @@ pub async fn process_delta(
             search_res.hits.len(),
         );
 
-        if !search_res.hits.is_empty() {
-            // for every partition, compute the queried range omitting the result cache ratio
-            let queried_range =
-                calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
-            *remaining_query_range -= queried_range;
+        // for every partition, compute the queried range omitting the result cache ratio
+        let queried_range = calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
+        *remaining_query_range -= queried_range;
 
-            // set took
-            search_res.set_took(start_timer.elapsed().as_millis() as usize);
-            // reset start timer
-            *start_timer = Instant::now();
+        // set took
+        search_res.set_took(start_timer.elapsed().as_millis() as usize);
+        // reset start timer
+        *start_timer = Instant::now();
 
-            // when searching with limit queries
-            // the limit in sql takes precedence over the requested size
-            // hence, the search result needs to be trimmed when the req limit is reached
-            if *curr_res_size > req_size {
-                let excess_hits = *curr_res_size - req_size;
-                let total_hits = search_res.hits.len() as i64;
-                if total_hits > excess_hits {
-                    let cache_hits: usize = (total_hits - excess_hits) as usize;
-                    search_res.hits.truncate(cache_hits);
-                    search_res.total = cache_hits;
-                }
+        // when searching with limit queries
+        // the limit in sql takes precedence over the requested size
+        // hence, the search result needs to be trimmed when the req limit is reached
+        if *curr_res_size > req_size {
+            let excess_hits = *curr_res_size - req_size;
+            let total_hits = search_res.hits.len() as i64;
+            if total_hits > excess_hits {
+                let cache_hits: usize = (total_hits - excess_hits) as usize;
+                search_res.hits.truncate(cache_hits);
+                search_res.total = cache_hits;
             }
+        }
 
-            // Accumulate the result
-            if is_streaming_aggs {
-                // Only accumulate the results of the last partition
-                if idx == partitions.len() - 1 {
-                    accumulated_results.push(SearchResultType::Search(search_res.clone()));
-                }
-            } else {
+        // Accumulate the result
+        if is_streaming_aggs {
+            // Only accumulate the results of the last partition
+            if idx == partitions.len() - 1 {
                 accumulated_results.push(SearchResultType::Search(search_res.clone()));
             }
+        } else {
+            accumulated_results.push(SearchResultType::Search(search_res.clone()));
+        }
 
-            // `result_cache_ratio` will be 0 for delta search
-            let result_cache_ratio = search_res.result_cache_ratio;
+        // `result_cache_ratio` will be 0 for delta search
+        let result_cache_ratio = search_res.result_cache_ratio;
 
-            if let Some(values_ctx) = values_ctx.as_ref()
-                && req
-                    .search_type
-                    .is_some_and(|search_type| search_type == SearchEventType::Values)
-            {
-                let search_stream_span = tracing::info_span!(
-                    "src::service::search::stream_execution::process_delta::get_top_k_values",
-                    org_id = %org_id,
-                );
-
-                log::debug!("Getting top k values for partition {idx}");
-                let field = values_ctx.field.clone();
-                let top_k = values_ctx.top_k.unwrap_or(10);
-                let no_count = values_ctx.no_count;
-                let (top_k_values, hit_count) = tokio::task::spawn_blocking(move || {
-                    get_top_k_values(&search_res.hits, &field, top_k, no_count)
-                })
-                .instrument(search_stream_span.clone())
-                .await
-                .unwrap()?;
-                search_res.total = hit_count as usize;
-                search_res.hits = top_k_values;
-            }
-            if is_result_array_skip_vrl {
-                search_res.hits = crate::service::search::cache::apply_vrl_to_response(
-                    backup_query_fn.clone(),
-                    &mut search_res,
-                    org_id,
-                    stream_name,
-                    trace_id,
-                );
-            }
-
-            let response = StreamResponses::SearchResponse {
-                results: search_res.clone(),
-                streaming_aggs: is_streaming_aggs,
-                streaming_id: partition_resp.streaming_id.clone(),
-                time_offset: TimeOffset {
-                    start_time,
-                    end_time,
-                },
-            };
-            log::debug!(
-                "[HTTP2_STREAM]: Sending search response for trace_id: {}, delta: {:?}, hits len: {}, result_cache_ratio: {}",
-                trace_id,
-                delta,
-                search_res.hits.len(),
-                result_cache_ratio,
+        if let Some(values_ctx) = values_ctx.as_ref()
+            && req
+                .search_type
+                .is_some_and(|search_type| search_type == SearchEventType::Values)
+        {
+            let search_stream_span = tracing::info_span!(
+                "src::service::search::stream_execution::process_delta::get_top_k_values",
+                org_id = %org_id,
             );
 
-            if sender.send(Ok(response)).await.is_err() {
-                log::warn!("[trace_id {trace_id}] Sender is closed, stop sending search response");
-                return Ok(());
-            }
+            log::debug!("Getting top k values for partition {idx}");
+            let field = values_ctx.field.clone();
+            let top_k = values_ctx.top_k.unwrap_or(10);
+            let no_count = values_ctx.no_count;
+            let (top_k_values, hit_count) = tokio::task::spawn_blocking(move || {
+                get_top_k_values(&search_res.hits, &field, top_k, no_count)
+            })
+            .instrument(search_stream_span.clone())
+            .await
+            .unwrap()?;
+            search_res.total = hit_count as usize;
+            search_res.hits = top_k_values;
+        }
+        #[cfg(feature = "enterprise")]
+        crate::service::search::cache::apply_regex_to_response(
+            &req,
+            org_id,
+            stream_name,
+            stream_type,
+            &mut search_res,
+        )
+        .await?;
+
+        if is_result_array_skip_vrl {
+            search_res.hits = crate::service::search::cache::apply_vrl_to_response(
+                backup_query_fn.clone(),
+                &mut search_res,
+                org_id,
+                stream_name,
+                trace_id,
+            );
+        }
+
+        let response = StreamResponses::SearchResponse {
+            results: search_res.clone(),
+            streaming_aggs: is_streaming_aggs,
+            streaming_id: partition_resp.streaming_id.clone(),
+            time_offset: TimeOffset {
+                start_time,
+                end_time,
+            },
+        };
+        log::debug!(
+            "[HTTP2_STREAM]: Sending search response for trace_id: {}, delta: {:?}, hits len: {}, result_cache_ratio: {}",
+            trace_id,
+            delta,
+            search_res.hits.len(),
+            result_cache_ratio,
+        );
+
+        if sender.send(Ok(response)).await.is_err() {
+            log::warn!("[trace_id {trace_id}] Sender is closed, stop sending search response");
+            return Ok(());
         }
 
         // Stop if `remaining_query_range` is less than 0
@@ -577,12 +616,15 @@ pub async fn process_delta(
                 new_start_time,
                 new_end_time,
                 search_res.order_by,
+                search_res.order_by_metadata.clone(),
                 is_streaming_aggs,
                 sender,
                 is_result_array_skip_vrl,
                 backup_query_fn.clone(),
                 org_id,
                 stream_name,
+                stream_type,
+                &req,
             )
             .await;
             break;
@@ -651,12 +693,15 @@ async fn send_partial_search_resp(
     new_start_time: i64,
     new_end_time: i64,
     order_by: Option<OrderBy>,
+    order_by_metadata: Vec<(String, OrderBy)>,
     is_streaming_aggs: bool,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
     org_id: &str,
     stream_name: &str,
+    stream_type: StreamType,
+    _req: &config::meta::search::Request,
 ) -> Result<(), infra::errors::Error> {
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
@@ -669,9 +714,19 @@ async fn send_partial_search_resp(
         new_start_time: Some(new_start_time),
         new_end_time: Some(new_end_time),
         order_by,
+        order_by_metadata,
         trace_id: trace_id.to_string(),
         ..Default::default()
     };
+    #[cfg(feature = "enterprise")]
+    crate::service::search::cache::apply_regex_to_response(
+        _req,
+        org_id,
+        stream_name,
+        stream_type,
+        &mut s_resp,
+    )
+    .await?;
     if is_result_array_skip_vrl {
         s_resp.hits = crate::service::search::cache::apply_vrl_to_response(
             backup_query_fn.clone(),
@@ -691,7 +746,9 @@ async fn send_partial_search_resp(
             end_time: new_end_time,
         },
     };
-    log::info!("[HTTP2_STREAM]: trace_id: {trace_id} Sending partial search response");
+    log::info!(
+        "[HTTP2_STREAM]: trace_id: {trace_id} Sending partial search response for {stream_name} {stream_type}"
+    );
 
     if sender.send(Ok(response)).await.is_err() {
         log::warn!("[trace_id {trace_id}] Sender is closed, stop sending partial search response");
@@ -699,4 +756,219 @@ async fn send_partial_search_resp(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::sql::OrderBy;
+    use tokio::sync::mpsc;
+
+    use super::*;
+
+    #[test]
+    fn test_calc_queried_range_basic() {
+        let start_time = 1_000_000_000; // 1 second in microseconds
+        let end_time = 3_600_000_000; // 1 hour in microseconds
+
+        // 100% cache ratio should result in 0 hours queried
+        let result = calc_queried_range(start_time, end_time, 100);
+        assert_eq!(result, 0.0);
+
+        // 0% cache ratio should result in full range queried
+        let result = calc_queried_range(start_time, end_time, 0);
+        let expected = (end_time - start_time) as f64 / 3_600_000_000.0;
+        assert_eq!(result, expected);
+
+        // 50% cache ratio should result in half range queried
+        let result = calc_queried_range(start_time, end_time, 50);
+        let expected = (end_time - start_time) as f64 / 3_600_000_000.0 * 0.5;
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_calc_queried_range_edge_cases() {
+        // Same start and end time
+        let result = calc_queried_range(1_000_000_000, 1_000_000_000, 0);
+        assert_eq!(result, 0.0);
+
+        // Very small time range
+        let result = calc_queried_range(1_000_000_000, 1_000_001_000, 0);
+        let expected = 1_000.0 / 3_600_000_000.0;
+        assert_eq!(result, expected);
+
+        // Very large time range
+        let result = calc_queried_range(0, 86_400_000_000, 0); // 24 hours
+        assert_eq!(result, 24.0);
+    }
+
+    #[test]
+    fn test_calc_queried_range_cache_ratio_bounds() {
+        let start_time = 0;
+        let end_time = 3_600_000_000; // 1 hour
+
+        // Cache ratio > 100 should be clamped to 100
+        let result = calc_queried_range(start_time, end_time, 150);
+        assert_eq!(result, 0.0);
+
+        // Cache ratio < 0 should work (though unusual)
+        let result = calc_queried_range(start_time, end_time, 50);
+        let expected = 0.5; // 1 hour * 0.5
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_handle_partial_response() {
+        let response = Response {
+            is_partial: true,
+            function_error: vec!["Custom error".to_string()],
+            trace_id: "test-123".to_string(),
+            ..Default::default()
+        };
+
+        let result = handle_partial_response(response.clone());
+
+        // Should add the partial error message
+        assert!(
+            result
+                .function_error
+                .contains(&PARTIAL_ERROR_RESPONSE_MESSAGE.to_string())
+        );
+        assert!(result.function_error.contains(&"Custom error".to_string()));
+        assert_eq!(result.function_error.len(), 2);
+    }
+
+    #[test]
+    fn test_handle_partial_response_no_errors() {
+        let response = Response {
+            is_partial: true,
+            function_error: vec![],
+            trace_id: "test-123".to_string(),
+            ..Default::default()
+        };
+
+        let result = handle_partial_response(response.clone());
+
+        // Should add only the partial error message
+        assert_eq!(result.function_error.len(), 1);
+        assert_eq!(result.function_error[0], PARTIAL_ERROR_RESPONSE_MESSAGE);
+    }
+
+    #[test]
+    fn test_handle_partial_response_not_partial() {
+        let response = Response {
+            is_partial: false,
+            function_error: vec!["Custom error".to_string()],
+            trace_id: "test-123".to_string(),
+            ..Default::default()
+        };
+
+        let result = handle_partial_response(response.clone());
+
+        // Should not change the response
+        assert_eq!(result.function_error.len(), 1);
+        assert_eq!(result.function_error[0], "Custom error");
+    }
+
+    #[tokio::test]
+    async fn test_send_partial_search_resp_success() {
+        let (tx, mut rx) = mpsc::channel(10);
+
+        let result = send_partial_search_resp(
+            "test-123",
+            "Test error",
+            1000,
+            2000,
+            Some(OrderBy::Desc),
+            vec![("field".to_string(), OrderBy::Asc)],
+            false,
+            tx,
+            false,
+            None,
+            "test-org",
+            "test-stream",
+            StreamType::Logs,
+            &config::meta::search::Request::default(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+
+        // Check that response was sent
+        let response = rx.recv().await.unwrap().unwrap();
+        match response {
+            StreamResponses::SearchResponse { results, .. } => {
+                assert!(results.is_partial);
+                // The error message gets formatted with PARTIAL_ERROR_RESPONSE_MESSAGE
+                let expected_error = format!("{PARTIAL_ERROR_RESPONSE_MESSAGE} \n Test error");
+                assert!(results.function_error.contains(&expected_error));
+                assert_eq!(results.new_start_time, Some(1000));
+                assert_eq!(results.new_end_time, Some(2000));
+            }
+            _ => panic!("Expected SearchResponse"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_send_partial_search_resp_empty_error() {
+        let (tx, mut rx) = mpsc::channel(10);
+
+        let result = send_partial_search_resp(
+            "test-123",
+            "",
+            1000,
+            2000,
+            Some(OrderBy::Desc),
+            vec![],
+            false,
+            tx,
+            false,
+            None,
+            "test-org",
+            "test-stream",
+            StreamType::Logs,
+            &config::meta::search::Request::default(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+
+        let response = rx.recv().await.unwrap().unwrap();
+        match response {
+            StreamResponses::SearchResponse { results, .. } => {
+                assert!(
+                    results
+                        .function_error
+                        .contains(&PARTIAL_ERROR_RESPONSE_MESSAGE.to_string())
+                );
+            }
+            _ => panic!("Expected SearchResponse"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_send_partial_search_resp_sender_closed() {
+        let (tx, _rx) = mpsc::channel(1);
+        drop(_rx); // Close the receiver
+
+        let result = send_partial_search_resp(
+            "test-123",
+            "Test error",
+            1000,
+            2000,
+            None,
+            vec![],
+            false,
+            tx,
+            false,
+            None,
+            "test-org",
+            "test-stream",
+            StreamType::Logs,
+            &config::meta::search::Request::default(),
+        )
+        .await;
+
+        // Should not panic, should return Ok
+        assert!(result.is_ok());
+    }
 }

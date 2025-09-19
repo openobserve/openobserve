@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     data-test="add-alert-delay-error"
-                    v-if="triggerData.silence < 0 || triggerData.silence === undefined || triggerData.silence === null"
+                    v-if="triggerData.silence < 0 || triggerData.silence === undefined || triggerData.silence === null || triggerData.silence === ''"
                     class="text-red-8 q-pt-xs q-field--error"
                     style="font-size: 11px; line-height: 12px"
                   >
@@ -346,6 +346,25 @@ function updateGroup(updatedGroup:any) {
       );
     });
   };
+
+    // Expose methods and data for testing
+    defineExpose({
+    triggerData,
+    destinations,
+    filteredDestinations,
+    inputData,
+    destinationSelectRef,
+    isDestinationDropdownOpen,
+    updateTrigger,
+    addField,
+    removeField,
+    routeToCreateDestination,
+    updateDestinations,
+    updateGroup,
+    removeConditionGroup,
+    conditionsImage,
+    filterDestinations,
+  });
 </script>
 
 <style lang="scss" scoped></style>

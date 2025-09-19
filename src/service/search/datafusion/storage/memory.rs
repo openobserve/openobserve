@@ -19,8 +19,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{StreamExt, stream::BoxStream};
 use object_store::{
-    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore, PutMultipartOpts,
-    PutOptions, PutPayload, PutResult, Result, path::Path,
+    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
+    PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, path::Path,
 };
 
 use super::format_location;
@@ -109,7 +109,7 @@ impl ObjectStore for FS {
     async fn put_multipart_opts(
         &self,
         location: &Path,
-        _opts: PutMultipartOpts,
+        _opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
         log::error!("NotImplemented put_multipart_opts: {}", location);
         Err(object_store::Error::NotImplemented)
@@ -214,7 +214,7 @@ mod tests {
         let to = Path::from("test/to.txt");
         let payload = PutPayload::from(Bytes::from("test data"));
         let opts = PutOptions::default();
-        let multipart_opts = PutMultipartOpts::default();
+        let multipart_opts = PutMultipartOptions::default();
 
         // Test all operations that return NotImplemented
         let put_opts_result = fs.put_opts(&location, payload, opts).await;
@@ -315,7 +315,7 @@ mod tests {
 
         for path in &test_paths {
             let result = fs.get(path).await;
-            assert!(result.is_err(), "Should fail for path: {}", path);
+            assert!(result.is_err(), "Should fail for path: {path}");
         }
     }
 }

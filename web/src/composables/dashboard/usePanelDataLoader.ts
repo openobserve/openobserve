@@ -45,6 +45,7 @@ import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitVal
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import { useAnnotations } from "./useAnnotations";
 import useHttpStreamingSearch from "../useStreamingSearch";
+import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -68,6 +69,11 @@ export const usePanelDataLoader = (
   dashboardId: any,
   folderId: any,
   reportId: any,
+  runId?: any,
+  tabId?: any,
+  tabName?: any,
+  searchResponse: any,
+  is_ui_histogram: any,
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -443,6 +449,9 @@ export const usePanelDataLoader = (
             },
             page_type: pageType,
             traceparent,
+            // Using same config for align histogram
+            // in future we can make it seperate for scenarios
+            enable_align_histogram: is_ui_histogram.value ?? false,
           }),
         abortControllerRef.signal,
       );
@@ -531,6 +540,12 @@ export const usePanelDataLoader = (
                   traceparent,
                   dashboard_id: dashboardId?.value,
                   folder_id: folderId?.value,
+                  panel_id: panelSchema.value.id,
+                  panel_name: panelSchema.value.title,
+                  run_id: runId?.value,
+                  tab_id: tabId?.value,
+                  tab_name: tabName?.value,
+                  is_ui_histogram: is_ui_histogram.value,
                 },
                 searchType.value ?? "dashboards",
               ),
@@ -851,7 +866,13 @@ export const usePanelDataLoader = (
         use_cache: (window as any).use_cache ?? true,
         dashboard_id: dashboardId?.value,
         folder_id: folderId?.value,
+        panel_id: panelSchema.value.id,
+        panel_name: panelSchema.value.title,
+        run_id: runId?.value,
+        tab_id: tabId?.value,
+        tab_name: tabName?.value,
         fallback_order_by_col: getFallbackOrderByCol(),
+        is_ui_histogram: is_ui_histogram.value,
       },
     });
   };
@@ -971,6 +992,11 @@ export const usePanelDataLoader = (
         pageType,
         meta: {
           currentQueryIndex,
+          panel_id: panelSchema.value.id,
+          panel_name: panelSchema.value.title,
+          run_id: runId?.value,
+          tab_id: tabId?.value,
+          tab_name: tabName?.value,
         },
       };
 
@@ -1040,7 +1066,13 @@ export const usePanelDataLoader = (
           currentQueryIndex,
           dashboard_id: dashboardId?.value,
           folder_id: folderId?.value,
+          panel_id: panelSchema.value.id,
+          panel_name: panelSchema.value.title,
+          run_id: runId?.value,
+          tab_id: tabId?.value,
+          tab_name: tabName?.value,
           fallback_order_by_col: getFallbackOrderByCol(),
+          is_ui_histogram: is_ui_histogram.value,
         },
       };
 
@@ -1230,6 +1262,13 @@ export const usePanelDataLoader = (
                     start_time: startISOTimestamp,
                     end_time: endISOTimestamp,
                     step: panelSchema.value.config.step_value ?? "0",
+                    dashboard_id: dashboardId?.value,
+                    folder_id: folderId?.value,
+                    panel_id: panelSchema.value.id,
+                    panel_name: panelSchema.value.title,
+                    run_id: runId?.value,
+                    tab_id: tabId?.value,
+                    tab_name: tabName?.value,
                   }),
                 abortController.signal,
               );
@@ -1397,6 +1436,12 @@ export const usePanelDataLoader = (
                           traceparent,
                           dashboard_id: dashboardId?.value,
                           folder_id: folderId?.value,
+                          panel_id: panelSchema.value.id,
+                          panel_name: panelSchema.value.title,
+                          run_id: runId?.value,
+                          tab_id: tabId?.value,
+                          tab_name: tabName?.value,
+                          is_ui_histogram: is_ui_histogram.value,
                         },
                         searchType.value ?? "dashboards",
                       ),
@@ -1526,6 +1571,21 @@ export const usePanelDataLoader = (
                 : [];
               state.annotations = annotations;
 
+              if (searchResponse?.value?.hits?.length > 0) {
+                // Add empty objects to state.resultMetaData for the results of this query
+                state.data.push([]);
+                state.resultMetaData.push({});
+
+                const currentQueryIndex = state.data.length - 1;
+
+                state.data[currentQueryIndex] = searchResponse.value.hits;
+                state.resultMetaData[currentQueryIndex] = searchResponse.value;
+                // set loading to false
+                state.loading = false;
+
+                return;
+              }
+
               if (isStreamingEnabled(store.state)) {
                 await getDataThroughStreaming(
                   query,
@@ -1585,11 +1645,31 @@ export const usePanelDataLoader = (
 
   watch(
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
-    () => [panelSchema?.value, selectedTimeObj?.value, forceLoad?.value],
+    () => [selectedTimeObj?.value, forceLoad?.value],
     async () => {
       log("PanelSchema/Time Wather: called");
       loadData(); // Loading the data
     },
+  );
+
+  watch(
+    () => [panelSchema?.value],
+    async (newVal, oldVal) => {
+      const [newSchema] = newVal;
+      const [oldSchema] = oldVal;
+
+      const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
+        oldSchema,
+        newSchema,
+      );
+
+      if (!configNeedsApiCall) {
+        return;
+      }
+
+      loadData();
+    },
+    { deep: true },
   );
 
   /**
@@ -1843,9 +1923,9 @@ export const usePanelDataLoader = (
         const errorDetailValue =
           error?.response?.data.error_detail ||
           error?.response?.data.message ||
+          error?.error_detail ||
           error?.message ||
-          error?.error ||
-          error?.error_detail;
+          error?.error;
 
         const trimmedErrorMessage =
           errorDetailValue?.length > 300
@@ -1854,10 +1934,15 @@ export const usePanelDataLoader = (
 
         const errorCode =
           isWebSocketEnabled(store.state) || isStreamingEnabled(store.state)
-            ? error?.response?.data?.code || error?.code || error?.status || ""
-            : error?.response?.status ||
+            ? error?.response?.status ||
               error?.status ||
               error?.response?.data?.code ||
+              error?.code ||
+              ""
+            : error?.response?.status ||
+              error?.response?.data?.code ||
+              error?.status ||
+              error?.code ||
               "";
 
         state.errorDetail = {

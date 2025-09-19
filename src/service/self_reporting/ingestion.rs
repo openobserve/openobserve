@@ -30,6 +30,7 @@ use config::{
 };
 use hashbrown::{HashMap, hash_map::Entry};
 use proto::cluster_rpc;
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 
 use crate::{common::meta::ingestion, service};
 
@@ -93,7 +94,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         }
     }
 
-    let mut report_data = vec![];
+    let mut report_data = Vec::with_capacity(groups.len() + search_events.len());
     for (_, data) in groups {
         let mut usage_data = data.usage_data;
         usage_data.response_time /= data.count as f64;
@@ -113,12 +114,10 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         } else {
             format!("Basic {}", &cfg.common.usage_reporting_creds)
         };
-        match reqwest::Client::builder()
-            .build()
-            .unwrap()
+        match reqwest::Client::new()
             .post(url)
-            .header("Content-Type", "application/json")
-            .header(reqwest::header::AUTHORIZATION, creds)
+            .header(CONTENT_TYPE, "application/json")
+            .header(AUTHORIZATION, creds)
             .json(&report_data)
             .send()
             .await
@@ -170,7 +169,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
 
     if &cfg.common.usage_reporting_mode != "remote" {
         let report_data = report_data
-            .iter_mut()
+            .iter()
             .map(|usage| json::to_value(usage).unwrap())
             .collect::<Vec<_>>();
         // report usage data
@@ -214,7 +213,7 @@ pub(super) async fn ingest_reporting_data(
         let req = ingestion::IngestionRequest::Usage(&bytes);
         match service::logs::ingest::ingest(0, &org_id, &stream_name, req, "", None, false).await {
             Ok(resp) if resp.code == 200 => {
-                log::info!(
+                log::debug!(
                     "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"
                 );
                 Ok(())
@@ -247,7 +246,7 @@ pub(super) async fn ingest_reporting_data(
 
         match service::ingestion::ingestion_service::ingest(req).await {
             Ok(resp) if resp.status_code == 200 => {
-                log::info!(
+                log::debug!(
                     "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"
                 );
                 Ok(())
@@ -260,5 +259,549 @@ pub(super) async fn ingest_reporting_data(
                 Err(anyhow!("{err}"))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::{search::SearchEventContext, stream::StreamType};
+
+    use super::*;
+
+    // Helper function to create test UsageData
+    fn create_test_usage_data(
+        event: UsageEvent,
+        org_id: &str,
+        stream_name: &str,
+        user_email: &str,
+        size: f64,
+        num_records: i64,
+        response_time: f64,
+    ) -> UsageData {
+        UsageData {
+            _timestamp: 1640995200000000, // 2022-01-01 00:00:00
+            event,
+            year: 2022,
+            month: 1,
+            day: 1,
+            hour: 0,
+            event_time_hour: "2022010100".to_string(),
+            org_id: org_id.to_string(),
+            request_body: "test_request".to_string(),
+            size,
+            unit: "MB".to_string(),
+            user_email: user_email.to_string(),
+            response_time,
+            stream_type: StreamType::Logs,
+            num_records,
+            dropped_records: 0,
+            stream_name: stream_name.to_string(),
+            trace_id: None,
+            cached_ratio: None,
+            scan_files: None,
+            compressed_size: None,
+            min_ts: None,
+            max_ts: None,
+            search_type: None,
+            search_event_context: None,
+            took_wait_in_queue: None,
+            result_cache_ratio: None,
+            function: None,
+            is_partial: false,
+            work_group: None,
+            node_name: Some("test-node".to_string()),
+            dashboard_info: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_ingest_usages_empty_input() {
+        let usages = vec![];
+        ingest_usages(usages).await;
+        // Should return early without any processing
+    }
+
+    #[tokio::test]
+    async fn test_ingest_usages_single_usage() {
+        let usages = vec![create_test_usage_data(
+            UsageEvent::Ingestion,
+            "test-org",
+            "test-stream",
+            "test@example.com",
+            10.0,
+            100,
+            1.5,
+        )];
+
+        // This test verifies the function doesn't panic with single usage
+        ingest_usages(usages).await;
+    }
+
+    #[tokio::test]
+    async fn test_ingest_usages_aggregation() {
+        let usages = vec![
+            create_test_usage_data(
+                UsageEvent::Ingestion,
+                "test-org",
+                "test-stream",
+                "test@example.com",
+                10.0,
+                100,
+                1.0,
+            ),
+            create_test_usage_data(
+                UsageEvent::Ingestion,
+                "test-org",
+                "test-stream",
+                "test@example.com",
+                20.0,
+                200,
+                2.0,
+            ),
+        ];
+
+        // This test verifies aggregation logic works
+        ingest_usages(usages).await;
+    }
+
+    #[tokio::test]
+    async fn test_ingest_usages_search_events_not_aggregated() {
+        let usages = vec![
+            create_test_usage_data(
+                UsageEvent::Search,
+                "test-org",
+                "test-stream",
+                "test@example.com",
+                10.0,
+                100,
+                1.0,
+            ),
+            create_test_usage_data(
+                UsageEvent::Search,
+                "test-org",
+                "test-stream",
+                "test@example.com",
+                20.0,
+                200,
+                2.0,
+            ),
+        ];
+
+        // Search events should not be aggregated
+        ingest_usages(usages).await;
+    }
+
+    #[tokio::test]
+    async fn test_ingest_usages_mixed_events() {
+        let usages = vec![
+            create_test_usage_data(
+                UsageEvent::Ingestion,
+                "test-org",
+                "test-stream",
+                "test@example.com",
+                10.0,
+                100,
+                1.0,
+            ),
+            create_test_usage_data(
+                UsageEvent::Search,
+                "test-org",
+                "test-stream",
+                "test@example.com",
+                20.0,
+                200,
+                2.0,
+            ),
+            create_test_usage_data(
+                UsageEvent::Ingestion,
+                "test-org",
+                "test-stream",
+                "test@example.com",
+                30.0,
+                300,
+                3.0,
+            ),
+        ];
+
+        // Mixed events should be handled correctly
+        ingest_usages(usages).await;
+    }
+
+    #[tokio::test]
+    async fn test_ingest_usages_different_groups() {
+        let usages = vec![
+            create_test_usage_data(
+                UsageEvent::Ingestion,
+                "org1",
+                "stream1",
+                "user1@example.com",
+                10.0,
+                100,
+                1.0,
+            ),
+            create_test_usage_data(
+                UsageEvent::Ingestion,
+                "org2",
+                "stream2",
+                "user2@example.com",
+                20.0,
+                200,
+                2.0,
+            ),
+        ];
+
+        // Different groups should not be aggregated together
+        ingest_usages(usages).await;
+    }
+
+    #[tokio::test]
+    async fn test_ingest_usages_with_node_name() {
+        let mut usage1 = create_test_usage_data(
+            UsageEvent::Ingestion,
+            "test-org",
+            "test-stream",
+            "test@example.com",
+            10.0,
+            100,
+            1.0,
+        );
+        usage1.node_name = Some("node1".to_string());
+
+        let mut usage2 = create_test_usage_data(
+            UsageEvent::Ingestion,
+            "test-org",
+            "test-stream",
+            "test@example.com",
+            20.0,
+            200,
+            2.0,
+        );
+        usage2.node_name = Some("node2".to_string());
+
+        let usages = vec![usage1, usage2];
+
+        // Different node names should create different groups
+        ingest_usages(usages).await;
+    }
+
+    #[tokio::test]
+    async fn test_ingest_usages_without_node_name() {
+        let mut usage1 = create_test_usage_data(
+            UsageEvent::Ingestion,
+            "test-org",
+            "test-stream",
+            "test@example.com",
+            10.0,
+            100,
+            1.0,
+        );
+        usage1.node_name = None;
+
+        let mut usage2 = create_test_usage_data(
+            UsageEvent::Ingestion,
+            "test-org",
+            "test-stream",
+            "test@example.com",
+            20.0,
+            200,
+            2.0,
+        );
+        usage2.node_name = None;
+
+        let usages = vec![usage1, usage2];
+
+        // Usages without node names should use empty string
+        ingest_usages(usages).await;
+    }
+
+    #[tokio::test]
+    async fn test_ingest_reporting_data_empty_input() {
+        let reporting_data = vec![];
+        let stream_params = StreamParams::new("test-org", "test-stream", StreamType::Logs);
+
+        let result = ingest_reporting_data(reporting_data, stream_params).await;
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_group_key_creation() {
+        let usage = create_test_usage_data(
+            UsageEvent::Ingestion,
+            "test-org",
+            "test-stream",
+            "test@example.com",
+            10.0,
+            100,
+            1.0,
+        );
+
+        let node = usage.node_name.clone().unwrap_or_default();
+        let key = GroupKey {
+            stream_name: usage.stream_name.clone(),
+            org_id: usage.org_id.clone(),
+            stream_type: usage.stream_type,
+            day: usage.day,
+            hour: usage.hour,
+            event: usage.event,
+            email: usage.user_email.clone(),
+            node,
+        };
+
+        assert_eq!(key.stream_name, "test-stream");
+        assert_eq!(key.org_id, "test-org");
+        assert_eq!(key.email, "test@example.com");
+        assert_eq!(key.node, "test-node");
+        assert_eq!(key.event, UsageEvent::Ingestion);
+    }
+
+    #[test]
+    fn test_aggregated_data_creation() {
+        let usage = create_test_usage_data(
+            UsageEvent::Ingestion,
+            "test-org",
+            "test-stream",
+            "test@example.com",
+            10.0,
+            100,
+            1.0,
+        );
+
+        let aggregated = AggregatedData {
+            count: 1,
+            usage_data: usage.clone(),
+        };
+
+        assert_eq!(aggregated.count, 1);
+        assert_eq!(aggregated.usage_data.org_id, usage.org_id);
+        assert_eq!(aggregated.usage_data.stream_name, usage.stream_name);
+    }
+
+    #[test]
+    fn test_usage_event_display() {
+        assert_eq!(UsageEvent::Ingestion.to_string(), "Ingestion");
+        assert_eq!(UsageEvent::Search.to_string(), "Search");
+        assert_eq!(UsageEvent::Functions.to_string(), "Functions");
+        assert_eq!(UsageEvent::Other.to_string(), "Other");
+    }
+
+    #[test]
+    fn test_group_key_hash() {
+        use std::collections::HashMap;
+
+        let key1 = GroupKey {
+            stream_name: "stream1".to_string(),
+            org_id: "org1".to_string(),
+            stream_type: StreamType::Logs,
+            day: 1,
+            hour: 0,
+            event: UsageEvent::Ingestion,
+            email: "user1@example.com".to_string(),
+            node: "node1".to_string(),
+        };
+
+        let key2 = GroupKey {
+            stream_name: "stream1".to_string(),
+            org_id: "org1".to_string(),
+            stream_type: StreamType::Logs,
+            day: 1,
+            hour: 0,
+            event: UsageEvent::Ingestion,
+            email: "user1@example.com".to_string(),
+            node: "node1".to_string(),
+        };
+
+        let mut map = HashMap::new();
+        map.insert(key1, "value1");
+
+        assert!(map.contains_key(&key2));
+        assert_eq!(map.get(&key2), Some(&"value1"));
+    }
+
+    #[tokio::test]
+    async fn test_ingest_usages_large_dataset() {
+        let mut usages = Vec::new();
+
+        // Create 1000 usage records
+        for i in 0..1000 {
+            usages.push(create_test_usage_data(
+                UsageEvent::Ingestion,
+                &format!("org-{}", i % 10),
+                &format!("stream-{}", i % 20),
+                &format!("user{}@example.com", i % 5),
+                (i as f64) * 0.1,
+                i as i64,
+                (i as f64) * 0.01,
+            ));
+        }
+
+        // Should handle large datasets without issues
+        ingest_usages(usages).await;
+    }
+
+    #[tokio::test]
+    async fn test_ingest_usages_response_time_averaging() {
+        let usages = vec![
+            create_test_usage_data(
+                UsageEvent::Ingestion,
+                "test-org",
+                "test-stream",
+                "test@example.com",
+                10.0,
+                100,
+                1.0,
+            ),
+            create_test_usage_data(
+                UsageEvent::Ingestion,
+                "test-org",
+                "test-stream",
+                "test@example.com",
+                20.0,
+                200,
+                3.0,
+            ),
+        ];
+
+        // Response time should be averaged when aggregating
+        ingest_usages(usages).await;
+    }
+
+    #[test]
+    fn test_usage_data_serialization() {
+        let usage = create_test_usage_data(
+            UsageEvent::Ingestion,
+            "test-org",
+            "test-stream",
+            "test@example.com",
+            10.0,
+            100,
+            1.0,
+        );
+
+        let json_value = json::to_value(&usage).unwrap();
+        assert!(json_value.is_object());
+
+        let deserialized: UsageData = json::from_value(json_value).unwrap();
+        assert_eq!(deserialized.org_id, usage.org_id);
+        assert_eq!(deserialized.stream_name, usage.stream_name);
+        assert_eq!(deserialized.event, usage.event);
+    }
+
+    #[test]
+    fn test_usage_data_with_search_context() {
+        let mut usage = create_test_usage_data(
+            UsageEvent::Search,
+            "test-org",
+            "test-stream",
+            "test@example.com",
+            10.0,
+            100,
+            1.0,
+        );
+
+        usage.search_type = Some(SearchEventType::Dashboards);
+        usage.search_event_context = Some(SearchEventContext {
+            dashboard_id: Some("dashboard-123".to_string()),
+            dashboard_name: None,
+            dashboard_folder_id: None,
+            dashboard_folder_name: None,
+            alert_key: None,
+            derived_stream_key: None,
+            report_key: None,
+        });
+
+        // Should handle search context correctly
+        assert_eq!(usage.search_type, Some(SearchEventType::Dashboards));
+        assert!(usage.search_event_context.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_ingest_usages_with_functions_event() {
+        let usages = vec![
+            create_test_usage_data(
+                UsageEvent::Functions,
+                "test-org",
+                "test-stream",
+                "test@example.com",
+                10.0,
+                100,
+                1.0,
+            ),
+            create_test_usage_data(
+                UsageEvent::Functions,
+                "test-org",
+                "test-stream",
+                "test@example.com",
+                20.0,
+                200,
+                2.0,
+            ),
+        ];
+
+        // Functions events should be aggregated like Ingestion events
+        ingest_usages(usages).await;
+    }
+
+    #[tokio::test]
+    async fn test_ingest_usages_with_other_event() {
+        let usages = vec![
+            create_test_usage_data(
+                UsageEvent::Other,
+                "test-org",
+                "test-stream",
+                "test@example.com",
+                10.0,
+                100,
+                1.0,
+            ),
+            create_test_usage_data(
+                UsageEvent::Other,
+                "test-org",
+                "test-stream",
+                "test@example.com",
+                20.0,
+                200,
+                2.0,
+            ),
+        ];
+
+        // Other events should be aggregated like Ingestion events
+        ingest_usages(usages).await;
+    }
+
+    #[test]
+    fn test_usage_data_with_optional_fields() {
+        let mut usage = create_test_usage_data(
+            UsageEvent::Ingestion,
+            "test-org",
+            "test-stream",
+            "test@example.com",
+            10.0,
+            100,
+            1.0,
+        );
+
+        usage.trace_id = Some("trace-123".to_string());
+        usage.cached_ratio = Some(50);
+        usage.scan_files = Some(25);
+        usage.compressed_size = Some(5.0);
+        usage.min_ts = Some(1640995200000000);
+        usage.max_ts = Some(1640995260000000);
+        usage.took_wait_in_queue = Some(100);
+        usage.result_cache_ratio = Some(75);
+        usage.function = Some("test_function".to_string());
+        usage.is_partial = true;
+        usage.work_group = Some("test_workgroup".to_string());
+
+        assert_eq!(usage.trace_id, Some("trace-123".to_string()));
+        assert_eq!(usage.cached_ratio, Some(50));
+        assert_eq!(usage.scan_files, Some(25));
+        assert_eq!(usage.compressed_size, Some(5.0));
+        assert_eq!(usage.min_ts, Some(1640995200000000));
+        assert_eq!(usage.max_ts, Some(1640995260000000));
+        assert_eq!(usage.took_wait_in_queue, Some(100));
+        assert_eq!(usage.result_cache_ratio, Some(75));
+        assert_eq!(usage.function, Some("test_function".to_string()));
+        assert!(usage.is_partial);
+        assert_eq!(usage.work_group, Some("test_workgroup".to_string()));
     }
 }

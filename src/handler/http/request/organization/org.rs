@@ -182,7 +182,8 @@ pub async fn all_organizations(
         .parse::<i64>()
         .ok();
 
-    let all_orgs = match infra::table::organizations::list(limit).await {
+    let filter = infra::table::organizations::ListFilter::with_limit(limit);
+    let all_orgs = match infra::table::organizations::list(filter).await {
         Ok(orgs) => orgs,
         Err(e) => {
             return Ok(

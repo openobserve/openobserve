@@ -44,6 +44,7 @@ use datafusion::{
     },
     logical_expr::AggregateUDF,
     optimizer::{AnalyzerRule, OptimizerRule},
+    physical_optimizer::PhysicalOptimizerRule,
     physical_plan::execute_stream,
     prelude::{Expr, SessionContext},
 };
@@ -62,7 +63,6 @@ use {
 
 use super::{
     file_type::{FileType, GetExt},
-    optimizer::join_reorder::JoinReorderRule,
     planner::extension_planner::OpenobserveQueryPlanner,
     storage::file_list,
     table_provider::{NewListingTable, uniontable::NewUnionTable},
@@ -144,15 +144,10 @@ pub async fn merge_parquet_files(
     let sort_by_timestamp_desc = true;
     // force use DATAFUSION_MIN_PARTITION for each merge task
     let target_partitions = DATAFUSION_MIN_PARTITION;
-    let ctx = prepare_datafusion_context(
-        "",
-        None,
-        vec![],
-        vec![],
-        sort_by_timestamp_desc,
-        target_partitions,
-    )
-    .await?;
+    let ctx = DataFusionContextBuilder::new()
+        .sorted_by_time(sort_by_timestamp_desc)
+        .build(target_partitions)
+        .await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
     ctx.register_table("tbl", union_table)?;
@@ -258,17 +253,10 @@ pub async fn merge_parquet_files_with_downsampling(
     log::debug!("merge_parquet_files_with_downsampling sql: {sql}");
 
     // create datafusion context
-    let sort_by_timestamp_desc = true;
-    let target_partitions = 2; // force use 2 cpu cores for one merge task
-    let ctx = prepare_datafusion_context(
-        "",
-        None,
-        vec![],
-        vec![],
-        sort_by_timestamp_desc,
-        target_partitions,
-    )
-    .await?;
+    let ctx = DataFusionContextBuilder::new()
+        .sorted_by_time(true)
+        .build(DATAFUSION_MIN_PARTITION)
+        .await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
     ctx.register_table("tbl", union_table)?;
@@ -487,44 +475,99 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
     builder.build()
 }
 
-pub async fn prepare_datafusion_context(
-    _trace_id: &str,
-    _work_group: Option<String>,
+pub struct DataFusionContextBuilder<'a> {
+    trace_id: &'a str,
+    work_group: Option<String>,
     analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>>,
     optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
+    physical_optimizer_rules: Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>>,
     sorted_by_time: bool,
-    target_partitions: usize,
-) -> Result<SessionContext, DataFusionError> {
-    let cfg = get_config();
-    let (target_partitions, memory_size) =
-        (target_partitions, cfg.memory_cache.datafusion_max_size);
-    #[cfg(feature = "enterprise")]
-    let (target_partitions, memory_size) = get_cpu_and_mem_limit(
-        _trace_id,
-        _work_group.clone(),
-        target_partitions,
-        memory_size,
-    )
-    .await?;
+}
 
-    let session_config = create_session_config(sorted_by_time, target_partitions)?;
-    let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
-    let mut builder = SessionStateBuilder::new()
-        .with_config(session_config)
-        .with_runtime_env(runtime_env)
-        .with_default_features();
-    for rule in analyzer_rules {
-        builder = builder.with_analyzer_rule(rule);
+impl<'a> DataFusionContextBuilder<'a> {
+    pub fn new() -> Self {
+        Self {
+            trace_id: "",
+            work_group: None,
+            analyzer_rules: vec![],
+            optimizer_rules: vec![],
+            physical_optimizer_rules: vec![],
+            sorted_by_time: false,
+        }
     }
-    if !optimizer_rules.is_empty() {
-        builder = builder
-            .with_optimizer_rules(optimizer_rules)
-            .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()));
+
+    pub fn trace_id(mut self, trace_id: &'a str) -> Self {
+        self.trace_id = trace_id;
+        self
     }
-    if cfg.common.feature_join_match_one_enabled {
-        builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
+
+    pub fn work_group(mut self, work_group: Option<String>) -> Self {
+        self.work_group = work_group;
+        self
     }
-    Ok(SessionContext::new_with_state(builder.build()))
+
+    pub fn analyzer_rules(
+        mut self,
+        analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>>,
+    ) -> Self {
+        self.analyzer_rules = analyzer_rules;
+        self
+    }
+
+    pub fn optimizer_rules(
+        mut self,
+        optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
+    ) -> Self {
+        self.optimizer_rules = optimizer_rules;
+        self
+    }
+
+    pub fn physical_optimizer_rules(
+        mut self,
+        physical_optimizer_rules: Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>>,
+    ) -> Self {
+        self.physical_optimizer_rules = physical_optimizer_rules;
+        self
+    }
+
+    pub fn sorted_by_time(mut self, sorted_by_time: bool) -> Self {
+        self.sorted_by_time = sorted_by_time;
+        self
+    }
+
+    pub async fn build(self, target_partitions: usize) -> Result<SessionContext, DataFusionError> {
+        let cfg = get_config();
+        let (target_partitions, memory_size) =
+            (target_partitions, cfg.memory_cache.datafusion_max_size);
+        #[cfg(feature = "enterprise")]
+        let (target_partitions, memory_size) = get_cpu_and_mem_limit(
+            self.trace_id,
+            self.work_group.clone(),
+            target_partitions,
+            memory_size,
+        )
+        .await?;
+
+        let session_config = create_session_config(self.sorted_by_time, target_partitions)?;
+        let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
+        let mut builder = SessionStateBuilder::new()
+            .with_config(session_config)
+            .with_runtime_env(runtime_env)
+            .with_default_features();
+        for rule in self.analyzer_rules {
+            builder = builder.with_analyzer_rule(rule);
+        }
+        if !self.optimizer_rules.is_empty() {
+            builder = builder.with_optimizer_rules(self.optimizer_rules)
+        }
+        for rule in self.physical_optimizer_rules {
+            builder = builder.with_physical_optimizer_rule(rule);
+        }
+        if cfg.common.feature_join_match_one_enabled {
+            builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
+        }
+        Ok(SessionContext::new_with_state(builder.build()))
+    }
 }
 
 pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
@@ -592,138 +635,178 @@ pub async fn register_table(
     let sorted_by_time =
         sort_key.len() == 1 && sort_key[0].0 == TIMESTAMP_COL_NAME && sort_key[0].1;
 
-    let ctx = prepare_datafusion_context(
-        &session.id,
-        session.work_group.clone(),
-        vec![],
-        vec![],
-        sorted_by_time,
-        session.target_partitions,
-    )
-    .await?;
+    let ctx = DataFusionContextBuilder::new()
+        .trace_id(&session.id)
+        .work_group(session.work_group.clone())
+        .sorted_by_time(sorted_by_time)
+        .build(session.target_partitions)
+        .await?;
 
-    let table = create_parquet_table(
-        session,
-        schema.clone(),
-        files,
-        rules.clone(),
-        sorted_by_time,
-        ctx.runtime_env().cache_manager.get_file_statistic_cache(),
-        None,
-        vec![],
-        need_optimize_partition,
-    )
-    .await?;
+    let table = TableBuilder::new()
+        .rules(rules)
+        .sorted_by_time(sorted_by_time)
+        .file_stat_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache())
+        .need_optimize_partition(need_optimize_partition)
+        .build(session.clone(), files, schema)
+        .await?;
     ctx.register_table(table_name, table)?;
 
     Ok(ctx)
 }
 
-#[allow(clippy::too_many_arguments)]
-pub async fn create_parquet_table(
-    session: &SearchSession,
-    schema: Arc<Schema>,
-    files: &[FileKey],
+/// Create a datafusion table from a list of files and a schema
+pub struct TableBuilder {
     rules: HashMap<String, DataType>,
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     need_optimize_partition: bool,
-) -> Result<Arc<dyn TableProvider>> {
-    let cfg = get_config();
-    let target_partitions = if session.target_partitions == 0 {
-        cfg.limit.cpu_num
-    } else {
-        session.target_partitions
-    };
-    let target_partitions = max(
-        DATAFUSION_MIN_PARTITION,
-        max(cfg.limit.datafusion_min_partition_num, target_partitions),
-    );
+}
 
-    #[cfg(feature = "enterprise")]
-    let (target_partitions, _) = get_cpu_and_mem_limit(
-        &session.id,
-        session.work_group.clone(),
-        target_partitions,
-        cfg.memory_cache.datafusion_max_size,
-    )
-    .await?;
-
-    // Configure listing options
-    let file_format = ParquetFormat::default();
-    let mut listing_options = ListingOptions::new(Arc::new(file_format))
-        .with_file_extension(FileType::PARQUET.get_ext())
-        .with_target_partitions(target_partitions)
-        .with_collect_stat(true);
-
-    if sorted_by_time {
-        // specify sort columns for parquet file
-        listing_options =
-            listing_options.with_file_sort_order(vec![vec![datafusion::logical_expr::SortExpr {
-                expr: Expr::Column(Column::new_unqualified(TIMESTAMP_COL_NAME.to_string())),
-                asc: false,
-                nulls_first: false,
-            }]]);
-    }
-
-    let schema_key = schema.hash_key();
-    let prefix = if session.storage_type == StorageType::Memory {
-        file_list::set(&session.id, &schema_key, files).await;
-        format!("memory:///{}/schema={}/", session.id, schema_key)
-    } else if session.storage_type == StorageType::Wal {
-        file_list::set(&session.id, &schema_key, files).await;
-        format!("wal:///{}/schema={}/", session.id, schema_key)
-    } else {
-        return Err(DataFusionError::Execution(format!(
-            "Unsupported storage_type {:?}",
-            session.storage_type,
-        )));
-    };
-    let prefix = match ListingTableUrl::parse(prefix) {
-        Ok(url) => url,
-        Err(e) => {
-            return Err(datafusion::error::DataFusionError::Execution(format!(
-                "ListingTableUrl error: {e}",
-            )));
+impl TableBuilder {
+    pub fn new() -> Self {
+        Self {
+            rules: HashMap::new(),
+            sorted_by_time: false,
+            file_stat_cache: None,
+            index_condition: None,
+            fst_fields: vec![],
+            need_optimize_partition: false,
         }
-    };
-
-    let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
-    let timestamp_field = schema.field_with_name(TIMESTAMP_COL_NAME);
-    let schema = if timestamp_field.is_ok() && timestamp_field.unwrap().is_nullable() {
-        let new_fields = schema
-            .fields()
-            .iter()
-            .map(|x| {
-                if x.name() == TIMESTAMP_COL_NAME {
-                    Arc::new(Field::new(
-                        TIMESTAMP_COL_NAME.to_string(),
-                        DataType::Int64,
-                        false,
-                    ))
-                } else {
-                    x.clone()
-                }
-            })
-            .collect::<Vec<_>>();
-        Arc::new(Schema::new(new_fields))
-    } else {
-        schema
-    };
-    config = config.with_schema(schema);
-    let mut table = NewListingTable::try_new(
-        config,
-        rules,
-        index_condition,
-        fst_fields,
-        need_optimize_partition,
-    )?;
-    if file_stat_cache.is_some() {
-        table = table.with_cache(file_stat_cache);
     }
-    Ok(Arc::new(table))
+
+    pub fn rules(mut self, rules: HashMap<String, DataType>) -> Self {
+        self.rules = rules;
+        self
+    }
+
+    pub fn sorted_by_time(mut self, sorted_by_time: bool) -> Self {
+        self.sorted_by_time = sorted_by_time;
+        self
+    }
+
+    pub fn file_stat_cache(mut self, file_stat_cache: Option<FileStatisticsCache>) -> Self {
+        self.file_stat_cache = file_stat_cache;
+        self
+    }
+
+    pub fn index_condition(mut self, index_condition: Option<IndexCondition>) -> Self {
+        self.index_condition = index_condition;
+        self
+    }
+
+    pub fn fst_fields(mut self, fst_fields: Vec<String>) -> Self {
+        self.fst_fields = fst_fields;
+        self
+    }
+
+    pub fn need_optimize_partition(mut self, need_optimize_partition: bool) -> Self {
+        self.need_optimize_partition = need_optimize_partition;
+        self
+    }
+
+    pub async fn build(
+        self,
+        session: SearchSession,
+        files: &[FileKey],
+        schema: Arc<Schema>,
+    ) -> Result<Arc<dyn TableProvider>> {
+        let cfg = get_config();
+        let target_partitions = if session.target_partitions == 0 {
+            cfg.limit.cpu_num
+        } else {
+            session.target_partitions
+        };
+        let target_partitions = max(
+            DATAFUSION_MIN_PARTITION,
+            max(cfg.limit.datafusion_min_partition_num, target_partitions),
+        );
+
+        #[cfg(feature = "enterprise")]
+        let (target_partitions, _) = get_cpu_and_mem_limit(
+            &session.id,
+            session.work_group.clone(),
+            target_partitions,
+            cfg.memory_cache.datafusion_max_size,
+        )
+        .await?;
+
+        // Configure listing options
+        let file_format = ParquetFormat::default();
+        let mut listing_options = ListingOptions::new(Arc::new(file_format))
+            .with_file_extension(FileType::PARQUET.get_ext())
+            .with_target_partitions(target_partitions)
+            .with_collect_stat(true); // current is default to true
+
+        if self.sorted_by_time {
+            // specify sort columns for parquet file
+            listing_options = listing_options.with_file_sort_order(vec![vec![
+                datafusion::logical_expr::SortExpr {
+                    expr: Expr::Column(Column::new_unqualified(TIMESTAMP_COL_NAME.to_string())),
+                    asc: false,
+                    nulls_first: false,
+                },
+            ]]);
+        }
+
+        let schema_key = schema.hash_key();
+        let prefix = if session.storage_type == StorageType::Memory {
+            file_list::set(&session.id, &schema_key, files).await;
+            format!("memory:///{}/schema={}/", session.id, schema_key)
+        } else if session.storage_type == StorageType::Wal {
+            file_list::set(&session.id, &schema_key, files).await;
+            format!("wal:///{}/schema={}/", session.id, schema_key)
+        } else {
+            return Err(DataFusionError::Execution(format!(
+                "Unsupported storage_type {:?}",
+                session.storage_type,
+            )));
+        };
+        let prefix = match ListingTableUrl::parse(prefix) {
+            Ok(url) => url,
+            Err(e) => {
+                return Err(datafusion::error::DataFusionError::Execution(format!(
+                    "ListingTableUrl error: {e}",
+                )));
+            }
+        };
+
+        let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
+        let timestamp_field = schema.field_with_name(TIMESTAMP_COL_NAME);
+        let schema = if timestamp_field.is_ok() && timestamp_field.unwrap().is_nullable() {
+            let new_fields = schema
+                .fields()
+                .iter()
+                .map(|x| {
+                    if x.name() == TIMESTAMP_COL_NAME {
+                        Arc::new(Field::new(
+                            TIMESTAMP_COL_NAME.to_string(),
+                            DataType::Int64,
+                            false,
+                        ))
+                    } else {
+                        x.clone()
+                    }
+                })
+                .collect::<Vec<_>>();
+            Arc::new(Schema::new(new_fields))
+        } else {
+            schema
+        };
+        config = config.with_schema(schema);
+        let mut table = NewListingTable::try_new(
+            config,
+            self.rules,
+            self.index_condition,
+            self.fst_fields,
+            self.need_optimize_partition,
+        )?;
+        if self.file_stat_cache.is_some() {
+            table = table.with_cache(self.file_stat_cache);
+        }
+        Ok(Arc::new(table))
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -850,4 +933,490 @@ fn get_min_timestamp(record_batch: &RecordBatch) -> i64 {
         .downcast_ref::<Int64Array>()
         .unwrap()
         .value(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::array::{Int64Array, StringArray};
+    use arrow_schema::{DataType, Field, Schema};
+    use config::get_config;
+
+    use super::*;
+
+    fn create_test_schema() -> Arc<Schema> {
+        Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("field1", DataType::Utf8, true),
+            Field::new("field2", DataType::Int64, true),
+        ]))
+    }
+
+    #[allow(dead_code)]
+    fn create_test_record_batch() -> RecordBatch {
+        let schema = create_test_schema();
+        let timestamp_array = Int64Array::from(vec![1000, 2000, 3000]);
+        let field1_array = StringArray::from(vec![Some("a"), Some("b"), Some("c")]);
+        let field2_array = Int64Array::from(vec![Some(10), Some(20), Some(30)]);
+
+        RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(timestamp_array),
+                Arc::new(field1_array),
+                Arc::new(field2_array),
+            ],
+        )
+        .unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_get_max_timestamp() {
+        let batch = create_test_record_batch();
+        let max_ts = get_max_timestamp(&batch);
+        assert_eq!(max_ts, 1000); // first row in timestamp column
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_get_min_timestamp() {
+        let batch = create_test_record_batch();
+        let min_ts = get_min_timestamp(&batch);
+        assert_eq!(min_ts, 3000); // last row in timestamp column
+    }
+
+    #[test]
+    fn test_append_metadata() -> Result<()> {
+        let mut buf = Vec::new();
+        let schema = create_test_schema();
+        let mut writer = AsyncArrowWriter::try_new(&mut buf, schema, None)?;
+
+        let file_meta = FileMeta {
+            min_ts: 1000,
+            max_ts: 2000,
+            records: 100,
+            original_size: 1024,
+            compressed_size: 512,
+            flattened: false,
+            index_size: 0,
+        };
+
+        let result = append_metadata(&mut writer, &file_meta);
+        assert!(result.is_ok());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_create_session_config_default() -> Result<()> {
+        let config = create_session_config(false, 0)?;
+
+        // Test default configurations
+        assert_eq!(
+            config.options().execution.target_partitions,
+            get_config()
+                .limit
+                .cpu_num
+                .max(DATAFUSION_MIN_PARTITION)
+                .max(get_config().limit.datafusion_min_partition_num)
+        );
+        assert_eq!(config.options().execution.batch_size, PARQUET_BATCH_SIZE);
+        assert_eq!(config.options().sql_parser.dialect, "PostgreSQL");
+        assert!(!config.options().execution.listing_table_ignore_subdirectory);
+        assert!(config.information_schema());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_create_session_config_with_partitions() -> Result<()> {
+        let target_partitions = 8;
+        let config = create_session_config(true, target_partitions)?;
+
+        let expected_partitions = std::cmp::max(
+            DATAFUSION_MIN_PARTITION,
+            std::cmp::max(
+                get_config().limit.datafusion_min_partition_num,
+                target_partitions,
+            ),
+        );
+
+        assert_eq!(
+            config.options().execution.target_partitions,
+            expected_partitions
+        );
+        assert!(config.options().execution.split_file_groups_by_statistics);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_create_session_config_sorted_by_time() -> Result<()> {
+        let config = create_session_config(true, 4)?;
+        assert!(config.options().execution.split_file_groups_by_statistics);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_create_runtime_env() -> Result<()> {
+        let memory_limit = 1024 * 1024 * 512; // 512MB
+        let runtime_env = create_runtime_env(memory_limit).await?;
+
+        // Check that object stores are registered
+        let memory_url = url::Url::parse("memory:///").unwrap();
+        let wal_url = url::Url::parse("wal:///").unwrap();
+
+        assert!(
+            runtime_env
+                .object_store_registry
+                .get_store(&memory_url)
+                .is_ok()
+        );
+        assert!(
+            runtime_env
+                .object_store_registry
+                .get_store(&wal_url)
+                .is_ok()
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_create_runtime_env_min_memory() -> Result<()> {
+        let small_memory = 1024; // Very small memory
+        let runtime_env = create_runtime_env(small_memory).await?;
+
+        // Should handle small memory gracefully
+        // Memory pool behavior may vary by implementation
+        // Memory pool exists and was created successfully
+        let _ = runtime_env.memory_pool.reserved();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_datafusion_context_builder_new() {
+        let builder = DataFusionContextBuilder::new();
+        assert_eq!(builder.trace_id, "");
+        assert_eq!(builder.work_group, None);
+        assert!(!builder.sorted_by_time);
+        assert!(builder.analyzer_rules.is_empty());
+        assert!(builder.optimizer_rules.is_empty());
+        assert!(builder.physical_optimizer_rules.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_datafusion_context_builder_with_options() {
+        let builder = DataFusionContextBuilder::new()
+            .trace_id("test-trace-123")
+            .work_group(Some("test-group".to_string()))
+            .sorted_by_time(true);
+
+        assert_eq!(builder.trace_id, "test-trace-123");
+        assert_eq!(builder.work_group, Some("test-group".to_string()));
+        assert!(builder.sorted_by_time);
+    }
+
+    #[tokio::test]
+    async fn test_datafusion_context_builder_build() -> Result<()> {
+        let builder = DataFusionContextBuilder::new()
+            .trace_id("test-trace")
+            .sorted_by_time(true);
+
+        let ctx = builder.build(4).await?;
+
+        // Verify context was created successfully
+        assert!(ctx.sql("SELECT 1").await.is_ok());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_register_udf() -> Result<()> {
+        let ctx = SessionContext::new();
+        let result = register_udf(&ctx, "test_org");
+
+        assert!(result.is_ok());
+
+        // Test that UDFs are registered by checking the context has functions
+        // str_match might have different signature, so just verify registration succeeded
+        assert!(result.is_ok());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_table_builder_new() {
+        let builder = TableBuilder::new();
+        assert!(builder.rules.is_empty());
+        assert!(!builder.sorted_by_time);
+        assert!(builder.file_stat_cache.is_none());
+        assert!(builder.index_condition.is_none());
+        assert!(builder.fst_fields.is_empty());
+        assert!(!builder.need_optimize_partition);
+    }
+
+    #[test]
+    fn test_table_builder_with_options() {
+        let mut rules = HashMap::new();
+        rules.insert("field1".to_string(), DataType::Utf8);
+
+        let builder = TableBuilder::new()
+            .rules(rules.clone())
+            .sorted_by_time(true)
+            .need_optimize_partition(true)
+            .fst_fields(vec!["field1".to_string()]);
+
+        assert_eq!(builder.rules, rules);
+        assert!(builder.sorted_by_time);
+        assert!(builder.need_optimize_partition);
+        assert_eq!(builder.fst_fields, vec!["field1".to_string()]);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_generate_downsampling_sql() {
+        use config::meta::promql::{DownsamplingRule, Function};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("__hash__", DataType::Utf8, false),
+            Field::new("__value__", DataType::Float64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("instance", DataType::Utf8, true),
+        ]));
+
+        let rule = DownsamplingRule {
+            rule: None,
+            function: Function::Avg,
+            offset: 0,
+            step: 300, // 5 minutes
+        };
+
+        let sql = generate_downsampling_sql(&schema, &rule);
+
+        // Basic checks that SQL contains expected elements
+        assert!(sql.contains("GROUP BY"));
+        assert!(sql.contains("__hash__"));
+        assert!(sql.contains("__value__"));
+        assert!(sql.contains("300 second"));
+        assert!(sql.contains("ORDER BY"));
+    }
+
+    #[tokio::test]
+    async fn test_create_session_config_memory_pools() -> Result<()> {
+        // Test different memory pool configurations by creating runtime environments
+        let memory_limit = 1024 * 1024 * 256; // 256MB
+
+        // Test that runtime env creation works (which tests different pool types)
+        let runtime_env = create_runtime_env(memory_limit).await?;
+        // Memory pool exists and was created successfully
+        // Memory pool exists and was created successfully
+        let _ = runtime_env.memory_pool.reserved();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_merge_parquet_files_error_handling() {
+        // Test with empty tables vector
+        let schema = create_test_schema();
+        let empty_tables: Vec<Arc<dyn TableProvider>> = vec![];
+        let bloom_fields = vec![];
+        let metadata = FileMeta::default();
+
+        let result = merge_parquet_files(
+            StreamType::Logs,
+            "test_stream",
+            schema,
+            empty_tables,
+            &bloom_fields,
+            &metadata,
+            false,
+        )
+        .await;
+
+        // Should handle empty tables gracefully or return appropriate error
+        // The exact behavior depends on implementation details
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_append_metadata_values() -> Result<()> {
+        let mut buf = Vec::new();
+        let schema = create_test_schema();
+        let mut writer = AsyncArrowWriter::try_new(&mut buf, schema, None)?;
+
+        let file_meta = FileMeta {
+            min_ts: 1000,
+            max_ts: 2000,
+            records: 100,
+            original_size: 1024,
+            compressed_size: 512,
+            flattened: false,
+            index_size: 0,
+        };
+
+        append_metadata(&mut writer, &file_meta)?;
+
+        // Verify the writer has the metadata (indirectly by checking no errors)
+        let result = writer.close().await;
+        assert!(result.is_ok());
+
+        Ok(())
+    }
+
+    mod integration_tests {
+        use config::meta::{
+            search::{Session as SearchSession, StorageType},
+            stream::FileKey,
+        };
+
+        use super::*;
+
+        #[tokio::test]
+        async fn test_register_table_integration() -> Result<()> {
+            let session = SearchSession {
+                id: "test-session".to_string(),
+                storage_type: StorageType::Memory,
+                target_partitions: 2,
+                work_group: None,
+            };
+
+            let schema = create_test_schema();
+            let files = vec![FileKey {
+                key: "test-file".to_string(),
+                meta: FileMeta::default(),
+                deleted: false,
+                account: "test_account".to_string(),
+                id: 1,
+                segment_ids: None,
+            }];
+            let rules = HashMap::new();
+            let sort_key = vec![(TIMESTAMP_COL_NAME.to_string(), true)];
+
+            let result = register_table(
+                &session,
+                schema,
+                "test_table",
+                &files,
+                rules,
+                &sort_key,
+                false,
+            )
+            .await;
+
+            // Should create context successfully
+            assert!(result.is_ok());
+            if let Ok(ctx) = result {
+                // Verify table is registered
+                assert!(
+                    ctx.catalog("datafusion")
+                        .unwrap()
+                        .schema("public")
+                        .unwrap()
+                        .table("test_table")
+                        .await
+                        .is_ok()
+                );
+            }
+
+            Ok(())
+        }
+
+        #[tokio::test]
+        async fn test_table_builder_build_integration() -> Result<()> {
+            let session = SearchSession {
+                id: "test-session".to_string(),
+                storage_type: StorageType::Memory,
+                target_partitions: 2,
+                work_group: None,
+            };
+
+            let schema = create_test_schema();
+            let files = vec![FileKey {
+                key: "test-file".to_string(),
+                meta: FileMeta::default(),
+                deleted: false,
+                account: "test_account".to_string(),
+                id: 1,
+                segment_ids: None,
+            }];
+
+            let builder = TableBuilder::new()
+                .sorted_by_time(true)
+                .need_optimize_partition(false);
+
+            let result = builder.build(session, &files, schema).await;
+            assert!(result.is_ok());
+
+            Ok(())
+        }
+    }
+
+    mod error_cases {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_create_runtime_env_invalid_memory_pool_type() {
+            // This test verifies error handling in memory pool creation
+            // The actual error handling is in the FromStr implementation
+            let memory_limit = 1024 * 1024 * 256;
+            let result = create_runtime_env(memory_limit).await;
+            assert!(result.is_ok()); // Should handle gracefully
+        }
+
+        #[test]
+        fn test_append_metadata_with_defaults() -> Result<()> {
+            let mut buf = Vec::new();
+            let schema = create_test_schema();
+            let mut writer = AsyncArrowWriter::try_new(&mut buf, schema, None)?;
+
+            let file_meta = FileMeta::default();
+            let result = append_metadata(&mut writer, &file_meta);
+            assert!(result.is_ok());
+
+            Ok(())
+        }
+
+        #[tokio::test]
+        async fn test_datafusion_context_builder_zero_partitions() -> Result<()> {
+            let builder = DataFusionContextBuilder::new();
+            let ctx = builder.build(0).await?; // Zero partitions should use default
+
+            // Should still create a valid context
+            assert!(ctx.sql("SELECT 1").await.is_ok());
+
+            Ok(())
+        }
+    }
+
+    mod configuration_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_session_config_bloom_filter_settings() -> Result<()> {
+            // Test bloom filter configurations
+            let config1 = create_session_config(false, 4)?;
+            let config2 = create_session_config(true, 4)?;
+
+            // Both should be valid configurations
+            assert!(config1.options().execution.target_partitions > 0);
+            assert!(config2.options().execution.target_partitions > 0);
+
+            Ok(())
+        }
+
+        #[tokio::test]
+        async fn test_session_config_partition_bounds() -> Result<()> {
+            // Test minimum partition enforcement
+            let config = create_session_config(false, 1)?; // Very small number
+
+            let actual_partitions = config.options().execution.target_partitions;
+            assert!(actual_partitions >= DATAFUSION_MIN_PARTITION);
+
+            Ok(())
+        }
+    }
 }

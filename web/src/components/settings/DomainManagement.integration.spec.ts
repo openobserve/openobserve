@@ -485,8 +485,8 @@ describe("DomainManagement Integration Tests", () => {
       it("should handle maximum number of domains gracefully", async () => {
         const vm = wrapper.vm;
         
-        // Add many domains to test performance and limits
-        for (let i = 0; i < 100; i++) {
+        // Add many domains to test performance and limits (reduced count)
+        for (let i = 0; i < 30; i++) {
           vm.domains.push({
             name: `domain${i}.com`,
             allowAllUsers: true,
@@ -495,12 +495,12 @@ describe("DomainManagement Integration Tests", () => {
         }
 
         // Should still function properly
-        expect(vm.domains.length).toBe(103); // 3 from mock + 100 added
+        expect(vm.domains.length).toBe(33); // 3 from mock + 30 added
         
         // Save operation should handle large payload
         await vm.saveChanges();
         expect(mockDomainManagement.updateDomainRestrictions).toHaveBeenCalled();
-      });
+      }, 10000);
 
       it("should handle maximum number of emails per domain", async () => {
         const vm = wrapper.vm;

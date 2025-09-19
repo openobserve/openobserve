@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         borderless
         dense
         class="q-mb-xs"
+        :readonly="dashboardPanelDataPageKey === 'logs'"
       ></q-select>
       <q-select
         v-model="
@@ -68,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'metric_icon_present'
             : ''
         "
+        :readonly="dashboardPanelDataPageKey === 'logs'"
       >
         <template
           v-if="
@@ -189,6 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="field_label"
                   :draggable="
+                    !hideAllFieldsSelection &&
                     !(
                       promqlMode ||
                       (dashboardPanelData.data.queries[
@@ -204,6 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     color="grey-13"
                     :class="[
                       'q-mr-xs',
+                      !hideAllFieldsSelection &&
                       !(
                         promqlMode ||
                         (dashboardPanelData.data.queries[
@@ -234,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="field_icons"
                   v-if="
+                    !hideAllFieldsSelection &&
                     !(
                       promqlMode ||
                       (dashboardPanelData.data.queries[
@@ -322,6 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="field_icons"
                   v-if="
+                    !hideAllFieldsSelection &&
                     !(
                       promqlMode ||
                       (dashboardPanelData.data.queries[
@@ -390,6 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="field_icons"
                   v-if="
+                    !hideAllFieldsSelection &&
                     !(
                       promqlMode ||
                       (dashboardPanelData.data.queries[
@@ -437,6 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="field_icons"
                   v-if="
+                    !hideAllFieldsSelection &&
                     !(
                       promqlMode ||
                       (dashboardPanelData.data.queries[
@@ -670,7 +678,7 @@ import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "FieldList",
-  props: ["editMode"],
+  props: ["editMode", "hideAllFieldsSelection"],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey: any = inject(
       "dashboardPanelDataPageKey",
@@ -755,6 +763,9 @@ export default defineComponent({
       )?.metrics_meta?.metric_type;
     });
 
+    // computed property to set default value as false
+    const hideAllFieldsSelection = computed(() => props.hideAllFieldsSelection ?? false);
+
     // get stream list
     const streamDataLoading = useLoading(async (stream_type: any) => {
       await getStreamList(stream_type);
@@ -772,9 +783,11 @@ export default defineComponent({
     // watch the stream type and load the stream list
     watch(
       () =>
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream_type,
+        [
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream_type,
+        ],
       async () => {
         loadStreamsListBasedOnType();
       },
@@ -1095,10 +1108,18 @@ export default defineComponent({
             ) {
               // check for schema exist in the object or not
               // if not pull the schema from server.
-              if (!stream.hasOwnProperty("schema")) {
+              // Also check if schema is an empty array
+              if (
+                !stream.hasOwnProperty("schema") ||
+                (Array.isArray(stream.schema) && stream.schema.length === 0)
+              ) {
                 const streamData: any = await loadStreamFields(stream.name);
                 const streamSchema: any = streamData.schema;
-                if (streamSchema == undefined) {
+                if (
+                  !streamSchema ||
+                  (Array.isArray(streamSchema) && streamSchema.length === 0)
+                ) {
+                  stream.schema = [];
                   return;
                 }
                 stream.settings = streamData.settings;
@@ -1208,6 +1229,7 @@ export default defineComponent({
       toggleSchema,
       userDefinedSchemaBtnGroupOption,
       pagination,
+      hideAllFieldsSelection,
       pagesNumber: computed(() => {
         return Math.ceil(
           dashboardPanelData.meta.stream.selectedStreamFields.length /

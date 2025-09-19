@@ -370,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 data-test="scheduled-alert-threshold-error-text"
                 v-if="!triggerData.operator || !Number(triggerData.threshold)"
-                class="text-red-8 q-pt-xs absolute"
+                class="text-red-8 q-pt-xs"
                 style="font-size: 11px; line-height: 12px"
               >
                 Field is required!
@@ -756,7 +756,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     data-test="add-alert-delay-error"
-                  v-if="triggerData.silence < 0 || triggerData.silence == undefined || triggerData.silence == ''"
+                  v-if="triggerData.silence < 0 || triggerData.silence === undefined || triggerData.silence === null || triggerData.silence === ''"
                     class="text-red-8 q-pt-xs"
                     style="font-size: 11px; line-height: 12px"
                   >

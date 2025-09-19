@@ -17,6 +17,7 @@ exceptions = [
     { name = "ingester", allow = ["AGPL-3.0"] },
     { name = "wal", allow = ["AGPL-3.0"] },
     { name = "proto", allow = ["AGPL-3.0"] },
+    { name = "flight", allow = ["AGPL-3.0"] },
     { name = "report_server", allow = ["AGPL-3.0"] },
     { name = "arrayref", allow = ["BSD-2-Clause"] },
     { name = "mach", allow = ["BSD-2-Clause"] },
@@ -37,6 +38,7 @@ exceptions = [
     { name = "quoted_printable", allow = ["0BSD"] },
     { name = "ring", allow = ["BSD-4-Clause", "OpenSSL"] },
     { name = "inferno", allow = ["CDDL-1.0"] },
+    { name = "libbz2-rs-sys", allow = ["bzip2-1.0.6"] },
 ]
 
 allow = [

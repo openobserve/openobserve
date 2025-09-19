@@ -26,16 +26,18 @@ use config::{
     meta::{
         cluster::RoleGroup,
         function::RESULT_ARRAY,
-        search,
+        search::{self},
         self_reporting::usage::{RequestStats, UsageType},
-        sql::{OrderBy, SqlOperator, TableReferenceExt, resolve_stream_names},
+        sql::{OrderBy, TableReferenceExt, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
-    metrics,
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_simple_distinct_query},
+        sql::{
+            is_aggregate_query, is_eligible_for_histogram, is_explain_query,
+            is_simple_distinct_query,
+        },
         time::now_micros,
     },
 };
@@ -43,7 +45,7 @@ use hashbrown::HashMap;
 use infra::{
     cache::stats,
     errors::{Error, ErrorCodes},
-    schema::{get_stream_setting_index_fields, unwrap_stream_settings},
+    schema::unwrap_stream_settings,
 };
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
@@ -54,7 +56,9 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::{grpc::make_grpc_search_client, search::sql::get_group_by_fields},
+    crate::service::{
+        grpc::make_grpc_search_client, search::sql::visitor::group_by::get_group_by_fields,
+    },
     config::utils::sql::is_simple_aggregate_query,
     o2_enterprise::enterprise::{
         common::config::get_config as get_o2_config,
@@ -85,7 +89,12 @@ use crate::{
         },
     },
     handler::grpc::request::search::Searcher,
-    service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    service::search::{
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        sql::visitor::histogram_interval::{
+            convert_histogram_interval_to_seconds, generate_histogram_interval,
+        },
+    },
 };
 
 pub(crate) mod cache;
@@ -147,33 +156,6 @@ pub async fn search(
         trace_id.to_string()
     };
 
-    #[cfg(feature = "enterprise")]
-    {
-        let sql = Some(in_req.query.sql.clone());
-        let start_time = Some(in_req.query.start_time);
-        let end_time = Some(in_req.query.end_time);
-        let s_event_type = in_req
-            .search_type
-            .map(|s_event_type| s_event_type.to_string());
-        // set search task
-        SEARCH_SERVER
-            .insert(
-                trace_id.clone(),
-                TaskStatus::new_leader(
-                    vec![],
-                    true,
-                    user_id.clone(),
-                    Some(org_id.to_string()),
-                    Some(stream_type.to_string()),
-                    sql,
-                    start_time,
-                    end_time,
-                    s_event_type,
-                ),
-            )
-            .await;
-    }
-
     #[cfg(not(feature = "enterprise"))]
     let req_regions = vec![];
     #[cfg(not(feature = "enterprise"))]
@@ -203,6 +185,34 @@ pub async fn search(
     }
     request.set_use_cache(in_req.use_cache);
     let meta = Sql::new_from_req(&request, &query).await?;
+
+    #[cfg(feature = "enterprise")]
+    {
+        let sql = Some(in_req.query.sql.clone());
+        let start_time = Some(in_req.query.start_time);
+        let end_time = Some(in_req.query.end_time);
+        let s_event_type = in_req
+            .search_type
+            .map(|s_event_type| s_event_type.to_string());
+        // set search task
+        SEARCH_SERVER
+            .insert(
+                trace_id.clone(),
+                TaskStatus::new_leader(
+                    vec![],
+                    true,
+                    user_id.clone(),
+                    Some(org_id.to_string()),
+                    Some(stream_type.to_string()),
+                    sql,
+                    start_time,
+                    end_time,
+                    s_event_type,
+                ),
+            )
+            .await;
+    }
+
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
         async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
@@ -249,10 +259,6 @@ pub async fn search(
             }
         };
     }
-
-    metrics::QUERY_RUNNING_NUMS
-        .with_label_values(&[org_id])
-        .dec();
 
     // do this because of clippy warning
     match res {
@@ -604,6 +610,7 @@ pub async fn search_multi(
     Ok(multi_res)
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tracing::instrument(name = "service:search_partition", skip(req))]
 pub async fn search_partition(
     trace_id: &str,
@@ -613,6 +620,7 @@ pub async fn search_partition(
     req: &search::SearchPartitionRequest,
     skip_max_query_range: bool,
     is_http_req: bool,
+    enable_align_histogram: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -639,10 +647,10 @@ pub async fn search_partition(
         }
     };
 
-    // if there is no _timestamp field in the query, return single partitions
+    // if there is no _timestamp field or EXPLAIN in the query, return single partitions
+    let is_explain_query = is_explain_query(&req.sql);
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let res_ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
-    let ts_column = res_ts_column.map(|(v, _)| v);
+    let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).map(|(v, _)| v);
 
     #[cfg(feature = "enterprise")]
     let mut is_cachable_aggs = is_simple_aggregate_query(&req.sql).unwrap_or(false);
@@ -661,9 +669,15 @@ pub async fn search_partition(
     let is_http_distinct = is_simple_distinct && is_http_req;
 
     #[cfg(feature = "enterprise")]
+    let org_settings = crate::service::db::organization::get_org_setting(org_id)
+        .await
+        .unwrap_or_default();
+
+    #[cfg(feature = "enterprise")]
     let mut is_streaming_aggregate = ts_column.is_none()
         && is_cachable_aggs
         && cfg.common.feature_query_streaming_aggs
+        && org_settings.streaming_aggregation_enabled
         && !is_http_distinct;
 
     #[cfg(not(feature = "enterprise"))]
@@ -677,7 +691,7 @@ pub async fn search_partition(
     }
 
     // if http distinct, we should skip file list
-    if is_http_distinct {
+    if is_http_distinct || is_explain_query {
         skip_get_file_list = true;
     }
 
@@ -685,6 +699,7 @@ pub async fn search_partition(
     // check if we need to use streaming_output
     let (streaming_id, streaming_interval_micros) = if req.streaming_output
         && is_streaming_aggregate
+        && !skip_get_file_list
     {
         let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
             // TODO: cache don't not support multiple stream names
@@ -848,6 +863,12 @@ pub async fn search_partition(
     );
 
     let file_list_took = start.elapsed().as_millis() as usize;
+    let (is_histogram_eligible, _) = is_eligible_for_histogram(
+        &req.sql, // `is_multi_stream_search` will always be false for search_partition
+        false,
+    )
+    .unwrap_or((false, false));
+
     log::info!(
         "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, took: {} ms",
         (req.start_time, req.end_time),
@@ -860,6 +881,7 @@ pub async fn search_partition(
         response.partitions.push([req.start_time, req.end_time]);
         response.max_query_range = max_query_range_in_hour;
         response.histogram_interval = sql.histogram_interval;
+        response.is_histogram_eligible = is_histogram_eligible;
         log::info!("[trace_id {trace_id}] search_partition: returning single partition");
         return Ok(response);
     };
@@ -906,6 +928,7 @@ pub async fn search_partition(
         streaming_aggs,
         #[cfg(feature = "enterprise")]
         streaming_id: streaming_id.clone(),
+        is_histogram_eligible,
     };
 
     let mut min_step = Duration::try_seconds(1)
@@ -913,10 +936,44 @@ pub async fn search_partition(
         .num_microseconds()
         .unwrap();
     if is_aggregate && ts_column.is_some() {
-        let hist_int = sql.histogram_interval.unwrap_or(0);
+        let hist_int = if let Some(hist_int) = sql.histogram_interval {
+            hist_int
+        } else {
+            let interval = generate_histogram_interval(Some((req.start_time, req.end_time)));
+            match convert_histogram_interval_to_seconds(interval) {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {e:?}",
+                    );
+                    10
+                }
+            }
+        };
         // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
         if hist_int > 0 {
             min_step *= hist_int;
+        }
+    }
+    // Only for UI search or query param is `true`, we need to generate histogram interval
+    else if enable_align_histogram {
+        if let Some(hist_int) = sql.histogram_interval {
+            // convert seconds to microseconds
+            min_step = hist_int * 1_000_000;
+        } else {
+            let time_range = (req.start_time, req.end_time);
+            let interval = generate_histogram_interval(Some(time_range));
+            match convert_histogram_interval_to_seconds(interval) {
+                Ok(v) => {
+                    // convert seconds to microseconds
+                    min_step = v * 1_000_000
+                }
+                Err(e) => {
+                    log::error!(
+                        "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {e:?}",
+                    );
+                }
+            }
         }
     }
 
@@ -966,7 +1023,19 @@ pub async fn search_partition(
         };
     }
 
-    let is_histogram = sql.histogram_interval.is_some();
+    let mut is_histogram = sql.histogram_interval.is_some();
+    let mut add_mini_partition = false;
+    // Set this to true to generate partitions aligned with interval
+    // only for logs page when query is non-histogram
+    // and also with query param `align_histogram` is true,
+    // so that logs can reuse the same partitions
+    // for histogram query
+    if !is_histogram && enable_align_histogram {
+        is_histogram = true;
+        // add mini partition for the histogram aligned partitions in the UI search
+        add_mini_partition = true;
+    }
+
     let sql_order_by = sql
         .order_by
         .first()
@@ -1006,6 +1075,7 @@ pub async fn search_partition(
         sql_order_by,
         is_streaming_aggregate,
         streaming_interval_micros,
+        add_mini_partition,
     );
 
     if sql_order_by == OrderBy::Asc {
@@ -1013,6 +1083,10 @@ pub async fn search_partition(
     }
 
     resp.partitions = partitions;
+    if enable_align_histogram {
+        let min_step_secs = min_step / 1_000_000;
+        resp.histogram_interval = Some(min_step_secs);
+    }
     Ok(resp)
 }
 
@@ -1338,9 +1412,11 @@ pub async fn search_partition_multi(
     user_id: &str,
     stream_type: StreamType,
     req: &search::MultiSearchPartitionRequest,
+    enable_align_histogram: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let mut res = search::SearchPartitionResponse::default();
     let mut total_rec = 0;
+    let mut is_histogram_eligible = true;
     for query in &req.sql {
         match search_partition(
             trace_id,
@@ -1360,12 +1436,16 @@ pub async fn search_partition_multi(
             },
             false,
             true,
+            enable_align_histogram,
         )
         .await
         {
             Ok(resp) => {
                 if resp.partitions.len() > res.partitions.len() {
                     total_rec += resp.records;
+                    if !resp.is_histogram_eligible {
+                        is_histogram_eligible = false;
+                    }
                     res = resp;
                 }
             }
@@ -1375,6 +1455,7 @@ pub async fn search_partition_multi(
         };
     }
     res.records = total_rec;
+    res.is_histogram_eligible = is_histogram_eligible;
     Ok(res)
 }
 
@@ -1418,152 +1499,8 @@ pub fn is_use_inverted_index(sql: &Arc<Sql>) -> bool {
     }
 
     let cfg = get_config();
-    let index_terms = if sql.equal_items.len() == 1 {
-        let schema = sql.schemas.values().next().unwrap().schema();
-        let stream_settings = infra::schema::unwrap_stream_settings(schema);
-        let index_fields = get_stream_setting_index_fields(&stream_settings);
-        filter_index_fields(sql.equal_items.values().next().unwrap(), &index_fields)
-    } else {
-        vec![]
-    };
-
-    sql.stream_type != StreamType::Index
-        && sql.use_inverted_index
+    sql.use_inverted_index
         && cfg.common.inverted_index_enabled
         && !cfg.common.feature_query_without_index
-        && (sql.index_condition.is_some() || sql.match_items.is_some() || !index_terms.is_empty())
-}
-
-pub fn filter_index_fields(
-    items: &[(String, String)],
-    index_fields: &[String],
-) -> Vec<(String, String)> {
-    let mut result = Vec::new();
-    for item in items {
-        if index_fields.contains(&item.0) {
-            result.push(item.clone());
-        }
-    }
-    result
-}
-
-pub fn generate_filter_from_quick_text(
-    data: &[(String, String, SqlOperator)],
-) -> Vec<(&str, Vec<String>)> {
-    let quick_text_len = data.len();
-    let mut filters = HashMap::with_capacity(quick_text_len);
-    for i in 0..quick_text_len {
-        let (k, v, op) = &data[i];
-        if op == &SqlOperator::And
-            || (op == &SqlOperator::Or && (i + 1 == quick_text_len || k == &data[i + 1].0))
-        {
-            let entry = filters.entry(k.as_str()).or_insert_with(Vec::new);
-            entry.push(v.to_string());
-        } else {
-            filters.clear();
-            break;
-        }
-    }
-    filters.into_iter().collect::<Vec<(_, _)>>()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_matches_by_partition_key_with_sql() {
-        use config::meta::sql;
-        let path = "files/default/logs/gke-fluentbit/2023/04/14/08/kuberneteshost=gke-dev1/kubernetesnamespacename=ziox-dev/7052558621820981249.parquet";
-        let sqls = vec![
-            ("SELECT * FROM tbl", true),
-            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev1'", true),
-            ("SELECT * FROM tbl WHERE kuberneteshost='gke-dev2'", false),
-            ("SELECT * FROM tbl WHERE some_other_key = 'no-matter'", true),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' AND kubernetesnamespacename='ziox-dev'",
-                true,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' AND kubernetesnamespacename='abcdefg'",
-                false,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' AND kubernetesnamespacename='ziox-dev'",
-                false,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' AND kubernetesnamespacename='abcdefg'",
-                false,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' OR kubernetesnamespacename='ziox-dev'",
-                true,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' OR kubernetesnamespacename='abcdefg'",
-                true,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' OR kubernetesnamespacename='ziox-dev'",
-                true,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev2' OR kubernetesnamespacename='abcdefg'",
-                true,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost='gke-dev1' OR kuberneteshost='gke-dev2'",
-                true,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1')",
-                true,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev2')",
-                false,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2')",
-                true,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') AND kubernetesnamespacename='ziox-dev'",
-                true,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') AND kubernetesnamespacename='abcdefg'",
-                false,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') OR kubernetesnamespacename='ziox-dev'",
-                true,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') OR kubernetesnamespacename='abcdefg'",
-                true,
-            ),
-            (
-                "SELECT * FROM tbl WHERE kuberneteshost IN ('gke-dev1', 'gke-dev2') OR some_other_key='abcdefg'",
-                true,
-            ),
-        ];
-
-        #[allow(deprecated)]
-        for (tsql, expected) in sqls {
-            let meta = sql::Sql::new(tsql).unwrap();
-            let filter = generate_filter_from_quick_text(&meta.quick_text);
-            assert_eq!(
-                filter_source_by_partition_key(
-                    path,
-                    &filter
-                        .into_iter()
-                        .map(|(f1, f2)| (f1.to_owned(), f2))
-                        .collect::<Vec<(String, Vec<String>)>>()
-                ),
-                expected
-            );
-        }
-    }
+        && sql.index_condition.is_some()
 }

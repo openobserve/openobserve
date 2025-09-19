@@ -13,41 +13,40 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    io::Cursor,
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::{io::Cursor, sync::Arc};
 
-use arrow::{
-    array::RecordBatch,
-    ipc::{CompressionType, writer::IpcWriteOptions},
-};
+use arrow::ipc::{CompressionType, writer::IpcWriteOptions};
 use arrow_flight::{
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
-    encode::FlightDataEncoderBuilder, error::FlightError, flight_service_server::FlightService,
+    flight_service_server::FlightService,
 };
-use arrow_schema::Schema;
-use config::{cluster::LOCAL_NODE, meta::search::ScanStats, metrics};
+use config::{cluster::LOCAL_NODE, meta::search::ScanStats};
 use datafusion::{
     common::{DataFusionError, Result},
-    execution::SendableRecordBatchStream,
     physical_plan::execute_stream,
 };
-use futures::{Stream, StreamExt, TryStreamExt, stream::BoxStream};
+use flight::common::{MetricsInfo, PreCustomMessage};
+use futures::{StreamExt, stream::BoxStream};
+use futures_util::pin_mut;
 use prost::Message;
 use tonic::{Request, Response, Status, Streaming};
+use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::search::SEARCH_SERVER,
-    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
-    o2_enterprise::enterprise::search::TaskStatus,
+    o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
 };
 
 use crate::{
-    handler::grpc::MetadataMap,
+    handler::grpc::{
+        MetadataMap,
+        flight::{
+            stream::FlightEncoderStreamBuilder,
+            visitor::{get_cluster_metrics, get_scan_stats},
+        },
+    },
     service::search::{
         grpc::flight as grpcFlight,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -55,6 +54,9 @@ use crate::{
         utils::AsyncDefer,
     },
 };
+
+mod stream;
+pub mod visitor;
 
 #[derive(Default)]
 pub struct FlightServiceImpl;
@@ -69,7 +71,6 @@ impl FlightService for FlightServiceImpl {
     type ListActionsStream = BoxStream<'static, Result<ActionType, Status>>;
     type DoExchangeStream = BoxStream<'static, Result<FlightData, Status>>;
 
-    #[tracing::instrument(name = "grpc:search:flight:do_get", skip_all)]
     async fn do_get(
         &self,
         request: Request<Ticket>,
@@ -80,9 +81,10 @@ impl FlightService for FlightServiceImpl {
         let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
             prop.extract(&MetadataMap(request.metadata()))
         });
-        tracing::Span::current().set_parent(parent_cx.clone());
+        let span = tracing::info_span!("grpc:search:flight:do_get");
+        span.set_parent(parent_cx);
 
-        // 1. decode ticket to RemoteExecNode
+        // decode ticket to RemoteExecNode
         let ticket = request.into_inner();
         let mut buf = Cursor::new(ticket.ticket);
         let req = proto::cluster_rpc::FlightSearchRequest::decode(&mut buf)
@@ -96,20 +98,37 @@ impl FlightService for FlightServiceImpl {
         );
         let is_super_cluster = req.super_cluster_info.is_super_cluster;
         let timeout = req.search_info.timeout as u64;
-        log::info!(
-            "[trace_id {}] flight->search: do_get, timeout: {}s",
-            trace_id,
-            timeout
-        );
+        log::info!("[trace_id {trace_id}] flight->search: do_get, timeout: {timeout}s",);
 
-        #[cfg(feature = "enterprise")]
-        if is_super_cluster && !SEARCH_SERVER.contain_key(&trace_id).await {
-            SEARCH_SERVER
-                .insert(trace_id.clone(), TaskStatus::new_follower(vec![], false))
-                .await;
+        // Note: all async should in this place, otherwise it will break tracing
+        // https://docs.rs/tracing/latest/tracing/span/struct.Span.html#in-asynchronous-code
+        let req_move = req.clone();
+        let trace_id_move = trace_id.clone();
+        let result = async move {
+            #[cfg(feature = "enterprise")]
+            if is_super_cluster && !SEARCH_SERVER.contain_key(&trace_id_move).await {
+                // this is for work_group check in super cluster follower leader
+                SEARCH_SERVER
+                    .insert(
+                        trace_id_move.clone(),
+                        TaskStatus::new_follower(vec![], false),
+                    )
+                    .await;
+            }
+
+            let result = get_ctx_and_physical_plan(&trace_id_move, &req_move).await;
+
+            #[cfg(feature = "enterprise")]
+            if is_super_cluster && !SEARCH_SERVER.is_leader(&trace_id_move).await {
+                // this is for work_group check in super cluster follower leader
+                SEARCH_SERVER.remove(&trace_id_move, false).await;
+            }
+
+            result
         }
+        .instrument(span.clone())
+        .await;
 
-        let result = get_ctx_and_physical_plan(&trace_id, &req).await;
         log::info!(
             "{}",
             search_inspector_fields(
@@ -126,12 +145,7 @@ impl FlightService for FlightServiceImpl {
             )
         );
 
-        #[cfg(feature = "enterprise")]
-        if is_super_cluster && !SEARCH_SERVER.is_leader(&trace_id).await {
-            SEARCH_SERVER.remove(&trace_id, false).await;
-        }
-
-        // 2. prepare dataufion context
+        // prepare dataufion context
         let (ctx, physical_plan, defer, scan_stats) = match result {
             Ok(v) => v,
             Err(e) => {
@@ -145,12 +159,8 @@ impl FlightService for FlightServiceImpl {
         };
 
         log::info!(
-            "[trace_id {}] flight->search: executing stream, is super cluster: {}",
-            trace_id,
-            is_super_cluster
+            "[trace_id {trace_id}] flight->search: executing stream, is super cluster: {is_super_cluster}"
         );
-
-        let mut schema = physical_plan.schema();
 
         if cfg.common.print_key_sql {
             log::info!(
@@ -160,18 +170,6 @@ impl FlightService for FlightServiceImpl {
                 "{}",
                 config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
             );
-        }
-
-        schema = add_scan_stats_to_schema(schema, scan_stats);
-        #[cfg(feature = "enterprise")]
-        if get_o2_config().super_cluster.enabled && !req.super_cluster_info.is_super_cluster {
-            // we only set for non-follow leaders
-            // split will always have atleast one element even if the string is empty
-            // or the split char is not in string, so we can safely unwrap here
-            let main_trace_id = trace_id.split("-").next().unwrap();
-            SEARCH_SERVER
-                .set_scan_stats(main_trace_id, (&scan_stats).into())
-                .await;
         }
 
         let start = std::time::Instant::now();
@@ -185,6 +183,20 @@ impl FlightService for FlightServiceImpl {
                 );
                 Status::internal(e.to_string())
             })?;
+
+        // used for super cluster follower leader to get scan stats
+        let scan_stats_ref = get_scan_stats(physical_plan.clone());
+
+        // used for EXPLAIN ANALYZE to collect metrics after stream is done
+        let metrics = req.search_info.is_analyze.then_some(MetricsInfo {
+            plan: physical_plan.clone(),
+            is_super_cluster,
+            func: Box::new(super_cluster_enabled),
+        });
+
+        // used for super cluster follower leader to get metrics
+        let metrics_ref = get_cluster_metrics(physical_plan.clone());
+
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
             // clear session data
             clear_session_data(&trace_id);
@@ -193,22 +205,38 @@ impl FlightService for FlightServiceImpl {
             );
             Status::internal(e.to_string())
         })?;
-        let flight_data_stream = FlightDataEncoderBuilder::new()
-            .with_schema(schema)
-            .with_max_flight_data_size(33554432) // 32MB
-            .with_options(write_options)
-            .build(FlightSenderStream::new(
-                trace_id.to_string(),
-                stream,
-                defer,
-                start,
-                timeout,
-            ))
-            .map_err(|err| Status::from_error(Box::new(err)));
 
-        Ok(Response::new(
-            Box::pin(flight_data_stream) as Self::DoGetStream
-        ))
+        let mut stream = FlightEncoderStreamBuilder::new(write_options, 33554432)
+            .with_trace_id(trace_id.to_string())
+            .with_defer(defer)
+            .with_start(start)
+            .with_custom_message(PreCustomMessage::ScanStats(scan_stats))
+            .with_custom_message(PreCustomMessage::ScanStatsRef(scan_stats_ref))
+            .with_custom_message(PreCustomMessage::Metrics(metrics))
+            .with_custom_message(PreCustomMessage::MetricsRef(metrics_ref))
+            .build(stream, span);
+
+        let stream = async_stream::stream! {
+            let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));
+            pin_mut!(timeout);
+            loop {
+                tokio::select! {
+                    batch = stream.next() => {
+                        if let Some(batch) = batch {
+                            yield batch
+                        } else {
+                            break;
+                        }
+                    }
+                    _ = &mut timeout => {
+                        log::info!("[trace_id {trace_id}] flight->search: timeout");
+                        break;
+                    }
+                }
+            }
+        };
+
+        Ok(Response::new(Box::pin(stream) as Self::DoGetStream))
     }
 
     async fn handshake(
@@ -275,92 +303,6 @@ impl FlightService for FlightServiceImpl {
     }
 }
 
-struct FlightSenderStream {
-    trace_id: String,
-    stream: SendableRecordBatchStream,
-    defer: Option<AsyncDefer>,
-    start: std::time::Instant,
-    timeout: u64,
-}
-
-impl FlightSenderStream {
-    fn new(
-        trace_id: String,
-        stream: SendableRecordBatchStream,
-        defer: Option<AsyncDefer>,
-        start: std::time::Instant,
-        timeout: u64,
-    ) -> Self {
-        Self {
-            trace_id,
-            stream,
-            defer,
-            start,
-            timeout,
-        }
-    }
-}
-
-impl Stream for FlightSenderStream {
-    type Item = Result<RecordBatch, FlightError>;
-
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
-        if self.start.elapsed().as_secs() > self.timeout {
-            return Poll::Ready(None);
-        }
-        match self.stream.poll_next_unpin(ctx) {
-            Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(Ok(batch))),
-            Poll::Ready(None) => Poll::Ready(None),
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(Some(Err(e))) => {
-                log::error!(
-                    "[trace_id {}] flight->search: stream error: {}, took: {} ms",
-                    self.trace_id,
-                    e,
-                    self.start.elapsed().as_millis()
-                );
-                Poll::Ready(Some(Err(FlightError::Tonic(
-                    Status::internal(e.to_string()).into(),
-                ))))
-            }
-        }
-    }
-}
-
-impl Drop for FlightSenderStream {
-    fn drop(&mut self) {
-        let end = self.start.elapsed().as_millis();
-        log::info!(
-            "[trace_id {}] flight->search: stream end, took: {} ms",
-            self.trace_id,
-            end
-        );
-
-        // metrics
-        let time = self.start.elapsed().as_secs_f64();
-        metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/search/flight/do_get", "200", "", "", "", ""])
-            .observe(time);
-        metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/search/flight/do_get", "200", "", "", "", ""])
-            .inc();
-
-        if let Some(defer) = self.defer.take() {
-            drop(defer);
-        } else {
-            log::info!(
-                "[trace_id {}] flight->search: drop FlightSenderStream",
-                self.trace_id
-            );
-            // clear session data
-            clear_session_data(&self.trace_id);
-        }
-    }
-}
-
 type PlanResult = (
     datafusion::prelude::SessionContext,
     Arc<dyn datafusion::physical_plan::ExecutionPlan>,
@@ -394,16 +336,17 @@ async fn get_ctx_and_physical_plan(
     Ok((ctx, physical_plan, None, scan_stats))
 }
 
-fn add_scan_stats_to_schema(schema: Arc<Schema>, scan_stats: ScanStats) -> Arc<Schema> {
-    let mut metadata = schema.metadata().clone();
-    let stats_string = serde_json::to_string(&scan_stats).unwrap_or_default();
-    metadata.insert("scan_stats".to_string(), stats_string);
-    Arc::new(schema.as_ref().clone().with_metadata(metadata))
-}
-
 fn clear_session_data(trace_id: &str) {
     // clear session data
     crate::service::search::datafusion::storage::file_list::clear(trace_id);
     // release wal lock files
     crate::common::infra::wal::release_request(trace_id);
+}
+
+fn super_cluster_enabled() -> bool {
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        return true;
+    }
+    false
 }

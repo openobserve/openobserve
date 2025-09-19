@@ -501,6 +501,10 @@ export const addCommasToNumber = (number: number) => {
  * @param us : Time in microseconds
  */
 export const formatTimeWithSuffix = (us: number) => {
+  if(!us || us === 0) {
+    return "0us";
+  }
+  
   if (us >= 1000 * 1000) {
     return `${(us / 1000 / 1000).toFixed(2)}s`;
   }
@@ -579,19 +583,16 @@ export function addSpacesToOperators(input: string): string {
   let inSingleQuote = false;
   let inDoubleQuote = false;
   let parenDepth = 0;
-
   while (i < input.length) {
     const char = input[i];
     const nextChar = input[i + 1];
     const prevChar = i > 0 ? input[i - 1] : '';
-
     // Track quote states
     if (char === "'" && !inDoubleQuote) {
       inSingleQuote = !inSingleQuote;
     } else if (char === '"' && !inSingleQuote) {
       inDoubleQuote = !inDoubleQuote;
     }
-
     // Track parentheses depth (for function calls)
     if (!inSingleQuote && !inDoubleQuote) {
       if (char === '(') {
@@ -622,7 +623,6 @@ export function addSpacesToOperators(input: string): string {
           continue;
         }
       }
-
       // Handle special case of "! =" (space between ! and =)
       if (char === '!' && nextChar === ' ' && i + 2 < input.length && input[i + 2] === '=') {
         // Add space before if needed
@@ -637,7 +637,6 @@ export function addSpacesToOperators(input: string): string {
         i += 3;
         continue;
       }
-
       // Handle single-character operators
       if (char === '=' || char === '>' || char === '<') {
         // Add space before if needed
@@ -653,12 +652,10 @@ export function addSpacesToOperators(input: string): string {
         continue;
       }
     }
-
     // Default: just add the character
     result += char;
     i++;
   }
-
   return result;
 }
 

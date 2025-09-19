@@ -164,22 +164,29 @@ fn convert_data_type(
         return Ok(());
     }
     match (f_type, &data_type) {
+        (DataType::LargeUtf8, _) => {}
+        (DataType::Utf8, DataType::LargeUtf8) => {
+            fields.insert(key.to_string(), Field::new(key, data_type, true));
+        }
         (DataType::Utf8, _) => {}
         (DataType::Float64, DataType::UInt64)
         | (DataType::Float64, DataType::Int64)
         | (DataType::Float64, DataType::Boolean) => {}
         (DataType::Int64, DataType::UInt64)
         | (DataType::Int64, DataType::Float64)
-        | (DataType::Int64, DataType::Utf8) => {
+        | (DataType::Int64, DataType::Utf8)
+        | (DataType::Int64, DataType::LargeUtf8) => {
             fields.insert(key.to_string(), Field::new(key, data_type, true));
         }
         (DataType::UInt64, DataType::Int64)
         | (DataType::UInt64, DataType::Boolean)
         | (DataType::Int64, DataType::Boolean) => {}
-        (DataType::UInt64, DataType::Float64) | (DataType::UInt64, DataType::Utf8) => {
+        (DataType::UInt64, DataType::Float64)
+        | (DataType::UInt64, DataType::Utf8)
+        | (DataType::UInt64, DataType::LargeUtf8) => {
             fields.insert(key.to_string(), Field::new(key, data_type, true));
         }
-        (DataType::Float64, DataType::Utf8) => {
+        (DataType::Float64, DataType::Utf8) | (DataType::Float64, DataType::LargeUtf8) => {
             fields.insert(key.to_string(), Field::new(key, data_type, true));
         }
 

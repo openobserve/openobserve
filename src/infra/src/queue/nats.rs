@@ -77,9 +77,15 @@ impl super::Queue for NatsQueue {
             retention: jetstream::stream::RetentionPolicy::Limits,
             max_age: Duration::from_secs(60 * 60 * 24 * max(1, cfg.nats.queue_max_age)),
             num_replicas: cfg.nats.replicas,
+            max_bytes: cfg.nats.queue_max_size,
             ..Default::default()
         };
-        _ = jetstream.get_or_create_stream(config).await?;
+        _ = jetstream.get_or_create_stream(config).await.map_err(|e| {
+            log::error!("Failed to get_or_create_stream for nats stream {topic_name}: {e}");
+            Error::Message(format!(
+                "Failed to get_or_create_stream for nats stream {topic_name}: {e}"
+            ))
+        })?;
         Ok(())
     }
 
@@ -120,9 +126,11 @@ impl super::Queue for NatsQueue {
                 .get_or_create_consumer(&consumer_name, config)
                 .await
                 .map_err(|e| {
-                    log::error!("Failed to get_or_create nats for stream {stream_name}: {e}");
+                    log::error!(
+                        "Failed to get_or_create_consumer for nats stream {stream_name}: {e}"
+                    );
                     Error::Message(format!(
-                        "Failed to get_or_create nats for stream {stream_name}: {e}"
+                        "Failed to get_or_create_consumer for nats stream {stream_name}: {e}"
                     ))
                 })?;
             // Consume messages from the consumer

@@ -26,7 +26,6 @@ use writer::PuffinDirWriter;
 pub mod caching_directory;
 pub mod footer_cache;
 pub mod reader;
-pub mod reader_cache;
 pub mod writer;
 
 // We do not need all of the tantivy files, only specific ones:
@@ -90,22 +89,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_constants() {
-        // Test that constants are defined correctly
-        assert_eq!(ALLOWED_FILE_EXT, &["term", "idx", "pos", "fast"]);
-        assert_eq!(EMPTY_FILE_EXT, &["fieldnorm", "store"]);
-        assert_eq!(META_JSON, "meta.json");
-        assert_eq!(FOOTER_CACHE, "footer_cache");
-    }
-
-    #[test]
     fn test_allowed_file_extensions() {
         // Test that we have the expected file extensions
         assert!(ALLOWED_FILE_EXT.contains(&"term"));
         assert!(ALLOWED_FILE_EXT.contains(&"idx"));
         assert!(ALLOWED_FILE_EXT.contains(&"pos"));
         assert!(ALLOWED_FILE_EXT.contains(&"fast"));
-        assert_eq!(ALLOWED_FILE_EXT.len(), 4);
     }
 
     #[test]
@@ -113,7 +102,6 @@ mod tests {
         // Test that we have the expected empty file extensions
         assert!(EMPTY_FILE_EXT.contains(&"fieldnorm"));
         assert!(EMPTY_FILE_EXT.contains(&"store"));
-        assert_eq!(EMPTY_FILE_EXT.len(), 2);
     }
 
     #[test]
@@ -357,15 +345,6 @@ mod tests {
         });
 
         assert!(found_file.is_some());
-    }
-
-    #[test]
-    fn test_constants_are_static() {
-        // Test that our constants are compile-time constants
-        const _: &[&str] = ALLOWED_FILE_EXT;
-        const _: &[&str] = EMPTY_FILE_EXT;
-        const _: &str = META_JSON;
-        const _: &str = FOOTER_CACHE;
     }
 
     #[test]

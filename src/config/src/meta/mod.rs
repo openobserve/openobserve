@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod actions;
+pub mod ai;
 pub mod alerts;
 pub mod bitvec;
 pub mod cluster;
@@ -28,6 +29,7 @@ pub mod organization;
 pub mod otlp;
 pub mod pipeline;
 pub mod plan;
+pub mod projections;
 pub mod promql;
 pub mod ratelimit;
 pub mod search;

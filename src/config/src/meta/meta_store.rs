@@ -28,37 +28,77 @@ pub enum MetaStore {
 impl From<&str> for MetaStore {
     fn from(s: &str) -> Self {
         match s.to_lowercase().as_str() {
-            "sqlite" => MetaStore::Sqlite,
-            "etcd" => MetaStore::Etcd,
-            "nats" => MetaStore::Nats,
-            "mysql" => MetaStore::MySQL,
-            "postgres" | "postgresql" => MetaStore::PostgreSQL,
-            _ => MetaStore::Sqlite,
+            "sqlite" => Self::Sqlite,
+            "etcd" => Self::Etcd,
+            "nats" => Self::Nats,
+            "mysql" => Self::MySQL,
+            "postgres" | "postgresql" => Self::PostgreSQL,
+            _ => Self::Sqlite,
         }
     }
 }
 
 impl From<String> for MetaStore {
     fn from(s: String) -> Self {
-        match s.to_lowercase().as_str() {
-            "sqlite" => MetaStore::Sqlite,
-            "etcd" => MetaStore::Etcd,
-            "nats" => MetaStore::Nats,
-            "mysql" => MetaStore::MySQL,
-            "postgres" | "postgresql" => MetaStore::PostgreSQL,
-            _ => MetaStore::Sqlite,
-        }
+        Self::from(s.as_str())
     }
 }
 
 impl std::fmt::Display for MetaStore {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            MetaStore::Sqlite => write!(f, "sqlite"),
-            MetaStore::Etcd => write!(f, "etcd"),
-            MetaStore::Nats => write!(f, "nats"),
-            MetaStore::MySQL => write!(f, "mysql"),
-            MetaStore::PostgreSQL => write!(f, "postgresql"),
+            Self::Sqlite => write!(f, "sqlite"),
+            Self::Etcd => write!(f, "etcd"),
+            Self::Nats => write!(f, "nats"),
+            Self::MySQL => write!(f, "mysql"),
+            Self::PostgreSQL => write!(f, "postgresql"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_metastore_from_str() {
+        assert_eq!(MetaStore::from("sqlite"), MetaStore::Sqlite);
+        assert_eq!(MetaStore::from("etcd"), MetaStore::Etcd);
+        assert_eq!(MetaStore::from("nats"), MetaStore::Nats);
+        assert_eq!(MetaStore::from("mysql"), MetaStore::MySQL);
+        assert_eq!(MetaStore::from("postgres"), MetaStore::PostgreSQL);
+        assert_eq!(MetaStore::from("postgresql"), MetaStore::PostgreSQL);
+
+        // Case insensitive
+        assert_eq!(MetaStore::from("SQLITE"), MetaStore::Sqlite);
+        assert_eq!(MetaStore::from("ETCD"), MetaStore::Etcd);
+
+        // Unknown values default to Sqlite
+        assert_eq!(MetaStore::from("unknown"), MetaStore::Sqlite);
+    }
+
+    #[test]
+    fn test_metastore_from_string() {
+        assert_eq!(MetaStore::from("sqlite".to_string()), MetaStore::Sqlite);
+        assert_eq!(MetaStore::from("etcd".to_string()), MetaStore::Etcd);
+    }
+
+    #[test]
+    fn test_metastore_display() {
+        assert_eq!(MetaStore::Sqlite.to_string(), "sqlite");
+        assert_eq!(MetaStore::Etcd.to_string(), "etcd");
+        assert_eq!(MetaStore::Nats.to_string(), "nats");
+        assert_eq!(MetaStore::MySQL.to_string(), "mysql");
+        assert_eq!(MetaStore::PostgreSQL.to_string(), "postgresql");
+    }
+
+    #[test]
+    fn test_metastore_serialization() {
+        let metastore = MetaStore::Etcd;
+        let serialized = serde_json::to_string(&metastore).unwrap();
+        assert_eq!(serialized, "\"etcd\"");
+
+        let deserialized: MetaStore = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, MetaStore::Etcd);
     }
 }

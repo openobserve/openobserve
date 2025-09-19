@@ -442,10 +442,16 @@ export default defineComponent({
       changePagination,
       perPageOptions,
       resultTotal,
+      selectedPerPage,
       pagination,
       outlinedDelete,
       routeTo,
       store,
+      // Exposed helper functions for testing
+      getTemplates,
+      updateRoute,
+      getDestinationByName,
+      resetEditingDestination,
     };
   },
 });

@@ -1,0 +1,23 @@
+[package]
+name = "flight"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = []
+
+[dependencies]
+datafusion.workspace = true
+arrow.workspace = true
+arrow-schema.workspace = true
+arrow-flight.workspace = true
+bytes.workspace = true
+futures.workspace = true
+tonic.workspace = true
+tokio.workspace = true
+config.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+flatbuffers = "25.2.10"
+parking_lot.workspace = true

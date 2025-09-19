@@ -402,7 +402,7 @@ class="padding-none" />
                   <q-icon size="xs" name="language" class="padding-none" />
                 </q-item-section>
                 <q-item-section>
-                  <q-item-label>{{ t("menu.language") }}</q-item-label>
+                  <q-item-label class="tw-max-w-[150px]">{{ t("menu.language") }}</q-item-label>
                 </q-item-section>
                 <q-item-section></q-item-section>
                 <q-item-section side>
@@ -696,7 +696,7 @@ export default defineComponent({
     const { closeSocket } = useSearchWebSocket();
 
     const isMonacoEditorLoaded = ref(false);
-    const showGetStarted = ref(localStorage.getItem('isFirstTimeLogin') == 'true' ?? false);
+    const showGetStarted = ref((localStorage.getItem('isFirstTimeLogin') ?? 'false') === 'true');
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
     const rowsPerPage = ref(10);
@@ -1252,8 +1252,8 @@ export default defineComponent({
             orgSettings?.data?.data?.enable_websocket_search ?? false,
           enable_streaming_search:
             orgSettings?.data?.data?.enable_streaming_search ?? false,
-          aggregation_cache_enabled:
-            orgSettings?.data?.data?.aggregation_cache_enabled ?? false,
+            streaming_aggregation_enabled:
+            orgSettings?.data?.data?.streaming_aggregation_enabled ?? false,
           free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? "",
         });
 
@@ -1426,7 +1426,12 @@ export default defineComponent({
       userClickedOrg,
       searchQuery,
       filteredOrganizations,
-      rowsPerPage
+      rowsPerPage,
+      verifyStreamExist,
+      filterMenus,
+      updateActionsMenu,
+      getConfig,
+      setRumUser
     };
   },
   computed: {

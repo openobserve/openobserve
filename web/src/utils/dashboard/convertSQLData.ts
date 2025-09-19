@@ -30,6 +30,7 @@ import {
   formatDate,
   formatUnitValue,
   getContrastColor,
+  applySeriesColorMappings,
   getUnitValue,
   isTimeSeries,
   isTimeStamp,
@@ -43,6 +44,7 @@ import {
   ColorModeWithoutMinMax,
   getSeriesColor,
   getSQLMinMaxValue,
+  getColorPalette,
 } from "./colorPalette";
 import { deepCopy } from "@/utils/zincutils";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
@@ -1366,7 +1368,6 @@ export const convertSQLData = async (
 
     return seriesData;
   };
-
   const getSeriesObj = (
     yAxisName: string,
     seriesData: Array<number> = [],
@@ -1393,6 +1394,7 @@ export const convertSQLData = async (
           chartMin,
           chartMax,
           store.state.theme,
+          panelSchema?.config?.color?.colorBySeries,
         ) ?? null,
       data: seriesData,
       ...seriesConfig,
@@ -1613,6 +1615,8 @@ export const convertSQLData = async (
       options.series = getSeries(
         panelSchema.type == "line" || panelSchema.type == "area"
           ? { opacity: 0.8 }
+          : panelSchema.type == "bar"
+          ? { barMinHeight: 1 }
           : {},
       );
 
@@ -1625,11 +1629,6 @@ export const convertSQLData = async (
         breakDownKeys.length
       )
         updateTrellisConfig();
-
-      break;
-    }
-    case "bar": {
-      options.series = getSeries({ barMinHeight: 1 });
 
       break;
     }
@@ -1735,6 +1734,7 @@ export const convertSQLData = async (
                       chartMin,
                       chartMax,
                       store.state.theme,
+                      panelSchema?.config?.color?.colorBySeries,
                     ) ?? null
                   );
                 },
@@ -1810,6 +1810,7 @@ export const convertSQLData = async (
                       chartMin,
                       chartMax,
                       store.state.theme,
+                      panelSchema?.config?.color?.colorBySeries,
                     ) ?? null
                   );
                 },
@@ -2287,6 +2288,7 @@ export const convertSQLData = async (
                     chartMin,
                     chartMax,
                     store.state.theme,
+                    panelSchema?.config?.color?.colorBySeries,
                   ) ?? null,
               },
             },
@@ -2817,6 +2819,13 @@ export const convertSQLData = async (
       zlevel: 1,
     });
   }
+
+  // Apply series color mappings via reusable helper
+  applySeriesColorMappings(
+    options.series,
+    panelSchema?.config?.color?.colorBySeries,
+    store.state.theme,
+  );
 
   return {
     options,

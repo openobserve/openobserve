@@ -64,6 +64,20 @@ pub fn set_stream_settings_atomic(settings: StreamSettingsCache) {
     STREAM_SETTINGS_ATOMIC.store(Arc::new(settings));
 }
 
+pub async fn get_stream_schema_from_cache(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> Option<Schema> {
+    let key = mk_key(org_id, stream_type, stream_name);
+    let cache_key = key.strip_prefix("/schema/").unwrap();
+    STREAM_SCHEMAS_LATEST
+        .read()
+        .await
+        .get(cache_key)
+        .map(|schema| schema.schema().as_ref().clone())
+}
+
 pub fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("/schema/{org_id}/{stream_type}/{stream_name}")
 }
@@ -209,10 +223,11 @@ pub async fn get_settings(
     }
 
     // Get from DB without holding any locks
-    let settings = match get(org_id, stream_name, stream_type).await {
-        Ok(schema) => unwrap_stream_settings(&schema),
-        Err(_) => None,
-    };
+    let settings = get(org_id, stream_name, stream_type)
+        .await
+        .ok()
+        .as_ref()
+        .and_then(unwrap_stream_settings);
 
     // Only acquire write lock if we have settings to update
     if let Some(ref s) = settings {
@@ -723,13 +738,25 @@ impl SchemaCache {
             .get(field_name)
             .and_then(|i| self.schema.fields().get(*i))
     }
+
+    pub fn size(&self) -> usize {
+        let mut size = std::mem::size_of::<SchemaRef>() + self.schema.size();
+        size += std::mem::size_of::<HashMap<String, usize>>();
+        for (key, _val) in self.fields_map.iter() {
+            size += std::mem::size_of::<String>() + key.len();
+            size += std::mem::size_of::<usize>();
+        }
+        size += std::mem::size_of::<String>() + self.hash_key.len();
+        size
+    }
 }
 
 pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
     let allowed_type = match from {
-        DataType::Boolean => vec![DataType::Utf8],
+        DataType::Boolean => vec![DataType::Utf8, DataType::LargeUtf8],
         DataType::Int8 => vec![
             DataType::Utf8,
+            DataType::LargeUtf8,
             DataType::Int16,
             DataType::Int32,
             DataType::Int64,
@@ -739,6 +766,7 @@ pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
         ],
         DataType::Int16 => vec![
             DataType::Utf8,
+            DataType::LargeUtf8,
             DataType::Int32,
             DataType::Int64,
             DataType::Float16,
@@ -747,25 +775,44 @@ pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
         ],
         DataType::Int32 => vec![
             DataType::Utf8,
+            DataType::LargeUtf8,
             DataType::Int64,
             DataType::UInt32,
             DataType::UInt64,
             DataType::Float32,
             DataType::Float64,
         ],
-        DataType::Int64 => vec![DataType::Utf8, DataType::UInt64, DataType::Float64],
+        DataType::Int64 => vec![
+            DataType::Utf8,
+            DataType::LargeUtf8,
+            DataType::UInt64,
+            DataType::Float64,
+        ],
         DataType::UInt8 => vec![
             DataType::Utf8,
+            DataType::LargeUtf8,
             DataType::UInt16,
             DataType::UInt32,
             DataType::UInt64,
         ],
-        DataType::UInt16 => vec![DataType::Utf8, DataType::UInt32, DataType::UInt64],
-        DataType::UInt32 => vec![DataType::Utf8, DataType::UInt64],
-        DataType::UInt64 => vec![DataType::Utf8],
-        DataType::Float16 => vec![DataType::Utf8, DataType::Float32, DataType::Float64],
-        DataType::Float32 => vec![DataType::Utf8, DataType::Float64],
-        DataType::Float64 => vec![DataType::Utf8],
+        DataType::UInt16 => vec![
+            DataType::Utf8,
+            DataType::LargeUtf8,
+            DataType::UInt32,
+            DataType::UInt64,
+        ],
+        DataType::UInt32 => vec![DataType::Utf8, DataType::LargeUtf8, DataType::UInt64],
+        DataType::UInt64 => vec![DataType::Utf8, DataType::LargeUtf8],
+        DataType::Float16 => vec![
+            DataType::Utf8,
+            DataType::LargeUtf8,
+            DataType::Float32,
+            DataType::Float64,
+        ],
+        DataType::Float32 => vec![DataType::Utf8, DataType::LargeUtf8, DataType::Float64],
+        DataType::Float64 => vec![DataType::Utf8, DataType::LargeUtf8],
+        DataType::Utf8 => vec![DataType::LargeUtf8],
+        DataType::LargeUtf8 => vec![DataType::LargeUtf8],
         _ => vec![DataType::Utf8],
     };
     allowed_type.contains(to)

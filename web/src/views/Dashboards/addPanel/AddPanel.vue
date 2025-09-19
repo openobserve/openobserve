@@ -256,6 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @updated:vrlFunctionFieldList="updateVrlFunctionFieldList"
                       @last-triggered-at-update="handleLastTriggeredAtUpdate"
                       searchType="dashboards"
+                      @series-data-update="seriesDataUpdate"
                     />
                     <q-dialog v-model="showViewPanel">
                       <QueryInspector
@@ -275,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <q-separator vertical />
-              <div class="col-auto">
+              <div class="col-auto" style="height: 100%;">
                 <PanelSidebar
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
@@ -283,6 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ConfigPanel
                     :dashboardPanelData="dashboardPanelData"
                     :variablesData="updatedVariablesData"
+                    :panelData="seriesData"
                   />
                 </PanelSidebar>
               </div>
@@ -438,9 +440,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         @last-triggered-at-update="handleLastTriggeredAtUpdate"
                         searchType="dashboards"
+                        @series-data-update="seriesDataUpdate"
                       />
                     </template>
                   </q-splitter>
+                </div>
+                <div class="col-auto" style="flex-shrink: 0">
                   <DashboardErrorsComponent
                     :errors="errorData"
                     class="col-auto"
@@ -452,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <q-separator vertical />
-              <div class="col-auto">
+              <div class="col-auto" style="height: 100%;">
                 <PanelSidebar
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
@@ -460,6 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ConfigPanel
                     :dashboardPanelData="dashboardPanelData"
                     :variablesData="updatedVariablesData"
+                    :panelData="seriesData"
                   />
                 </PanelSidebar>
               </div>
@@ -506,13 +512,14 @@ import VariablesValueSelector from "../../../components/dashboards/VariablesValu
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import { useLoading } from "@/composables/useLoading";
-import { isEqual } from "lodash-es";
+import { debounce, isEqual } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
+import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -588,6 +595,11 @@ export default defineComponent({
     let variablesData: any = reactive({});
     const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
     const { getStream } = useStreams();
+    const seriesData = ref([]);
+
+    const seriesDataUpdate = (data: any) => {
+      seriesData.value = data;
+    };
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);
@@ -890,11 +902,19 @@ export default defineComponent({
 
       const normalizedCurrent = normalizeVariables(variablesData);
       const normalizedRefreshed = normalizeVariables(updatedVariablesData);
+      const variablesChanged = !isEqual(normalizedCurrent, normalizedRefreshed);
 
-      return (
-        !isEqual(chartData.value, dashboardPanelData.data) ||
-        !isEqual(normalizedCurrent, normalizedRefreshed)
-      );
+      const configChanged = !isEqual(chartData.value, dashboardPanelData.data);
+      let configNeedsApiCall = false;
+
+      if (configChanged) {
+        configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
+          chartData.value,
+          dashboardPanelData.data,
+        );
+      }
+
+      return configNeedsApiCall || variablesChanged;
     });
 
     watch(isOutDated, () => {
@@ -976,7 +996,6 @@ export default defineComponent({
 
         // copy the data object excluding the reactivity
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-
         // refresh the date time based on current time if relative date is selected
         dateTimePickerRef.value && dateTimePickerRef.value.refresh();
         updateDateTime(selectedDate.value);
@@ -1553,6 +1572,24 @@ export default defineComponent({
       return { width: `${contentWidth}px` };
     });
 
+    const debouncedUpdateChartConfig = debounce((newVal, oldVal) => {
+      if (!isEqual(chartData.value, newVal)) {
+        const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
+          chartData.value,
+          newVal,
+        );
+
+        if (!configNeedsApiCall) {
+          chartData.value = JSON.parse(JSON.stringify(newVal));
+
+          window.dispatchEvent(new Event("resize"));
+        }
+      }
+    }, 1000);
+
+    watch(() => dashboardPanelData.data, debouncedUpdateChartConfig, {
+      deep: true,
+    });
     // [START] ai chat
 
     // [START] O2 AI Context Handler
@@ -1658,6 +1695,8 @@ export default defineComponent({
       inputStyle,
       setTimeForVariables,
       dateTimeForVariables,
+      seriesDataUpdate,
+      seriesData,
     };
   },
   methods: {

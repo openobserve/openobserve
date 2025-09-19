@@ -25,7 +25,6 @@ use actix_web::{
     middleware, web,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
-use actix_web_lab::middleware::{Next, from_fn};
 use config::get_config;
 use futures::FutureExt;
 use utoipa::OpenApi;
@@ -76,7 +75,7 @@ pub fn get_cors() -> Rc<Cors> {
 #[cfg(feature = "enterprise")]
 async fn audit_middleware(
     mut req: ServiceRequest,
-    next: Next<impl MessageBody>,
+    next: middleware::Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
     let method = req.method().to_string();
     let prefix = format!("{}/api/", get_config().common.base_uri);
@@ -165,7 +164,7 @@ async fn audit_middleware(
 #[cfg(not(feature = "enterprise"))]
 async fn audit_middleware(
     req: ServiceRequest,
-    next: Next<impl MessageBody>,
+    next: middleware::Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
     let mut res = next.call(req).await?;
     res.headers_mut().remove(ERROR_HEADER);
@@ -363,8 +362,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
     #[cfg(not(feature = "enterprise"))]
     let server = cfg.common.instance_name_short.to_string();
 
+    #[allow(deprecated)]
     let service = web::scope("/api")
-        .wrap(from_fn(audit_middleware))
+        .wrap(middleware::from_fn(audit_middleware))
         .wrap(HttpAuthentication::with_fn(
             super::auth::validator::oo_validator,
         ))
@@ -403,11 +403,13 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(organization::es::org_pipeline)
         .service(organization::es::org_pipeline_create)
         .service(stream::schema)
-        .service(stream::settings)
+        .service(stream::create)
         .service(stream::update_settings)
         .service(stream::delete_fields)
         .service(stream::delete)
         .service(stream::list)
+        .service(stream::delete_stream_data_by_time_range)
+        .service(stream::get_delete_stream_data_status)
         .service(logs::ingest::bulk)
         .service(logs::ingest::multi)
         .service(logs::ingest::json)
@@ -436,6 +438,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(promql::format_query_post)
         .service(search::search)
         .service(search::search_partition)
+        .service(search::result_schema)
         .service(search::around_v1)
         .service(search::around_v2)
         .service(search_inspector::get_search_profile)
@@ -458,6 +461,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(dashboards::update_dashboard)
         .service(dashboards::list_dashboards)
         .service(dashboards::get_dashboard)
+        .service(dashboards::export_dashboard)
         .service(dashboards::delete_dashboard)
         .service(dashboards::move_dashboard)
         .service(dashboards::move_dashboards)
@@ -487,6 +491,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(folders::deprecated::delete_folder)
         .service(alerts::create_alert)
         .service(alerts::get_alert)
+        .service(alerts::export_alert)
         .service(alerts::update_alert)
         .service(alerts::delete_alert)
         .service(alerts::list_alerts)
@@ -586,8 +591,12 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(ratelimit::update_ratelimit)
         .service(ratelimit::api_modules)
         .service(actions::operations::test_action)
-        .service(ai::chat)
-        .service(ai::chat_stream)
+        .service(ai::chat::chat)
+        .service(ai::chat::chat_stream)
+        .service(ai::prompt::list_prompts)
+        .service(ai::prompt::get_prompt)
+        .service(ai::prompt::update_prompt)
+        .service(ai::prompt::rollback_prompt)
         .service(re_pattern::get)
         .service(re_pattern::list)
         .service(re_pattern::save)
@@ -609,7 +618,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(cloud::billings::unsubscribe)
         .service(cloud::billings::create_billing_portal_session)
         .service(cloud::org_usage::get_org_usage)
-        .service(cloud::marketing::handle_new_attrition_event)
+        .service(cloud::marketing::handle_new_attribution_event)
         .service(organization::org::all_organizations)
         .service(organization::org::extend_trial_period);
 
@@ -642,7 +651,7 @@ pub fn get_other_service_routes(svc: &mut web::ServiceConfig) {
     svc.service(
         web::scope("/rum")
             .wrap(cors)
-            .wrap(from_fn(RumExtraData::extractor))
+            .wrap(middleware::from_fn(RumExtraData::extractor))
             .wrap(HttpAuthentication::with_fn(
                 super::auth::validator::validator_rum,
             ))

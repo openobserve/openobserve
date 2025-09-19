@@ -450,7 +450,7 @@ mod meta_table_reports {
         true
     }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct Report {
         #[serde(default)]
@@ -529,7 +529,7 @@ mod meta_table_reports {
         }
     }
 
-    #[derive(Default, Deserialize, Serialize, PartialEq)]
+    #[derive(Default, Deserialize, Serialize, PartialEq, Clone, Debug)]
     pub enum ReportFrequencyType {
         #[serde(rename = "once")]
         Once,
@@ -546,20 +546,20 @@ mod meta_table_reports {
         Cron,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Clone)]
     pub enum ReportDestination {
         #[serde(rename = "email")]
         Email(String), // Supports email only
     }
 
-    #[derive(Default, Deserialize)]
+    #[derive(Default, Deserialize, Clone)]
     pub enum ReportMediaType {
         #[default]
         #[serde(rename = "pdf")]
         Pdf, // Supports Pdf only
     }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Clone)]
     pub struct ReportDashboard {
         pub dashboard: String,
         pub folder: String,
@@ -571,7 +571,7 @@ mod meta_table_reports {
         pub timerange: ReportTimerange,
     }
 
-    #[derive(Default, Deserialize)]
+    #[derive(Default, Deserialize, Clone)]
     pub struct ReportDashboardVariable {
         pub key: String,
         pub value: String,
@@ -579,7 +579,7 @@ mod meta_table_reports {
         pub id: Option<String>,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Clone)]
     pub struct ReportTimerange {
         #[serde(rename = "type")]
         pub range_type: ReportTimerangeType,
@@ -599,7 +599,7 @@ mod meta_table_reports {
         }
     }
 
-    #[derive(Default, Deserialize)]
+    #[derive(Default, Deserialize, Clone)]
     pub enum ReportTimerangeType {
         #[default]
         #[serde(rename = "relative")]
@@ -608,7 +608,7 @@ mod meta_table_reports {
         Absolute,
     }
 
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Serialize, Clone)]
     pub struct ReportFrequency {
         /// Frequency interval in the `frequency_type` unit
         #[serde(default)]
@@ -903,5 +903,255 @@ mod tests {
                 AND "folders"."folder_id" = 'default'
             "#
         );
+    }
+
+    #[test]
+    fn test_folder_ksuid_deterministic_generation() {
+        // Test that identical folder inputs always produce the same KSUID
+        let org1 = "test_org";
+        let folder_type = REPORTS_FOLDER_TYPE;
+        let folder_id = "default";
+
+        let ksuid1 = folder_ksuid_from_hash(org1, folder_type, folder_id);
+        let ksuid2 = folder_ksuid_from_hash(org1, folder_type, folder_id);
+        assert_eq!(ksuid1, ksuid2);
+
+        // Different inputs should produce different KSUIDs
+        let ksuid3 = folder_ksuid_from_hash("different_org", folder_type, folder_id);
+        assert_ne!(ksuid1, ksuid3);
+
+        let ksuid4 = folder_ksuid_from_hash(org1, folder_type, "different_folder");
+        assert_ne!(ksuid1, ksuid4);
+
+        let ksuid5 = folder_ksuid_from_hash(org1, 999, folder_id);
+        assert_ne!(ksuid1, ksuid5);
+    }
+
+    #[test]
+    fn test_report_ksuid_deterministic_generation() {
+        // Test that identical report inputs always produce the same KSUID
+        let report1 = meta_table_reports::Report {
+            name: "test_report".to_string(),
+            org_id: "test_org".to_string(),
+            ..Default::default()
+        };
+
+        let report2 = meta_table_reports::Report {
+            name: "test_report".to_string(),
+            org_id: "test_org".to_string(),
+            // Different fields but same identity fields
+            title: "Different Title".to_string(),
+            description: "Different description".to_string(),
+            enabled: !report1.enabled,
+            ..Default::default()
+        };
+
+        let folder_id = folder_ksuid_from_hash("test_org", REPORTS_FOLDER_TYPE, "default");
+
+        // Same identity fields should produce same KSUID
+        let ksuid1 = report_ksuid_from_hash(&report1, folder_id);
+        let ksuid2 = report_ksuid_from_hash(&report2, folder_id);
+        assert_eq!(ksuid1, ksuid2);
+
+        // Different identity fields should produce different KSUID
+        let mut report3 = report1.clone();
+        report3.name = "different_report".to_string();
+        let ksuid3 = report_ksuid_from_hash(&report3, folder_id);
+        assert_ne!(ksuid1, ksuid3);
+    }
+
+    #[test]
+    fn test_meta_report_with_folder_error_handling() {
+        // Test successful KSUID parsing
+        let valid_meta = MetaReportWithFolder {
+            value: "{}".to_string(),
+            id: Some("2TCDwPCXlNNEHdJ5oIhupZXZ3nJ".to_string()), // Valid KSUID
+        };
+        assert!(valid_meta.folder_id().is_ok());
+
+        // Test error on missing folder ID
+        let missing_folder = MetaReportWithFolder {
+            value: "{}".to_string(),
+            id: None,
+        };
+        assert!(missing_folder.folder_id().is_err());
+        assert_eq!(
+            missing_folder.folder_id().unwrap_err(),
+            "Could not find folder for the report"
+        );
+
+        // Test error on invalid KSUID format
+        let invalid_ksuid = MetaReportWithFolder {
+            value: "{}".to_string(),
+            id: Some("invalid_ksuid".to_string()),
+        };
+        assert!(invalid_ksuid.folder_id().is_err());
+    }
+
+    #[test]
+    fn test_report_destination_conversion() {
+        // Test single email destination
+        let meta_destinations = vec![meta_table_reports::ReportDestination::Email(
+            "test@example.com".to_string(),
+        )];
+        let reports_destinations: reports_table_ser::ReportDestinations =
+            meta_destinations.as_slice().into();
+
+        // Verify conversion works (specific implementation is internal)
+        let json_result = serde_json::to_value(&reports_destinations);
+        assert!(json_result.is_ok());
+
+        // Test multiple destinations
+        let multi_destinations = vec![
+            meta_table_reports::ReportDestination::Email("admin@example.com".to_string()),
+            meta_table_reports::ReportDestination::Email("user@example.com".to_string()),
+        ];
+        let multi_reports_destinations: reports_table_ser::ReportDestinations =
+            multi_destinations.as_slice().into();
+
+        let multi_json_result = serde_json::to_value(&multi_reports_destinations);
+        assert!(multi_json_result.is_ok());
+    }
+
+    #[test]
+    fn test_report_timerange_conversion() {
+        // Test relative timerange conversion
+        let relative_timerange = meta_table_reports::ReportTimerange {
+            range_type: meta_table_reports::ReportTimerangeType::Relative,
+            period: "1d".to_string(),
+            from: 0,
+            to: 0,
+        };
+
+        let converted_relative: report_dashboards_table_ser::ReportTimerange =
+            (&relative_timerange).into();
+
+        // Test that conversion produces valid JSON
+        let relative_json = serde_json::to_value(&converted_relative);
+        assert!(relative_json.is_ok());
+
+        // Test absolute timerange conversion
+        let absolute_timerange = meta_table_reports::ReportTimerange {
+            range_type: meta_table_reports::ReportTimerangeType::Absolute,
+            period: "".to_string(),
+            from: 1640995200000000, // 2022-01-01 in microseconds
+            to: 1641081600000000,   // 2022-01-02 in microseconds
+        };
+
+        let converted_absolute: report_dashboards_table_ser::ReportTimerange =
+            (&absolute_timerange).into();
+
+        // Test that conversion produces valid JSON
+        let absolute_json = serde_json::to_value(&converted_absolute);
+        assert!(absolute_json.is_ok());
+    }
+
+    #[test]
+    fn test_dashboard_variable_conversion() {
+        // Test dashboard variables conversion
+        let meta_variables = vec![
+            meta_table_reports::ReportDashboardVariable {
+                key: "environment".to_string(),
+                value: "production".to_string(),
+                id: Some("var1".to_string()),
+            },
+            meta_table_reports::ReportDashboardVariable {
+                key: "service".to_string(),
+                value: "api".to_string(),
+                id: None,
+            },
+        ];
+
+        let converted_variables: report_dashboards_table_ser::ReportDashboardVariables =
+            meta_variables.as_slice().into();
+
+        // Test that conversion produces valid JSON
+        let variables_json = serde_json::to_value(&converted_variables);
+        assert!(variables_json.is_ok());
+    }
+
+    #[test]
+    fn test_report_frequency_type_defaults() {
+        // Test default frequency type is Weeks
+        let default_frequency = meta_table_reports::ReportFrequency::default();
+        assert_eq!(
+            default_frequency.frequency_type,
+            meta_table_reports::ReportFrequencyType::Weeks
+        );
+        assert_eq!(default_frequency.interval, 1);
+        assert_eq!(default_frequency.cron, "");
+        assert!(default_frequency.align_time);
+
+        // Test frequency type enum default
+        let default_type = meta_table_reports::ReportFrequencyType::default();
+        assert_eq!(default_type, meta_table_reports::ReportFrequencyType::Weeks);
+    }
+
+    #[test]
+    fn test_empty_string_filtering() {
+        use meta_table_reports::Report;
+        let folder_id = folder_ksuid_from_hash("test_org", REPORTS_FOLDER_TYPE, "default");
+
+        // Test empty strings are filtered out in conversion
+        let report_with_empty_strings = Report {
+            name: "test_report".to_string(),
+            org_id: "test_org".to_string(),
+            description: "".to_string(), // Empty string should be filtered
+            message: "".to_string(),     // Empty string should be filtered
+            owner: "".to_string(),       // Empty string should be filtered
+            last_edited_by: "".to_string(), // Empty string should be filtered
+            ..Default::default()
+        };
+
+        let result: Result<reports_table::ActiveModel, String> =
+            (folder_id, &report_with_empty_strings).try_into();
+        assert!(result.is_ok());
+
+        let active_model = result.unwrap();
+        // The implementation should filter out empty strings and set them to None
+        // We can't directly inspect the Set values, but the conversion should succeed
+        match active_model.description {
+            sea_orm::ActiveValue::Set(desc) => assert_eq!(desc, None),
+            _ => panic!("Expected Set value for description"),
+        }
+    }
+
+    #[test]
+    fn test_timestamp_conversion() {
+        use chrono::{FixedOffset, TimeZone};
+
+        // Test timestamp conversion from DateTime to microseconds
+        let fixed_offset = FixedOffset::east_opt(0).unwrap();
+        let test_datetime = fixed_offset.from_utc_datetime(&chrono::Utc::now().naive_utc());
+
+        let timestamp_micros = test_datetime.timestamp_micros();
+        assert!(timestamp_micros > 0);
+
+        // Test that datetime_now() produces valid timestamps
+        let now = meta_table_reports::datetime_now();
+        assert!(now.timestamp_micros() > 0);
+    }
+
+    #[test]
+    fn test_reports_folder_type_constant() {
+        // Test that the constant matches the expected folder type for reports
+
+        // Test that it's different from other folder types (alerts = 1)
+        assert_ne!(REPORTS_FOLDER_TYPE, 1);
+
+        // Test that it's used correctly in hash generation
+        let ksuid1 = folder_ksuid_from_hash("test", REPORTS_FOLDER_TYPE, "default");
+        let ksuid2 = folder_ksuid_from_hash("test", 1, "default"); // Different type
+        assert_ne!(ksuid1, ksuid2);
+    }
+
+    #[test]
+    fn test_default_align_time_function() {
+        // Test that the default_align_time function returns true
+        assert!(meta_table_reports::default_align_time());
+
+        // Test that it's used in ReportFrequency default
+        let default_freq = meta_table_reports::ReportFrequency::default();
+        assert!(default_freq.align_time);
     }
 }

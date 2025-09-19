@@ -128,6 +128,7 @@ pub async fn handle_cache_responses_and_deltas(
     started_at: i64,
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
+    is_multi_stream_search: bool,
 ) -> Result<(), infra::errors::Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
@@ -213,6 +214,7 @@ pub async fn handle_cache_responses_and_deltas(
                     is_result_array_skip_vrl,
                     backup_query_fn.clone(),
                     all_streams,
+                    is_multi_stream_search,
                 )
                 .await?;
                 delta_iter.next(); // Move to the next delta after processing
@@ -262,6 +264,7 @@ pub async fn handle_cache_responses_and_deltas(
                 is_result_array_skip_vrl,
                 backup_query_fn.clone(),
                 all_streams,
+                is_multi_stream_search,
             )
             .await?;
             delta_iter.next(); // Move to the next delta after processing
@@ -362,6 +365,16 @@ async fn send_cached_responses(
         cached.cached_response.hits.len(),
         cached.cached_response.result_cache_ratio,
     );
+
+    #[cfg(feature = "enterprise")]
+    crate::service::search::cache::apply_regex_to_response(
+        req,
+        org_id,
+        all_streams,
+        stream_type,
+        &mut cached.cached_response,
+    )
+    .await?;
 
     if is_result_array_skip_vrl {
         cached.cached_response.hits = crate::service::search::cache::apply_vrl_to_response(
@@ -471,5 +484,25 @@ pub async fn write_partial_results_to_cache(
             }
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_write_results_to_cache_empty_results_logic() {
+        let accumulated_results: Vec<SearchResultType> = Vec::new();
+
+        // Test that empty results return early
+        assert!(accumulated_results.is_empty());
+
+        // This simulates the early return logic in write_results_to_cache
+        if accumulated_results.is_empty() {
+            // Should return Ok for empty results - this is the expected behavior
+            // No assertion needed here as this is just testing the early return logic
+        }
     }
 }

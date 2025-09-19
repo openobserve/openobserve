@@ -472,7 +472,7 @@ const removeVariable = (variable: any) => {
     );
 };
 
-const validateSqlQuery = () => {
+const validateSqlQuery = async () => {
   validatingSqlQuery.value = true;
   if (streamRoute.value.query_condition.type == "promql") {
     isValidSqlQuery.value = true;
@@ -490,7 +490,12 @@ const validateSqlQuery = () => {
 
   query.query.start_time = query.query.start_time + 895000000;
 
-  query.query.sql = streamRoute.value.query_condition.sql;
+  //before assigning the sql , we need to check if the sql does limit is applied or not 
+  //if yes we need to change the limit to 100 because for validating we dont need to send the original limit 
+  //if no we can directly assign the sql to the query 
+  //we dont need to change the actual query instead of we need to change the query that we are sending for validation purpose
+
+  query.query.sql = normalizeLimit(streamRoute.value.query_condition.sql,100);
 
   //removed the encoding as it is not required for the pipeline queries
   if (store.state.zoConfig.sql_base64_enabled && query?.encoding) {
@@ -521,10 +526,11 @@ const validateSqlQuery = () => {
             message: `${message}`,
             timeout: 3000,
           });
+          resolve("");
+        } else {
+          isValidSqlQuery.value = true;
           reject("");
-        } else isValidSqlQuery.value = true;
-
-        resolve("");
+        }
       });
   });
 };
@@ -545,6 +551,36 @@ const toggleExpandLog = (index: number) => {
 const updateDelay = (val: any) => {
   streamRoute.value.delay = parseInt(val);
 };
+//this is used to normalize the limit in the sql query
+//if the limit is greater than maxLimit then it will set the limit to maxLimit
+//if the limit is less than maxLimit then it will set the limit to the original limit
+//if there is no limit in the sql query then it will return the sql query as is
+const normalizeLimit = (sql: string, maxLimit = 100): string => {
+  try {
+    // regex will detect the LIMIT and OFFSET in the sql query 
+    // it will capture multiple LIMIT and OFFSET in the sql query
+    const regex = /\bLIMIT\s+(\d+)(\s+OFFSET\s+\d+)?/gi;
+     //here we will test if the sql query has LIMIT and OFFSET
+    //if it has LIMIT then we will replace the LIMIT with the normalized limit
+    //if it has no LIMIT then we will return the sql query as is
+    //if it has LIMIT but no OFFSET then we will return the sql query with the normalized
+    //we have moved to match instead of test because sometimes it fails when there are multiple limit with in the same query 
+    //due to last index effects
+    if (sql.match(regex)) {
+      return sql.replace(regex, (match, limit, offset) => {
+        const num = parseInt(limit, 10);
+        return `LIMIT ${num > maxLimit ? maxLimit : num}${offset || ''}`;
+      });
+    }
+
+    // no LIMIT just return as it is the same query that user have written
+    return sql;
+  } catch (error) {
+    console.error("Error normalizing SQL limit:", error);
+    return sql; // fallback to original SQL
+  }
+};
+
 </script>
 
 <style scoped>

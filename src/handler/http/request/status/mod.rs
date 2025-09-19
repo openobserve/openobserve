@@ -75,12 +75,14 @@ use crate::{
     },
     service::{
         db,
-        search::datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
-        tantivy::puffin_directory::reader_cache,
+        search::{
+            datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
+            grpc::tantivy_result_cache,
+        },
     },
 };
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, serde::Deserialize, ToSchema)]
 pub struct HealthzResponse {
     status: String,
 }
@@ -125,7 +127,7 @@ struct ConfigResponse<'a> {
     usage_publish_interval: i64,
     ingestion_url: String,
     #[cfg(feature = "enterprise")]
-    aggregation_cache_enabled: bool,
+    streaming_aggregation_enabled: bool,
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
     max_dashboard_series: usize,
@@ -138,7 +140,7 @@ struct ConfigResponse<'a> {
     dashboard_show_symbol_enabled: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, serde::Deserialize)]
 struct Rum {
     pub enabled: bool,
     pub client_token: String,
@@ -335,7 +337,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         usage_publish_interval: cfg.common.usage_publish_interval,
         ingestion_url: cfg.common.ingestion_url.to_string(),
         #[cfg(feature = "enterprise")]
-        aggregation_cache_enabled: cfg.common.aggregation_cache_enabled,
+        streaming_aggregation_enabled: cfg.common.feature_query_streaming_aggs,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
@@ -356,8 +358,6 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     stats.insert("LOCAL_NODE_UUID", json::json!(LOCAL_NODE.uuid.clone()));
     stats.insert("LOCAL_NODE_NAME", json::json!(&cfg.common.instance_name));
     stats.insert("LOCAL_NODE_ROLE", json::json!(&cfg.common.node_role));
-    let nodes = cluster::get_cached_online_nodes().await;
-    stats.insert("NODE_LIST", json::json!(nodes));
 
     let (stream_num, stream_schema_num, mem_size) = get_stream_schema_status().await;
     stats.insert("STREAM_SCHEMA", json::json!({"stream_num": stream_num,"stream_schema_num": stream_schema_num, "mem_size": mem_size}));
@@ -401,11 +401,17 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     );
     stats.insert(
         "DATAFUSION",
-        json::json!({"file_stat_cache": file_statistics_cache::GLOBAL_CACHE.clone().len()}),
+        json::json!({"file_stat_cache": {
+            "file_num": file_statistics_cache::GLOBAL_CACHE.len(),
+            "mem_size": file_statistics_cache::GLOBAL_CACHE.memory_size()
+        }}),
     );
     stats.insert(
         "INVERTED_INDEX",
-        json::json!({"reader_cache": reader_cache::GLOBAL_CACHE.clone().len()}),
+        json::json!({"result_cache": {
+            "file_num": tantivy_result_cache::GLOBAL_CACHE.len(),
+            "mem_size": tantivy_result_cache::GLOBAL_CACHE.memory_size()
+        }}),
     );
 
     #[cfg(feature = "enterprise")]
@@ -462,14 +468,15 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
 async fn get_stream_schema_status() -> (usize, usize, usize) {
     let mut stream_num = 0;
     let mut stream_schema_num = 0;
-    let mut mem_size = 0;
+    let mut mem_size = std::mem::size_of::<HashMap<String, Vec<Schema>>>();
     let r = STREAM_SCHEMAS.read().await;
     for (key, val) in r.iter() {
         stream_num += 1;
         mem_size += std::mem::size_of::<Vec<Schema>>();
-        mem_size += key.len();
+        mem_size += std::mem::size_of::<String>() + key.len();
         for schema in val.iter() {
             stream_schema_num += 1;
+            mem_size += std::mem::size_of::<i64>();
             mem_size += schema.1.size();
         }
     }
@@ -478,8 +485,8 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
     for (key, schema) in r.iter() {
         stream_num += 1;
         stream_schema_num += 1;
-        mem_size += key.len();
-        mem_size += schema.schema().size();
+        mem_size += std::mem::size_of::<String>() + key.len();
+        mem_size += schema.size();
     }
     drop(r);
     (stream_num, stream_schema_num, mem_size)
@@ -549,8 +556,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 &get_dex_config().client_id,
                 true,
                 true,
-            )
-            .await;
+            );
             let id_token;
             match token_ver {
                 Ok(res) => {
@@ -937,4 +943,432 @@ async fn consistent_hash(body: web::Json<HashFileRequest>) -> Result<HttpRespons
         ret.files.insert(file.clone(), nodes);
     }
     Ok(MetaHttpResponse::json(ret))
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json;
+
+    use super::*;
+
+    #[test]
+    fn test_healthz_response_different_status() {
+        let response = HealthzResponse {
+            status: "not ok".to_string(),
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"status\":\"not ok\""));
+    }
+
+    #[test]
+    fn test_healthz_response_empty_status() {
+        let response = HealthzResponse {
+            status: "".to_string(),
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"status\":\"\""));
+    }
+
+    #[test]
+    fn test_rum_serialization() {
+        let rum = Rum {
+            enabled: true,
+            client_token: "test_token".to_string(),
+            application_id: "test_app".to_string(),
+            site: "test_site".to_string(),
+            service: "test_service".to_string(),
+            env: "test_env".to_string(),
+            version: "1.0.0".to_string(),
+            organization_identifier: "test_org".to_string(),
+            api_version: "v1".to_string(),
+            insecure_http: false,
+        };
+
+        let json = serde_json::to_string(&rum).unwrap();
+        assert!(json.contains("\"enabled\":true"));
+        assert!(json.contains("\"client_token\":\"test_token\""));
+        assert!(json.contains("\"application_id\":\"test_app\""));
+        assert!(json.contains("\"insecure_http\":false"));
+    }
+
+    #[test]
+    fn test_rum_serialization_disabled() {
+        let rum = Rum {
+            enabled: false,
+            client_token: "".to_string(),
+            application_id: "".to_string(),
+            site: "".to_string(),
+            service: "".to_string(),
+            env: "".to_string(),
+            version: "".to_string(),
+            organization_identifier: "".to_string(),
+            api_version: "".to_string(),
+            insecure_http: true,
+        };
+
+        let json = serde_json::to_string(&rum).unwrap();
+        assert!(json.contains("\"enabled\":false"));
+        assert!(json.contains("\"insecure_http\":true"));
+    }
+
+    #[test]
+    fn test_rum_with_special_characters() {
+        let rum = Rum {
+            enabled: true,
+            client_token: "token_with_special_chars!@#$%".to_string(),
+            application_id: "app-id.with.dots".to_string(),
+            site: "site with spaces".to_string(),
+            service: "service/with/slashes".to_string(),
+            env: "env_with_underscores".to_string(),
+            version: "1.0.0-beta+build.1".to_string(),
+            organization_identifier: "org-123-test".to_string(),
+            api_version: "v2.1".to_string(),
+            insecure_http: false,
+        };
+
+        let json = serde_json::to_string(&rum).unwrap();
+        assert!(json.contains("token_with_special_chars!@#$%"));
+        assert!(json.contains("app-id.with.dots"));
+        assert!(json.contains("site with spaces"));
+        assert!(json.contains("service/with/slashes"));
+        assert!(json.contains("1.0.0-beta+build.1"));
+    }
+
+    #[test]
+    fn test_healthz_response_structure() {
+        // Test that we can create and serialize a HealthzResponse
+        let response = HealthzResponse {
+            status: "ok".to_string(),
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"status\":\"ok\""));
+    }
+
+    #[test]
+    fn test_prepare_empty_cookie_basic() {
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct TestToken {
+            value: String,
+        }
+
+        let test_token = TestToken {
+            value: "test_value".to_string(),
+        };
+
+        let config = Arc::new(Config::default());
+        let cookie = prepare_empty_cookie("test_cookie", &test_token, &config);
+
+        assert_eq!(cookie.name(), "test_cookie");
+        assert!(!cookie.value().is_empty());
+        assert_eq!(cookie.path(), Some("/"));
+        assert_eq!(cookie.http_only(), Some(true));
+    }
+
+    #[test]
+    fn test_prepare_empty_cookie_security_settings() {
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct EmptyToken {}
+
+        let empty_token = EmptyToken {};
+        let config = Arc::new(Config::default());
+        let cookie = prepare_empty_cookie("auth_cookie", &empty_token, &config);
+
+        assert_eq!(cookie.http_only(), Some(true));
+        assert_eq!(cookie.path(), Some("/"));
+        assert!(cookie.expires().is_some());
+    }
+
+    #[test]
+    fn test_prepare_empty_cookie_different_names() {
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct TestData {
+            id: i32,
+        }
+
+        let test_data = TestData { id: 42 };
+        let config = Arc::new(Config::default());
+
+        let cookie1 = prepare_empty_cookie("cookie1", &test_data, &config);
+        let cookie2 = prepare_empty_cookie("cookie2", &test_data, &config);
+
+        assert_eq!(cookie1.name(), "cookie1");
+        assert_eq!(cookie2.name(), "cookie2");
+        assert_eq!(cookie1.value(), cookie2.value()); // Same data, same encoded value
+    }
+
+    #[tokio::test]
+    async fn test_get_stream_schema_status_empty() {
+        let (_stream_num, _stream_schema_num, mem_size) = get_stream_schema_status().await;
+
+        // Should return some values, even if caches are empty
+        assert!(mem_size > 0); // At least the size of empty HashMap
+    }
+
+    #[test]
+    fn test_rum_deserialization() {
+        let json = r#"{
+            "enabled": true,
+            "client_token": "token123",
+            "application_id": "app123",
+            "site": "site123",
+            "service": "service123",
+            "env": "prod",
+            "version": "2.0.0",
+            "organization_identifier": "org123",
+            "api_version": "v2",
+            "insecure_http": true
+        }"#;
+
+        let rum: Rum = serde_json::from_str(json).unwrap();
+        assert!(rum.enabled);
+        assert_eq!(rum.client_token, "token123");
+        assert_eq!(rum.application_id, "app123");
+        assert!(rum.insecure_http);
+    }
+
+    #[test]
+    fn test_rum_round_trip_serialization() {
+        let original = Rum {
+            enabled: false,
+            client_token: "round_trip_token".to_string(),
+            application_id: "round_trip_app".to_string(),
+            site: "round_trip_site".to_string(),
+            service: "round_trip_service".to_string(),
+            env: "staging".to_string(),
+            version: "0.1.0".to_string(),
+            organization_identifier: "round_trip_org".to_string(),
+            api_version: "v1.5".to_string(),
+            insecure_http: false,
+        };
+
+        let json = serde_json::to_string(&original).unwrap();
+        let deserialized: Rum = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(original.enabled, deserialized.enabled);
+        assert_eq!(original.client_token, deserialized.client_token);
+        assert_eq!(original.application_id, deserialized.application_id);
+        assert_eq!(original.site, deserialized.site);
+        assert_eq!(original.service, deserialized.service);
+        assert_eq!(original.env, deserialized.env);
+        assert_eq!(original.version, deserialized.version);
+        assert_eq!(
+            original.organization_identifier,
+            deserialized.organization_identifier
+        );
+        assert_eq!(original.api_version, deserialized.api_version);
+        assert_eq!(original.insecure_http, deserialized.insecure_http);
+    }
+
+    #[test]
+    fn test_healthz_response_round_trip_serialization() {
+        let original = HealthzResponse {
+            status: "healthy".to_string(),
+        };
+
+        let json = serde_json::to_string(&original).unwrap();
+        let deserialized: HealthzResponse = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(original.status, deserialized.status);
+    }
+
+    #[test]
+    fn test_prepare_empty_cookie_with_complex_data() {
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct ComplexData {
+            nested: NestedData,
+            array: Vec<String>,
+            flag: bool,
+        }
+
+        #[derive(Serialize)]
+        struct NestedData {
+            id: u64,
+            name: String,
+        }
+
+        let complex_data = ComplexData {
+            nested: NestedData {
+                id: 12345,
+                name: "test_nested".to_string(),
+            },
+            array: vec!["item1".to_string(), "item2".to_string()],
+            flag: true,
+        };
+
+        let config = Arc::new(Config::default());
+        let cookie = prepare_empty_cookie("complex_cookie", &complex_data, &config);
+
+        assert_eq!(cookie.name(), "complex_cookie");
+        assert!(!cookie.value().is_empty());
+
+        // Verify the cookie value is base64 encoded JSON
+        let decoded_str = base64::decode(cookie.value()).unwrap();
+        let json_str = decoded_str;
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+
+        assert_eq!(parsed["nested"]["id"], 12345);
+        assert_eq!(parsed["nested"]["name"], "test_nested");
+        assert_eq!(parsed["flag"], true);
+        assert_eq!(parsed["array"][0], "item1");
+    }
+
+    #[test]
+    fn test_rum_with_unicode_characters() {
+        let rum = Rum {
+            enabled: true,
+            client_token: "тестовый_токен".to_string(),
+            application_id: "应用程序_id".to_string(),
+            site: "サイト名".to_string(),
+            service: "خدمة_اختبار".to_string(),
+            env: "環境_test".to_string(),
+            version: "1.0.0-α".to_string(),
+            organization_identifier: "org_测试".to_string(),
+            api_version: "v1.0-β".to_string(),
+            insecure_http: false,
+        };
+
+        let json = serde_json::to_string(&rum).unwrap();
+        let deserialized: Rum = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(rum.client_token, deserialized.client_token);
+        assert_eq!(rum.application_id, deserialized.application_id);
+        assert_eq!(rum.site, deserialized.site);
+        assert_eq!(rum.version, deserialized.version);
+    }
+
+    #[test]
+    fn test_healthz_response_with_long_status() {
+        let long_status = "a".repeat(1000);
+        let response = HealthzResponse {
+            status: long_status.clone(),
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        let deserialized: HealthzResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.status, long_status);
+    }
+
+    #[test]
+    fn test_rum_default_values() {
+        let rum = Rum {
+            enabled: false,
+            client_token: String::new(),
+            application_id: String::new(),
+            site: String::new(),
+            service: String::new(),
+            env: String::new(),
+            version: String::new(),
+            organization_identifier: String::new(),
+            api_version: String::new(),
+            insecure_http: false,
+        };
+
+        let json = serde_json::to_string(&rum).unwrap();
+        assert!(json.contains("\"enabled\":false"));
+        assert!(json.contains("\"client_token\":\"\""));
+        assert!(json.contains("\"insecure_http\":false"));
+    }
+
+    #[test]
+    fn test_prepare_empty_cookie_with_empty_data() {
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct EmptyStruct;
+
+        let empty_data = EmptyStruct;
+        let config = Arc::new(Config::default());
+        let cookie = prepare_empty_cookie("empty_cookie", &empty_data, &config);
+
+        assert_eq!(cookie.name(), "empty_cookie");
+        assert!(!cookie.value().is_empty()); // Even empty struct gets base64 encoded
+
+        // Verify it's valid base64 encoded JSON
+        let decoded_str = base64::decode(cookie.value()).unwrap();
+        let json_str = decoded_str;
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+        // Empty structs serialize as null in serde, not as objects
+        assert!(parsed.is_null() || parsed.is_object());
+    }
+
+    #[test]
+    fn test_prepare_empty_cookie_serialization_error_handling() {
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct ValidData {
+            value: String,
+        }
+
+        let valid_data = ValidData {
+            value: "test".to_string(),
+        };
+        let config = Arc::new(Config::default());
+        let cookie = prepare_empty_cookie("valid_cookie", &valid_data, &config);
+
+        // Should not panic and should produce valid cookie
+        assert_eq!(cookie.name(), "valid_cookie");
+        assert!(!cookie.value().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_stream_schema_status_returns_valid_data() {
+        let (_stream_num, _stream_schema_num, mem_size) = get_stream_schema_status().await;
+
+        // All values should be non-negative integers
+        assert!(mem_size > 0); // Memory size should always be positive
+    }
+
+    #[test]
+    fn test_rum_field_types() {
+        let rum = Rum {
+            enabled: true,
+            client_token: "token".to_string(),
+            application_id: "app".to_string(),
+            site: "site".to_string(),
+            service: "service".to_string(),
+            env: "env".to_string(),
+            version: "1.0".to_string(),
+            organization_identifier: "org".to_string(),
+            api_version: "v1".to_string(),
+            insecure_http: false,
+        };
+
+        // Test that all boolean fields work correctly
+        assert!(rum.enabled);
+        assert!(!rum.insecure_http);
+
+        // Test that all string fields are properly set
+        assert!(!rum.client_token.is_empty());
+        assert!(!rum.application_id.is_empty());
+        assert!(!rum.site.is_empty());
+        assert!(!rum.service.is_empty());
+        assert!(!rum.env.is_empty());
+        assert!(!rum.version.is_empty());
+        assert!(!rum.organization_identifier.is_empty());
+        assert!(!rum.api_version.is_empty());
+    }
 }

@@ -158,6 +158,7 @@ export default defineComponent({
       ingestTabType,
       tabsFilter,
       filteredList,
+      networkingTabs,
     };
   },
 });

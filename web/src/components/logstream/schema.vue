@@ -46,13 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-spinner-hourglass color="primary" size="lg" />
         </div>
-        <div
-          v-else-if="indexData.schema.length == 0"
-          class="q-pt-md text-center q-w-md q-mx-lg"
-          style="max-width: 450px"
-        >
-          No data available.
-        </div>
         <div v-else class="indexDetailsContainer" style="height: 100vh">
           <div
             class="titleContainer tw-flex tw-flex-col tw-items-flex-start tw-gap-5"
@@ -325,16 +318,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-card-section>
                 <!-- Main Content (Scrollable if necessary) -->
                 <q-card-section
+
                   class="q-pa-none"
-                  style="flex: 1; overflow-y: auto; padding: 4px 16px 6px 16px"
+                  style="flex: 1; overflow-y: auto; padding: 4px 16px 6px 16px; margin-bottom: 4px;"
                 >
                   <StreamFieldsInputs
                     :fields="newSchemaFields"
                     :showHeader="false"
-                    :isInSchema="true"
                     :visibleInputs="{
                       name: true,
-                      type: false,
+                      data_type: true,
                       index_type: false,
                     }"
                     @add="addSchemaField"
@@ -447,8 +440,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           props.row.name == allFieldsName
                         )
                       "
-                      v-model="props.row.index_type"
+                      :model-value="computedIndexType(props).value"
                       :options="streamIndexType"
+                      option-label="label"
+                      option-value="value"
                       :popup-content-style="{ textTransform: 'capitalize' }"
                       color="input-border"
                       bg-color="input-bg"
@@ -468,8 +463,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       filled
                       dense
                       style="min-width: 15rem; max-width: 15rem"
-                      @update:model-value="markFormDirty(props.row.name, 'fts')"
-                    />
+                      @update:model-value="val => updateIndexType(props, val)"
+                    >
+                    <template v-slot:option="scope">
+                      <q-item style="margin: 0px !important; border-radius: 0px !important;" v-bind="scope.itemProps" :disable="disableOptions(props.row, scope.opt)">
+                        <q-item-section>
+                          <q-item-label>
+                            {{ scope.opt.label }}
+                          </q-item-label>
+                        </q-item-section>
+                        <q-tooltip class="tw-text-[12px] tw-w-[200px]" v-if="checkIfOptionPresentInDefaultEnv(props.row.name, scope.opt) == true">
+                          This is a predefined environment setting and cannot be changed.
+                        </q-tooltip>
+                      </q-item>
+                    </template>
+                  </q-select>
                   </q-td>
                 </template>
                 <!-- here we will render the number of regex patterns associated with the specific field -->
@@ -967,11 +975,8 @@ export default defineComponent({
 
     const getFieldIndices = (property, settings) => {
       const fieldIndices = [];
-      if (
-        (settings.full_text_search_keys.length > 0 &&
-          settings.full_text_search_keys.includes(property.name)) ||
-        (settings.full_text_search_keys.length == 0 &&
-          store.state.zoConfig.default_fts_keys.includes(property.name))
+      if (settings.full_text_search_keys.length > 0 &&
+          settings.full_text_search_keys.includes(property.name)
       ) {
         fieldIndices.push("fullTextSearchKey");
       }
@@ -1017,19 +1022,18 @@ export default defineComponent({
     };
 
     const setSchema = (streamResponse) => {
+
       const schemaMapping = new Set([]);
 
       //here lets add the pattern associations to the streamResponse
       streamResponse.settings.pattern_associations = streamResponse.pattern_associations;
       if (streamResponse?.settings) {
-        // console.log("streamResponse:", streamResponse);
         previousSchemaVersion = JSON.parse(
           JSON.stringify(streamResponse.settings),
         );
       }
       //after this we need to have a map of pattern_id and according to field as well
       //so that we can easily access the apply_at value for a pattern if it is undefined or null
-      
       previousSchemaVersion.pattern_associations && previousSchemaVersion.pattern_associations.forEach((pattern: PatternAssociation) => {
         patternIdToApplyAtMap.set(pattern.field + pattern.pattern_id, pattern);
       });
@@ -1163,6 +1167,7 @@ export default defineComponent({
     const onSubmit = async () => {
       patternAssociations.value = ungroupPatternAssociations(patternAssociations.value);
       let settings = {
+        fields: [], // only used for add new fields
         partition_keys: [],
         index_fields: [],
         full_text_search_keys: [],
@@ -1171,6 +1176,7 @@ export default defineComponent({
         extended_retention_days: [...indexData.value.extended_retention_days],
         pattern_associations: [...patternAssociations.value],
       };
+
       if (showDataRetention.value && dataRetentionDays.value < 1) {
         q.notify({
           color: "negative",
@@ -1194,14 +1200,22 @@ export default defineComponent({
       settings["store_original_data"] = storeOriginalData.value;
       settings["approx_partition"] = approxPartition.value;
 
-      const newSchemaFieldsSet = new Set(
+      const newSchemaFieldSet = new Set(
+        newSchemaFields.value.map((field) => {
+          return {
+            name: field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
+            type: field.type,
+          }
+        }),
+      );
+      const newSchemaFieldNameSet = new Set(
         newSchemaFields.value.map((field) =>
-          field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
-        ),
+           field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_")
+         ),
       );
       // Push unique and normalized field names to settings.defined_schema_fields
-      settings.defined_schema_fields.push(...newSchemaFieldsSet);
-
+      settings.fields.push(...newSchemaFieldSet);
+      settings.defined_schema_fields.push(...newSchemaFieldNameSet);
       redDaysList.value.forEach((field) => {
         settings.extended_retention_days.push({
           start: field.start,
@@ -1400,7 +1414,21 @@ export default defineComponent({
         option.value.includes("hashPartition")
       )
         return true;
-
+            //handle if fulltextsearchkey or secondaryindexkey is selected by env then we need to disable the option
+            if (
+        store.state.zoConfig.default_fts_keys.includes(schema.name) &&
+        option.value.includes("fullTextSearchKey")
+      )
+      {
+        return true;
+      }
+      if (
+        store.state.zoConfig.default_secondary_index_fields.includes(schema.name) &&
+        option.value.includes("secondaryIndexKey")
+      )
+      {
+        return true;
+      }
       return false;
     };
 
@@ -1522,6 +1550,7 @@ export default defineComponent({
         resultTotal.value = indexData.value.schema.length;
       }
     };
+
     const updateActiveMainTab = (tab) => {
       activeMainTab.value = tab;
     };
@@ -1559,6 +1588,7 @@ export default defineComponent({
 
       selectedFields.value = [];
     };
+
     const updateStreamResponse = (streamResponse) => {
       if (streamResponse.settings.hasOwnProperty("defined_schema_fields")) {
         const userDefinedSchema = streamResponse.settings.defined_schema_fields;
@@ -1580,13 +1610,13 @@ export default defineComponent({
             isUserDefined: true,
             // Optionally, add default values for other properties (e.g., type, index_type, etc.)
           }));
-
         // Combine the updated schema with additional fields
         streamResponse.schema = [...updatedSchema, ...additionalFields];
       }
       updateResultTotal(streamResponse);
       return streamResponse;
     };
+    
     const closeDialog = () => {
       isDialogOpen.value = false;
       newSchemaFields.value = [];
@@ -1750,7 +1780,64 @@ export default defineComponent({
       if(patternAssociations.value[fieldName]){
         patternAssociationDialog.value.data = [...patternAssociations.value[fieldName]];
       }
+    };
+
+
+  //this is used to compute the index_type value based on the env
+  //so instead of directly showing the value of the index_type we will add the values of fulltextsearchkey and secondaryindexkey if it is set by the env
+  //and if it is not set by the env then we will not add the values of fulltextsearchkey and secondaryindexkey becuase those will be already there and we don't want to show them twice
+  const computedIndexType = (props) => {
+    return computed(() => {
+      let keysToBeDisplayed = props.row.index_type || [];
+      // return the actual index_type value from the row
+      //merge env fts and secondary index keys
+      //check for the props.row.name is in the env fts and secondary index keys
+      if (store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1
+        ) {
+        keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "fullTextSearchKey"])];
+      }
+      if (store.state.zoConfig.default_secondary_index_fields.indexOf(props.row.name) > -1
+      ) {
+        keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "secondaryIndexKey"])];
+      }
+      return keysToBeDisplayed || []
+    })
+  };
+  //this function is used to check if the option is present in the default env
+  //if present then we will return true else false
+  //this is used to show the tooltip in the q-select for disabled options
+  //why there are disabled
+  const checkIfOptionPresentInDefaultEnv = (name, option) => {
+    if (store.state.zoConfig.default_fts_keys.indexOf(name) > -1 && option.value == "fullTextSearchKey") {
+      return true;
     }
+    if (store.state.zoConfig.default_secondary_index_fields.indexOf(name) > -1 && option.value == "secondaryIndexKey") {
+      return true;
+  }
+  return false;
+  };
+  //this is used to upate the model value of the index_type
+  const updateIndexType = (props, value) => {
+    props.row.index_type = filterValueBasedOnEnv(props, value ?? []);
+    markFormDirty(props.row.name, 'fts');
+  };
+  //this function is used while we update the index_type value so if the value is set by the env then we need to remove it from the value because 
+  //we don't give access to the user to change the value of the env set by the env
+  //and if it is empty then we will return empty array 
+  //if the value is not empty then we will remove the value if it is set by the env
+  const filterValueBasedOnEnv = (props, value) => {
+    if(value.length == 0){
+      return [];
+    }
+    let filteredValue = value;
+    if (store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1 && value.includes("fullTextSearchKey")) {
+      filteredValue = value.filter(item => item !== "fullTextSearchKey");
+    }
+    if (store.state.zoConfig.default_secondary_index_fields.indexOf(props.row.name) > -1 && value.includes("secondaryIndexKey")) {
+      filteredValue = value.filter(item => item !== "secondaryIndexKey");
+    }
+    return filteredValue;
+  };
 
 
     return {
@@ -1827,7 +1914,17 @@ export default defineComponent({
       openPatternAssociationDialog,
       handleAddPattern,
       handleRemovePattern,
-      handleUpdateAppliedPattern
+      handleUpdateAppliedPattern,
+      getFieldIndices,
+      setSchema,
+      formatDate,
+      convertUnixToQuasarFormat,
+      computedSchemaFieldsName,
+      groupPatternAssociationsByField,
+      ungroupPatternAssociations,
+      computedIndexType,
+      checkIfOptionPresentInDefaultEnv,
+      updateIndexType,
     };
   },
   created() {

@@ -44,7 +44,7 @@ use crate::{
                     node::{RemoteScanNode, SearchInfos},
                     remote_scan::RemoteScanExec,
                 },
-                exec::prepare_datafusion_context,
+                exec::DataFusionContextBuilder,
                 table_provider::empty_table::NewEmptyTable,
             },
             utils::ScanStatsVisitor,
@@ -102,7 +102,10 @@ pub(crate) async fn create_context(
         stats.original_size,
     );
 
-    let ctx = prepare_datafusion_context(trace_id, None, vec![], vec![], false, 0).await?;
+    let ctx = DataFusionContextBuilder::new()
+        .trace_id(trace_id)
+        .build(0)
+        .await?;
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
     log::info!("[trace_id {trace_id}] promql->wal->search: register mem table done");
     ctx.register_table(stream_name, mem_table)?;
@@ -131,7 +134,9 @@ async fn get_wal_batches(
     }
     let nodes = nodes.unwrap();
 
-    let ctx = prepare_datafusion_context(trace_id, None, vec![], vec![], false, cfg.limit.cpu_num)
+    let ctx = DataFusionContextBuilder::new()
+        .trace_id(trace_id)
+        .build(cfg.limit.cpu_num)
         .await?;
     let table = Arc::new(
         NewEmptyTable::new(stream_name, Arc::clone(&schema))
@@ -181,6 +186,7 @@ async fn get_wal_batches(
             timeout: cfg.limit.query_timeout,
             use_cache: false,
             histogram_interval: 0, // not needed for wal
+            is_analyze: false,     // not needed for wal
         },
         index_info: IndexInfo::default(), // not needed for wal
         super_cluster_info: cluster_rpc::SuperClusterInfo::default(), // current not needed for wal

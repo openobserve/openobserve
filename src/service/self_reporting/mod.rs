@@ -16,6 +16,8 @@
 use chrono::{DateTime, Datelike, Timelike};
 #[cfg(feature = "enterprise")]
 use config::META_ORG_ID;
+#[cfg(feature = "enterprise")]
+use config::spawn_pausable_job;
 use config::{
     SIZE_IN_MB,
     cluster::LOCAL_NODE,
@@ -143,6 +145,7 @@ pub async fn report_request_usage_stats(
             is_partial: stats.is_partial,
             work_group: None,
             node_name: stats.node_name.clone(),
+            dashboard_info: stats.dashboard_info.clone(),
         });
     };
 
@@ -184,6 +187,7 @@ pub async fn report_request_usage_stats(
         is_partial: stats.is_partial,
         work_group: stats.work_group,
         node_name: stats.node_name,
+        dashboard_info: stats.dashboard_info,
     });
     if !usage.is_empty() {
         publish_usage(usage).await;
@@ -231,7 +235,6 @@ pub async fn publish_error(error_data: ErrorData) {
     if !should_report_usage() {
         return;
     }
-
     match queues::ERROR_QUEUE
         .enqueue(ReportingData::Error(Box::new(error_data)))
         .await
@@ -276,25 +279,25 @@ pub async fn flush() {
 
 // Cron job to frequently publish auditted events
 #[cfg(feature = "enterprise")]
-pub async fn run_audit_publish() {
+pub fn run_audit_publish() -> Option<tokio::task::JoinHandle<()>> {
     let o2cfg = o2_enterprise::enterprise::common::config::get_config();
     if !o2cfg.common.audit_enabled {
-        return;
+        return None;
     }
 
-    let mut audit_interval = tokio::time::interval(tokio::time::Duration::from_secs(
-        o2cfg.common.audit_publish_interval.try_into().unwrap(),
-    ));
-    audit_interval.tick().await; // trigger the first run
-    loop {
-        log::debug!("Audit ingestion loop running");
-        audit_interval.tick().await;
-        o2_enterprise::enterprise::common::auditor::publish_existing_audits(
-            META_ORG_ID,
-            publish_audit,
-        )
-        .await;
-    }
+    Some(spawn_pausable_job!(
+        "audit_publish",
+        o2cfg.common.audit_publish_interval,
+        {
+            log::debug!("Audit ingestion loop running");
+            o2_enterprise::enterprise::common::auditor::publish_existing_audits(
+                META_ORG_ID,
+                publish_audit,
+            )
+            .await;
+        },
+        pause_if: o2cfg.common.audit_publish_interval == 0 || !o2_enterprise::enterprise::common::config::get_config().common.audit_enabled
+    ))
 }
 
 #[cfg(feature = "enterprise")]

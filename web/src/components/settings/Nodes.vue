@@ -915,6 +915,7 @@ export default defineComponent({
         }
         return filtered;
       },
+      flattenObject,
     };
   },
 });

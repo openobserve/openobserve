@@ -28,8 +28,8 @@ use o2_enterprise::enterprise::{
 };
 use o2_openfga::{
     authorizer::authz::{
-        add_tuple_for_pipeline, get_org_creation_tuples, get_ownership_all_org_tuple,
-        get_ownership_tuple, get_user_role_tuple, update_tuples,
+        add_tuple_for_pipeline, get_add_user_to_org_tuples, get_org_creation_tuples,
+        get_ownership_all_org_tuple, get_ownership_tuple, update_tuples,
     },
     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
 };
@@ -246,8 +246,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         } else {
                             org_user.role.to_string()
                         };
-
-                        get_user_role_tuple(&role, &org_user.email, &org_user.org_id, &mut tuples);
+                        get_add_user_to_org_tuples(
+                            &org_user.org_id,
+                            &org_user.email,
+                            &role,
+                            &mut tuples,
+                        );
                     }
                 }
             } else {

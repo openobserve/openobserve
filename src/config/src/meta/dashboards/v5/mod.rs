@@ -319,6 +319,20 @@ pub struct ColorCfg {
     fixed_color: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     series_by: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    color_by_series: Option<Vec<ColorBySeries>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct ColorBySeries {
+    #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
+    typee: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    color: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -389,14 +403,20 @@ pub struct Field {
     value: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
-#[serde(default)]
-#[serde(rename_all = "camelCase")]
-pub struct Config {
-    #[serde(rename = "type")]
-    typee: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    value: Option<Value>,
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum Config {
+    #[serde(rename = "unit")]
+    Unit {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<Value>,
+    },
+    #[serde(rename = "unique_value_color")]
+    #[serde(rename_all = "camelCase")]
+    UniqueValueColor {
+        #[serde(default)]
+        auto_color: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]

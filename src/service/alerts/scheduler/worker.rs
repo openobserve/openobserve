@@ -96,6 +96,13 @@ impl SchedulerWorker {
 
                     // Process the trigger
                     let ret = self.handle_trigger(&job.trace_id, job.trigger).await;
+                    log::debug!(
+                        "[SCHEDULER][Worker-{}] trace_id: {} Job[{}], trigger: {} done",
+                        self.id,
+                        job.trace_id,
+                        job_id,
+                        job_key
+                    );
                     // Stop the keep alive for the job
                     if let Err(e) = job.stop_keep_alive_tx.send(()).await {
                         log::error!(
@@ -135,7 +142,17 @@ impl SchedulerWorker {
     pub async fn handle_trigger(&self, trace_id: &str, trigger: Trigger) -> Result<()> {
         let trace_id = trace_id.to_owned();
         // If there is any panic, it should not crash the scheduler worker
-        let handler_job = tokio::spawn(async move { handle_triggers(&trace_id, trigger).await });
+        let handler_job = tokio::spawn(async move {
+            let trigger_key = trigger.module_key.to_string();
+            if let Err(e) = handle_triggers(&trace_id, trigger).await {
+                log::error!(
+                    "[SCHEDULER] trace_id: {} Error handling trigger key {}: {}",
+                    trace_id,
+                    trigger_key,
+                    e
+                );
+            }
+        });
 
         if let Err(e) = handler_job.await {
             return Err(anyhow::anyhow!("Error in handler: {}", e));
@@ -243,6 +260,9 @@ impl SchedulerJobPuller {
                                 "[SCHEDULER][JobPuller-{trace_id_keep_alive}] keep_alive for job[{job_id}] trigger[{job_key}] failed: {e}"
                             );
                         }
+                        log::debug!(
+                            "[SCHEDULER][JobPuller-{trace_id_keep_alive}] keep_alive extended for job[{job_id}] trigger[{job_key}]"
+                        );
                     }
                 });
             }

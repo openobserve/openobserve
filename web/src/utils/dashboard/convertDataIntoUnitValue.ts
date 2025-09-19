@@ -1,5 +1,6 @@
 import { date } from "quasar";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
+import { getColorPalette } from "./colorPalette";
 
 const units: any = {
   bytes: [
@@ -237,6 +238,87 @@ export const getUnitValue = (
 };
 
 /**
+ * Applies user-configured series-to-color mappings to the given series list and
+ * ensures auto-generated colors do not conflict with configured colors.
+ *
+ * - Enforces configured colors for mapped series names
+ * - Tracks colors already in use (configured + existing on series)
+ * - Reassigns auto-generated colors that collide with configured ones to the
+ *   next available color from the theme palette; if exhausted, uses an HSL fallback
+ *
+ * This function mutates the provided `series` array in place.
+ */
+export const applySeriesColorMappings = (
+  series: any[],
+  colorBySeries:
+    | Array<{ value: string; color: string | null }>
+    | undefined
+    | null,
+  theme: string,
+): void => {
+  if (!Array.isArray(series) || !colorBySeries?.length) return;
+
+  const configuredSeriesToColor = new Map<string, string>();
+  const configuredColors = new Set<string>();
+  for (const mapping of colorBySeries) {
+    if (mapping?.value && mapping?.color) {
+      configuredSeriesToColor.set(String(mapping.value), String(mapping.color));
+      configuredColors.add(String(mapping.color));
+    }
+  }
+
+  if (configuredSeriesToColor.size === 0) return;
+
+  const usedColors = new Set<string>(configuredColors);
+
+  const getSeriesColor = (s: any): string | undefined =>
+    s?.color ?? s?.itemStyle?.color;
+  const setSeriesColor = (s: any, clr: string) => {
+    if (!s) return;
+    if (s.color !== undefined) s.color = clr;
+    if (s.itemStyle?.color !== undefined) s.itemStyle.color = clr;
+  };
+
+  // Enforce configured colors and collect currently used colors
+  series.forEach((s: any) => {
+    const mapped = configuredSeriesToColor.get(s?.name);
+    if (mapped) {
+      setSeriesColor(s, mapped);
+      usedColors.add(mapped);
+    } else {
+      const current = getSeriesColor(s);
+      if (current) usedColors.add(current);
+    }
+  });
+
+  // Generate a unique non-conflicting color
+  const generateUniqueColor = (
+    used: Set<string>,
+    themeName: string,
+  ): string => {
+    const palette = getColorPalette(themeName);
+    for (const c of palette) {
+      if (!used.has(c)) return c;
+    }
+    const hue = (used.size * 137.508) % 360;
+    const saturation = 70 + (used.size % 20);
+    const lightness = 45 + (used.size % 20);
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  };
+
+  // Reassign auto-generated colors that collide with configured colors
+  series.forEach((s: any) => {
+    if (configuredSeriesToColor.has(s?.name)) return;
+    const current = getSeriesColor(s);
+    if (current && configuredColors.has(current)) {
+      const next = generateUniqueColor(usedColors, theme);
+      usedColors.add(next);
+      setSeriesColor(s, next);
+    }
+  });
+};
+
+/**
  * Formats a unit value.
  *
  * @param {any} obj - The object containing the value and unit.
@@ -305,34 +387,6 @@ export const isTimeStamp = (sample: any, treatAsNonTimestamp: any) => {
       microsecondsPattern.test(value?.toString()),
     );
   }
-};
-
-/**
- * Converts 16-digit microsecond timestamps to readable date format
- * @param value - The value to convert (can be single value or array)
- * @returns The converted value(s) in date format
- */
-export const convert16DigitTimestamp = (value: any): any => {
-  // If value is an array, convert each element
-  if (Array.isArray(value)) {
-    return value.map((item: any) => convert16DigitTimestamp(item));
-  }
-
-  // If value is a string or number, convert it
-  if (typeof value === "string" || typeof value === "number") {
-    const strValue = value.toString();
-    const microsecondsPattern = /^\d{16}$/;
-
-    if (microsecondsPattern.test(strValue)) {
-      // Convert microseconds to milliseconds (divide by 1000)
-      const milliseconds = parseInt(strValue) / 1000;
-      const date = new Date(milliseconds);
-      return formatDate(date);
-    }
-  }
-
-  // Return original value if not a 16-digit timestamp
-  return value;
 };
 
 export function convertOffsetToSeconds(
@@ -548,36 +602,61 @@ const validateChartFieldsConfiguration = (
   errors: string[],
   xAxisLabel: string = "X-Axis",
   yAxisLabel: string = "Y-Axis",
+  pageKey: string = "dashboard",
 ) => {
   switch (chartType) {
     case "donut":
     case "pie": {
       if (fields?.y?.length > 1 || fields?.y?.length === 0) {
-        errors.push("Add one value field for donut and pie charts");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : "Add one value field for donut and pie charts";
+        errors.push(errorMsg);
       }
 
       if (fields?.x?.length > 1 || fields?.x?.length === 0) {
-        errors.push("Add one label field for donut and pie charts");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract label field from the query."
+            : "Add one label field for donut and pie charts";
+        errors.push(errorMsg);
       }
       break;
     }
     case "metric": {
       if (fields?.y?.length > 1 || fields?.y?.length === 0) {
-        errors.push("Add one value field for metric charts");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : "Add one value field for metric charts";
+        errors.push(errorMsg);
       }
 
       if (fields?.x?.length) {
-        errors.push(`${xAxisLabel} field is not allowed for Metric chart`);
+        const errorMsg =
+          pageKey === "logs"
+            ? "Grouping field is not allowed for Metric chart"
+            : `${xAxisLabel} field is not allowed for Metric chart`;
+        errors.push(errorMsg);
       }
       break;
     }
     case "gauge": {
       if (fields?.y?.length !== 1) {
-        errors.push("Add one value field for gauge chart");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : "Add one value field for gauge chart";
+        errors.push(errorMsg);
       }
       // gauge can have zero or one label
       if (fields?.x?.length !== 1 && fields?.x?.length !== 0) {
-        errors.push("Add one label field for gauge chart");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract grouping field from the query."
+            : "Add one label field for gauge chart";
+        errors.push(errorMsg);
       }
       break;
     }
@@ -587,86 +666,148 @@ const validateChartFieldsConfiguration = (
     case "scatter":
     case "bar": {
       if (fields?.y?.length < 1) {
-        errors.push(`Add at least one field for the ${yAxisLabel}`);
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : `Add at least one field for the ${yAxisLabel}`;
+        errors.push(errorMsg);
       }
 
       if (fields?.x?.length > 1 || fields?.x?.length === 0) {
-        errors.push(`Add one fields for the ${xAxisLabel}`);
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract grouping field from the query."
+            : `Add one fields for the ${xAxisLabel}`;
+        errors.push(errorMsg);
       }
       break;
     }
     case "table": {
       if (fields?.y?.length === 0 && fields?.x?.length === 0) {
-        errors.push(`Add at least one field on ${xAxisLabel} or ${yAxisLabel}`);
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract fields from the query."
+            : `Add at least one field on ${xAxisLabel} or ${yAxisLabel}`;
+        errors.push(errorMsg);
       }
       break;
     }
     case "heatmap": {
       if (fields?.y?.length === 0) {
-        errors.push(`Add at least one field for the ${yAxisLabel}`);
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract grouping field from the query."
+            : `Add at least one field for the ${yAxisLabel}`;
+        errors.push(errorMsg);
       }
 
       if (fields?.x?.length === 0) {
-        errors.push(`Add one field for the ${xAxisLabel}`);
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract second level grouping field from the query."
+            : `Add one field for the ${xAxisLabel}`;
+        errors.push(errorMsg);
       }
 
       if (fields?.z?.length === 0) {
-        errors.push("Add one field for the Z-Axis");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : "Add one field for the Z-Axis";
+        errors.push(errorMsg);
       }
       break;
     }
     case "stacked":
     case "h-stacked": {
       if (fields?.y?.length === 0) {
-        errors.push(`Add at least one field for the ${yAxisLabel}`);
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : `Add at least one field for the ${yAxisLabel}`;
+        errors.push(errorMsg);
       }
       if (fields?.x?.length !== 1 || fields?.breakdown?.length !== 1) {
-        errors.push(
-          `Add exactly one field on the ${xAxisLabel} and breakdown for stacked and h-stacked charts`,
-        );
+        const breakdownErrMsg =
+          pageKey === "logs"
+            ? "Unable to extract grouping field from the query."
+            : `Add exactly one field on the ${xAxisLabel} and breakdown for stacked and h-stacked charts`;
+        errors.push(breakdownErrMsg);
       }
       break;
     }
     case "area-stacked": {
       if (fields?.y?.length > 1 || fields?.y?.length === 0) {
-        errors.push(
-          `Add exactly one field on ${yAxisLabel} for area-stacked charts`,
-        );
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : `Add exactly one field on ${yAxisLabel} for area-stacked charts`;
+        errors.push(errorMsg);
       }
       if (fields?.x?.length !== 1 || fields?.breakdown?.length !== 1) {
-        errors.push(
-          `Add exactly one field on the ${xAxisLabel} and breakdown for area-stacked charts`,
-        );
+        const breakdownErrMsg =
+          pageKey === "logs"
+            ? "Unable to extract grouping field from the query."
+            : `Add exactly one field on the ${xAxisLabel} and breakdown for area-stacked charts`;
+        errors.push(breakdownErrMsg);
       }
       break;
     }
     case "geomap": {
       if (fields?.latitude == null) {
-        errors.push("Add one field for the latitude");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract latitude field from the query."
+            : "Add one field for the latitude";
+        errors.push(errorMsg);
       }
       if (fields?.longitude == null) {
-        errors.push("Add one field for the longitude");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract longitude field from the query."
+            : "Add one field for the longitude";
+        errors.push(errorMsg);
       }
       break;
     }
     case "sankey": {
       if (fields?.source == null) {
-        errors.push("Add one field for the source");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract source field from the query."
+            : "Add one field for the source";
+        errors.push(errorMsg);
       }
       if (fields?.target == null) {
-        errors.push("Add one field for the target");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract target field from the query."
+            : "Add one field for the target";
+        errors.push(errorMsg);
       }
       if (fields?.value == null) {
-        errors.push("Add one field for the value");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : "Add one field for the value";
+        errors.push(errorMsg);
       }
       break;
     }
     case "maps": {
       if (fields?.name == null) {
-        errors.push("Add one field for the name");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract name field from the query."
+            : "Add one field for the name";
+        errors.push(errorMsg);
       }
       if (fields?.value_for_maps == null) {
-        errors.push("Add one field for the value");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : "Add one field for the value";
+        errors.push(errorMsg);
       }
       break;
     }
@@ -697,6 +838,7 @@ export const validateSQLPanelFields = (
   currentYLabel: string,
   errors: string[],
   isFieldsValidationRequired: boolean = true,
+  pageKey?: string,
 ) => {
   if (isFieldsValidationRequired) {
     // Validate fields configuration based on chart type
@@ -706,6 +848,7 @@ export const validateSQLPanelFields = (
       errors,
       currentXLabel,
       currentYLabel,
+      pageKey,
     );
   }
 };
@@ -889,6 +1032,7 @@ export const validatePanel = (
   errors: string[] = [],
   isFieldsValidationRequired: boolean = true,
   allStreamFields: any[] = [],
+  pageKey: string = "dashboard",
 ) => {
   // Get current query index
   const currentQueryIndex = panelData?.layout?.currentQueryIndex || 0;
@@ -963,6 +1107,7 @@ export const validatePanel = (
       currentYLabel,
       errors,
       isFieldsValidationRequired,
+      pageKey,
     );
 
     // Validate fields against streams if field validation is required

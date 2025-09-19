@@ -97,7 +97,7 @@ export const addLabelToSQlQuery = async (
 
   if (operator === "match_all") {
     condition = `match_all(${formatValue(value)})`;
-  } else if (operator === "str_match") {
+  } else if (operator === "str_match" || operator === "Contains") {
     condition = `str_match(${label}, ${formatValue(value)})`;
   } else if (operator === "str_match_ignore_case") {
     condition = `str_match_ignore_case(${label}, ${formatValue(value)})`;
@@ -107,10 +107,10 @@ export const addLabelToSQlQuery = async (
     condition = `re_not_match(${label}, ${formatValue(value)})`;
   } else {
     switch (operator) {
-      case "Contains":
-        operator = "LIKE";
-        value = "%" + escapeSingleQuotes(value) + "%";
-        break;
+      // case "Contains":
+      //   operator = "LIKE";
+      //   value = "%" + escapeSingleQuotes(value) + "%";
+      //   break;
       case "Not Contains":
         operator = "NOT LIKE";
         value = "%" + escapeSingleQuotes(value) + "%";
@@ -774,3 +774,82 @@ export const convertQueryIntoSingleLine = async (query: any) => {
     return query;
   }
 };
+
+
+export const getStreamNameFromQuery = async (query: any) => {
+  let streamName = null;
+  try {
+    await importSqlParser();
+    try {
+      if(query && query != ""){
+        const parsedQuery = parser?.astify(query);
+        if (parsedQuery?.with) {
+            let withObj = parsedQuery.with;
+            withObj.forEach((obj: any) => {
+              // Recursively extract table names from the WITH statement with depth protection
+              const MAX_RECURSION_DEPTH = 50; // Prevent stack overflow
+              const visitedNodes = new WeakSet(); // Prevent circular references - more efficient for objects
+              
+              const extractTablesFromNode = (node: any, depth: number = 0) => {
+                if (!node || depth > MAX_RECURSION_DEPTH) {
+                  if (depth > MAX_RECURSION_DEPTH) {
+                    console.warn("Maximum recursion depth reached while parsing SQL query");
+                  }
+                  return;
+                }
+                
+                // Use WeakSet for efficient circular reference detection
+                if (typeof node === 'object' && node !== null) {
+                  if (visitedNodes.has(node)) {
+                    return; // Skip already visited nodes
+                  }
+                  visitedNodes.add(node);
+                }
+                
+                // Check if current node has a from clause
+                if (node.from && Array.isArray(node.from)) {
+                  node.from.forEach((stream: any) => {
+                    if (stream.table) {
+                      streamName = stream.table;
+                    }
+                    // Handle subquery in FROM clause
+                    if (stream.expr && stream.expr.ast) {
+                      extractTablesFromNode(stream.expr.ast, depth + 1);
+                    }
+                  });
+                }
+                
+                // Check for nested subqueries in WHERE clause
+                if (node.where && node.where.right && node.where.right.ast) {
+                  extractTablesFromNode(node.where.right.ast, depth + 1);
+                }
+                
+                // Check for nested subqueries in SELECT expressions
+                if (node.columns && Array.isArray(node.columns)) {
+                  node.columns.forEach((col: any) => {
+                    if (col.expr && col.expr.ast) {
+                      extractTablesFromNode(col.expr.ast, depth + 1);
+                    }
+                  });
+                }
+              };
+              
+              // Start extraction from the WITH statement
+              extractTablesFromNode(obj?.stmt);
+            });
+          }
+          else{
+            streamName = parsedQuery?.from[0]?.table;
+          }
+      }
+    } catch (error) {
+      console.log(error,'error parsing sql query');
+    }
+    return streamName;
+  } catch (error) {
+    return null;
+  }
+};
+
+// Export internal functions for testing
+export { formatValue, parseCondition, convertWhereToFilter, extractFilters, extractTableName };

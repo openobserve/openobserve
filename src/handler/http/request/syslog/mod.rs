@@ -17,6 +17,7 @@ use std::io::Error;
 
 use actix_web::{HttpResponse, Responder, delete, get, post, put, web};
 
+#[allow(deprecated)]
 use crate::{
     common::meta::syslog::{SyslogRoute, SyslogServer},
     service::syslogs_route::{self},
@@ -25,6 +26,7 @@ use crate::{
 /// Start/StopSyslog Server
 
 #[post("/{org_id}/syslog-server")]
+#[allow(deprecated)]
 pub async fn toggle_state(details: web::Json<SyslogServer>) -> Result<HttpResponse, Error> {
     syslogs_route::toggle_state(details.into_inner()).await
 }
@@ -52,6 +54,7 @@ pub async fn toggle_state(details: web::Json<SyslogServer>) -> Result<HttpRespon
     ),
 )]
 #[post("/{org_id}/syslog-routes")]
+#[allow(deprecated)]
 pub async fn create_route(details: web::Json<SyslogRoute>) -> Result<HttpResponse, Error> {
     syslogs_route::create_route(details.into_inner()).await
 }
@@ -81,6 +84,7 @@ pub async fn create_route(details: web::Json<SyslogRoute>) -> Result<HttpRespons
     ),
 )]
 #[put("/{org_id}/syslog-routes/{id}")]
+#[allow(deprecated)]
 async fn update_route(
     path: web::Path<(String, String)>,
     details: web::Json<SyslogRoute>,
@@ -107,6 +111,7 @@ async fn update_route(
     ),
 )]
 #[get("/{org_id}/syslog-routes")]
+#[allow(deprecated)]
 async fn list_routes() -> impl Responder {
     syslogs_route::list_routes().await
 }
@@ -131,6 +136,7 @@ async fn list_routes() -> impl Responder {
     ),
 )]
 #[delete("/{org_id}/syslog-routes/{id}")]
+#[allow(deprecated)]
 async fn delete_route(path: web::Path<(String, String)>) -> impl Responder {
     let (_, id) = path.into_inner();
     syslogs_route::delete_route(&id).await

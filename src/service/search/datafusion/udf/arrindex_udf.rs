@@ -51,9 +51,9 @@ pub fn arr_index_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Colum
     log::debug!("Inside arrindex");
     if args.len() < 2 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError(
+            Box::new(ParserError::ParserError(
                 "UDF params should be: arrindex(field1, start, end)".to_string(),
-            ),
+            )),
             None,
         ));
     }
@@ -255,10 +255,7 @@ mod tests {
         ];
 
         for (json_input, start, end, _test_name) in edge_cases {
-            let sql = format!(
-                "select arrindex(test_col, {}, {}) as ret from t",
-                start, end
-            );
+            let sql = format!("select arrindex(test_col, {start}, {end}) as ret from t");
             // Empty arrays return [] instead of null, other invalid inputs return null
             let expected = if json_input == r#"[]"# {
                 vec!["+-----+", "| ret |", "+-----+", "| []  |", "+-----+"]
@@ -312,7 +309,7 @@ mod tests {
             .unwrap();
         let data = df.collect().await.unwrap();
         assert_batches_eq!(
-            vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"],
+            ["+-----+", "| ret |", "+-----+", "|     |", "+-----+"],
             &data
         );
     }
@@ -356,7 +353,7 @@ mod tests {
             .unwrap();
         let data = df.collect().await.unwrap();
         assert_batches_eq!(
-            vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"],
+            ["+-----+", "| ret |", "+-----+", "|     |", "+-----+"],
             &data
         );
     }

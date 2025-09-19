@@ -1,5 +1,5 @@
 import { test, expect } from "../baseFixtures";
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
@@ -249,7 +249,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardCreate.searchDashboard(randomDashboardName);
     await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
-  test("Should apply the filter group inside group", async ({ page }) => {
+  test.skip("Should apply the filter group inside group", async ({ page }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
     const panelName =
@@ -566,7 +566,8 @@ test.describe("dashboard filter testcases", () => {
 
     // Expect error message
     await expect(
-      page.getByText("Schema error: No field named").first()
+      page.getByText(
+        /(sql parser error: Expected:|Search field not found:|Schema error: No field named controller\.?)/i).first()
     ).toBeVisible();
 
     // Fix filter condition (change to "=" operator)

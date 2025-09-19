@@ -568,7 +568,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       const userSelectedDestinations = ref<string[][]>([]);
       const userSelectedPipelineName = ref<string[]>([]);
   
-      const tempalteCreators = ref([]);
+      const templateCreators = ref([]);
       const destinationCreators = ref([]);
       const pipelineCreators = ref<alertCreator>([]);
       const queryEditorPlaceholderFlag = ref(true);
@@ -1361,7 +1361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         templateErrorsToDisplay,
         destinationErrorsToDisplay,
         pipelineErrorsToDisplay,
-        tempalteCreators,
+        templateCreators,
         destinationCreators,
         pipelineCreators,
         queryEditorPlaceholderFlag,
@@ -1413,6 +1413,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         userSelectedOrgId,
         organizationData,
         updateOrgId,
+        // Exposed internal functions for testing
+        processJsonObject,
+        validatePipelineInputs,
+        validateSourceStream,
+        validateDestinationStream,
+        validateScheduledPipelineNodes,
+        validateNodesForOrg,
+        validateRemoteDestination,
+        createPipeline,
+        getFunctions,
+        getAlertDestinations,
+        getScheduledPipelines,
       };
     },
     components: {

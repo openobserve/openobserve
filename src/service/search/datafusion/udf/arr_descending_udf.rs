@@ -50,7 +50,9 @@ pub fn arr_descending_impl(args: &[ColumnarValue]) -> datafusion::error::Result<
     log::debug!("Inside arr_descending");
     if args.len() != 1 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError("UDF params should be: arr_descending(field1)".to_string()),
+            Box::new(ParserError::ParserError(
+                "UDF params should be: arr_descending(field1)".to_string(),
+            )),
             None,
         ));
     }
@@ -242,7 +244,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_arr_descending_null_input() {
-        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
+        let expected_output = ["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
 
         let schema = Arc::new(Schema::new(vec![Field::new(
             "arr_field",
@@ -276,7 +278,7 @@ mod tests {
             r#"{"key": "value"}"#,
         ];
         let sql = "select arr_descending(arr_field) as ret from t";
-        let expected_output = vec![
+        let expected_output = [
             "+---------------+",
             "| ret           |",
             "+---------------+",

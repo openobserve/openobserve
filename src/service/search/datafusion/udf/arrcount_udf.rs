@@ -48,7 +48,9 @@ pub fn arr_count_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Colum
     log::debug!("Inside arrcount");
     if args.len() != 1 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError("UDF params should be: arrcount(arr_field)".to_string()),
+            Box::new(ParserError::ParserError(
+                "UDF params should be: arrcount(arr_field)".to_string(),
+            )),
             None,
         ));
     }
@@ -98,23 +100,23 @@ mod tests {
         let sqls = [
             (
                 "select arrcount(bools) as ret from t",
-                vec!["+-----+", "| ret |", "+-----+", "| 3   |", "+-----+"],
+                ["+-----+", "| ret |", "+-----+", "| 3   |", "+-----+"],
             ),
             (
                 "select arrcount(names) as ret from t",
-                vec!["+-----+", "| ret |", "+-----+", "| 3   |", "+-----+"],
+                ["+-----+", "| ret |", "+-----+", "| 3   |", "+-----+"],
             ),
             (
                 "select arrcount(nums) as ret from t",
-                vec!["+-----+", "| ret |", "+-----+", "| 4   |", "+-----+"],
+                ["+-----+", "| ret |", "+-----+", "| 4   |", "+-----+"],
             ),
             (
                 "select arrcount(floats) as ret from t",
-                vec!["+-----+", "| ret |", "+-----+", "| 4   |", "+-----+"],
+                ["+-----+", "| ret |", "+-----+", "| 4   |", "+-----+"],
             ),
             (
                 "select arrcount(mixed) as ret from t",
-                vec!["+-----+", "| ret |", "+-----+", "| 5   |", "+-----+"],
+                ["+-----+", "| ret |", "+-----+", "| 5   |", "+-----+"],
             ),
         ];
 
@@ -163,7 +165,7 @@ mod tests {
         // Test invalid JSON input - should return 0 instead of panicking
         let invalid_sqls = [(
             "select arrcount(invalid_json) as ret from t",
-            vec!["+-----+", "| ret |", "+-----+", "| 0   |", "+-----+"],
+            ["+-----+", "| ret |", "+-----+", "| 0   |", "+-----+"],
         )];
 
         // Add invalid JSON column to schema
@@ -207,8 +209,8 @@ mod tests {
         ];
 
         for json_input in edge_cases {
-            let sql = format!("select arrcount(test_col) as ret from t");
-            let expected = vec!["+-----+", "| ret |", "+-----+", "| 0   |", "+-----+"];
+            let sql = "select arrcount(test_col) as ret from t";
+            let expected = ["+-----+", "| ret |", "+-----+", "| 0   |", "+-----+"];
 
             let schema = Arc::new(Schema::new(vec![Field::new(
                 "test_col",
@@ -226,7 +228,7 @@ mod tests {
             let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
             ctx.register_table("t", Arc::new(provider)).unwrap();
 
-            let df = ctx.sql(&sql).await.unwrap();
+            let df = ctx.sql(sql).await.unwrap();
             let data = df.collect().await.unwrap();
             assert_batches_eq!(expected, &data);
         }
@@ -256,7 +258,7 @@ mod tests {
             .unwrap();
         let data = df.collect().await.unwrap();
         assert_batches_eq!(
-            vec!["+-----+", "| ret |", "+-----+", "| 0   |", "+-----+"],
+            ["+-----+", "| ret |", "+-----+", "| 0   |", "+-----+"],
             &data
         );
     }
@@ -290,7 +292,7 @@ mod tests {
             .unwrap();
         let data = df.collect().await.unwrap();
         assert_batches_eq!(
-            vec![
+            [
                 "+-----+", "| ret |", "+-----+", "| 3   |", "| 0   |", "| 0   |", "| 2   |",
                 "| 0   |", "+-----+",
             ],

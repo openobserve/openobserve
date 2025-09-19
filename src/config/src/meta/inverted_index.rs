@@ -15,13 +15,31 @@
 
 use proto::cluster_rpc;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum IndexOptimizeMode {
     SimpleSelect(usize, bool),
     SimpleCount,
     SimpleHistogram(i64, u64, usize),
     SimpleTopN(String, usize, bool),
     SimpleDistinct(String, usize, bool),
+}
+
+impl IndexOptimizeMode {
+    pub fn to_rule_string(&self) -> String {
+        match self {
+            IndexOptimizeMode::SimpleSelect(limit, ascend) => format!("s(l:{limit},a:{ascend})"),
+            IndexOptimizeMode::SimpleCount => "c".to_string(),
+            IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
+                format!("h(m:{min_value},b:{bucket_width},n:{num_buckets})")
+            }
+            IndexOptimizeMode::SimpleTopN(field, limit, ascend) => {
+                format!("t(f{field},l:{limit},a:{ascend})")
+            }
+            IndexOptimizeMode::SimpleDistinct(field, limit, ascend) => {
+                format!("d(f:{field},l:{limit},a:{ascend})")
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for IndexOptimizeMode {
@@ -405,28 +423,6 @@ mod tests {
         // Test that converting from an invalid cluster_rpc mode panics
         let invalid_mode = cluster_rpc::IdxOptimizeMode { mode: None };
         let _: IndexOptimizeMode = invalid_mode.into();
-    }
-
-    #[test]
-    fn test_enum_variant_equality_and_cloning() {
-        // Test that enum variants can be compared and cloned correctly
-        let mode1 = IndexOptimizeMode::SimpleSelect(100, true);
-        let mode2 = IndexOptimizeMode::SimpleSelect(100, true);
-        let mode3 = IndexOptimizeMode::SimpleSelect(100, false);
-        let mode4 = IndexOptimizeMode::SimpleCount;
-
-        // Test equality
-        assert_eq!(mode1, mode2);
-        assert_ne!(mode1, mode3);
-        assert_ne!(mode1, mode4);
-
-        // Test cloning
-        let cloned_mode = mode1.clone();
-        assert_eq!(mode1, cloned_mode);
-
-        // Test that cloned mode is independent
-        let mode5 = IndexOptimizeMode::SimpleSelect(200, true);
-        assert_ne!(cloned_mode, mode5);
     }
 
     #[test]

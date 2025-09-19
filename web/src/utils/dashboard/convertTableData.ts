@@ -21,7 +21,6 @@ import {
   getUnitValue,
   isTimeSeries,
   isTimeStamp,
-  convert16DigitTimestamp,
 } from "./convertDataIntoUnitValue";
 
 const applyValueMapping = (value: any, mappings: any) => {
@@ -65,6 +64,26 @@ export const convertTableData = (
   const histogramFields: string[] = [];
 
   const overrideConfigs = panelSchema.config.override_config || [];
+  const colorConfigMap: Record<string, any> = {};
+  const unitConfigMap: Record<string, any> = {};
+  try {
+    // Build maps for both color and unit configs
+    overrideConfigs.forEach((o: any) => {
+      const alias = o?.field?.value;
+      const config = o?.config?.[0];
+
+      if (alias && config) {
+        if (config.type === "unique_value_color") {
+          const autoColor = config.autoColor;
+          colorConfigMap[alias] = { autoColor };
+        } else if (config.type === "unit") {
+          const unit = config.value?.unit;
+          const customUnit = config.value?.customUnit;
+          unitConfigMap[alias] = { unit, customUnit };
+        }
+      }
+    });
+  } catch (e) {}
 
   // use all response keys if tableDynamicColumns is true
   if (panelSchema?.config?.table_dynamic_columns == true) {
@@ -151,6 +170,10 @@ export const convertTableData = (
       obj["label"] = it.label;
       obj["align"] = !isNumber ? "left" : "right";
       obj["sortable"] = true;
+      // pass color mode info for renderer
+      if (colorConfigMap?.[it.alias]?.autoColor) {
+        obj["colorMode"] = "auto";
+      }
 
       obj["format"] = (val: any) => {
         // value mapping
@@ -182,14 +205,10 @@ export const convertTableData = (
           let unitToUse = null;
           let customUnitToUse = null;
 
-          if (overrideConfigs.length > 0) {
-            const overrideConfig = overrideConfigs.find(
-              (override: any) => override.field?.value === it.alias,
-            );
-            if (overrideConfig) {
-              unitToUse = overrideConfig.config[0].value.unit;
-              customUnitToUse = overrideConfig.config[0].value.customUnit;
-            }
+          // Check unit config map first
+          if (unitConfigMap[it.alias]) {
+            unitToUse = unitConfigMap[it.alias].unit;
+            customUnitToUse = unitConfigMap[it.alias].customUnit;
           }
 
           if (!unitToUse) {
@@ -226,17 +245,20 @@ export const convertTableData = (
             return valueMapping;
           }
 
-          // Check if the value is a 16-digit timestamp and convert it
-          const convertedVal = convert16DigitTimestamp(val);
+          // Handle 16-digit microsecond timestamps
+          let timestamp;
+          if (typeof val === "string" && /^\d{16}$/.test(val)) {
+            // 16-digit string represents microseconds, convert to milliseconds
+            timestamp = parseInt(val) / 1000;
+          } else if (typeof val === "string") {
+            // Regular ISO string, append Z if needed
+            timestamp = `${val}Z`;
+          } else {
+            // Number or Date object
+            timestamp = new Date(val)?.getTime() / 1000;
+          }
 
-          return formatDate(
-            toZonedTime(
-              typeof convertedVal === "string"
-                ? `${convertedVal}Z`
-                : new Date(convertedVal)?.getTime() / 1000,
-              store.state.timezone,
-            ),
-          );
+          return formatDate(toZonedTime(timestamp, store.state.timezone));
         };
       }
       return obj;
@@ -322,6 +344,10 @@ export const convertTableData = (
         obj["label"] = it;
         obj["align"] = !isNumber ? "left" : "right";
         obj["sortable"] = true;
+        // pass color mode info for renderer
+        if (colorConfigMap?.[it]?.autoColor) {
+          obj["colorMode"] = "auto";
+        }
 
         obj["format"] = (val: any) => {
           // value mapping
@@ -378,17 +404,20 @@ export const convertTableData = (
               return valueMapping;
             }
 
-            // Check if the value is a 16-digit timestamp and convert it
-            const convertedVal = convert16DigitTimestamp(val);
+            // Handle 16-digit microsecond timestamps
+            let timestamp;
+            if (typeof val === "string" && /^\d{16}$/.test(val)) {
+              // 16-digit string represents microseconds, convert to milliseconds
+              timestamp = parseInt(val) / 1000;
+            } else if (typeof val === "string") {
+              // Regular ISO string, append Z if needed
+              timestamp = `${val}Z`;
+            } else {
+              // Number or Date object
+              timestamp = new Date(val)?.getTime() / 1000;
+            }
 
-            return formatDate(
-              toZonedTime(
-                typeof convertedVal === "string"
-                  ? `${convertedVal}Z`
-                  : new Date(convertedVal)?.getTime() / 1000,
-                store.state.timezone,
-              ),
-            );
+            return formatDate(toZonedTime(timestamp, store.state.timezone));
           };
         }
 
@@ -402,14 +431,22 @@ export const convertTableData = (
         (acc: any, curr: any, reduceIndex: any) => {
           const value = searchQueryData[0][reduceIndex][it.alias] ?? "";
           acc[curr] = histogramFields.includes(it.alias)
-            ? formatDate(
-                toZonedTime(
-                  typeof convert16DigitTimestamp(value) === "string"
-                    ? `${convert16DigitTimestamp(value)}Z`
-                    : new Date(convert16DigitTimestamp(value))?.getTime() / 1000,
-                  store.state.timezone,
-                ),
-              )
+            ? (() => {
+                // Handle 16-digit microsecond timestamps
+                let timestamp;
+                if (typeof value === "string" && /^\d{16}$/.test(value)) {
+                  // 16-digit string represents microseconds, convert to milliseconds
+                  timestamp = parseInt(value) / 1000;
+                } else if (typeof value === "string") {
+                  // Regular ISO string, append Z if needed
+                  timestamp = `${value}Z`;
+                } else {
+                  // Number or Date object
+                  timestamp = new Date(value)?.getTime() / 1000;
+                }
+
+                return formatDate(toZonedTime(timestamp, store.state.timezone));
+              })()
             : value;
           return acc;
         },

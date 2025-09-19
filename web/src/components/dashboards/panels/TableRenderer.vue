@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:body-cell="props">
       <q-td :props="props" :style="getStyle(props)">
-        {{ props.value }}
+        {{ props.value == 'undefined' || props.value === null ? '' : props.value }}
       </q-td>
     </template>
   </q-table>
@@ -49,6 +49,7 @@ import { exportFile } from "quasar";
 import { defineComponent, ref } from "vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useStore } from "vuex";
+import { getColorForTable } from "@/utils/dashboard/colorPalette";
 
 export default defineComponent({
   name: "TableRenderer",
@@ -162,7 +163,29 @@ export default defineComponent({
     const getStyle = (rowData: any) => {
       const value = rowData?.row[rowData?.col?.field] ?? rowData?.value;
 
-      // Find the first valid mapping with a valid color
+      // 1) Priority: override config auto color
+      if (rowData?.col?.colorMode === "auto") {
+        const palette = getColorForTable;
+        const key = String(value);
+        // cache on column to keep stable mapping across rows
+        const cacheKey = `__autoColorMap_${rowData?.col?.field}`;
+        // init cache map on column object
+        if (!rowData.col[cacheKey])
+          rowData.col[cacheKey] = new Map<string, string>();
+        const map: Map<string, string> = rowData.col[cacheKey];
+
+        if (!map.has(key)) {
+          const idx = map.size % palette.length;
+          map.set(key, palette[idx]);
+        }
+        const hex = map.get(key) as string;
+        const isDark = isDarkColor(hex);
+        return `background-color: ${hex}; color: ${
+          isDark ? "#ffffff" : "#000000"
+        }`;
+      }
+
+      // 2) Fallback: explicit value-mapping color
       const foundValue = findFirstValidMappedValue(
         value,
         props?.valueMapping,

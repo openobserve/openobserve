@@ -28,12 +28,12 @@ use crate::service::search::{
     request::{FlightSearchRequest, Request},
 };
 
+#[derive(Debug, Clone)]
 pub struct RemoteScanNodes {
     pub req: Request,
     pub nodes: Vec<Arc<dyn NodeInfo>>,
     pub file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
     pub equal_keys: HashMap<TableReference, Vec<KvItem>>,
-    pub match_all_keys: Vec<String>,
     pub index_condition: Option<IndexCondition>,
     pub index_optimize_mode: Option<IndexOptimizeMode>,
     pub is_leader: bool, // for super cluster
@@ -47,7 +47,6 @@ impl RemoteScanNodes {
         nodes: Vec<Arc<dyn NodeInfo>>,
         file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
-        match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
         index_optimize_mode: Option<IndexOptimizeMode>,
         is_leader: bool,
@@ -58,7 +57,6 @@ impl RemoteScanNodes {
             nodes,
             file_id_lists,
             equal_keys,
-            match_all_keys,
             index_condition,
             index_optimize_mode,
             is_leader,
@@ -73,7 +71,7 @@ impl RemoteScanNodes {
             stream_type: table_name.get_stream_type(self.req.stream_type).to_string(),
             partition: 0,           // set in FlightSearchRequest
             job_id: "".to_string(), // set in FlightSearchRequest
-            enrich_mode: false,
+            enrich_mode: false,     // set in RemoteScanExec
         };
 
         let search_infos = SearchInfos {
@@ -88,6 +86,7 @@ impl RemoteScanNodes {
             timeout: self.req.timeout as u64,
             use_cache: self.req.use_cache,
             histogram_interval: self.req.histogram_interval,
+            is_analyze: false, // set in distribute Analyze
         };
 
         let index_condition = match &self.index_condition {
@@ -99,7 +98,6 @@ impl RemoteScanNodes {
             use_inverted_index: self.req.use_inverted_index,
             index_condition,
             equal_keys: self.equal_keys.get(table_name).unwrap_or(&vec![]).clone(),
-            match_all_keys: self.match_all_keys.clone(),
             index_optimize_mode: self.index_optimize_mode.clone().map(|x| x.into()),
         };
 
@@ -192,6 +190,7 @@ pub struct SearchInfos {
     pub timeout: u64,
     pub use_cache: bool,
     pub histogram_interval: i64,
+    pub is_analyze: bool,
 }
 
 impl SearchInfos {
@@ -209,6 +208,7 @@ impl SearchInfos {
             timeout: self.timeout as i64,
             use_cache: self.use_cache,
             histogram_interval: self.histogram_interval,
+            is_analyze: self.is_analyze,
         }
     }
 }

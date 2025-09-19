@@ -27,6 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       style="display: flex; flex-direction: row; width: 100%"
       class="q-pl-md"
+      v-if="
+        dashboardPanelData.data.type != 'metric'
+      "
     >
       <div style="flex: 1">
         <div style="display: flex; flex-direction: row">
@@ -1190,8 +1193,14 @@ export default defineComponent({
               ? false
               : true;
         } else {
-          // For existing panels: set all to false (unchecked) initially
-          field.treatAsNonTimestamp = false;
+          // For existing panels: only set if treatAsNonTimestamp is not already defined
+          // This preserves the saved values from the database
+          if (
+            field.treatAsNonTimestamp === undefined ||
+            field.treatAsNonTimestamp === null
+          ) {
+            field.treatAsNonTimestamp = false;
+          }
         }
       };
 

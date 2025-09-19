@@ -50,7 +50,9 @@ pub fn fuzzy_match_expr_impl() -> ScalarFunctionImplementation {
     Arc::new(move |args: &[ColumnarValue]| {
         if args.len() != 3 {
             return Err(DataFusionError::SQL(
-                ParserError::ParserError("fuzzy_match UDF expects two string".to_string()),
+                Box::new(ParserError::ParserError(
+                    "fuzzy_match UDF expects two string".to_string(),
+                )),
                 None,
             ));
         }

@@ -169,8 +169,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   ref,
   type Ref,
-  defineEmits,
-  onBeforeMount,
   watch,
   nextTick,
   defineAsyncComponent,

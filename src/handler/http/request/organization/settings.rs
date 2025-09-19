@@ -95,11 +95,11 @@ async fn create(
     }
 
     #[cfg(feature = "enterprise")]
-    if let Some(aggregation_cache_enabled) = settings.aggregation_cache_enabled
-        && config::get_config().common.aggregation_cache_enabled
+    if let Some(streaming_aggregation_enabled) = settings.streaming_aggregation_enabled
+        && config::get_config().common.feature_query_streaming_aggs
     {
         field_found = true;
-        data.aggregation_cache_enabled = aggregation_cache_enabled;
+        data.streaming_aggregation_enabled = streaming_aggregation_enabled;
     }
 
     if let Some(enable_streaming_search) = settings.enable_streaming_search {

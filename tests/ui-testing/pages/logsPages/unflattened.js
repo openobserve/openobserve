@@ -70,6 +70,10 @@ class UnflattenedPage {
     get logsSearchBarQueryEditor() {
         return this.page.locator('[data-test="logs-search-bar-query-editor"]');
     }
+
+    get allFieldsButton() {
+        return this.page.locator('[data-test="logs-all-fields-btn"]');
+    }
 }
 export default UnflattenedPage;
 

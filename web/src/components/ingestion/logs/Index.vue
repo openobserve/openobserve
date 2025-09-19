@@ -125,19 +125,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label="Syslog-ng"
           content-class="tab_content"
         />
-        <q-route-tab
-          v-if="showSyslog"
-          name="syslog"
-          :to="{
-            name: 'syslog',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          icon="plagiarism"
-          label="Syslog"
-          content-class="tab_content"
-        />
       </q-tabs>
     </template>
 
@@ -188,7 +175,6 @@ export default defineComponent({
       "fluentbit",
       "fluentd",
       "vector",
-      "syslog",
       "syslogNg",
     ];
 
@@ -254,10 +240,6 @@ export default defineComponent({
       confirmUpdate.value = true;
     };
 
-    const showSyslog = computed(() => {
-      return config.isCloud !== "true";
-    });
-
     const showCloudIngestionOptions = computed(() => {
       return config.isCloud === "true";
     });
@@ -277,8 +259,8 @@ export default defineComponent({
       getImageURL,
       verifyOrganizationStatus,
       ingestiontabs,
-      showSyslog,
       showCloudIngestionOptions,
+      ingestRoutes,
     };
   },
 });

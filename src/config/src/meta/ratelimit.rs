@@ -155,3 +155,348 @@ pub fn get_resource_from_params(
 ) -> String {
     format!("{org}:{rule_type}:{user_role}:{api_group_name}:{api_group_operation}:{user_id}")
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use bytes::Bytes;
+
+    use super::*;
+
+    #[test]
+    fn test_cached_user_roles_creation() {
+        let roles = vec!["admin".to_string(), "user".to_string()];
+        let expires_at = Instant::now() + Duration::from_secs(3600);
+
+        let cached_roles = CachedUserRoles {
+            roles: roles.clone(),
+            expires_at,
+        };
+
+        assert_eq!(cached_roles.roles, roles);
+        assert!(cached_roles.expires_at > Instant::now());
+    }
+
+    #[test]
+    fn test_ratelimit_rule_default() {
+        let rule = RatelimitRule::default();
+        assert_eq!(rule.org, "");
+        assert_eq!(rule.rule_type, None);
+        assert_eq!(rule.rule_id, None);
+        assert_eq!(rule.user_role, None);
+        assert_eq!(rule.user_id, None);
+        assert_eq!(rule.api_group_name, None);
+        assert_eq!(rule.api_group_operation, None);
+        assert_eq!(rule.threshold, 0);
+    }
+
+    #[test]
+    fn test_ratelimit_rule_creation() {
+        let rule = RatelimitRule {
+            org: "test_org".to_string(),
+            rule_type: Some("exact".to_string()),
+            rule_id: Some("rule123".to_string()),
+            user_role: Some("admin".to_string()),
+            user_id: Some("user123".to_string()),
+            api_group_name: Some("search".to_string()),
+            api_group_operation: Some("query".to_string()),
+            threshold: 100,
+        };
+
+        assert_eq!(rule.org, "test_org");
+        assert_eq!(rule.rule_type, Some("exact".to_string()));
+        assert_eq!(rule.rule_id, Some("rule123".to_string()));
+        assert_eq!(rule.user_role, Some("admin".to_string()));
+        assert_eq!(rule.user_id, Some("user123".to_string()));
+        assert_eq!(rule.api_group_name, Some("search".to_string()));
+        assert_eq!(rule.api_group_operation, Some("query".to_string()));
+        assert_eq!(rule.threshold, 100);
+    }
+
+    #[test]
+    fn test_ratelimit_rule_try_from_bytes_valid() {
+        let rule = RatelimitRule {
+            org: "test_org".to_string(),
+            rule_type: Some("exact".to_string()),
+            rule_id: Some("rule123".to_string()),
+            user_role: Some("admin".to_string()),
+            user_id: Some("user123".to_string()),
+            api_group_name: Some("search".to_string()),
+            api_group_operation: Some("query".to_string()),
+            threshold: 100,
+        };
+
+        let json = serde_json::to_string(&rule).unwrap();
+        let bytes = Bytes::from(json);
+
+        let parsed_rule = RatelimitRule::try_from(&bytes).unwrap();
+        assert_eq!(parsed_rule.org, rule.org);
+        assert_eq!(parsed_rule.rule_type, rule.rule_type);
+        assert_eq!(parsed_rule.threshold, rule.threshold);
+    }
+
+    #[test]
+    fn test_ratelimit_rule_try_from_bytes_invalid() {
+        let invalid_json = Bytes::from("invalid json");
+        let result = RatelimitRule::try_from(&invalid_json);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to deserialize RatelimitRule")
+        );
+    }
+
+    #[test]
+    fn test_ratelimit_rule_updater() {
+        let mut operations = HashMap::new();
+        operations.insert("query".to_string(), 100);
+        operations.insert("insert".to_string(), 50);
+
+        let mut groups = HashMap::new();
+        groups.insert("search".to_string(), operations.clone());
+        groups.insert("ingest".to_string(), operations.clone());
+
+        let updater = RatelimitRuleUpdater(groups);
+        assert_eq!(updater.0.len(), 2);
+        assert!(updater.0.contains_key("search"));
+        assert!(updater.0.contains_key("ingest"));
+    }
+
+    #[test]
+    fn test_ratelimit_rule_from_updater() {
+        let mut operations = HashMap::new();
+        operations.insert("QUERY".to_string(), 100);
+        operations.insert("INSERT".to_string(), 50);
+
+        let mut groups = HashMap::new();
+        groups.insert("search".to_string(), operations.clone());
+        groups.insert("ingest".to_string(), operations.clone());
+
+        let updater = RatelimitRuleUpdater(groups);
+        let rules = RatelimitRule::from_updater("test_org", "admin", &updater);
+
+        assert_eq!(rules.len(), 4); // 2 groups × 2 operations
+
+        for rule in &rules {
+            assert_eq!(rule.org, "test_org");
+            assert_eq!(rule.rule_type, Some("exact".to_string()));
+            assert!(rule.rule_id.is_some());
+            assert_eq!(rule.user_role, Some("admin".to_string()));
+            assert_eq!(rule.user_id, Some(".*".to_string()));
+            assert!(rule.api_group_name.is_some());
+            assert!(rule.api_group_operation.is_some());
+            assert!(rule.threshold > 0);
+        }
+
+        // Check that operations are lowercase
+        let query_rules: Vec<_> = rules
+            .iter()
+            .filter(|r| r.api_group_operation == Some("query".to_string()))
+            .collect();
+        assert_eq!(query_rules.len(), 2);
+
+        let insert_rules: Vec<_> = rules
+            .iter()
+            .filter(|r| r.api_group_operation == Some("insert".to_string()))
+            .collect();
+        assert_eq!(insert_rules.len(), 2);
+    }
+
+    #[test]
+    fn test_ratelimit_rule_type_from_str() {
+        assert!(matches!(
+            RatelimitRuleType::from("exact"),
+            RatelimitRuleType::Exact
+        ));
+        assert!(matches!(
+            RatelimitRuleType::from("regex"),
+            RatelimitRuleType::Regex
+        ));
+        assert!(matches!(
+            RatelimitRuleType::from("invalid"),
+            RatelimitRuleType::Exact
+        ));
+        assert!(matches!(
+            RatelimitRuleType::from(""),
+            RatelimitRuleType::Exact
+        ));
+    }
+
+    #[test]
+    fn test_ratelimit_rule_type_display() {
+        assert_eq!(RatelimitRuleType::Exact.to_string(), "exact");
+        assert_eq!(RatelimitRuleType::Regex.to_string(), "regex");
+    }
+
+    #[test]
+    fn test_ratelimit_rule_getters() {
+        let rule = RatelimitRule {
+            org: "test_org".to_string(),
+            rule_type: Some("exact".to_string()),
+            rule_id: Some("rule123".to_string()),
+            user_role: Some("admin".to_string()),
+            user_id: Some("user123".to_string()),
+            api_group_name: Some("search".to_string()),
+            api_group_operation: Some("query".to_string()),
+            threshold: 100,
+        };
+
+        assert_eq!(rule.get_rule_id(), "rule123");
+        assert_eq!(rule.get_org(), "test_org");
+        assert_eq!(rule.get_rule_type(), "exact");
+        assert_eq!(rule.get_user_role(), "admin");
+        assert_eq!(rule.get_user_id(), "user123");
+        assert_eq!(rule.get_api_group_name(), "search");
+        assert_eq!(rule.get_api_group_operation(), "query");
+        assert_eq!(rule.get_threshold(), 100);
+    }
+
+    #[test]
+    fn test_ratelimit_rule_getters_none_values() {
+        let rule = RatelimitRule {
+            org: "test_org".to_string(),
+            rule_type: None,
+            rule_id: None,
+            user_role: None,
+            user_id: None,
+            api_group_name: None,
+            api_group_operation: None,
+            threshold: 50,
+        };
+
+        assert_eq!(rule.get_rule_id(), "");
+        assert_eq!(rule.get_org(), "test_org");
+        assert_eq!(rule.get_rule_type(), "");
+        assert_eq!(rule.get_user_role(), "");
+        assert_eq!(rule.get_user_id(), "");
+        assert_eq!(rule.get_api_group_name(), "");
+        assert_eq!(rule.get_api_group_operation(), "");
+        assert_eq!(rule.get_threshold(), 50);
+    }
+
+    #[test]
+    fn test_ratelimit_rule_get_resource() {
+        let rule = RatelimitRule {
+            org: "test_org".to_string(),
+            rule_type: Some("exact".to_string()),
+            rule_id: Some("rule123".to_string()),
+            user_role: Some("admin".to_string()),
+            user_id: Some("user123".to_string()),
+            api_group_name: Some("search".to_string()),
+            api_group_operation: Some("query".to_string()),
+            threshold: 100,
+        };
+
+        let expected = "test_org:exact:admin:search:query:user123";
+        assert_eq!(rule.get_resource(), expected);
+    }
+
+    #[test]
+    fn test_ratelimit_rule_get_resource_with_none_values() {
+        let rule = RatelimitRule {
+            org: "test_org".to_string(),
+            rule_type: None,
+            rule_id: None,
+            user_role: None,
+            user_id: None,
+            api_group_name: None,
+            api_group_operation: None,
+            threshold: 50,
+        };
+
+        let expected = "test_org:::::";
+        assert_eq!(rule.get_resource(), expected);
+    }
+
+    #[test]
+    fn test_get_resource_from_params() {
+        let resource =
+            get_resource_from_params("test_org", "exact", "admin", "search", "query", "user123");
+
+        assert_eq!(resource, "test_org:exact:admin:search:query:user123");
+    }
+
+    #[test]
+    fn test_get_resource_from_params_empty_values() {
+        let resource = get_resource_from_params("", "", "", "", "", "");
+        assert_eq!(resource, ":::::");
+    }
+
+    #[test]
+    fn test_get_resource_from_params_special_characters() {
+        let resource = get_resource_from_params(
+            "org:with:colons",
+            "exact",
+            "admin",
+            "search",
+            "query",
+            "user:123",
+        );
+
+        assert_eq!(
+            resource,
+            "org:with:colons:exact:admin:search:query:user:123"
+        );
+    }
+
+    #[test]
+    fn test_serialization_deserialization() {
+        let rule = RatelimitRule {
+            org: "test_org".to_string(),
+            rule_type: Some("exact".to_string()),
+            rule_id: Some("rule123".to_string()),
+            user_role: Some("admin".to_string()),
+            user_id: Some("user123".to_string()),
+            api_group_name: Some("search".to_string()),
+            api_group_operation: Some("query".to_string()),
+            threshold: 100,
+        };
+
+        // Test serialization
+        let json = serde_json::to_string(&rule).expect("Failed to serialize");
+        assert!(!json.is_empty());
+
+        // Test deserialization
+        let deserialized: RatelimitRule =
+            serde_json::from_str(&json).expect("Failed to deserialize");
+        assert_eq!(deserialized.org, rule.org);
+        assert_eq!(deserialized.rule_type, rule.rule_type);
+        assert_eq!(deserialized.rule_id, rule.rule_id);
+        assert_eq!(deserialized.user_role, rule.user_role);
+        assert_eq!(deserialized.user_id, rule.user_id);
+        assert_eq!(deserialized.api_group_name, rule.api_group_name);
+        assert_eq!(deserialized.api_group_operation, rule.api_group_operation);
+        assert_eq!(deserialized.threshold, rule.threshold);
+    }
+
+    #[test]
+    fn test_serialization_skips_none_values() {
+        let rule = RatelimitRule {
+            org: "test_org".to_string(),
+            rule_type: None,
+            rule_id: None,
+            user_role: None,
+            user_id: None,
+            api_group_name: None,
+            api_group_operation: None,
+            threshold: 100,
+        };
+
+        let json = serde_json::to_string(&rule).expect("Failed to serialize");
+
+        // Check that None values are not included in JSON
+        assert!(!json.contains("rule_type"));
+        assert!(!json.contains("rule_id"));
+        assert!(!json.contains("user_role"));
+        assert!(!json.contains("user_id"));
+        assert!(!json.contains("api_group_name"));
+        assert!(!json.contains("api_group_operation"));
+
+        // Check that required fields are included
+        assert!(json.contains("org"));
+        assert!(json.contains("threshold"));
+    }
+}

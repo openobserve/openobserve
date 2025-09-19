@@ -315,7 +315,6 @@
 import {
   onBeforeMount,
   ref,
-  defineProps,
   defineExpose,
   computed,
   nextTick,
