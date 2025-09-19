@@ -526,7 +526,6 @@ pub fn merge_response(
     order_by: Vec<(String, OrderBy)>,
 ) -> config::meta::search::Response {
     cache_responses.retain(|res| !res.hits.is_empty());
-
     search_response.retain(|res| !res.hits.is_empty());
 
     if cache_responses.is_empty() && search_response.is_empty() {
@@ -541,9 +540,7 @@ pub fn merge_response(
         for res in cache_responses {
             resp.total += res.total;
             resp.scan_size += res.scan_size;
-
             resp.scan_records += res.scan_records;
-
             if res.hits.is_empty() {
                 continue;
             }
@@ -800,24 +797,16 @@ pub async fn write_results(
     // 4. check if the time range is less than discard_duration
     let last_rec_ts = get_ts_value(ts_column, res.hits.last().unwrap());
     let first_rec_ts = get_ts_value(ts_column, res.hits.first().unwrap());
-    let smallest_ts = std::cmp::min(first_rec_ts, last_rec_ts);
-    if (last_rec_ts - first_rec_ts).abs() < delay_ts {
+    let cache_start_time = std::cmp::min(first_rec_ts, last_rec_ts);
+    let mut cache_end_time = std::cmp::max(first_rec_ts, last_rec_ts);
+    if (cache_end_time - cache_start_time) < delay_ts {
         return;
     }
 
     // 5. adjust the cache time range
-    let largest_ts = std::cmp::max(first_rec_ts, last_rec_ts);
-    let cache_end_time = if largest_ts > 0 && largest_ts < req_query_end_time {
-        largest_ts
-    } else {
-        req_query_end_time
-    };
-
-    let cache_start_time = if smallest_ts > 0 && smallest_ts > req_query_start_time {
-        smallest_ts
-    } else {
-        req_query_start_time
-    };
+    if let Some(interval) = res.histogram_interval {
+        cache_end_time += interval * 1000 * 1000;
+    }
 
     // 6. cache to disk
     let file_name = format!(
