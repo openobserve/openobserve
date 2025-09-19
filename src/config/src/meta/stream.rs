@@ -776,23 +776,23 @@ impl TimeRange {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, ToSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, ToSchema, PartialEq)]
 pub struct StreamSettings {
-    #[serde(skip_serializing_if = "Option::None")]
+    #[serde(default)]
     pub partition_time_level: Option<PartitionTimeLevel>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub partition_keys: Vec<StreamPartition>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub full_text_search_keys: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub index_fields: Vec<String>,
     #[serde(default)]
     pub bloom_filter_fields: Vec<String>,
     #[serde(default)]
     pub data_retention: i64,
-    #[serde(skip_serializing_if = "Option::None")]
+    #[serde(default)]
     pub flatten_level: Option<i64>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub defined_schema_fields: Vec<String>,
     #[serde(default)]
     pub max_query_range: i64, // hours
@@ -800,7 +800,7 @@ pub struct StreamSettings {
     pub store_original_data: bool,
     #[serde(default)]
     pub approx_partition: bool,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub distinct_value_fields: Vec<DistinctField>,
     #[serde(default)]
     pub index_updated_at: i64,
@@ -812,6 +812,30 @@ pub struct StreamSettings {
     pub index_all_values: bool,
     #[serde(default)]
     pub enable_distinct_fields: bool,
+}
+
+impl Default for StreamSettings {
+    fn default() -> Self {
+        Self {
+            partition_time_level: None,
+            partition_keys: Vec::new(),
+            full_text_search_keys: Vec::new(),
+            index_fields: Vec::new(),
+            bloom_filter_fields: Vec::new(),
+            data_retention: 0,
+            flatten_level: None,
+            defined_schema_fields: Vec::new(),
+            max_query_range: 0,
+            store_original_data: false,
+            approx_partition: false,
+            distinct_value_fields: Vec::new(),
+            index_updated_at: 0,
+            extended_retention_days: Vec::new(),
+            index_original_data: false,
+            index_all_values: false,
+            enable_distinct_fields: true,
+        }
+    }
 }
 
 impl Serialize for StreamSettings {
@@ -841,7 +865,7 @@ impl Serialize for StreamSettings {
         state.serialize_field("extended_retention_days", &self.extended_retention_days)?;
         state.serialize_field("index_original_data", &self.index_original_data)?;
         state.serialize_field("index_all_values", &self.index_all_values)?;
-        state.serialize_field("disable_distinct_fields", &self.enable_distinct_fields)?;
+        state.serialize_field("enable_distinct_fields", &self.enable_distinct_fields)?;
 
         if !self.defined_schema_fields.is_empty() {
             let mut fields = self.defined_schema_fields.clone();
