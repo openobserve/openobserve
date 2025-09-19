@@ -34,6 +34,7 @@ mod cipher;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
+pub mod config_watcher;
 mod file_downloader;
 mod file_list_dump;
 pub(crate) mod files;
@@ -257,6 +258,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
+    config_watcher::run();
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_querier() && get_enterprise_config().ai.enabled {
         tokio::task::spawn(async move {

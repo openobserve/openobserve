@@ -9,22 +9,44 @@ test.describe("Logs Downloads testcases", () => {
   let pageManager;
   let downloadDir;
 
+  // Helper function to set up logs page after navigation
+  async function setupLogsPage(page) {
+    await page.goto(
+      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+    );
+    await pageManager.logsPage.selectStream("e2e_automate");
+    await pageManager.logsPage.clickRefreshButton();
+    await expect(page.locator('[data-test="log-table-column-0-source"]').getByText('{"_timestamp":')).toBeVisible();
+  }
+
+  // Helper function to set up SQL mode with LIMIT 2000
+  async function setupSQLMode(page) {
+    await pageManager.logsPage.clickSQLModeToggle();
+    await page.waitForTimeout(1000);
+    await pageManager.logsPage.clickQueryEditor();
+    await pageManager.logsPage.clearQueryEditor();
+    await pageManager.logsPage.fillQueryEditor('SELECT * FROM "e2e_automate" LIMIT 2000');
+    await page.waitForTimeout(1000);
+    await pageManager.logsPage.clickRefreshButton();
+    await page.waitForTimeout(2000);
+  }
+
   test.beforeEach(async ({ page }, testInfo) => {
     // Initialize test setup
     testLogger.testStart(testInfo.title, testInfo.file);
-    
+
     // Navigate to base URL with authentication
     await navigateToBase(page);
     pageManager = new PageManager(page);
-    
+
     // Post-authentication stabilization wait
     await page.waitForLoadState('networkidle');
-    
+
     // Use existing ingestion function from logs page - ingest multiple times to ensure enough data
     testLogger.info('Ingesting data to ensure sufficient records for testing');
     await pageManager.logsPage.ingestLogs(process.env["ORGNAME"], "e2e_automate", logsdata);
     await page.waitForLoadState('networkidle');
-    
+
     // Ingest additional data to ensure we have at least 10000 records
     for (let i = 0; i < 5; i++) {
       await pageManager.logsPage.ingestLogs(process.env["ORGNAME"], "e2e_automate", logsdata);
@@ -38,10 +60,10 @@ test.describe("Logs Downloads testcases", () => {
     await pageManager.logsPage.selectStream("e2e_automate");
     await pageManager.logsPage.clickRefreshButton();
     await expect(page.locator('[data-test="log-table-column-0-source"]').getByText('{"_timestamp":')).toBeVisible();
-    
+
     // Setup download directory using page function
     downloadDir = await pageManager.logsPage.setupDownloadDirectory();
-    
+
     // Verify directory exists and is accessible
     expect(fs.existsSync(downloadDir)).toBe(true);
   });
@@ -51,215 +73,187 @@ test.describe("Logs Downloads testcases", () => {
     await pageManager.logsPage.cleanupDownloadDirectory(downloadDir);
   });
 
-  // No streaming flips in this suite
-
-  test("should download normal results and verify CSV content", {
-    tag: ['@downloadNormal', '@all', '@logs', '@logsDownloads']
+  test("should download all formats and scenarios with detailed error handling", {
+    tag: ['@downloadAll', '@all', '@logs', '@logsDownloads']
   }, async ({ page }) => {
-    testLogger.info('Starting test: Normal download (no custom range)');
-    
-    await pageManager.logsPage.clickMoreOptionsButton();
-    await pageManager.logsPage.clickDownloadResults();
-    const downloadPromise = pageManager.logsPage.waitForDownload();
-    
-    // Try to find CSV button with fallback mechanism
-    const csvButton = page.getByText('CSV', { exact: true });
-    try {
-      await csvButton.waitFor({ state: 'visible', timeout: 3000 });
-      await csvButton.click();
-    } catch (error) {
-      testLogger.debug('CSV button not visible, reopening more options menu');
-      await pageManager.logsPage.clickMoreOptionsButton();
-      await csvButton.click();
+    testLogger.info('🚀 Starting comprehensive download test: All formats and scenarios');
+
+    const testResults = [];
+    let totalTests = 0;
+    let passedTests = 0;
+
+    // Helper function to execute download with error handling
+    async function executeDownloadTest(testName, downloadFunction) {
+      totalTests++;
+      try {
+        testLogger.info(`Testing: ${testName}`);
+        await downloadFunction();
+        testLogger.info(`✅ PASSED: ${testName}`);
+        testResults.push({ test: testName, status: 'PASSED', error: null });
+        passedTests++;
+      } catch (error) {
+        testLogger.error(`❌ FAILED: ${testName}`, { error: error.message });
+        testResults.push({ test: testName, status: 'FAILED', error: error.message });
+        // Don't throw, continue with other tests
+      }
     }
-    
-    const download = await downloadPromise;
-    
-    // Verify download started
-    expect(download).toBeDefined();
-    expect(download.suggestedFilename()).toBeTruthy();
-    
-    await pageManager.logsPage.verifyDownload(download, 'download_results.csv', downloadDir);
-    testLogger.info('Test completed: Normal download verification finished');
+
+    // 1. Normal Downloads
+    await executeDownloadTest('Normal CSV Download', async () => {
+      await pageManager.logsPage.clickMoreOptionsButton();
+      await pageManager.logsPage.clickDownloadResults();
+      const csvDownloadPromise = pageManager.logsPage.waitForDownload();
+
+      const csvButton = page.getByText('CSV', { exact: true });
+      try {
+        await csvButton.waitFor({ state: 'visible', timeout: 3000 });
+        await csvButton.click();
+      } catch (error) {
+        await pageManager.logsPage.clickMoreOptionsButton();
+        await csvButton.click();
+      }
+
+      const csvDownload = await csvDownloadPromise;
+      expect(csvDownload).toBeDefined();
+      await pageManager.logsPage.verifyDownload(csvDownload, 'download_normal.csv', downloadDir);
+    });
+
+    await executeDownloadTest('Normal JSON Download', async () => {
+      testLogger.debug('🔄 Refreshing for Normal JSON');
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      await setupLogsPage(page);
+      await page.waitForTimeout(2000);
+
+      await pageManager.logsPage.clickMoreOptionsButton();
+      await pageManager.logsPage.clickDownloadResults();
+      const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
+
+      const jsonButton = page.getByText('JSON', { exact: true });
+      try {
+        await jsonButton.waitFor({ state: 'visible', timeout: 3000 });
+        await jsonButton.click();
+      } catch (error) {
+        await pageManager.logsPage.clickMoreOptionsButton();
+        await jsonButton.click();
+      }
+
+      const jsonDownload = await jsonDownloadPromise;
+      expect(jsonDownload).toBeDefined();
+      await pageManager.logsPage.verifyJsonDownload(jsonDownload, 'download_normal.json', downloadDir);
+    });
+
+    // 2. Custom Range Downloads
+    const ranges = ['100', '500', '1000', '5000', '10000'];
+    for (const range of ranges) {
+
+      await executeDownloadTest(`Custom Range ${range} CSV Download`, async () => {
+        testLogger.debug(`🔄 Refreshing for Custom Range ${range} CSV`);
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+        await setupLogsPage(page);
+        await page.waitForTimeout(2000);
+
+        await pageManager.logsPage.clickMoreOptionsButton();
+        await pageManager.logsPage.clickDownloadResultsForCustom();
+        await pageManager.logsPage.expectCustomDownloadDialogVisible();
+        await pageManager.logsPage.clickCustomDownloadRangeSelect();
+        await pageManager.logsPage.selectCustomDownloadRange(range);
+
+        const csvDownloadPromise = pageManager.logsPage.waitForDownload();
+        await pageManager.logsPage.clickConfirmDialogOkButton();
+        const csvDownload = await csvDownloadPromise;
+
+        expect(csvDownload).toBeDefined();
+        await pageManager.logsPage.verifyDownload(csvDownload, `download_custom_${range}.csv`, downloadDir);
+      });
+
+      await executeDownloadTest(`Custom Range ${range} JSON Download`, async () => {
+        testLogger.debug(`🔄 Refreshing for Custom Range ${range} JSON`);
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+        await setupLogsPage(page);
+        await page.waitForTimeout(2000);
+
+        await pageManager.logsPage.clickMoreOptionsButton();
+        await pageManager.logsPage.clickDownloadResultsForCustom();
+        await pageManager.logsPage.expectCustomDownloadDialogVisible();
+        await pageManager.logsPage.clickCustomDownloadRangeSelect();
+        await pageManager.logsPage.selectCustomDownloadRange(range);
+
+        await page.locator('[data-test="custom-download-file-type-json-btn"]').click();
+
+        const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
+        await pageManager.logsPage.clickConfirmDialogOkButton();
+        const jsonDownload = await jsonDownloadPromise;
+
+        expect(jsonDownload).toBeDefined();
+        await pageManager.logsPage.verifyJsonDownloadWithCount(jsonDownload, `download_custom_${range}.json`, downloadDir, parseInt(range));
+      });
+    }
+
+    // 3. SQL Mode Downloads
+    await executeDownloadTest('SQL Mode LIMIT 2000 CSV Download', async () => {
+      testLogger.debug('🔄 Refreshing for SQL Mode CSV');
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      await setupLogsPage(page);
+      await setupSQLMode(page);
+
+      await pageManager.logsPage.clickMoreOptionsButton();
+      await pageManager.logsPage.clickDownloadResults();
+      const csvDownloadPromise = pageManager.logsPage.waitForDownload();
+      await page.getByText('CSV', { exact: true }).click();
+      const csvDownload = await csvDownloadPromise;
+
+      expect(csvDownload).toBeDefined();
+      await pageManager.logsPage.verifyDownload(csvDownload, 'download_sql_2000.csv', downloadDir);
+    });
+
+    await executeDownloadTest('SQL Mode LIMIT 2000 JSON Download', async () => {
+      testLogger.debug('🔄 Refreshing for SQL Mode JSON');
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      await setupLogsPage(page);
+      await setupSQLMode(page);
+
+      await pageManager.logsPage.clickMoreOptionsButton();
+      await pageManager.logsPage.clickDownloadResults();
+      const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
+      await page.getByText('JSON', { exact: true }).click();
+      const jsonDownload = await jsonDownloadPromise;
+
+      expect(jsonDownload).toBeDefined();
+      await pageManager.logsPage.verifyJsonDownloadWithCount(jsonDownload, 'download_sql_2000.json', downloadDir, 2000);
+    });
+
+    // Final Results Summary
+    testLogger.info('\n📊 COMPREHENSIVE TEST RESULTS SUMMARY:');
+    testLogger.info('='.repeat(50));
+    testLogger.info(`Total Tests: ${totalTests}`);
+    testLogger.info(`Passed: ${passedTests}`);
+    testLogger.info(`Failed: ${totalTests - passedTests}`);
+    testLogger.info('='.repeat(50));
+
+    testResults.forEach(result => {
+      const status = result.status === 'PASSED' ? '✅' : '❌';
+      testLogger.info(`${status} ${result.test}`);
+      if (result.error) {
+        testLogger.error(`   Error: ${result.error}`);
+      }
+    });
+
+    testLogger.info('='.repeat(50));
+
+    // Fail the test if any individual test failed
+    const failedTests = testResults.filter(r => r.status === 'FAILED');
+    if (failedTests.length > 0) {
+      const failedTestNames = failedTests.map(f => f.test).join(', ');
+      throw new Error(`${failedTests.length} test(s) failed: ${failedTestNames}`);
+    }
+
+    testLogger.info('🎉 ALL DOWNLOAD TESTS PASSED SUCCESSFULLY!');
   });
 
-  test("should download custom range 100 results and verify CSV content", {
-    tag: ['@downloadCustom100', '@all', '@logs', '@logsDownloads']
-  }, async ({ page }) => {
-    console.log('🧪 Starting test: Custom range download (100 rows)');
-    
-    await pageManager.logsPage.clickMoreOptionsButton();
-    await pageManager.logsPage.clickDownloadResultsForCustom();
-    await pageManager.logsPage.expectCustomDownloadDialogVisible();
-    await pageManager.logsPage.clickCustomDownloadRangeSelect();
-    await pageManager.logsPage.selectCustomDownloadRange('100');
-    const download1Promise = pageManager.logsPage.waitForDownload();
-    await pageManager.logsPage.clickConfirmDialogOkButton();
-    const download1 = await download1Promise;
-    
-    // Verify download started
-    expect(download1).toBeDefined();
-    expect(download1.suggestedFilename()).toBeTruthy();
-    
-    await pageManager.logsPage.verifyDownload(download1, 'download_custom_100.csv', downloadDir);
-    console.log('✅ Test completed: Custom range 100 rows verification finished');
-  });
-
-  test("should download custom range 500 results and verify CSV content", {
-    tag: ['@downloadCustom500', '@all', '@logs', '@logsDownloads']
-  }, async ({ page }) => {
-    console.log('🧪 Starting test: Custom range download (500 rows)');
-    
-    await pageManager.logsPage.clickMoreOptionsButton();
-    await pageManager.logsPage.clickDownloadResultsForCustom();
-    await pageManager.logsPage.expectCustomDownloadDialogVisible();
-    await pageManager.logsPage.clickCustomDownloadRangeSelect();
-    await pageManager.logsPage.selectCustomDownloadRange('500');
-    const download2Promise = pageManager.logsPage.waitForDownload();
-    await pageManager.logsPage.clickConfirmDialogOkButton();
-    const download2 = await download2Promise;
-    
-    // Verify download started
-    expect(download2).toBeDefined();
-    expect(download2.suggestedFilename()).toBeTruthy();
-    
-    await pageManager.logsPage.verifyDownload(download2, 'download_custom_500.csv', downloadDir);
-    console.log('✅ Test completed: Custom range 500 rows verification finished');
-  });
-
-  test("should download custom range 1000 results and verify CSV content", {
-    tag: ['@downloadCustom1000', '@all', '@logs', '@logsDownloads']
-  }, async ({ page }) => {
-    console.log('🧪 Starting test: Custom range download (1000 rows)');
-    
-    await pageManager.logsPage.clickMoreOptionsButton();
-    await pageManager.logsPage.clickDownloadResultsForCustom();
-    await pageManager.logsPage.clickCustomDownloadRangeSelect();
-    await pageManager.logsPage.selectCustomDownloadRange('1000');
-    const download3Promise = pageManager.logsPage.waitForDownload();
-    await pageManager.logsPage.clickConfirmDialogOkButton();
-    const download3 = await download3Promise;
-    
-    // Verify download started
-    expect(download3).toBeDefined();
-    expect(download3.suggestedFilename()).toBeTruthy();
-    
-    await pageManager.logsPage.verifyDownload(download3, 'download_custom_1000.csv', downloadDir);
-    console.log('✅ Test completed: Custom range 1000 rows verification finished');
-  });
-
-  test("should download custom range 5000 results and verify CSV content", {
-    tag: ['@downloadCustom5000', '@all', '@logs', '@logsDownloads']
-  }, async ({ page }) => {
-    console.log('🧪 Starting test: Custom range download (5000 rows)');
-    
-    await pageManager.logsPage.clickMoreOptionsButton();
-    await pageManager.logsPage.clickDownloadResultsForCustom();
-    await pageManager.logsPage.clickCustomDownloadRangeSelect();
-    await pageManager.logsPage.selectCustomDownloadRange('5000');
-    const download4Promise = pageManager.logsPage.waitForDownload();
-    await pageManager.logsPage.clickConfirmDialogOkButton();
-    const download4 = await download4Promise;
-    
-    // Verify download started
-    expect(download4).toBeDefined();
-    expect(download4.suggestedFilename()).toBeTruthy();
-    
-    await pageManager.logsPage.verifyDownload(download4, 'download_custom_5000.csv', downloadDir);
-    console.log('✅ Test completed: Custom range 5000 rows verification finished');
-  });
-
-  test("should download custom range 10000 results and verify CSV content", {
-    tag: ['@downloadCustom10000', '@all', '@logs', '@logsDownloads']
-  }, async ({ page }) => {
-    console.log('🧪 Starting test: Custom range download (10000 rows)');
-    
-    await pageManager.logsPage.clickMoreOptionsButton();
-    await pageManager.logsPage.clickDownloadResultsForCustom();
-    await pageManager.logsPage.clickCustomDownloadRangeSelect();
-    await pageManager.logsPage.selectCustomDownloadRange('10000');
-    const download5Promise = pageManager.logsPage.waitForDownload();
-    await pageManager.logsPage.clickConfirmDialogOkButton();
-    const download5 = await download5Promise;
-    
-    // Verify download started
-    expect(download5).toBeDefined();
-    expect(download5.suggestedFilename()).toBeTruthy();
-    
-    await pageManager.logsPage.verifyDownload(download5, 'download_custom_10000.csv', downloadDir);
-    console.log('✅ Test completed: Custom range 10000 rows verification finished');
-  });
-
-  test("should download results with SQL mode LIMIT 2000 and verify CSV content", {
-    tag: ['@downloadSQLLimit2000', '@downloadWithLimit', '@all', '@logs', '@logsDownloads']
-  }, async ({ page }) => {
-    console.log('🧪 Starting test: SQL mode download with LIMIT 2000');
-    
-    // Enable SQL mode
-    await pageManager.logsPage.clickSQLModeToggle();
-    await page.waitForTimeout(1000);
-    
-    // Clear and fill query editor with LIMIT query
-    await pageManager.logsPage.clickQueryEditor();
-    await pageManager.logsPage.clearQueryEditor();
-    await pageManager.logsPage.fillQueryEditor('SELECT * FROM "e2e_automate" LIMIT 2000');
-    await page.waitForTimeout(1000);
-    
-    // Execute query
-    await pageManager.logsPage.clickRefreshButton();
-    await page.waitForTimeout(2000);
-    
-    // Download results
-    await pageManager.logsPage.clickMoreOptionsButton();
-    await pageManager.logsPage.clickDownloadResults();
-    const downloadPromise = pageManager.logsPage.waitForDownload();
-    await page.getByText('CSV', { exact: true }).click();
-    const download = await downloadPromise;
-    
-    // Verify download started
-    expect(download).toBeDefined();
-    expect(download.suggestedFilename()).toBeTruthy();
-    
-    await pageManager.logsPage.verifyDownload(download, 'download_sql_limit_2000.csv', downloadDir);
-    console.log('✅ Test completed: SQL mode LIMIT 2000 download verification finished');
-  });
-
-  // To be uncommented post the bug fix
-
-  test.skip("should download custom range 500 with SQL mode LIMIT 2000 and verify CSV content", {
-    tag: ['@downloadSQLLimit2000Custom500', '@downloadWithLimit', '@all', '@logs', '@logsDownloads']
-  }, async ({ page }) => {
-    console.log('🧪 Starting test: SQL mode LIMIT 2000 with custom range 500');
-    
-    // Enable SQL mode
-    await pageManager.logsPage.clickSQLModeToggle();
-    await page.waitForTimeout(1000);
-    
-    // Clear and fill query editor with LIMIT query
-    await pageManager.logsPage.clickQueryEditor();
-    await pageManager.logsPage.clearQueryEditor();
-    await pageManager.logsPage.fillQueryEditor('SELECT * FROM "e2e_automate" LIMIT 2000');
-    await page.waitForTimeout(1000);
-    
-    // Execute query
-    await pageManager.logsPage.clickRefreshButton();
-    await page.waitForTimeout(2000);
-    
-    // Download with custom range 500
-    await pageManager.logsPage.clickMoreOptionsButton();
-    await pageManager.logsPage.clickDownloadResultsForCustom();
-    await pageManager.logsPage.clickCustomDownloadRangeSelect();
-    await pageManager.logsPage.selectCustomDownloadRange('500');
-    const downloadPromise = pageManager.logsPage.waitForDownload();
-    await pageManager.logsPage.clickConfirmDialogOkButton();
-    const download = await downloadPromise;
-    
-    // Verify download started
-    expect(download).toBeDefined();
-    expect(download.suggestedFilename()).toBeTruthy();
-    
-    await pageManager.logsPage.verifyDownload(download, 'download_sql_limit_2000_custom_500.csv', downloadDir);
-    console.log('✅ Test completed: SQL mode LIMIT 2000 with custom range 500 verification finished');
-  });
 
 });
