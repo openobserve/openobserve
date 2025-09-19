@@ -43,10 +43,13 @@ pub async fn lock_files(files: &[String]) {
 }
 
 pub async fn release_files(files: &[String]) {
-    // Process files sequentially to avoid Send issues with complex futures
+    // Because usize data in the Entry can be moved along with the task, I need
+    // to guarantee that inc/dec won't suffer a race condition. The guarantees
+    // of concurrency by scc::HashMap are only for the Entry not the data inside.
+    // Which is why I picked Atomics over regular isize/usize.
     let futures = files.iter().map(|file| {
         Box::pin(SEARCHING_FILES.remove_if_async(file, |e| {
-            e.fetch_add(-1, std::sync::atomic::Ordering::SeqCst) <= 1
+            e.fetch_sub(1, std::sync::atomic::Ordering::SeqCst) <= 1
         }))
     });
     futures::future::join_all(futures).await;
