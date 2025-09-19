@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-card
-    style="width: 60vw"
+    style="width: 80vw"
     class="column full-height no-wrap"
     v-if="indexData.schema"
   >
@@ -28,6 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="schema-title-text"
           >
             {{ t("logStream.schemaHeader") }}
+            <!-- introduced name at the top  -->
+            <span class="tw-font-bold tw-text-blue-600 tw-bg-blue-50 tw-px-2 tw-py-1 tw-rounded-md tw-ml-2">
+              {{ indexData.name }}
+            </span>
           </div>
         </div>
         <div class="col-auto">
@@ -40,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-card-section class="q-ma-none q-pa-none">
       <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
+        <!-- we will show loading state here -->
         <div
           v-if="loadingState"
           class="q-pt-md text-center q-w-md q-mx-lg tw-flex tw-justify-center"
@@ -47,550 +52,340 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-spinner-hourglass color="primary" size="lg" />
         </div>
-        <div v-else class="indexDetailsContainer" style="height: 100vh">
-          <div
-            class="titleContainer tw-flex tw-flex-col tw-items-flex-start tw-gap-5"
-          >
-            <div
-              data-test="stream-details-container"
-              class="stream_details_container tw-flex tw-justify-between tw-gap-5 tw-flex-wrap"
-            >
-              <div data-test="schema-stream-title-text">
-                {{ t("alerts.stream_name") }}
-                <span class="title q-pl-xs"> {{ indexData.name }}</span>
-              </div>
+        <!-- if we have data and no loading then we will show the data otherwise we will show the loading state -->
+        <div v-else class="indexDetailsContainer" style="height: calc(100vh - 120px)">
+          <!-- this the grid section the tiles section -->
+          <div class="stats-grid tw-grid tw-grid-cols-4 tw-gap-2 tw-mb-2">
+              <!-- Docs Count Tile -->
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
-                data-test="schema-stream-title-text"
+                class="tile"
+                data-test="docs-count-tile"
               >
-                {{ t("logStream.docsCount") }}
-                <span class="title q-pl-xs">
-                  {{
-                    parseInt(indexData.stats.doc_num).toLocaleString("en-US")
-                  }}
-                </span>
-              </div>
-              <div data-test="schema-stream-title-text">
-                {{ t("logStream.storageSize") }}
-                <span class="title q-pl-xs">
-                  {{ formatSizeFromMB(indexData.stats.storage_size) }}</span
+                <div 
+                  class="tile-content tw-rounded-lg tw-p-3 tw-text-center tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
+                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
                 >
-              </div>
-              <div
-                v-if="isCloud !== 'true'"
-                data-test="schema-stream-title-text"
-              >
-                {{ t("logStream.compressedSize") }}
-                <span class="title q-pl-xs">
-                  {{ formatSizeFromMB(indexData.stats.compressed_size) }}</span
-                >
-              </div>
-            </div>
-            <div class="tw-flex tw-justify-between">
-              <div
-                v-if="isCloud !== 'true'"
-                data-test="schema-stream-title-text"
-              >
-                {{ t("logStream.indexSize") }}
-                <span class="title q-pl-xs">
-                  {{ formatSizeFromMB(indexData.stats.index_size) }}</span
-                >
-              </div>
-              <div
-                class="stream-time-container flex justify-between tw-gap-5"
-                v-if="store.state.zoConfig.show_stream_stats_doc_num"
-                data-test="schema-stream-title-text"
-              >
-                <span class="q-px-xs">
-                  Start Time:
-                  <span class="title">{{ indexData.stats.doc_time_min }}</span>
-                </span>
-
-                <span class="q-px-xs">
-                  End Time:
-                  <span class="title">{{ indexData.stats.doc_time_max }}</span>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <template v-if="showDataRetention">
-            <div class="tw-flex tw-justify-between">
-              <div class="row flex items-center q-pb-xs q-mt-lg">
-                <div class="flex tw-flex-col">
-                  <label class="q-pr-sm tw-font-medium"
-                    >Data Retention in days</label
-                  >
-                  <span class="tw-text-xs tw-font-normal">
-                    (Global retention is
-                    {{ store.state.zoConfig.data_retention_days }} days)
-                  </span>
-                </div>
-                <q-input
-                  data-test="stream-details-data-retention-input"
-                  v-model="dataRetentionDays"
-                  type="number"
-                  dense
-                  filled
-                  min="1"
-                  round
-                  class="q-mr-sm q-ml-sm data-retention-input"
-                  hide-bottom-space
-                  @change="formDirtyFlag = true"
-                  @update:model-value="markFormDirty"
-                />
-                <div></div>
-              </div>
-
-              <div class="row flex items-center q-pb-xs q-mt-lg">
-                <label class="q-pr-sm tw-font-medium"
-                  >Max Query Range (in hours)</label
-                >
-                <q-input
-                  data-test="stream-details-max-query-range-input"
-                  v-model="maxQueryRange"
-                  type="number"
-                  dense
-                  filled
-                  min="0"
-                  round
-                  class="q-mr-sm data-retention-input"
-                  @wheel.prevent
-                  @change="formDirtyFlag = true"
-                  @update:model-value="markFormDirty"
-                />
-              </div>
-
-              <div class="row flex items-center q-pb-xs q-mt-lg">
-                <div>
-                  <label class="q-pr-sm tw-font-medium"
-                    >{{ t("logStream.flattenLevel") }}</label
-                  >
-                  <span class="tw-text-xs tw-font-normal">
-                    (Global is
-                    {{ store.state.zoConfig.ingest_flatten_level || 3 }})
-                  </span>
-                </div>
-                <q-input
-                  data-test="stream-details-flatten-level-input"
-                  v-model="flattenLevel"
-                  type="number"
-                  dense
-                  filled
-                  min="0"
-                  round
-                  class="q-mr-sm q-ml-sm data-retention-input"
-                  hide-bottom-space
-                  @change="formDirtyFlag = true"
-                  @update:model-value="markFormDirty"
-                />
-                <div></div>
-              </div>
-
-              <div class="row flex items-center q-pb-xs q-mt-lg">
-                <q-toggle
-                  data-test="log-stream-use_approx-toggle-btn"
-                  v-model="approxPartition"
-                  :label="t('logStream.approxPartition')"
-                  @click="formDirtyFlag = true"
-                  left-label
-                  dense
-                />
-              </div>
-            </div>
-            <div
-              class="q-ma-none q-pa-none text-negative"
-              style="min-height: 20px"
-            >
-              <span v-if="dataRetentionDays <= 0 || dataRetentionDays == ''">
-                Retention period must be at least 1 day
-              </span>
-            </div>
-          </template>
-          <div>
-            <div class="flex justify-start">
-              <q-tabs v-model="activeMainTab" inline-label dense>
-                <!-- Schema Settings Tab with conditional class -->
-                <q-tab
-                  :class="{
-                    'text-primary': activeMainTab === 'schemaSettings',
-                  }"
-                  name="schemaSettings"
-                  icon="settings"
-                  label="Schema Settings"
-                />
-
-                <!-- Red Button Tab -->
-                <q-tab
-                  :class="{ 'text-primary': activeMainTab === 'redButton' }"
-                  name="redButton"
-                  icon="backup"
-                  label="Extended Retention"
-                />
-              </q-tabs>
-            </div>
-          </div>
-          <!-- schema settings tab -->
-          <div v-if="activeMainTab == 'schemaSettings'">
-            <div
-              class="title flex tw-justify-between tw-items-center"
-              data-test="schema-log-stream-mapping-title-text"
-            >
-              <div style="font-weight: 400" class="q-mt-md">
-                <label
-                  v-show="indexData.defaultFts"
-                  style="font-weight: 600"
-                  class="mapping-warning-msg"
-                >
-                  {{ t("logStream.mapping") }} Default FTS keys used (no custom
-                  keys set).</label
-                >
-              </div>
-              <q-toggle
-                v-if="showStoreOriginalDataToggle"
-                data-test="log-stream-store-original-data-toggle-btn"
-                v-model="storeOriginalData"
-                :label="t('logStream.storeOriginalData')"
-                @click="formDirtyFlag = true"
-                left-label
-                dense
-              />
-            </div>
-            <div class="q-mb-md">
-              <div class="flex justify-between items-center full-width">
-                <div class="flex items-center">
-                  <app-tabs
-                    v-if="isSchemaUDSEnabled"
-                    class="schema-fields-tabs"
-                    style="
-                      border: 1px solid #8a8a8a;
-                      border-radius: 4px;
-                      overflow: hidden;
-                    "
-                    data-test="schema-fields-tabs"
-                    :tabs="tabs"
-                    :active-tab="activeTab"
-                    @update:active-tab="updateActiveTab"
-                  />
-                  <div v-if="hasUserDefinedSchema" class="q-ml-sm">
-                    <q-icon
-                      name="info"
-                      class="q-mr-xs"
-                      size="16px"
-                      style="color: #f5a623; cursor: pointer"
+                  <div class="tile-header tw-flex tw-justify-between tw-items-start">
+                    <div 
+                      class="tile-title tw-text-xs tw-font-bold tw-text-left"
+                      :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
                     >
-                      <q-tooltip style="font-size: 14px; width: 250px">
-                        Other fields show only the schema fields that existed
-                        before the stream was configured to use a user-defined
-                        schema.
-                      </q-tooltip>
-                    </q-icon>
-                  </div>
-                </div>
-
-                <div class="flex items-center tw-gap-4">
-                  <q-input
-                    data-test="schema-field-search-input"
-                    v-model="filterField"
-                    data-cy="schema-index-field-search-input"
-                    filled
-                    borderless
-                    dense
-                    debounce="1"
-                    :placeholder="t('search.searchField')"
-                  >
-                    <template #prepend>
-                      <q-icon name="search" />
-                    </template>
-                  </q-input>
-                  <q-btn
-                    v-if="isSchemaUDSEnabled"
-                    color="primary"
-                    data-test="schema-add-fields-title"
-                    @click="openDialog"
-                    class="q-my-sm text-bold no-border"
-                    padding="sm md"
-                    no-caps
-                    dense
-                    :disable="isDialogOpen"
-                  >
-                    Add Field(s)
-                  </q-btn>
-                </div>
-              </div>
-            </div>
-
-            <div class="q-mb-md" v-if="isDialogOpen">
-              <q-card class="add-fields-card">
-                <!-- Header Section -->
-                <q-card-section
-                  class="q-pa-none"
-                  style="padding: 8px 16px 6px 16px"
-                >
-                  <div class="tw-flex tw-justify-between tw-items-center">
-                    <div class="text-h6">Add Field(s)</div>
-                    <div>
-                      <q-btn
-                        data-test="add-stream-cancel-btn"
-                        icon="close"
-                        class="text-bold q-mr-md"
-                        text-color="light-text"
-                        no-caps
-                        dense
-                        flat
-                        @click="closeDialog"
-                      />
+                    Events
+                    </div>
+                    <div class="tile-icon tw-opacity-80">
+                      <img src="@/assets/images/home/records.svg" alt="Records Icon" class="tw-h-6 tw-w-6" />
                     </div>
                   </div>
-                </q-card-section>
-                <!-- Main Content (Scrollable if necessary) -->
-                <q-card-section
-
-                  class="q-pa-none"
-                  style="flex: 1; overflow-y: auto; padding: 4px 16px 6px 16px; margin-bottom: 4px;"
-                >
-                  <StreamFieldsInputs
-                    :fields="newSchemaFields"
-                    :showHeader="false"
-                    :visibleInputs="{
-                      name: true,
-                      data_type: true,
-                      index_type: false,
-                    }"
-                    @add="addSchemaField"
-                    @remove="removeSchemaField"
-                  />
-                </q-card-section>
-              </q-card>
-            </div>
-
-            <!-- Note: Drawer max-height to be dynamically calculated with JS -->
-            <div
-              :class="
-                store.state.theme === 'dark'
-                  ? 'dark-theme-table'
-                  : 'light-theme-table'
-              "
-              style="margin-bottom: 30px"
-            >
-              <q-table
-                ref="qTable"
-                data-test="schema-log-stream-field-mapping-table"
-                :rows="indexData.schema"
-                :columns="columns"
-                :row-key="(row) => 'tr_' + row.name"
-                :filter="`${filterField}@${activeTab}`"
-                :filter-method="filterFieldFn"
-                :pagination="pagination"
-                selection="multiple"
-                v-model:selected="selectedFields"
-                class="q-table"
-                id="schemaFieldList"
-                :rows-per-page-options="[]"
-                dense
-              >
-                <template v-slot:header="props">
-                  <q-tr :props="props">
-                    <q-th>
-                      <q-checkbox v-model="props.selected" color="primary" />
-                    </q-th>
-                    <q-th
-                      v-for="col in props.cols"
-                      :key="col.name"
-                      :props="props"
-                    >
-                      <span v-if="col.icon">
-                        <q-icon color="primary" :name="outlinedPerson"></q-icon>
-                        <q-icon color="primary" :name="outlinedSchema"></q-icon>
-                      </span>
-                      <span v-else>
-                        {{ col.label }}
-                      </span>
-                    </q-th>
-                  </q-tr>
-                </template>
-                <template v-slot:header-selection="scope">
-                  <q-td class="text-center">
-                    <q-checkbox
-                      v-if="
-                        !(
-                          scope.name == store.state.zoConfig.timestamp_column ||
-                          scope.name == allFieldsName
-                        )
-                      "
-                      :data-test="`schema-stream-delete-${scope.name}-field-fts-key-checkbox`"
-                      v-model="scope.selected"
-                      size="sm"
-                    />
-                  </q-td>
-                </template>
-
-                <template v-slot:body-selection="scope">
-                  <q-td class="text-center q-td--no-hover">
-                    <q-checkbox
-                      v-if="
-                        !(
-                          scope.row.name ==
-                            store.state.zoConfig.timestamp_column ||
-                          scope.row.name == allFieldsName
-                        )
-                      "
-                      :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
-                      v-model="scope.selected"
-                      size="sm"
-                    />
-                  </q-td>
-                </template>
-
-                <template v-slot:body-cell-name="props">
-                  <q-td class="q-td--no-hover field-name"
-                    >{{ props.row.name }}
-                    <span v-if="isEnvQuickModeField(props.row.name)">
-                      <img
-                        :src="quickModeIcon"
-                        :alt="t('logStream.envQuickModeMsg')"
-                        class="tw-inline-block q-ml-xs tw-w-[20px]"
-                      />
-                      <q-tooltip
-                      class="tw-text-[12px] tw-w-[200px]"
-                    >
-                      {{ t('logStream.envQuickModeMsg') }}
-                    </q-tooltip>
-                  </span>
-                  </q-td>
-                </template>
-                <template v-slot:body-cell-type="props">
-                  <q-td>{{ props.row.type }}</q-td>
-                </template>
-                <template v-slot:body-cell-settings="props">
-                  <q-td class="text-left" v-if="props.row.isUserDefined">
-                    <q-icon color="primary" :name="outlinedPerson"></q-icon>
-                    <q-icon color="primary" :name="outlinedSchema"></q-icon>
-                  </q-td>
-                  <q-td v-else> </q-td>
-                </template>
-                <template v-slot:body-cell-index_type="props">
-                  <q-td data-test="schema-stream-index-select">
-                    <q-select
-                      v-if="
-                        !(
-                          props.row.name ==
-                            store.state.zoConfig.timestamp_column ||
-                          props.row.name == allFieldsName
-                        )
-                      "
-                      :model-value="computedIndexType(props).value"
-                      :options="streamIndexType"
-                      option-label="label"
-                      option-value="value"
-                      :popup-content-style="{ textTransform: 'capitalize' }"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="stream-schema-index-select q-py-xs fit q-pa-xs"
-                      size="xs"
-                      :option-disable="
-                        (_option) => disableOptions(props.row, _option)
-                      "
-                      multiple
-                      :max-values="2"
-                      map-options
-                      emit-value
-                      autoclose
-                      clearable
-                      stack-label
-                      outlined
-                      filled
-                      dense
-                      style="min-width: 15rem; max-width: 15rem"
-                      @update:model-value="val => updateIndexType(props, val)"
-                    >
-                    <template v-slot:option="scope">
-                      <q-item style="margin: 0px !important; border-radius: 0px !important;" v-bind="scope.itemProps" :disable="disableOptions(props.row, scope.opt)">
-                        <q-item-section>
-                          <q-item-label>
-                            {{ scope.opt.label }}
-                          </q-item-label>
-                        </q-item-section>
-                        <q-tooltip class="tw-text-[12px] tw-w-[200px]" v-if="checkIfOptionPresentInDefaultEnv(props.row.name, scope.opt) == true">
-                          This is a predefined environment setting and cannot be changed.
-                        </q-tooltip>
-                      </q-item>
-                    </template>
-                  </q-select>
-                  </q-td>
-                </template>
-                <!-- here we will render the number of regex patterns associated with the specific field -->
-                <template v-slot:body-cell-patterns="props">
-                  <q-td v-if="!(props.row.name == store.state.zoConfig.timestamp_column) && (props.row.type == 'Utf8' || props.row.type == 'utf8')" class="field-name text-left tw-text-[#5960B2] tw-cursor-pointer " style="padding-left: 12px !important;" @click="openPatternAssociationDialog(props.row.name)">
-                    {{ patternAssociations[props.row.name]?.length ? `View ${patternAssociations[props.row.name]?.length} Patterns` : 'Add Pattern' }}
-                    <span>
-                      <q-icon name="arrow_forward" size="xs" />
-                    </span>
-                  </q-td>
-                  <q-td v-else>
-                  </q-td>
-                </template>
-
-                <template #bottom="scope">
-                  <QTablePagination
-                    :scope="scope"
-                    :position="'bottom'"
-                    :resultTotal="resultTotal"
-                    :perPageOptions="perPageOptions"
-                    @update:changeRecordPerPage="changePagination"
-                  />
-                </template>
-              </q-table>
-            </div>
-          </div>
-          <!-- red button tab -->
-          <div v-else>
-            <div
-              class="mapping-warning-msg q-mb-sm q-mt-sm"
-              style="width: fit-content"
-            >
-              <span style="font-weight: 600">
-                <q-icon name="info" class="q-mr-xs" size="16px" />
-
-                Additional
-                {{ store.state.zoConfig.extended_data_retention_days }} days of
-                extension will be applied to the selected date ranges</span
-              >
-            </div>
-            <div class="q-mt-sm">
-              <div class="text-center q-mt-sm tw-flex items-center">
-                <div class="flex items-center">
-                  <span class="text-bold"> Select Date</span>
-                  <date-time
-                    class="q-mx-sm"
-                    @on:date-change="dateChangeValue"
-                    disable-relative
-                    hide-relative-time
-                    hide-relative-timezone
-                    :minDate="minDate"
-                  />
+                  <div 
+                    class="tile-value tw-text-lg tw-font-bold tw-flex tw-items-end tw-justify-start"
+                    :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
+                  >
+                    {{ parseInt(indexData.stats.doc_num).toLocaleString("en-US") }}
+                  </div>
                 </div>
-                <span class="text-bold"> (UTC Timezone) </span>
+              </div>
+              <!-- Storage Size Tile -->
+              <div class="tile" data-test="storage-size-tile">
+                <div 
+                  class="tile-content tw-rounded-lg tw-p-3 tw-text-center tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
+                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
+                >
+                  <div class="tile-header tw-flex tw-justify-between tw-items-start">
+                    <div 
+                      class="tile-title tw-text-xs tw-font-bold tw-text-left"
+                      :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+                    >
+                      {{ t("logStream.storageSize") }}
+                    </div>
+                    <div class="tile-icon tw-opacity-80">
+                      <img src="@/assets/images/home/ingested_size.svg" alt="Ingested Size Icon" class="tw-h-6 tw-w-6" />
+                    </div>
+                  </div>
+                  <div 
+                    class="tile-value tw-text-lg tw-font-bold tw-flex tw-items-end tw-justify-start"
+                    :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
+                  >
+                    {{ formatSizeFromMB(indexData.stats.storage_size) }}
+                  </div>
+                </div>
+              </div>
+              <!-- Compressed Size Tile -->
+              <div
+                v-if="isCloud !== 'true'"
+                class="tile"
+                data-test="compressed-size-tile"
+              >
+                <div 
+                  class="tile-content tw-rounded-lg tw-p-3 tw-text-center tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
+                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
+                >
+                  <div class="tile-header tw-flex tw-justify-between tw-items-start">
+                    <div 
+                      class="tile-title tw-text-xs tw-font-bold tw-text-left"
+                      :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+                    >
+                      {{ t("logStream.compressedSize") }}
+                    </div>
+                    <div class="tile-icon tw-opacity-80">
+                      <img src="@/assets/images/home/compressed_size.svg" alt="Compressed Size Icon" class="tw-h-6 tw-w-6" />
+                    </div>
+                  </div>
+                  <div 
+                    class="tile-value tw-text-lg tw-font-bold tw-flex tw-items-end tw-justify-start"
+                    :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
+                  >
+                    {{ formatSizeFromMB(indexData.stats.compressed_size) }}
+                  </div>
+                </div>
+              </div>
+              <!-- Index Size Tile -->
+              <div
+                v-if="isCloud !== 'true'"
+                class="tile"
+                data-test="index-size-tile"
+              >
+                <div 
+                  class="tile-content tw-rounded-lg tw-p-3 tw-text-center tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
+                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
+                >
+                  <div class="tile-header tw-flex tw-justify-between tw-items-start">
+                    <div 
+                      class="tile-title tw-text-xs tw-font-bold tw-text-left"
+                      :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
+                    >
+                      {{ t("logStream.indexSize") }}
+                    </div>
+                    <div class="tile-icon tw-opacity-80">
+                      <img src="@/assets/images/home/index_size.svg" alt="Index Size Icon" class="tw-h-6 tw-w-6" />
+                    </div>
+                  </div>
+                  <div 
+                    class="tile-value tw-text-lg tw-font-bold tw-flex tw-items-end tw-justify-start"
+                    :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
+                  >
+                    {{ formatSizeFromMB(indexData.stats.index_size) }}
+                  </div>
+                </div>
+              </div>
+          </div>
+          <div class="tw-w-full tw-flex tw-gap-2">
+          <!--  left section(includes tabs and schema settings) -->
+            <div 
+              :class="[
+                'tw-w-[76%] tw-h-[calc(100vh-200px)] tw-bg-white tw-rounded-lg tw-border tw-shadow-sm tw-p-2 tw-flex tw-flex-col tw-h-full',
+                store.state.theme === 'dark' ? 'tw-bg-[#181A1B] tw-border-gray-700' : 'tw-bg-white tw-border-gray-200'
+              ]"
+            >
+            <div>
+              <div class="flex justify-start">
+                <q-tabs v-model="activeMainTab" inline-label dense>
+                  <!-- Schema Settings Tab with conditional class -->
+                  <q-tab
+                    :class="{
+                      'text-primary': activeMainTab === 'schemaSettings',
+                    }"
+                    name="schemaSettings"
+                    icon="settings"
+                    label="Schema Settings"
+                    no-caps
+                  />
+
+                  <!-- Red Button Tab -->
+                  <q-tab
+                    :class="{ 'text-primary': activeMainTab === 'redButton' }"
+                    name="redButton"
+                    icon="backup"
+                    label="Extended Retention"
+                    no-caps
+                  />
+                </q-tabs>
+              </div>
+            </div>
+            <!-- schema settings tab -->
+            <div v-if="activeMainTab == 'schemaSettings'">
+              <div
+                class="flex tw-justify-between tw-items-center"
+                data-test="schema-log-stream-mapping-title-text"
+              >
+                <div  v-if="indexData.defaultFts" style="font-weight: 400" class="tw-mt-[12px]">
+                  <label
+                    style="font-weight: 600"
+                    class="mapping-warning-msg"
+                  >
+                    {{ t("logStream.mapping") }} Default FTS keys used (no custom
+                    keys set).</label
+                  >
+                </div>
+              </div>
+                <div class="flex justify-between items-center full-width">
+                  <div class="flex items-center">
+                    <app-tabs
+                      v-if="isSchemaUDSEnabled"
+                      class="schema-fields-tabs"
+                      style="
+                        border: 1px solid #8a8a8a;
+                        border-radius: 4px;
+                        overflow: hidden;
+                      "
+                      data-test="schema-fields-tabs"
+                      :tabs="tabs"
+                      :active-tab="activeTab"
+                      @update:active-tab="updateActiveTab"
+                    />
+                    <div v-if="hasUserDefinedSchema" class="q-ml-sm">
+                      <q-icon
+                        name="info"
+                        class="q-mr-xs"
+                        size="16px"
+                        style="color: #f5a623; cursor: pointer"
+                      >
+                        <q-tooltip style="font-size: 14px; width: 250px">
+                          Other fields show only the schema fields that existed
+                          before the stream was configured to use a user-defined
+                          schema.
+                        </q-tooltip>
+                      </q-icon>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center tw-gap-2">
+                    <q-input
+                      data-test="schema-field-search-input"
+                      v-model="filterField"
+                      data-cy="schema-index-field-search-input"
+                      borderless
+                      debounce="1"
+                      class="q-ml-auto no-border o2-search-input"
+                      :placeholder="t('search.searchField')"
+                      :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+                    >
+                      <template #prepend>
+                        <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                      </template>
+                    </q-input>
+                    <q-btn
+                      v-if="isSchemaUDSEnabled"
+                      color="primary"
+                      data-test="schema-add-fields-title"
+                      @click="openDialog"
+                      no-caps
+                      :disable="isDialogOpen"
+                      class="o2-secondary-button tw-h-[36px] tw-w-[32px] q-my-sm"
+                      :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                      style="min-width: 0px !important; min-height: 0px !important;"
+                      flat
+                      @click.stop="openDialog"
+                      title="Add Field(s)"
+                    >
+                    <q-icon name="add" size="xs" />
+                    </q-btn>
+                  </div>
+                </div>
+
+              <div class="q-mb-md" v-if="isDialogOpen">
+                <q-card class="add-fields-card">
+                  <!-- Header Section -->
+                  <q-card-section
+                    class="q-pa-none"
+                    style="padding: 4px 16px 4px 16px"
+                  >
+                    <div class="tw-flex tw-justify-between tw-items-center">
+                      <div class="text-h6">Add Field(s)</div>
+                      <div>
+                        <q-btn
+                          data-test="add-stream-cancel-btn"
+                          icon="close"
+                          class="text-bold q-mr-md"
+                          text-color="light-text"
+                          no-caps
+                          dense
+                          flat
+                          @click="closeDialog"
+                        />
+                      </div>
+                    </div>
+                  </q-card-section>
+                  <!-- Main Content (Scrollable if necessary) -->
+                  <q-card-section
+
+                    class="q-pa-none"
+                    style="flex: 1; overflow-y: auto; padding: 0px 16px 0px 16px; margin-bottom: 2px;"
+                  >
+                    <StreamFieldsInputs
+                      :fields="newSchemaFields"
+                      :showHeader="false"
+                      :visibleInputs="{
+                        name: true,
+                        data_type: true,
+                        index_type: false,
+                      }"
+                      @add="addSchemaField"
+                      @remove="removeSchemaField"
+                    />
+                  </q-card-section>
+                </q-card>
               </div>
 
-              <div class="q-mt-sm" style="margin-bottom: 30px">
+              <!-- Note: Drawer max-height to be dynamically calculated with JS -->
+              <div
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'dark-theme-table'
+                    : 'light-theme-table'
+                "
+                style="margin-bottom: 10px"
+              >
                 <q-table
                   ref="qTable"
-                  :row-key="(row, index) => 'tr_' + row.index"
                   data-test="schema-log-stream-field-mapping-table"
-                  :rows="redBtnRows"
-                  :columns="redBtnColumns"
+                  :rows="indexData.schema"
+                  :columns="columns"
+                  :row-key="(row) => 'tr_' + row.name"
+                  :filter="`${filterField}@${activeTab}`"
+                  :filter-method="filterFieldFn"
                   :pagination="pagination"
                   selection="multiple"
-                  v-model:selected="selectedDateFields"
-                  class="q-table"
+                  v-model:selected="selectedFields"
+                  class="q-table o2-schema-table"
+                  :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark o2-schema-table-header-sticky-dark' : 'o2-last-row-border-light o2-schema-table-header-sticky-light'"
                   id="schemaFieldList"
+                  :style="{
+                    height: `${indexData.defaultFts ? 'calc(100vh - 363px)' : 'calc(100vh - 330px)'}`,
+                    width: '100%'
+                  }"
                   :rows-per-page-options="[]"
                   dense
                 >
+                  <template v-slot:header="props">
+                    <q-tr :props="props">
+                      <q-th>
+                        <q-checkbox size="xs" v-model="props.selected" color="primary" />
+                      </q-th>
+                      <q-th
+                        v-for="col in props.cols"
+                        :key="col.name"
+                        :props="props"
+                      >
+                        <span v-if="col.icon" class="tw-ml-[5px]">
+                          <q-icon color="primary" size="12px" :name="outlinedPerson"></q-icon>
+                          <q-icon color="primary" size="12px" :name="outlinedSchema"></q-icon>
+                        </span>
+                        <span v-else>
+                          {{ col.label }}
+                        </span>
+                      </q-th>
+                    </q-tr>
+                  </template>
                   <template v-slot:header-selection="scope">
                     <q-td class="text-center">
                       <q-checkbox
+                        v-if="
+                          !(
+                            scope.name == store.state.zoConfig.timestamp_column ||
+                            scope.name == allFieldsName
+                          )
+                        "
                         :data-test="`schema-stream-delete-${scope.name}-field-fts-key-checkbox`"
                         v-model="scope.selected"
                         size="sm"
@@ -598,117 +393,607 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-td>
                   </template>
 
-                  <!-- Body Slot for Selection -->
                   <template v-slot:body-selection="scope">
-                    <q-td class="text-center q-td--no-hover">
                       <q-checkbox
+                        v-if="
+                          !(
+                            scope.row.name ==
+                              store.state.zoConfig.timestamp_column ||
+                            scope.row.name == allFieldsName
+                          )
+                        "
+                        dense
                         :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
                         v-model="scope.selected"
-                        size="sm"
+                        size="xs"
+                        class="tw-flex tw-items-center tw-justify-center tw-w-full"
                       />
+                  </template>
+
+                  <template v-slot:body-cell-name="props">
+                    <q-td class="q-td--no-hover field-name field-name-ellipsis">
+                      <div class="tw-flex tw-items-center">
+                        <span class="field-name-text">{{ props.row.name }}</span>
+                        <span v-if="isEnvQuickModeField(props.row.name)" class="tw-flex tw-items-center tw-ml-1">
+                          <img
+                            :src="quickModeIcon"
+                            :alt="t('logStream.envQuickModeMsg')"
+                            class="tw-w-[20px] tw-h-[20px]"
+                          />
+                          <q-tooltip
+                          class="tw-text-[12px] tw-w-[200px]"
+                        >
+                          {{ t('logStream.envQuickModeMsg') }}
+                        </q-tooltip>
+                        </span>
+                        <q-tooltip v-if="props.row.name.length > 30" class="tw-text-[12px]">
+                          {{ props.row.name }}
+                        </q-tooltip>
+                      </div>
+                    </q-td>
+                  </template>
+                  <template v-slot:body-cell-type="props">
+                    <q-td>
+                      <span 
+                        class="field-type-badge"
+                        :class="{
+                          'badge-int64': props.row.type === 'Int64',
+                          'badge-float64': props.row.type === 'Float64', 
+                          'badge-utf8': props.row.type === 'Utf8'
+                        }"
+                      >
+                        {{ props.row.type }}
+                      </span>
+                    </q-td>
+                  </template>
+                  <template v-slot:body-cell-settings="props">
+                    <q-td class="text-left" v-if="props.row.isUserDefined">
+                      <q-icon size="12px" color="primary" :name="outlinedPerson"></q-icon>
+                      <q-icon size="12px" color="primary" :name="outlinedSchema"></q-icon>
+                    </q-td>
+                    <q-td v-else> </q-td>
+                  </template>
+                  <template v-slot:body-cell-index_type="props">
+                    <q-td data-test="schema-stream-index-select">
+                        <q-select
+                        v-if="
+                          !(
+                            props.row.name ==
+                              store.state.zoConfig.timestamp_column ||
+                            props.row.name == allFieldsName
+                          )
+                        "
+                        :model-value="computedIndexType(props).value"
+                        :options="streamIndexType"
+                        option-label="label"
+                        option-value="value"
+                        :popup-content-style="{ textTransform: 'capitalize' }"
+                        color="input-border"
+                        bg-color="input-bg"
+                        class="mini-select"
+                        :class="store.state.theme == 'dark' ? 'schema-index-select-dropdown-dark' : 'schema-index-select-dropdown-light'"
+                        input-class="mini-select"
+                        :option-disable="
+                          (_option) => disableOptions(props.row, _option)
+                        "
+                        multiple
+                        :max-values="2"
+                        map-options
+                        emit-value
+                        autoclose
+                        borderless
+                        dense
+                        input-style="height: 12px; min-height: 8px; margin: 0px; width: 120px;"
+                        style="width: 190px;"
+                        @update:model-value="val => updateIndexType(props, val)"
+                      >
+                      <template v-slot:append>
+                        <q-icon 
+                          v-if="props.row.index_type && props.row.index_type.length > 0"
+                          name="cancel" 
+                          size="14px"
+                          style="cursor: pointer; display: flex; align-items: center; font-weight: bold; margin-top: 8px;"
+                          @click.stop="updateIndexType(props, [])"
+                        />
+                      </template>
+                      <template v-slot:option="scope">
+                        <q-item style="margin: 0px !important; border-radius: 0px !important;" v-bind="scope.itemProps" :disable="disableOptions(props.row, scope.opt)">
+                          <q-item-section>
+                            <q-item-label>
+                              {{ scope.opt.label }}
+                            </q-item-label>
+                          </q-item-section>
+                          <q-tooltip class="tw-text-[12px] tw-w-[200px]" v-if="checkIfOptionPresentInDefaultEnv(props.row.name, scope.opt) == true">
+                            This is a predefined environment setting and cannot be changed.
+                          </q-tooltip>
+                        </q-item>
+                      </template>
+                      <q-tooltip 
+                        v-if="props.row.index_type && props.row.index_type.length > 0" 
+                        class="tw-text-[12px]"
+                      >
+                        {{ streamIndexType.filter(opt => props.row.index_type.includes(opt.value)).map(opt => opt.label).join(', ') }}
+                      </q-tooltip>
+                      </q-select>
+                    </q-td>
+                  </template>
+                  <!-- here we will render the number of regex patterns associated with the specific field -->
+                  <template v-slot:body-cell-patterns="props">
+                    <q-td v-if="!(props.row.name == store.state.zoConfig.timestamp_column) && (props.row.type == 'Utf8' || props.row.type == 'utf8')" class="field-name text-left tw-text-[#5960B2] tw-cursor-pointer " style="padding-left: 12px !important;" @click="openPatternAssociationDialog(props.row.name)">
+                      {{ patternAssociations[props.row.name]?.length ? `View ${patternAssociations[props.row.name]?.length} Patterns` : 'Add Pattern' }}
+                      <span>
+                        <q-icon name="arrow_forward" size="xs" />
+                      </span>
+                    </q-td>
+                    <q-td v-else>
                     </q-td>
                   </template>
 
                   <template #bottom="scope">
-                    <QTablePagination
+                    <div class="bottom-btn">
+                      <div class="tw-text-sm tw-w-full tw-flex tw-justify-">
+                      </div>
+                      <QTablePagination
+                      style="padding: 0px !important; padding-left: 50px !important;"
                       :scope="scope"
                       :position="'bottom'"
-                      :resultTotal="redBtnRows.length"
+                      :resultTotal="resultTotal"
                       :perPageOptions="perPageOptions"
                       @update:changeRecordPerPage="changePagination"
                     />
+                    </div>
                   </template>
                 </q-table>
               </div>
             </div>
-          </div>
-          <!-- floating footer for the table -->
+            <!-- red button tab -->
+            <div v-else>
+              <div
+                class="mapping-warning-msg q-mt-sm"
+                style="width: fit-content"
+              >
+                <span style="font-weight: 600">
+                  <q-icon name="info" class="q-mr-xs" size="16px" />
 
-          <div
-            :class="
-              store.state.theme === 'dark'
-                ? 'dark-theme-floating-buttons'
-                : 'light-theme-floating-buttons'
-            "
-            class="floating-buttons q-px-md q-py-xs"
-          >
+                  Additional
+                  {{ store.state.zoConfig.extended_data_retention_days }} days of
+                  extension will be applied to the selected date ranges</span
+                >
+              </div>
+              <div class="q-mt-sm">
+                <div class="text-center q-mt-sm tw-flex items-center">
+                  <div class="flex items-center">
+                    <span class="text-bold"> Select Date</span>
+                    <date-time
+                      class="q-mx-sm"
+                      @on:date-change="dateChangeValue"
+                      disable-relative
+                      hide-relative-time
+                      hide-relative-timezone
+                      :minDate="minDate"
+                    />
+                  </div>
+                  <span class="text-bold"> (UTC Timezone) </span>
+                </div>
+
+                <div class="q-mt-sm" style="margin-bottom: 10px">
+                  <q-table
+                    ref="qTable"
+                    :row-key="(row, index) => 'tr_' + row.index"
+                    data-test="schema-log-stream-field-mapping-table"
+                    :rows="redBtnRows"
+                    :columns="redBtnColumns"
+                    :pagination="pagination"
+                    selection="multiple"
+                    v-model:selected="selectedDateFields"
+                    class="q-table o2-schema-table"
+                    id="schemaFieldList"
+                    :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark o2-schema-table-header-sticky-dark' : 'o2-last-row-border-light o2-schema-table-header-sticky-light'"
+                    style="height: calc(100vh - 363px);"
+                    :rows-per-page-options="[]"
+                    dense
+                  >
+                    <template v-slot:header-selection="scope">
+                        <q-checkbox
+                          :data-test="`schema-stream-delete-${scope.name}-field-fts-key-checkbox`"
+                          v-model="scope.selected"
+                          size="xs"
+                        />
+                    </template>
+
+                    <!-- Body Slot for Selection -->
+                    <template v-slot:body-selection="scope">
+                        <q-checkbox
+                          :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
+                          v-model="scope.selected"
+                          size="xs"
+                        />
+                    </template>
+
+                    <template #bottom="scope">
+                      <QTablePagination
+                        :scope="scope"
+                        :position="'bottom'"
+                        :resultTotal="redBtnRows.length"
+                        :perPageOptions="perPageOptions"
+                        @update:changeRecordPerPage="changePagination"
+                      />
+                    </template>
+                  </q-table>
+                </div>
+              </div>
+            </div>
+            <!-- floating footer for the table -->
             <div
-              v-if="indexData.schema.length > 0"
-              class="q-mt-sm flex items-center justify-between"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'dark-theme-floating-buttons'
+                  : 'light-theme-floating-buttons'
+              "
+              class="floating-buttons q-px-sm q-py-xs"
             >
-              <div class="flex items-center">
-                <span
-                  v-if="activeMainTab == 'schemaSettings'"
-                  class="q-px-sm q-py-md"
-                  ><strong> {{ selectedFields.length }}</strong> fields
-                  selected</span
-                >
-                <q-btn
-                  v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
-                  data-test="schema-add-field-button"
-                  class=" no-border q-mr-md o2-secondary-button tw-h-[36px]"
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  no-caps
-                  v-bind:disable="!selectedFields.length"
-                  @click="updateDefinedSchemaFields"
-                >
-                  <span class="flex items-center justify-start q-mr-sm">
-                    <q-icon size="14px" :name="outlinedPerson" />
-                    <q-icon size="14px" :name="outlinedSchema" />
-                  </span>
-                  {{
-                    activeTab === "schemaFields"
-                      ? t("logStream.removeSchemaField")
-                      : t("logStream.addSchemaField")
-                  }}
-                </q-btn>
-                <q-btn
-                  v-bind:disable="
-                    !selectedFields.length && !selectedDateFields.length
-                  "
-                  data-test="schema-delete-button"
-                  class="q-my-sm text-bold btn-delete o2-secondary-button tw-h-[36px]"
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  no-caps
-                  flat
-                  @click="
-                    activeMainTab == 'schemaSettings'
-                      ? (confirmQueryModeChangeDialog = true)
-                      : (confirmDeleteDatesDialog = true)
-                  "
-                >
-                  <span class="flex items-center tw-gap-1">
-                    <q-icon size="14px" :name="outlinedDelete" />
-                    {{ t("logStream.delete") }}
-                  </span>
-                </q-btn>
+              <div
+                v-if="indexData.schema.length > 0"
+                class="flex items-center justify-between"
+              >
+                <div class="flex items-center">
+                  <span
+                    v-if="activeMainTab == 'schemaSettings'"
+                    class="q-px-sm q-py-sm"
+                    ><strong> {{ selectedFields.length }}</strong> fields
+                    selected</span
+                  >
+                  <q-btn
+                    v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
+                    data-test="schema-add-field-button"
+                    class=" no-border q-mr-md o2-secondary-button tw-h-[36px]"
+                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                    no-caps
+                    v-bind:disable="!selectedFields.length"
+                    @click="updateDefinedSchemaFields"
+                  >
+                    <span class="flex items-center justify-start q-mr-sm">
+                      <q-icon size="14px" :name="outlinedPerson" />
+                      <q-icon size="14px" :name="outlinedSchema" />
+                    </span>
+                    {{
+                      activeTab === "schemaFields"
+                        ? t("logStream.removeSchemaField")
+                        : t("logStream.addSchemaField")
+                    }}
+                  </q-btn>
+                  <q-btn
+                    v-bind:disable="
+                      !selectedFields.length && !selectedDateFields.length
+                    "
+                    data-test="schema-delete-button"
+                    class="text-bold btn-delete o2-secondary-button tw-h-[36px]"
+                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                    no-caps
+                    flat
+                    @click="
+                      activeMainTab == 'schemaSettings'
+                        ? (confirmQueryModeChangeDialog = true)
+                        : (confirmDeleteDatesDialog = true)
+                    "
+                  >
+                    <span class="flex items-center tw-gap-1">
+                      <q-icon size="14px" :name="outlinedDelete" />
+                      {{ t("logStream.delete") }}
+                    </span>
+                  </q-btn>
+                </div>
+                <div class="flex justify-end">
+                  <q-btn
+                    v-close-popup="true"
+                    data-test="schema-cancel-button"
+                    class="q-ml-md o2-secondary-button tw-h-[36px]"
+                    :label="t('logStream.cancel')"
+                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                    no-caps
+                    flat
+                  />
+                  <q-btn
+                    v-bind:disable="!formDirtyFlag"
+                    data-test="schema-update-settings-button"
+                    :label="t('logStream.updateSettings')"
+                    class=" no-border q-ml-md o2-primary-button tw-h-[36px"
+                    :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                    type="submit"
+                    no-caps
+                    flat
+                  />
+                </div>
               </div>
-              <div class="flex justify-end">
-                <q-btn
-                  v-close-popup="true"
-                  data-test="schema-cancel-button"
-                  class="q-ml-md o2-secondary-button tw-h-[36px]"
-                  :label="t('logStream.cancel')"
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  no-caps
-                  flat
-                />
-                <q-btn
-                  v-bind:disable="!formDirtyFlag"
-                  data-test="schema-update-settings-button"
-                  :label="t('logStream.updateSettings')"
-                  class=" no-border q-ml-md o2-primary-button tw-h-[36px"
-                  :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-                  type="submit"
-                  no-caps
-                  flat
-                />
-              </div>
+            </div>
+            </div>
+            <!-- right section includes the configuration -->
+            <div class="tw-w-[25%] tw-flex tw-flex-col tw-gap-4 tw-h-[calc(100vh-165px)] tw-overflow-y-auto">
+                <!-- Configuration Settings Card -->
+                <div 
+                  :class="[
+                    'tw-bg-white tw-rounded-lg tw-h-[78%] tw-min-h-[500px] tw-p-2 tw-border tw-shadow-sm tw-flex tw-flex-col tw-justify-evenly',
+                    store.state.theme === 'dark' ? 'dark:tw-bg-[#181A1B] dark:tw-border-gray-700' : 'tw-border-gray-200'
+                  ]"
+                >
+                  <h3 
+                    :class="[
+                      'tw-pb-2 tw-mb-3 tw-text-sm tw-font-semibold tw-flex tw-items-center tw-gap-1 tw-border-b',
+                      store.state.theme === 'dark' ? 'tw-text-white tw-border-gray-600' : 'tw-text-gray-800 tw-border-gray-200'
+                    ]"
+                  >
+                  <img :src="getConfigIcon" alt="Configuration Icon" class="tw-w-[16px] tw-h-[16px]" />
+                     Configuration
+                  </h3>
+                  
+                  <div class="tw-flex tw-flex-col tw-gap-2 tw-flex-1">
+                    <!-- Data Retention -->
+                    <div v-if="showDataRetention" class="setting-group">
+                      <label 
+                        :class="[
+                          'tw-block tw-text-sm tw-font-semibold tw-mb-1',
+                          store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-700'
+                        ]"
+                      >
+                        Data Retention (days)
+                      </label>
+                      <q-input
+                        data-test="stream-details-data-retention-input"
+                        v-model="dataRetentionDays"
+                        type="number"
+                        dense
+                        min="1"
+                        borderless
+                        :class="[
+                          'tw-w-full',
+                          store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'
+                        ]"
+                        class="o2-search-input no-border"
+                        hide-bottom-space
+                        @change="formDirtyFlag = true"
+                        @update:model-value="markFormDirty"
+                      />
+                      <small 
+                          v-if="dataRetentionDays > 0 && dataRetentionDays != ''"
+                          :class="[
+                            'tw-block tw-text-xs tw-mt-1 tw-italic',
+                            store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'
+                          ]"
+                      >
+                        Global retention is {{ store.state.zoConfig.data_retention_days }} days
+                        
+                      </small>
+                      <!-- Error Message -->
+                      <div
+                        class="tw-text-red-500 tw-text-sm"
+                      >
+                        <span v-if="dataRetentionDays <= 0 || dataRetentionDays == ''">
+                          Retention period must be at least 1 day
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- Max Query Range -->
+                    <div class="setting-group">
+                      <label 
+                        :class="[
+                          'tw-block tw-text-sm tw-font-semibold tw-mb-1',
+                          store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-700'
+                        ]"
+                      >
+                        Max Query Range (hours)
+                      </label>
+                      <q-input
+                        data-test="stream-details-max-query-range-input"
+                        v-model="maxQueryRange"
+                        type="number"
+                        dense
+                        borderless
+                        min="0"
+                        :class="[
+                          'tw-w-full',
+                          store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'
+                        ]"
+                        class="o2-search-input no-border"
+                        hide-bottom-space
+                        @wheel.prevent
+                        @change="formDirtyFlag = true"
+                        @update:model-value="markFormDirty"
+                      />
+                      <small 
+                        :class="[
+                          'tw-block tw-text-xs tw-mt-1 tw-italic',
+                          store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'
+                        ]"
+                      >
+                        Maximum time range allowed for queries. Set 0 for unlimited range.
+                      </small>
+                    </div>
+
+                    <!-- Flatten Level -->
+                    <div class="setting-group">
+                      <label 
+                        :class="[
+                          'tw-block tw-text-sm tw-font-semibold tw-mb-1',
+                          store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-700'
+                        ]"
+                      >
+                        {{ t("logStream.flattenLevel") }}
+                      </label>
+                      <q-input
+                        data-test="stream-details-flatten-level-input"
+                        v-model="flattenLevel"
+                        type="number"
+                        dense
+                        borderless
+                        min="0"
+                        :class="[
+                          'tw-w-full',
+                          store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'
+                        ]"
+                        class="o2-search-input no-border"
+                        hide-bottom-space
+                        @change="formDirtyFlag = true"
+                        @update:model-value="markFormDirty"
+                      />
+                      <small 
+                        :class="[
+                          'tw-block tw-text-xs tw-mt-1 tw-italic',
+                          store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'
+                        ]"
+                      >
+                        Global is {{ store.state.zoConfig.ingest_flatten_level || 3 }}
+                      </small>
+                    </div>
+
+                    <!-- Toggles -->
+                    <div 
+                      :class="[
+                        'tw-flex tw-items-center tw-justify-between tw-border-b tw-text-sm',
+                        store.state.theme === 'dark' ? 'tw-border-gray-600' : 'tw-border-gray-200'
+                      ]"
+                    >
+                      <span 
+                        :class="[
+                          store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-700'
+                        ]"
+                      >
+                        Use Stream Stats for Partitioning
+                      </span>
+                      <q-toggle
+                        data-test="log-stream-use_approx-toggle-btn"
+                        v-model="approxPartition"
+                        size="lg"
+                        class="o2-toggle-button-lg"
+                        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+                        @click="formDirtyFlag = true"
+                      />
+                    </div>
+
+                    <div 
+                      :class="[
+                        'tw-flex tw-items-center tw-justify-between tw-border-b tw-text-sm',
+                        store.state.theme === 'dark' ? 'tw-border-gray-600 tw-text-gray-200' : 'tw-border-gray-200 tw-text-gray-700'
+                      ]"
+                    >
+                      <span>Store Original Data</span>
+                      <q-toggle
+                        v-if="showStoreOriginalDataToggle"
+                        data-test="log-stream-store-original-data-toggle-btn"
+                        v-model="storeOriginalData"
+                        class="o2-toggle-button-lg"
+                        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+                        size="lg"
+                        @click="formDirtyFlag = true"
+                      />
+                    </div>
+
+                    <div 
+                      :class="[
+                        'tw-flex tw-items-center tw-justify-between tw-text-sm',
+                        store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-700'
+                      ]"
+                    >
+                      <span>Enable Distinct Values</span>
+                      <q-toggle
+                        data-test="log-stream-enabled-distinct-values-toggle-btn"
+                        v-model="enableDistinctFields"
+                        class="o2-toggle-button-lg"
+                        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+                        size="lg"
+                        @click="formDirtyFlag = true"
+                      />
+                    </div>
+                  </div>
+
+                </div>
+
+                <!-- Timeline  -->
+                <div 
+                  :class="[
+                    'tw-bg-white tw-h-[19%] tw-rounded-lg tw-p-2 tw-border tw-shadow-sm tw-flex tw-flex-col tw-gap-[10px]',
+                    store.state.theme === 'dark' ? 'dark:tw-bg-[#181A1B] dark:tw-border-gray-700' : 'tw-border-gray-200'
+                  ]"
+                  v-if="store.state.zoConfig.show_stream_stats_doc_num"
+                >
+                  <h3 
+                    :class="[
+                      'tw-text-sm tw-font-semibold tw-flex tw-items-center tw-gap-1 tw-mb-1',
+                      store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-800'
+                    ]"
+                  >
+                    <img :src="getTimelineIcon" alt="Timeline Icon" class="tw-w-[16px] tw-h-[16px]" />
+                    Timeline (UTC)
+                  </h3>
+                  
+                  <div 
+                    :class="[
+                      'tw-rounded-md tw-p-2 tw-border',
+                      store.state.theme === 'dark' 
+                        ? 'tw-bg-[#2b2c2d] tw-border-gray-600' 
+                        : 'tw-bg-gray-50 tw-border-gray-200'
+                    ]"
+                  >
+                    <div class="tw-flex tw-justify-between tw-items-center tw-mb-1">
+                      <span 
+                        :class="[
+                          'tw-text-xs tw-font-medium',
+                          store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'
+                        ]"
+                      >
+                        Start Time:
+                      </span>
+                      <span 
+                        :class="[
+                          'tw-text-xs tw-font-semibold tw-font-mono',
+                          store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-800'
+                        ]"
+                      >
+                        {{ indexData.stats.doc_time_min }}
+                      </span>
+                    </div>
+                    <div class="tw-flex tw-justify-between tw-items-center tw-mb-1">
+                      <span 
+                        :class="[
+                          'tw-text-xs tw-font-medium',
+                          store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'
+                        ]"
+                      >
+                        End Time:
+                      </span>
+                      <span 
+                        :class="[
+                          'tw-text-xs tw-font-semibold tw-font-mono',
+                          store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-800'
+                        ]"
+                      >
+                        {{ indexData.stats.doc_time_max }}
+                      </span>
+                    </div>
+                    <div class="tw-flex tw-justify-between tw-items-center">
+                      <span 
+                        :class="[
+                          'tw-text-xs tw-font-medium',
+                          store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'
+                        ]"
+                      >
+                        Duration:
+                      </span>
+                      <span 
+                        :class="[
+                          'tw-text-xs tw-font-semibold tw-font-mono',
+                          store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-800'
+                        ]"
+                      >
+                        {{ getDuration(indexData.stats.original_doc_time_min, indexData.stats.original_doc_time_max) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
             </div>
           </div>
         </div>
       </q-form>
-      <br /><br /><br />
     </q-card-section>
   </q-card>
   <q-card v-else class="column q-pa-md full-height no-wrap">
@@ -817,6 +1102,7 @@ export default defineComponent({
     const isCloud = config.isCloud;
     const dataRetentionDays = ref(0);
     const storeOriginalData = ref(false);
+    const enableDistinctFields = ref(false);
     const maxQueryRange = ref(0);
     const flattenLevel = ref(null);
     const confirmQueryModeChangeDialog = ref(false);
@@ -843,12 +1129,11 @@ export default defineComponent({
     const redDaysList = ref([]);
     const resultTotal = ref<number>(0);
     const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
       { label: "20", value: 20 },
       { label: "50", value: 50 },
       { label: "100", value: 100 },
-      { label: "All", value: 0 },
+      { label: "250", value: 250 },
+      { label: "500", value: 500 },
     ];
 
     const changePagination = (val: { label: string; value: any }) => {
@@ -938,6 +1223,7 @@ export default defineComponent({
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
       maxQueryRange.value = 0;
       storeOriginalData.value = false;
+      enableDistinctFields.value = false;
       approxPartition.value = false;
     });
 
@@ -1114,14 +1400,18 @@ export default defineComponent({
       indexData.value.schema = streamResponse.schema || [];
       indexData.value.stats = JSON.parse(JSON.stringify(streamResponse.stats));
 
+      indexData.value.stats.original_doc_time_max = streamResponse.stats.doc_time_max;
+      indexData.value.stats.original_doc_time_min = streamResponse.stats.doc_time_min;
+
       indexData.value.stats.doc_time_max = date.formatDate(
         parseInt(streamResponse.stats.doc_time_max) / 1000,
-        "YYYY-MM-DD THH:mm:ss:SS Z",
+        "YYYY-MM-DDTHH:mm:ss:SS",
       );
       indexData.value.stats.doc_time_min = date.formatDate(
         parseInt(streamResponse.stats.doc_time_min) / 1000,
-        "YYYY-MM-DD THH:mm:ss:SS Z",
+        "YYYY-MM-DDTHH:mm:ss:SS",
       );
+
 
       indexData.value.defined_schema_fields =
         streamResponse.settings.defined_schema_fields || [];
@@ -1136,6 +1426,7 @@ export default defineComponent({
       flattenLevel.value = streamResponse.settings.flatten_level || null;
       storeOriginalData.value =
         streamResponse.settings.store_original_data || false;
+      enableDistinctFields.value = streamResponse.settings.enable_distinct_fields || false;
       approxPartition.value = streamResponse.settings.approx_partition || false;
 
       if (!streamResponse.schema) {
@@ -1232,6 +1523,7 @@ export default defineComponent({
       }
 
       settings["store_original_data"] = storeOriginalData.value;
+      settings["enable_distinct_fields"] = enableDistinctFields.value;
       settings["approx_partition"] = approxPartition.value;
 
       if (flattenLevel.value !== null) {
@@ -1933,6 +2225,43 @@ export default defineComponent({
         : getImageURL("images/common/quick_mode.svg");
     });
 
+    const getDuration = (startTime: number, endTime: number): string => {
+  // Convert to ms if it looks like microseconds
+      const normalize = (ts: number) => (ts > 1e12 ? Math.floor(ts / 1000) : ts);
+
+      const start = normalize(startTime);
+      const end = normalize(endTime);
+
+      const durationMs = end - start;
+      if (durationMs <= 0) return "0s";
+
+      const seconds = Math.floor(durationMs / 1000);
+      if (seconds < 60) return `${seconds}s`;
+
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}m`;
+
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h`;
+
+      const days = Math.floor(hours / 24);
+      return `${days}d`;
+    };
+
+    const getConfigIcon = computed(() => {
+      return store.state.theme === "dark"
+        ? getImageURL("images/streams/config_light.svg")
+        : getImageURL("images/streams/config.svg");
+    });
+    const getTimelineIcon = computed(() => {
+      return store.state.theme === "dark"
+        ? getImageURL("images/streams/timeline_light.svg")
+        : getImageURL("images/streams/timeline.svg");
+    });
+
+
+
+
     return {
       t,
       q,
@@ -1949,6 +2278,7 @@ export default defineComponent({
       getImageURL,
       dataRetentionDays,
       storeOriginalData,
+      enableDistinctFields,
       approxPartition,
       maxQueryRange,
       flattenLevel,
@@ -2021,6 +2351,9 @@ export default defineComponent({
       updateIndexType,
       isEnvQuickModeField,
       quickModeIcon,
+      getDuration,
+      getConfigIcon,
+      getTimelineIcon,
     };
   },
   created() {
@@ -2042,7 +2375,6 @@ export default defineComponent({
   padding: 8px 16px;
 }
 .indexDetailsContainer {
-  padding: 1.25rem;
   width: 100%;
 
   .title {
@@ -2145,7 +2477,7 @@ export default defineComponent({
 
 .mapping-warning-msg {
   background-color: #f9f290;
-  padding: 8px 16px;
+  padding: 4px 16px;
   border-radius: 4px;
   border: 1px solid #f5a623;
   color: #865300;
@@ -2232,18 +2564,7 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
 }
-.stream-schema-index-select {
-  .q-field__control {
-    .q-field__control-container {
-      span {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        text-wrap: nowrap;
-        display: inline-block;
-      }
-    }
-  }
-}
+/* Global styles for mini-select - using unscoped CSS */
 // background:
 //             activeTab.value === "allFields" ? "#5960B2 !important" : "",
 // color: activeTab.value === "allFields" ? "#ffffff !important" : "",
@@ -2315,9 +2636,9 @@ export default defineComponent({
 .floating-buttons {
   position: sticky;
   bottom: 0;
-  top: 0;
   z-index: 1; /* Ensure it stays on top of table content */
   width: 100%;
+  margin-top: auto; /* Push to bottom when there's less content */
 }
 .dark-theme-floating-buttons {
   background-color: #181a1b;
@@ -2332,4 +2653,209 @@ export default defineComponent({
   border-radius: 10px;
   padding: 6px 3px;
 }
+</style>
+
+<style>
+/* Global styles for mini-select - unscoped to override Quasar defaults */
+.mini-select .q-field__control {
+  min-height: 24px !important;
+  padding: 0px 4px !important;
+}
+
+.mini-select .q-field__control-container {
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  min-height: 20px !important;
+}
+
+.mini-select .q-field__control-container span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  font-size: 11px !important;
+  line-height: 12px !important;
+}
+
+.mini-select .q-field__marginal {
+  height: 20px !important;
+}
+
+.mini-select.q-field--auto-height.q-field--dense .q-field__control,
+.mini-select.q-field--auto-height.q-field--dense .q-field__native {
+  min-height: 24px !important;
+  height: 24px !important;
+}
+
+.mini-select.q-field--dense .q-field__control,
+.mini-select.q-field--dense .q-field__marginal {
+  min-height: 12px !important;
+  height: 12px !important;
+}
+
+.mini-select .q-field--dense .q-field__control,
+.mini-select .q-field--dense .q-field__marginal {
+  min-height: 12px !important;
+  height: 12px !important;
+}
+
+/* Custom clear icon styling */
+.mini-select .q-icon {
+  font-size: 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+  opacity: 0.7;
+  font-weight: 900 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  margin-top: 16px !important;
+}
+
+.mini-select .q-icon:hover {
+  opacity: 1;
+}
+
+/* Move dropdown arrow down and add rotation animation */
+.mini-select .q-field__append .q-icon {
+  margin-top: 14px;
+  transition: transform 0.2s ease;
+}
+
+/* Rotate arrow when dropdown is open */
+.mini-select.q-field--focused .q-field__append .q-icon {
+  transform: rotate(180deg);
+}
+.schema-index-select-dropdown-light{
+  background-color: white !important;
+  border-radius: 4px !important;
+  border: 1px solid #C9CCD6 !important;
+}
+
+.schema-index-select-dropdown-light.q-field--focused .q-field__control {
+  outline: 2px solid #575FC5 !important;
+  box-shadow: none !important;
+  background-color: #FFFFFF !important;
+  border-radius: 4px !important;
+}
+
+.schema-index-select-dropdown-dark{
+  background-color: #2B2D30 !important;
+  border-radius: 4px !important;
+  border: 1px solid #4E5157 !important;
+}
+
+.schema-index-select-dropdown-dark.q-field--focused .q-field__control {
+  outline: 2px solid #575FC5 !important;
+  box-shadow: none !important;
+  background-color: #2B2D30 !important;
+  border-radius: 4px !important;
+}
+
+/* Field name ellipsis styling */
+.field-name-ellipsis {
+  max-width: 200px;
+}
+
+.field-name-text {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  
+}
+
+.o2-schema-table{
+  th,td {
+    height: 14px !important;
+    min-height: 14px !important;
+    padding: 2px 3px !important;
+  }
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+}
+
+.o2-schema-table-header-sticky-dark{
+  thead {
+    background-color: #181A1B;
+  }
+}
+
+.o2-schema-table-header-sticky-light{
+  thead {
+    background-color: #ffffff;
+  }
+}
+
+
+/* Field type badge styling */
+.field-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.badge-int64 {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.badge-float64 {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-utf8 {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.schema-input-box{
+  background-color: white !important;
+  border-radius: 4px !important;
+  padding: 0px 8px !important;
+  border: 1px solid #C9CCD6 !important;
+  .q-field__control{
+    color: transparent !important;
+
+  }
+}
+
+.schema-input-box-light{
+  .q-field__control{
+    background-color: #ffffff !important;
+    outline: 0px 1px 0px 1px solid #C9CCD6 !important;
+    padding: 0px 6px !important;
+    }
+}
+
+.schema-input-box-dark{
+  background-color: #2B2D30 !important;
+  border-radius: 4px !important;
+  border: 1px solid #4E5157 !important;
+}
+.bottom-btn {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tile-content-dark{
+  background-color: #181a1b;
+}
+
+.tile-content-light{
+  background-color: #ffffff;
+}
+
 </style>
