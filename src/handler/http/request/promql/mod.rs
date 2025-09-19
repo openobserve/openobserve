@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, get, http, http::StatusCode, post, web};
+use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
 use config::utils::time::{now_micros, parse_milliseconds, parse_str_to_timestamp_micros};
 use infra::errors;
 use promql_parser::parser;
@@ -163,7 +163,7 @@ async fn query(
     {
         if crate::service::search::check_search_allowed().is_err() {
             return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                StatusCode::FORBIDDEN,
+                http::StatusCode::FORBIDDEN,
                 "installation has exceeded the search quota".to_string(),
             )));
         }
@@ -441,7 +441,7 @@ async fn query_range(
 
         if crate::service::search::check_search_allowed().is_err() {
             return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                StatusCode::FORBIDDEN,
+                http::StatusCode::FORBIDDEN,
                 "installation has exceeded the search quota".to_string(),
             )));
         }
@@ -704,7 +704,7 @@ async fn series(
     {
         if crate::service::search::check_search_allowed().is_err() {
             return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                StatusCode::FORBIDDEN,
+                http::StatusCode::FORBIDDEN,
                 "installation has exceeded the search quota".to_string(),
             )));
         }

@@ -35,9 +35,9 @@ use hashbrown::HashMap;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use utils::check_stream_permissions;
-#[cfg(feature = "cloud")]
-use {crate::service::organization::is_org_in_free_trial_period, actix_web::http::StatusCode};
 
+#[cfg(feature = "cloud")]
+use crate::service::organization::is_org_in_free_trial_period;
 #[cfg(feature = "enterprise")]
 use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
@@ -359,8 +359,6 @@ pub async fn search(
 
     #[cfg(feature = "enterprise")]
     {
-        use actix_http::StatusCode;
-
         use crate::common::meta;
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
@@ -1844,8 +1842,6 @@ pub async fn result_schema(
 
     #[cfg(feature = "enterprise")]
     {
-        use actix_http::StatusCode;
-
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
@@ -1904,20 +1900,16 @@ pub async fn result_schema(
             Ok(v) => v,
             Err(e) => {
                 log::error!("Error parsing sql: {e}");
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    actix_web::http::StatusCode::BAD_REQUEST,
-                    e,
-                )));
+                return Ok(HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
             }
         };
 
     let res_schema = match get_result_schema(sql, is_streaming, use_cache).await {
         Ok(v) => v,
         Err(e) => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                actix_web::http::StatusCode::BAD_REQUEST,
-                e,
-            )));
+            return Ok(HttpResponse::BadRequest()
+                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
         }
     };
 

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, http::StatusCode, post, web};
+use actix_web::{HttpRequest, HttpResponse, post, web};
 use config::{
     get_config,
     meta::{
@@ -97,7 +97,7 @@ pub async fn search_http2_stream(
     {
         if crate::service::search::check_search_allowed().is_err() {
             return HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                StatusCode::FORBIDDEN,
+                actix_web::http::StatusCode::FORBIDDEN,
                 "installation has exceeded the search quota".to_string(),
             ));
         }
@@ -555,7 +555,7 @@ pub async fn values_http2_stream(
     {
         if crate::service::search::check_search_allowed().is_err() {
             return HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                StatusCode::FORBIDDEN,
+                actix_web::http::StatusCode::FORBIDDEN,
                 "installation has exceeded the search quota".to_string(),
             ));
         }

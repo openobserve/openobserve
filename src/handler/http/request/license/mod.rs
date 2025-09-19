@@ -70,7 +70,7 @@ pub async fn store_license(body: web::Bytes) -> HttpResponse {
         }
     };
 
-    let (k, license) = match check_license(&req.key, &license).await {
+    let (k, _) = match check_license(&req.key, &license).await {
         Ok(v) => v,
         Err(e) => {
             return HttpResponse::BadRequest().json(serde_json::json!({"message":e.to_string()}));
@@ -78,9 +78,7 @@ pub async fn store_license(body: web::Bytes) -> HttpResponse {
     };
 
     let db = infra::db::get_db().await;
-    db.put(LICENSE_DB_KEY, req.key.into(), false, None)
-        .await
-        .unwrap();
+    db.put(LICENSE_DB_KEY, k.into(), false, None).await.unwrap();
     match license::update().await {
         Ok(_) => HttpResponse::Created().finish(),
         Err(e) => {
