@@ -587,13 +587,15 @@ pub async fn cache_results_to_disk(
     file_name: &str,
     data: String,
     clear_cache: bool,
+    clean_start_ts: Option<i64>,
+    clean_end_ts: Option<i64>,
 ) -> std::io::Result<()> {
     if clear_cache {
         log::info!(
             "Clearing cache for file path as use_cache is false: {}",
             file_path
         );
-        let _ = delete_cache(file_path, 0).await;
+        let _ = delete_cache(file_path, 0,clean_start_ts,clean_end_ts).await;
     }
     let file = format!("results/{}/{}", file_path, file_name);
     if disk::exist(&file).await {
@@ -684,15 +686,40 @@ pub fn get_ts_col_order_by(
 }
 
 #[tracing::instrument]
-pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
+pub async fn delete_cache(
+    path: &str,
+    delete_ts: i64,
+    clean_start_ts: Option<i64>,
+    clean_end_ts: Option<i64>,
+) -> std::io::Result<bool> {
     let root_dir = disk::get_dir().await;
     let pattern = format!("{}/results/{}", root_dir, path);
     let prefix = format!("{}/", root_dir);
     let files = scan_files(&pattern, "json", None).unwrap_or_default();
     let mut remove_files: Vec<String> = vec![];
     for file in files {
+        // If clean_start_ts and clean_end_ts are provided, only delete files that overlap with the
+        // range
+        if let (Some(clean_start), Some(clean_end)) = (clean_start_ts, clean_end_ts) {
+            // Parse the start_time and end_time from filename:
+            // {start_time}_{end_time}_{is_aggregate}_{is_descending}.json
+            if let Some(file_name) = file.split('/').next_back() {
+                let parts: Vec<&str> = file_name.split('_').collect();
+                if parts.len() >= 2 {
+                    if let (Ok(file_start_ts), Ok(file_end_ts)) =
+                        (parts[0].parse::<i64>(), parts[1].parse::<i64>())
+                    {
+                        // Check if file data range overlaps with clean range
+                        // File overlaps if: file_start < clean_end AND file_end > clean_start
+                        if !(file_start_ts < clean_end && file_end_ts > clean_start) {
+                            continue; // Skip this file, no overlap
+                        }
+                    }
+                }
+            }
+        }
         // If timestamp is provided, check if we should delete this file
-        if delete_ts > 0 {
+        else if delete_ts > 0 {
             // Parse the start_time from filename:
             // {start_time}_{end_time}_{is_aggregate}_{is_descending}.json
             if let Some(file_name) = file.split('/').next_back() {
@@ -706,6 +733,7 @@ pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
                 }
             }
         }
+
         match disk::remove("", file.strip_prefix(&prefix).unwrap()).await {
             Ok(_) => remove_files.push(file),
             Err(e) => {

@@ -780,6 +780,8 @@ pub async fn _write_results(
             &file_name,
             res_cache,
             false,
+            Some(cache_start_time),
+            Some(cache_end_time),
         )
         .await
         {
@@ -939,6 +941,8 @@ pub async fn write_results_v2(
             &file_name,
             res_cache,
             clear_cache,
+            Some(cache_start_time),
+            Some(cache_end_time),
         )
         .await
         {
