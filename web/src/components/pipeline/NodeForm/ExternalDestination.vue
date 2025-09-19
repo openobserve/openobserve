@@ -24,9 +24,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-page>
       <div class="o2-input">
         <div class="row items-center no-wrap q-mx-md q-pb-sm q-pl-md q-pt-md">
-          <div class="flex items-center">
-            <div class="col" data-test="add-destination-title">
-              <div class="text-h6">External Destination</div>
+          <div class="flex items-center tw-w-full">
+            <div class="tw-w-full" data-test="add-destination-title">
+              <div class="tw-text-[18px] tw-flex tw-items-center tw-justify-between">
+                External Destination
+                <div>
+                  <q-btn v-close-popup="true" round flat icon="cancel" >
+                  </q-btn>
+                </div>
+              </div>
             </div>
           </div>
         </div>

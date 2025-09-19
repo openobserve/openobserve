@@ -13,14 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, collections::BTreeMap, path::Path, sync::Arc, time::Duration};
+use std::{
+    cmp::max,
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 use aes_siv::{KeyInit, siv::Aes256Siv};
 use arc_swap::ArcSwap;
 use base64::{Engine, prelude::BASE64_STANDARD};
 use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
-use dotenvy::dotenv_override;
 use hashbrown::{HashMap, HashSet};
 use itertools::chain;
 use lettre::{
@@ -31,10 +36,11 @@ use lettre::{
     },
 };
 use once_cell::sync::Lazy;
+use sha256::digest;
 
 use crate::{
     meta::{cluster, stream::QueryPartitionStrategy},
-    utils::{file::get_file_meta, sysinfo},
+    utils::sysinfo,
 };
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
@@ -306,6 +312,35 @@ pub fn get_instance_id() -> String {
     }
 }
 
+pub fn calculate_config_file_hash(path: &PathBuf) -> Result<String, anyhow::Error> {
+    let content = std::fs::read_to_string(path)?;
+    Ok(digest(content))
+}
+
+pub fn load_config() -> Result<(), anyhow::Error> {
+    match crate::config_path_manager::get_config_file_path() {
+        Some(path) => {
+            log::info!("Loading config from file {:?}", &path);
+            if dotenvy::from_path_override(&path).is_err() {
+                return Err(anyhow::anyhow!("Config loading from file failed"));
+            }
+            log::info!("Config loaded successfully from file {path:?}");
+        }
+        None => {
+            // Perform default .env discovery and set it in the config manager
+            if let Ok(env_path) = dotenvy::dotenv_override() {
+                log::debug!("Config init: Found .env file at {env_path:?} during boot");
+                // Set the default path in config manager
+                crate::config_path_manager::set_config_file_path(env_path)?;
+            } else {
+                return Err(anyhow::anyhow!(
+                    "Config init: No .env file found during default discovery"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
 static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =
     tokio::sync::OnceCell::const_new();
 
@@ -425,7 +460,6 @@ pub struct Config {
     pub memory_cache: MemoryCache,
     pub disk_cache: DiskCache,
     pub log: Log,
-    pub etcd: Etcd,
     pub nats: Nats,
     pub s3: S3,
     pub sns: Sns,
@@ -493,7 +527,7 @@ pub struct Chrome {
     pub chrome_check_default: bool,
     #[env_config(name = "ZO_CHROME_AUTO_DOWNLOAD", default = false)]
     pub chrome_auto_download: bool,
-    #[env_config(name = "ZO_CHROME_DOWNLOAD_PATH", default = "./download")]
+    #[env_config(name = "ZO_CHROME_DOWNLOAD_PATH", default = "./data/download")]
     pub chrome_download_path: String,
     #[env_config(name = "ZO_CHROME_NO_SANDBOX", default = false)]
     pub chrome_no_sandbox: bool,
@@ -685,7 +719,7 @@ pub struct Common {
     #[env_config(name = "ZO_LOCAL_MODE_STORAGE", default = "disk")]
     pub local_mode_storage: String,
     pub is_local_storage: bool,
-    #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "etcd")]
+    #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "nats")]
     pub cluster_coordinator: String,
     #[env_config(name = "ZO_QUEUE_STORE", default = "")]
     pub queue_store: String,
@@ -743,8 +777,6 @@ pub struct Common {
         help = "Disable timestamp field compression"
     )]
     pub timestamp_compression_disabled: bool,
-    #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
-    pub feature_per_thread_lock: bool,
     #[env_config(name = "ZO_FEATURE_INGESTER_NONE_COMPRESSION", default = false)]
     pub feature_ingester_none_compression: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
@@ -769,8 +801,6 @@ pub struct Common {
     pub feature_query_infer_schema: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
     pub feature_query_exclude_all: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_WITHOUT_INDEX", default = false)]
-    pub feature_query_without_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
     pub feature_query_remove_filter_with_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
@@ -783,6 +813,24 @@ pub struct Common {
         help = "Default to 50_000 when ZO_FEATURE_JOIN_MATCH_ONE_ENABLED is true"
     )]
     pub feature_join_right_side_max_rows: usize,
+    #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_ENABLED",
+        default = false,
+        help = "Enable broadcast join"
+    )]
+    pub feature_broadcast_join_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_ROWS",
+        default = 0,
+        help = "Max rows for left side of broadcast join, default to 10_000 rows"
+    )]
+    pub feature_broadcast_join_left_side_max_rows: usize,
+    #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_SIZE",
+        default = 0,
+        help = "Max size for left side of broadcast join, default to 10 MB"
+    )]
+    pub feature_broadcast_join_left_side_max_size: usize, // MB
     #[env_config(
         name = "ZO_FEATURE_QUERY_SKIP_WAL",
         default = false,
@@ -898,7 +946,7 @@ pub struct Common {
     // MMDB
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
-    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = false)]
+    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = true)]
     pub mmdb_disable_download: bool,
     #[env_config(name = "ZO_MMDB_UPDATE_DURATION_DAYS", default = 30)] // default 30 days
     pub mmdb_update_duration_days: u64,
@@ -1123,6 +1171,18 @@ pub struct Common {
         help = "Enable to use large partition for index. This will apply for all streams"
     )]
     pub align_partitions_for_index: bool,
+    #[env_config(
+        name = "ZO_CONFIG_WATCHER_INTERVAL",
+        default = 30,
+        help = "Config file watcher interval in seconds. Set to 0 to disable"
+    )]
+    pub env_watcher_interval: u64,
+    #[env_config(
+        name = "ZO_LOG_PAGE_DEFAULT_FIELD_LIST",
+        default = "uds",
+        help = "Which fields to show by default in logs search page. Valid values - all,uds,interesting"
+    )]
+    pub log_page_default_field_list: String,
 }
 
 #[derive(EnvConfig, Default)]
@@ -1513,8 +1573,9 @@ pub struct Compact {
     pub delete_files_delay_hours: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
     pub blocked_orgs: String,
-    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_HISTORY", default = false)]
-    pub data_retention_history: bool,
+    #[env_config(name = "ZO_COMPACT_FILE_LIST_DELETED_MODE", default = "deleted")]
+    // "history" "deleted" "none"
+    pub file_list_deleted_mode: String,
     #[env_config(
         name = "ZO_COMPACT_BATCH_SIZE",
         default = 0,
@@ -1654,36 +1715,6 @@ pub struct Log {
 }
 
 #[derive(Debug, EnvConfig, Default)]
-pub struct Etcd {
-    #[env_config(name = "ZO_ETCD_ADDR", default = "localhost:2379")]
-    pub addr: String,
-    #[env_config(name = "ZO_ETCD_PREFIX", default = "/zinc/observe/")]
-    pub prefix: String,
-    #[env_config(name = "ZO_ETCD_CONNECT_TIMEOUT", default = 5)]
-    pub connect_timeout: u64,
-    #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 10)]
-    pub command_timeout: u64,
-    #[env_config(name = "ZO_ETCD_LOCK_WAIT_TIMEOUT", default = 3600)]
-    pub lock_wait_timeout: u64,
-    #[env_config(name = "ZO_ETCD_USER", default = "")]
-    pub user: String,
-    #[env_config(name = "ZO_ETCD_PASSWORD", default = "")]
-    pub password: String,
-    #[env_config(name = "ZO_ETCD_CLIENT_CERT_AUTH", default = false)]
-    pub cert_auth: bool,
-    #[env_config(name = "ZO_ETCD_TRUSTED_CA_FILE", default = "")]
-    pub ca_file: String,
-    #[env_config(name = "ZO_ETCD_CERT_FILE", default = "")]
-    pub cert_file: String,
-    #[env_config(name = "ZO_ETCD_KEY_FILE", default = "")]
-    pub key_file: String,
-    #[env_config(name = "ZO_ETCD_DOMAIN_NAME", default = "")]
-    pub domain_name: String,
-    #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 1000)]
-    pub load_page_size: i64,
-}
-
-#[derive(Debug, EnvConfig, Default)]
 pub struct Nats {
     #[env_config(name = "ZO_NATS_ADDR", default = "localhost:4222")]
     pub addr: String,
@@ -1725,6 +1756,8 @@ pub struct Nats {
     pub subscription_capacity: usize,
     #[env_config(name = "ZO_NATS_QUEUE_MAX_AGE", default = 60)] // days
     pub queue_max_age: u64,
+    #[env_config(name = "ZO_NATS_EVENT_MAX_AGE", default = 3600)] // seconds
+    pub event_max_age: u64,
     #[env_config(
         name = "ZO_NATS_QUEUE_MAX_SIZE",
         help = "The maximum size of the queue in MB, default is 2048MB",
@@ -1962,6 +1995,18 @@ pub struct Pipeline {
         help = "pipeline max file retention time in seconds"
     )]
     pub pipeline_max_file_retention_time_seconds: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_FILE_PUSH_BACK_INTERVAL",
+        default = 2,
+        help = "duration in seconds to push the file to back to the queue after a read complete"
+    )]
+    pub pipeline_file_push_back_interval: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_SINK_TASK_SPAWN_INTERVAL_MS",
+        default = 100,
+        help = "interval in milliseconds to spawn a new sink task"
+    )]
+    pub pipeline_sink_task_spawn_interval_ms: u64,
 }
 
 #[derive(EnvConfig, Default)]
@@ -2013,7 +2058,10 @@ pub struct EnrichmentTable {
 }
 
 pub fn init() -> Config {
-    dotenv_override().ok();
+    if let Err(e) = load_config() {
+        log::error!("Failed to load config {e}");
+        // do nothing
+    }
     let mut cfg = Config::init().expect("config init error");
 
     // set local mode
@@ -2067,11 +2115,6 @@ pub fn init() -> Config {
     // check compact config
     if let Err(e) = check_compact_config(&mut cfg) {
         panic!("compact config error: {e}");
-    }
-
-    // check etcd config
-    if let Err(e) = check_etcd_config(&mut cfg) {
-        panic!("etcd config error: {e}");
     }
 
     // check s3 config
@@ -2319,7 +2362,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         if cfg.common.local_mode {
             cfg.common.meta_store = "sqlite".to_string();
         } else {
-            cfg.common.meta_store = "etcd".to_string();
+            cfg.common.meta_store = "nats".to_string();
         }
     }
     cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
@@ -2360,6 +2403,19 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.feature_join_right_side_max_rows = 50_000;
     }
 
+    // check for broadcast join left side max rows
+    if cfg.common.feature_broadcast_join_enabled
+        && cfg.common.feature_broadcast_join_left_side_max_rows == 0
+    {
+        cfg.common.feature_broadcast_join_left_side_max_rows = 10_000;
+    }
+
+    if cfg.common.feature_broadcast_join_enabled
+        && cfg.common.feature_broadcast_join_left_side_max_size == 0
+    {
+        cfg.common.feature_broadcast_join_left_side_max_size = 10; // 10 MB
+    }
+
     // debug check is useful only when dual write is enabled. Otherwise it will raise error
     // incorrectly each time
     cfg.common.file_list_dump_debug_check =
@@ -2367,6 +2423,14 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.common.default_hec_stream.is_empty() {
         cfg.common.default_hec_stream = "_hec".to_string();
+    }
+
+    cfg.common.log_page_default_field_list = cfg.common.log_page_default_field_list.to_lowercase();
+    if !matches!(
+        cfg.common.log_page_default_field_list.as_str(),
+        "uds" | "all" | "interesting"
+    ) {
+        cfg.common.log_page_default_field_list = "uds".to_string();
     }
 
     Ok(())
@@ -2452,39 +2516,6 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check for pprof flamegraph
     if cfg.profiling.pprof_flamegraph_path.is_empty() {
         cfg.profiling.pprof_flamegraph_path = format!("{}flamegraph.svg", cfg.common.data_dir);
-    }
-
-    Ok(())
-}
-
-fn check_etcd_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if !cfg.etcd.prefix.is_empty() && !cfg.etcd.prefix.ends_with('/') {
-        cfg.etcd.prefix = format!("{}/", cfg.etcd.prefix);
-    }
-
-    if !cfg.etcd.cert_auth {
-        return Ok(());
-    }
-    if let Err(e) = get_file_meta(&cfg.etcd.ca_file) {
-        return Err(anyhow::anyhow!("ZO_ETCD_TRUSTED_CA_FILE check err: {}", e));
-    }
-    if let Err(e) = get_file_meta(&cfg.etcd.cert_file) {
-        return Err(anyhow::anyhow!("ZO_ETCD_TRUSTED_CA_FILE check err: {}", e));
-    }
-    if let Err(e) = get_file_meta(&cfg.etcd.key_file) {
-        return Err(anyhow::anyhow!("ZO_ETCD_TRUSTED_CA_FILE check err: {}", e));
-    }
-
-    // check domain name
-    if cfg.etcd.domain_name.is_empty() {
-        let mut name = cfg.etcd.addr.clone();
-        if name.contains("//") {
-            name = name.split("//").collect::<Vec<&str>>()[1].to_string();
-        }
-        if name.contains(':') {
-            name = name.split(':').collect::<Vec<&str>>()[0].to_string();
-        }
-        cfg.etcd.domain_name = name;
     }
 
     Ok(())
@@ -2836,6 +2867,14 @@ fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     } else {
         cfg.pipeline.wal_size_limit *= 1024 * 1024;
+    }
+
+    if cfg.pipeline.pipeline_file_push_back_interval == 0 {
+        cfg.pipeline.pipeline_file_push_back_interval = 2; // 2 seconds
+    }
+
+    if cfg.pipeline.pipeline_sink_task_spawn_interval_ms == 0 {
+        cfg.pipeline.pipeline_sink_task_spawn_interval_ms = 100; // 100 milliseconds
     }
     Ok(())
 }

@@ -960,7 +960,7 @@ SELECT date
 SELECT 
     stream,
     MIN(CASE WHEN deleted IS FALSE THEN min_ts END) AS min_ts,
-    MAX(CASE WHEN deleted IS FALSE THEN max_ts END) AS max_ts,
+    MAX(CASE WHEN deleted IS FALSE THEN max_ts ELSE 0 END) AS max_ts,
     CAST(SUM(CASE 
         WHEN deleted IS TRUE AND created_at <= {min} THEN -1
         WHEN deleted IS FALSE THEN 1
@@ -1114,12 +1114,26 @@ INSERT INTO stream_stats
             if let Err(e) = sqlx::query(
                 r#"
 UPDATE stream_stats
-    SET file_num = file_num + ?, min_ts = ?, max_ts = ?, records = records + ?, original_size = original_size + ?, compressed_size = compressed_size + ?, index_size = index_size + ?
+    SET file_num = file_num + ?, 
+        min_ts = CASE WHEN ? = 0 THEN min_ts 
+                     WHEN min_ts = 0 OR ? < min_ts THEN ? 
+                     ELSE min_ts END,
+        max_ts = CASE WHEN ? = 0 THEN max_ts 
+                     WHEN max_ts = 0 OR ? > max_ts THEN ? 
+                     ELSE max_ts END,
+        records = records + ?, 
+        original_size = original_size + ?, 
+        compressed_size = compressed_size + ?, 
+        index_size = index_size + ?
     WHERE stream = ?;
                 "#,
             )
             .bind(stats.file_num)
             .bind(stats.doc_time_min)
+            .bind(stats.doc_time_min)
+            .bind(stats.doc_time_min)
+            .bind(stats.doc_time_max)
+            .bind(stats.doc_time_max)
             .bind(stats.doc_time_max)
             .bind(stats.doc_num)
             .bind(stats.storage_size as i64)
@@ -2168,7 +2182,7 @@ pub async fn create_table_index() -> Result<()> {
             .bind(file)
             .execute(&pool)
             .await?;
-            if i % 1000 == 0 {
+            if i.is_multiple_of(1000) {
                 log::warn!("[MYSQL] delete duplicate records: {}/{}", i, ret.len());
             }
         }

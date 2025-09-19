@@ -345,6 +345,7 @@ pub async fn handle_request(
                     if !derived_streams.contains(&destination_stream) {
                         derived_streams.insert(destination_stream.clone());
                     }
+
                     if !user_defined_schema_map.contains_key(&destination_stream) {
                         // a new dynamically created stream. need to check the two maps again
                         crate::service::ingestion::get_uds_and_original_data_streams(

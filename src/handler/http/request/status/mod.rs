@@ -87,6 +87,13 @@ pub struct HealthzResponse {
     status: String,
 }
 
+#[cfg(feature = "enterprise")]
+pub fn reload_enterprise_config() -> Result<(), anyhow::Error> {
+    refresh_o2_config()
+        .and_then(|_| refresh_dex_config())
+        .and_then(|_| refresh_openfga_config())
+}
+
 #[derive(Serialize)]
 struct ConfigResponse<'a> {
     version: String,
@@ -138,6 +145,7 @@ struct ConfigResponse<'a> {
     dashboard_placeholder: String,
     dashboard_show_symbol_enabled: bool,
     ingest_flatten_level: u32,
+    log_page_default_field_list: String,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -358,6 +366,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
         ingest_flatten_level: cfg.limit.ingest_flatten_level,
+        log_page_default_field_list: cfg.common.log_page_default_field_list.clone(),
     }))
 }
 
@@ -450,10 +459,7 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
         );
     }
     #[cfg(feature = "enterprise")]
-    if let Err(e) = refresh_o2_config()
-        .and_then(|_| refresh_dex_config())
-        .and_then(|_| refresh_openfga_config())
-    {
+    if let Err(e) = reload_enterprise_config() {
         return Ok(
             HttpResponse::InternalServerError().json(serde_json::json!({"status": e.to_string()}))
         );
@@ -959,6 +965,26 @@ async fn consistent_hash(body: web::Json<HashFileRequest>) -> Result<HttpRespons
         ret.files.insert(file.clone(), nodes);
     }
     Ok(MetaHttpResponse::json(ret))
+}
+
+#[get("/refresh_nodes_list")]
+async fn refresh_nodes_list() -> Result<HttpResponse, Error> {
+    match cluster::cache_node_list().await {
+        Ok(node_ids) => Ok(MetaHttpResponse::json(node_ids)),
+        Err(e) => {
+            log::error!("[CLUSTER] refresh_node_list failed: {}", e);
+            Ok(MetaHttpResponse::internal_error(e.to_string()))
+        }
+    }
+}
+
+#[get("/refresh_user_sessions")]
+async fn refresh_user_sessions() -> Result<HttpResponse, Error> {
+    let _ = db::session::cache().await.map_err(|e| {
+        log::error!("[CLUSTER] refresh_user_sessions failed: {}", e);
+        e
+    });
+    Ok(MetaHttpResponse::json("user sessions refreshed"))
 }
 
 #[cfg(test)]

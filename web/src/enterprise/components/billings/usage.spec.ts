@@ -160,7 +160,9 @@ describe("Usage Component", () => {
     expect(wrapper.vm.usageData).toEqual({
       ingestion: "10.50",
       search: "5.25",
-      functions: "2.75"
+      functions: "2.75",
+      pipeline: "0.00",
+      remotepipeline: "0.00"
     });
   });
 
@@ -328,7 +330,9 @@ describe("Usage Component", () => {
     expect(wrapper.vm.usageData).toEqual({
       ingestion: "10.50",
       search: "5.25",
-      functions: "2.75"
+      functions: "2.75",
+      pipeline: "0.00",
+      remotepipeline: "0.00"
     });
   });
 

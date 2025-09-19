@@ -80,6 +80,8 @@ utoipa.workspace = true
 uuid.workspace = true
 vrl.workspace = true
 roaring.workspace = true
+tonic.workspace = true
+tracing-opentelemetry.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true

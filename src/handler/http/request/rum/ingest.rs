@@ -20,6 +20,7 @@ use actix_web::{HttpResponse, post, web};
 use config::utils::json;
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{
     common::meta::{
@@ -34,9 +35,11 @@ pub const RUM_SESSION_REPLAY_STREAM: &str = "_sessionreplay";
 pub const RUM_DATA_STREAM: &str = "_rumdata";
 
 /// Multipart form data being ingested in the form of session-replay
-#[derive(MultipartForm)]
+#[derive(MultipartForm, ToSchema)]
 pub struct SegmentEvent {
+    #[schema(value_type = String, format = Binary)]
     pub segment: Bytes,
+    #[schema(value_type = String, format = Binary)]
     pub event: Bytes,
 }
 
@@ -200,7 +203,9 @@ pub async fn log(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Object, description = "Multipart form data containing compressed session replay segment and event metadata", content_type = "multipart/form-data"),
+    request_body(
+        content = SegmentEvent, content_type = "multipart/form-data",
+        description = "Multipart form data containing compressed session replay segment and event metadata"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", 
             body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]}),

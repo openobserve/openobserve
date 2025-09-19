@@ -123,7 +123,6 @@ pub async fn delete_action(path: web::Path<(String, Ksuid)>) -> Result<HttpRespo
         ("org_id" = String, Path, description = "Organization name"),
         ("ksuid" = String, Path, description = "Action ID"),
     ),
-    request_body(content = Template, description = "Template data", content_type ="application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/zip", body = String),
         (status = 400, description = "Error",   content_type = "application/json",body = ()),
@@ -253,7 +252,6 @@ pub async fn update_action_details(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = Template, description = "Template data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error", content_type = "application/json", body = ()),

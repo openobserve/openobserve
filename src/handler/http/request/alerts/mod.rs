@@ -22,15 +22,20 @@ use hashbrown::HashMap;
 use infra::db::{ORM_CLIENT, connect_to_orm};
 use svix_ksuid::Ksuid;
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::search::utils::check_resource_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
         models::alerts::{
             requests::{
-                CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery, MoveAlertsRequestBody,
-                UpdateAlertRequestBody,
+                AlertBulkEnableRequest, CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery,
+                MoveAlertsRequestBody, UpdateAlertRequestBody,
             },
-            responses::{EnableAlertResponseBody, GetAlertResponseBody, ListAlertsResponseBody},
+            responses::{
+                AlertBulkEnableResponse, EnableAlertResponseBody, GetAlertResponseBody,
+                ListAlertsResponseBody,
+            },
         },
         request::dashboards::{get_folder, is_overwrite},
     },
@@ -401,6 +406,90 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
         }
         Err(e) => e.into(),
     }
+}
+
+/// EnableAlertBulk
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "EnableAlertBulk",
+    summary = "Enable or disable alert in bulk",
+    description = "Toggles the active status of alerts to enable or disable its monitoring and notification functionality in bulk. When disabled, the alert will stop evaluating conditions and sending notifications until re-enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        EnableAlertQuery,
+    ),
+    request_body(content = AlertBulkEnableRequest, description = "Alert id list", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+    )
+)]
+#[post("/v2/{org_id}/alerts/bulk/enable")]
+async fn enable_alert_bulk(
+    path: web::Path<String>,
+    body: web::Bytes,
+    in_req: HttpRequest,
+) -> HttpResponse {
+    let org_id = path.into_inner();
+    let Ok(query) = web::Query::<EnableAlertQuery>::from_query(in_req.query_string()) else {
+        return MetaHttpResponse::bad_request("Error parsing query parameters");
+    };
+    let should_enable = query.0.value;
+
+    let req: AlertBulkEnableRequest = match serde_json::from_slice(&body) {
+        Ok(v) => v,
+        Err(_) => return MetaHttpResponse::bad_request("invalid body"),
+    };
+
+    #[cfg(feature = "enterprise")]
+    {
+        let user_id = in_req
+            .headers()
+            .get("user_id")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+
+        for id in &req.ids {
+            if let Some(res) =
+                check_resource_permissions(&org_id, &user_id, "alerts", &id.to_string(), "PUT")
+                    .await
+            {
+                return res;
+            }
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    for id in req.ids {
+        match alert::enable_by_id(client, &org_id, id, should_enable).await {
+            Ok(_) => {
+                successful.push(id);
+            }
+            Err(e) => {
+                log::error!("error in enabling alert {id} : {e}");
+                unsuccessful.push(id);
+                err = Some(e.to_string());
+            }
+        }
+    }
+    MetaHttpResponse::json(AlertBulkEnableResponse {
+        successful,
+        unsuccessful,
+        err,
+    })
 }
 
 /// TriggerAlert

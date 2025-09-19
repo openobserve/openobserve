@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::meta::{cluster::NodeInfo, inverted_index::IndexOptimizeMode};
+use config::{datafusion::request::Request, meta::cluster::NodeInfo};
 use datafusion::{
     common::{
         Result, TableReference,
@@ -32,6 +32,11 @@ use datafusion::{
 };
 use hashbrown::HashMap;
 use proto::cluster_rpc::{self, KvItem};
+#[cfg(feature = "enterprise")]
+use {
+    crate::service::search::datafusion::optimizer::physical_optimizer::broadcast_join::broadcast_join_rewrite,
+    o2_enterprise::enterprise::search::datafusion::optimizer::broadcast_join::should_use_broadcast_join,
+};
 
 use crate::service::search::{
     datafusion::{
@@ -40,8 +45,6 @@ use crate::service::search::{
         },
         optimizer::{context::RemoteScanContext, utils::is_place_holder_or_empty},
     },
-    index::IndexCondition,
-    request::Request,
     sql::Sql,
 };
 
@@ -77,8 +80,6 @@ pub fn generate_remote_scan_rules(
         nodes,
         partitioned_file_lists,
         equal_keys,
-        sql.index_condition.clone(),
-        sql.index_optimize_mode.clone(),
         is_leader,
         context,
     ))
@@ -97,8 +98,6 @@ impl RemoteScanRule {
         nodes: Vec<Arc<dyn NodeInfo>>,
         file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
-        index_condition: Option<IndexCondition>,
-        index_optimize_mode: Option<IndexOptimizeMode>,
         is_leader: bool,
         opentelemetry_context: opentelemetry::Context,
     ) -> Self {
@@ -107,8 +106,6 @@ impl RemoteScanRule {
             nodes,
             file_id_lists,
             equal_keys,
-            index_condition,
-            index_optimize_mode,
             is_leader,
             opentelemetry_context,
         );
@@ -127,6 +124,13 @@ impl PhysicalOptimizerRule for RemoteScanRule {
         // should not add remote scan for placeholder or emptyplan
         if is_place_holder_or_empty(&plan) {
             return Ok(plan);
+        }
+
+        #[cfg(feature = "enterprise")]
+        if config::get_config().common.feature_broadcast_join_enabled
+            && should_use_broadcast_join(&plan)
+        {
+            return broadcast_join_rewrite(plan, self.remote_scan_nodes.clone());
         }
 
         // if single node and can optimize, add remote scan to top
@@ -282,7 +286,7 @@ fn is_single_node_optimize(plan: &Arc<dyn ExecutionPlan>) -> bool {
     empty_exec_count <= 1 && config::cluster::LOCAL_NODE.is_single_node()
 }
 
-fn remote_scan_to_top_if_needed(
+pub fn remote_scan_to_top_if_needed(
     plan: Arc<dyn ExecutionPlan>,
     remote_scan_nodes: Arc<RemoteScanNodes>,
 ) -> Result<Arc<dyn ExecutionPlan>> {

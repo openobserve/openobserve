@@ -116,7 +116,7 @@ pub async fn get_prompt(path: web::Path<(String, PromptType)>) -> Result<HttpRes
         ("org_id" = String, Path, description = "Organization name")
     ),
     request_body(
-        content = Object,
+        content = UpdatePromptRequest,
         description = "Prompt details", 
         example = json!({
             "content": "Write a SQL query to get the top 10 users by response time in the default stream"
@@ -149,7 +149,7 @@ pub async fn update_prompt(
     match prompt_service::update_prompt(request.content.clone()).await {
         Ok(_) => {
             // Emit cluster coordinator event to notify nodes in current cluster
-            if let Err(e) = infra::cluster_coordinator::ai_prompts::emit_put_event().await {
+            if let Err(e) = infra::coordinator::ai_prompts::emit_put_event().await {
                 log::error!("Failed to emit AI prompt update event to cluster coordinator: {e}");
             }
 
@@ -211,7 +211,7 @@ pub async fn rollback_prompt(path: web::Path<String>) -> Result<HttpResponse, Er
     match prompt_service::rollback_to_default_prompt().await {
         Ok(()) => {
             // Emit cluster coordinator event to notify nodes in current cluster
-            if let Err(e) = infra::cluster_coordinator::ai_prompts::emit_rollback_event().await {
+            if let Err(e) = infra::coordinator::ai_prompts::emit_rollback_event().await {
                 log::error!("Failed to emit AI prompt rollback event to cluster coordinator: {e}");
             }
 

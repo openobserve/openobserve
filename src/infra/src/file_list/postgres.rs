@@ -903,7 +903,7 @@ SELECT date
 SELECT 
     stream,
     MIN(CASE WHEN deleted IS FALSE THEN min_ts END) AS min_ts,
-    MAX(CASE WHEN deleted IS FALSE THEN max_ts END) AS max_ts,
+    MAX(CASE WHEN deleted IS FALSE THEN max_ts ELSE 0 END) AS max_ts,
     SUM(CASE 
         WHEN deleted IS TRUE AND created_at <= {min} THEN -1
         WHEN deleted IS FALSE THEN 1
@@ -1058,7 +1058,17 @@ INSERT INTO stream_stats
             if let Err(e) = sqlx::query(
                 r#"
 UPDATE stream_stats
-    SET file_num = file_num + $1, min_ts = $2, max_ts = $3, records = records + $4, original_size = original_size + $5, compressed_size = compressed_size + $6, index_size = index_size + $7
+    SET file_num = file_num + $1, 
+        min_ts = CASE WHEN $2 = 0 THEN min_ts 
+                     WHEN min_ts = 0 OR $2 < min_ts THEN $2 
+                     ELSE min_ts END,
+        max_ts = CASE WHEN $3 = 0 THEN max_ts 
+                     WHEN max_ts = 0 OR $3 > max_ts THEN $3 
+                     ELSE max_ts END,
+        records = records + $4, 
+        original_size = original_size + $5, 
+        compressed_size = compressed_size + $6, 
+        index_size = index_size + $7
     WHERE stream = $8;
                 "#,
             )
@@ -2059,7 +2069,7 @@ pub async fn create_table_index() -> Result<()> {
                 .bind(date)
                 .bind(file)
                 .execute(&pool).await?;
-            if i % 1000 == 0 {
+            if i.is_multiple_of(1000) {
                 log::warn!("[POSTGRES] delete duplicate records: {}/{}", i, ret.len());
             }
         }

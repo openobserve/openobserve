@@ -33,14 +33,16 @@ use config::{
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
-use infra::errors::{Error, ErrorCodes, Result};
+use infra::{
+    client::grpc::make_grpc_metrics_client,
+    errors::{Error, ErrorCodes, Result},
+};
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 
 use crate::{
     common::infra::cluster,
     service::{
-        grpc::make_grpc_metrics_client,
         promql::{
             DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end,
             micros, value::*,

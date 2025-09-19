@@ -40,7 +40,6 @@ use infra::{
 };
 use once_cell::sync::Lazy;
 
-mod etcd;
 mod nats;
 mod scheduler;
 
@@ -48,6 +47,7 @@ pub use scheduler::select_best_node;
 
 const CONSISTENT_HASH_PRIME: u32 = 16777619;
 
+pub const NODES_KEY: &str = "/nodes/";
 static NODES: Lazy<RwAHashMap<String, Node>> = Lazy::new(Default::default);
 static QUERIER_INTERACTIVE_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
     Lazy::new(Default::default);
@@ -199,7 +199,7 @@ pub async fn register_and_keep_alive() -> Result<()> {
 
     match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::register_and_keep_alive().await?,
-        _ => etcd::register_and_keep_alive().await?,
+        _ => nats::register_and_keep_alive().await?,
     };
 
     // check node heatbeat
@@ -221,7 +221,7 @@ pub async fn register_and_keep_alive() -> Result<()> {
     Ok(())
 }
 
-pub async fn set_online(new_lease_id: bool) -> Result<()> {
+pub async fn set_online() -> Result<()> {
     let cfg = get_config();
     if cfg.common.local_mode {
         return Ok(());
@@ -229,11 +229,11 @@ pub async fn set_online(new_lease_id: bool) -> Result<()> {
 
     match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::set_online().await,
-        _ => etcd::set_online(new_lease_id).await,
+        _ => nats::set_online().await,
     }
 }
 
-pub async fn set_offline(new_lease_id: bool) -> Result<()> {
+pub async fn set_offline() -> Result<()> {
     let cfg = get_config();
     if cfg.common.local_mode {
         return Ok(());
@@ -241,7 +241,7 @@ pub async fn set_offline(new_lease_id: bool) -> Result<()> {
 
     match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::set_offline().await,
-        _ => etcd::set_offline(new_lease_id).await,
+        _ => nats::set_offline().await,
     }
 }
 
@@ -253,7 +253,7 @@ pub async fn update_local_node(node: &Node) -> Result<()> {
 
     match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::update_local_node(node).await,
-        _ => etcd::update_local_node(node).await,
+        _ => nats::update_local_node(node).await,
     }
 }
 
@@ -285,7 +285,7 @@ pub async fn leave() -> Result<()> {
 
     match cfg.common.cluster_coordinator.as_str().into() {
         MetaStore::Nats => nats::leave().await,
-        _ => etcd::leave().await,
+        _ => nats::leave().await,
     }
 }
 
@@ -293,7 +293,7 @@ pub async fn leave() -> Result<()> {
 pub async fn list_nodes() -> Result<Vec<Node>> {
     let mut nodes = Vec::new();
     let client = get_coordinator().await;
-    let items = client.list_values("/nodes/").await.map_err(|e| {
+    let items = client.list_values(NODES_KEY).await.map_err(|e| {
         log::error!("[CLUSTER] error getting nodes: {e}");
         e
     })?;
@@ -310,7 +310,7 @@ pub async fn list_nodes() -> Result<Vec<Node>> {
 }
 
 async fn watch_node_list() -> Result<()> {
-    let key = "/nodes/";
+    let key = NODES_KEY;
     let client = get_coordinator().await;
     let mut events = client.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -698,6 +698,39 @@ async fn update_node_status_metrics() -> NodeMetrics {
     node_status
 }
 
+pub async fn cache_node_list() -> Result<Vec<i32>> {
+    let cfg = get_config();
+    if cfg.common.local_mode {
+        return Ok(vec![]);
+    }
+    let node_list = match list_nodes().await {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(e);
+        }
+    };
+    let mut node_ids = Vec::new();
+    let mut w = NODES.write().await;
+    for node in node_list {
+        if node.is_interactive_querier() {
+            add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
+        }
+        if node.is_background_querier() {
+            add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background)).await;
+        }
+        if node.is_compactor() {
+            add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
+        }
+        if node.is_flatten_compactor() {
+            add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
+        }
+        node_ids.push(node.id);
+        w.insert(node.uuid.clone(), node);
+    }
+    drop(w);
+    Ok(node_ids)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -711,14 +744,14 @@ mod tests {
     #[tokio::test]
     async fn test_set_online() {
         register_and_keep_alive().await.unwrap();
-        set_online(true).await.unwrap();
+        set_online().await.unwrap();
         assert!(get_cached_online_nodes().await.is_some());
     }
 
     #[tokio::test]
     async fn test_set_offline() {
         register_and_keep_alive().await.unwrap();
-        set_offline(true).await.unwrap();
+        set_offline().await.unwrap();
         // doesn't work for local mode
         assert!(get_cached_online_nodes().await.is_some());
     }
@@ -770,7 +803,7 @@ mod tests {
     #[tokio::test]
     async fn test_cluster() {
         register_and_keep_alive().await.unwrap();
-        set_online(false).await.unwrap();
+        set_online().await.unwrap();
         leave().await.unwrap();
         assert!(get_cached_online_nodes().await.is_some());
         assert!(get_cached_online_query_nodes(None).await.is_some());

@@ -26,6 +26,14 @@ const pipelines = {
     const url = `/api/${org_identifier}/pipelines/${pipeline_id}/enable?value=${enable}&from_now=${from_now}`;
     return http().put(url);
   },
+  bulkToggleState: (
+    org_identifier: string,
+    enable: boolean,
+    data: any
+  ) => {
+    const url = `/api/${org_identifier}/pipelines/bulk/enable?value=${enable}`;
+    return http().post(url, data);
+  },
 
   deletePipeline: ({
     pipeline_id,

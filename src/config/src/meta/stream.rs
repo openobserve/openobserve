@@ -132,10 +132,10 @@ pub enum StreamType {
 }
 
 impl StreamType {
-    pub fn is_basic_type(&self) -> bool {
+    pub fn support_index(&self) -> bool {
         matches!(
             *self,
-            StreamType::Logs | StreamType::Metrics | StreamType::Traces
+            StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Metadata
         )
     }
 
@@ -492,20 +492,22 @@ impl std::ops::Sub<&StreamStats> for &StreamStats {
     type Output = StreamStats;
 
     fn sub(self, rhs: &StreamStats) -> Self::Output {
-        let mut ret = StreamStats {
+        StreamStats {
             created_at: self.created_at,
             file_num: self.file_num - rhs.file_num,
             doc_num: self.doc_num - rhs.doc_num,
-            doc_time_min: self.doc_time_min.min(rhs.doc_time_min),
+            doc_time_min: if self.doc_time_min == 0 {
+                rhs.doc_time_min
+            } else if rhs.doc_time_min == 0 {
+                self.doc_time_min
+            } else {
+                self.doc_time_min.min(rhs.doc_time_min)
+            },
             doc_time_max: self.doc_time_max.max(rhs.doc_time_max),
             storage_size: self.storage_size - rhs.storage_size,
             compressed_size: self.compressed_size - rhs.compressed_size,
             index_size: self.index_size - rhs.index_size,
-        };
-        if ret.doc_time_min == 0 {
-            ret.doc_time_min = rhs.doc_time_min;
         }
-        ret
     }
 }
 
@@ -513,20 +515,22 @@ impl std::ops::Add<&StreamStats> for &StreamStats {
     type Output = StreamStats;
 
     fn add(self, rhs: &StreamStats) -> Self::Output {
-        let mut ret = StreamStats {
+        StreamStats {
             created_at: self.created_at,
             file_num: self.file_num + rhs.file_num,
             doc_num: self.doc_num + rhs.doc_num,
-            doc_time_min: self.doc_time_min.min(rhs.doc_time_min),
+            doc_time_min: if self.doc_time_min == 0 {
+                rhs.doc_time_min
+            } else if rhs.doc_time_min == 0 {
+                self.doc_time_min
+            } else {
+                self.doc_time_min.min(rhs.doc_time_min)
+            },
             doc_time_max: self.doc_time_max.max(rhs.doc_time_max),
             storage_size: self.storage_size + rhs.storage_size,
             compressed_size: self.compressed_size + rhs.compressed_size,
             index_size: self.index_size + rhs.index_size,
-        };
-        if ret.doc_time_min == 0 {
-            ret.doc_time_min = rhs.doc_time_min;
         }
-        ret
     }
 }
 
@@ -1263,6 +1267,35 @@ pub struct EnrichmentTableMetaStreamStats {
     pub start_time: i64,
     pub end_time: i64,
     pub size: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub enum FileListBookKeepMode {
+    History,
+    #[default]
+    Deleted,
+    None,
+}
+
+impl std::fmt::Display for FileListBookKeepMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FileListBookKeepMode::History => write!(f, "history"),
+            FileListBookKeepMode::Deleted => write!(f, "deleted"),
+            FileListBookKeepMode::None => write!(f, "none"),
+        }
+    }
+}
+
+impl From<&str> for FileListBookKeepMode {
+    fn from(s: &str) -> Self {
+        match s {
+            "history" => FileListBookKeepMode::History,
+            "deleted" => FileListBookKeepMode::Deleted,
+            "none" => FileListBookKeepMode::None,
+            _ => FileListBookKeepMode::default(),
+        }
+    }
 }
 
 #[cfg(test)]
