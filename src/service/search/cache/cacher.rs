@@ -607,7 +607,7 @@ pub async fn cache_results_to_disk(
                 e
             });
         log::info!(
-            "[trace_id {trace_id}] Clearing cache for file path as use_cache is {clear_cache} completed, took: {} ms, {file_path}",
+            "[trace_id {trace_id}] Clearing cache for file path completed. use_cache: false, clear_cache: {clear_cache}, took: {} ms, {file_path}",
             start.elapsed().as_millis(),
         );
     }
