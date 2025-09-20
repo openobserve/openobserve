@@ -13,311 +13,58 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
+use infra::cache::file_data::disk::QUERY_RESULT_CACHE;
+use itertools::Itertools;
 
-use async_recursion::async_recursion;
-use chrono::Utc;
-use config::{
-    get_config,
-    meta::search::Response,
-    utils::{json, time::second_micros},
-};
-use infra::cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta};
-
-use super::{cacher::get_results, sort_response};
 use crate::{
     common::meta::search::{CacheQueryRequest, ResultCacheSelectionStrategy},
-    service::search::cache::{
-        CachedQueryResponse,
-        result_utils::{get_ts_value, round_down_to_nearest_minute},
-    },
+    service::search::cache::{CachedQueryResponse, cacher::select_cache_meta},
 };
 
 pub async fn get_cached_results(
-    file_path: &str,
     trace_id: &str,
+    file_path: &str,
     cache_req: CacheQueryRequest,
 ) -> Vec<CachedQueryResponse> {
     let mut res: Vec<_> = vec![];
     let r = QUERY_RESULT_CACHE.read().await;
     let query_key = file_path.replace('/', "_");
-    let is_cached = r.get(&query_key).cloned();
+    let cache_metas = r.get(&query_key).cloned();
     drop(r);
-    if is_cached.is_none() {
+
+    let Some(mut cache_metas) = cache_metas else {
         log::debug!(
             "[CACHE RESULT {trace_id}] No cache found during get_cached_results for query key: {query_key}, cache_query: {cache_req:?}"
         );
         return res;
-    }
+    };
 
-    if let Some(cache_metas) = is_cached {
-        let _ = recursive_process_multiple_metas(
-            &cache_metas,
-            trace_id,
-            cache_req,
-            &mut res,
-            &query_key,
-            file_path,
-        )
-        .await;
-        res
-    } else {
-        res
-    }
-}
-
-#[async_recursion]
-async fn recursive_process_multiple_metas(
-    cache_metas: &[ResultCacheMeta],
-    trace_id: &str,
-    cache_req: CacheQueryRequest,
-    results: &mut Vec<CachedQueryResponse>,
-    query_key: &str,
-    file_path: &str,
-) -> Result<(), anyhow::Error> {
-    if cache_metas.is_empty() {
-        if results.is_empty() {
-            log::debug!(
-                "[CACHE RESULT {trace_id}] No cache found during recursive_process_multiple_metas for query key: {query_key}, cached_metas: {cache_metas:?}"
-            );
-        }
-
-        return Ok(());
-    }
-    let selection_strategy: ResultCacheSelectionStrategy = ResultCacheSelectionStrategy::from_str(
-        &get_config().common.result_cache_selection_strategy,
-    )
-    .unwrap_or_default();
-
-    // Filter relevant metas that are within the overall query range
-    let relevant_metas: Vec<ResultCacheMeta> = cache_metas
-        .iter()
-        .filter(|m| m.start_time <= cache_req.q_end_time && m.end_time >= cache_req.q_start_time)
-        .cloned()
-        .collect();
-
-    if relevant_metas.is_empty() {
-        log::info!("[CACHE RESULT {trace_id}] No relevant cache found for query key: {query_key}");
-        return Ok(());
-    }
-
-    // Sort by start time to process them in sequence
-    let mut sorted_metas = relevant_metas;
-    sorted_metas.sort_by_key(|m| m.start_time);
-
-    if
-        let Some(largest_meta) = sorted_metas
-            .iter()
-            .filter(|cache_meta| {
-                log::info!(
-                    "[CACHE CANDIDATES {trace_id}] Got caches: cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
-                    cache_meta.start_time,
-                    cache_meta.end_time
-                );
-                cache_meta.start_time <= cache_req.q_end_time &&
-                    cache_meta.end_time >= cache_req.q_start_time
-            })
-            .max_by_key(|result| select_cache_meta(result, &cache_req, &selection_strategy))
-    {
-        let file_name = format!(
-            "{}_{}_{}_{}.json",
-            largest_meta.start_time,
-            largest_meta.end_time,
-            if cache_req.is_aggregate {
-                1
-            } else {
-                0
-            },
-            if cache_req.is_descending {
-                1
-            } else {
-                0
-            }
-        );
-
-        let mut matching_cache_meta = largest_meta.clone();
-
-        // Calculate delta time range to fetch the delta data using search query
-        let cfg = get_config();
-        let discard_duration = second_micros(cfg.limit.cache_delay_secs);
-
-        let cache_duration = matching_cache_meta.end_time - matching_cache_meta.start_time;
-        if
-            cache_duration <= discard_duration &&
-            matching_cache_meta.start_time > Utc::now().timestamp_micros() - discard_duration
-        {
-            return Ok(());
-        }
-
-        let result = match get_results(file_path, &file_name).await {
-            Ok(v) => {
-                match json::from_str::<Response>(&v) {
-                    Ok(v) => Some(v),
-                    Err(e) => {
-                        log::error!("[trace_id {trace_id}] Error parsing cached response: {e}");
-                        None
-                    }
-                }
-            }
-            Err(e) => {
-                log::error!("[trace_id {trace_id}] Get results from disk failed: {e}");
-                None
-            }
+    let selection_strategy = ResultCacheSelectionStrategy::from(
+        config::get_config()
+            .common
+            .result_cache_selection_strategy
+            .as_str(),
+    );
+    loop {
+        let Some(idx) = cache_metas.iter().position_max_by_key(|result| {
+            select_cache_meta(result, &cache_req, &selection_strategy)
+        }) else {
+            break;
         };
-        if let Some(mut cached_response) = result {
-            let (hits_allowed_start_time, hits_allowed_end_time) = if
-                cache_req.discard_interval > 0
-            {
-                (
-                    cache_req.q_start_time - (cache_req.q_start_time % cache_req.discard_interval),
-                    cache_req.q_end_time - (cache_req.q_end_time % cache_req.discard_interval),
-                )
-            } else {
-                (cache_req.q_start_time, cache_req.q_end_time)
-            };
-            let discard_ts = get_allowed_up_to(&cached_response, &cache_req, discard_duration);
-            cached_response.hits.retain(|hit| {
-                let hit_ts = get_ts_value(&cache_req.ts_column, hit);
-                hit_ts < hits_allowed_end_time &&
-                    hit_ts > hits_allowed_start_time &&
-                    hit_ts < discard_ts
-            });
-
-            // Sort the hits by the order
-            sort_response(cache_req.is_descending, &mut cached_response, &cache_req.ts_column, &vec![]);
-
-            cached_response.total = cached_response.hits.len();
-            if cache_req.discard_interval < 0 {
-                matching_cache_meta.end_time = discard_ts;
-            }
-            if !cached_response.hits.is_empty() {
-                let last_rec_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
-                let first_rec_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
-                let response_start_time = if cache_req.is_descending {
-                    last_rec_ts
-                } else {
-                    first_rec_ts
-                };
-                let response_end_time = if cache_req.is_descending {
-                    first_rec_ts
-                } else {
-                    last_rec_ts
-                };
-                log::info!(
-                    "[CACHE RESULT {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} , len {}",
-                    query_key,
-                    matching_cache_meta.start_time,
-                    matching_cache_meta.end_time,
-                    cached_response.hits.len()
-                );
-                results.push(CachedQueryResponse {
-                    cached_response,
-                    deltas: vec![],
-                    has_cached_data: true,
-                    cache_query_response: true,
-                    response_start_time,
-                    response_end_time,
-                    ts_column: cache_req.ts_column.to_string(),
-                    is_descending: cache_req.is_descending,
-                    limit: -1,
-                });
-            }
-        }
-        // Filter out the largest meta and call recursively with non-overlapping metas
-        let remaining_metas: Vec<ResultCacheMeta> = sorted_metas
-            .clone()
-            .into_iter()
-            .filter(|meta| {
-                !largest_meta.eq(meta) &&
-                    (meta.end_time <= largest_meta.start_time ||
-                        meta.start_time >= largest_meta.end_time)
-            })
-            .collect();
-        if !remaining_metas.is_empty() {
-            return Ok(());
-        }
-        let _ = recursive_process_multiple_metas(
-            &remaining_metas[..],
+        let cache_meta = cache_metas.remove(idx);
+        if let Some(result) = super::cacher::get_cached_results(
             trace_id,
-            cache_req,
-            results,
-            query_key,
-            file_path
-        ).await;
-    }
-    Ok(())
-}
-
-/// Cache selection strategies determine how to choose the best cached result when multiple caches
-/// exist:
-///
-/// 1. Overlap: Selects cache with maximum overlap with query time range Example: Query:
-///    10:00-10:30, Cache1: 10:00-10:15, Cache2: 10:10-10:25 Chooses Cache2 (15min overlap) over
-///    Cache1 (10min overlap)
-///
-/// 2. Duration: Selects cache with longest duration regardless of overlap Example: Query:
-///    10:00-10:30, Cache1: 09:00-10:00, Cache2: 09:30-10:30   Chooses Cache1 (1hr) over Cache2
-///    (30min)
-///
-/// 3. Both: Calculates what percentage of the cache duration overlaps with query Example: Query:
-///    10:00-11:00 Cache1: 10:00-10:30 (duration: 30min, overlap: 30min) = (30/30)*100 = 100%
-///    Cache2: 10:15-11:15 (duration: 60min, overlap: 45min) = (45/60)*100 = 75% Chooses Cache1
-///    because 100% of its duration is useful for the query
-fn select_cache_meta(
-    meta: &ResultCacheMeta,
-    req: &CacheQueryRequest,
-    strategy: &ResultCacheSelectionStrategy,
-) -> i64 {
-    match strategy {
-        ResultCacheSelectionStrategy::Overlap => {
-            let overlap_start = meta.start_time.max(req.q_start_time);
-            let overlap_end = meta.end_time.min(req.q_end_time);
-            overlap_end - overlap_start
-        }
-        ResultCacheSelectionStrategy::Duration => meta.end_time - meta.start_time,
-        ResultCacheSelectionStrategy::Both => {
-            let overlap_start = req.q_start_time.max(meta.start_time);
-            let overlap_end = req.q_end_time.min(meta.end_time);
-            let overlap_duration = overlap_end - overlap_start;
-            let cache_duration = meta.end_time - meta.start_time;
-            if cache_duration > 0 {
-                (overlap_duration * 100) / cache_duration
-            } else {
-                0
-            }
+            file_path,
+            cache_req.clone(),
+            Some(vec![cache_meta]),
+        )
+        .await
+        {
+            res.push(result);
         }
     }
-}
 
-fn get_allowed_up_to(
-    cached_response: &Response,
-    cache_req: &CacheQueryRequest,
-    discard_duration: i64,
-) -> i64 {
-    let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
-    let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
-
-    if cache_req.is_descending {
-        if cache_req.discard_interval > 0 {
-            first_ts
-        } else {
-            let m_first_ts = round_down_to_nearest_minute(first_ts);
-            if Utc::now().timestamp_micros() - discard_duration < m_first_ts {
-                m_first_ts - discard_duration
-            } else {
-                first_ts
-            }
-        }
-    } else if cache_req.discard_interval > 0 {
-        last_ts
-    } else {
-        let m_last_ts = round_down_to_nearest_minute(last_ts);
-        if Utc::now().timestamp_micros() - discard_duration < last_ts {
-            m_last_ts - discard_duration
-        } else {
-            last_ts
-        }
-    }
+    res
 }
 
 #[cfg(test)]
@@ -341,7 +88,7 @@ mod tests {
             q_end_time,
             is_aggregate: false,
             ts_column: "_timestamp".to_string(),
-            discard_interval: 0,
+            histogram_interval: 0,
             is_descending: false,
         }
     }
