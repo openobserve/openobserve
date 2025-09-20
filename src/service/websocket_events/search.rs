@@ -1216,7 +1216,7 @@ pub async fn write_results_to_cache(
             c_resp.file_path.clone(),
             c_resp.is_aggregate,
             c_resp.is_descending,
-            false,
+            c_resp.clear_cache,
         )
         .await;
         log::info!(
