@@ -80,7 +80,7 @@ pub async fn search(
     ScanStats,
 )> {
     let start = std::time::Instant::now();
-    let mut checkpoint = 0usize;
+    let mut checkpoint;
     let cfg = config::get_config();
     let mut req: Request = (*flight_request).clone().into();
     let trace_id = trace_id.to_string();
@@ -186,7 +186,6 @@ pub async fn search(
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_num = file_id_list_vec.len();
     let file_id_list_took = start.elapsed().as_millis() as usize - checkpoint;
-    checkpoint += file_id_list_took;
     log::info!(
         "{}",
         search_inspector_fields(
