@@ -841,8 +841,6 @@ pub async fn write_results_v2(
         local_resp.hits.first()
     };
 
-    // Only perform boundary deduplication if we're actually dealing with a cache merge scenario
-    // where there might be overlapping records. Skip deduplication for initial cache writes.
     if !local_resp.hits.is_empty() && remove_hit.is_some() {
         let ts_value_to_remove = remove_hit.unwrap().get(ts_column).cloned();
 
@@ -884,7 +882,7 @@ pub async fn write_results_v2(
                 // Only apply boundary deduplication for aggregate queries where cache segments
                 // might overlap For non-aggregate queries, preserve all records to
                 // avoid losing legitimate duplicates
-                if is_aggregate && res.histogram_interval.is_some() {
+                if res.histogram_interval.is_some() {
                     let mut removed_boundary = false;
                     local_resp.hits.retain(|hit| {
                         if !removed_boundary {
