@@ -142,6 +142,7 @@ pub async fn search(
             &mut file_path,
             is_aggregate,
             &mut should_exec_query,
+            false,
         )
         .await
     } else {
@@ -1051,6 +1052,7 @@ pub async fn check_cache_v2(
             &mut file_path,
             is_aggregate,
             &mut should_exec_query,
+            true,
         )
         .await;
         resp.is_aggregate = is_aggregate;
