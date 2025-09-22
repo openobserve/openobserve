@@ -30,7 +30,7 @@ use config::{
         file::is_exists,
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
         record_batch_ext::concat_batches,
-        size::bytes_to_human_readable,
+        size::bytes_to_human_readable, time::HOUR_MICRO_SECS,
     },
 };
 use datafusion::{
@@ -578,6 +578,8 @@ async fn get_file_list_inner(
         wal_dir, query.org_id, query.stream_type, query.stream_name
     );
     let files = if let Some((start_time, end_time)) = query.time_range.and_then(|(s, e)| {
+        let s = s - s % HOUR_MICRO_SECS;
+        let e = e - e % HOUR_MICRO_SECS;
         DateTime::from_timestamp_micros(s).zip(DateTime::from_timestamp_micros(e))
     }) {
         let skip_count = AsRef::<Path>::as_ref(&pattern).components().count();
