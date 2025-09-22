@@ -77,8 +77,18 @@ pub async fn handle_new_attribution_event(
             json::Value::String(chrono::Local::now().format("%Y-%m-%d").to_string()),
         ),
     ]);
-    telemetry::Telemetry::new()
+    let mut telemetry_instance = telemetry::Telemetry::new();
+    telemetry_instance
         .send_track_event(
+            "OpenObserve - New user attribution",
+            Some(segment_event_data.clone()),
+            false,
+            false,
+        )
+        .await;
+
+    telemetry_instance
+        .send_keyevent_track_event(
             "OpenObserve - New user attribution",
             Some(segment_event_data),
             false,
