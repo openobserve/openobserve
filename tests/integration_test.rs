@@ -3439,8 +3439,8 @@ mod tests {
         assert!(!stream_settings.contains_key(&schema_key));
         drop(stream_settings);
 
-        // wait for 5 seconds
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        // wait for 2 seconds
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
         // Check the ENRICHMENT_TABLES cache to check if the table is deleted
         let enrichment_tables = ENRICHMENT_TABLES.clone();
