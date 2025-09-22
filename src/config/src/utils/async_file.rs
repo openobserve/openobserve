@@ -15,14 +15,17 @@
 
 use std::{
     fs::Metadata,
+    future::Future,
     ops::Range,
     path::{Path, PathBuf},
+    pin::Pin,
+    sync::Arc,
     time::SystemTime,
 };
 
 use async_walkdir::WalkDir;
 use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use tokio::{
     fs::{File, metadata, read_dir, remove_dir},
     io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
@@ -175,65 +178,148 @@ pub fn create_wal_dir_datetime_filter(
     end_time: DateTime<Utc>,
     extension_pattern: String,
     skip_count: usize,
-) -> impl Fn(PathBuf) -> bool + Send + Clone + 'static {
-    let extension_pattern = extension_pattern.to_lowercase();
-    move |path: PathBuf| {
-        let mut components = path
-            .components()
-            .skip(skip_count)
-            .map(|c| c.as_os_str())
-            .filter_map(|osc| osc.to_str());
+) -> impl for<'a> Fn(&'a PathBuf) -> Pin<Box<dyn Future<Output = bool> + Send + 'a>> + Clone {
+    let extension_pattern = Arc::new(extension_pattern.to_lowercase());
+    move |path: &PathBuf| {
+        let extension_pattern = Arc::clone(&extension_pattern);
+        Box::pin(async move {
+            let mut components = path
+                .components()
+                .skip(skip_count)
+                .map(|c| c.as_os_str())
+                .filter_map(|osc| osc.to_str());
 
-        let year = match components.next().map(|c| c.parse::<i32>()) {
-            Some(Ok(y @ 1901..=9999)) => y, // A plausible year
-            Some(_) => return false,        // Parsed, but not a plausible year
-            None => return true,            /* Not present or failed to parse, could be a
-                                              * skippable path */
-        };
+            let year = match components.next().map(|c| c.parse::<i32>()) {
+                Some(Ok(y @ 1901..=9999)) => y, // A plausible year
+                Some(_) => return false,        // Parsed, but not a plausible year
+                None => return true,            /* Not present or failed to parse, could be a
+                                                  * skippable path */
+            };
 
-        let month = match components.next().map(|c| c.parse::<u32>()) {
-            Some(Ok(m @ 1..=12)) => m,
-            Some(_) => return false,    // Parsed, but invalid month number
-            None => start_time.month(), // Not present or failed to parse
-        };
+            let month = match components.next().map(|c| c.parse::<u32>()) {
+                Some(Ok(m @ 1..=12)) => m,
+                Some(_) => return false, // Parsed, but invalid month number
+                None => start_time.month(), // Not present or failed to parse
+            };
 
-        let month_days = [31u32, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        let days = month_days[month as usize] + if month == 2 && year % 4 == 0 { 1 } else { 0 };
-        let day = match components.next().map(|c| c.parse::<u32>()) {
-            Some(Ok(day)) => {
-                if 1 <= day && day <= days {
-                    day
-                } else {
-                    return false;
+            let month_days = [31u32, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+            let days = month_days[month as usize] + if month == 2 && year % 4 == 0 { 1 } else { 0 };
+            let day = match components.next().map(|c| c.parse::<u32>()) {
+                Some(Ok(day)) => {
+                    if 1 <= day && day <= days {
+                        day
+                    } else {
+                        return false;
+                    }
                 }
-            }
-            Some(_) => return false,
-            None => start_time.day(),
-        };
+                Some(_) => return false,
+                None => start_time.day(),
+            };
 
-        let hour = match components.next().map(|c| c.parse::<u32>()) {
-            Some(Ok(hour @ 0..24)) => hour,
-            Some(_) => return false,
-            None => start_time.hour(),
-        };
+            let hour = match components.next().map(|c| c.parse::<u32>()) {
+                Some(Ok(hour @ 0..24)) => hour,
+                Some(_) => return false,
+                None => start_time.hour(),
+            };
 
-        let date_range_check =
-            if let Some(datetime) = Utc.with_ymd_and_hms(year, month, day, hour, 0, 0).single() {
+            let date_range_check = if let Some(datetime) =
+                Utc.with_ymd_and_hms(year, month, day, hour, 0, 0).single()
+            {
                 datetime >= start_time && datetime <= end_time
             } else {
                 false
             };
 
-        date_range_check
-            && (!path.is_file()
-                || path
-                    .extension()
-                    .and_then(|extension| {
-                        extension
-                            .to_str()
-                            .map(|s| s.to_lowercase() == extension_pattern)
-                    })
-                    .unwrap_or_default())
+            date_range_check
+                && (!path.is_file()
+                    || path
+                        .extension()
+                        .and_then(|extension| {
+                            extension
+                                .to_str()
+                                .map(|s| s.to_lowercase() == **extension_pattern)
+                        })
+                        .unwrap_or_default())
+        })
+    }
+}
+
+/// Asynchronously scans a directory tree and asychronously processes the files that
+/// are filtered by the filter predicate
+///
+/// This function walks the directory starting from `root`, applying a filter to each
+/// entry. It uses `async_walkdir` for efficient, non-blocking directory traversal.
+/// The filter logic determines whether to continue the walk, ignore a directory,
+/// or ignore a file.
+///
+/// For entries that pass the filter and are files, their paths are canonicalized
+/// to produce absolute paths.
+///
+/// # Type Parameters
+///
+/// * `R` - A type that can be referenced as a `Path`, e.g., `&str` or `PathBuf`.
+/// * `F` - An async closure that takes a `&PathBuf` and returns a boolean.
+/// * `P` - A PathBuf processor that returns `T`
+///
+/// # Arguments
+///
+/// * `root` - The path to the root directory to start the scan from.
+/// * `filter` - An asynchronous closure that is called for each entry in the directory. It should
+///   return `true` to keep an entry or `false` to discard it. If a directory is discarded, its
+///   contents will not be visited.
+/// * `limit` - An optional `usize` to limit the number of file paths collected.
+///
+/// # Returns
+///
+/// A `Result` containing either:
+/// - `Ok(Vec<String>)`: A vector of canonicalized file path strings.
+/// - `Err(std::io::Error)`: An I/O error that occurred during scanning.
+pub fn process_files_filtered<R, F, P, T>(
+    root: R,
+    filter: F,
+    process: P,
+    limit: Option<usize>,
+) -> Pin<Box<dyn Stream<Item = T> + Send>>
+where
+    R: AsRef<Path>,
+    F: for<'a> Fn(&'a PathBuf) -> Pin<Box<dyn Future<Output = bool> + Send + 'a>>
+        + Send
+        + Clone
+        + 'static,
+    P: Fn(PathBuf) -> Pin<Box<dyn Future<Output = T> + Send>> + Send + Clone + 'static,
+    T: Send + 'static,
+{
+    let walker = WalkDir::new(root).filter(move |entry| {
+        let path = entry.path();
+        let filter = filter.clone();
+        async move {
+            let is_dir = path.is_dir();
+            if filter(&path).await {
+                async_walkdir::Filtering::Continue
+            } else if is_dir {
+                async_walkdir::Filtering::IgnoreDir
+            } else {
+                async_walkdir::Filtering::Ignore
+            }
+        }
+    });
+
+    let file_stream = walker.filter_map(|item| async {
+        item.ok().and_then(|dir_entry| {
+            let pb = dir_entry.path();
+            if pb.is_file() { Some(pb) } else { None }
+        })
+    });
+
+    let process_stream = file_stream.then(move |path| {
+        let process = process.clone();
+        async move { process(path).await }
+    });
+
+    if let Some(limit_count) = limit {
+        Box::pin(process_stream.take(limit_count))
+    } else {
+        Box::pin(process_stream)
     }
 }
 
@@ -273,49 +359,27 @@ pub async fn scan_files_filtered<P, F>(
 ) -> Result<Vec<String>, std::io::Error>
 where
     P: AsRef<Path>,
-    F: Fn(PathBuf) -> bool + Send + Clone + 'static,
+    F: for<'a> Fn(&'a PathBuf) -> Pin<Box<dyn Future<Output = bool> + Send + 'a>>
+        + Send
+        + Clone
+        + 'static,
 {
-    let walker = WalkDir::new(root).filter(move |entry| {
-        let path = entry.path();
-        let filter = filter.clone();
-        async move {
-            let is_dir = path.is_dir();
-            if filter(path) {
-                async_walkdir::Filtering::Continue
-            } else if is_dir {
-                async_walkdir::Filtering::IgnoreDir
-            } else {
-                async_walkdir::Filtering::Ignore
-            }
-        }
-    });
+    let stream = process_files_filtered(
+        root,
+        filter,
+        |path| {
+            Box::pin(async move {
+                tokio::fs::canonicalize(path)
+                    .await
+                    .ok()
+                    .and_then(|pbuf| pbuf.to_str().map(String::from))
+            })
+        },
+        limit,
+    );
 
-    let walker = walker.filter_map(|item| async {
-        item.ok().and_then(|dir_entry| {
-            let pb = dir_entry.path();
-
-            if pb.is_file() { Some(pb) } else { None }
-        })
-    });
-
-    let uncanonicalized_paths: Vec<PathBuf> = if let Some(limit_count) = limit {
-        walker.take(limit_count).collect().await
-    } else {
-        walker.collect().await
-    };
-
-    let files = futures::future::join_all(
-        uncanonicalized_paths
-            .into_iter()
-            .map(tokio::fs::canonicalize),
-    )
-    .await
-    .into_iter()
-    .map(Result::ok)
-    .filter_map(|path| path.and_then(|pbuf| pbuf.to_str().map(String::from)))
-    .collect();
-
-    Ok(files)
+    let results: Vec<Option<String>> = stream.collect().await;
+    Ok(results.into_iter().flatten().collect())
 }
 
 #[inline(always)]
@@ -324,18 +388,21 @@ pub async fn scan_files<P: AsRef<Path>>(
     ext: &str,
     limit: Option<usize>,
 ) -> Result<Vec<String>, std::io::Error> {
-    let ext = ext.to_lowercase();
+    let ext = Arc::new(ext.to_lowercase());
     scan_files_filtered(
         root,
-        move |f| {
-            if f.is_dir() {
-                true
-            } else {
-                f.extension()
-                    .and_then(|file_ext| file_ext.to_str())
-                    .map(|s| s.to_lowercase() == ext)
-                    .unwrap_or_default()
-            }
+        move |f: &PathBuf| {
+            let ext = Arc::clone(&ext);
+            Box::pin(async move {
+                if f.is_dir() {
+                    true
+                } else {
+                    f.extension()
+                        .and_then(|file_ext| file_ext.to_str())
+                        .map(|s| s.eq_ignore_ascii_case(&ext))
+                        .unwrap_or_default()
+                }
+            })
         },
         limit,
     )
