@@ -1495,12 +1495,12 @@ export const calculateBottomLegendHeight = (
   // Calculate total height
   const totalHeight = numRows * LEGEND_ITEM_HEIGHT + LEGEND_PADDING;
 
-  // Apply 80% maximum height constraint if maxHeight is provided
-  // This ensures 20% of space is reserved for the chart and 80% maximum for legends
+  // Apply 50% maximum height constraint if maxHeight is provided
+  // This ensures 50% of space is reserved for the chart and 50% maximum for legends
   let finalHeight = Math.max(totalHeight, remToPx(3.125)); // Minimum height of 3.125rem = 50px
 
   if (maxHeight && maxHeight > 0) {
-    const maxAllowedHeight = maxHeight * 0.8; // 80% maximum for legends, 20% for chart
+    const maxAllowedHeight = maxHeight * 0.5; // 50% maximum for legends, 50% for chart
     finalHeight = Math.min(finalHeight, maxAllowedHeight);
   }
 
@@ -1575,8 +1575,8 @@ export const calculateRightLegendWidth = (
   // Total width reserved for legends
   const totalLegendWidth = cols * perColumnWidth + HORIZONTAL_PADDING * 2;
 
-  // Apply constraint: max 80% of chart width to ensure chart remains visible
-  const maxAllowedWidth = chartWidth * 0.8;
+  // Apply constraint: max 50% of chart width to ensure chart remains visible
+  const maxAllowedWidth = chartWidth * 0.5;
   return Math.min(totalLegendWidth, maxAllowedWidth);
 };
 
@@ -1822,7 +1822,7 @@ export const calculatePieChartRadius = (
   if (!panelSchema.layout) {
     // Calculate the optimal radius in pixels based on available space
     const maxAvailableRadius = Math.min(availableWidth, availableHeight) / 2;
-    const optimalRadiusPixels = maxAvailableRadius * 0.8; // 80% of available space for padding
+    const optimalRadiusPixels = maxAvailableRadius * 0.5; // 50% of available space for padding
 
     // If original dimensions are provided, convert to percentage of original container
     if (originalWidth && originalHeight) {

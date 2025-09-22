@@ -3392,13 +3392,13 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
         label: {
           show: true,
         },
-        radius: "80%",
+        radius: "50%",
         lineStyle: { width: 1.5 },
       };
     case "donut":
       return {
         type: "pie",
-        radius: ["50%", "80%"],
+        radius: ["25%", "50%"],
         avoidLabelOverlap: false,
         label: {
           show: true,

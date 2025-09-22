@@ -168,11 +168,11 @@ const shouldApplyRightLegendPositioning = (
  * Calculates reserved width for scroll legends based on container size
  */
 const calculateScrollLegendReservedWidth = (chartWidth: number): number => {
-  let reservedWidthPercentage = 0.2; // Default 20%
+  let reservedWidthPercentage = 0.5; // Default 50%
   if (chartWidth < 400) {
-    reservedWidthPercentage = 0.35; // Use 35% for very small containers
+    reservedWidthPercentage = 0.6; // Use 60% for very small containers
   } else if (chartWidth < 600) {
-    reservedWidthPercentage = 0.28; // Use 28% for small containers
+    reservedWidthPercentage = 0.55; // Use 55% for small containers
   }
 
   const minScrollLegendWidth = Math.min(
@@ -353,11 +353,11 @@ export const applyRightLegendPositioning = (
     const chartWidth = chartPanelRef.value?.offsetWidth || 800;
 
     // Calculate more appropriate reserved width based on container size
-    let reservedWidthPercentage = 0.2; // Default 20%
+    let reservedWidthPercentage = 0.5; // Default 50%
     if (chartWidth < 400) {
-      reservedWidthPercentage = 0.35; // Use 35% for very small containers
+      reservedWidthPercentage = 0.6; // Use 60% for very small containers
     } else if (chartWidth < 600) {
-      reservedWidthPercentage = 0.28; // Use 28% for small containers
+      reservedWidthPercentage = 0.55; // Use 55% for small containers
     }
 
     const minScrollLegendWidth = Math.min(
@@ -436,7 +436,7 @@ export const applyBottomLegendPositioning = (
     // Count legend items from series data
     const legendCount = options.series?.length || 0;
 
-    // Apply 80% height constraint for plain legends with bottom or auto position
+    // Apply 50% height constraint for plain legends with bottom or auto position
     const maxHeight =
       panelSchema?.config?.legends_position === "bottom" ||
       panelSchema?.config?.legends_position === null
@@ -603,7 +603,7 @@ export const applyPieDonutLegendPositioning = (
           legendCount,
           chartWidth,
           options.series?.[0]?.data || [],
-          chartHeight, // Apply 80% constraint
+          chartHeight, // Apply 50% constraint
           options.legend,
           {}, // No grid config needed for pie/donut
           chartHeight,
@@ -631,7 +631,7 @@ export const applyPieDonutLegendPositioning = (
       ) // Don't apply if explicit width is set
     ) {
       // Reserve minimum space for scroll legends to prevent chart overlap
-      const minScrollLegendWidth = Math.min(chartWidth * 0.2, 170); // 20% of chart width or 170px max
+      const minScrollLegendWidth = Math.min(chartWidth * 0.5, 170); // 50% of chart width or 170px max
       const reservedWidth = Math.max(minScrollLegendWidth, 120); // At least 120px for scroll legends (extra space for scroll indicators)
 
       // Position legend on the right side with reserved space
@@ -778,7 +778,7 @@ export const applyPieDonutCenterAdjustment = (
   ) {
     if (panelSchema.config?.legends_position === "right") {
       // Reserve minimum space for scroll legends and adjust center
-      const minScrollLegendWidth = Math.min(chartWidth * 0.2, 170); // 20% of chart width or 170px max
+      const minScrollLegendWidth = Math.min(chartWidth * 0.5, 170); // 50% of chart width or 170px max
       const reservedWidth = Math.max(minScrollLegendWidth, 120); // At least 120px for scroll legends (extra space for scroll indicators)
       const availableWidth = chartWidth - reservedWidth;
       const centerX = (availableWidth / 2 / chartWidth) * 100; // Convert to percentage
