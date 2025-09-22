@@ -228,8 +228,9 @@ async fn recursive_process_multiple_metas(
             .into_iter()
             .filter(|meta| {
                 // Keep only metas that don't overlap with the selected largest meta
-                !meta.eq(&largest_meta) && 
-                !(meta.start_time < largest_meta.end_time && meta.end_time > largest_meta.start_time)
+                !largest_meta.eq(meta) &&
+                (meta.end_time <= largest_meta.start_time ||
+                    meta.start_time >= largest_meta.end_time)
             })
             .collect();
         if !remaining_metas.is_empty() {
