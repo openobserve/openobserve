@@ -331,9 +331,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         vec![]
                     }
                 };
-                log::debug!(
-                    "enrichment table: {} cache data length: {}",
-                    item_key,
+                log::info!(
+                    "enrichment table: {item_key} cache data length: {}",
                     data.len()
                 );
                 ENRICHMENT_TABLES.insert(

@@ -196,7 +196,8 @@ pub async fn search(
         work_group: work_group.clone(),
         use_inverted_index: index_condition.is_some()
             && cfg.common.inverted_index_enabled
-            && !index_condition.as_ref().unwrap().is_condition_all(),
+            && (!index_condition.as_ref().unwrap().is_condition_all()
+                || idx_optimize_rule.is_some()),
     });
 
     log::info!(
@@ -528,6 +529,15 @@ fn optimizer_physical_plan(
             .collect(),
     );
     let plan = rewrite_match_rule.optimize(plan, ctx.state().config_options())?;
+
+    // reset the index_condition if index_optimizer_rule is none and index_condition is all
+    let index_condition = index_condition_ref.lock().clone();
+    if index_condition.is_some()
+        && index_condition.as_ref().unwrap().is_condition_all()
+        && index_optimizer_rule_ref.lock().is_none()
+    {
+        index_condition_ref.lock().take();
+    }
 
     Ok(plan)
 }
