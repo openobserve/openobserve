@@ -280,6 +280,10 @@ test.describe("dashboard UI testcases", () => {
     // Select table chart type
     await pm.chartTypeSelector.selectChartType("table");
 
+
+    // Now we can access the field removal buttons
+    await pm.chartTypeSelector.removeField("_timestamp", "x");
+
     // Open Custom SQL editor
     await page.locator('[data-test="dashboard-customSql"]').click();
 
@@ -293,20 +297,16 @@ test.describe("dashboard UI testcases", () => {
       .locator('[data-test="dashboard-panel-query-editor"]')
       .locator(".inputarea")
       .fill(
-        'SELECT k8s_namespace_name as "xAxis", count(k8s_namespace_name) as "y_axis_1" FROM "default" GROUP BY "xAxis"'
+        'SELECT kubernetes_namespace_name as "xAxis", count(kubernetes_namespace_name) as "y_axis_1"  FROM "e2e_automate"  GROUP BY "xAxis"'
       );
 
-    // Map query results to chart axes
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000);
 
-    await pm.chartTypeSelector.removeField("_timestamp", "x");
-
-    await page.waitForTimeout(2000);
     await pm.chartTypeSelector.searchAndAddField("y_axis_1", "x");
     await pm.chartTypeSelector.searchAndAddField("xAxis", "y");
     
     // Set relative time range  
-     await pm.dashboardTimeRefresh.setRelativeTimeRange("6-w");    
+     await pm.dashboardTimeRefresh.setRelative("6", "w");    
 
     await  page.waitForTimeout(2000);
 
@@ -319,11 +319,35 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelConfigs.selectTranspose();
     await pm.dashboardPanelActions.applyDashboardBtn();
 
+    // Wait for chart to render after transpose and check for errors
+    await pm.dashboardPanelActions.waitForChartToRender();
+    await page.waitForTimeout(2000);
+
+    // Check for dashboard errors ONLY after transpose is applied
+    const transposeErrorResult = await pm.logsVisualise.checkDashboardErrors(
+      page,
+      "Table (After Transpose)"
+    );
+
+    if (transposeErrorResult.hasErrors) {
+      transposeErrorResult.errors.forEach((error, index) => {
+        console.log(`Transpose Error ${index + 1}: ${error}`);
+      });
+
+      // Fail the test with detailed error information
+      expect(transposeErrorResult.errorTextCount).toBe(0);
+      expect(transposeErrorResult.errorListCount).toBe(0);
+    }
+
     // Save the panel
     await pm.dashboardPanelActions.savePanel();
 
-    // Assert no error occurred
+    // Assert no console error occurred
     expect(errorMessage).toBe("");
+
+    // Assert no dashboard errors occurred after transpose
+    expect(transposeErrorResult.errorTextCount).toBe(0);
+    expect(transposeErrorResult.errorListCount).toBe(0);
 
     // Delete the created dashboard
     await pm.dashboardCreate.backToDashboardList();
