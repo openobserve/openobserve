@@ -74,7 +74,7 @@ impl PhysicalOptimizerRule for RewriteMatchPhysical {
     }
 
     fn name(&self) -> &str {
-        "rewrite_match_physical"
+        "RewriteMatchAllRule"
     }
 
     fn schema_check(&self) -> bool {

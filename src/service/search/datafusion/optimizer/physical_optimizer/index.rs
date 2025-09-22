@@ -111,7 +111,7 @@ impl PhysicalOptimizerRule for IndexRule {
     }
 
     fn name(&self) -> &str {
-        "index"
+        "IndexConditionRule"
     }
 
     fn schema_check(&self) -> bool {

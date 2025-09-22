@@ -46,7 +46,7 @@ impl PhysicalOptimizerRule for JoinReorderRule {
     }
 
     fn name(&self) -> &str {
-        "join_reorder"
+        "JoinReorderRule"
     }
 
     fn schema_check(&self) -> bool {
