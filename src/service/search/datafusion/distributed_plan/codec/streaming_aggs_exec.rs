@@ -23,7 +23,6 @@ use datafusion::{
     prelude::SessionContext,
 };
 use datafusion_proto::{physical_plan::AsExecutionPlan, protobuf::PhysicalPlanNode};
-#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec::StreamingAggsExec;
 use prost::Message;
 use proto::cluster_rpc;
@@ -37,7 +36,8 @@ pub(crate) fn try_decode(
         return internal_err!("aggregate_plan is required");
     };
     let extension_codec = super::get_physical_extension_codec();
-    // TODO: check if we need register udf
+    // TODO: Waiting for this
+    // https://github.com/apache/datafusion/issues/17596
     let ctx = SessionContext::new();
     let runtime = RuntimeEnvBuilder::default().build()?;
     let aggregate_plan = aggregate_plan.try_into_physical_plan(&ctx, &runtime, &extension_codec)?;
