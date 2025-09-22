@@ -159,7 +159,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :selectedTimeObj="dashboardPanelData.meta.dateTime"
                         :variablesData="{}"
                         @updated:vrl-function-field-list="
-                          updateVrlFunctionFieldList
+                          updateVrlFunctionFieldList"
+                        @limit-number-of-series-warning-message-update="
+                          handleLimitNumberOfSeriesWarningMessage
                         "
                         :width="6"
                         @error="handleChartApiError"
@@ -172,6 +174,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="flex justify-end q-pr-lg q-mb-md q-pt-xs"
                       style="position: absolute; top: 0px; right: -13px"
                     >
+                      <!-- Error/Warning tooltips -->
+                      <q-btn
+                        v-if="errorMessage"
+                        :icon="outlinedWarning"
+                        flat
+                        size="xs"
+                        padding="2px"
+                        data-test="dashboard-panel-error-data"
+                        class="warning q-mr-xs"
+                      >
+                        <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+                          <div style="white-space: pre-wrap">
+                            {{ errorMessage }}
+                          </div>
+                        </q-tooltip>
+                      </q-btn>
+                      <q-btn
+                        v-if="maxQueryRangeWarning"
+                        :icon="outlinedWarning"
+                        flat
+                        size="xs"
+                        padding="2px"
+                        data-test="dashboard-panel-max-duration-warning"
+                        class="warning q-mr-xs"
+                      >
+                        <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+                          <div style="white-space: pre-wrap">
+                            {{ maxQueryRangeWarning }}
+                          </div>
+                        </q-tooltip>
+                      </q-btn>
+                      <q-btn
+                        v-if="limitNumberOfSeriesWarningMessage"
+                        :icon="symOutlinedDataInfoAlert"
+                        flat
+                        size="xs"
+                        padding="2px"
+                        data-test="dashboard-panel-limit-number-of-series-warning"
+                        class="warning q-mr-xs"
+                      >
+                        <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+                          <div style="white-space: pre-wrap">
+                            {{ limitNumberOfSeriesWarningMessage }}
+                          </div>
+                        </q-tooltip>
+                      </q-btn>
                       <q-btn
                         size="md"
                         class="no-border"
@@ -183,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         title="Add To Dashboard"
                         :disabled="
                           errorData?.errors?.length > 0 ||
-                          errorData?.value?.message !== ''
+                          errorData?.value !== ''
                         "
                         >Add To Dashboard</q-btn
                       >
@@ -407,6 +455,12 @@ import CustomChartEditor from "@/components/dashboards/addPanel/CustomChartEdito
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import useLogs from "@/composables/useLogs";
 import { isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
+import {
+  outlinedWarning,
+  outlinedRunningWithErrors,
+} from "@quasar/extras/material-icons-outlined";
+import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
+import { processQueryMetadataErrors } from "@/utils/zincutils";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -469,12 +523,16 @@ export default defineComponent({
     const { dashboardPanelData, resetAggregationFunction, validatePanel } =
       useDashboardPanelData(dashboardPanelDataPageKey);
     const metaData = ref(null);
-    const resultMetaData = ref(null);
     const seriesData = ref([] as any[]);
     const seriesDataUpdate = (data: any) => {
       seriesData.value = data;
     };
     const splitterModel = ref(50);
+
+    // Warning messages
+    const maxQueryRangeWarning = ref("");
+    const limitNumberOfSeriesWarningMessage = ref("");
+    const errorMessage = ref("");
 
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
@@ -578,9 +636,21 @@ export default defineComponent({
 
     const expandedSplitterHeight = ref(null);
 
-    const handleChartApiError = (errorMessage: any) => {
-      props.errorData.value = errorMessage.message || errorMessage;
-      emit("handleChartApiError", errorMessage);
+    const handleChartApiError = (errorMsg: any) => {
+      if (typeof errorMsg === "string") {
+        props.errorData.value = errorMsg;
+        errorMessage.value = errorMsg;
+      } else {
+        props.errorData.value = errorMsg?.message ?? "";
+        errorMessage.value = errorMsg?.message ?? "";
+      }
+
+      emit("handleChartApiError", errorMsg);
+    };
+
+    // Handle limit number of series warning from PanelSchemaRenderer
+    const handleLimitNumberOfSeriesWarningMessage = (message: string) => {
+      limitNumberOfSeriesWarningMessage.value = message;
     };
 
     const hoveredSeriesState = ref({
@@ -610,13 +680,6 @@ export default defineComponent({
     provide("hoveredSeriesState", hoveredSeriesState);
 
     const addToDashboard = () => {
-
-      // only copy if is_ui_histogram is true
-      if (resultMetaData.value?.[0]?.converted_histogram_query && is_ui_histogram.value === true) {
-        dashboardPanelData.data.queries[0].query =
-          resultMetaData.value?.[0]?.converted_histogram_query;
-      }
-
       const errors: any = [];
       // will push errors in errors array
       validatePanel(errors, true);
@@ -816,15 +879,28 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
-    const onResultMetadataUpdate = (resultMetaDataParam: any) => {
-      // Store the result metadata
-      resultMetaData.value = resultMetaDataParam;
+    const onResultMetadataUpdate = (resultMetaData: any) => {
+      // only copy if is_ui_histogram is true - check first partition of first query
+      if (
+        resultMetaData?.[0]?.[0]?.converted_histogram_query &&
+        is_ui_histogram.value === true
+      ) {
+        dashboardPanelData.data.queries[0].query =
+          resultMetaData?.[0]?.[0]?.converted_histogram_query;
+      } else if (
+        // Backward compatibility - check if it's old format
+        resultMetaData?.[0]?.converted_histogram_query &&
+        is_ui_histogram.value === true &&
+        !Array.isArray(resultMetaData[0])
+      ) {
+        dashboardPanelData.data.queries[0].query =
+          resultMetaData?.[0]?.converted_histogram_query;
+      }
 
-      // only copy if is_ui_histogram is true
-      // if (resultMetaDataParam?.[0]?.converted_histogram_query && is_ui_histogram.value === true) {
-      //   dashboardPanelData.data.queries[0].query =
-      //     resultMetaDataParam?.[0]?.converted_histogram_query;
-      // }
+      maxQueryRangeWarning.value = processQueryMetadataErrors(
+        resultMetaData,
+        store.state.timezone,
+      );
     };
 
     return {
@@ -850,9 +926,15 @@ export default defineComponent({
       is_ui_histogram,
       onResultMetadataUpdate,
       hoveredSeriesState,
-      resultMetaData,
       isSimpleSelectAllQuery,
       handleChartTypeChange,
+      maxQueryRangeWarning,
+      limitNumberOfSeriesWarningMessage,
+      errorMessage,
+      handleLimitNumberOfSeriesWarningMessage,
+      outlinedWarning,
+      symOutlinedDataInfoAlert,
+      outlinedRunningWithErrors,
     };
   },
 });
@@ -908,5 +990,9 @@ export default defineComponent({
   writing-mode: vertical-rl;
   text-orientation: mixed;
   font-weight: bold;
+}
+
+.warning {
+  color: var(--q-warning);
 }
 </style>
