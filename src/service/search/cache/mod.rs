@@ -192,7 +192,6 @@ pub async fn search(
         c_resp.deltas.push(QueryDelta {
             delta_start_time: req.query.start_time,
             delta_end_time: req.query.end_time,
-            delta_removed_hits: false,
         });
     } else if use_cache {
         log::info!(
@@ -252,7 +251,7 @@ pub async fn search(
         log::info!(
             "{}",
             search_inspector_fields(
-                format!("[trace_id {trace_id}] deltas are : {:?}", c_resp.deltas),
+                format!("[trace_id {trace_id}] deltas are: {:?}", c_resp.deltas),
                 SearchInspectorFieldsBuilder::new()
                     .node_name(LOCAL_NODE.name.clone())
                     .component("cacher:search deltas".to_string())
@@ -266,8 +265,9 @@ pub async fn search(
                     .build()
             )
         );
+
         log::info!(
-            "[trace_id {trace_id}] Query original start time: {}, end time : {}",
+            "[trace_id {trace_id}] Query original start time: {}, end time: {}",
             req.query.start_time,
             req.query.end_time
         );
@@ -298,7 +298,7 @@ pub async fn search(
                         && c_resp.has_cached_data
                     {
                         log::info!(
-                            "[trace_id {trace_id}] Query new start time: {}, end time : {}",
+                            "[trace_id {trace_id}] Query new start time: {}, end time: {}",
                             req.query.start_time,
                             req.query.end_time
                         );
@@ -752,7 +752,7 @@ pub async fn write_results(
     }
 
     // 1. remove incomplete records for histogram
-    if let Some(interval) = res.histogram_interval {
+    if is_aggregate && let Some(interval) = res.histogram_interval {
         let interval = interval * 1000 * 1000; // convert to microseconds
         if req_query_start_time % interval != 0 || req_query_end_time % interval != 0 {
             res.hits.remove(0); // remove first record
@@ -804,7 +804,7 @@ pub async fn write_results(
     }
 
     // 5. adjust the cache time range
-    if let Some(interval) = res.histogram_interval {
+    if is_aggregate && let Some(interval) = res.histogram_interval {
         cache_end_time += interval * 1000 * 1000;
     }
 
@@ -822,18 +822,22 @@ pub async fn write_results(
         match SearchService::cache::cacher::cache_results_to_disk(&file_path, &file_name, res_cache)
             .await
         {
-            Ok(_) => {
-                QUERY_RESULT_CACHE
-                    .write()
-                    .await
-                    .entry(query_key)
-                    .or_insert_with(Vec::new)
-                    .push(ResultCacheMeta {
-                        start_time: cache_start_time,
-                        end_time: cache_end_time,
-                        is_aggregate,
-                        is_descending,
-                    });
+            Ok(success) => {
+                if success {
+                    // success: true, cache to disk success
+                    // success: false, cache to disk already exists, skipping caching
+                    QUERY_RESULT_CACHE
+                        .write()
+                        .await
+                        .entry(query_key)
+                        .or_insert_with(Vec::new)
+                        .push(ResultCacheMeta {
+                            start_time: cache_start_time,
+                            end_time: cache_end_time,
+                            is_aggregate,
+                            is_descending,
+                        });
+                }
             }
             Err(e) => {
                 log::error!("Cache results to disk failed: {e}");
