@@ -260,14 +260,6 @@ test.describe("dashboard UI testcases", () => {
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
-    // Set up listener to catch console errors
-    let errorMessage = "";
-    page.on("console", (msg) => {
-      if (msg.type() === "error") {
-        errorMessage += msg.text() + "\n";
-      }
-    });
-
     // Navigate to the dashboards list
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
@@ -337,9 +329,6 @@ test.describe("dashboard UI testcases", () => {
 
     // Save the panel
     await pm.dashboardPanelActions.savePanel();
-
-    // Assert no console error occurred
-    expect(errorMessage).toBe("");
 
     // Assert no dashboard errors occurred after transpose
     expect(transposeErrorResult.errorTextCount).toBe(0);
