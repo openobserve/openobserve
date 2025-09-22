@@ -216,22 +216,13 @@ pub fn create_wal_dir_datetime_filter(
             Some(_) => return false,
             None => start_time.hour(),
         };
-   
-        let date_range_check = if let Some(datetime) = Utc
-            .with_ymd_and_hms(
-                year,
-                month,
-                day,
-                hour,
-                0,
-                0,
-            )
-            .single()
-        {
-            datetime >= start_time && datetime <= end_time
-        } else {
-            false
-        };
+
+        let date_range_check =
+            if let Some(datetime) = Utc.with_ymd_and_hms(year, month, day, hour, 0, 0).single() {
+                datetime >= start_time && datetime <= end_time
+            } else {
+                false
+            };
 
         date_range_check
             && (!path.is_file()

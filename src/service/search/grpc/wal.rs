@@ -30,7 +30,8 @@ use config::{
         file::is_exists,
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
         record_batch_ext::concat_batches,
-        size::bytes_to_human_readable, time::HOUR_MICRO_SECS,
+        size::bytes_to_human_readable,
+        time::HOUR_MICRO_SECS,
     },
 };
 use datafusion::{
