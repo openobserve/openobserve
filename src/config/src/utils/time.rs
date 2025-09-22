@@ -24,6 +24,7 @@ pub static BASE_TIME: Lazy<DateTime<Utc>> =
     Lazy::new(|| Utc.with_ymd_and_hms(1971, 1, 1, 0, 0, 0).unwrap());
 
 pub static DAY_MICRO_SECS: i64 = 24 * 3600 * 1_000_000;
+pub static HOUR_MICRO_SECS: i64 = 3600 * 1_000_000;
 
 // check format: 1s, 1m, 1h, 1d, 1w, 1y, 1h10m30s
 static TIME_UNITS: [(char, u64); 7] = [
