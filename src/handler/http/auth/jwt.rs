@@ -703,8 +703,18 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> (bool, bool) 
             ),
             ("role".to_string(), json::Value::String(role)),
         ]);
-        telemetry::Telemetry::new()
+        let mut telemetry_instance = telemetry::Telemetry::new();
+        telemetry_instance
             .send_track_event(
+                "OpenObserve - New user registered",
+                Some(segment_event_data.clone()),
+                false,
+                false,
+            )
+            .await;
+
+        telemetry_instance
+            .send_keyevent_track_event(
                 "OpenObserve - New user registered",
                 Some(segment_event_data),
                 false,

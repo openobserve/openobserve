@@ -787,8 +787,6 @@ pub struct Common {
     pub feature_distinct_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
     pub feature_quick_mode_fields: String,
-    #[env_config(name = "ZO_FEATURE_FILELIST_DEDUP_ENABLED", default = false)]
-    pub feature_filelist_dedup_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
     pub feature_query_queue_enabled: bool,
     #[env_config(
@@ -797,8 +795,6 @@ pub struct Common {
         default = "file_num"
     )]
     pub feature_query_partition_strategy: QueryPartitionStrategy,
-    #[env_config(name = "ZO_FEATURE_QUERY_INFER_SCHEMA", default = false)]
-    pub feature_query_infer_schema: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
     pub feature_query_exclude_all: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
@@ -908,6 +904,8 @@ pub struct Common {
     pub telemetry_url: String,
     #[env_config(name = "ZO_TELEMETRY_HEARTBEAT", default = 1800)] // seconds
     pub telemetry_heartbeat: i64,
+    #[env_config(name = "ZO_KEYEVENT_TELEMETRY_URL", default = "")]
+    pub keyevent_telemetry_url: String,
     #[env_config(name = "ZO_PROMETHEUS_ENABLED", default = true)]
     pub prometheus_enabled: bool,
     #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
@@ -1100,7 +1098,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_RESULT_CACHE_SELECTION_STRATEGY",
         default = "overlap",
-        help = "Strategy to use for result cache, default is both , possible value - both,overlap , duration"
+        help = "Strategy to use for result cache, default is both, possible value - both, overlap, duration"
     )]
     pub result_cache_selection_strategy: String,
     #[env_config(
