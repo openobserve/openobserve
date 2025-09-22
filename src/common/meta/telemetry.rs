@@ -145,7 +145,10 @@ impl Telemetry {
         match res {
             Ok(response) => {
                 if !response.status().is_success() {
-                    log::error!("Error sending keyevent {event}, status: {}", response.status());
+                    log::error!(
+                        "Error sending keyevent {event}, status: {}",
+                        response.status()
+                    );
                 }
             }
             Err(e) => {
