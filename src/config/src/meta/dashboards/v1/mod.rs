@@ -26,7 +26,9 @@ use crate::meta::stream::StreamType;
 pub struct Dashboard {
     #[serde(default)]
     pub dashboard_id: String,
+    #[schema(required)]
     pub title: String,
+    #[schema(required)]
     pub description: String,
     #[serde(default)]
     pub role: String,
