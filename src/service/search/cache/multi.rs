@@ -116,16 +116,8 @@ async fn recursive_process_multiple_metas(
             "{}_{}_{}_{}.json",
             largest_meta.start_time,
             largest_meta.end_time,
-            if cache_req.is_aggregate {
-                1
-            } else {
-                0
-            },
-            if cache_req.is_descending {
-                1
-            } else {
-                0
-            }
+            if cache_req.is_aggregate { 1 } else { 0 },
+            if cache_req.is_descending { 1 } else { 0 }
         );
         log::info!(
             "[CACHE RESULT {trace_id}] Selected meta for query key: {} with file name: {} and start time: {} and end time: {}",
@@ -142,31 +134,33 @@ async fn recursive_process_multiple_metas(
         let discard_duration = cfg.common.result_cache_discard_duration * 1000 * 1000;
 
         let cache_duration = matching_cache_meta.end_time - matching_cache_meta.start_time;
-        if
-            cache_duration <= discard_duration &&
-            matching_cache_meta.start_time > Utc::now().timestamp_micros() - discard_duration
+        if cache_duration <= discard_duration
+            && matching_cache_meta.start_time > Utc::now().timestamp_micros() - discard_duration
         {
             return Ok(());
         }
 
         let result = match get_results(file_path, &file_name).await {
-            Ok(v) => {
-                match json::from_str::<Response>(&v) {
-                    Ok(v) => Some(v),
-                    Err(e) => {
-                        log::error!("[trace_id {trace_id}] Error parsing cached response: {:?}", e);
-                        None
-                    }
+            Ok(v) => match json::from_str::<Response>(&v) {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    log::error!(
+                        "[trace_id {trace_id}] Error parsing cached response: {:?}",
+                        e
+                    );
+                    None
                 }
-            }
+            },
             Err(e) => {
-                log::error!("[trace_id {trace_id}] Get results from disk failed: {:?}", e);
+                log::error!(
+                    "[trace_id {trace_id}] Get results from disk failed: {:?}",
+                    e
+                );
                 None
             }
         };
         if let Some(mut cached_response) = result {
-            let (hits_allowed_start_time, hits_allowed_end_time) = if
-                cache_req.discard_interval > 0
+            let (hits_allowed_start_time, hits_allowed_end_time) = if cache_req.discard_interval > 0
             {
                 (
                     cache_req.q_start_time - (cache_req.q_start_time % cache_req.discard_interval),
@@ -178,21 +172,28 @@ async fn recursive_process_multiple_metas(
             let discard_ts = get_allowed_up_to(&cached_response, &cache_req, discard_duration);
             cached_response.hits.retain(|hit| {
                 let hit_ts = get_ts_value(&cache_req.ts_column, hit);
-                hit_ts < hits_allowed_end_time &&
-                    hit_ts > hits_allowed_start_time &&
-                    hit_ts < discard_ts
+                hit_ts < hits_allowed_end_time
+                    && hit_ts > hits_allowed_start_time
+                    && hit_ts < discard_ts
             });
 
             // Sort the hits by the order
-            sort_response(cache_req.is_descending, &mut cached_response, &cache_req.ts_column, &vec![]);
+            sort_response(
+                cache_req.is_descending,
+                &mut cached_response,
+                &cache_req.ts_column,
+                &vec![],
+            );
 
             cached_response.total = cached_response.hits.len();
             if cache_req.discard_interval < 0 {
                 matching_cache_meta.end_time = discard_ts;
             }
             if !cached_response.hits.is_empty() {
-                let last_rec_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
-                let first_rec_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
+                let last_rec_ts =
+                    get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
+                let first_rec_ts =
+                    get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
                 let response_start_time = if cache_req.is_descending {
                     last_rec_ts
                 } else {
@@ -228,9 +229,9 @@ async fn recursive_process_multiple_metas(
             .into_iter()
             .filter(|meta| {
                 // Keep only metas that don't overlap with the selected largest meta
-                !largest_meta.eq(meta) &&
-                (meta.end_time <= largest_meta.start_time ||
-                    meta.start_time >= largest_meta.end_time)
+                !largest_meta.eq(meta)
+                    && (meta.end_time <= largest_meta.start_time
+                        || meta.start_time >= largest_meta.end_time)
             })
             .collect();
         if !remaining_metas.is_empty() {
@@ -242,12 +243,12 @@ async fn recursive_process_multiple_metas(
             cache_req,
             results,
             query_key,
-            file_path
-        ).await;
+            file_path,
+        )
+        .await;
     }
     Ok(())
 }
-
 
 fn select_cache_meta(
     meta: &ResultCacheMeta,
