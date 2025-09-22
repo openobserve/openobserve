@@ -617,6 +617,18 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                         }
                     }
 
+                    #[cfg(feature = "cloud")]
+                    if let Err(e) =
+                        o2_enterprise::enterprise::cloud::email::check_email(&res.0.user_email)
+                            .await
+                    {
+                        log::info!(
+                            "blocking user with email {} as domain blocked with : {e}",
+                            res.0.user_email
+                        );
+                        return Ok(HttpResponse::Unauthorized()
+                            .json("Email Domain not allowed".to_string()));
+                    }
                     audit_message.user_email = res.0.user_email.clone();
                     id_token = json::to_string(&json::json!({
                         "email": res.0.user_email,
