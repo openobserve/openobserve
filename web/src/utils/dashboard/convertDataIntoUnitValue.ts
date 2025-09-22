@@ -1807,15 +1807,34 @@ export const generateChartAlignmentProperties = (
  * @param {any} panelSchema - Panel configuration schema
  * @param {number} availableWidth - Available width for chart
  * @param {number} availableHeight - Available height for chart
+ * @param {number} originalWidth - Original container width (optional)
+ * @param {number} originalHeight - Original container height (optional)
  * @returns {number} Optimal radius percentage (0-100)
  */
 export const calculatePieChartRadius = (
   panelSchema: any,
   availableWidth: number,
   availableHeight: number,
+  originalWidth?: number,
+  originalHeight?: number,
 ): number => {
+  // When layout is not available (add panel), calculate based on available dimensions
   if (!panelSchema.layout) {
-    return 85; // Default radius for charts without layout
+    // Calculate the optimal radius in pixels based on available space
+    const maxAvailableRadius = Math.min(availableWidth, availableHeight) / 2;
+    const optimalRadiusPixels = maxAvailableRadius * 0.8; // 80% of available space for padding
+
+    // If original dimensions are provided, convert to percentage of original container
+    if (originalWidth && originalHeight) {
+      const originalMaxRadius = Math.min(originalWidth, originalHeight) / 2;
+      return Math.min(
+        Math.max((optimalRadiusPixels / originalMaxRadius) * 100, 20),
+        85,
+      );
+    }
+
+    // Fallback: use a conservative percentage
+    return 60;
   }
 
   const minRadius = Math.min(

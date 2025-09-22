@@ -79,6 +79,16 @@ const calculatePieChartContainer = (
   const chartAlign = panelSchema.config?.chart_align;
   const legendPosition = panelSchema.config?.legends_position;
 
+  console.log("📊 calculatePieChartContainer - Input parameters:", {
+    chartWidth,
+    chartHeight,
+    chartAlign,
+    legendPosition,
+    seriesDataLength: seriesData?.length || 0,
+    showLegends: panelSchema.config?.show_legends,
+    legendsType: panelSchema.config?.legends_type,
+  });
+
   // Calculate available space using our centralized helper function
   const dimensions = calculateChartDimensions(
     panelSchema,
@@ -87,11 +97,24 @@ const calculatePieChartContainer = (
     seriesData,
   );
 
+  console.log("📏 calculatePieChartContainer - Chart dimensions calculated:", {
+    availableWidth: dimensions.availableWidth,
+    availableHeight: dimensions.availableHeight,
+    originalWidth: chartWidth,
+    originalHeight: chartHeight,
+  });
+
   // Determine if chart alignment should be applied
   const shouldApplyAlignment = shouldApplyChartAlignment(
     panelSchema,
     seriesData,
   );
+
+  console.log("⚡ calculatePieChartContainer - Chart alignment check:", {
+    shouldApplyAlignment,
+    chartAlign,
+    legendPosition,
+  });
 
   // Generate CSS grid properties for chart alignment
   const gridProperties = generateChartAlignmentProperties(
@@ -99,6 +122,11 @@ const calculatePieChartContainer = (
     legendPosition,
     shouldApplyAlignment,
   );
+
+  console.log("🎯 calculatePieChartContainer - Grid properties generated:", {
+    gridProperties,
+    shouldUseGridAlignment: shouldApplyAlignment,
+  });
 
   return {
     gridProperties,
@@ -630,8 +658,22 @@ export const convertSQLData = async (
    * @returns {number} - the radius percentage
    */
   const getPieChartRadius = (seriesData: any[] = []) => {
+    console.log("🥧 getPieChartRadius - Starting calculation:", {
+      seriesDataLength: seriesData?.length || 0,
+      legendPosition: panelSchema.config?.legends_position,
+      showLegends: panelSchema.config?.show_legends,
+      legendsType: panelSchema.config?.legends_type,
+    });
+
     // Get chart dimensions from chartPanelRef
     const dimensions = getChartDimensions(chartPanelRef);
+
+    console.log("📐 getPieChartRadius - Chart panel dimensions:", {
+      chartWidth: dimensions.chartWidth,
+      chartHeight: dimensions.chartHeight,
+      panelWidth: chartPanelRef?.value?.offsetWidth,
+      panelHeight: chartPanelRef?.value?.offsetHeight,
+    });
 
     // Calculate available dimensions using our centralized helper function
     const chartDimensions = calculateChartDimensions(
@@ -641,16 +683,55 @@ export const convertSQLData = async (
       seriesData,
     );
 
+    console.log("📊 getPieChartRadius - Available chart dimensions:", {
+      availableWidth: chartDimensions.availableWidth,
+      availableHeight: chartDimensions.availableHeight,
+      widthReduction: dimensions.chartWidth - chartDimensions.availableWidth,
+      heightReduction: dimensions.chartHeight - chartDimensions.availableHeight,
+    });
+
     // Use the optimized pie chart radius calculation
-    return calculatePieChartRadius(
+    const radius = calculatePieChartRadius(
       panelSchema,
       chartDimensions.availableWidth,
       chartDimensions.availableHeight,
+      dimensions.chartWidth,
+      dimensions.chartHeight,
     );
+
+    console.log("🎯 getPieChartRadius - Final radius calculated:", {
+      radius,
+      radiusPercentage: `${radius}%`,
+      calculatedFromWidth: chartDimensions.availableWidth,
+      calculatedFromHeight: chartDimensions.availableHeight,
+    });
+
+    return radius;
   };
 
   // Create legend configuration using the new centralized function
+  console.log("🔧 Creating legend configuration - Input data:", {
+    panelType: panelSchema.type,
+    showLegends: panelSchema.config?.show_legends,
+    legendsPosition: panelSchema.config?.legends_position,
+    legendsType: panelSchema.config?.legends_type,
+    hoveredSeriesState,
+  });
+
   const legendConfig = createBaseLegendConfig(panelSchema, hoveredSeriesState);
+
+  console.log("✅ Legend configuration created:", {
+    legendConfig,
+    orient: legendConfig?.orient,
+    show: legendConfig?.show,
+    type: legendConfig?.type,
+    position: {
+      left: legendConfig?.left,
+      right: legendConfig?.right,
+      top: legendConfig?.top,
+      bottom: legendConfig?.bottom,
+    },
+  });
 
   const isHorizontalChart =
     panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
@@ -965,6 +1046,49 @@ export const convertSQLData = async (
     panelSchema.queries[0]?.fields?.y?.length == 1 &&
     panelSchema.queries[0]?.fields?.y[0]?.label;
 
+  console.log("🏗️ Building chart options - Axis and Legend calculations:", {
+    hasXAxisName,
+    hasYAxisName,
+    legendOrient: legendConfig.orient,
+    showLegends: panelSchema.config?.show_legends,
+    axisWidth: panelSchema.config?.axis_width,
+    breakDownKeysLength: breakDownKeys.length,
+  });
+
+  // Calculate bottom spacing based on legend position and axis names
+  const calculateBottomSpacing = () => {
+    if (hasXAxisName) {
+      if (
+        legendConfig.orient === "horizontal" &&
+        panelSchema.config?.show_legends
+      ) {
+        const spacing = panelSchema.config?.axis_width == null ? 50 : 60;
+        console.log("📐 Bottom spacing (horizontal legend + X axis):", spacing);
+        return spacing;
+      } else {
+        const spacing = panelSchema.config?.axis_width == null ? 35 : 40;
+        console.log("📐 Bottom spacing (X axis only):", spacing);
+        return spacing;
+      }
+    } else {
+      if (
+        legendConfig.orient === "vertical" &&
+        panelSchema.config?.show_legends
+      ) {
+        console.log("📐 Bottom spacing (vertical legend, no X axis):", 0);
+        return 0;
+      } else if (breakDownKeys.length > 0) {
+        console.log("📐 Bottom spacing (breakdown keys):", 25);
+        return 25;
+      } else {
+        console.log("📐 Bottom spacing (default):", 0);
+        return 0;
+      }
+    }
+  };
+
+  const bottomSpacing = calculateBottomSpacing();
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
@@ -973,22 +1097,7 @@ export const convertSQLData = async (
       left: hasYAxisName ? (panelSchema.config?.axis_width ?? 30) : 5,
       right: 20,
       top: "15",
-      bottom: hasXAxisName
-        ? (() => {
-            if (
-              legendConfig.orient === "horizontal" &&
-              panelSchema.config?.show_legends
-            ) {
-              return panelSchema.config?.axis_width == null ? 50 : 60;
-            } else {
-              return panelSchema.config?.axis_width == null ? 35 : 40;
-            }
-          })()
-        : legendConfig.orient === "vertical" && panelSchema.config?.show_legends
-          ? 0
-          : breakDownKeys.length > 0
-            ? 25
-            : 0,
+      bottom: bottomSpacing,
     },
     tooltip: {
       trigger: "axis",
@@ -1280,6 +1389,29 @@ export const convertSQLData = async (
     },
     series: [],
   };
+
+  console.log("🎨 Chart options object created:", {
+    legend: {
+      show: options.legend?.show,
+      orient: options.legend?.orient,
+      type: options.legend?.type,
+      position: {
+        left: options.legend?.left,
+        right: options.legend?.right,
+        top: options.legend?.top,
+        bottom: options.legend?.bottom,
+      },
+    },
+    grid: {
+      left: options.grid?.left,
+      right: options.grid?.right,
+      top: options.grid?.top,
+      bottom: options.grid?.bottom,
+      containLabel: options.grid?.containLabel,
+    },
+    chartType: panelSchema.type,
+    showGridlines,
+  });
 
   // Ensure gridlines visibility is set for all xAxis and yAxis (handles both array and object cases)
   if (options.xAxis) {
@@ -1787,12 +1919,24 @@ export const convertSQLData = async (
         return seriesObj;
       });
 
-      if (options.series.length > 0 && panelSchema.layout) {
+      if (options.series.length > 0) {
         // Get current chart dimensions
         const { chartWidth, chartHeight } = getChartDimensions(chartPanelRef);
 
+        console.log("🥧 Pie chart setup - Chart dimensions:", {
+          chartWidth,
+          chartHeight,
+          seriesDataLength: options.series[0].data?.length || 0,
+        });
+
         // Calculate responsive radius that accounts for dynamic resizing
-        options.series[0].radius = `${getPieChartRadius(options.series[0].data)}%`;
+        const pieRadius = getPieChartRadius(options.series[0].data);
+        options.series[0].radius = `${pieRadius}%`;
+
+        console.log("📏 Pie chart radius applied:", {
+          radius: pieRadius,
+          radiusString: `${pieRadius}%`,
+        });
 
         // Apply chart alignment - only when legend position is right and chart_align is explicitly set
         const shouldApplyAlignment =
@@ -1803,6 +1947,14 @@ export const convertSQLData = async (
             panelSchema.config?.legends_type === null) &&
           panelSchema.config?.chart_align; // Only apply when chart_align is explicitly set
 
+        console.log("🎯 Pie chart alignment check:", {
+          shouldApplyAlignment,
+          showLegends: panelSchema.config?.show_legends,
+          legendsPosition: panelSchema.config?.legends_position,
+          legendsType: panelSchema.config?.legends_type,
+          chartAlign: panelSchema.config?.chart_align,
+        });
+
         if (shouldApplyAlignment) {
           // Apply chart alignment based on container properties
           const containerProps = calculatePieChartContainer(
@@ -1811,6 +1963,13 @@ export const convertSQLData = async (
             chartHeight,
             options.series[0].data || [],
           );
+
+          console.log("📐 Pie chart container properties:", {
+            availableWidth: containerProps.availableWidth,
+            availableHeight: containerProps.availableHeight,
+            shouldUseGridAlignment: containerProps.shouldUseGridAlignment,
+            gridProperties: containerProps.gridProperties,
+          });
 
           // Apply center positioning based on alignment requirements
           if (containerProps.shouldUseGridAlignment) {
@@ -1821,10 +1980,24 @@ export const convertSQLData = async (
             let centerX = 50; // Default center
             let centerY = 50; // Default center
 
+            console.log("🎯 Calculating pie chart center position:", {
+              chartAlign,
+              chartAreaWidth,
+              chartHeight,
+              defaultCenterX: centerX,
+              defaultCenterY: centerY,
+            });
+
             // For right legends, adjust horizontal positioning
             const chartAreaRadius = Math.min(chartAreaWidth, chartHeight) * 0.4; // 40% of smaller dimension
             const radiusAsPercentOfTotal = (chartAreaRadius / chartWidth) * 100;
             const minSafeXInChartArea = radiusAsPercentOfTotal + 2; // 2% padding
+
+            console.log("📏 Chart area radius calculations:", {
+              chartAreaRadius,
+              radiusAsPercentOfTotal,
+              minSafeXInChartArea,
+            });
 
             switch (chartAlign) {
               case "left": {
@@ -1834,6 +2007,10 @@ export const convertSQLData = async (
                   minSafeXInChartArea,
                   (leftPositionInChartArea / chartWidth) * 100,
                 );
+                console.log("📍 Left alignment applied:", {
+                  leftPositionInChartArea,
+                  calculatedCenterX: centerX,
+                });
                 break;
               }
               case "center":
@@ -1841,23 +2018,41 @@ export const convertSQLData = async (
                 // Center within ONLY the chart area
                 const chartAreaCenter = chartAreaWidth / 2;
                 centerX = (chartAreaCenter / chartWidth) * 100;
+                console.log("📍 Center alignment applied:", {
+                  chartAreaCenter,
+                  calculatedCenterX: centerX,
+                });
                 break;
               }
             }
 
-            options.series[0].center = [`${centerX}%`, `${centerY}%`];
+            const finalCenter = [`${centerX}%`, `${centerY}%`];
+            options.series[0].center = finalCenter;
+
+            console.log("✅ Final pie chart center position:", {
+              center: finalCenter,
+              centerXPercent: centerX,
+              centerYPercent: centerY,
+            });
           } else {
             // Fallback to default center when grid alignment is not used
             options.series[0].center = ["50%", "50%"];
+            console.log(
+              "🔄 Using default center (grid alignment not used): ['50%', '50%']",
+            );
           }
         } else {
           // Use the new centralized function for pie/donut center adjustment
+          console.log("🔧 Applying centralized pie/donut center adjustment");
           applyPieDonutCenterAdjustment(
             panelSchema,
             options,
             chartWidth,
             chartHeight,
           );
+          console.log("✅ Centralized center adjustment applied:", {
+            center: options.series[0]?.center,
+          });
         }
       }
 
@@ -1933,9 +2128,15 @@ export const convertSQLData = async (
         return seriesObj;
       });
 
-      if (options.series.length > 0 && panelSchema.layout) {
+      if (options.series.length > 0) {
         // Get current chart dimensions
         const { chartWidth, chartHeight } = getChartDimensions(chartPanelRef);
+
+        console.log("🍩 Donut chart setup - Chart dimensions:", {
+          chartWidth,
+          chartHeight,
+          seriesDataLength: options.series[0].data?.length || 0,
+        });
 
         const outerRadius: number = getPieChartRadius(options.series[0].data);
 
@@ -1945,6 +2146,13 @@ export const convertSQLData = async (
 
         options.series[0].radius = [`${innterRadius}%`, `${outerRadius}%`];
 
+        console.log("📏 Donut chart radius calculations:", {
+          outerRadius,
+          thickness,
+          innerRadius: innterRadius,
+          radiusArray: [`${innterRadius}%`, `${outerRadius}%`],
+        });
+
         // Apply chart alignment - only when legend position is right and chart_align is explicitly set
         const shouldApplyAlignment =
           panelSchema.config?.show_legends &&
@@ -1953,6 +2161,14 @@ export const convertSQLData = async (
             panelSchema.config?.legends_type === "scroll" ||
             panelSchema.config?.legends_type === null) &&
           panelSchema.config?.chart_align; // Only apply when chart_align is explicitly set
+
+        console.log("🎯 Donut chart alignment check:", {
+          shouldApplyAlignment,
+          showLegends: panelSchema.config?.show_legends,
+          legendsPosition: panelSchema.config?.legends_position,
+          legendsType: panelSchema.config?.legends_type,
+          chartAlign: panelSchema.config?.chart_align,
+        });
 
         if (shouldApplyAlignment) {
           // Apply chart alignment based on container properties
@@ -2012,6 +2228,13 @@ export const convertSQLData = async (
               // Calculate legend width and move chart center to the left
               const legendCount = options.series[0].data?.length || 0;
 
+              console.log("📊 Donut chart - Right legend width calculation:", {
+                legendCount,
+                chartWidth,
+                chartHeight,
+                configLegendWidth: panelSchema.config.legend_width,
+              });
+
               // Prefer explicit legend width if provided in config
               let legendWidth;
               if (
@@ -2022,6 +2245,11 @@ export const convertSQLData = async (
                   panelSchema.config.legend_width.unit === "%"
                     ? chartWidth * (panelSchema.config.legend_width.value / 100)
                     : panelSchema.config.legend_width.value;
+                console.log("📏 Using configured legend width:", {
+                  configValue: panelSchema.config.legend_width.value,
+                  configUnit: panelSchema.config.legend_width.unit,
+                  calculatedWidth: legendWidth,
+                });
               } else {
                 // Dynamically compute width to ensure legends do not overlap the chart
                 legendWidth = calculateRightLegendWidth(
@@ -2031,17 +2259,40 @@ export const convertSQLData = async (
                   options.series[0].data || [],
                   false,
                 );
+                console.log("📏 Using calculated legend width:", {
+                  calculatedWidth: legendWidth,
+                });
               }
 
               const availableWidth = chartWidth - legendWidth;
               const centerX = (availableWidth / 2 / chartWidth) * 100; // Convert to percentage
               options.series[0].center = [`${centerX}%`, "50%"];
+
+              console.log("📍 Donut chart - Right legend positioning:", {
+                legendWidth,
+                availableWidth,
+                centerXPercent: centerX,
+                finalCenter: [`${centerX}%`, "50%"],
+              });
             } else if (
               panelSchema.config?.legends_position === "bottom" ||
               panelSchema.config?.legends_position === null
             ) {
               // Calculate legend height and move chart center up
               const legendCount = options.series[0].data?.length || 0;
+
+              console.log(
+                "📊 Donut chart - Bottom legend height calculation:",
+                {
+                  legendCount,
+                  chartWidth,
+                  chartHeight,
+                  configLegendHeight: panelSchema.config.legend_height,
+                  legendsPosition: panelSchema.config?.legends_position,
+                  legendsType: panelSchema.config?.legends_type,
+                },
+              );
+
               // Prefer explicit legend height if provided in config, but not for scroll legends when position is auto/bottom
               let legendHeight;
               if (
@@ -2060,6 +2311,11 @@ export const convertSQLData = async (
                     ? chartHeight *
                       (panelSchema.config.legend_height.value / 100)
                     : panelSchema.config.legend_height.value;
+                console.log("📏 Using configured legend height:", {
+                  configValue: panelSchema.config.legend_height.value,
+                  configUnit: panelSchema.config.legend_height.unit,
+                  calculatedHeight: legendHeight,
+                });
               } else {
                 // Dynamically compute height to ensure legends do not overlap the chart
                 legendHeight = calculateBottomLegendHeight(
@@ -2068,10 +2324,20 @@ export const convertSQLData = async (
                   options.series[0].data || [],
                   chartHeight,
                 );
+                console.log("📏 Using calculated legend height:", {
+                  calculatedHeight: legendHeight,
+                });
               }
               const availableHeight = chartHeight - legendHeight;
               const centerY = (availableHeight / 2 / chartHeight) * 100; // Convert to percentage
               options.series[0].center = ["50%", `${centerY}%`];
+
+              console.log("📍 Donut chart - Bottom legend positioning:", {
+                legendHeight,
+                availableHeight,
+                centerYPercent: centerY,
+                finalCenter: ["50%", `${centerY}%`],
+              });
             }
           }
         }
@@ -3040,7 +3306,7 @@ export const convertSQLData = async (
     panelSchema?.config?.color?.colorBySeries,
     store.state.theme,
   );
-
+  console.log(options, "optionssssss");
   return {
     options,
     extras: {
