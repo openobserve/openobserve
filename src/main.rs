@@ -277,12 +277,6 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("job init failed: {e}");
             }
 
-            // init meter provider
-            let Ok(meter_provider) = job::metrics::init_meter_provider().await else {
-                job_init_tx.send(false).ok();
-                panic!("meter provider init failed");
-            };
-
             // Register job runtime for metrics collection
             if let Ok(handle) = tokio::runtime::Handle::try_current() {
                 openobserve::service::runtime_metrics::register_runtime("job".to_string(), handle);
@@ -291,9 +285,6 @@ async fn main() -> Result<(), anyhow::Error> {
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
-
-            // shutdown meter provider
-            let _ = meter_provider.shutdown();
 
             // flush distinct values
             _ = metadata::close().await;
