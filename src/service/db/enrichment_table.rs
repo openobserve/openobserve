@@ -312,7 +312,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), infra::errors::Error
         StreamType::EnrichmentTables,
         name
     );
-    cluster_coordinator.delete(&key, false, false, None).await
+    cluster_coordinator.delete(&key, false, true, None).await
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
