@@ -4097,7 +4097,19 @@ export default defineComponent({
                     filter +
                     " order by" +
                     afterOrderBy;
-                } else if (query.toLowerCase().includes("limit")) {
+                } else if (query.toLowerCase().includes("group by")) {
+                  const [beforeGroupBy, afterGroupBy] = queryIndexSplit(
+                    query,
+                    "group by",
+                  );
+                  query =
+                    beforeGroupBy.trim() +
+                    " AND " +
+                    filter +
+                    " group by" +
+                    afterGroupBy;
+                } 
+                else if (query.toLowerCase().includes("limit")) {
                   const [beforeLimit, afterLimit] = queryIndexSplit(
                     query,
                     "limit",
@@ -4123,7 +4135,19 @@ export default defineComponent({
                     filter +
                     " order by" +
                     afterOrderBy;
-                } else if (query.toLowerCase().includes("limit")) {
+                } else if (query.toLowerCase().includes("group by")) {
+                  const [beforeGroupBy, afterGroupBy] = queryIndexSplit(
+                    query,
+                    "group by",
+                  );
+                  query =
+                    beforeGroupBy.trim() +
+                    " where " +
+                    filter +
+                    " group by" +
+                    afterGroupBy;
+                }
+                 else if (query.toLowerCase().includes("limit")) {
                   const [beforeLimit, afterLimit] = queryIndexSplit(
                     query,
                     "limit",
