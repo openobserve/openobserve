@@ -96,7 +96,7 @@ pub async fn search(
     datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes
-    let proto = get_physical_extension_codec();
+    let proto = get_physical_extension_codec(org_id.clone());
     let physical_plan =
         physical_plan_from_bytes_with_extension_codec(&req.search_info.plan, &ctx, &proto)?;
 
