@@ -1,0 +1,66 @@
+name: Wait for Enterprise Build
+
+on:
+  pull_request:
+    branches:
+      - "*"
+
+env:
+  GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  wait-for-enterprise:
+    if: ${{ github.event.pull_request.head.repo.fork == false }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+
+    steps:
+      - name: Generate token
+        id: generate_token
+        uses: actions/create-github-app-token@v2
+        with:
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          app-id: ${{ secrets.APP_ID }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Wait for enterprise build completion
+        env:
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
+          COMMIT_SHA: ${{ env.GITHUB_HEAD_SHA }}
+        run: |
+          echo "Waiting for enterprise build completion for commit: $COMMIT_SHA"
+
+          # Maximum wait time (70 minutes)
+          MAX_WAIT=4200
+          INTERVAL=30
+          ELAPSED=0
+
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            echo "Waiting for callback... (elapsed: ${ELAPSED}s)"
+
+            # Check if enterprise-build-callback workflow has completed for this commit
+            CALLBACK_STATUS=$(gh run list \
+              --workflow="enterprise-build-callback.yml" \
+              --json="conclusion,status,event" \
+              --jq=".[] | select(.event == \"repository_dispatch\" and .status == \"completed\")")
+
+            if [ -n "$CALLBACK_STATUS" ]; then
+              echo "Found completed callback workflow"
+              CONCLUSION=$(echo "$CALLBACK_STATUS" | jq -r '.conclusion')
+
+              if [ "$CONCLUSION" = "success" ]; then
+                echo "✅ Enterprise build passed"
+                exit 0
+              else
+                echo "❌ Enterprise build failed"
+                exit 1
+              fi
+            fi
+
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          echo "❌ Timeout waiting for enterprise build"
+          exit 1

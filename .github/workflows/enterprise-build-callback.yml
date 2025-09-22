@@ -1,65 +1,11 @@
 name: Enterprise Build Callback
 
 on:
-  pull_request:
-    branches:
-      - "*"
   repository_dispatch:
     types: [enterprise-build-complete]
 
-env:
-  GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.client_payload.commit_sha }}
-
 jobs:
-  wait-for-enterprise:
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false }}
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-
-    steps:
-      - name: Wait for enterprise build signal
-        env:
-          BUILD_ID: ${{ github.run_id }}-${{ env.GITHUB_HEAD_SHA }}
-        run: |
-          echo "Waiting for enterprise build completion signal..."
-
-          # Maximum wait time (70 minutes)
-          MAX_WAIT=4200
-          INTERVAL=30
-          ELAPSED=0
-
-          while [ $ELAPSED -lt $MAX_WAIT ]; do
-            echo "Waiting for callback... (elapsed: ${ELAPSED}s)"
-
-            # Check if handle-completion job has run for this commit
-            CALLBACK_STATUS=$(gh run list \
-              --workflow="enterprise-build-callback.yml" \
-              --json="conclusion,status,headSha" \
-              --jq=".[] | select(.headSha == \"${{ env.GITHUB_HEAD_SHA }}\" and .status == \"completed\")")
-
-            if [ -n "$CALLBACK_STATUS" ]; then
-              echo "Found completed callback"
-              CONCLUSION=$(echo "$CALLBACK_STATUS" | jq -r '.conclusion')
-
-              if [ "$CONCLUSION" = "success" ]; then
-                echo "✅ Enterprise build passed"
-                exit 0
-              else
-                echo "❌ Enterprise build failed"
-                exit 1
-              fi
-            fi
-
-            sleep $INTERVAL
-            ELAPSED=$((ELAPSED + INTERVAL))
-          done
-
-          echo "❌ Timeout waiting for enterprise build"
-          exit 1
-
   handle-completion:
-    if: ${{ github.event_name == 'repository_dispatch' && github.event.action == 'enterprise-build-complete' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -67,9 +13,11 @@ jobs:
         env:
           CONCLUSION: ${{ github.event.client_payload.conclusion }}
           RUN_URL: ${{ github.event.client_payload.run_url }}
+          COMMIT_SHA: ${{ github.event.client_payload.commit_sha }}
         run: |
           echo "Enterprise build completed with: $CONCLUSION"
           echo "Build URL: $RUN_URL"
+          echo "Commit SHA: $COMMIT_SHA"
 
           if [ "$CONCLUSION" = "success" ]; then
             echo "✅ Enterprise build passed"
