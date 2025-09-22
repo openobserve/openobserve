@@ -2351,72 +2351,6 @@ pub mod ingest_server {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct QueryDelta {
-    #[prost(int64, tag = "1")]
-    pub delta_start_time: i64,
-    #[prost(int64, tag = "2")]
-    pub delta_end_time: i64,
-    #[prost(bool, tag = "3")]
-    pub delta_removed_hits: bool,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct QueryResponse {
-    #[prost(bytes = "vec", tag = "1")]
-    pub data: ::prost::alloc::vec::Vec<u8>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct QueryCacheRequest {
-    #[prost(int64, tag = "1")]
-    pub start_time: i64,
-    #[prost(int64, tag = "2")]
-    pub end_time: i64,
-    #[prost(bool, tag = "3")]
-    pub is_aggregate: bool,
-    #[prost(string, tag = "4")]
-    pub query_key: ::prost::alloc::string::String,
-    #[prost(string, tag = "5")]
-    pub file_path: ::prost::alloc::string::String,
-    #[prost(string, tag = "6")]
-    pub timestamp_col: ::prost::alloc::string::String,
-    #[prost(string, tag = "7")]
-    pub trace_id: ::prost::alloc::string::String,
-    #[prost(int64, tag = "8")]
-    pub discard_interval: i64,
-    #[prost(bool, tag = "9")]
-    pub is_descending: bool,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct QueryCacheRes {
-    #[prost(message, optional, tag = "1")]
-    pub cached_response: ::core::option::Option<QueryResponse>,
-    #[prost(bool, tag = "2")]
-    pub has_cached_data: bool,
-    #[prost(bool, tag = "3")]
-    pub cache_query_response: bool,
-    #[prost(int64, tag = "4")]
-    pub cache_start_time: i64,
-    #[prost(int64, tag = "5")]
-    pub cache_end_time: i64,
-    #[prost(bool, tag = "6")]
-    pub is_descending: bool,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct QueryCacheResponse {
-    #[prost(message, optional, tag = "1")]
-    pub response: ::core::option::Option<QueryCacheRes>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MultiQueryCacheResponse {
-    #[prost(message, repeated, tag = "1")]
-    pub response: ::prost::alloc::vec::Vec<QueryCacheRes>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DeleteResultCacheRequest {
     #[prost(string, tag = "1")]
     pub path: ::prost::alloc::string::String,
@@ -2514,58 +2448,6 @@ pub mod query_cache_client {
             self.inner = self.inner.max_encoding_message_size(limit);
             self
         }
-        pub async fn get_cached_result(
-            &mut self,
-            request: impl tonic::IntoRequest<super::QueryCacheRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::QueryCacheResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/cluster.QueryCache/GetCachedResult",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("cluster.QueryCache", "GetCachedResult"));
-            self.inner.unary(req, path, codec).await
-        }
-        pub async fn get_multiple_cached_result(
-            &mut self,
-            request: impl tonic::IntoRequest<super::QueryCacheRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::MultiQueryCacheResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/cluster.QueryCache/GetMultipleCachedResult",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("cluster.QueryCache", "GetMultipleCachedResult"),
-                );
-            self.inner.unary(req, path, codec).await
-        }
         pub async fn delete_result_cache(
             &mut self,
             request: impl tonic::IntoRequest<super::DeleteResultCacheRequest>,
@@ -2600,20 +2482,6 @@ pub mod query_cache_server {
     /// Generated trait containing gRPC methods that should be implemented for use with QueryCacheServer.
     #[async_trait]
     pub trait QueryCache: Send + Sync + 'static {
-        async fn get_cached_result(
-            &self,
-            request: tonic::Request<super::QueryCacheRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::QueryCacheResponse>,
-            tonic::Status,
-        >;
-        async fn get_multiple_cached_result(
-            &self,
-            request: tonic::Request<super::QueryCacheRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::MultiQueryCacheResponse>,
-            tonic::Status,
-        >;
         async fn delete_result_cache(
             &self,
             request: tonic::Request<super::DeleteResultCacheRequest>,
@@ -2701,102 +2569,6 @@ pub mod query_cache_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/cluster.QueryCache/GetCachedResult" => {
-                    #[allow(non_camel_case_types)]
-                    struct GetCachedResultSvc<T: QueryCache>(pub Arc<T>);
-                    impl<
-                        T: QueryCache,
-                    > tonic::server::UnaryService<super::QueryCacheRequest>
-                    for GetCachedResultSvc<T> {
-                        type Response = super::QueryCacheResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::QueryCacheRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as QueryCache>::get_cached_result(&inner, request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = GetCachedResultSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/cluster.QueryCache/GetMultipleCachedResult" => {
-                    #[allow(non_camel_case_types)]
-                    struct GetMultipleCachedResultSvc<T: QueryCache>(pub Arc<T>);
-                    impl<
-                        T: QueryCache,
-                    > tonic::server::UnaryService<super::QueryCacheRequest>
-                    for GetMultipleCachedResultSvc<T> {
-                        type Response = super::MultiQueryCacheResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::QueryCacheRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as QueryCache>::get_multiple_cached_result(
-                                        &inner,
-                                        request,
-                                    )
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = GetMultipleCachedResultSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
                 "/cluster.QueryCache/DeleteResultCache" => {
                     #[allow(non_camel_case_types)]
                     struct DeleteResultCacheSvc<T: QueryCache>(pub Arc<T>);

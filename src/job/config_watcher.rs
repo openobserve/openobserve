@@ -82,7 +82,7 @@ pub fn reload_config(path: &PathBuf) -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
         use o2_dex::config::refresh_config as refresh_dex_config;
-        use o2_enterprise::enterprise::common::infra::config::refresh_config as refresh_o2_config;
+        use o2_enterprise::enterprise::common::config::refresh_config as refresh_o2_config;
         use o2_openfga::config::refresh_config as refresh_openfga_config;
 
         refresh_o2_config()
