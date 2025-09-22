@@ -13,13 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use config::meta::inverted_index::IndexOptimizeMode;
 use datafusion::{
     common::{
         Result,
-        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter},
+        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
     },
     config::ConfigOptions,
     physical_optimizer::PhysicalOptimizerRule,
@@ -27,6 +30,7 @@ use datafusion::{
         ExecutionPlan, aggregates::AggregateExec,
         sorts::sort_preserving_merge::SortPreservingMergeExec,
     },
+    sql::TableReference,
 };
 use parking_lot::Mutex;
 
@@ -38,7 +42,7 @@ mod topn;
 mod utils;
 
 use crate::service::search::datafusion::{
-    distributed_plan::remote_scan::RemoteScanExec,
+    distributed_plan::{empty_exec::NewEmptyExec, remote_scan::RemoteScanExec},
     optimizer::physical_optimizer::index_optimizer::{
         count::is_simple_count, distinct::is_simple_distinct, histogram::is_simple_histogram,
         select::is_simple_select, topn::is_simple_topn,
@@ -148,11 +152,11 @@ impl TreeNodeRewriter for FollowerIndexOptimizer {
 /// like order and limit
 #[derive(Default, Debug)]
 pub struct LeaderIndexOptimizerRule {
-    index_fields: HashSet<String>,
+    index_fields: HashMap<TableReference, HashSet<String>>,
 }
 
 impl LeaderIndexOptimizerRule {
-    pub fn new(index_fields: HashSet<String>) -> Self {
+    pub fn new(index_fields: HashMap<TableReference, HashSet<String>>) -> Self {
         Self { index_fields }
     }
 }
@@ -182,11 +186,11 @@ impl PhysicalOptimizerRule for LeaderIndexOptimizerRule {
 }
 
 struct LeaderIndexOptimizer {
-    index_fields: HashSet<String>,
+    index_fields: HashMap<TableReference, HashSet<String>>,
 }
 
 impl LeaderIndexOptimizer {
-    pub fn new(index_fields: HashSet<String>) -> Self {
+    pub fn new(index_fields: HashMap<TableReference, HashSet<String>>) -> Self {
         Self { index_fields }
     }
 }
@@ -200,23 +204,36 @@ impl TreeNodeRewriter for LeaderIndexOptimizer {
             .downcast_ref::<SortPreservingMergeExec>()
             .is_some()
         {
-            // Check for SimpleTopN first
+            // Get the index fields of the underlying table
+            let mut visitor = TableNameVisitor::new();
+            plan.visit(&mut visitor)?;
+            let Some(table_name) = visitor.table_name else {
+                return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
+            };
+            let index_fields = self
+                .index_fields
+                .get(&table_name)
+                .cloned()
+                .unwrap_or(HashSet::new());
+
+            // check if the query is simple topn or simple distinct
             if let Some(index_optimize_mode) =
-                is_simple_topn(Arc::clone(&plan), self.index_fields.clone())
+                is_simple_topn(Arc::clone(&plan), index_fields.clone())
             {
+                // Check for SimpleTopN
                 let mut rewriter = IndexOptimizerRewrite::new(index_optimize_mode);
                 let plan = plan.rewrite(&mut rewriter)?.data;
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
-            }
-            // Check for SimpleDistinct
-            if let Some(index_optimize_mode) =
-                is_simple_distinct(Arc::clone(&plan), self.index_fields.clone())
+            } else if let Some(index_optimize_mode) =
+                is_simple_distinct(Arc::clone(&plan), index_fields.clone())
             {
+                // Check for SimpleDistinct
                 let mut rewriter = IndexOptimizerRewrite::new(index_optimize_mode);
                 let plan = plan.rewrite(&mut rewriter)?.data;
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+            } else {
+                return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
             }
-            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Continue));
         }
         Ok(Transformed::no(plan))
     }
@@ -248,5 +265,31 @@ impl TreeNodeRewriter for IndexOptimizerRewrite {
             return Ok(Transformed::new(remote, true, TreeNodeRecursion::Stop));
         }
         Ok(Transformed::no(node))
+    }
+}
+
+// visit physical plan to get underlying table name
+struct TableNameVisitor {
+    table_name: Option<TableReference>,
+}
+
+impl TableNameVisitor {
+    pub fn new() -> Self {
+        Self { table_name: None }
+    }
+}
+
+impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        let name = node.name();
+        if name == "NewEmptyExec" {
+            let table = node.as_any().downcast_ref::<NewEmptyExec>().unwrap();
+            self.table_name = Some(TableReference::from(table.name()));
+            Ok(TreeNodeRecursion::Continue)
+        } else {
+            Ok(TreeNodeRecursion::Continue)
+        }
     }
 }
