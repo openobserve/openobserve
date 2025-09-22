@@ -1,5 +1,7 @@
 name: Enterprise Build Callback
 
+permissions: {}
+
 on:
   repository_dispatch:
     types: [enterprise-build-complete]
