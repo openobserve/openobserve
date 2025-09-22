@@ -106,20 +106,12 @@ async fn recursive_process_multiple_metas(
     let mut sorted_metas = relevant_metas;
     sorted_metas.sort_by_key(|m| m.start_time);
 
-    if
-        let Some(largest_meta) = sorted_metas
-            .iter()
-            .filter(|cache_meta| {
-                log::info!(
-                    "[CACHE CANDIDATES {trace_id}] Got caches: cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
-                    cache_meta.start_time,
-                    cache_meta.end_time
-                );
-                cache_meta.start_time <= cache_req.q_end_time &&
-                    cache_meta.end_time >= cache_req.q_start_time
-            })
-            .max_by_key(|result| select_cache_meta(result, &cache_req, &selection_strategy))
+    // Select the largest meta by selection strategy
+    if let Some(largest_meta) = sorted_metas
+        .iter()
+        .max_by_key(|meta| select_cache_meta(meta, &cache_req, &selection_strategy))
     {
+        let largest_meta = largest_meta.clone();
         let file_name = format!(
             "{}_{}_{}_{}.json",
             largest_meta.start_time,
@@ -134,6 +126,13 @@ async fn recursive_process_multiple_metas(
             } else {
                 0
             }
+        );
+        log::info!(
+            "[CACHE RESULT {trace_id}] Selected meta for query key: {} with file name: {} and start time: {} and end time: {}",
+            query_key,
+            file_name,
+            largest_meta.start_time,
+            largest_meta.end_time
         );
 
         let mut matching_cache_meta = largest_meta.clone();
@@ -224,14 +223,13 @@ async fn recursive_process_multiple_metas(
                 });
             }
         }
-        // Filter out the largest meta and call recursively with non-overlapping metas
+        // Remove all overlapping metas with the selected largest meta and call recursively
         let remaining_metas: Vec<ResultCacheMeta> = sorted_metas
-            .clone()
             .into_iter()
             .filter(|meta| {
-                !largest_meta.eq(meta) &&
-                    (meta.end_time <= largest_meta.start_time ||
-                        meta.start_time >= largest_meta.end_time)
+                // Keep only metas that don't overlap with the selected largest meta
+                !meta.eq(&largest_meta) && 
+                !(meta.start_time < largest_meta.end_time && meta.end_time > largest_meta.start_time)
             })
             .collect();
         if !remaining_metas.is_empty() {
@@ -249,21 +247,7 @@ async fn recursive_process_multiple_metas(
     Ok(())
 }
 
-/// Cache selection strategies determine how to choose the best cached result when multiple caches
-/// exist:
-///
-/// 1. Overlap: Selects cache with maximum overlap with query time range Example: Query:
-///    10:00-10:30, Cache1: 10:00-10:15, Cache2: 10:10-10:25 Chooses Cache2 (15min overlap) over
-///    Cache1 (10min overlap)
-///
-/// 2. Duration: Selects cache with longest duration regardless of overlap Example: Query:
-///    10:00-10:30, Cache1: 09:00-10:00, Cache2: 09:30-10:30   Chooses Cache1 (1hr) over Cache2
-///    (30min)
-///
-/// 3. Both: Calculates what percentage of the cache duration overlaps with query Example: Query:
-///    10:00-11:00 Cache1: 10:00-10:30 (duration: 30min, overlap: 30min) = (30/30)*100 = 100%
-///    Cache2: 10:15-11:15 (duration: 60min, overlap: 45min) = (45/60)*100 = 75% Chooses Cache1
-///    because 100% of its duration is useful for the query
+
 fn select_cache_meta(
     meta: &ResultCacheMeta,
     req: &CacheQueryRequest,
