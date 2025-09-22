@@ -224,11 +224,10 @@ pub fn create_wal_dir_datetime_filter(
                 month,
                 day,
                 hour,
-                start_time.minute(),
-                start_time.second(),
+                0,
+                0,
             )
             .single()
-            .and_then(|dt| dt.with_nanosecond(start_time.timestamp_subsec_nanos()))
         {
             datetime >= start_time && datetime <= end_time
         } else {
