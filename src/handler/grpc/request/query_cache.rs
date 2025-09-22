@@ -14,61 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use proto::cluster_rpc::{
-    DeleteResultCacheRequest, DeleteResultCacheResponse, MultiQueryCacheResponse,
-    QueryCacheRequest, QueryCacheRes, QueryCacheResponse, QueryResponse,
-    query_cache_server::QueryCache,
+    DeleteResultCacheRequest, DeleteResultCacheResponse, query_cache_server::QueryCache,
 };
 use tonic::{Request, Response, Status};
 
-use crate::{
-    common::meta::search::CacheQueryRequest,
-    service::search::cache::{cacher, multi},
-};
+use crate::service::search::cache::cacher;
 
 #[derive(Default)]
 pub struct QueryCacheServerImpl;
 
 #[tonic::async_trait]
 impl QueryCache for QueryCacheServerImpl {
-    async fn get_cached_result(
-        &self,
-        request: Request<QueryCacheRequest>,
-    ) -> Result<Response<QueryCacheResponse>, Status> {
-        let req: QueryCacheRequest = request.into_inner();
-        match cacher::get_cached_results(
-            &req.file_path,
-            &req.trace_id,
-            CacheQueryRequest {
-                q_start_time: req.start_time,
-                q_end_time: req.end_time,
-                is_aggregate: req.is_aggregate,
-                ts_column: req.timestamp_col,
-                discard_interval: req.discard_interval,
-                is_descending: req.is_descending,
-            },
-        )
-        .await
-        {
-            Some(res) => {
-                let res = QueryCacheRes {
-                    cached_response: Some(QueryResponse {
-                        data: serde_json::to_vec(&res.cached_response).unwrap(),
-                    }),
-                    has_cached_data: res.has_cached_data,
-                    cache_query_response: res.cache_query_response,
-                    cache_start_time: res.response_start_time,
-                    cache_end_time: res.response_end_time,
-                    is_descending: res.is_descending,
-                };
-
-                Ok(Response::new(QueryCacheResponse {
-                    response: Some(res),
-                }))
-            }
-            None => Ok(Response::new(QueryCacheResponse { response: None })),
-        }
-    }
-
     async fn delete_result_cache(
         &self,
         request: Request<DeleteResultCacheRequest>,
@@ -77,43 +33,5 @@ impl QueryCache for QueryCacheServerImpl {
         let deleted = cacher::delete_cache(&req.path, req.ts).await.is_ok();
 
         Ok(Response::new(DeleteResultCacheResponse { deleted }))
-    }
-
-    async fn get_multiple_cached_result(
-        &self,
-        request: Request<QueryCacheRequest>,
-    ) -> Result<Response<MultiQueryCacheResponse>, Status> {
-        let req: QueryCacheRequest = request.into_inner();
-        let results = multi::get_cached_results(
-            &req.file_path,
-            &req.trace_id,
-            CacheQueryRequest {
-                q_start_time: req.start_time,
-                q_end_time: req.end_time,
-                is_aggregate: req.is_aggregate,
-                ts_column: req.timestamp_col,
-                discard_interval: req.discard_interval,
-                is_descending: req.is_descending,
-            },
-        )
-        .await;
-        if results.is_empty() {
-            return Ok(Response::new(MultiQueryCacheResponse { response: vec![] }));
-        } else {
-            let mut response = Vec::new();
-            for res in results {
-                response.push(QueryCacheRes {
-                    cached_response: Some(QueryResponse {
-                        data: serde_json::to_vec(&res.cached_response).unwrap(),
-                    }),
-                    has_cached_data: res.has_cached_data,
-                    cache_query_response: res.cache_query_response,
-                    cache_start_time: res.response_start_time,
-                    cache_end_time: res.response_end_time,
-                    is_descending: res.is_descending,
-                });
-            }
-            Ok(Response::new(MultiQueryCacheResponse { response }))
-        }
     }
 }
