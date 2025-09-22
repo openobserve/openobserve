@@ -15,7 +15,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      metadata: read
 
     steps:
       - name: Generate token
