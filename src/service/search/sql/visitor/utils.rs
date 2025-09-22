@@ -222,10 +222,26 @@ pub fn is_simple_topn_query(query: &Query) -> Option<(String, usize, bool)> {
                     value: Value::Number(v, _b),
                     ..
                 })),
+            offset,
             ..
         }) => {
-            let v: i64 = v.parse().unwrap_or(0);
-            std::cmp::min(v, MAX_LIMIT) as usize
+            let limit_val: i64 = v.parse().unwrap_or(0);
+            let offset_val: i64 = match offset {
+                Some(offset) => {
+                    if let Expr::Value(ValueWithSpan {
+                        value: Value::Number(offset_v, _),
+                        ..
+                    }) = &offset.value
+                    {
+                        offset_v.parse().unwrap_or(0)
+                    } else {
+                        return None;
+                    }
+                }
+                _ => 0,
+            };
+            let effective_limit = limit_val + offset_val;
+            std::cmp::min(effective_limit, MAX_LIMIT) as usize
         }
         _ => return None,
     };
@@ -334,10 +350,26 @@ pub fn is_simple_distinct_query(query: &Query) -> Option<(String, usize, bool)> 
                     value: Value::Number(v, _b),
                     ..
                 })),
+            offset,
             ..
         }) => {
-            let v: i64 = v.parse().unwrap_or(0);
-            std::cmp::min(v, MAX_LIMIT) as usize
+            let limit_val: i64 = v.parse().unwrap_or(0);
+            let offset_val: i64 = match offset {
+                Some(offset) => {
+                    if let Expr::Value(ValueWithSpan {
+                        value: Value::Number(offset_v, _),
+                        ..
+                    }) = &offset.value
+                    {
+                        offset_v.parse().unwrap_or(0)
+                    } else {
+                        return None;
+                    }
+                }
+                _ => 0,
+            };
+            let effective_limit = limit_val + offset_val;
+            std::cmp::min(effective_limit, MAX_LIMIT) as usize
         }
         _ => return None,
     };
