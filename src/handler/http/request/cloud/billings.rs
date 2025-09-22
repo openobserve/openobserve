@@ -173,8 +173,18 @@ pub async fn process_session_detail(
                     json::Value::String(query.plan.to_string()),
                 ),
             ]);
-            telemetry::Telemetry::new()
+            let mut telemetry_instance = telemetry::Telemetry::new();
+            telemetry_instance
                 .send_track_event(
+                    "OpenObserve - New subscription started",
+                    Some(segment_event_data.clone()),
+                    false,
+                    false,
+                )
+                .await;
+
+            telemetry_instance
+                .send_keyevent_track_event(
                     "OpenObserve - New subscription started",
                     Some(segment_event_data),
                     false,
