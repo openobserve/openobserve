@@ -300,17 +300,11 @@ test.describe("dashboard UI testcases", () => {
         'SELECT kubernetes_namespace_name as "xAxis", count(kubernetes_namespace_name) as "y_axis_1"  FROM "e2e_automate"  GROUP BY "xAxis"'
       );
 
-    await page.waitForTimeout(1000);
-
     await pm.chartTypeSelector.searchAndAddField("y_axis_1", "x");
     await pm.chartTypeSelector.searchAndAddField("xAxis", "y");
     
     // Set relative time range  
      await pm.dashboardTimeRefresh.setRelative("6", "w");    
-
-    await  page.waitForTimeout(2000);
-
-    // await pm.dashboardPanelActions.applyDashboardBtn();
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -321,7 +315,9 @@ test.describe("dashboard UI testcases", () => {
 
     // Wait for chart to render after transpose and check for errors
     await pm.dashboardPanelActions.waitForChartToRender();
-    await page.waitForTimeout(2000);
+
+    // await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(1000);
 
     // Check for dashboard errors ONLY after transpose is applied
     const transposeErrorResult = await pm.logsVisualise.checkDashboardErrors(
