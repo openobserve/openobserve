@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
-
 use config::meta::{search::Response, sql::OrderBy};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -46,7 +44,7 @@ pub struct CacheQueryRequest {
     pub q_end_time: i64,
     pub is_aggregate: bool,
     pub ts_column: String,
-    pub discard_interval: i64,
+    pub histogram_interval: i64,
     pub is_descending: bool,
 }
 
@@ -80,15 +78,13 @@ pub enum ResultCacheSelectionStrategy {
 }
 
 // Implementing FromStr for ResultCacheSelectionStrategy
-impl FromStr for ResultCacheSelectionStrategy {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<ResultCacheSelectionStrategy, Self::Err> {
+impl From<&str> for ResultCacheSelectionStrategy {
+    fn from(input: &str) -> Self {
         match input {
-            "overlap" => Ok(ResultCacheSelectionStrategy::Overlap),
-            "duration" => Ok(ResultCacheSelectionStrategy::Duration),
-            "both" => Ok(ResultCacheSelectionStrategy::Both),
-            _ => Ok(ResultCacheSelectionStrategy::Both),
+            "overlap" => ResultCacheSelectionStrategy::Overlap,
+            "duration" => ResultCacheSelectionStrategy::Duration,
+            "both" => ResultCacheSelectionStrategy::Both,
+            _ => ResultCacheSelectionStrategy::Both,
         }
     }
 }
@@ -191,7 +187,7 @@ mod tests {
             q_end_time: 2000,
             is_aggregate: true,
             ts_column: "timestamp".to_string(),
-            discard_interval: 100,
+            histogram_interval: 100,
             is_descending: false,
         };
 
@@ -199,7 +195,7 @@ mod tests {
         assert_eq!(request.q_end_time, 2000);
         assert!(request.is_aggregate);
         assert_eq!(request.ts_column, "timestamp");
-        assert_eq!(request.discard_interval, 100);
+        assert_eq!(request.histogram_interval, 100);
         assert!(!request.is_descending);
     }
 
@@ -240,19 +236,19 @@ mod tests {
     #[test]
     fn test_result_cache_selection_strategy_from_str() {
         assert_eq!(
-            ResultCacheSelectionStrategy::from_str("overlap").unwrap(),
+            ResultCacheSelectionStrategy::from("overlap"),
             ResultCacheSelectionStrategy::Overlap
         );
         assert_eq!(
-            ResultCacheSelectionStrategy::from_str("duration").unwrap(),
+            ResultCacheSelectionStrategy::from("duration"),
             ResultCacheSelectionStrategy::Duration
         );
         assert_eq!(
-            ResultCacheSelectionStrategy::from_str("both").unwrap(),
+            ResultCacheSelectionStrategy::from("both"),
             ResultCacheSelectionStrategy::Both
         );
         assert_eq!(
-            ResultCacheSelectionStrategy::from_str("invalid").unwrap(),
+            ResultCacheSelectionStrategy::from("invalid"),
             ResultCacheSelectionStrategy::Both
         );
     }

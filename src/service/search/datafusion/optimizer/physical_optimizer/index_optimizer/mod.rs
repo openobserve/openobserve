@@ -245,7 +245,7 @@ impl TreeNodeRewriter for IndexOptimizerRewrite {
                     .clone()
                     .set_index_optimize_mode(self.index_optimizer_mode.clone()),
             ) as Arc<dyn ExecutionPlan>;
-            return Ok(Transformed::yes(remote));
+            return Ok(Transformed::new(remote, true, TreeNodeRecursion::Stop));
         }
         Ok(Transformed::no(node))
     }

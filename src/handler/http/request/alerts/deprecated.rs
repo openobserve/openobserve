@@ -98,7 +98,7 @@ pub async fn save_alert(
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
-    operation_id = "UpdateAlert",
+    operation_id = "UpdateAlertDeprecated",
     summary = "Update alert (deprecated)",
     description = "Updates an existing alert with new configuration settings. This endpoint is deprecated; please use \
                    the newer alert management endpoints for improved functionality and better error handling.",
@@ -203,7 +203,7 @@ async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest)
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
-    operation_id = "ListAlerts",
+    operation_id = "ListAlertsDeprecated",
     summary = "List all alerts (deprecated)",
     description = "Retrieves all alerts in the organization across all streams. Supports filtering by owner, enabled \
                    status, stream type, and stream name. This endpoint is deprecated; please use the newer alert \
@@ -314,7 +314,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
-    operation_id = "GetAlert",
+    operation_id = "GetAlertDeprecated",
     summary = "Get alert details (deprecated)",
     description = "Retrieves detailed information about a specific alert including its configuration, trigger conditions, \
                    and execution status. This endpoint is deprecated; please use the newer alert management endpoints \
@@ -370,7 +370,7 @@ async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) 
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
-    operation_id = "DeleteAlert",
+    operation_id = "DeleteAlertDeprecated",
     summary = "Delete alert (deprecated)",
     description = "Permanently removes an alert and stops its monitoring and notification functionality. This endpoint is \
                    deprecated; please use the newer alert management endpoints for better error handling and \
@@ -408,7 +408,7 @@ async fn delete_alert(path: web::Path<(String, String, String)>, req: HttpReques
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
-    operation_id = "EnableAlert",
+    operation_id = "EnableAlertDeprecated",
     summary = "Enable/disable alert (deprecated)",
     description = "Enables or disables an alert's monitoring and notification functionality. When disabled, the alert \
                    will not trigger or send notifications. This endpoint is deprecated; please use the newer alert \
@@ -453,7 +453,7 @@ async fn enable_alert(path: web::Path<(String, String, String)>, req: HttpReques
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
-    operation_id = "TriggerAlert",
+    operation_id = "TriggerAlertDeprecated",
     summary = "Manually trigger alert (deprecated)",
     description = "Manually triggers an alert to test its notification functionality and validate the configured \
                    destinations. This is useful for testing alert configurations without waiting for actual \

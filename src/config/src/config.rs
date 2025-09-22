@@ -13,14 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, collections::BTreeMap, path::Path, sync::Arc, time::Duration};
+use std::{
+    cmp::max,
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 use aes_siv::{KeyInit, siv::Aes256Siv};
 use arc_swap::ArcSwap;
 use base64::{Engine, prelude::BASE64_STANDARD};
 use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
-use dotenvy::dotenv_override;
 use hashbrown::{HashMap, HashSet};
 use itertools::chain;
 use lettre::{
@@ -31,6 +36,7 @@ use lettre::{
     },
 };
 use once_cell::sync::Lazy;
+use sha256::digest;
 
 use crate::{
     meta::{cluster, stream::QueryPartitionStrategy},
@@ -306,6 +312,35 @@ pub fn get_instance_id() -> String {
     }
 }
 
+pub fn calculate_config_file_hash(path: &PathBuf) -> Result<String, anyhow::Error> {
+    let content = std::fs::read_to_string(path)?;
+    Ok(digest(content))
+}
+
+pub fn load_config() -> Result<(), anyhow::Error> {
+    match crate::config_path_manager::get_config_file_path() {
+        Some(path) => {
+            log::info!("Loading config from file {:?}", &path);
+            if dotenvy::from_path_override(&path).is_err() {
+                return Err(anyhow::anyhow!("Config loading from file failed"));
+            }
+            log::info!("Config loaded successfully from file {path:?}");
+        }
+        None => {
+            // Perform default .env discovery and set it in the config manager
+            if let Ok(env_path) = dotenvy::dotenv_override() {
+                log::debug!("Config init: Found .env file at {env_path:?} during boot");
+                // Set the default path in config manager
+                crate::config_path_manager::set_config_file_path(env_path)?;
+            } else {
+                return Err(anyhow::anyhow!(
+                    "Config init: No .env file found during default discovery"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
 static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =
     tokio::sync::OnceCell::const_new();
 
@@ -492,7 +527,7 @@ pub struct Chrome {
     pub chrome_check_default: bool,
     #[env_config(name = "ZO_CHROME_AUTO_DOWNLOAD", default = false)]
     pub chrome_auto_download: bool,
-    #[env_config(name = "ZO_CHROME_DOWNLOAD_PATH", default = "./download")]
+    #[env_config(name = "ZO_CHROME_DOWNLOAD_PATH", default = "./data/download")]
     pub chrome_download_path: String,
     #[env_config(name = "ZO_CHROME_NO_SANDBOX", default = false)]
     pub chrome_no_sandbox: bool,
@@ -752,8 +787,6 @@ pub struct Common {
     pub feature_distinct_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
     pub feature_quick_mode_fields: String,
-    #[env_config(name = "ZO_FEATURE_FILELIST_DEDUP_ENABLED", default = false)]
-    pub feature_filelist_dedup_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
     pub feature_query_queue_enabled: bool,
     #[env_config(
@@ -762,8 +795,6 @@ pub struct Common {
         default = "file_num"
     )]
     pub feature_query_partition_strategy: QueryPartitionStrategy,
-    #[env_config(name = "ZO_FEATURE_QUERY_INFER_SCHEMA", default = false)]
-    pub feature_query_infer_schema: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
     pub feature_query_exclude_all: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
@@ -1077,7 +1108,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_RESULT_CACHE_SELECTION_STRATEGY",
         default = "overlap",
-        help = "Strategy to use for result cache, default is both , possible value - both,overlap , duration"
+        help = "Strategy to use for result cache, default is both, possible value - both, overlap, duration"
     )]
     pub result_cache_selection_strategy: String,
     #[env_config(
@@ -1148,6 +1179,12 @@ pub struct Common {
         help = "Enable to use large partition for index. This will apply for all streams"
     )]
     pub align_partitions_for_index: bool,
+    #[env_config(
+        name = "ZO_CONFIG_WATCHER_INTERVAL",
+        default = 30,
+        help = "Config file watcher interval in seconds. Set to 0 to disable"
+    )]
+    pub env_watcher_interval: u64,
     #[env_config(
         name = "ZO_LOG_PAGE_DEFAULT_FIELD_LIST",
         default = "uds",
@@ -2029,7 +2066,10 @@ pub struct EnrichmentTable {
 }
 
 pub fn init() -> Config {
-    dotenv_override().ok();
+    if let Err(e) = load_config() {
+        log::error!("Failed to load config {e}");
+        // do nothing
+    }
     let mut cfg = Config::init().expect("config init error");
 
     // set local mode

@@ -23,7 +23,6 @@ use tokio::sync::{OnceCell, mpsc};
 use crate::errors::{Error, Result};
 
 pub mod nats;
-pub mod nop;
 
 #[derive(Debug)]
 pub enum RetentionPolicy {
@@ -56,7 +55,7 @@ pub async fn init() -> Result<()> {
 async fn default() -> Box<dyn Queue> {
     match config::get_config().common.queue_store.as_str().into() {
         MetaStore::Nats => Box::<nats::NatsQueue>::default(),
-        _ => Box::<nop::NopQueue>::default(),
+        _ => Box::<nats::NatsQueue>::default(),
     }
 }
 

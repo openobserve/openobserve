@@ -122,6 +122,7 @@ use crate::{common::meta, handler::http::request};
         request::alerts::delete_alert,
         request::alerts::list_alerts,
         request::alerts::enable_alert,
+        request::alerts::enable_alert_bulk,
         request::alerts::trigger_alert,
         request::alerts::move_alerts,
         request::alerts::templates::list_templates,
@@ -155,6 +156,7 @@ use crate::{common::meta, handler::http::request};
         request::pipeline::delete_pipeline,
         request::pipeline::update_pipeline,
         request::pipeline::enable_pipeline,
+        request::pipeline::enable_pipeline_bulk,
         request::dashboards::reports::create_report,
         request::dashboards::reports::update_report,
         request::dashboards::reports::list_reports,
@@ -238,7 +240,6 @@ use crate::{common::meta, handler::http::request};
             config::meta::timed_annotations::TimedAnnotationDelete,
             config::meta::timed_annotations::TimedAnnotationUpdate,
             // Dashboards
-            crate::handler::http::models::dashboards::CreateDashboardRequestBody,
             crate::handler::http::models::dashboards::CreateDashboardResponseBody,
             crate::handler::http::models::dashboards::GetDashboardResponseBody,
             crate::handler::http::models::dashboards::UpdateDashboardRequestBody,

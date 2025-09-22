@@ -2567,20 +2567,6 @@ pub mod query_cache_server {
     /// Generated trait containing gRPC methods that should be implemented for use with QueryCacheServer.
     #[async_trait]
     pub trait QueryCache: std::marker::Send + std::marker::Sync + 'static {
-        async fn get_cached_result(
-            &self,
-            request: tonic::Request<super::QueryCacheRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::QueryCacheResponse>,
-            tonic::Status,
-        >;
-        async fn get_multiple_cached_result(
-            &self,
-            request: tonic::Request<super::QueryCacheRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::MultiQueryCacheResponse>,
-            tonic::Status,
-        >;
         async fn delete_result_cache(
             &self,
             request: tonic::Request<super::DeleteResultCacheRequest>,

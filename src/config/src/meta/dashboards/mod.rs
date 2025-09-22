@@ -43,157 +43,46 @@ pub struct Dashboard {
     pub updated_at: i64,
 }
 
-impl Dashboard {
-    pub fn dashboard_id(&self) -> Option<&str> {
-        match self.version {
-            1 => self.v1.as_ref().map(|inner| inner.dashboard_id.as_str()),
-            2 => self.v2.as_ref().map(|inner| inner.dashboard_id.as_str()),
-            3 => self.v3.as_ref().map(|inner| inner.dashboard_id.as_str()),
-            4 => self.v4.as_ref().map(|inner| inner.dashboard_id.as_str()),
-            5 => self.v5.as_ref().map(|inner| inner.dashboard_id.as_str()),
-            _ => None,
+/// Generate elegant setter methods for `Dashboard` fields.
+macro_rules! make_setter {
+    ($field:ident; $($ver:literal $vx:ident),+) => {
+        #[doc = concat!("Set the ", stringify!($field), " field for the dashboard.")]
+        pub fn ${concat(set_, $field)}(&mut self, $field: String) {
+            match self {
+                $(Self { version: $ver, $vx: Some(inner), .. } => {inner.$field = $field;})+
+                _ => {}
+            }
         }
-    }
+    };
+}
 
-    pub fn set_dashboard_id(&mut self, dashboard_id: String) {
-        match self {
-            Self {
-                version: 1,
-                v1: Some(inner),
-                ..
-            } => inner.dashboard_id = dashboard_id,
-            Self {
-                version: 2,
-                v2: Some(inner),
-                ..
-            } => inner.dashboard_id = dashboard_id,
-            Self {
-                version: 3,
-                v3: Some(inner),
-                ..
-            } => inner.dashboard_id = dashboard_id,
-            Self {
-                version: 4,
-                v4: Some(inner),
-                ..
-            } => inner.dashboard_id = dashboard_id,
-            Self {
-                version: 5,
-                v5: Some(inner),
-                ..
-            } => inner.dashboard_id = dashboard_id,
-            _ => {}
-        };
-    }
+macro_rules! make_getter {
+    ($field:ident; $($ver:literal $vx:ident),+) => {
+        #[doc = concat!("Get the ", stringify!($field), " field for the dashboard.")]
+        pub fn $field(&self) -> Option<&str> {
+            match self.version {
+                $($ver => self.$vx.as_ref().map(|inner| inner.$field.as_str()),)+
+                _ => None,
+            }
+        }
+    };
+}
+
+impl Dashboard {
+    make_getter!(dashboard_id; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
+    make_setter!(dashboard_id; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
+
+    make_getter!(owner; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
+    make_setter!(owner; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
+
+    make_getter!(title; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
+    make_setter!(title; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
+
+    make_getter!(description; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
+    make_getter!(role; 1 v1, 2 v2, 3 v3, 4 v4, 5 v5);
 
     pub fn set_updated_at(&mut self) {
         self.updated_at = Utc::now().timestamp_micros();
-    }
-
-    pub fn owner(&self) -> Option<&str> {
-        match self.version {
-            1 => self.v1.as_ref().map(|inner| inner.owner.as_str()),
-            2 => self.v2.as_ref().map(|inner| inner.owner.as_str()),
-            3 => self.v3.as_ref().map(|inner| inner.owner.as_str()),
-            4 => self.v4.as_ref().map(|inner| inner.owner.as_str()),
-            5 => self.v5.as_ref().map(|inner| inner.owner.as_str()),
-            _ => None,
-        }
-    }
-
-    pub fn set_owner(&mut self, owner: String) {
-        match self {
-            Self {
-                version: 1,
-                v1: Some(inner),
-                ..
-            } => inner.owner = owner,
-            Self {
-                version: 2,
-                v2: Some(inner),
-                ..
-            } => inner.owner = owner,
-            Self {
-                version: 3,
-                v3: Some(inner),
-                ..
-            } => inner.owner = owner,
-            Self {
-                version: 4,
-                v4: Some(inner),
-                ..
-            } => inner.owner = owner,
-            Self {
-                version: 5,
-                v5: Some(inner),
-                ..
-            } => inner.owner = owner,
-            _ => {}
-        };
-    }
-
-    pub fn title(&self) -> Option<&str> {
-        match self.version {
-            1 => self.v1.as_ref().map(|inner| inner.title.as_str()),
-            2 => self.v2.as_ref().map(|inner| inner.title.as_str()),
-            3 => self.v3.as_ref().map(|inner| inner.title.as_str()),
-            4 => self.v4.as_ref().map(|inner| inner.title.as_str()),
-            5 => self.v5.as_ref().map(|inner| inner.title.as_str()),
-            _ => None,
-        }
-    }
-
-    pub fn set_title(&mut self, title: String) {
-        match self {
-            Self {
-                version: 1,
-                v1: Some(inner),
-                ..
-            } => inner.title = title,
-            Self {
-                version: 2,
-                v2: Some(inner),
-                ..
-            } => inner.title = title,
-            Self {
-                version: 3,
-                v3: Some(inner),
-                ..
-            } => inner.title = title,
-            Self {
-                version: 4,
-                v4: Some(inner),
-                ..
-            } => inner.title = title,
-            Self {
-                version: 5,
-                v5: Some(inner),
-                ..
-            } => inner.title = title,
-            _ => {}
-        };
-    }
-
-    pub fn description(&self) -> Option<&str> {
-        match self.version {
-            1 => self.v1.as_ref().map(|inner| inner.description.as_str()),
-            2 => self.v2.as_ref().map(|inner| inner.description.as_str()),
-            3 => self.v3.as_ref().map(|inner| inner.description.as_str()),
-            4 => self.v4.as_ref().map(|inner| inner.description.as_str()),
-            5 => self.v5.as_ref().map(|inner| inner.description.as_str()),
-            _ => None,
-        }
-    }
-
-    pub fn role(&self) -> Option<&str> {
-        match self.version {
-            1 => self.v1.as_ref().map(|inner| inner.role.as_str()),
-            2 => self.v2.as_ref().map(|inner| inner.role.as_str()),
-            3 => self.v3.as_ref().map(|inner| inner.role.as_str()),
-            4 => self.v4.as_ref().map(|inner| inner.role.as_str()),
-            5 => self.v5.as_ref().map(|inner| inner.role.as_str()),
-            _ => None,
-        }
     }
 
     /// Returns the timestamp with timezone of the time at which the dashboard
@@ -307,6 +196,87 @@ mod tests {
     }
 
     #[test]
+    fn test_set_dashboard_id_v1() {
+        let mut dashboard = Dashboard {
+            version: 1,
+            v1: Some(v1::Dashboard {
+                dashboard_id: "old_id".to_string(),
+                title: "Test".to_string(),
+                description: "Test desc".to_string(),
+                role: String::new(),
+                owner: String::new(),
+                created: datetime_now(),
+                panels: Vec::new(),
+                layouts: None,
+                variables: None,
+                updated_at: 0,
+            }),
+            ..Default::default()
+        };
+
+        dashboard.set_dashboard_id("new_dashboard_id".to_string());
+
+        assert_eq!(dashboard.dashboard_id(), Some("new_dashboard_id"));
+        assert_eq!(
+            dashboard.v1.as_ref().unwrap().dashboard_id,
+            "new_dashboard_id"
+        );
+    }
+
+    #[test]
+    fn test_set_dashboard_id_multiple_versions() {
+        // Test that setter works for v1
+        let v1_dashboard = v1::Dashboard {
+            dashboard_id: "old_id_v1".to_string(),
+            title: "Test V1".to_string(),
+            description: "Test desc V1".to_string(),
+            role: String::new(),
+            owner: String::new(),
+            created: datetime_now(),
+            panels: Vec::new(),
+            layouts: None,
+            variables: None,
+            updated_at: 0,
+        };
+        let mut dashboard = Dashboard::from(v1_dashboard);
+
+        dashboard.set_dashboard_id("new_id_v1".to_string());
+
+        assert_eq!(dashboard.dashboard_id(), Some("new_id_v1"));
+        assert_eq!(dashboard.v1.as_ref().unwrap().dashboard_id, "new_id_v1");
+
+        // Test with empty string
+        dashboard.set_dashboard_id("".to_string());
+        assert_eq!(dashboard.dashboard_id(), Some(""));
+        assert_eq!(dashboard.v1.as_ref().unwrap().dashboard_id, "");
+    }
+
+    #[test]
+    fn test_set_dashboard_id_no_inner_dashboard() {
+        let mut dashboard = Dashboard {
+            version: 1,
+            v1: None,
+            ..Default::default()
+        };
+
+        dashboard.set_dashboard_id("should_not_set".to_string());
+
+        assert_eq!(dashboard.dashboard_id(), None);
+    }
+
+    #[test]
+    fn test_set_dashboard_id_unsupported_version() {
+        let mut dashboard = Dashboard {
+            version: 99,
+            ..Default::default()
+        };
+
+        dashboard.set_dashboard_id("should_not_set".to_string());
+
+        assert_eq!(dashboard.dashboard_id(), None);
+    }
+
+    #[test]
     fn test_set_updated_at() {
         let mut dashboard = Dashboard::default();
         let before = Utc::now().timestamp_micros();
@@ -326,6 +296,112 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(dashboard.owner(), None);
+    }
+
+    #[test]
+    fn test_set_owner_v1() {
+        let mut dashboard = Dashboard {
+            version: 1,
+            v1: Some(v1::Dashboard {
+                dashboard_id: "test_id".to_string(),
+                title: "Test".to_string(),
+                description: "Test desc".to_string(),
+                role: String::new(),
+                owner: "old_owner@example.com".to_string(),
+                created: datetime_now(),
+                panels: Vec::new(),
+                layouts: None,
+                variables: None,
+                updated_at: 0,
+            }),
+            ..Default::default()
+        };
+
+        dashboard.set_owner("new_owner@example.com".to_string());
+
+        assert_eq!(dashboard.owner(), Some("new_owner@example.com"));
+        assert_eq!(
+            dashboard.v1.as_ref().unwrap().owner,
+            "new_owner@example.com"
+        );
+    }
+
+    #[test]
+    fn test_set_owner_multiple_versions() {
+        // Test that setter works for v1
+        let v1_dashboard = v1::Dashboard {
+            dashboard_id: "test_id_v1".to_string(),
+            title: "Test V1".to_string(),
+            description: "Test desc V1".to_string(),
+            role: String::new(),
+            owner: "old_owner_v1@example.com".to_string(),
+            created: datetime_now(),
+            panels: Vec::new(),
+            layouts: None,
+            variables: None,
+            updated_at: 0,
+        };
+        let mut dashboard = Dashboard::from(v1_dashboard);
+
+        dashboard.set_owner("new_owner_v1@example.com".to_string());
+
+        assert_eq!(dashboard.owner(), Some("new_owner_v1@example.com"));
+        assert_eq!(
+            dashboard.v1.as_ref().unwrap().owner,
+            "new_owner_v1@example.com"
+        );
+
+        // Test with empty string
+        dashboard.set_owner("".to_string());
+        assert_eq!(dashboard.owner(), Some(""));
+        assert_eq!(dashboard.v1.as_ref().unwrap().owner, "");
+    }
+
+    #[test]
+    fn test_set_owner_no_inner_dashboard() {
+        let mut dashboard = Dashboard {
+            version: 1,
+            v1: None,
+            ..Default::default()
+        };
+
+        dashboard.set_owner("should_not_set@example.com".to_string());
+
+        assert_eq!(dashboard.owner(), None);
+    }
+
+    #[test]
+    fn test_set_owner_unsupported_version() {
+        let mut dashboard = Dashboard {
+            version: 99,
+            ..Default::default()
+        };
+
+        dashboard.set_owner("should_not_set@example.com".to_string());
+
+        assert_eq!(dashboard.owner(), None);
+    }
+
+    #[test]
+    fn test_set_owner_empty_string() {
+        let v1_dashboard = v1::Dashboard {
+            dashboard_id: "test_id".to_string(),
+            title: "Test".to_string(),
+            description: "Test desc".to_string(),
+            role: String::new(),
+            owner: "existing_owner@example.com".to_string(),
+            created: datetime_now(),
+            panels: Vec::new(),
+            layouts: None,
+            variables: None,
+            updated_at: 0,
+        };
+        let mut dashboard = Dashboard::from(v1_dashboard);
+
+        dashboard.set_owner("".to_string());
+
+        assert_eq!(dashboard.owner(), Some(""));
+        assert_eq!(dashboard.v1.as_ref().unwrap().owner, "");
     }
 
     #[test]
