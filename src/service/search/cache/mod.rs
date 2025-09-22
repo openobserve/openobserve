@@ -166,6 +166,7 @@ pub async fn search(
                     file_path: file_path.clone(),
                     cache_query_response: true,
                     clear_cache: !is_streaming,
+                    trace_id: trace_id.to_string(),
                     ..Default::default()
                 }
             }
@@ -1079,6 +1080,7 @@ pub async fn check_cache_v2(
                     limit: v.limit,
                     is_aggregate,
                     clear_cache: true,
+                    trace_id: trace_id.to_string(),
                     ..Default::default()
                 }
             }

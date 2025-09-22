@@ -795,7 +795,7 @@ pub async fn delete_cache(
             }
         }
     }
-    for file in remove_files {
+    for file in remove_files.iter() {
         let columns = file
             .strip_prefix(&prefix)
             .unwrap()
@@ -810,8 +810,9 @@ pub async fn delete_cache(
         r.remove(&query_key);
     }
     log::info!(
-        "Deleting cache for path end, took: {} ms, {path}",
-        start.elapsed().as_millis()
+        "Deleting cache for path end, took: {} ms, remove_files_num: {}, {path}",
+        start.elapsed().as_millis(),
+        remove_files.len(),
     );
     Ok(true)
 }
