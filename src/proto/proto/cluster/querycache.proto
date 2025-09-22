@@ -6,45 +6,8 @@ option java_outer_classname = "querycacheProto";
 
 package cluster;
 
-
-message QueryDelta {
-    int64  delta_start_time = 1;
-    int64    delta_end_time = 2;
-    bool delta_removed_hits = 3; 
-}
-
-message QueryResponse {
-    bytes data = 1;
-}
-
-
-message QueryCacheRequest {
-    int64  start_time = 1;
-    int64    end_time = 2;
-    bool is_aggregate = 3; 
-    string  query_key = 4; 
-    string  file_path = 5; 
-    string  timestamp_col = 6; 
-    string  trace_id = 7;
-    int64 discard_interval = 8;
-    bool is_descending = 9; 
-}
-
-message QueryCacheRes {
-    QueryResponse cached_response = 1;
-    bool          has_cached_data = 2;
-    bool     cache_query_response = 3;
-    int64        cache_start_time = 4;
-    int64          cache_end_time = 5;
-    bool is_descending = 6;
-}
-
-message QueryCacheResponse {
-    optional QueryCacheRes response  = 1;   
-}
-
-message MultiQueryCacheResponse {
-    repeated QueryCacheRes response  = 1;   
+service QueryCache {
+    rpc DeleteResultCache (DeleteResultCacheRequest) returns (DeleteResultCacheResponse) {}
 }
 
 message DeleteResultCacheRequest {
@@ -54,10 +17,4 @@ message DeleteResultCacheRequest {
 
 message DeleteResultCacheResponse {
     bool deleted = 1;  
-}
-
-service QueryCache {
-    rpc GetCachedResult (QueryCacheRequest) returns (QueryCacheResponse) {}
-    rpc GetMultipleCachedResult (QueryCacheRequest) returns (MultiQueryCacheResponse) {}
-    rpc DeleteResultCache (DeleteResultCacheRequest) returns (DeleteResultCacheResponse) {}
 }

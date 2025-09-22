@@ -2031,6 +2031,78 @@ export class LogsPage {
         return downloadPath;
     }
 
+    // Helper method for common file validation logic (lines 2037-2046)
+    async _saveAndValidateDownloadFile(download, expectedFileName, downloadDir) {
+        const downloadPath = path.join(downloadDir, expectedFileName);
+
+        // Save the download
+        await download.saveAs(downloadPath);
+
+        // Wait for file system to sync
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Verify file exists and has content
+        expect(fs.existsSync(downloadPath)).toBe(true);
+        const stats = fs.statSync(downloadPath);
+        expect(stats.size).toBeGreaterThan(0);
+
+        return downloadPath;
+    }
+
+    async verifyJsonDownload(download, expectedFileName, downloadDir) {
+        const downloadPath = await this._saveAndValidateDownloadFile(download, expectedFileName, downloadDir);
+
+        // Verify it's a JSON file
+        const content = fs.readFileSync(downloadPath, 'utf8');
+
+        // Parse as JSON to verify it's valid JSON
+        let jsonData;
+        try {
+            jsonData = JSON.parse(content);
+        } catch (error) {
+            throw new Error(`Downloaded file is not valid JSON: ${error.message}`);
+        }
+
+        // Verify it's an array of objects and contains expected fields
+        expect(Array.isArray(jsonData)).toBe(true);
+        expect(jsonData.length).toBeGreaterThan(0);
+
+        // Check that the first record has the expected timestamp field
+        const firstRecord = jsonData[0];
+        expect(firstRecord).toHaveProperty('_timestamp');
+
+        console.log(`JSON Download ${expectedFileName}: ${jsonData.length} records`);
+
+        return downloadPath;
+    }
+
+    async verifyJsonDownloadWithCount(download, expectedFileName, downloadDir, expectedCount) {
+        const downloadPath = await this._saveAndValidateDownloadFile(download, expectedFileName, downloadDir);
+
+        // Verify it's a JSON file
+        const content = fs.readFileSync(downloadPath, 'utf8');
+
+        // Parse as JSON to verify it's valid JSON
+        let jsonData;
+        try {
+            jsonData = JSON.parse(content);
+        } catch (error) {
+            throw new Error(`Downloaded file is not valid JSON: ${error.message}`);
+        }
+
+        // Verify it's an array of objects and contains expected fields
+        expect(Array.isArray(jsonData)).toBe(true);
+        expect(jsonData.length).toBe(expectedCount);
+
+        // Check that the first record has the expected timestamp field
+        const firstRecord = jsonData[0];
+        expect(firstRecord).toHaveProperty('_timestamp');
+
+        console.log(`JSON Download ${expectedFileName}: ${jsonData.length} records (expected ${expectedCount})`);
+
+        return downloadPath;
+    }
+
     // Download action methods
     async clickMoreOptionsButton() {
         return await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
