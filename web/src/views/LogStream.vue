@@ -40,17 +40,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div data-test="streams-search-stream-input">
           <q-input
+            ref="searchInputRef"
             v-model="filterQuery"
             borderless
             dense
-            class="q-ml-auto no-border o2-search-input tw-h-[36px]"
+            class="q-ml-auto no-border o2-search-input tw-h-[36px] tw-w-[200px]"
             :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             :placeholder="t('logStream.search')"
             debounce="300"
+            @focus="isSearchInputFocused = true"
+            @blur="isSearchInputFocused = false"
           >
             <template #prepend>
               <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
             </template>
+              <kbd v-if="!isSearchInputFocused" class="tw-my-auto tw-border-[1px] tw-px-1 tw-rounded-[4px] "
+              :class="store.state.theme === 'dark' ? 'tw-border-[#4E5157] tw-text-[#c0c0c1]' : 'tw-border-[#C9CCD6] tw-text-[#666666]'"
+              >/</kbd>
           </q-input>
         </div>
         <q-btn
@@ -328,6 +334,8 @@ import {
   ref,
   onActivated,
   onBeforeMount,
+  onMounted,
+  onUnmounted,
   type Ref,
 } from "vue";
 import { useStore } from "vuex";
@@ -374,6 +382,8 @@ export default defineComponent({
     const qTable: any = ref(null);
     const previousOrgIdentifier = ref("");
     const filterQuery = ref("");
+    const searchInputRef = ref(null);
+    const isSearchInputFocused = ref(false);
     const duplicateStreamList: Ref<any[]> = ref([]);
     const selectedStreamType = ref("logs");
     const loadingState = ref(true);
@@ -503,6 +513,24 @@ export default defineComponent({
     let deleteStreamName = "";
     let deleteStreamType = "";
 
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        const activeElement = document.activeElement as HTMLElement;
+        if (activeElement?.tagName !== 'INPUT' && activeElement?.tagName !== 'TEXTAREA') {
+          event.preventDefault();
+          searchInputRef.value?.focus();
+        }
+      }
+    };
+
+    onMounted(() => {
+      document.addEventListener('keydown', handleKeyDown);
+    });
+
+    onUnmounted(() => {
+      document.removeEventListener('keydown', handleKeyDown);
+    });
+
     onBeforeMount(() => {
       if (columns.value && !store.state.zoConfig.show_stream_stats_doc_num) {
         columns.value = columns.value.filter(
@@ -524,17 +552,6 @@ export default defineComponent({
     const isSchemaUDSEnabled = computed(() => {
       return store.state.zoConfig.user_defined_schemas_enabled;
     });
-
-    // As filter data don't gets called when search input is cleared.
-    // So calling onChangeStreamFilter to filter again
-    // watch(
-    //   () => filterQuery.value,
-    //   (value) => {
-    //     if (!value) {
-    //       onChangeStreamFilter(selectedStreamType.value);
-    //     }
-    //   },
-    // );
 
     const getLogStream = (refresh: boolean = false) => {
       if (store.state.selectedOrganization != null) {
@@ -977,6 +994,8 @@ export default defineComponent({
       outlinedDelete,
       isSchemaUDSEnabled,
       filterQuery,
+      searchInputRef,
+      isSearchInputFocused,
       filterData,
       getImageURL,
       verifyOrganizationStatus,
