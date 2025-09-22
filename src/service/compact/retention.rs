@@ -570,7 +570,7 @@ fn generate_local_dirs(
 ) -> Vec<PathBuf> {
     let cfg = get_config();
     let mut dirs_to_delete = Vec::new();
-    while date_start <= date_end {
+    while date_start < date_end {
         let day_dir = format!(
             "{}files/{org_id}/{stream_type}/{stream_name}/{}",
             cfg.common.data_stream_dir,
