@@ -35,6 +35,7 @@ use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyEx
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
 #[derive(Debug)]
 pub struct PhysicalPlanNodePhysicalExtensionCodec {
+    #[allow(dead_code)]
     pub org_id: String,
 }
 
