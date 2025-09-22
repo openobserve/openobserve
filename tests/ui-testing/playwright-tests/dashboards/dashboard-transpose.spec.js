@@ -250,4 +250,83 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
+
+  test("should not show an error when transpose is enabled from config with custom SQL query", async ({
+    page,
+  }) => {
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
+
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+
+    // Set up listener to catch console errors
+    let errorMessage = "";
+    page.on("console", (msg) => {
+      if (msg.type() === "error") {
+        errorMessage += msg.text() + "\n";
+      }
+    });
+
+    // Navigate to the dashboards list
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard and add a panel
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+
+    // Select table chart type
+    await pm.chartTypeSelector.selectChartType("table");
+
+    // Open Custom SQL editor
+    await page.locator('[data-test="dashboard-customSql"]').click();
+
+    // Focus on the editor and enter the custom SQL query
+    await page.locator(".view-line").first().click();
+    await page
+      .locator('[data-test="dashboard-panel-query-editor"]')
+      .locator(".monaco-editor")
+      .click();
+    await page
+      .locator('[data-test="dashboard-panel-query-editor"]')
+      .locator(".inputarea")
+      .fill(
+        'SELECT k8s_namespace_name as "xAxis", count(k8s_namespace_name) as "y_axis_1" FROM "default" GROUP BY "xAxis"'
+      );
+
+    // Map query results to chart axes
+    await page.waitForTimeout(2000);
+
+    await pm.chartTypeSelector.removeField("_timestamp", "x");
+
+    await page.waitForTimeout(2000);
+    await pm.chartTypeSelector.searchAndAddField("y_axis_1", "x");
+    await pm.chartTypeSelector.searchAndAddField("xAxis", "y");
+    
+    // Set relative time range  
+     await pm.dashboardTimeRefresh.setRelativeTimeRange("6-w");    
+
+    await  page.waitForTimeout(2000);
+
+    // await pm.dashboardPanelActions.applyDashboardBtn();
+
+    await pm.dashboardPanelActions.waitForChartToRender();
+
+    // Open the configuration panel and enable transpose
+    await pm.dashboardPanelConfigs.openConfigPanel();
+    await pm.dashboardPanelConfigs.selectTranspose();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+
+    // Save the panel
+    await pm.dashboardPanelActions.savePanel();
+
+    // Assert no error occurred
+    expect(errorMessage).toBe("");
+
+    // Delete the created dashboard
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
+  });
 });
