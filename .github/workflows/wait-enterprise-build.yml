@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: read
+      contents: read
+      metadata: read
 
     steps:
       - name: Generate token
@@ -41,6 +43,7 @@ jobs:
 
             # Check if enterprise-build-callback workflow has completed for this commit
             CALLBACK_STATUS=$(gh run list \
+              --repo="${{ github.repository }}" \
               --workflow="enterprise-build-callback.yml" \
               --json="conclusion,status,event" \
               --jq=".[] | select(.event == \"repository_dispatch\" and .status == \"completed\")")
