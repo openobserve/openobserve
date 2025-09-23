@@ -310,13 +310,11 @@ mod tests {
     };
 
     use arrow::datatypes::{DataType, Field, Schema};
-    use config::datafusion::request::Request;
     use datafusion::{
         execution::{SessionStateBuilder, runtime_env::RuntimeEnvBuilder},
         physical_plan::ExecutionPlan,
         prelude::{SessionConfig, SessionContext},
     };
-    use tracing_opentelemetry::OpenTelemetrySpanExt;
 
     use super::*;
     use crate::service::search::datafusion::{
@@ -463,14 +461,7 @@ mod tests {
 
         let mut file_id_lists = hashbrown::HashMap::new();
         file_id_lists.insert(TableReference::from("t"), vec![]);
-        let remote_scan_rule = RemoteScanRule::new(
-            Request::default(),
-            vec![],
-            file_id_lists,
-            hashbrown::HashMap::new(),
-            false,
-            tracing::Span::current().context(),
-        );
+        let remote_scan_rule = RemoteScanRule::new_test(file_id_lists, false);
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new().with_target_partitions(12))
@@ -509,14 +500,7 @@ mod tests {
 
         let mut file_id_lists = hashbrown::HashMap::new();
         file_id_lists.insert(TableReference::from("t"), vec![]);
-        let remote_scan_rule = RemoteScanRule::new(
-            Request::default(),
-            vec![],
-            file_id_lists,
-            hashbrown::HashMap::new(),
-            false,
-            tracing::Span::current().context(),
-        );
+        let remote_scan_rule = RemoteScanRule::new_test(file_id_lists, false);
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new().with_target_partitions(12))
@@ -560,14 +544,7 @@ mod tests {
 
         let mut file_id_lists = hashbrown::HashMap::new();
         file_id_lists.insert(TableReference::from("t"), vec![]);
-        let remote_scan_rule = RemoteScanRule::new(
-            Request::default(),
-            vec![],
-            file_id_lists,
-            hashbrown::HashMap::new(),
-            false,
-            tracing::Span::current().context(),
-        );
+        let remote_scan_rule = RemoteScanRule::new_test(file_id_lists, false);
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new().with_target_partitions(12))
