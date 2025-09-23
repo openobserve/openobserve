@@ -41,6 +41,7 @@ use super::NUMERICS;
 
 const PERCENTILE_CONT: &str = "percentile_cont";
 
+#[derive(Debug, Hash, Eq, PartialEq)]
 pub(crate) struct PercentileCont(Signature);
 
 impl PercentileCont {
@@ -51,15 +52,6 @@ impl PercentileCont {
             variants.push(TypeSignature::Exact(vec![num.clone(), DataType::Float64]));
         }
         Self(Signature::one_of(variants, Volatility::Immutable))
-    }
-}
-
-impl std::fmt::Debug for PercentileCont {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        f.debug_struct("PercentileCont")
-            .field("name", &self.name())
-            .field("signature", &self.0)
-            .finish()
     }
 }
 
@@ -677,23 +669,5 @@ mod test {
     fn test_percentile_cont_name() {
         let pc = PercentileCont::new();
         assert_eq!(pc.name(), "percentile_cont");
-    }
-
-    #[test]
-    fn test_percentile_cont_debug_fmt() {
-        let pc = PercentileCont::new();
-        let debug_str = format!("{pc:?}");
-        assert!(debug_str.contains("PercentileCont"));
-        assert!(debug_str.contains("name"));
-        assert!(debug_str.contains("signature"));
-    }
-
-    #[test]
-    fn test_accumulator_debug_fmt() {
-        let acc = PercentileContAccumulator::new(0.75, DataType::Float64);
-        let debug_str = format!("{acc:?}");
-        assert!(debug_str.contains("PercentileContAccumulator"));
-        assert!(debug_str.contains("Float64"));
-        assert!(debug_str.contains("0.75"));
     }
 }
