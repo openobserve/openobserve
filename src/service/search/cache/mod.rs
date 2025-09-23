@@ -142,6 +142,7 @@ pub async fn search(
             &mut file_path,
             is_aggregate,
             &mut should_exec_query,
+            false,
         )
         .await
     } else {
@@ -165,6 +166,7 @@ pub async fn search(
                     file_path: file_path.clone(),
                     cache_query_response: true,
                     clear_cache: !is_streaming,
+                    trace_id: trace_id.to_string(),
                     ..Default::default()
                 }
             }
@@ -859,25 +861,70 @@ pub async fn write_results_v2(
         let ts_value_to_remove = remove_hit.unwrap().get(ts_column).cloned();
 
         if let Some(ts_value) = ts_value_to_remove {
-            // Extract the date, hour, minute from the timestamp
-            if let Some(ts_datetime) = convert_ts_value_to_datetime(&ts_value) {
-                // Extract the target date, hour, minute, and second (e.g., "2024-12-06T04:15:23")
-                let target_date_hour_minute_second =
-                    ts_datetime.format("%Y-%m-%dT%H:%M:%S").to_string();
+            let boundary_timestamp = match ts_value {
+                serde_json::Value::Number(num) => num.as_i64(),
+                _ => None,
+            };
 
-                // Retain only the hits that do NOT fall within the
-                // same date, hour, minute as the hit to remove
-                local_resp.hits.retain(|hit| {
-                    if let Some(hit_ts) = hit.get(ts_column) {
-                        if let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts) {
-                            // Extract the date, hour, minute, and second for the current hit
-                            let hit_date_hour_minute_second =
-                                hit_ts_datetime.format("%Y-%m-%dT%H:%M:%S").to_string();
-                            return hit_date_hour_minute_second != target_date_hour_minute_second;
+            if let Some(boundary_ts) = boundary_timestamp {
+                let remove_hit_record = remove_hit.unwrap().clone();
+                let original_count = local_resp.hits.len();
+
+                log::info!(
+                    "[CACHE_DEBUG] Boundary dedup check: {} records, boundary_ts: {}, is_desc: {}",
+                    original_count,
+                    boundary_ts,
+                    is_descending
+                );
+
+                // Check if we actually have duplicate boundary records that need deduplication
+                let boundary_count = local_resp
+                    .hits
+                    .iter()
+                    .filter(|hit| {
+                        if let Some(hit_ts) = hit.get(ts_column).and_then(|v| v.as_i64()) {
+                            hit_ts == boundary_ts && hit == &&remove_hit_record
+                        } else {
+                            false
                         }
-                    }
-                    false
-                });
+                    })
+                    .count();
+
+                log::info!(
+                    "[CACHE_DEBUG] Found {} boundary records with exact match",
+                    boundary_count
+                );
+
+                // Only apply boundary deduplication for aggregate queries where cache segments
+                // might overlap For non-aggregate queries, preserve all records to
+                // avoid losing legitimate duplicates
+                if res.histogram_interval.is_some() {
+                    let mut removed_boundary = false;
+                    local_resp.hits.retain(|hit| {
+                                if !removed_boundary {
+                                    if let Some(hit_ts) = hit.get(ts_column).and_then(|v| v.as_i64()) {
+                                        if hit_ts == boundary_ts && hit == &remove_hit_record {
+                                            log::info!("[CACHE_DEBUG] Removing duplicate boundary record for aggregate query with ts: {}", hit_ts);
+                                            removed_boundary = true;
+                                            return false;
+                                        }
+                                    }
+                                }
+                                true
+                            });
+
+                    let final_count = local_resp.hits.len();
+                    log::info!(
+                        "[CACHE_DEBUG] After aggregate boundary dedup: {} records (removed: {})",
+                        final_count,
+                        original_count - final_count
+                    );
+                } else {
+                    log::info!(
+                        "[CACHE_DEBUG] Skipping boundary deduplication for non-aggregate query, preserving all {} records",
+                        original_count
+                    );
+                }
             }
         }
 
@@ -1016,6 +1063,7 @@ pub async fn check_cache_v2(
             &mut file_path,
             is_aggregate,
             &mut should_exec_query,
+            true,
         )
         .await;
         resp.is_aggregate = is_aggregate;
@@ -1042,6 +1090,7 @@ pub async fn check_cache_v2(
                     limit: v.limit,
                     is_aggregate,
                     clear_cache: true,
+                    trace_id: trace_id.to_string(),
                     ..Default::default()
                 }
             }
@@ -1053,7 +1102,7 @@ pub async fn check_cache_v2(
     })
 }
 
-fn convert_ts_value_to_datetime(ts_value: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
+fn _convert_ts_value_to_datetime(ts_value: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
     match ts_value {
         // Handle the case where ts_value is a number (microseconds)
         serde_json::Value::Number(num) => {
