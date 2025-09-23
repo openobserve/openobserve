@@ -828,6 +828,18 @@ pub struct Common {
     )]
     pub feature_broadcast_join_left_side_max_size: usize, // MB
     #[env_config(
+        name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
+        default = true,
+        help = "Enable dynamic pushdown filter"
+    )]
+    pub feature_dynamic_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED",
+        default = true,
+        help = "Enable single node optimize(used for debug, not document)"
+    )]
+    pub feature_single_node_optimize_enabled: bool,
+    #[env_config(
         name = "ZO_FEATURE_QUERY_SKIP_WAL",
         default = false,
         help = "Skip WAL for query"
@@ -904,6 +916,8 @@ pub struct Common {
     pub telemetry_url: String,
     #[env_config(name = "ZO_TELEMETRY_HEARTBEAT", default = 1800)] // seconds
     pub telemetry_heartbeat: i64,
+    #[env_config(name = "ZO_KEYEVENT_TELEMETRY_URL", default = "")]
+    pub keyevent_telemetry_url: String,
     #[env_config(name = "ZO_PROMETHEUS_ENABLED", default = true)]
     pub prometheus_enabled: bool,
     #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
@@ -1045,24 +1059,6 @@ pub struct Common {
         help = "Streams for which dedicated MemTable will be used as comma separated values"
     )]
     pub mem_table_individual_streams: String,
-    #[env_config(
-        name = "ZO_TRACES_SPAN_METRICS_ENABLED",
-        default = false,
-        help = "enable span metrics for traces"
-    )]
-    pub traces_span_metrics_enabled: bool,
-    #[env_config(
-        name = "ZO_TRACES_SPAN_METRICS_EXPORT_INTERVAL",
-        default = 60,
-        help = "traces span metrics export interval, unit seconds"
-    )]
-    pub traces_span_metrics_export_interval: u64,
-    #[env_config(
-        name = "ZO_TRACES_SPAN_METRICS_CHANNEL_BUFFER",
-        default = 100000,
-        help = "traces span metrics channel send buffer"
-    )]
-    pub traces_span_metrics_channel_buffer: usize,
     #[env_config(
         name = "ZO_SELF_METRIC_CONSUMPTION_ENABLED",
         default = false,
