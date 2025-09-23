@@ -131,7 +131,10 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.streamDetailButton.click();
     // Strategic 500ms wait for operation completion - this is functionally necessary
   await page.waitForTimeout(500);
-  
+
+    //before toggling we need to make sure that we shift to configuration tab 
+    await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
+    await page.getByRole('tab', { name: 'Configuration' }).click();
     // Toggle 'Store Original Data' and update schema
     await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor(); // Wait for the toggle to be visible
     await pageManager.unflattenedPage.storeOriginalDataToggle.click();
@@ -206,7 +209,9 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.streamDetailButton.click();
     // Strategic 500ms wait for operation completion - this is functionally necessary
   await page.waitForTimeout(500);
-
+    //before toggling we need to make sure that we shift to configuration tab 
+    await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
+    await page.getByRole('tab', { name: 'Configuration' }).click();
     // Toggle 'Store Original Data' and update schema
     await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor();
     await pageManager.unflattenedPage.storeOriginalDataToggle.click();
@@ -318,7 +323,9 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.streamDetailButton.click();
     // Strategic 500ms wait for operation completion - this is functionally necessary
   await page.waitForTimeout(500);
-    
+    //before toggling we need to make sure that we shift to configuration tab 
+    await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
+    await page.getByRole('tab', { name: 'Configuration' }).click();
     await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor();
     await pageManager.unflattenedPage.storeOriginalDataToggle.click();
     
