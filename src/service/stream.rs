@@ -34,8 +34,8 @@ use infra::{
     cache::stats,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-        unwrap_partition_time_level, unwrap_stream_created_at, unwrap_stream_is_derived,
-        unwrap_stream_settings,
+        get_stream_setting_fts_fields, unwrap_partition_time_level, unwrap_stream_created_at,
+        unwrap_stream_is_derived, unwrap_stream_settings,
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
@@ -646,6 +646,8 @@ pub async fn update_stream_settings(
             .retain(|range| !new_settings.extended_retention_days.remove.contains(range));
     }
 
+    let _fts = get_stream_setting_fts_fields(&Some(settings));
+
     if !new_settings.distinct_value_fields.add.is_empty() {
         for f in &new_settings.distinct_value_fields.add {
             if f == "count" || f == TIMESTAMP_COL_NAME {
@@ -659,9 +661,7 @@ pub async fn update_stream_settings(
                 );
             }
             // we ignore full text search fields
-            if settings.full_text_search_keys.contains(f)
-                || new_settings.full_text_search_keys.add.contains(f)
-            {
+            if _fts.contains(f) || new_settings.full_text_search_keys.add.contains(f) {
                 continue;
             }
             let record = DistinctFieldRecord::new(
