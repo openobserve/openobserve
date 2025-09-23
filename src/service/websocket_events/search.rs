@@ -1223,11 +1223,6 @@ pub async fn write_results_to_cache(
             c_resp.clear_cache,
         )
         .await;
-        log::info!(
-            "[WS_SEARCH]: Results written to file for trace_id: {}, file_path: {}",
-            c_resp.trace_id,
-            c_resp.file_path,
-        );
     }
 
     Ok(())
