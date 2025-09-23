@@ -611,13 +611,22 @@ export default defineComponent({
         "org_identifier",
         store.state.selectedOrganization.identifier,
       );
-      logsUrl.searchParams.set("quick_mode", "false");
+      // if store.state.zoConfig.quick_mode_enabled is true then only set quick_mode to true else set quick_mode to false
+      if (store.state.zoConfig.quick_mode_enabled) {
+        logsUrl.searchParams.set("quick_mode", "true");
+      } else {
+        logsUrl.searchParams.set("quick_mode", "false");
+      }
       logsUrl.searchParams.set("show_histogram", "false");
-
       return logsUrl;
     };
 
     const onLogPanel = async () => {
+      console.log(
+        "Navigating to logs page with query details:",
+        store.state.zoConfig.quick_mode_enabled,
+      );
+
       const showNotification = showPositiveNotification(
         "Redirecting to logs page",
         {
