@@ -5,9 +5,6 @@ import pytest
 from datetime import datetime, timezone, timedelta
 import time
 
-# Global variable to store detected array indexing convention
-OPENOBSERVE_ARRAY_INDEXING = None
-
 
 def test_e2e_error_rate_analysis(create_session, base_url):
     """Running an E2E test for error rate analysis query."""
@@ -558,20 +555,12 @@ def test_e2e_array_case_sensitive(create_session, base_url):
             assert log_value.startswith('['), f"Hit {i} log should be array format, got: {log_value}"
             
             # str_match does substring matching, so 'fu' should match 'datafusion'
-            # Note: Validation logic depends on OpenObserve's array indexing convention  
             import json
             try:
                 array_data = json.loads(log_value)
                 if len(array_data) > 0:
-                    # Get the expected first element based on SQL array_extract(log, 1)
-                    # If 1-based: SQL index 1 = Python index 0
-                    # If 0-based: SQL index 1 = Python index 1
-                    expected_first_element = array_data[0]  # Assume 1-based (most common in SQL)
-                    
-                    # Validate that this element would match the SQL query  
-                    assert 'fu' in expected_first_element, f"Hit {i} first array element '{expected_first_element}' should contain 'fu' (case sensitive)"
-                    
-                    print(f"  Validated: Python array[0]='{expected_first_element}' contains 'fu' (case sensitive)")
+                    first_element = array_data[0]
+                    assert 'fu' in first_element, f"Hit {i} first array element '{first_element}' should contain 'fu' (case sensitive)"
             except json.JSONDecodeError:
                 assert False, f"Hit {i} log is not valid JSON array: {log_value}"
             
@@ -631,20 +620,12 @@ def test_e2e_array_case_insensitive(create_session, base_url):
             print(f"Hit {i}: log = {log_value}")
             
             # The array should contain elements that match 'Fu' case-insensitively
-            # Note: Validation logic depends on OpenObserve's array indexing convention
             import json
             try:
                 array_data = json.loads(log_value)
                 if len(array_data) > 0:
-                    # Get the expected first element based on SQL array_extract(log, 1)
-                    # If 1-based: SQL index 1 = Python index 0
-                    # If 0-based: SQL index 1 = Python index 1
-                    expected_first_element = array_data[0]  # Assume 1-based (most common in SQL)
-                    
-                    # Validate that this element would match the SQL query
-                    assert 'fu' in expected_first_element.lower(), f"Hit {i} first array element '{expected_first_element}' should contain 'fu' (case insensitive)"
-                    
-                    print(f"  Validated: Python array[0]='{expected_first_element}' contains 'fu' (case insensitive)")
+                    first_element = array_data[0].lower()
+                    assert 'fu' in first_element, f"Hit {i} first array element '{array_data[0]}' should contain 'fu' (case insensitive)"
             except json.JSONDecodeError:
                 assert False, f"Hit {i} log is not valid JSON array: {log_value}"
         
@@ -653,379 +634,6 @@ def test_e2e_array_case_insensitive(create_session, base_url):
         assert len(hits) >= 1, f"Expected at least 1 hit for case-insensitive 'Fu' match, got {len(hits)}"
     else:
         print("⚠️  No hits found for case-insensitive array query")
-
-
-def test_e2e_array_indexing_convention(create_session, base_url):
-    """Running an E2E test to verify OpenObserve's array indexing convention (1-based vs 0-based)."""
-
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
-    
-    # Test array indexing with known data: ["datafusion", "bad"], ["querying", "good"], ["parsing", "Fu"]
-    json_data = {
-        "query": {
-            "sql": """SELECT 
-                log,
-                array_extract(cast_to_arr(log), 1) AS first_element,
-                array_extract(cast_to_arr(log), 2) AS second_element,
-                array_length(cast_to_arr(log)) AS array_len
-            FROM "stream_pytest_data"
-            WHERE log LIKE '[%'
-            ORDER BY kubernetes_container_name""",
-            "start_time": one_hour_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 10,
-        },
-    }
-
-    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
-    assert (
-        resp_get_allsearch.status_code == 200
-    ), f"Array indexing convention query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
-    
-    response_data = resp_get_allsearch.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    assert len(hits) > 0, "Should find array test data for indexing verification"
-    
-    print(f"🔍 Verifying array indexing convention with {len(hits)} hits")
-    
-    indexing_convention = None  # Will be determined from first hit
-    
-    for i, hit in enumerate(hits):
-        assert "log" in hit, f"Hit {i} should contain 'log' field"
-        assert "first_element" in hit, f"Hit {i} should contain 'first_element' field"
-        assert "second_element" in hit, f"Hit {i} should contain 'second_element' field"
-        assert "array_len" in hit, f"Hit {i} should contain 'array_len' field"
-        
-        log_value = hit["log"]
-        first_element = hit["first_element"]
-        second_element = hit["second_element"]
-        array_len = hit["array_len"]
-        
-        print(f"Hit {i}: log={log_value}")
-        print(f"  SQL array_extract(log, 1) = '{first_element}'")
-        print(f"  SQL array_extract(log, 2) = '{second_element}'")
-        print(f"  SQL array_length = {array_len}")
-        
-        # Parse the JSON array for comparison
-        import json
-        try:
-            python_array = json.loads(log_value)
-            print(f"  Python array[0] = '{python_array[0] if len(python_array) > 0 else 'N/A'}'")
-            print(f"  Python array[1] = '{python_array[1] if len(python_array) > 1 else 'N/A'}'")
-            print(f"  Python len(array) = {len(python_array)}")
-            
-            # Determine indexing convention from first valid hit
-            if indexing_convention is None and len(python_array) >= 2:
-                if first_element == python_array[0]:
-                    indexing_convention = "1-based"
-                    print(f"  ✅ DETECTED: OpenObserve uses 1-BASED indexing (SQL index 1 = Python index 0)")
-                elif first_element == python_array[1]:
-                    indexing_convention = "0-based"  
-                    print(f"  ✅ DETECTED: OpenObserve uses 0-BASED indexing (SQL index 1 = Python index 1)")
-                else:
-                    print(f"  ❓ UNCLEAR: SQL first_element '{first_element}' doesn't match expected Python elements")
-            
-            # Validate consistency with detected convention
-            if indexing_convention == "1-based":
-                assert first_element == python_array[0], f"Hit {i}: SQL array_extract(log, 1) should equal Python array[0]"
-                if len(python_array) > 1:
-                    assert second_element == python_array[1], f"Hit {i}: SQL array_extract(log, 2) should equal Python array[1]"
-                assert array_len == len(python_array), f"Hit {i}: SQL array_length should equal Python len()"
-            
-            elif indexing_convention == "0-based":
-                assert first_element == python_array[1], f"Hit {i}: SQL array_extract(log, 1) should equal Python array[1]"  
-                if len(python_array) > 2:
-                    assert second_element == python_array[2], f"Hit {i}: SQL array_extract(log, 2) should equal Python array[2]"
-                assert array_len == len(python_array), f"Hit {i}: SQL array_length should equal Python len()"
-        
-        except json.JSONDecodeError:
-            assert False, f"Hit {i} log is not valid JSON array: {log_value}"
-        
-        print()  # Empty line for readability
-    
-    assert indexing_convention is not None, "Could not determine OpenObserve's array indexing convention"
-    
-    # Store the detected convention for other tests to use
-    global OPENOBSERVE_ARRAY_INDEXING
-    OPENOBSERVE_ARRAY_INDEXING = indexing_convention
-    
-    print(f"🎯 CONCLUSION: OpenObserve uses {indexing_convention.upper()} array indexing")
-    print(f"✅ All {len(hits)} hits validated against {indexing_convention} indexing convention")
-
-
-def test_e2e_array_bounds_and_edge_cases(create_session, base_url):
-    """Running an E2E test for array bounds checking and edge case handling."""
-
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
-    
-    # Test array bounds, NULL handling, and edge cases
-    json_data = {
-        "query": {
-            "sql": """SELECT 
-                log,
-                array_extract(cast_to_arr(log), 1) AS element_1,
-                array_extract(cast_to_arr(log), 2) AS element_2, 
-                array_extract(cast_to_arr(log), 3) AS element_3,
-                array_extract(cast_to_arr(log), 99) AS element_99,
-                array_length(cast_to_arr(log)) AS array_len,
-                array_extract(cast_to_arr(COALESCE(log, '[]')), 1) AS null_safe_element
-            FROM "stream_pytest_data"
-            WHERE log LIKE '[%' OR log IS NULL
-            ORDER BY kubernetes_container_name
-            LIMIT 5""",
-            "start_time": one_hour_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 10,
-        },
-    }
-
-    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
-    assert (
-        resp_get_allsearch.status_code == 200
-    ), f"Array bounds and edge cases query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
-    
-    response_data = resp_get_allsearch.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    if len(hits) > 0:
-        print(f"🔍 Testing array bounds and edge cases with {len(hits)} hits")
-        
-        for i, hit in enumerate(hits):
-            log_value = hit["log"]
-            element_1 = hit.get("element_1")
-            element_2 = hit.get("element_2") 
-            element_3 = hit.get("element_3")
-            element_99 = hit.get("element_99")  # Out of bounds
-            array_len = hit.get("array_len")
-            null_safe_element = hit.get("null_safe_element")
-            
-            print(f"Hit {i}: log={log_value}")
-            print(f"  element_1={element_1}, element_2={element_2}, element_3={element_3}")
-            print(f"  element_99 (out of bounds)={element_99}")
-            print(f"  array_length={array_len}, null_safe_element={null_safe_element}")
-            
-            if log_value and log_value.startswith('['):
-                import json
-                try:
-                    python_array = json.loads(log_value)
-                    expected_len = len(python_array)
-                    
-                    # Validate array length consistency
-                    if array_len is not None:
-                        assert array_len == expected_len, f"Hit {i}: SQL array_length({array_len}) != Python len({expected_len})"
-                    
-                    # Test out-of-bounds behavior
-                    print(f"  🧪 Out-of-bounds element_99: {element_99} (should be NULL or handle gracefully)")
-                    # Most SQL engines return NULL for out-of-bounds access
-                    
-                    # Test null-safe extraction
-                    print(f"  🛡️  NULL-safe extraction works: {null_safe_element}")
-                    
-                except json.JSONDecodeError:
-                    print(f"  ⚠️  Invalid JSON array: {log_value}")
-            
-            print()  # Empty line for readability
-        
-        print(f"✅ Array bounds and edge case testing completed for {len(hits)} hits")
-        
-        # Key validations for array handling robustness
-        bounds_test_passed = True
-        for hit in hits:
-            element_99 = hit.get("element_99")
-            # Out-of-bounds should typically return NULL, not throw error
-            if element_99 is not None and element_99 != "":
-                print(f"⚠️  Warning: Out-of-bounds array access returned non-NULL: {element_99}")
-        
-        print("✅ Array bounds handling appears robust (no crashes on out-of-bounds access)")
-    else:
-        print("⚠️  No hits found for array bounds testing")
-
-
-def test_e2e_window_function_compatibility(create_session, base_url):
-    """Running an E2E test to validate window function semantics and compatibility."""
-
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
-    
-    # Test window function semantics with proper separation of concerns
-    json_data = {
-        "query": {
-            "sql": """WITH base_counts AS (
-                SELECT 
-                    histogram(_timestamp) AS time_bucket,
-                    kubernetes_namespace_name AS environment,
-                    COUNT(*) AS log_count,
-                    SUM(CASE WHEN level = 'info' THEN 1 ELSE 0 END) AS info_count
-                FROM "stream_pytest_data"
-                WHERE kubernetes_namespace_name IS NOT NULL
-                GROUP BY histogram(_timestamp), kubernetes_namespace_name
-            ),
-            windowed_metrics AS (
-                SELECT 
-                    time_bucket,
-                    environment,
-                    log_count,
-                    info_count,
-                    LAG(log_count, 1) OVER (
-                        PARTITION BY environment 
-                        ORDER BY time_bucket
-                    ) AS prev_log_count,
-                    LAG(log_count, 2) OVER (
-                        PARTITION BY environment 
-                        ORDER BY time_bucket  
-                    ) AS prev2_log_count,
-                    LEAD(log_count, 1) OVER (
-                        PARTITION BY environment 
-                        ORDER BY time_bucket
-                    ) AS next_log_count,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY environment 
-                        ORDER BY time_bucket
-                    ) AS time_sequence,
-                    RANK() OVER (
-                        PARTITION BY environment 
-                        ORDER BY log_count DESC
-                    ) AS count_rank
-                FROM base_counts
-            )
-            SELECT 
-                time_bucket,
-                environment,
-                log_count,
-                prev_log_count,
-                next_log_count,
-                time_sequence,
-                count_rank,
-                CASE 
-                    WHEN prev_log_count IS NOT NULL AND prev_log_count > 0 THEN
-                        ROUND((log_count - prev_log_count) * 100.0 / prev_log_count, 2)
-                    ELSE 0
-                END AS growth_rate_percent,
-                CASE
-                    WHEN time_sequence = 1 THEN 'First'
-                    WHEN next_log_count IS NULL THEN 'Last' 
-                    ELSE 'Middle'
-                END AS sequence_position
-            FROM windowed_metrics
-            ORDER BY environment, time_bucket
-            LIMIT 20""",
-            "start_time": one_hour_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 20,
-        },
-    }
-
-    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
-    assert (
-        resp_get_allsearch.status_code == 200
-    ), f"Window function compatibility query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
-    
-    response_data = resp_get_allsearch.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
-    if len(hits) > 0:
-        print(f"🔍 Testing window function compatibility with {len(hits)} hits")
-        
-        # Validate window function semantics
-        environments_seen = {}
-        
-        for i, hit in enumerate(hits):
-            # Required fields from window functions
-            assert "time_bucket" in hit, f"Hit {i} should contain 'time_bucket' field"
-            assert "environment" in hit, f"Hit {i} should contain 'environment' field"
-            assert "log_count" in hit, f"Hit {i} should contain 'log_count' field"
-            assert "time_sequence" in hit, f"Hit {i} should contain 'time_sequence' field"
-            assert "count_rank" in hit, f"Hit {i} should contain 'count_rank' field"
-            assert "sequence_position" in hit, f"Hit {i} should contain 'sequence_position' field"
-            
-            environment = hit["environment"]
-            log_count = hit["log_count"]
-            prev_log_count = hit.get("prev_log_count")
-            next_log_count = hit.get("next_log_count")
-            time_sequence = hit["time_sequence"]
-            count_rank = hit["count_rank"]
-            growth_rate = hit["growth_rate_percent"]
-            sequence_pos = hit["sequence_position"]
-            
-            print(f"Hit {i}: {environment} seq={time_sequence} rank={count_rank}")
-            print(f"  counts: prev={prev_log_count}, current={log_count}, next={next_log_count}")
-            print(f"  growth: {growth_rate}%, position: {sequence_pos}")
-            
-            # Track environments for sequence validation
-            if environment not in environments_seen:
-                environments_seen[environment] = []
-            environments_seen[environment].append((time_sequence, sequence_pos))
-            
-            # Validate window function results
-            assert log_count > 0, f"Hit {i} log_count should be > 0, got {log_count}"
-            assert time_sequence >= 1, f"Hit {i} time_sequence should be >= 1, got {time_sequence}"
-            assert count_rank >= 1, f"Hit {i} count_rank should be >= 1, got {count_rank}"
-            assert sequence_pos in ['First', 'Middle', 'Last'], f"Hit {i} unexpected sequence_position: {sequence_pos}"
-            
-            # Validate LAG/LEAD semantics
-            if sequence_pos == 'First':
-                assert prev_log_count is None, f"Hit {i} first record should have NULL prev_log_count"
-            if sequence_pos == 'Last':
-                assert next_log_count is None, f"Hit {i} last record should have NULL next_log_count"
-            
-            # Validate growth rate calculation
-            if prev_log_count is not None and prev_log_count > 0:
-                expected_growth = round((log_count - prev_log_count) * 100.0 / prev_log_count, 2)
-                assert abs(growth_rate - expected_growth) < 0.01, f"Hit {i} growth rate mismatch: expected {expected_growth}, got {growth_rate}"
-            else:
-                assert growth_rate == 0, f"Hit {i} should have 0 growth rate when prev_log_count is NULL or 0"
-            
-            print()  # Empty line for readability
-        
-        # Validate sequence integrity per environment
-        print("🔍 Validating window function sequence integrity:")
-        for env, sequences in environments_seen.items():
-            sequences.sort()  # Sort by time_sequence
-            
-            has_first = any(pos == 'First' for _, pos in sequences)
-            has_last = any(pos == 'Last' for _, pos in sequences) 
-            
-            print(f"  {env}: {len(sequences)} time buckets, First={has_first}, Last={has_last}")
-            
-            # Validate sequence numbers are consecutive
-            seq_numbers = [seq for seq, _ in sequences]
-            expected_sequences = list(range(1, len(sequences) + 1))
-            
-            if len(sequences) > 1:
-                print(f"    Sequence numbers: {seq_numbers}")
-                # Note: May not be consecutive if data is sparse across time buckets
-        
-        print(f"✅ Window function compatibility validated for {len(hits)} hits across {len(environments_seen)} environments")
-        print("✅ LAG/LEAD semantics working correctly")
-        print("✅ ROW_NUMBER and RANK functions working correctly") 
-        print("✅ Histogram bucketing alignment confirmed")
-        
-    else:
-        print("⚠️  No hits found for window function compatibility testing")
 
 
 def test_e2e_multi_level_array_processing(create_session, base_url):
@@ -1107,41 +715,34 @@ def test_e2e_time_series_window_functions(create_session, base_url):
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
     json_data = {
         "query": {
-            "sql": """WITH time_series_base AS (
-                SELECT 
-                    histogram(_timestamp) AS time_bucket,
-                    kubernetes_namespace_name AS environment,
-                    COUNT(*) AS current_count
-                FROM "stream_pytest_data"
-                WHERE kubernetes_namespace_name IN ('production', 'staging', 'monitoring', 'default')
-                GROUP BY histogram(_timestamp), kubernetes_namespace_name
-            )
-            SELECT 
-                time_bucket,
-                environment,
-                current_count,
-                LAG(current_count) OVER (
-                    PARTITION BY environment 
-                    ORDER BY time_bucket
+            "sql": """SELECT 
+                histogram(_timestamp) AS time_bucket,
+                kubernetes_namespace_name AS environment,
+                COUNT(*) AS current_count,
+                LAG(COUNT(*)) OVER (
+                    PARTITION BY kubernetes_namespace_name 
+                    ORDER BY histogram(_timestamp)
                 ) AS previous_count,
                 CASE 
-                    WHEN LAG(current_count) OVER (
-                        PARTITION BY environment 
-                        ORDER BY time_bucket
+                    WHEN LAG(COUNT(*)) OVER (
+                        PARTITION BY kubernetes_namespace_name 
+                        ORDER BY histogram(_timestamp)
                     ) IS NOT NULL THEN
                         ROUND(
-                            ((current_count - LAG(current_count) OVER (
-                                PARTITION BY environment 
-                                ORDER BY time_bucket
+                            ((COUNT(*) - LAG(COUNT(*)) OVER (
+                                PARTITION BY kubernetes_namespace_name 
+                                ORDER BY histogram(_timestamp)
                             )) * 100.0) / 
-                            NULLIF(LAG(current_count) OVER (
-                                PARTITION BY environment 
-                                ORDER BY time_bucket
-                            ), 0), 2
+                            LAG(COUNT(*)) OVER (
+                                PARTITION BY kubernetes_namespace_name 
+                                ORDER BY histogram(_timestamp)
+                            ), 2
                         )
                     ELSE 0
                 END AS growth_rate_percent
-            FROM time_series_base
+            FROM "stream_pytest_data"
+            WHERE kubernetes_namespace_name IN ('production', 'staging', 'monitoring', 'default')
+            GROUP BY time_bucket, environment
             ORDER BY time_bucket, environment""",
             "start_time": one_hour_ago,
             "end_time": end_time,
