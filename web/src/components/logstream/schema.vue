@@ -598,11 +598,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             
             <!-- Configuration tab -->
             <div v-if="activeMainTab == 'configuration'">
-              <div class="tw-w-full tw-flex tw-flex-col tw-gap-4 tw-h-full tw-overflow-y-auto tw-p-4">
+              <div class="tw-w-full tw-h-[calc(100vh-267px)] tw-flex tw-flex-col tw-gap-4 tw-h-full tw-overflow-y-auto tw-p-4">
                 <!-- Configuration Settings Card -->
                 <div 
                   :class="[
-                    'tw-rounded-lg tw-min-h-[524px] tw-h-calc(100vh - 140px) tw-p-2 tw-border tw-shadow-sm tw-flex tw-flex-col tw-justify-evenly',
+                    'tw-rounded-lg tw-p-2 tw-border tw-shadow-sm tw-flex tw-flex-col tw-justify-evenly',
                     store.state.theme === 'dark' ? 'dark:tw-bg-[#181A1B] dark:tw-border-gray-700' : 'tw-border-gray-200'
                   ]"
                 >
@@ -950,92 +950,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            </div>
-            <!-- right section includes the configuration -->
-            <div v-if="false" class="tw-w-[25%] tw-flex tw-flex-col tw-gap-4 tw-h-[calc(100vh-165px)] tw-overflow-y-auto">
-
-                <!-- Timeline  -->
-                <div 
-                  :class="[
-                    'tw-bg-white tw-h-[19%] tw-rounded-lg tw-p-2 tw-border tw-shadow-sm tw-flex tw-flex-col tw-gap-[10px]',
-                    store.state.theme === 'dark' ? 'dark:tw-bg-[#181A1B] dark:tw-border-gray-700' : 'tw-border-gray-200'
-                  ]"
-                  v-if="store.state.zoConfig.show_stream_stats_doc_num && false"
-                >
-                  <h3 
-                    :class="[
-                      'tw-text-sm tw-font-semibold tw-flex tw-items-center tw-gap-1 tw-mb-1',
-                      store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-800'
-                    ]"
-                  >
-                    <img :src="getTimelineIcon" alt="Timeline Icon" class="tw-w-[16px] tw-h-[16px]" />
-                    Timeline (UTC)
-                  </h3>
-                  
-                  <div 
-                    :class="[
-                      'tw-rounded-md tw-p-2 tw-border',
-                      store.state.theme === 'dark' 
-                        ? 'tw-bg-[#2b2c2d] tw-border-gray-600' 
-                        : 'tw-bg-gray-50 tw-border-gray-200'
-                    ]"
-                  >
-                    <div class="tw-flex tw-justify-between tw-items-center tw-mb-1">
-                      <span 
-                        :class="[
-                          'tw-text-xs tw-font-medium',
-                          store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'
-                        ]"
-                      >
-                        Start Time:
-                      </span>
-                      <span 
-                        :class="[
-                          'tw-text-xs tw-font-semibold tw-font-mono',
-                          store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-800'
-                        ]"
-                      >
-                        {{ indexData.stats.doc_time_min }}
-                      </span>
-                    </div>
-                    <div class="tw-flex tw-justify-between tw-items-center tw-mb-1">
-                      <span 
-                        :class="[
-                          'tw-text-xs tw-font-medium',
-                          store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'
-                        ]"
-                      >
-                        End Time:
-                      </span>
-                      <span 
-                        :class="[
-                          'tw-text-xs tw-font-semibold tw-font-mono',
-                          store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-800'
-                        ]"
-                      >
-                        {{ indexData.stats.doc_time_max }}
-                      </span>
-                    </div>
-                    <div class="tw-flex tw-justify-between tw-items-center">
-                      <span 
-                        :class="[
-                          'tw-text-xs tw-font-medium',
-                          store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'
-                        ]"
-                      >
-                        Duration:
-                      </span>
-                      <span 
-                        :class="[
-                          'tw-text-xs tw-font-semibold tw-font-mono',
-                          store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-800'
-                        ]"
-                      >
-                        {{ getDuration(indexData.stats.original_doc_time_min, indexData.stats.original_doc_time_max) }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
             </div>
           </div>
         </div>
