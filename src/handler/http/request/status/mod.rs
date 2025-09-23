@@ -617,18 +617,6 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                         }
                     }
 
-                    #[cfg(feature = "cloud")]
-                    if let Err(e) =
-                        o2_enterprise::enterprise::cloud::email::check_email(&res.0.user_email)
-                            .await
-                    {
-                        log::info!(
-                            "blocking user with email {} as domain blocked with : {e}",
-                            res.0.user_email
-                        );
-                        return Ok(HttpResponse::Unauthorized()
-                            .json("Email Domain not allowed".to_string()));
-                    }
                     audit_message.user_email = res.0.user_email.clone();
                     id_token = json::to_string(&json::json!({
                         "email": res.0.user_email,
@@ -638,9 +626,15 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                         "is_valid": res.0.is_valid,
                     }))
                     .unwrap();
-                    let url_params = process_token(res).await.map(|(new_user, pending_invites)| {
-                        format!("&new_user_login={new_user}&pending_invites={pending_invites}")
-                    });
+                    let url_params = match process_token(res).await {
+                        Ok(v) => v.map(|(new_user, pending_invites)| {
+                            format!("&new_user_login={new_user}&pending_invites={pending_invites}")
+                        }),
+                        Err(_) => {
+                            return Ok(HttpResponse::Unauthorized()
+                                .json("Email Domain not allowed".to_string()));
+                        }
+                    };
                     login_url = format!(
                         "{}#id_token={}.{}{}",
                         login_data.url,
