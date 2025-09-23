@@ -105,7 +105,7 @@ mod tests {
 
         log::info!("starting gRPC server at {}", gaddr);
         tonic::transport::Server::builder()
-            .layer(tonic::service::interceptor(check_auth))
+            .layer(tonic::service::InterceptorLayer::new(check_auth))
             .add_service(search_svc)
             .add_service(flight_svc)
             .serve(gaddr)

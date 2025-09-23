@@ -84,7 +84,7 @@ impl PhysicalOptimizerRule for FollowerIndexOptimizerRule {
     }
 
     fn name(&self) -> &str {
-        "follower_index_optimizer"
+        "FollowerIndexOptimizerRule"
     }
 
     fn schema_check(&self) -> bool {
@@ -173,7 +173,7 @@ impl PhysicalOptimizerRule for LeaderIndexOptimizerRule {
     }
 
     fn name(&self) -> &str {
-        "leader_index_optimizer"
+        "LeaderIndexOptimizerRule"
     }
 
     fn schema_check(&self) -> bool {
