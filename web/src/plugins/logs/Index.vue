@@ -384,14 +384,14 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep, debounce } from "lodash-es";
-import { buildSqlQuery, getFieldsFromQuery, isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
+import { isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
-import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
+import { isStreamingEnabled } from "@/utils/zincutils";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import useAiChat from "@/composables/useAiChat";
 import queryService from "@/services/search";
@@ -2337,7 +2337,6 @@ export default defineComponent({
       buildWebSocketPayload,
       initializeSearchConnection,
       addTraceId,
-      isWebSocketEnabled,
       showJobScheduler,
       showSearchScheduler,
       closeSearchSchedulerFn,
@@ -2487,11 +2486,7 @@ export default defineComponent({
           // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
 
-          if (
-            this.searchObj.communicationMethod === "ws" ||
-            this.searchObj.communicationMethod === "streaming"
-          ) {
-            // Use WebSocket for histogram data
+          if (this.searchObj.communicationMethod === "streaming") {
             const payload = this.buildWebSocketPayload(
               this.searchObj.data.histogramQuery,
               false,

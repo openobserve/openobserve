@@ -338,15 +338,7 @@ export const useSearchStream = () => {
     payload: any,
   ): string | Promise<void> | null => {
     // Use the appropriate method to fetch data
-    if (searchObj.communicationMethod === "ws") {
-      return fetchQueryDataWithWebSocket(payload, {
-        open: sendSearchMessage,
-        close: handleSearchClose,
-        error: handleSearchError,
-        message: handleSearchResponse,
-        reset: handleSearchReset,
-      }) as string;
-    } else if (searchObj.communicationMethod === "streaming") {
+    if (searchObj.communicationMethod === "streaming") {
       payload.searchType = "ui";
       payload.pageType = searchObj.data.stream.streamType;
       return fetchQueryDataWithHttpStream(payload, {

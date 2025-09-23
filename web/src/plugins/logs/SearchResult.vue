@@ -86,8 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :max="
               Math.max(
                 1,
-                (searchObj.communicationMethod === 'ws' ||
-                searchObj.communicationMethod === 'streaming' ||
+                (searchObj.communicationMethod === 'streaming' ||
                 searchObj.meta.jobId != ''
                   ? searchObj.data.queryResults?.pagination?.length
                   : searchObj.data.queryResults?.partitionDetail?.paginations
@@ -435,10 +434,7 @@ export default defineComponent({
       } else if (actionType == "recordsPerPage") {
         this.searchObj.data.resultGrid.currentPage = 1;
         this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
-        if (
-          this.searchObj.communicationMethod === "ws" ||
-          this.searchObj.communicationMethod === "streaming"
-        ) {
+        if (this.searchObj.communicationMethod === "streaming") {
           if (this.searchObj.meta.jobId == "") {
             this.refreshPagination();
           } else {
@@ -462,7 +458,6 @@ export default defineComponent({
           this.searchObj.data.queryResults.pagination = [];
         }
         const maxPages =
-          this.searchObj.communicationMethod === "ws" ||
           this.searchObj.communicationMethod === "streaming" ||
           this.searchObj.meta.jobId != ""
             ? this.searchObj.data.queryResults.pagination.length

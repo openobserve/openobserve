@@ -27,7 +27,6 @@ import { logsErrorMessage } from "@/utils/common";
 import {
   generateTraceContext,
   arraysMatch,
-  isWebSocketEnabled,
   isStreamingEnabled,
 } from "@/utils/zincutils";
 import config from "@/aws-exports";
@@ -448,7 +447,6 @@ export const useSearchBar = () => {
       // Reset cancel query on new search request initation
       searchObj.data.isOperationCancelled = false;
 
-      // get websocket enable config from store
       // window will have more priority
       // if window has use_web_socket property then use that
       // else use organization settings
@@ -479,341 +477,338 @@ export const useSearchBar = () => {
       }
 
       // Use the appropriate method to fetch data
-      if (
-        searchObj.communicationMethod === "ws" ||
-        searchObj.communicationMethod === "streaming"
-      ) {
+      if (searchObj.communicationMethod === "streaming") {
         getDataThroughStream(isPagination);
         return;
       }
 
-      searchObjDebug["buildSearchStartTime"] = performance.now();
-      const queryReq: any = buildSearch();
-      searchObjDebug["buildSearchEndTime"] = performance.now();
-      if (queryReq == false) {
-        throw new Error(notificationMsg.value || "Something went wrong.");
-      }
-      // reset query data and get partition detail for given query.
-      if (!isPagination) {
-        resetQueryData();
-        searchObjDebug["partitionStartTime"] = performance.now();
-        await getQueryPartitions(queryReq);
-        searchObjDebug["partitionEndTime"] = performance.now();
-      }
+      // searchObjDebug["buildSearchStartTime"] = performance.now();
+      // const queryReq: any = buildSearch();
+      // searchObjDebug["buildSearchEndTime"] = performance.now();
+      // if (queryReq == false) {
+      //   throw new Error(notificationMsg.value || "Something went wrong.");
+      // }
+      // // reset query data and get partition detail for given query.
+      // if (!isPagination) {
+      //   resetQueryData();
+      //   searchObjDebug["partitionStartTime"] = performance.now();
+      //   await getQueryPartitions(queryReq);
+      //   searchObjDebug["partitionEndTime"] = performance.now();
+      // }
 
       //reset the plot chart when the query is run
       //this is to avoid the issue of chart not updating when histogram is disabled and enabled and clicking the run query button
       //only reset the plot chart when the query is not run for pagination
       // if(!isPagination && searchObj.meta.refreshInterval == 0) searchObj.meta.resetPlotChart = true;
 
-      if (queryReq != null) {
-        // in case of live refresh, reset from to 0
-        if (
-          searchObj.meta.refreshInterval > 0 &&
-          router.currentRoute.value.name == "logs"
-        ) {
-          queryReq.query.from = 0;
-          searchObj.meta.refreshHistogram = true;
-        }
+      // if (queryReq != null) {
+      //   // in case of live refresh, reset from to 0
+      //   if (
+      //     searchObj.meta.refreshInterval > 0 &&
+      //     router.currentRoute.value.name == "logs"
+      //   ) {
+      //     queryReq.query.from = 0;
+      //     searchObj.meta.refreshHistogram = true;
+      //   }
 
-        // update query with function or action
-        addTransformToQuery(queryReq);
+      //   // update query with function or action
+      //   addTransformToQuery(queryReq);
 
-        // in case of relative time, set start_time and end_time to query
-        // it will be used in pagination request
-        if (searchObj.data.datetime.type === "relative") {
-          if (!isPagination) initialQueryPayload.value = cloneDeep(queryReq);
-          else {
-            if (
-              searchObj.meta.refreshInterval == 0 &&
-              router.currentRoute.value.name == "logs" &&
-              searchObj.data.queryResults.hasOwnProperty("hits")
-            ) {
-              const start_time: number =
-                initialQueryPayload.value?.query?.start_time || 0;
-              const end_time: number =
-                initialQueryPayload.value?.query?.end_time || 0;
-              queryReq.query.start_time = start_time;
-              queryReq.query.end_time = end_time;
-            }
-          }
-        }
+      //   // in case of relative time, set start_time and end_time to query
+      //   // it will be used in pagination request
+      //   if (searchObj.data.datetime.type === "relative") {
+      //     if (!isPagination) initialQueryPayload.value = cloneDeep(queryReq);
+      //     else {
+      //       if (
+      //         searchObj.meta.refreshInterval == 0 &&
+      //         router.currentRoute.value.name == "logs" &&
+      //         searchObj.data.queryResults.hasOwnProperty("hits")
+      //       ) {
+      //         const start_time: number =
+      //           initialQueryPayload.value?.query?.start_time || 0;
+      //         const end_time: number =
+      //           initialQueryPayload.value?.query?.end_time || 0;
+      //         queryReq.query.start_time = start_time;
+      //         queryReq.query.end_time = end_time;
+      //       }
+      //     }
+      //   }
 
-        // reset errorCode
-        searchObj.data.errorCode = 0;
+      //   // reset errorCode
+      //   searchObj.data.errorCode = 0;
 
-        // copy query request for histogram query and same for customDownload
-        searchObj.data.histogramQuery = JSON.parse(JSON.stringify(queryReq));
+      //   // copy query request for histogram query and same for customDownload
+      //   searchObj.data.histogramQuery = JSON.parse(JSON.stringify(queryReq));
 
-        //here we need to send the actual sql query for histogram
-        searchObj.data.histogramQuery.query.sql = queryReq.query.sql;
+      //   //here we need to send the actual sql query for histogram
+      //   searchObj.data.histogramQuery.query.sql = queryReq.query.sql;
 
-        // searchObj.data.histogramQuery.query.start_time =
-        //   queryReq.query.start_time;
+      //   // searchObj.data.histogramQuery.query.start_time =
+      //   //   queryReq.query.start_time;
 
-        // searchObj.data.histogramQuery.query.end_time =
-        //   queryReq.query.end_time;
+      //   // searchObj.data.histogramQuery.query.end_time =
+      //   //   queryReq.query.end_time;
 
-        delete searchObj.data.histogramQuery.query.quick_mode;
-        delete searchObj.data.histogramQuery.query.from;
-        if (searchObj.data.histogramQuery.query.action_id)
-          delete searchObj.data.histogramQuery.query.action_id;
+      //   delete searchObj.data.histogramQuery.query.quick_mode;
+      //   delete searchObj.data.histogramQuery.query.from;
+      //   if (searchObj.data.histogramQuery.query.action_id)
+      //     delete searchObj.data.histogramQuery.query.action_id;
 
-        delete searchObj.data.histogramQuery.aggs;
-        searchObj.data.customDownloadQueryObj = JSON.parse(
-          JSON.stringify(queryReq),
-        );
+      //   delete searchObj.data.histogramQuery.aggs;
+      //   searchObj.data.customDownloadQueryObj = JSON.parse(
+      //     JSON.stringify(queryReq),
+      //   );
 
-        // get the current page detail and set it into query request
-        queryReq.query.start_time =
-          searchObj.data.queryResults.partitionDetail.paginations[
-            searchObj.data.resultGrid.currentPage - 1
-          ][0].startTime;
-        queryReq.query.end_time =
-          searchObj.data.queryResults.partitionDetail.paginations[
-            searchObj.data.resultGrid.currentPage - 1
-          ][0].endTime;
-        queryReq.query.from =
-          searchObj.data.queryResults.partitionDetail.paginations[
-            searchObj.data.resultGrid.currentPage - 1
-          ][0].from;
-        queryReq.query.size =
-          searchObj.data.queryResults.partitionDetail.paginations[
-            searchObj.data.resultGrid.currentPage - 1
-          ][0].size;
-        queryReq.query.streaming_output =
-          searchObj.data.queryResults.partitionDetail.paginations[
-            searchObj.data.resultGrid.currentPage - 1
-          ][0].streaming_output;
-        queryReq.query.streaming_id =
-          searchObj.data.queryResults.partitionDetail.paginations[
-            searchObj.data.resultGrid.currentPage - 1
-          ][0].streaming_id;
+      //   // get the current page detail and set it into query request
+      //   queryReq.query.start_time =
+      //     searchObj.data.queryResults.partitionDetail.paginations[
+      //       searchObj.data.resultGrid.currentPage - 1
+      //     ][0].startTime;
+      //   queryReq.query.end_time =
+      //     searchObj.data.queryResults.partitionDetail.paginations[
+      //       searchObj.data.resultGrid.currentPage - 1
+      //     ][0].endTime;
+      //   queryReq.query.from =
+      //     searchObj.data.queryResults.partitionDetail.paginations[
+      //       searchObj.data.resultGrid.currentPage - 1
+      //     ][0].from;
+      //   queryReq.query.size =
+      //     searchObj.data.queryResults.partitionDetail.paginations[
+      //       searchObj.data.resultGrid.currentPage - 1
+      //     ][0].size;
+      //   queryReq.query.streaming_output =
+      //     searchObj.data.queryResults.partitionDetail.paginations[
+      //       searchObj.data.resultGrid.currentPage - 1
+      //     ][0].streaming_output;
+      //   queryReq.query.streaming_id =
+      //     searchObj.data.queryResults.partitionDetail.paginations[
+      //       searchObj.data.resultGrid.currentPage - 1
+      //     ][0].streaming_id;
 
-        // for custom download we need to set the streaming_output and streaming_id
-        searchObj.data.customDownloadQueryObj.query.streaming_output =
-          queryReq.query.streaming_output;
-        searchObj.data.customDownloadQueryObj.query.streaming_id =
-          queryReq.query.streaming_id;
-        // setting subpage for pagination to handle below scenario
-        // for one particular page, if we have to fetch data from multiple partitions in that case we need to set subpage
-        // in below example we have 2 partitions and we need to fetch data from both partitions for page 2 to match recordsPerPage
-        /*
-             [
-                {
-                    "startTime": 1704869331795000,
-                    "endTime": 1705474131795000,
-                    "from": 500,
-                    "size": 34
-                },
-                {
-                    "startTime": 1705474131795000,
-                    "endTime": 1706078931795000,
-                    "from": 0,
-                    "size": 216
-                }
-              ],
-              [
-                {
-                    "startTime": 1706078931795000,
-                    "endTime": 1706683731795000,
-                    "from": 0,
-                    "size": 250
-                }
-              ]
-            */
-        searchObj.data.queryResults.subpage = 1;
+      //   // for custom download we need to set the streaming_output and streaming_id
+      //   searchObj.data.customDownloadQueryObj.query.streaming_output =
+      //     queryReq.query.streaming_output;
+      //   searchObj.data.customDownloadQueryObj.query.streaming_id =
+      //     queryReq.query.streaming_id;
+      //   // setting subpage for pagination to handle below scenario
+      //   // for one particular page, if we have to fetch data from multiple partitions in that case we need to set subpage
+      //   // in below example we have 2 partitions and we need to fetch data from both partitions for page 2 to match recordsPerPage
+      //   /*
+      //        [
+      //           {
+      //               "startTime": 1704869331795000,
+      //               "endTime": 1705474131795000,
+      //               "from": 500,
+      //               "size": 34
+      //           },
+      //           {
+      //               "startTime": 1705474131795000,
+      //               "endTime": 1706078931795000,
+      //               "from": 0,
+      //               "size": 216
+      //           }
+      //         ],
+      //         [
+      //           {
+      //               "startTime": 1706078931795000,
+      //               "endTime": 1706683731795000,
+      //               "from": 0,
+      //               "size": 250
+      //           }
+      //         ]
+      //       */
+      //   searchObj.data.queryResults.subpage = 1;
 
-        // based on pagination request, get the data
-        searchObjDebug["paginatedDatawithAPIStartTime"] = performance.now();
-        await getPaginatedData(queryReq);
-        if (
-          !isPagination &&
-          searchObj.meta.refreshInterval == 0 &&
-          searchObj.data.queryResults.hits.length > 0
-        )
-          searchObj.meta.resetPlotChart = true;
-        searchObjDebug["paginatedDatawithAPIEndTime"] = performance.now();
-        const parsedSQL: any = fnParsedSQL();
+      //   // based on pagination request, get the data
+      //   searchObjDebug["paginatedDatawithAPIStartTime"] = performance.now();
+      //   await getPaginatedData(queryReq);
+      //   if (
+      //     !isPagination &&
+      //     searchObj.meta.refreshInterval == 0 &&
+      //     searchObj.data.queryResults.hits.length > 0
+      //   )
+      //     searchObj.meta.resetPlotChart = true;
+      //   searchObjDebug["paginatedDatawithAPIEndTime"] = performance.now();
+      //   const parsedSQL: any = fnParsedSQL();
 
-        if (
-          (searchObj.data.queryResults.aggs == undefined &&
-            searchObj.meta.refreshHistogram == true &&
-            searchObj.loadingHistogram == false &&
-            searchObj.meta.showHistogram == true &&
-            (!searchObj.meta.sqlMode ||
-              isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
-          (searchObj.loadingHistogram == false &&
-            searchObj.meta.showHistogram == true &&
-            searchObj.meta.sqlMode == false &&
-            searchObj.meta.refreshHistogram == true)
-        ) {
-          searchObj.meta.refreshHistogram = false;
-          if (searchObj.data.queryResults.hits.length > 0) {
-            if (
-              searchObj.data.stream.selectedStream.length > 1 &&
-              searchObj.meta.sqlMode == true
-            ) {
-              searchObj.data.histogram = {
-                xData: [],
-                yData: [],
-                chartParams: {
-                  title: getHistogramTitle(),
-                  unparsed_x_data: [],
-                  timezone: "",
-                },
-                errorCode: 0,
-                errorMsg:
-                  "Histogram is not available for multi-stream SQL mode search.",
-                errorDetail: "",
-              };
+      //   if (
+      //     (searchObj.data.queryResults.aggs == undefined &&
+      //       searchObj.meta.refreshHistogram == true &&
+      //       searchObj.loadingHistogram == false &&
+      //       searchObj.meta.showHistogram == true &&
+      //       (!searchObj.meta.sqlMode ||
+      //         isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
+      //     (searchObj.loadingHistogram == false &&
+      //       searchObj.meta.showHistogram == true &&
+      //       searchObj.meta.sqlMode == false &&
+      //       searchObj.meta.refreshHistogram == true)
+      //   ) {
+      //     searchObj.meta.refreshHistogram = false;
+      //     if (searchObj.data.queryResults.hits.length > 0) {
+      //       if (
+      //         searchObj.data.stream.selectedStream.length > 1 &&
+      //         searchObj.meta.sqlMode == true
+      //       ) {
+      //         searchObj.data.histogram = {
+      //           xData: [],
+      //           yData: [],
+      //           chartParams: {
+      //             title: getHistogramTitle(),
+      //             unparsed_x_data: [],
+      //             timezone: "",
+      //           },
+      //           errorCode: 0,
+      //           errorMsg:
+      //             "Histogram is not available for multi-stream SQL mode search.",
+      //           errorDetail: "",
+      //         };
 
-              // get page count for multi stream sql mode search
-              setTimeout(async () => {
-                getPageCount(queryReq);
-              }, 0);
-              searchObj.meta.histogramDirtyFlag = false;
-            } else {
-              if (
-                searchObj.data.stream.selectedStream.length > 1 &&
-                searchObj.meta.sqlMode == false
-              ) {
-                searchObj.data.histogramQuery.query.sql =
-                  setMultiStreamHistogramQuery(
-                    searchObj.data.histogramQuery.query,
-                  );
-              }
-              searchObjDebug["histogramStartTime"] = performance.now();
-              searchObj.data.histogram.errorMsg = "";
-              searchObj.data.histogram.errorCode = 0;
-              searchObj.data.histogram.errorDetail = "";
-              searchObj.loadingHistogram = true;
+      //         // get page count for multi stream sql mode search
+      //         setTimeout(async () => {
+      //           getPageCount(queryReq);
+      //         }, 0);
+      //         searchObj.meta.histogramDirtyFlag = false;
+      //       } else {
+      //         if (
+      //           searchObj.data.stream.selectedStream.length > 1 &&
+      //           searchObj.meta.sqlMode == false
+      //         ) {
+      //           searchObj.data.histogramQuery.query.sql =
+      //             setMultiStreamHistogramQuery(
+      //               searchObj.data.histogramQuery.query,
+      //             );
+      //         }
+      //         searchObjDebug["histogramStartTime"] = performance.now();
+      //         searchObj.data.histogram.errorMsg = "";
+      //         searchObj.data.histogram.errorCode = 0;
+      //         searchObj.data.histogram.errorDetail = "";
+      //         searchObj.loadingHistogram = true;
 
-              const parsedSQL: any = fnParsedSQL();
-              searchObj.data.queryResults.aggs = [];
+      //         const parsedSQL: any = fnParsedSQL();
+      //         searchObj.data.queryResults.aggs = [];
 
-              const partitions = JSON.parse(
-                JSON.stringify(
-                  searchObj.data.queryResults.partitionDetail.partitions,
-                ),
-              );
+      //         const partitions = JSON.parse(
+      //           JSON.stringify(
+      //             searchObj.data.queryResults.partitionDetail.partitions,
+      //           ),
+      //         );
 
-              // is _timestamp orderby ASC then reverse the partition array
-              if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
-                partitions.reverse();
-              }
+      //         // is _timestamp orderby ASC then reverse the partition array
+      //         if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
+      //           partitions.reverse();
+      //         }
 
-              await generateHistogramSkeleton();
-              for (const partition of partitions) {
-                searchObj.data.histogramQuery.query.start_time = partition[0];
-                searchObj.data.histogramQuery.query.end_time = partition[1];
-                //to improve the cancel query UI experience we add additional check here and further we need to remove it
-                if (searchObj.data.isOperationCancelled) {
-                  searchObj.loadingHistogram = false;
-                  searchObj.data.isOperationCancelled = false;
+      //         await generateHistogramSkeleton();
+      //         for (const partition of partitions) {
+      //           searchObj.data.histogramQuery.query.start_time = partition[0];
+      //           searchObj.data.histogramQuery.query.end_time = partition[1];
+      //           //to improve the cancel query UI experience we add additional check here and further we need to remove it
+      //           if (searchObj.data.isOperationCancelled) {
+      //             searchObj.loadingHistogram = false;
+      //             searchObj.data.isOperationCancelled = false;
 
-                  if (!searchObj.data.histogram?.xData?.length) {
-                    notificationMsg.value = "Search query was cancelled";
-                    searchObj.data.histogram.errorMsg =
-                      "Search query was cancelled";
-                    searchObj.data.histogram.errorDetail =
-                      "Search query was cancelled";
-                  }
+      //             if (!searchObj.data.histogram?.xData?.length) {
+      //               notificationMsg.value = "Search query was cancelled";
+      //               searchObj.data.histogram.errorMsg =
+      //                 "Search query was cancelled";
+      //               searchObj.data.histogram.errorDetail =
+      //                 "Search query was cancelled";
+      //             }
 
-                  showCancelSearchNotification();
-                  break;
-                }
-                await getHistogramQueryData(searchObj.data.histogramQuery);
-                if (partitions.length > 1) {
-                  setTimeout(async () => {
-                    await generateHistogramData();
-                    if (!queryReq.query?.streaming_output)
-                      refreshPartitionPagination(true);
-                  }, 100);
-                }
-              }
-              searchObj.loadingHistogram = false;
-            }
-          }
-          if (
-            searchObj.data.stream.selectedStream.length == 1 ||
-            (searchObj.data.stream.selectedStream.length > 1 &&
-              searchObj.meta.sqlMode == false)
-          ) {
-            await generateHistogramData();
-          }
-          if (!queryReq.query?.streaming_output)
-            refreshPartitionPagination(true);
-        } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
-          resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
-            -1,
-          );
-          searchObj.meta.histogramDirtyFlag = false;
-        } else if (
-          searchObj.meta.sqlMode &&
-          (isDistinctQuery(parsedSQL) ||
-            isWithQuery(parsedSQL) ||
-            !searchObj.data.queryResults.is_histogram_eligible)
-        ) {
-          let aggFlag = false;
-          if (parsedSQL) {
-            aggFlag = hasAggregation(parsedSQL?.columns);
-          }
-          if (
-            queryReq.query.from == 0 &&
-            searchObj.data.queryResults.hits.length > 0 &&
-            !aggFlag
-          ) {
-            setTimeout(async () => {
-              searchObjDebug["pagecountStartTime"] = performance.now();
-              // TODO : check the page count request
-              getPageCount(queryReq);
-              searchObjDebug["pagecountEndTime"] = performance.now();
-            }, 0);
-          }
-          if (
-            isWithQuery(parsedSQL) ||
-            !searchObj.data.queryResults.is_histogram_eligible
-          ) {
-            resetHistogramWithError(
-              "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
-              -1,
-            );
-          } else {
-            resetHistogramWithError(
-              "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries",
-              -1,
-            );
-          }
-          searchObj.meta.histogramDirtyFlag = false;
-        } else {
-          let aggFlag = false;
-          if (parsedSQL) {
-            aggFlag = hasAggregation(parsedSQL?.columns);
-          }
-          if (
-            queryReq.query.from == 0 &&
-            searchObj.data.queryResults.hits.length > 0 &&
-            !aggFlag &&
-            searchObj.data.queryResults.aggs == undefined
-          ) {
-            setTimeout(async () => {
-              searchObjDebug["pagecountStartTime"] = performance.now();
-              await getPageCount(queryReq);
-              searchObjDebug["pagecountEndTime"] = performance.now();
-            }, 0);
-          } else {
-            await generateHistogramData();
-          }
-        }
-      } else {
-        searchObj.loading = false;
-        if (!notificationMsg.value) {
-          notificationMsg.value = "Search query is empty or invalid.";
-        }
-      }
-      searchObjDebug["queryDataEndTime"] = performance.now();
+      //             showCancelSearchNotification();
+      //             break;
+      //           }
+      //           await getHistogramQueryData(searchObj.data.histogramQuery);
+      //           if (partitions.length > 1) {
+      //             setTimeout(async () => {
+      //               await generateHistogramData();
+      //               if (!queryReq.query?.streaming_output)
+      //                 refreshPartitionPagination(true);
+      //             }, 100);
+      //           }
+      //         }
+      //         searchObj.loadingHistogram = false;
+      //       }
+      //     }
+      //     if (
+      //       searchObj.data.stream.selectedStream.length == 1 ||
+      //       (searchObj.data.stream.selectedStream.length > 1 &&
+      //         searchObj.meta.sqlMode == false)
+      //     ) {
+      //       await generateHistogramData();
+      //     }
+      //     if (!queryReq.query?.streaming_output)
+      //       refreshPartitionPagination(true);
+      //   } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
+      //     resetHistogramWithError(
+      //       "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
+      //       -1,
+      //     );
+      //     searchObj.meta.histogramDirtyFlag = false;
+      //   } else if (
+      //     searchObj.meta.sqlMode &&
+      //     (isDistinctQuery(parsedSQL) ||
+      //       isWithQuery(parsedSQL) ||
+      //       !searchObj.data.queryResults.is_histogram_eligible)
+      //   ) {
+      //     let aggFlag = false;
+      //     if (parsedSQL) {
+      //       aggFlag = hasAggregation(parsedSQL?.columns);
+      //     }
+      //     if (
+      //       queryReq.query.from == 0 &&
+      //       searchObj.data.queryResults.hits.length > 0 &&
+      //       !aggFlag
+      //     ) {
+      //       setTimeout(async () => {
+      //         searchObjDebug["pagecountStartTime"] = performance.now();
+      //         // TODO : check the page count request
+      //         getPageCount(queryReq);
+      //         searchObjDebug["pagecountEndTime"] = performance.now();
+      //       }, 0);
+      //     }
+      //     if (
+      //       isWithQuery(parsedSQL) ||
+      //       !searchObj.data.queryResults.is_histogram_eligible
+      //     ) {
+      //       resetHistogramWithError(
+      //         "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
+      //         -1,
+      //       );
+      //     } else {
+      //       resetHistogramWithError(
+      //         "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries",
+      //         -1,
+      //       );
+      //     }
+      //     searchObj.meta.histogramDirtyFlag = false;
+      //   } else {
+      //     let aggFlag = false;
+      //     if (parsedSQL) {
+      //       aggFlag = hasAggregation(parsedSQL?.columns);
+      //     }
+      //     if (
+      //       queryReq.query.from == 0 &&
+      //       searchObj.data.queryResults.hits.length > 0 &&
+      //       !aggFlag &&
+      //       searchObj.data.queryResults.aggs == undefined
+      //     ) {
+      //       setTimeout(async () => {
+      //         searchObjDebug["pagecountStartTime"] = performance.now();
+      //         await getPageCount(queryReq);
+      //         searchObjDebug["pagecountEndTime"] = performance.now();
+      //       }, 0);
+      //     } else {
+      //       await generateHistogramData();
+      //     }
+      //   }
+      // } else {
+      //   searchObj.loading = false;
+      //   if (!notificationMsg.value) {
+      //     notificationMsg.value = "Search query is empty or invalid.";
+      //   }
+      // }
+      // searchObjDebug["queryDataEndTime"] = performance.now();
     } catch (e: any) {
       console.error(
         `${notificationMsg.value || "Error occurred during the search operation."}`,
@@ -830,12 +825,6 @@ export const useSearchBar = () => {
   const cancelQuery = async (): Promise<boolean> => {
     return new Promise((resolve, reject) => {
       try {
-        if (searchObj.communicationMethod === "ws") {
-          sendCancelSearchMessage([...searchObj.data.searchWebSocketTraceIds]);
-          resolve(true);
-          return;
-        }
-
         const tracesIds = [...searchObj.data.searchRequestTraceIds];
 
         if (!searchObj.data.searchRequestTraceIds.length) {
@@ -915,7 +904,6 @@ export const useSearchBar = () => {
   };
 
   const setCommunicationMethod = () => {
-    const shouldUseWebSocket = isWebSocketEnabled(store.state);
     const shouldUseStreaming = isStreamingEnabled(store.state);
 
     const isMultiStreamSearch =
@@ -924,8 +912,6 @@ export const useSearchBar = () => {
 
     if (shouldUseStreaming && !isMultiStreamSearch) {
       searchObj.communicationMethod = "streaming";
-    } else if (shouldUseWebSocket && !isMultiStreamSearch) {
-      searchObj.communicationMethod = "ws";
     } else {
       searchObj.communicationMethod = "http";
     }
