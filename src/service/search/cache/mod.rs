@@ -115,8 +115,9 @@ pub async fn search(
     }
 
     // Result caching check start
-    let (mut c_resp, file_path, should_exec_query) =
+    let (mut c_resp, should_exec_query) =
         prepare_cache_response(trace_id, org_id, stream_type, &mut req, use_cache).await?;
+    let file_path = c_resp.file_path.clone();
 
     // get the modified original sql from req
     let origin_sql = in_req.query.sql.clone();
@@ -460,7 +461,7 @@ pub async fn prepare_cache_response(
     stream_type: StreamType,
     req: &mut search::Request,
     use_cache: bool,
-) -> Result<(MultiCachedQueryResponse, String, bool), Error> {
+) -> Result<(MultiCachedQueryResponse, bool), Error> {
     let mut origin_sql = req.query.sql.clone();
     let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or(true);
     let stream_name = match resolve_stream_names(&origin_sql) {
@@ -556,7 +557,7 @@ pub async fn prepare_cache_response(
             }
         }
     };
-    Ok((resp, file_path, should_exec_query))
+    Ok((resp, should_exec_query))
 }
 
 // based on _timestamp of first record in config::meta::search::Response either add it in start

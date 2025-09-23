@@ -135,7 +135,7 @@ pub async fn process_search_stream_request(
 
     if req.query.from == 0 && !req.query.track_total_hits && req.query.streaming_id.is_none() {
         // check cache for the first page
-        let (c_resp, _file_path, _should_exec_query) = match search_cache::prepare_cache_response(
+        let (c_resp, _should_exec_query) = match search_cache::prepare_cache_response(
             &trace_id,
             &org_id,
             stream_type,
@@ -208,7 +208,7 @@ pub async fn process_search_stream_request(
             .unwrap_or_default();
 
         log::info!(
-            "[HTTP2_STREAM trace_id {trace_id}] found cache responses len:{}, cache_start_time: {c_start_time}, cache_end_time: {c_end_time}",
+            "[HTTP2_STREAM trace_id {trace_id}] found cached files: {}, records: {cached_hits}, cache_time: {c_start_time} - {c_end_time}",
             cached_resp.len(),
         );
 

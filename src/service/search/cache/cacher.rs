@@ -438,15 +438,7 @@ pub async fn get_cached_results(
 
     // filter data based on request time range
     let (hits_allowed_start_time, hits_allowed_end_time) =
-        if cache_req.is_aggregate && cache_req.histogram_interval > 0 {
-            // calculation in line with date bin of datafusion
-            (
-                cache_req.q_start_time - (cache_req.q_start_time % cache_req.histogram_interval),
-                cache_req.q_end_time - (cache_req.q_end_time % cache_req.histogram_interval),
-            )
-        } else {
-            (cache_req.q_start_time, cache_req.q_end_time)
-        };
+        (cache_req.q_start_time, cache_req.q_end_time);
     let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
     let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
     let data_start_time = std::cmp::min(first_ts, last_ts);
@@ -455,7 +447,7 @@ pub async fn get_cached_results(
     if data_start_time < cache_req.q_start_time || data_end_time > cache_req.q_end_time {
         cached_response.hits.retain(|hit| {
             let hit_ts = get_ts_value(&cache_req.ts_column, hit);
-            hit_ts <= hits_allowed_end_time && hit_ts >= hits_allowed_start_time
+            hit_ts < hits_allowed_end_time && hit_ts >= hits_allowed_start_time
         });
         // if the data is empty after filtering, return None
         if cached_response.hits.is_empty() {
