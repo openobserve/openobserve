@@ -35,7 +35,7 @@ use infra::{
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
         get_stream_setting_fts_fields, unwrap_partition_time_level, unwrap_stream_created_at,
-        unwrap_stream_is_derived, unwrap_stream_settings,
+        unwrap_stream_settings,
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
@@ -468,7 +468,7 @@ pub async fn update_stream_settings(
                     .retain(|range| !new_settings.extended_retention_days.remove.contains(range));
             }
 
-            let _fts = get_stream_setting_fts_fields(&Some(settings));
+            let _fts = get_stream_setting_fts_fields(&Some(settings.clone()));
             if !new_settings.distinct_value_fields.add.is_empty() {
                 for f in &new_settings.distinct_value_fields.add {
                     if f == "count" || f == TIMESTAMP_COL_NAME {
