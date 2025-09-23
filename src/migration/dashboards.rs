@@ -83,8 +83,8 @@ async fn add_distinct_from_dashboard(
             };
 
             if !stream_settings.distinct_value_fields.contains(&temp)
-                && !SQL_FULL_TEXT_SEARCH_FIELDS.contains(&temp)
-                && !stream_settings.full_text_search_keys.contains(&temp)
+                && !SQL_FULL_TEXT_SEARCH_FIELDS.contains(&temp.name)
+                && !stream_settings.full_text_search_keys.contains(&temp.name)
             {
                 stream_settings.distinct_value_fields.push(temp);
             }
