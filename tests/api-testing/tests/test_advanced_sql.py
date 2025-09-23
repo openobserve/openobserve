@@ -555,7 +555,6 @@ def test_e2e_array_case_sensitive(create_session, base_url):
             assert log_value.startswith('['), f"Hit {i} log should be array format, got: {log_value}"
             
             # str_match does substring matching, so 'fu' should match 'datafusion'
-            import json
             try:
                 array_data = json.loads(log_value)
                 if len(array_data) > 0:
@@ -620,7 +619,6 @@ def test_e2e_array_case_insensitive(create_session, base_url):
             print(f"Hit {i}: log = {log_value}")
             
             # The array should contain elements that match 'Fu' case-insensitively
-            import json
             try:
                 array_data = json.loads(log_value)
                 if len(array_data) > 0:
