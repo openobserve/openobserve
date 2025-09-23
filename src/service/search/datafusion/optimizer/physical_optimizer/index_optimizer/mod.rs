@@ -45,7 +45,7 @@ use crate::service::search::datafusion::{
     distributed_plan::{empty_exec::NewEmptyExec, remote_scan::RemoteScanExec},
     optimizer::physical_optimizer::index_optimizer::{
         count::is_simple_count, distinct::is_simple_distinct, histogram::is_simple_histogram,
-        select::is_simple_select, topn::is_simple_topn,
+        select::is_simple_select, topn::is_simple_topn, utils::is_complex_plan,
     },
 };
 
@@ -117,6 +117,10 @@ impl TreeNodeRewriter for FollowerIndexOptimizer {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, plan: Self::Node) -> Result<Transformed<Self::Node>> {
+        if is_complex_plan(&plan) {
+            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
+        }
+
         if plan
             .as_any()
             .downcast_ref::<SortPreservingMergeExec>()
@@ -199,6 +203,10 @@ impl TreeNodeRewriter for LeaderIndexOptimizer {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, plan: Self::Node) -> Result<Transformed<Self::Node>> {
+        if is_complex_plan(&plan) {
+            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
+        }
+
         if plan
             .as_any()
             .downcast_ref::<SortPreservingMergeExec>()
@@ -287,7 +295,7 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
         if name == "NewEmptyExec" {
             let table = node.as_any().downcast_ref::<NewEmptyExec>().unwrap();
             self.table_name = Some(TableReference::from(table.name()));
-            Ok(TreeNodeRecursion::Continue)
+            Ok(TreeNodeRecursion::Stop)
         } else {
             Ok(TreeNodeRecursion::Continue)
         }

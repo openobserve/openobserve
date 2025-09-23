@@ -13,6 +13,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
+use datafusion::{common::tree_node::TreeNode, physical_plan::ExecutionPlan};
+
+// check if the plan contains join, union, interleave, unnest, partial sort(use for streaming
+// table), bounded window agg, window agg
+pub fn is_complex_plan(node: &Arc<dyn ExecutionPlan>) -> bool {
+    node.exists(|plan| {
+        Ok(plan.name() == "HashJoinExec"
+            || plan.name() == "RecursiveQueryExec"
+            || plan.name() == "UnionExec"
+            || plan.name() == "InterleaveExec"
+            || plan.name() == "UnnestExec"
+            || plan.name() == "CrossJoinExec"
+            || plan.name() == "NestedLoopJoinExec"
+            || plan.name() == "SymmetricHashJoinExec"
+            || plan.name() == "SortMergeJoinExec"
+            || plan.name() == "PartialSortExec"
+            || plan.name() == "BoundedWindowAggExec"
+            || plan.name() == "WindowAggExec"
+            || plan.children().len() > 1)
+    })
+    .unwrap_or(true)
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use std::sync::Arc;
