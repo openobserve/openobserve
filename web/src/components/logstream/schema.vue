@@ -462,7 +462,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-slot:body-cell-name="props">
                     <q-td class="q-td--no-hover field-name field-name-ellipsis">
                       <div class="tw-flex tw-items-center">
-                        <span class="field-name-text">{{ props.row.name }}</span>
+                        <span class="field-name-text">
+                          {{ props.row.name }}
+                          <q-tooltip v-if="props.row.name.length > 30" class="tw-text-[12px]">
+                            {{ props.row.name }}
+                          </q-tooltip>
+                        </span>
                         <span v-if="isEnvQuickModeField(props.row.name)" class="tw-flex tw-items-center tw-ml-1">
                           <img
                             :src="quickModeIcon"
@@ -475,9 +480,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ t('logStream.envQuickModeMsg') }}
                         </q-tooltip>
                         </span>
-                        <q-tooltip v-if="props.row.name.length > 30" class="tw-text-[12px]">
-                          {{ props.row.name }}
-                        </q-tooltip>
                       </div>
                     </q-td>
                   </template>
