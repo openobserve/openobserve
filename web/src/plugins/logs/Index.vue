@@ -1098,7 +1098,7 @@ export default defineComponent({
             (currentQuery.toLowerCase() === "select" ||
               currentQuery.toLowerCase().indexOf("select ") == 0);
           //check if user try to applied saved views in which sql mode is enabled.
-          if (currentQuery.indexOf("SELECT") >= 0) {
+          if (currentQuery.toLowerCase().indexOf("select") >= 0) {
             return;
           }
 
