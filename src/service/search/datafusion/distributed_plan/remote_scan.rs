@@ -162,6 +162,15 @@ impl RemoteScanExec {
     pub fn analyze(&self) -> bool {
         self.remote_scan_node.search_infos.is_analyze
     }
+
+    #[cfg(test)]
+    pub fn index_optimize_mode(&self) -> Option<IndexOptimizeMode> {
+        self.remote_scan_node
+            .index_info
+            .index_optimize_mode
+            .clone()
+            .map(|x| x.into())
+    }
 }
 
 impl DisplayAs for RemoteScanExec {
