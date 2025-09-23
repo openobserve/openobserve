@@ -36,8 +36,8 @@ export default class StreamSettingsPage {
 
     // Wait for stream details to appear and click
 
-    // await this.streamDetailButton.waitFor({ state: "visible", timeout: 2000 });
-    // await this.streamDetailButton.click();
+    await this.streamDetailButton.waitFor({ state: "visible", timeout: 2000 });
+    await this.streamDetailButton.click();
     //before clicking for max query range input we need to go to configuration tab due to schema UI layout change
     await this.configurationTab.waitFor({ state: "visible", timeout: 2000 });
     await this.configurationTab.click();
