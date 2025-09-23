@@ -1822,14 +1822,14 @@ export const calculatePieChartRadius = (
   if (!panelSchema.layout) {
     // Calculate the optimal radius in pixels based on available space
     const maxAvailableRadius = Math.min(availableWidth, availableHeight) / 2;
-    const optimalRadiusPixels = maxAvailableRadius * 0.5; // 50% of available space for padding
+    const optimalRadiusPixels = maxAvailableRadius * 0.75; // 75% of available space for padding
 
     // If original dimensions are provided, convert to percentage of original container
     if (originalWidth && originalHeight) {
       const originalMaxRadius = Math.min(originalWidth, originalHeight) / 2;
       return Math.min(
-        Math.max((optimalRadiusPixels / originalMaxRadius) * 100, 20),
-        85,
+        Math.max((optimalRadiusPixels / originalMaxRadius) * 100, 30),
+        90,
       );
     }
 
@@ -1854,7 +1854,7 @@ export const calculatePieChartRadius = (
   const isFullSpace =
     availableWidth === panelSchema.layout.w * 30 &&
     availableHeight === panelSchema.layout.h * 30;
-  const spaceUsage = isFullSpace ? 0.95 : 0.9;
+  const spaceUsage = isFullSpace ? 0.98 : 0.95;
 
   const effectiveRadius = Math.min(baseRadius, maxRadius * spaceUsage);
 
@@ -1864,7 +1864,7 @@ export const calculatePieChartRadius = (
   if (effectiveRadius > 150) multiplier = 140;
 
   // Calculate final percentage with appropriate limits
-  const maxLimit = isFullSpace ? 95 : 90;
+  const maxLimit = isFullSpace ? 98 : 95;
   return Math.min((effectiveRadius / minRadius) * multiplier, maxLimit);
 };
 
