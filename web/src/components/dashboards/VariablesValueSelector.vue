@@ -298,7 +298,7 @@ export default defineComponent({
       }
     };
 
-    // onUnmounted want to cancel the values api call for all http2, websocket and streaming
+    // onUnmounted want to cancel the values api call for all http2, and streaming
     onUnmounted(() => {
       // Cancel all active trace IDs for all variables
       Object.keys(traceIdMapper.value).forEach((field) => {

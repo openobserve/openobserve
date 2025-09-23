@@ -72,8 +72,7 @@ export const useHistogram = () => {
         endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
         if (
           currentPage >=
-          (searchObj.communicationMethod === "ws" ||
-          searchObj.communicationMethod === "streaming" ||
+          (searchObj.communicationMethod === "streaming" ||
           searchObj.meta.jobId != ""
             ? searchObj.data.queryResults?.pagination?.length
             : searchObj.data.queryResults.partitionDetail?.paginations
@@ -111,8 +110,7 @@ export const useHistogram = () => {
       }
 
       if (
-        (searchObj.communicationMethod === "ws" ||
-          searchObj.communicationMethod === "streaming") &&
+        (searchObj.communicationMethod === "streaming") &&
         endCount < totalCount &&
         !searchObj.meta.showHistogram
       ) {
