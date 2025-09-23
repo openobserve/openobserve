@@ -35,170 +35,175 @@ pub async fn get_cached_results(
     file_path: String,
     trace_id: String,
     cache_req: CacheQueryRequest,
+    is_streaming: bool,
 ) -> Vec<CachedQueryResponse> {
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_querier_nodes(None).await {
-        Some(nodes) => nodes,
-        None => {
-            log::error!("[trace_id {trace_id}] get_cached_results: no querier node online");
-            return vec![];
-        }
-    };
-    nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
-    nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
-
-    nodes.sort_by_key(|x| x.id);
-
-    let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
-    nodes.retain(|node| node.is_querier() && !node.uuid.eq(LOCAL_NODE.uuid.as_str()));
-
-    let querier_num = nodes.len();
-    if querier_num == 0 && local_node.is_none() {
-        log::error!("no querier node online");
-        return vec![];
-    };
-
     let ts_column = &cache_req.ts_column;
-    let mut tasks = Vec::new();
-    for node in nodes {
-        let cfg = config::get_config();
-        let node_addr = node.grpc_addr.clone();
-        let grpc_span = info_span!(
-            "service:search:cluster:cacher:get_cached_results",
-            node_id = node.id,
-            node_addr = node_addr.as_str(),
-        );
-        let query_key = query_key.clone();
-        let file_path = file_path.clone();
-        let trace_id = trace_id.clone();
-        let ts_column = ts_column.to_string();
-        let task = tokio::task::spawn(
-            async move {
-                let req = QueryCacheRequest {
-                   start_time: cache_req.q_start_time,
-                    end_time: cache_req.q_end_time,
-                    is_aggregate :cache_req.is_aggregate,
-                    query_key,
-                    file_path,
-                    timestamp_col: ts_column.to_string(),
-                    trace_id:trace_id.clone(),
-                    discard_interval:cache_req.discard_interval,
-                    is_descending:cache_req.is_descending,
-                };
+    let mut results = Vec::new();
+    let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
+    if !is_streaming {
+        let mut nodes = match infra_cluster::get_cached_online_querier_nodes(None).await {
+            Some(nodes) => nodes,
+            None => {
+                log::error!("[trace_id {trace_id}] get_cached_results: no querier node online");
+                return vec![];
+            }
+        };
+        nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
+        nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
 
-                let mut request = tonic::Request::new(req);
-                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
-                log::info!(
-                    "[trace_id {trace_id}] get_cached_results->grpc: request node: {}",
-                    &node_addr
-                );
+        nodes.sort_by_key(|x| x.id);
 
-                let token: MetadataValue<_> = get_internal_grpc_token()
-                    .parse()
-                    .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
-                    log::error!(
-                        "[trace_id {trace_id}] get_cached_results->grpc: node: {}, connect err: {:?}",
-                        &node.grpc_addr,
-                        err
+        let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
+        nodes.retain(|node| node.is_querier() && !node.uuid.eq(LOCAL_NODE.uuid.as_str()));
+
+        let querier_num = nodes.len();
+        if querier_num == 0 && local_node.is_none() {
+            log::error!("no querier node online");
+            return vec![];
+        };
+
+        let mut tasks = Vec::new();
+        for node in nodes {
+            let cfg = config::get_config();
+            let node_addr = node.grpc_addr.clone();
+            let grpc_span = info_span!(
+                "service:search:cluster:cacher:get_cached_results",
+                node_id = node.id,
+                node_addr = node_addr.as_str(),
+            );
+            let query_key = query_key.clone();
+            let file_path = file_path.clone();
+            let trace_id = trace_id.clone();
+            let ts_column = ts_column.to_string();
+            let task = tokio::task::spawn(
+                async move {
+                    let req = QueryCacheRequest {
+                       start_time: cache_req.q_start_time,
+                        end_time: cache_req.q_end_time,
+                        is_aggregate :cache_req.is_aggregate,
+                        query_key,
+                        file_path,
+                        timestamp_col: ts_column.to_string(),
+                        trace_id:trace_id.clone(),
+                        discard_interval:cache_req.discard_interval,
+                        is_descending:cache_req.is_descending,
+                    };
+
+                    let mut request = tonic::Request::new(req);
+                    request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
+                    log::info!(
+                        "[trace_id {trace_id}] get_cached_results->grpc: request node: {}",
+                        &node_addr
                     );
-                    server_internal_error("connect search node error")
-                })?;
-                let mut client =
-                    cluster_rpc::query_cache_client::QueryCacheClient::with_interceptor(
-                        channel,
-                        move |mut req: Request<()>| {
-                            req.metadata_mut().insert("authorization", token.clone());
 
-                            Ok(req)
-                        },
-                    );
-                client = client
-                    .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-                let response = match client.get_multiple_cached_result(request).await {
-                    Ok(res) => res.into_inner(),
-                    Err(err) => {
+                    let token: MetadataValue<_> = get_internal_grpc_token()
+                        .parse()
+                        .map_err(|_| Error::Message("invalid token".to_string()))?;
+                    let channel = get_cached_channel(&node_addr).await.map_err(|err| {
                         log::error!(
-                            "[trace_id {trace_id}] get_cached_results->grpc: node: {}, get_cached_results err: {:?}",
+                            "[trace_id {trace_id}] get_cached_results->grpc: node: {}, connect err: {:?}",
                             &node.grpc_addr,
                             err
                         );
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
-                    }
-                };
+                        server_internal_error("connect search node error")
+                    })?;
+                    let mut client =
+                        cluster_rpc::query_cache_client::QueryCacheClient::with_interceptor(
+                            channel,
+                            move |mut req: Request<()>| {
+                                req.metadata_mut().insert("authorization", token.clone());
 
-                Ok((node.clone(), response))
-            }
-            .instrument(grpc_span),
-        );
-        tasks.push(task);
-    }
+                                Ok(req)
+                            },
+                        );
+                    client = client
+                        .send_compressed(CompressionEncoding::Gzip)
+                        .accept_compressed(CompressionEncoding::Gzip)
+                        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+                    let response = match client.get_multiple_cached_result(request).await {
+                        Ok(res) => res.into_inner(),
+                        Err(err) => {
+                            log::error!(
+                                "[trace_id {trace_id}] get_cached_results->grpc: node: {}, get_cached_results err: {:?}",
+                                &node.grpc_addr,
+                                err
+                            );
+                            let err = ErrorCodes::from_json(err.message())?;
+                            return Err(Error::ErrorCode(err));
+                        }
+                    };
 
-    let mut results = Vec::new();
+                    Ok((node.clone(), response))
+                }
+                .instrument(grpc_span),
+            );
+            tasks.push(task);
+        }
 
-    for task in tasks {
-        match task.await {
-            Ok(res) => match res {
-                Ok((node, node_res)) => {
-                    let remote_responses = node_res.response;
-                    let mut node_responses = vec![];
-                    for res in remote_responses {
-                        let cached_res: config::meta::search::Response = match res.cached_response {
-                            Some(cached_response) => {
-                                match serde_json::from_slice(&cached_response.data) {
-                                    Ok(v) => v,
-                                    Err(e) => {
-                                        log::error!(
-                                            "[trace_id {trace_id}] get_cached_results->grpc: node: {}, cached_response parse error: {:?}",
-                                            &node.grpc_addr,
-                                            e
-                                        );
-                                        config::meta::search::Response::default()
+        for task in tasks {
+            match task.await {
+                Ok(res) => match res {
+                    Ok((node, node_res)) => {
+                        let remote_responses = node_res.response;
+                        let mut node_responses = vec![];
+                        for res in remote_responses {
+                            let cached_res: config::meta::search::Response = match res
+                                .cached_response
+                            {
+                                Some(cached_response) => {
+                                    match serde_json::from_slice(&cached_response.data) {
+                                        Ok(v) => v,
+                                        Err(e) => {
+                                            log::error!(
+                                                "[trace_id {trace_id}] get_cached_results->grpc: node: {}, cached_response parse error: {:?}",
+                                                &node.grpc_addr,
+                                                e
+                                            );
+                                            config::meta::search::Response::default()
+                                        }
                                     }
                                 }
+                                None => {
+                                    log::error!(
+                                        "[trace_id {trace_id}] get_cached_results->grpc: node: {}, no cached_response",
+                                        &node.grpc_addr
+                                    );
+                                    config::meta::search::Response::default()
+                                }
+                            };
+                            if !cached_res.hits.is_empty() {
+                                node_responses.push(CachedQueryResponse {
+                                    cached_response: cached_res,
+                                    deltas: vec![],
+                                    has_cached_data: res.has_cached_data,
+                                    cache_query_response: res.cache_query_response,
+                                    response_start_time: res.cache_start_time,
+                                    response_end_time: res.cache_end_time,
+                                    ts_column: ts_column.clone(),
+                                    is_descending: res.is_descending,
+                                    limit: -1,
+                                });
                             }
-                            None => {
-                                log::error!(
-                                    "[trace_id {trace_id}] get_cached_results->grpc: node: {}, no cached_response",
-                                    &node.grpc_addr
-                                );
-                                config::meta::search::Response::default()
-                            }
-                        };
-                        if !cached_res.hits.is_empty() {
-                            node_responses.push(CachedQueryResponse {
-                                cached_response: cached_res,
-                                deltas: vec![],
-                                has_cached_data: res.has_cached_data,
-                                cache_query_response: res.cache_query_response,
-                                response_start_time: res.cache_start_time,
-                                response_end_time: res.cache_end_time,
-                                ts_column: ts_column.clone(),
-                                is_descending: res.is_descending,
-                                limit: -1,
-                            });
                         }
-                    }
 
-                    results.push((node, node_responses));
-                }
-                Err(err) => {
+                        results.push((node, node_responses));
+                    }
+                    Err(err) => {
+                        log::error!(
+                            "[trace_id {trace_id}] get_cached_results->grpc: node search error: {err}"
+                        );
+                    }
+                },
+                Err(e) => {
                     log::error!(
-                        "[trace_id {trace_id}] get_cached_results->grpc: node search error: {err}"
+                        "[trace_id {trace_id}] get_cached_results->grpc: node search error: {e}"
                     );
                 }
-            },
-            Err(e) => {
-                log::error!(
-                    "[trace_id {trace_id}] get_cached_results->grpc: node search error: {e}"
-                );
             }
         }
-    }
+    };
 
     let local_results = crate::service::search::cache::multi::get_cached_results(
         &file_path,
