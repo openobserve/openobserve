@@ -916,41 +916,20 @@ export default defineComponent({
       { deep: true },
     );
 
-    // Watch for layout changes (config panel open/close) and re-trigger conversion
-    // This ensures legend calculations use fresh dimensions after layout changes
-    let resizeTimeout: any = null;
-    const handleResizeEvent = async () => {
-      // Clear any existing timeout to debounce resize events
-      if (resizeTimeout) {
-        clearTimeout(resizeTimeout);
+    // Listen for layout changes to update chart dimensions
+    const handleWindowLayoutChanges = async () => {
+      if (chartPanelRef.value) {
+        await nextTick();
+        await convertPanelDataCommon();
       }
-
-      // Wait for DOM to update with new dimensions before recalculating
-      resizeTimeout = setTimeout(async () => {
-        if (
-          !errorDetail?.value?.message &&
-          validatePanelData?.value?.length === 0 &&
-          data.value?.length &&
-          chartPanelRef.value
-        ) {
-          // Wait for next tick to ensure DOM has updated
-          await nextTick();
-          // Re-trigger conversion to recalculate legend sizing with fresh dimensions
-          await convertPanelDataCommon();
-        }
-      }, 50); // Small delay to ensure layout has stabilized
     };
 
-    // Listen for resize events (dispatched when config panel opens/closes)
     onMounted(() => {
-      window.addEventListener("resize", handleResizeEvent);
+      window.addEventListener("resize", handleWindowLayoutChanges);
     });
 
     onUnmounted(() => {
-      if (resizeTimeout) {
-        clearTimeout(resizeTimeout);
-      }
-      window.removeEventListener("resize", handleResizeEvent);
+      window.removeEventListener("resize", handleWindowLayoutChanges);
     });
 
     watch(
