@@ -858,7 +858,7 @@ pub async fn write_results_v2(
     };
 
     if !local_resp.hits.is_empty() && remove_hit.is_some() {
-        let ts_value_to_remove = remove_hit.unwrap().get(ts_column).cloned();
+        let ts_value_to_remove: Option<json::Value> = remove_hit.unwrap().get(ts_column).cloned();
 
         if let Some(ts_value) = ts_value_to_remove {
             let boundary_timestamp = match ts_value {
@@ -920,9 +920,21 @@ pub async fn write_results_v2(
                         original_count - final_count
                     );
                 } else {
+                    local_resp.hits.retain(|hit| {
+                            if let Some(hit_ts) = hit.get(ts_column).and_then(|v| v.as_i64()) {
+                                if hit_ts == boundary_ts  {
+                                    log::info!("[CACHE_DEBUG] Removing duplicate boundary record for aggregate query with ts: {}", hit_ts);
+                                    return false;
+                                }
+                        }
+                        true
+                    });
+
+                    let final_count = local_resp.hits.len();
                     log::info!(
-                        "[CACHE_DEBUG] Skipping boundary deduplication for non-aggregate query, preserving all {} records",
-                        original_count
+                        "[CACHE_DEBUG] After aggregate boundary dedup: {} records (removed: {})",
+                        final_count,
+                        original_count - final_count
                     );
                 }
             }
