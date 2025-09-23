@@ -21,6 +21,7 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { getImageURL } from "@/utils/zincutils";
+import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
 
 import config from "@/aws-exports";
 
@@ -171,7 +172,7 @@ const openCancelDialog = (id) => {
   confirmDialogMeta.value.message = "Are you sure you want to delete node?";
   //here we will check if the destination node is added by default if yes then we will show a warning message to the user
   if(props.data?.hasOwnProperty('node_type') && props.data.node_type === 'stream' && checkIfDefaultDestinationNode(id)){
-    confirmDialogMeta.value.warningMessage = "If you delete this default destination node, data from the source stream will no longer be ingested into the destination stream. Instead, it will flow only to the newly added destination stream."
+    confirmDialogMeta.value.warningMessage = defaultDestinationNodeWarningMessage
   }
   else{
     confirmDialogMeta.value.warningMessage = "";
