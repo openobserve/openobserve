@@ -24,7 +24,7 @@ use config::{
 use hashbrown::HashMap;
 use infra::{
     db as infra_db,
-    schema::{get_settings, get_stream_setting_fts_fields},
+    schema::get_settings,
     table::{
         dashboards,
         distinct_values::{self, DistinctFieldRecord, OriginType},
