@@ -379,11 +379,6 @@ export const logsUtils = () => {
    * addTraceId("trace-123-456-789");
    * console.log(searchObj.data.searchRequestTraceIds); // ["trace-123-456-789"]
    *
-   * // Add trace ID for WebSocket communication
-   * searchObj.communicationMethod = "ws";
-   * addTraceId("ws-trace-456-789");
-   * console.log(searchObj.data.searchWebSocketTraceIds); // ["ws-trace-456-789"]
-   *
    * // Attempting to add duplicate trace ID (no-op)
    * addTraceId("trace-123-456-789"); // Won't add duplicate
    * ```
@@ -398,10 +393,7 @@ export const logsUtils = () => {
     }
 
     // Determine target array based on communication method
-    const isWebSocket = searchObj.communicationMethod === "ws";
-    const targetTraceIds = isWebSocket
-      ? searchObj.data.searchWebSocketTraceIds
-      : searchObj.data.searchRequestTraceIds;
+    const targetTraceIds = searchObj.data.searchRequestTraceIds;
 
     // Early return if trace ID already exists (prevent duplicates)
     if (targetTraceIds.includes(traceId)) {
@@ -432,12 +424,6 @@ export const logsUtils = () => {
    * removeTraceId("trace-123");
    * console.log(searchObj.data.searchRequestTraceIds); // ["trace-456"]
    *
-   * // Remove trace ID from WebSocket communication
-   * searchObj.communicationMethod = "ws";
-   * searchObj.data.searchWebSocketTraceIds = ["ws-123", "ws-456"];
-   * removeTraceId("ws-123");
-   * console.log(searchObj.data.searchWebSocketTraceIds); // ["ws-456"]
-   *
    * // Attempting to remove non-existent trace ID (no effect)
    * removeTraceId("non-existent-id"); // Array remains unchanged
    * ```
@@ -450,23 +436,11 @@ export const logsUtils = () => {
       console.error("removeTraceId: traceId must be a non-empty string");
       return;
     }
-
-    // Determine which trace ID collection to modify based on communication method
-    const isWebSocket = searchObj.communicationMethod === "ws";
-
-    if (isWebSocket) {
-      // Remove trace ID from WebSocket trace IDs array
-      searchObj.data.searchWebSocketTraceIds =
-        searchObj.data.searchWebSocketTraceIds.filter(
-          (existingTraceId: string) => existingTraceId !== traceId,
-        );
-    } else {
-      // Remove trace ID from HTTP request trace IDs array
-      searchObj.data.searchRequestTraceIds =
-        searchObj.data.searchRequestTraceIds.filter(
-          (existingTraceId: string) => existingTraceId !== traceId,
-        );
-    }
+    // Remove trace ID from HTTP request trace IDs array
+    searchObj.data.searchRequestTraceIds =
+      searchObj.data.searchRequestTraceIds.filter(
+        (existingTraceId: string) => existingTraceId !== traceId,
+      );
   };
 
   const shouldAddFunctionToSearch = () => {

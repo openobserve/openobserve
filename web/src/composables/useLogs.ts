@@ -184,7 +184,6 @@ const useLogs = () => {
   };
   const getJobData = async (isPagination = false) => {
     try {
-      // get websocket enable config from store
       // window will have more priority
       // if window has use_web_socket property then use that
       // else use organization settings
