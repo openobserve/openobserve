@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    TIMESTAMP_COL_NAME,
+    SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
     meta::{
         dashboards::Dashboard,
         stream::{DistinctField, StreamSettings, StreamType},
@@ -24,7 +24,7 @@ use config::{
 use hashbrown::HashMap;
 use infra::{
     db as infra_db,
-    schema::get_settings,
+    schema::{get_settings, get_stream_setting_fts_fields},
     table::{
         dashboards,
         distinct_values::{self, DistinctFieldRecord, OriginType},
@@ -82,7 +82,10 @@ async fn add_distinct_from_dashboard(
                 added_ts: now_micros(),
             };
 
-            if !stream_settings.distinct_value_fields.contains(&temp) {
+            if !stream_settings.distinct_value_fields.contains(&temp)
+                && !SQL_FULL_TEXT_SEARCH_FIELDS.contains(&temp)
+                && !stream_settings.full_text_search_keys.contains(&temp)
+            {
                 stream_settings.distinct_value_fields.push(temp);
             }
 
