@@ -53,6 +53,8 @@ pub(crate) mod tests {
         },
     };
 
+    use crate::service::search::datafusion::distributed_plan::remote_scan::RemoteScanExec;
+
     // get the first final aggregate plan from bottom to top
     pub(crate) fn get_partial_aggregate_plan(
         plan: Arc<dyn ExecutionPlan>,
@@ -98,6 +100,44 @@ pub(crate) mod tests {
             } else {
                 Ok(TreeNodeRecursion::Continue)
             }
+        }
+    }
+
+    pub(crate) fn get_remote_scan(plan: Arc<dyn ExecutionPlan>) -> Vec<Arc<RemoteScanExec>> {
+        let mut visitor = RemoteScanVisitor::new();
+        let _ = plan.visit(&mut visitor);
+        visitor.get_data()
+    }
+
+    struct RemoteScanVisitor {
+        data: Vec<Arc<RemoteScanExec>>,
+    }
+
+    impl RemoteScanVisitor {
+        fn new() -> Self {
+            Self { data: Vec::new() }
+        }
+
+        fn get_data(&self) -> Vec<Arc<RemoteScanExec>> {
+            self.data.clone()
+        }
+    }
+
+    impl Default for RemoteScanVisitor {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl<'n> TreeNodeVisitor<'n> for RemoteScanVisitor {
+        type Node = Arc<dyn ExecutionPlan>;
+
+        fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+            if node.name() == "RemoteScanExec" {
+                let remote_scan = node.as_any().downcast_ref::<RemoteScanExec>().unwrap();
+                self.data.push(Arc::new(remote_scan.clone()));
+            }
+            Ok(TreeNodeRecursion::Continue)
         }
     }
 }
