@@ -2187,29 +2187,6 @@ export default defineComponent({
         : getImageURL("images/common/quick_mode.svg");
     });
 
-    const getDuration = (startTime: number, endTime: number): string => {
-  // Convert to ms if it looks like microseconds
-      const normalize = (ts: number) => (ts > 1e12 ? Math.floor(ts / 1000) : ts);
-
-      const start = normalize(startTime);
-      const end = normalize(endTime);
-
-      const durationMs = end - start;
-      if (durationMs <= 0) return "0s";
-
-      const seconds = Math.floor(durationMs / 1000);
-      if (seconds < 60) return `${seconds}s`;
-
-      const minutes = Math.floor(seconds / 60);
-      if (minutes < 60) return `${minutes}m`;
-
-      const hours = Math.floor(minutes / 60);
-      if (hours < 24) return `${hours}h`;
-
-      const days = Math.floor(hours / 24);
-      return `${days}d`;
-    };
-
     const getConfigIcon = computed(() => {
       return store.state.theme === "dark"
         ? getImageURL("images/streams/config_light.svg")
@@ -2313,7 +2290,6 @@ export default defineComponent({
       updateIndexType,
       isEnvQuickModeField,
       quickModeIcon,
-      getDuration,
       getConfigIcon,
       getTimelineIcon,
     };
