@@ -31,7 +31,10 @@ use config::{
         stream::{FileKey, StreamType},
     },
 };
-use datafusion::{common::TableReference, physical_optimizer::PhysicalOptimizerRule};
+use datafusion::{
+    common::TableReference,
+    physical_optimizer::{PhysicalOptimizerRule, filter_pushdown::FilterPushdown},
+};
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use hashbrown::HashMap;
 use infra::{
@@ -93,7 +96,7 @@ pub async fn search(
     datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes
-    let proto = get_physical_extension_codec();
+    let proto = get_physical_extension_codec(org_id.clone());
     let physical_plan =
         physical_plan_from_bytes_with_extension_codec(&req.search_info.plan, &ctx, &proto)?;
 
@@ -441,6 +444,12 @@ pub async fn search(
                 .build()
         )
     );
+
+    if cfg.common.feature_dynamic_pushdown_filter_enabled {
+        // pushdown filter
+        let pushdown_filter = FilterPushdown::new_post_optimization();
+        physical_plan = pushdown_filter.optimize(physical_plan, ctx.state().config_options())?;
+    }
 
     if !tantivy_file_list.is_empty() {
         let tantivy_start = std::time::Instant::now();

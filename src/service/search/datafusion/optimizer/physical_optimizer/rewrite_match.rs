@@ -74,7 +74,7 @@ impl PhysicalOptimizerRule for RewriteMatchPhysical {
     }
 
     fn name(&self) -> &str {
-        "rewrite_match_physical"
+        "RewriteMatchAllRule"
     }
 
     fn schema_check(&self) -> bool {
@@ -256,6 +256,7 @@ fn rewrite_match_all_physical(
                     Arc::new(Literal::new(ScalarValue::Int64(Some(distance)))),
                 ],
                 schema.as_ref(),
+                Arc::new(ConfigOptions::default()),
             )?) as Arc<dyn PhysicalExpr>;
             expr_list.push(new_expr);
         }
