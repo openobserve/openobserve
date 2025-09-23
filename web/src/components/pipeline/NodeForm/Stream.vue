@@ -403,7 +403,7 @@ const openDeleteDialog = () => {
   dialog.value.title = "Delete Node";
   dialog.value.message =
     "Are you sure you want to delete stream association?";
-  // //here we will check if the destination node is added by default if yes then we will show a warning message to the user
+  //here we will check if the destination node is added by default if yes then we will show a warning message to the user
   if(pipelineObj.currentSelectedNodeData?.data.hasOwnProperty('node_type') && pipelineObj.currentSelectedNodeData?.data.node_type === 'stream' && checkIfDefaultDestinationNode(pipelineObj.currentSelectedNodeID)){
       dialog.value.warningMessage = "If you delete this default destination node, data from the source stream will no longer be ingested into the destination stream. Instead, it will flow only to the newly added destination stream."
   }
