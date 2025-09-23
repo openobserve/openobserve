@@ -44,7 +44,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["delete:node"]);
-const { pipelineObj, deletePipelineNode,onDragStart,onDrop } = useDragAndDrop();
+const { pipelineObj, deletePipelineNode,onDragStart,onDrop, checkIfDefaultDestinationNode } = useDragAndDrop();
 const menu = ref(false)
 
 const hanldeMouseOver = () => {
@@ -161,6 +161,7 @@ const confirmDialogMeta = ref({
   title: "",
   message: "",
   data: null,
+  warningMessage: "",
   onConfirm: () => {},
 });
 
@@ -168,6 +169,13 @@ const openCancelDialog = (id) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("common.delete");
   confirmDialogMeta.value.message = "Are you sure you want to delete node?";
+  //here we will check if the destination node is added by default if yes then we will show a warning message to the user
+  if(props.data?.hasOwnProperty('node_type') && props.data.node_type === 'stream' && checkIfDefaultDestinationNode(id)){
+    confirmDialogMeta.value.warningMessage = "If you delete this default destination node, data from the source stream will no longer be ingested into the destination stream. Instead, it will flow only to the newly added destination stream."
+  }
+  else{
+    confirmDialogMeta.value.warningMessage = "";
+  }
   confirmDialogMeta.value.onConfirm = () => {
     deletePipelineNode(id);
   };
@@ -771,6 +779,7 @@ function getIcon(data, ioType) {
     :message="confirmDialogMeta.message"
     @update:ok="confirmDialogMeta.onConfirm()"
     @update:cancel="resetConfirmDialog"
+    :warning-message="confirmDialogMeta.warningMessage"
     v-model="confirmDialogMeta.show"
   />
 </template>
