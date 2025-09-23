@@ -23,10 +23,10 @@ use config::{
         stream::FileKey,
     },
 };
-use hashbrown::HashMap;
 use infra::client::grpc::get_cached_channel;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
+use scc::HashMap;
 use tokio::sync::{RwLock, mpsc};
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 
@@ -36,8 +36,7 @@ use crate::common::infra::cluster;
 pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =
     Lazy::new(|| RwLock::new(Vec::with_capacity(2048)));
 
-static EVENTS: Lazy<RwLock<HashMap<String, EventChannel>>> =
-    Lazy::new(|| RwLock::new(HashMap::new()));
+static EVENTS: Lazy<HashMap<String, EventChannel>> = Lazy::new(HashMap::new);
 
 type EventChannel = Arc<mpsc::UnboundedSender<Vec<FileKey>>>;
 
@@ -52,7 +51,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
     })
     .await
     .unwrap_or_default();
-    let mut events = EVENTS.write().await;
+
     for node in nodes {
         if node.uuid.eq(&LOCAL_NODE.uuid) {
             continue;
@@ -108,7 +107,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
         let mut ok = false;
         for _i in 0..5 {
             let node = node.clone();
-            let channel = events.entry(node_uuid.clone()).or_insert_with(|| {
+            let channel = EVENTS.entry_async(node_uuid.clone()).await.or_insert_with(|| {
                 let (tx, mut rx) = mpsc::unbounded_channel();
                 tokio::task::spawn(async move {
                     let node_addr = node.grpc_addr.clone();
@@ -124,7 +123,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
             });
             tokio::task::yield_now().await;
             if let Err(e) = channel.clone().send(node_items.clone()) {
-                events.remove(&node_uuid);
+                EVENTS.remove_async(&node_uuid).await;
                 log::error!(
                     "[broadcast] send event to node[{}] channel failed, {}, retrying...",
                     &node_addr,
@@ -156,7 +155,7 @@ async fn send_to_node(
         loop {
             match cluster::get_node_by_uuid(&node.uuid).await {
                 None => {
-                    EVENTS.write().await.remove(&node.uuid);
+                    EVENTS.remove_async(&node.uuid).await;
                     log::error!(
                         "[broadcast] node[{}] leaved cluster, dropping events",
                         &node.grpc_addr,
@@ -208,7 +207,7 @@ async fn send_to_node(
                 Some(v) => v,
                 None => {
                     log::info!("[broadcast] node[{}] channel closed", &node.grpc_addr);
-                    EVENTS.write().await.remove(&node.uuid);
+                    EVENTS.remove_async(&node.uuid).await;
                     return Ok(());
                 }
             };
@@ -236,7 +235,7 @@ async fn send_to_node(
                     Ok(_) => break,
                     Err(e) => {
                         if cluster::get_node_by_uuid(&node.uuid).await.is_none() {
-                            EVENTS.write().await.remove(&node.uuid);
+                            EVENTS.remove_async(&node.uuid).await;
                             log::error!(
                                 "[broadcast] node[{}] leaved cluster, dropping events",
                                 &node.grpc_addr,
@@ -329,9 +328,8 @@ mod tests {
     #[test]
     fn test_events_static() {
         tokio::runtime::Runtime::new().unwrap().block_on(async {
-            let events = EVENTS.read().await;
             // Just test that we can access the static
-            let _count = events.len();
+            let _count = EVENTS.len();
         });
     }
 

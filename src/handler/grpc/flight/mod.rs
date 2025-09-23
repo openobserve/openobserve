@@ -349,6 +349,7 @@ fn clear_session_data(trace_id: &str) {
     let trace_id_owned = trace_id.to_string();
     let _handle = tokio::spawn(async move {
         crate::common::infra::wal::release_request(&trace_id_owned).await;
+        log::info!("Cleared session for trace_id: {trace_id_owned}");
     });
 }
 

@@ -5181,6 +5181,7 @@ dependencies = [
  "log",
  "once_cell",
  "parquet",
+ "scc",
  "serde",
  "serde_json",
  "snafu 0.7.5",
