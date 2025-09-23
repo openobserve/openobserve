@@ -16,6 +16,7 @@ export default class StreamSettingsPage {
       '[data-test="schema-update-settings-button"]'
     );
     this.closeButton = page.locator('[data-test="schema-cancel-button"]');
+    this.configurationTab = page.getByRole('tab', { name: 'Configuration' })
   }
 
   async updateStreamMaxQueryRange(streamName, newValue) {
@@ -35,9 +36,10 @@ export default class StreamSettingsPage {
 
     // Wait for stream details to appear and click
 
-    await this.streamDetailButton.waitFor({ state: "visible", timeout: 5000 });
-    await this.streamDetailButton.click();
-
+    // await this.streamDetailButton.waitFor({ state: "visible", timeout: 2000 });
+    // await this.streamDetailButton.click();
+    //before clicking for max query range input we need to go to configuration tab due to schema UI layout change
+    await this.configurationTab.click();
     // Wait and update max query range input
     await this.maxQueryInput.waitFor({ state: "visible", timeout: 15000 });
     await this.maxQueryInput.click();
