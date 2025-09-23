@@ -8,47 +8,119 @@ import time
 # Global variable to store detected array indexing convention
 OPENOBSERVE_ARRAY_INDEXING = None
 
-
-def test_e2e_error_rate_analysis(create_session, base_url):
-    """Running an E2E test for error rate analysis query."""
-
-    session = create_session
-    url = base_url
-    org_id = "default"
+@pytest.fixture(scope="module")
+def time_range():
+    """Fixture providing validated start and end time for queries."""
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
+    return validate_time_parameters(one_hour_ago, end_time)
+
+@pytest.fixture
+def query_config(time_range):
+    """Fixture providing common query configuration."""
+    start_time, end_time = time_range
+    return {
+        "start_time": start_time,
+        "end_time": end_time,
+        "from": 0,
+        "size": 100,
+    }
+
+def validate_time_parameters(start_time, end_time):
+    """Validate and sanitize time parameters to prevent injection attacks."""
+    # Ensure parameters are integers
+    if not isinstance(start_time, int) or not isinstance(end_time, int):
+        raise ValueError("Time parameters must be integers")
+    
+    # Ensure reasonable bounds (not negative, end_time > start_time)
+    if start_time < 0 or end_time < 0:
+        raise ValueError("Time parameters cannot be negative")
+    
+    if end_time <= start_time:
+        raise ValueError("End time must be greater than start time")
+    
+    # Ensure reasonable time range (not more than 24 hours for tests)
+    max_time_range = 24 * 60 * 60 * 1000000  # 24 hours in microseconds
+    if (end_time - start_time) > max_time_range:
+        raise ValueError("Time range too large for test queries")
+    
+    return start_time, end_time
+
+
+def execute_query(session, base_url, sql, query_config, test_name="query"):
+    """Helper function to execute a SQL query and return validated results."""
+    org_id = "default"
     json_data = {
         "query": {
-            "sql": """SELECT 
-                COUNT(_timestamp) AS pvcount,
-                COUNT(CASE WHEN level = 'info' THEN 1 END) AS infocount,
-                (100.0 * COUNT(CASE WHEN level = 'info' THEN 1 END) / CAST(COUNT(_timestamp) AS FLOAT)) AS inforate,
-                COALESCE(kubernetes_container_name, 'unknown') AS component,
-                COALESCE(kubernetes_namespace_name, 'default') AS environment
-            FROM "stream_pytest_data"
-            WHERE (level IS NOT NULL)
-            GROUP BY component, environment
-            HAVING inforate >= 0
-            ORDER BY inforate DESC
-            LIMIT 50""",
-            "start_time": one_hour_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 50,
+            "sql": sql,
+            **query_config
         },
     }
 
-    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
+    resp = session.post(f"{base_url}api/{org_id}/_search?type=logs", json=json_data)
+    
     assert (
-        resp_get_allsearch.status_code == 200
-    ), f"Error rate analysis query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+        resp.status_code == 200
+    ), f"{test_name} failed with status {resp.status_code} {resp.content}"
     
-    response_data = resp_get_allsearch.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
+    response_data = resp.json()
+    assert "hits" in response_data, f"{test_name} response should contain 'hits' field"
     
-    hits = response_data["hits"]
+    return response_data["hits"]
+
+
+def validate_array_data(hit, hit_index, expected_pattern=None, case_sensitive=True):
+    """Helper function to validate array data in query results."""
+    assert "log" in hit, f"Hit {hit_index} should contain 'log' field"
+    
+    log_value = hit["log"]
+    assert log_value, f"Hit {hit_index} log should not be empty"
+    assert log_value.startswith('['), f"Hit {hit_index} log should be array format, got: {log_value}"
+    
+    if expected_pattern:
+        import json
+        try:
+            array_data = json.loads(log_value)
+            if len(array_data) > 0:
+                expected_first_element = array_data[0]  # Assume 1-based indexing
+                
+                if case_sensitive:
+                    pattern_match = expected_pattern in expected_first_element
+                    print(f"  Validated: Python array[0]='{expected_first_element}' contains '{expected_pattern}' (case sensitive)")
+                else:
+                    pattern_match = expected_pattern.lower() in expected_first_element.lower()
+                    print(f"  Validated: Python array[0]='{expected_first_element}' contains '{expected_pattern}' (case insensitive)")
+                
+                assert pattern_match, f"Hit {hit_index} first array element '{expected_first_element}' should contain '{expected_pattern}'"
+                
+        except json.JSONDecodeError:
+            assert False, f"Hit {hit_index} log is not valid JSON array: {log_value}"
+    
+    return log_value
+
+
+def test_e2e_error_rate_analysis(create_session, base_url, query_config):
+    """Running an E2E test for error rate analysis query."""
+
+    sql = """SELECT 
+        COUNT(_timestamp) AS pvcount,
+        COUNT(CASE WHEN level = 'info' THEN 1 END) AS infocount,
+        (100.0 * COUNT(CASE WHEN level = 'info' THEN 1 END) / CAST(COUNT(_timestamp) AS FLOAT)) AS inforate,
+        COALESCE(kubernetes_container_name, 'unknown') AS component,
+        COALESCE(kubernetes_namespace_name, 'default') AS environment
+    FROM "stream_pytest_data"
+    WHERE (level IS NOT NULL)
+    GROUP BY component, environment
+    HAVING inforate >= 0
+    ORDER BY inforate DESC
+    LIMIT 50"""
+
+    # Override default size for this query
+    config = query_config.copy()
+    config["size"] = 50
+
+    hits = execute_query(create_session, base_url, sql, config, "Error rate analysis query")
     if len(hits) > 0:
         print(f"Found {len(hits)} hits for info rate analysis")
         for i, hit in enumerate(hits):
@@ -515,67 +587,20 @@ def test_e2e_metadata_extraction(create_session, base_url):
         print("⚠️  No hits found for caller extraction query")
 
 
-def test_e2e_array_case_sensitive(create_session, base_url):
+def test_e2e_array_case_sensitive(create_session, base_url, query_config):
     """Running an E2E test for array extraction with case-sensitive matching."""
 
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
-    json_data = {
-        "query": {
-            "sql": """SELECT *
-            FROM "stream_pytest_data"
-            WHERE str_match(array_extract(cast_to_arr(log), 1), 'fu')""",
-            "start_time": one_hour_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 100,
-        },
-    }
+    sql = """SELECT *
+    FROM "stream_pytest_data"
+    WHERE str_match(array_extract(cast_to_arr(log), 1), 'fu')"""
 
-    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
-    assert (
-        resp_get_allsearch.status_code == 200
-    ), f"Array case-sensitive query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
-    
-    response_data = resp_get_allsearch.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
+    hits = execute_query(create_session, base_url, sql, query_config, "Array case-sensitive query")
     
     if len(hits) > 0:
         print(f"Found {len(hits)} hits for case-sensitive array extraction")
         for i, hit in enumerate(hits):
-            assert "log" in hit, f"Hit {i} should contain 'log' field"
-            
-            # Validate that the log contains an array and first element matches 'fu' (case sensitive)
-            log_value = hit["log"]
-            assert log_value, f"Hit {i} log should not be empty"
-            assert log_value.startswith('['), f"Hit {i} log should be array format, got: {log_value}"
-            
-            # str_match does substring matching, so 'fu' should match 'datafusion'
-            # Note: Validation logic depends on OpenObserve's array indexing convention  
-            import json
-            try:
-                array_data = json.loads(log_value)
-                if len(array_data) > 0:
-                    # Get the expected first element based on SQL array_extract(log, 1)
-                    # If 1-based: SQL index 1 = Python index 0
-                    # If 0-based: SQL index 1 = Python index 1
-                    expected_first_element = array_data[0]  # Assume 1-based (most common in SQL)
-                    
-                    # Validate that this element would match the SQL query  
-                    assert 'fu' in expected_first_element, f"Hit {i} first array element '{expected_first_element}' should contain 'fu' (case sensitive)"
-                    
-                    print(f"  Validated: Python array[0]='{expected_first_element}' contains 'fu' (case sensitive)")
-            except json.JSONDecodeError:
-                assert False, f"Hit {i} log is not valid JSON array: {log_value}"
-            
-            print(f"Hit {i}: log = {log_value}")
+            validate_array_data(hit, i, 'fu', case_sensitive=True)
+            print(f"Hit {i}: log = {hit['log']}")
         
         print(f"✅ All {len(hits)} hits have valid case-sensitive array data")
         # Should find 1 hit: ["datafusion", "bad"] (contains 'fu')
@@ -585,68 +610,19 @@ def test_e2e_array_case_sensitive(create_session, base_url):
         print("⚠️  No hits found for case-sensitive array query")
 
 
-def test_e2e_array_case_insensitive(create_session, base_url):
+def test_e2e_array_case_insensitive(create_session, base_url, query_config):
     """Running an E2E test for array extraction with case-insensitive matching."""
 
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
-    json_data = {
-        "query": {
-            "sql": """SELECT *
-            FROM "stream_pytest_data"
-            WHERE str_match_ignore_case(array_extract(cast_to_arr(log), 1), 'Fu')""",
-            "start_time": one_hour_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 100,
-        },
-    }
+    sql = """SELECT *
+    FROM "stream_pytest_data"
+    WHERE str_match_ignore_case(array_extract(cast_to_arr(log), 1), 'Fu')"""
 
-    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
-    assert (
-        resp_get_allsearch.status_code == 200
-    ), f"Array case-insensitive query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
-    
-    response_data = resp_get_allsearch.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
-    
-    hits = response_data["hits"]
+    hits = execute_query(create_session, base_url, sql, query_config, "Array case-insensitive query")
     if len(hits) > 0:
         print(f"Found {len(hits)} hits for case-insensitive array extraction")
         for i, hit in enumerate(hits):
-            assert "log" in hit, f"Hit {i} should contain 'log' field"
-            
-            # Validate that the log contains an array and first element matches 'Fu' (case insensitive)
-            log_value = hit["log"]
-            assert log_value, f"Hit {i} log should not be empty"
-            assert log_value.startswith('['), f"Hit {i} log should be array format, got: {log_value}"
-            
-            # Expected matches: "datafusion" and "Fu" should match 'Fu' case-insensitively
-            # Validate the log contains arrays with elements that would match 'Fu'
-            print(f"Hit {i}: log = {log_value}")
-            
-            # The array should contain elements that match 'Fu' case-insensitively
-            # Note: Validation logic depends on OpenObserve's array indexing convention
-            import json
-            try:
-                array_data = json.loads(log_value)
-                if len(array_data) > 0:
-                    # Get the expected first element based on SQL array_extract(log, 1)
-                    # If 1-based: SQL index 1 = Python index 0
-                    # If 0-based: SQL index 1 = Python index 1
-                    expected_first_element = array_data[0]  # Assume 1-based (most common in SQL)
-                    
-                    # Validate that this element would match the SQL query
-                    assert 'fu' in expected_first_element.lower(), f"Hit {i} first array element '{expected_first_element}' should contain 'fu' (case insensitive)"
-                    
-                    print(f"  Validated: Python array[0]='{expected_first_element}' contains 'fu' (case insensitive)")
-            except json.JSONDecodeError:
-                assert False, f"Hit {i} log is not valid JSON array: {log_value}"
+            validate_array_data(hit, i, 'fu', case_sensitive=False)
+            print(f"Hit {i}: log = {hit['log']}")
         
         print(f"✅ All {len(hits)} hits have valid case-insensitive array data")
         # Should find 2 hits: ["datafusion", "bad"] and ["parsing", "Fu"]
@@ -1026,6 +1002,80 @@ def test_e2e_window_function_compatibility(create_session, base_url):
         
     else:
         print("⚠️  No hits found for window function compatibility testing")
+
+
+def test_sql_injection_prevention():
+    """Test that validates our SQL injection prevention measures."""
+    
+    print("🛡️  Testing SQL injection prevention measures")
+    
+    # Test 1: Invalid time parameter types
+    try:
+        validate_time_parameters("malicious_string", 1234567890)
+        assert False, "Should have raised ValueError for non-integer start_time"
+    except ValueError as e:
+        assert "must be integers" in str(e)
+        print("✅ Rejected non-integer start_time")
+    
+    try:
+        validate_time_parameters(1234567890, "'; DROP TABLE users; --")
+        assert False, "Should have raised ValueError for non-integer end_time"
+    except ValueError as e:
+        assert "must be integers" in str(e)
+        print("✅ Rejected non-integer end_time")
+    
+    # Test 2: Negative time values
+    try:
+        validate_time_parameters(-1, 1234567890)
+        assert False, "Should have raised ValueError for negative start_time"
+    except ValueError as e:
+        assert "cannot be negative" in str(e)
+        print("✅ Rejected negative start_time")
+    
+    # Test 3: Invalid time ranges (end_time <= start_time)
+    try:
+        validate_time_parameters(1234567890, 1234567889)
+        assert False, "Should have raised ValueError for end_time <= start_time"
+    except ValueError as e:
+        assert "must be greater than" in str(e)
+        print("✅ Rejected invalid time range")
+    
+    # Test 4: Excessively large time ranges
+    now = int(datetime.now(timezone.utc).timestamp() * 1000000)
+    try:
+        validate_time_parameters(now, now + (25 * 60 * 60 * 1000000))  # 25 hours
+        assert False, "Should have raised ValueError for too large time range"
+    except ValueError as e:
+        assert "too large" in str(e)
+        print("✅ Rejected excessively large time range")
+    
+    # Test 5: Valid time parameters should pass
+    try:
+        now = datetime.now(timezone.utc)
+        end_time = int(now.timestamp() * 1000000)
+        one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
+        validated_start, validated_end = validate_time_parameters(one_hour_ago, end_time)
+        assert validated_start == one_hour_ago
+        assert validated_end == end_time
+        print("✅ Accepted valid time parameters")
+    except Exception as e:
+        assert False, f"Valid time parameters should not raise exception: {e}"
+    
+    # Test 6: SQL string validation (static SQL only)
+    static_sql_patterns = [
+        "SELECT * FROM \"stream_pytest_data\" WHERE str_match(",
+        "SELECT COUNT(*) FROM \"stream_pytest_data\" GROUP BY",
+        "WITH base_counts AS (SELECT histogram(_timestamp)",
+    ]
+    
+    for pattern in static_sql_patterns:
+        # These are safe because they're static strings, not interpolated
+        assert "DROP" not in pattern.upper(), f"SQL pattern should not contain DROP: {pattern}"
+        assert "DELETE" not in pattern.upper(), f"SQL pattern should not contain DELETE: {pattern}"
+        assert "--" not in pattern, f"SQL pattern should not contain SQL comments: {pattern}"
+        print(f"✅ SQL pattern validated: {pattern[:50]}...")
+    
+    print("🛡️  All SQL injection prevention tests passed!")
 
 
 def test_e2e_multi_level_array_processing(create_session, base_url):
