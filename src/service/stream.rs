@@ -646,7 +646,7 @@ pub async fn update_stream_settings(
             .retain(|range| !new_settings.extended_retention_days.remove.contains(range));
     }
 
-    let _fts = get_stream_setting_fts_fields(&Some(settings));
+    let _fts = get_stream_setting_fts_fields(&Some(settings.clone()));
 
     if !new_settings.distinct_value_fields.add.is_empty() {
         for f in &new_settings.distinct_value_fields.add {
