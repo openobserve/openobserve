@@ -584,7 +584,7 @@ export default function useDragAndDrop() {
   const getInputNodeStream = () => {
     const nodes = pipelineObj.currentSelectedPipeline?.nodes ?? [];
     const inputNode = nodes.find((node: any) => node.io_type === "input");
-    if(inputNode.data.hasOwnProperty('node_type') &&  inputNode.data.node_type === 'stream'){
+    if(inputNode?.data.hasOwnProperty('node_type') &&  inputNode.data.node_type === 'stream'){
       return inputNode?.data?.stream_name?.value || inputNode.data.stream_name || "";
     }
     else {
@@ -594,6 +594,7 @@ export default function useDragAndDrop() {
 
   const checkIfDefaultDestinationNode = (id: string) => {
     const inputNodeStream = getInputNodeStream();
+    if (!inputNodeStream) return false;
     const nodes = pipelineObj.currentSelectedPipeline?.nodes ?? [];
     if(inputNodeStream){
       return nodes.some((node: any) => node.id === id && node.type === 'output' && (node.data.stream_name.value === inputNodeStream || node.data.stream_name === inputNodeStream));
