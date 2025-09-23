@@ -523,6 +523,61 @@ test.describe("logs testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
+  test("should render line chart for SELECT * query and save to dashboard with correct query in inspector", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+
+    const selectAllQuery = `SELECT * FROM "${STREAM_NAME}"`;
+
+    await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
+
+    await pm.logsVisualise.setRelative("6", "w");
+
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.openVisualiseTab();
+
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    // Expect line chart to be the selected/default visualization
+    await pm.logsVisualise.verifyChartTypeSelected(page, "line", true);
+
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+
+    await pm.logsVisualise.addPanelToNewDashboard(
+      randomDashboardName,
+      panelName
+    );
+
+    // Wait for and assert the success message
+    const successMessage = page.getByText("Panel added to dashboard");
+    await expect(successMessage).toBeVisible({ timeout: 10000 });
+
+    // Open Query Inspector from the panel actions
+    await page
+      .locator('[data-test="dashboard-edit-panel-' + panelName + '-dropdown"]')
+      .click();
+    await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
+
+    await pm.logsVisualise.waitForQueryInspector(page);
+
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "e2e_automate" GROUP BY zo_sql_key ORDER BY zo_sql_key DESC',
+        })
+        .first()
+    ).toBeVisible();
+
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await deleteDashboard(page, randomDashboardName);
+  });
+
   test("should show error message when using aggregation functions without aliases in SQL query", async ({
     page,
   }) => {

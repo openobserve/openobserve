@@ -14,5 +14,5 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 export const getDataValue = (obj: any, alias: string): any => {
-  return obj?.[alias] || obj?.[alias?.toLowerCase()];
+  return obj?.[alias] || obj?.[alias?.toString()?.toLowerCase()];
 };
