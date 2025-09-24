@@ -1277,7 +1277,7 @@ export default defineComponent({
             query_context = query_context == undefined ? "" : query_context;
 
             // Implement streaming based field values, check getQueryData in useLogs for streaming enabled
-            if (isStreamingEnabled(store.state)) {
+            // if (isStreamingEnabled(store.state)) {
               fetchValuesWithWebsocket({
                 fields: [name],
                 size: 10,
@@ -1297,7 +1297,7 @@ export default defineComponent({
                   ) || "",
               });
               continue;
-            }
+            // }
 
             // //TODO : add comments for this in future
             // //for future reference
@@ -1719,7 +1719,7 @@ export default defineComponent({
     };
 
     const initializeWebSocketConnection = (payload: any) => {
-      if (isStreamingEnabled(store.state)) {
+      // if (isStreamingEnabled(store.state)) {
         fetchQueryDataWithHttpStream(payload, {
           data: handleSearchResponse,
           error: handleSearchError,
@@ -1727,7 +1727,7 @@ export default defineComponent({
           reset: handleSearchReset,
         });
         return;
-      }
+      // }
     };
 
     const sendSearchMessage = (queryReq: any) => {
