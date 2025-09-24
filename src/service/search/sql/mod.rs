@@ -2689,20 +2689,7 @@ pub async fn get_group_by_fields(sql: &Sql) -> Result<Vec<String>, Error> {
     let sql_arc = Arc::new(sql.clone());
     let ctx = generate_context(&Request::default(), &sql_arc, 0).await?;
     register_table(&ctx, &sql_arc).await?;
-    let plan = ctx
-        .state()
-        .create_logical_plan(&sql_arc.sql)
-        .await
-        .inspect_err(|e| {
-            log::error!(
-                "failed to create logical plan for sql: {}, error: {}",
-                sql_arc.sql,
-                e
-            );
-
-            // also print the sql object
-            log::error!("sql object: {:?}", sql_arc);
-        })?;
+    let plan = ctx.state().create_logical_plan(&sql_arc.sql).await?;
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     // visit group by fields
