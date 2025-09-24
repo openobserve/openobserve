@@ -2488,8 +2488,6 @@ export default defineComponent({
           // this.handleRunQuery();
           this.searchObj.loadingHistogram = true;
 
-          // this.setCommunicationMethod();
-
           // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
 
@@ -2511,22 +2509,6 @@ export default defineComponent({
 
             return;
           }
-
-          // this.processHttpHistogramResults(
-          //   this.searchObj.data.customDownloadQueryObj,
-          // )
-          //   .then((res: any) => {
-          //     this.refreshTimezone();
-          //     const timeout = setTimeout(() => {
-          //       if (this.searchResultRef) this.searchResultRef.reDrawChart();
-          //     }, 100);
-
-          //     // Store timeout reference for cleanup
-          //     this.chartRedrawTimeout = timeout;
-          //   })
-          //   .finally(() => {
-          //     this.searchObj.loadingHistogram = false;
-          //   });
         }
       }
 
@@ -2538,24 +2520,6 @@ export default defineComponent({
           this.searchObj.config.splitterModel > 0;
       }
     },
-    // changeStream: {
-    //   handler(stream, streamOld) {
-    //     if (
-    //       this.searchObj.data.stream.selectedStream.hasOwnProperty("value") &&
-    //       this.searchObj.data.stream.selectedStream.value != ""
-    //     ) {
-    //       this.searchObj.data.tempFunctionContent = "";
-    //       this.searchBarRef.resetFunctionContent();
-    //       if (streamOld.value) this.searchObj.data.query = "";
-    //       if (streamOld.value) this.setQuery(this.searchObj.meta.sqlMode);
-    //       this.searchObj.loading = true;
-    //       // setTimeout(() => {
-    //       //   this.runQueryFn();
-    //       // }, 500);
-    //     }
-    //   },
-    //   immediate: false,
-    // },
     updateSelectedColumns() {
       this.searchObj.meta.resultGrid.manualRemoveFields = true;
       // Clear any existing timeout
