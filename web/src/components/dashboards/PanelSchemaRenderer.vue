@@ -747,10 +747,13 @@ export default defineComponent({
       { deep: true },
     );
 
-    watch(panelData, () => {
-      emit("series-data-update", panelData.value);
-    },
-    { deep: true });
+    watch(
+      panelData,
+      () => {
+        emit("series-data-update", panelData.value);
+      },
+      { deep: true },
+    );
 
     // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
     watch(
@@ -1280,7 +1283,11 @@ export default defineComponent({
         "org_identifier",
         store.state.selectedOrganization.identifier,
       );
-      logsUrl.searchParams.set("quick_mode", "false");
+      if (store.state.zoConfig.quick_mode_enabled) {
+        logsUrl.searchParams.set("quick_mode", "true");
+      } else {
+        logsUrl.searchParams.set("quick_mode", "false");
+      }
       logsUrl.searchParams.set("show_histogram", "false");
 
       return logsUrl;
