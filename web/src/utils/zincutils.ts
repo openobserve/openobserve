@@ -1094,27 +1094,29 @@ export const getWebSocketUrl = (
 };
 
 export const isWebSocketEnabled = (data: any) => {
-  if (!data.zoConfig?.websocket_enabled) {
-    return false;
-  }
+  return false;
+  // if (!data.zoConfig?.websocket_enabled) {
+  //   return false;
+  // }
 
-  if ((window as any).use_web_socket === undefined) {
-    return data.organizationData?.organizationSettings?.enable_websocket_search;
-  } else {
-    return (window as any).use_web_socket;
-  }
+  // if ((window as any).use_web_socket === undefined) {
+  //   return data.organizationData?.organizationSettings?.enable_websocket_search;
+  // } else {
+  //   return (window as any).use_web_socket;
+  // }
 };
 
 export const isStreamingEnabled = (data: any) => {
-  if (!data.zoConfig?.streaming_enabled) {
-    return false;
-  }
+  return true;
+  // if (!data.zoConfig?.streaming_enabled) {
+  //   return false;
+  // }
 
-  if ((window as any).use_streaming === undefined) {
-    return data.organizationData?.organizationSettings?.enable_streaming_search;
-  } else {
-    return (window as any).use_streaming;
-  }
+  // if ((window as any).use_streaming === undefined) {
+  //   return data.organizationData?.organizationSettings?.enable_streaming_search;
+  // } else {
+  //   return (window as any).use_streaming;
+  // }
 };
 
 export const maxLengthCharValidation = (
