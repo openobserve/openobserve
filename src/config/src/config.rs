@@ -2314,6 +2314,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("search job retention is set to zero"));
     }
 
+    if cfg.common.tracing_search_enabled && cfg.common.otel_otlp_url.is_empty() {
+        return Err(anyhow::anyhow!(
+            "Either grpc or http url should be set when enabling tracing search"
+        ));
+    }
+
     // HACK instance_name
     if cfg.common.instance_name.is_empty() {
         cfg.common.instance_name = sysinfo::os::get_hostname();

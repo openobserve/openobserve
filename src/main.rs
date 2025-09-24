@@ -27,7 +27,6 @@ use std::{
 
 use actix_web::{App, HttpServer, dev::ServerHandle, http::KeepAlive, middleware, web};
 use actix_web_opentelemetry::RequestTracing;
-use anyhow::ensure;
 use arrow_flight::flight_service_server::FlightServiceServer;
 use config::{get_config, utils::size::bytes_to_human_readable};
 use log::LevelFilter;
@@ -970,11 +969,6 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
     opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
     let tracer = opentelemetry_sdk::trace::SdkTracerProvider::builder();
     let tracer = if cfg.common.otel_otlp_grpc_url.is_empty() {
-        ensure!(
-            !cfg.common.otel_otlp_url.is_empty(),
-            "otel otlp url needs to be set, to enable tracing"
-        );
-
         tracer.with_span_processor(
             opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
                 {
