@@ -146,6 +146,11 @@ test.describe("HTML chart dashboard", () => {
       .locator(".inputarea")
       .fill(VARIABLE_HTML_SNIPPET);
 
+    await pm.dashboardVariables.selectValueFromVariableDropDown(
+      "variablename",
+      "controller"
+    );
+
     await expect(
       page.getByRole("heading", { name: "Openobserve" })
     ).toBeVisible();
