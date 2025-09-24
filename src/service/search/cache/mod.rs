@@ -194,7 +194,10 @@ pub async fn search(
         log::info!(
             "{}",
             search_inspector_fields(
-                format!("[trace_id {trace_id}] Qeury deltas are: {:?}", c_resp.deltas),
+                format!(
+                    "[trace_id {trace_id}] Qeury deltas are: {:?}",
+                    c_resp.deltas
+                ),
                 SearchInspectorFieldsBuilder::new()
                     .node_name(LOCAL_NODE.name.clone())
                     .component("cacher:search deltas".to_string())
