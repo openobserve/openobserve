@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use async_trait::async_trait;
 use config::utils::time::parse_str_to_time;
 use vector_enrichment::{Case, IndexHandle, Table};
-use vrl::value::{ObjectMap, Value};
+use vrl::value::{KeyString, ObjectMap, Value};
 
 pub mod storage;
 
@@ -41,6 +41,7 @@ impl Table for StreamTable {
         case: vector_enrichment::Case,
         conditions: &[vector_enrichment::Condition],
         select: Option<&[String]>,
+        _wildcard: Option<&Value>,
         _index: Option<vector_enrichment::IndexHandle>,
     ) -> Result<ObjectMap, String> {
         let resp = get_data(self, conditions, select, case);
@@ -58,6 +59,7 @@ impl Table for StreamTable {
         case: vector_enrichment::Case,
         conditions: &[vector_enrichment::Condition],
         select: Option<&[String]>,
+        _wildcard: Option<&Value>,
         _index: Option<vector_enrichment::IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         let resp = get_data(self, conditions, select, case);
@@ -87,92 +89,61 @@ fn get_data(
     select: Option<&[String]>,
     case: vector_enrichment::Case,
 ) -> Vec<ObjectMap> {
+    // Return early since nothing to filter
+    if condition.is_empty() {
+        return vec![];
+    }
     let mut resp = vec![];
-    let filtered: Vec<&vrl::value::Value> = table
-        .data
-        .iter()
-        .filter(|v| {
-            if let vrl::value::Value::Object(map) = v {
-                // Default to false for empty conditions array
-                if condition.is_empty() {
-                    return false;
-                }
-
-                // Check that ALL conditions match (AND logic)
-                condition.iter().all(|cond| match cond {
-                    vector_enrichment::Condition::Equals { field, value } => match case {
-                        Case::Insensitive => {
-                            if let Some(Value::Bytes(bytes1)) = map.get(field.to_owned()) {
-                                if let Value::Bytes(bytes2) = value {
-                                    match (std::str::from_utf8(bytes1), std::str::from_utf8(bytes2))
-                                    {
-                                        (Ok(s1), Ok(s2)) => s1.eq_ignore_ascii_case(s2),
-                                        (Err(_), Err(_)) => bytes1 == bytes2,
-                                        _ => false,
-                                    }
-                                } else {
-                                    false
-                                }
-                            } else {
-                                false
+    let filtered = table.data.iter().filter(|v| {
+        if let Value::Object(map) = v {
+            // Check that ALL conditions match (AND logic)
+            condition.iter().all(|cond| match cond {
+                vector_enrichment::Condition::Equals { field, value } => match case {
+                    Case::Insensitive => match (map.get(*field), value) {
+                        (Some(Value::Bytes(bytes1)), Value::Bytes(bytes2)) => {
+                            match (std::str::from_utf8(bytes1), std::str::from_utf8(bytes2)) {
+                                (Ok(s1), Ok(s2)) => s1.eq_ignore_ascii_case(s2),
+                                (Err(_), Err(_)) => bytes1 == bytes2,
+                                _ => false,
                             }
                         }
-                        Case::Sensitive => {
-                            if let Some(v) = map.get(field.to_owned()) {
-                                v.clone() == value.clone()
-                            } else {
-                                false
-                            }
-                        }
+                        _ => false,
                     },
-                    vector_enrichment::Condition::BetweenDates { field, from, to } => {
-                        if let Some(v) = map.get(field.to_owned()) {
-                            if let Some(v) = v.as_str() {
-                                if let Ok(v) = parse_str_to_time(&v) {
-                                    v >= *from && v <= *to
-                                } else {
-                                    false
-                                }
-                            } else {
-                                false
-                            }
-                        } else {
-                            false
-                        }
-                    }
-                })
-            } else {
-                false
-            }
-        })
-        .collect();
+                    Case::Sensitive => map.get(*field).is_some_and(|v| v == value),
+                },
+                vector_enrichment::Condition::FromDate { field, from } => map
+                    .get(*field)
+                    .and_then(|v| v.as_str())
+                    .and_then(|v| parse_str_to_time(v.as_ref()).ok())
+                    .is_some_and(|d| d >= *from),
+                vector_enrichment::Condition::ToDate { field, to } => map
+                    .get(*field)
+                    .and_then(|v| v.as_str())
+                    .and_then(|v| parse_str_to_time(v.as_ref()).ok())
+                    .is_some_and(|d| d <= *to),
+                vector_enrichment::Condition::BetweenDates { field, from, to } => map
+                    .get(*field)
+                    .and_then(|v| v.as_str())
+                    .and_then(|v| parse_str_to_time(v.as_ref()).ok())
+                    .is_some_and(|d| d >= *from && d <= *to),
+            })
+        } else {
+            false
+        }
+    });
 
-    match select {
-        Some(val) => {
-            for value in filtered {
-                if let Some(map) = value.as_object() {
-                    let mut btree_map = ObjectMap::new();
-                    for field in val {
-                        if let Some(v) = map.get(field.as_str()) {
-                            btree_map.insert(field.to_owned().into(), v.clone());
-                        }
-                    }
-                    resp.push(btree_map);
-                };
-            }
-        }
-        None => {
-            for value in filtered {
-                if let Value::Object(map) = value {
-                    let btree_map: ObjectMap = map
-                        .iter()
-                        .map(|(k, v)| (k.to_owned(), v.clone()))
-                        .collect::<ObjectMap>();
-                    resp.push(btree_map);
-                };
-            }
-        }
-    };
+    for map in filtered.filter_map(|v| v.as_object()) {
+        let btree_map = if let Some(val) = select {
+            val.iter()
+                .filter_map(|field| map.get_key_value(field.as_str()))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<BTreeMap<KeyString, Value>>()
+        } else {
+            map.clone()
+        };
+
+        resp.push(btree_map);
+    }
 
     resp
 }

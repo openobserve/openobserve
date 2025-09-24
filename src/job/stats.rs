@@ -98,7 +98,7 @@ async fn update_node_memory_usage() -> Result<(), anyhow::Error> {
     loop {
         let mem_usage = config::utils::sysinfo::get_memory_usage();
         config::metrics::NODE_MEMORY_USAGE
-            .with_label_values(&[])
+            .with_label_values::<&str>(&[])
             .set(mem_usage as i64);
         tokio::time::sleep(time::Duration::from_secs(1)).await;
     }

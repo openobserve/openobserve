@@ -40,7 +40,9 @@ pub(crate) struct MemTable {
 
 impl MemTable {
     pub(crate) fn new() -> Self {
-        metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).inc();
+        metrics::INGEST_MEMTABLE_FILES
+            .with_label_values::<&str>(&[])
+            .inc();
         Self {
             streams: HashMap::default(),
             json_bytes_written: AtomicU64::new(0),
