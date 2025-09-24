@@ -194,7 +194,7 @@ pub async fn search(
         log::info!(
             "{}",
             search_inspector_fields(
-                format!("[trace_id {trace_id}] deltas are: {:?}", c_resp.deltas),
+                format!("[trace_id {trace_id}] Qeury deltas are: {:?}", c_resp.deltas),
                 SearchInspectorFieldsBuilder::new()
                     .node_name(LOCAL_NODE.name.clone())
                     .component("cacher:search deltas".to_string())
@@ -546,6 +546,7 @@ pub async fn prepare_cache_response(
 
                 MultiCachedQueryResponse {
                     ts_column,
+                    is_aggregate,
                     is_descending,
                     order_by,
                     ..Default::default()
@@ -800,35 +801,32 @@ pub async fn write_results(
         return;
     }
 
-    // 1. remove incomplete records for histogram
+    // 1. alignment time range for incomplete records for histogram
+    let mut accept_start_time = req_query_start_time;
+    let mut accept_end_time = req_query_end_time;
     if is_aggregate && let Some(interval) = res.histogram_interval {
         let interval = interval * 1000 * 1000; // convert to microseconds
-        if req_query_start_time % interval != 0 || req_query_end_time % interval != 0 {
-            res.hits.remove(0); // remove first record
-            res.hits.pop(); // remove last record
-            res.total = res.hits.len();
-            res.size = res.hits.len() as i64;
-        }
+        // next interval of start_time
+        accept_start_time = accept_start_time - (accept_start_time % interval) + interval;
+        // previous interval of end_time
+        accept_end_time = accept_end_time - (accept_end_time % interval) - interval;
     }
 
-    // 2. get the latest record, used to check if need to remove records with discard_duration
+    // 2. get the data time range, check if need to remove records with discard_duration
     let delay_ts = second_micros(get_config().limit.cache_delay_secs);
-    let max_ts = Utc::now().timestamp_micros() - delay_ts;
-    let remove_item = if is_descending {
-        res.hits.first()
-    } else {
-        res.hits.last()
-    };
-    if let Some(item) = remove_item
-        && let Some(val) = item.get(ts_column)
-        && let Some(ts) = convert_ts_value_to_datetime(val)
-        && ts.timestamp_micros() > max_ts
-    {
+    let accept_end_time = std::cmp::min(Utc::now().timestamp_micros() - delay_ts, accept_end_time);
+    let last_rec_ts = get_ts_value(ts_column, res.hits.last().unwrap());
+    let first_rec_ts = get_ts_value(ts_column, res.hits.first().unwrap());
+    let data_start_time = std::cmp::min(first_rec_ts, last_rec_ts);
+    let data_end_time = std::cmp::max(first_rec_ts, last_rec_ts);
+    if data_start_time < accept_start_time || data_end_time > accept_end_time {
         res.hits.retain(|hit| {
             if let Some(hit_ts) = hit.get(ts_column)
                 && let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts)
             {
-                hit_ts_datetime.timestamp_micros() <= max_ts
+                let item_ts = hit_ts_datetime.timestamp_micros();
+                // only keep the records within the accept time range
+                item_ts >= accept_start_time && item_ts <= accept_end_time
             } else {
                 true
             }
@@ -849,6 +847,7 @@ pub async fn write_results(
     let cache_start_time = std::cmp::min(first_rec_ts, last_rec_ts);
     let mut cache_end_time = std::cmp::max(first_rec_ts, last_rec_ts);
     if (cache_end_time - cache_start_time) < delay_ts {
+        log::info!("[trace_id {trace_id}] Time range is too short for caching, skipping caching");
         return;
     }
 

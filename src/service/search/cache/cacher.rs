@@ -153,7 +153,7 @@ pub async fn check_cache(
     };
 
     let mut histogram_interval = -1;
-    if let Some(interval) = sql.histogram_interval {
+    if is_aggregate && let Some(interval) = sql.histogram_interval {
         *file_path = format!("{file_path}_{interval}_{result_ts_col}");
 
         let mut req_time_range = (req.query.start_time, req.query.end_time);
@@ -186,12 +186,17 @@ pub async fn check_cache(
     if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
         return MultiCachedQueryResponse::default();
     }
-    let mut multi_resp = MultiCachedQueryResponse::default();
+    let mut multi_resp = MultiCachedQueryResponse {
+        trace_id: trace_id.to_string(),
+        is_aggregate,
+        is_descending,
+        ..Default::default()
+    };
     if histogram_interval > -1 {
         multi_resp.histogram_interval = histogram_interval / 1000 / 1000;
     }
     log::info!(
-        "[CACHE CANDIDATES {trace_id}] request result_ts_col: {}, histogram_interval: {}, time range: {} - {}",
+        "[trace_id {trace_id}] check_cache: result_ts_col: {}, histogram_interval: {}, time range: {} - {}",
         result_ts_col,
         histogram_interval,
         req.query.start_time,
@@ -265,7 +270,6 @@ pub async fn check_cache(
             }
         }
         multi_resp.cache_query_response = true;
-        multi_resp.is_descending = is_descending;
         multi_resp.limit = sql.limit as i64;
         multi_resp.ts_column = result_ts_col;
         multi_resp.took = start.elapsed().as_millis() as usize;
@@ -353,7 +357,6 @@ pub async fn check_cache(
         };
         multi_resp.deltas = c_resp.deltas.clone();
         multi_resp.has_cached_data = c_resp.has_cached_data;
-        multi_resp.is_descending = is_descending;
         multi_resp.cached_response.push(c_resp);
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.cache_query_response = true;
@@ -424,7 +427,9 @@ pub async fn get_cached_results(
     let data = match get_results(file_path, &file_name).await {
         Ok(v) => v,
         Err(e) => {
-            log::error!("[trace_id {trace_id}] Get results from disk failed: {e}");
+            log::error!(
+                "[trace_id {trace_id}] Get results from disk failed: file: {file_path}/{file_name}, error: {e}"
+            );
             return None;
         }
     };
@@ -771,12 +776,6 @@ fn calculate_deltas_multi(
     let mut current_end_time = start_time;
 
     for meta in results {
-        log::info!(
-            "meta time {} - {} - records {}",
-            meta.response_start_time,
-            meta.response_end_time,
-            meta.cached_response.hits.len()
-        );
         cache_duration += meta.response_end_time - meta.response_start_time;
         let delta_end_time = if histogram_interval > 0 && !meta.cached_response.hits.is_empty() {
             // If histogram interval > 0, we need to adjust the end time to the nearest interval
