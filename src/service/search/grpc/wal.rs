@@ -592,7 +592,7 @@ async fn get_file_list_inner(
 
         scan_files_filtered(&pattern, filter, None).await?
     } else {
-        scan_files_filtered(&pattern, |_| true, None).await?
+        scan_files_filtered(&pattern, |_| Box::pin(async { true }), None).await?
     };
 
     let files = files
