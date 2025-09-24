@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <div :class="[
-              'tw-font-medium tw-text-sm tw-leading-relaxed',
+              'tw-font-medium tw-text-sm tw-leading-relaxed tw-text-left',
               store.state.theme === 'dark' ? 'tw-text-gray-300' : 'tw-text-orange-800'
             ]">
               {{ warningMessage }}
