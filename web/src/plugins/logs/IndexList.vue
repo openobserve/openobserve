@@ -1277,108 +1277,24 @@ export default defineComponent({
             query_context = query_context == undefined ? "" : query_context;
 
             // Implement streaming based field values, check getQueryData in useLogs for streaming enabled
-            // if (isStreamingEnabled(store.state)) {
-              fetchValuesWithWebsocket({
-                fields: [name],
-                size: 10,
-                no_count: false,
-                regions: searchObj.meta.regions,
-                clusters: searchObj.meta.clusters,
-                vrl_fn: query_fn,
-                start_time: startISOTimestamp,
-                end_time: endISOTimestamp,
-                timeout: 30000,
-                stream_name: selectedStream,
-                stream_type: searchObj.data.stream.streamType,
-                use_cache: (window as any).use_cache ?? true,
-                sql:
-                  b64EncodeUnicode(
-                    query_context.replace("[INDEX_NAME]", selectedStream),
-                  ) || "",
-              });
-              continue;
-            // }
-
-            // //TODO : add comments for this in future
-            // //for future reference
-            // //values api using partition based api
-            // let queryToBeSent = query_context.replace(
-            //   "[INDEX_NAME]",
-            //   selectedStream,
-            // );
-
-            // const response = await getValuesPartition(
-            //   startISOTimestamp,
-            //   endISOTimestamp,
-            //   name,
-            //   queryToBeSent,
-            // );
-            // const partitions: any = response?.data.partitions || [];
-
-            // for (const partition of partitions) {
-            //   try {
-            //     //check if the field is opened because sometimes
-            //     // user might close the field before all the subsequent requests are completed
-            //     if (!openedFilterFields.value.includes(name)) {
-            //       return;
-            //     }
-
-            //     const res: any = await streamService.fieldValues({
-            //       org_identifier: store.state.selectedOrganization.identifier,
-            //       stream_name: selectedStream,
-            //       start_time: partition[0],
-            //       end_time: partition[1],
-            //       fields: [name],
-            //       size: 10,
-            //       query_context: b64EncodeUnicode(queryToBeSent) || "",
-            //       query_fn: query_fn,
-            //       action_id,
-            //       type: searchObj.data.stream.streamType,
-            //       clusters:
-            //         Object.hasOwn(searchObj.meta, "clusters") &&
-            //         searchObj.meta.clusters.length > 0
-            //           ? searchObj.meta.clusters.join(",")
-            //           : "",
-            //       traceparent: generateTraceContext().traceId,
-            //     });
-
-            //     if (res.data.hits.length) {
-            //       res.data.hits.forEach((item: any) => {
-            //         item.values.forEach((subItem: any) => {
-            //           const index = fieldValues.value[name]["values"].findIndex(
-            //             (value: any) => value.key === subItem.zo_sql_key,
-            //           );
-            //           if (index !== -1) {
-            //             fieldValues.value[name]["values"][index].count +=
-            //               parseInt(subItem.zo_sql_num);
-            //           } else {
-            //             fieldValues.value[name]["values"].push({
-            //               key: subItem.zo_sql_key,
-            //               count: parseInt(subItem.zo_sql_num),
-            //             });
-            //           }
-            //         });
-            //       });
-
-            //       if (fieldValues.value[name]["values"].length > 10) {
-            //         fieldValues.value[name]["values"].sort(
-            //           (a, b) => b.count - a.count,
-            //         );
-            //         fieldValues.value[name]["values"] = fieldValues.value[name][
-            //           "values"
-            //         ].slice(0, 10);
-            //       }
-            //     }
-            //   } catch (err: any) {
-            //     console.error("Failed to fetch field values:", err);
-            //     fieldValues.value[name].errMsg = "Failed to fetch field values";
-            //   } finally {
-            //     countTotal--;
-            //     if (countTotal <= 0) {
-            //       fieldValues.value[name].isLoading = false;
-            //     }
-            //   }
-            // }
+            fetchValuesWithWebsocket({
+              fields: [name],
+              size: 10,
+              no_count: false,
+              regions: searchObj.meta.regions,
+              clusters: searchObj.meta.clusters,
+              vrl_fn: query_fn,
+              start_time: startISOTimestamp,
+              end_time: endISOTimestamp,
+              timeout: 30000,
+              stream_name: selectedStream,
+              stream_type: searchObj.data.stream.streamType,
+              use_cache: (window as any).use_cache ?? true,
+              sql:
+                b64EncodeUnicode(
+                  query_context.replace("[INDEX_NAME]", selectedStream),
+                ) || "",
+            });
           }
         }
 
@@ -1418,15 +1334,6 @@ export default defineComponent({
         });
       }
     };
-    //   const query = searchObj.meta.sqlMode
-    //     ? `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`
-    //     : "";
-
-    //   searchObj.data.editorValue = query;
-    //   searchObj.data.query = query;
-
-    //   handleQueryData();
-    // };
 
     let fieldIndex: any = -1;
     const addToInterestingFieldList = (
