@@ -632,7 +632,12 @@ pub async fn cache_results_to_disk(
         }
     };
     match disk::set(&file, Bytes::from(data)).await {
-        Ok(_) => (),
+        Ok(_) => {
+            log::info!(
+                "[trace_id {trace_id}] After clearing cache, Cached results to disk completed, took: {} ms",
+                start.elapsed().as_millis()
+            );
+        }
         Err(e) => {
             log::error!(
                 "[trace_id {trace_id}] Error caching results to disk: {:?}",
