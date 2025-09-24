@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:header="props">
             <q-tr :props="props">
               <!-- Adding this block to render the select-all checkbox -->
-              <q-th auto-width>
+              <q-th v-if="columns.length > 0">
                 <q-checkbox
                   v-model="props.selected"
                   size="sm"
