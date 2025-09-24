@@ -21,8 +21,6 @@ use crate::service::search::datafusion::udf::match_all_udf::{
     FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME,
 };
 
-// TODO: check if from clause is a subquery and where caluse has match_all
-
 /// get all item from match_all functions
 pub struct MatchVisitor {
     pub has_match_all: bool,
@@ -60,11 +58,13 @@ impl VisitorMut for MatchVisitor {
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
             // if from clause has more than one table, where clause should not have match_all
+            // for example: select * from t1, t2 where t1.id = t2.id and match_all('error')
             if select.from.len() > 1 && select.selection.as_ref().is_some_and(has_match_all) {
                 self.is_support_match_all = false;
             }
 
             // if from clause has join, where clause should not have match_all
+            // for example: select * from t1 join t2 on t1.id = t2.id and match_all('error')
             if select.from.iter().any(|from| !from.joins.is_empty())
                 && select.selection.as_ref().is_some_and(has_match_all)
             {
@@ -72,6 +72,7 @@ impl VisitorMut for MatchVisitor {
             }
 
             // if from clause has a subquery, where clause should not have match_all
+            // for example: select * from (select id from t1) where match_all('critical')
             if select
                 .from
                 .iter()
@@ -82,6 +83,8 @@ impl VisitorMut for MatchVisitor {
             }
 
             // if query has CTE (Common Table Expression), where clause should not have match_all
+            // for example: with cte as (select id from t1) select * from cte where
+            // match_all('error')
             if query.with.is_some() && select.selection.as_ref().is_some_and(has_match_all) {
                 self.is_support_match_all = false;
             }
