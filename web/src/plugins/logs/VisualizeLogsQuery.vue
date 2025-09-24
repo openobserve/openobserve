@@ -405,8 +405,9 @@ import { onActivated } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import CustomChartEditor from "@/components/dashboards/addPanel/CustomChartEditor.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
-import useLogs from "@/composables/useLogs";
 import { isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
+import { useSearchStream } from "@/composables/useLogs/useSearchStream";
+import { searchState } from "@/composables/useLogs/searchState";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -481,7 +482,8 @@ export default defineComponent({
     };
     const { showErrorNotification } = useNotifications();
     
-    const { searchObj, buildSearch } = useLogs();
+    const { searchObj } = searchState();
+    const { buildSearch } = useSearchStream();
 
     const { visualizeChartData, is_ui_histogram }: any = toRefs(props);
     const chartData = ref(visualizeChartData.value);
