@@ -13,8 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::ops::ControlFlow;
+use std::{ops::ControlFlow, sync::Arc};
 
+use datafusion::sql::{TableReference, planner::object_name_to_table_reference};
+use hashbrown::HashMap;
+use infra::schema::{SchemaCache, get_stream_setting_fts_fields};
 use sqlparser::ast::{Expr, FunctionArguments, Query, TableFactor, VisitorMut, visit_expressions};
 
 use crate::service::search::datafusion::udf::match_all_udf::{
@@ -23,15 +26,48 @@ use crate::service::search::datafusion::udf::match_all_udf::{
 
 /// get all item from match_all functions
 pub struct MatchVisitor {
+    // table_name, has_fst_fields
+    pub has_fst_fields: HashMap<TableReference, bool>,
+    // true, when has match_all
     pub has_match_all: bool,
+    // true, when has match_all and support match_all
     pub is_support_match_all: bool,
+    // true, when has match_all and the stream do not have full text search fields
+    pub match_all_wrong_streams: bool,
 }
 
 impl MatchVisitor {
-    pub fn new() -> Self {
+    pub fn new(total_schemas: &HashMap<TableReference, Arc<SchemaCache>>) -> Self {
+        let mut has_fst_fields = HashMap::new();
+        for (table_name, schema) in total_schemas {
+            let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
+            let fts_fields = get_stream_setting_fts_fields(&stream_settings);
+            // check if schema don't have full text search field
+            if fts_fields
+                .into_iter()
+                .all(|field| !schema.contains_field(&field))
+            {
+                has_fst_fields.insert(table_name.clone(), false);
+            } else {
+                has_fst_fields.insert(table_name.clone(), true);
+            }
+        }
+
         Self {
+            has_fst_fields,
             has_match_all: false,
             is_support_match_all: true,
+            match_all_wrong_streams: false,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_test(has_fst_fields: HashMap<TableReference, bool>) -> Self {
+        Self {
+            has_fst_fields,
+            has_match_all: false,
+            is_support_match_all: true,
+            match_all_wrong_streams: false,
         }
     }
 }
@@ -57,17 +93,17 @@ impl VisitorMut for MatchVisitor {
     //       match_all('critical')
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
+            let has_match_all = select.selection.as_ref().is_some_and(has_match_all);
+
             // if from clause has more than one table, where clause should not have match_all
             // for example: select * from t1, t2 where t1.id = t2.id and match_all('error')
-            if select.from.len() > 1 && select.selection.as_ref().is_some_and(has_match_all) {
+            if select.from.len() > 1 && has_match_all {
                 self.is_support_match_all = false;
             }
 
             // if from clause has join, where clause should not have match_all
             // for example: select * from t1 join t2 on t1.id = t2.id and match_all('error')
-            if select.from.iter().any(|from| !from.joins.is_empty())
-                && select.selection.as_ref().is_some_and(has_match_all)
-            {
+            if select.from.iter().any(|from| !from.joins.is_empty()) && has_match_all {
                 self.is_support_match_all = false;
             }
 
@@ -77,7 +113,7 @@ impl VisitorMut for MatchVisitor {
                 .from
                 .iter()
                 .any(|from| matches!(from.relation, TableFactor::Derived { .. }))
-                && select.selection.as_ref().is_some_and(has_match_all)
+                && has_match_all
             {
                 self.is_support_match_all = false;
             }
@@ -85,8 +121,17 @@ impl VisitorMut for MatchVisitor {
             // if query has CTE (Common Table Expression), where clause should not have match_all
             // for example: with cte as (select id from t1) select * from cte where
             // match_all('error')
-            if query.with.is_some() && select.selection.as_ref().is_some_and(has_match_all) {
+            if query.with.is_some() && has_match_all {
                 self.is_support_match_all = false;
+            }
+
+            if has_match_all
+                && let TableFactor::Table { name, .. } = &select.from[0].relation
+                && let Ok(table) = object_name_to_table_reference(name.clone(), true)
+                && let Some(has_fst_fields) = self.has_fst_fields.get(&table)
+                && !*has_fst_fields
+            {
+                self.match_all_wrong_streams = true;
             }
         }
         ControlFlow::Continue(())
@@ -118,6 +163,14 @@ mod tests {
 
     use super::*;
 
+    fn has_fst_fields(table: Vec<(&str, bool)>) -> HashMap<TableReference, bool> {
+        let mut total_schemas = HashMap::new();
+        for (name, has_fst) in table {
+            total_schemas.insert(TableReference::parse_str(name), has_fst);
+        }
+        total_schemas
+    }
+
     #[test]
     fn test_match_visitor() {
         let sql = "SELECT * FROM logs WHERE match_all('error') AND match_all('critical')";
@@ -126,7 +179,8 @@ mod tests {
             .pop()
             .unwrap();
 
-        let mut match_visitor = MatchVisitor::new();
+        let has_fst_fields = has_fst_fields(vec![("logs", true)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
         let _ = statement.visit(&mut match_visitor);
 
         // Should extract match_all values
@@ -141,7 +195,8 @@ mod tests {
             .pop()
             .unwrap();
 
-        let mut match_visitor = MatchVisitor::new();
+        let has_fst_fields = has_fst_fields(vec![("logs", true)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
         let _ = statement.visit(&mut match_visitor);
 
         assert!(match_visitor.is_support_match_all);
@@ -156,7 +211,8 @@ mod tests {
             .pop()
             .unwrap();
 
-        let mut match_visitor = MatchVisitor::new();
+        let has_fst_fields = has_fst_fields(vec![("logs", true)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
         let _ = statement.visit(&mut match_visitor);
 
         assert!(match_visitor.is_support_match_all);
@@ -171,7 +227,8 @@ mod tests {
             .pop()
             .unwrap();
 
-        let mut match_visitor = MatchVisitor::new();
+        let has_fst_fields = has_fst_fields(vec![("logs", true)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
         let _ = statement.visit(&mut match_visitor);
 
         assert!(match_visitor.is_support_match_all);
@@ -186,7 +243,8 @@ mod tests {
             .pop()
             .unwrap();
 
-        let mut match_visitor = MatchVisitor::new();
+        let has_fst_fields = has_fst_fields(vec![("logs", true)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
         let _ = statement.visit(&mut match_visitor);
 
         assert!(match_visitor.is_support_match_all);
@@ -201,7 +259,8 @@ mod tests {
             .pop()
             .unwrap();
 
-        let mut match_visitor = MatchVisitor::new();
+        let has_fst_fields = has_fst_fields(vec![("logs", true)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
         let _ = statement.visit(&mut match_visitor);
 
         assert!(match_visitor.is_support_match_all);
@@ -216,11 +275,13 @@ mod tests {
             .pop()
             .unwrap();
 
-        let mut match_visitor = MatchVisitor::new();
+        let has_fst_fields = has_fst_fields(vec![("logs", true)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
         let _ = statement.visit(&mut match_visitor);
 
         assert!(match_visitor.is_support_match_all);
         assert!(!match_visitor.has_match_all);
+        assert!(!match_visitor.match_all_wrong_streams);
     }
 
     #[test]
@@ -231,11 +292,14 @@ mod tests {
             .pop()
             .unwrap();
 
-        let mut match_visitor = MatchVisitor::new();
+        let has_fst_fields = has_fst_fields(vec![("logs", true), ("users", true)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
         let _ = statement.visit(&mut match_visitor);
 
         assert!(!match_visitor.is_support_match_all);
         assert!(match_visitor.has_match_all);
+        // for this case, we do not support match_all, so do not check match_all_wrong_streams
+        // assert!(match_visitor.match_all_wrong_streams);
     }
 
     #[test]
@@ -246,11 +310,14 @@ mod tests {
             .pop()
             .unwrap();
 
-        let mut match_visitor = MatchVisitor::new();
+        let has_fst_fields = has_fst_fields(vec![("logs", true), ("users", true)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
         let _ = statement.visit(&mut match_visitor);
 
         assert!(!match_visitor.is_support_match_all);
         assert!(match_visitor.has_match_all);
+        // for this case, we do not support match_all, so do not check match_all_wrong_streams
+        // assert!(match_visitor.match_all_wrong_streams);
     }
 
     #[test]
@@ -261,11 +328,14 @@ mod tests {
             .pop()
             .unwrap();
 
-        let mut match_visitor = MatchVisitor::new();
+        let has_fst_fields = has_fst_fields(vec![("users", true)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
         let _ = statement.visit(&mut match_visitor);
 
         assert!(!match_visitor.is_support_match_all);
         assert!(match_visitor.has_match_all);
+        // for this case, we do not support match_all, so do not check match_all_wrong_streams
+        // assert!(match_visitor.match_all_wrong_streams);
     }
 
     #[test]
@@ -276,11 +346,13 @@ mod tests {
             .pop()
             .unwrap();
 
-        let mut match_visitor = MatchVisitor::new();
+        let has_fst_fields = has_fst_fields(vec![("logs", true)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
         let _ = statement.visit(&mut match_visitor);
 
         assert!(match_visitor.is_support_match_all);
         assert!(match_visitor.has_match_all);
+        assert!(!match_visitor.match_all_wrong_streams);
     }
 
     #[test]
@@ -291,11 +363,14 @@ mod tests {
             .pop()
             .unwrap();
 
-        let mut match_visitor = MatchVisitor::new();
+        let has_fst_fields = has_fst_fields(vec![("users", false)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
         let _ = statement.visit(&mut match_visitor);
 
         assert!(!match_visitor.is_support_match_all);
         assert!(match_visitor.has_match_all);
+        // for this case, we do not support match_all, so do not check match_all_wrong_streams
+        // assert!(match_visitor.match_all_wrong_streams);
     }
 
     #[test]
@@ -306,40 +381,63 @@ mod tests {
             .pop()
             .unwrap();
 
-        let mut match_visitor = MatchVisitor::new();
+        let has_fst_fields = has_fst_fields(vec![("users", true)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
         let _ = statement.visit(&mut match_visitor);
 
         assert!(match_visitor.is_support_match_all);
         assert!(match_visitor.has_match_all);
+        assert!(!match_visitor.match_all_wrong_streams);
     }
 
     #[test]
     fn test_cte_with_match_all_supported2() {
-        let sql = "WITH cte AS (SELECT id FROM users WHERE match_all('error')) SELECT * FROM users where id in (select id from cte)";
+        let sql = "WITH cte AS (SELECT id FROM logs WHERE match_all('error')) SELECT * FROM users where id in (select id from cte)";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
 
-        let mut match_visitor = MatchVisitor::new();
+        let has_fst_fields = has_fst_fields(vec![("logs", true), ("users", false)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
         let _ = statement.visit(&mut match_visitor);
 
         assert!(match_visitor.is_support_match_all);
         assert!(match_visitor.has_match_all);
+        assert!(!match_visitor.match_all_wrong_streams);
     }
 
     #[test]
     fn test_cte_with_match_all_supported3() {
+        let sql = "WITH cte AS (SELECT id FROM logs WHERE match_all('error')) SELECT * FROM users where id in (select id from cte)";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let has_fst_fields = has_fst_fields(vec![("logs", false), ("users", false)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
+        let _ = statement.visit(&mut match_visitor);
+
+        assert!(match_visitor.is_support_match_all);
+        assert!(match_visitor.has_match_all);
+        assert!(match_visitor.match_all_wrong_streams);
+    }
+
+    #[test]
+    fn test_cte_with_match_all_supported4() {
         let sql = "WITH cte AS (SELECT id FROM users where log like '%error%') SELECT * FROM users where id in (select id from cte)";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
 
-        let mut match_visitor = MatchVisitor::new();
+        let has_fst_fields = has_fst_fields(vec![("users", true)]);
+        let mut match_visitor = MatchVisitor::new_test(has_fst_fields);
         let _ = statement.visit(&mut match_visitor);
 
         assert!(match_visitor.is_support_match_all);
         assert!(!match_visitor.has_match_all);
+        assert!(!match_visitor.match_all_wrong_streams);
     }
 }

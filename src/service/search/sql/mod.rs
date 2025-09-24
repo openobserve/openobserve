@@ -179,13 +179,18 @@ impl Sql {
         }
 
         // 6. get match_all() value
-        let mut match_visitor = MatchVisitor::new();
+        let mut match_visitor = MatchVisitor::new(&total_schemas);
         let _ = statement.visit(&mut match_visitor);
 
         // 7. check if have full text search filed in stream
         if match_visitor.has_match_all && !match_visitor.is_support_match_all {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "match_all() should directly apply to stream, FROM clause should not be join/subuqery/cte".to_string(),
+            )));
+        } else if match_visitor.match_all_wrong_streams {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "match_all() should only apply to the stream that have full text search fields"
+                    .to_string(),
             )));
         }
 
