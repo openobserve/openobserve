@@ -4,6 +4,7 @@ import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from '../../pages/page-manager.js';
 // (unused CommonActions import removed)
+const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
 const streamName = `stream${Date.now()}`;
@@ -70,14 +71,13 @@ async function ingestion(page) {
       logsdata: logsdata,
     }
   );
-  console.log(response);
+  testLogger.debug('API response received', { response });
 }
 
 test.describe("Unflattened testcases", () => {
   let pageManager;
   // let logData;
   function removeUTFCharacters(text) {
-    // console.log(text, "tex");
     // Remove UTF characters using regular expression
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
@@ -131,7 +131,10 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.streamDetailButton.click();
     // Strategic 500ms wait for operation completion - this is functionally necessary
   await page.waitForTimeout(500);
-  
+
+    //before toggling we need to make sure that we shift to configuration tab 
+    await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
+    await page.getByRole('tab', { name: 'Configuration' }).click();
     // Toggle 'Store Original Data' and update schema
     await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor(); // Wait for the toggle to be visible
     await pageManager.unflattenedPage.storeOriginalDataToggle.click();
@@ -206,7 +209,9 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.streamDetailButton.click();
     // Strategic 500ms wait for operation completion - this is functionally necessary
   await page.waitForTimeout(500);
-
+    //before toggling we need to make sure that we shift to configuration tab 
+    await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
+    await page.getByRole('tab', { name: 'Configuration' }).click();
     // Toggle 'Store Original Data' and update schema
     await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor();
     await pageManager.unflattenedPage.storeOriginalDataToggle.click();
@@ -318,7 +323,9 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.streamDetailButton.click();
     // Strategic 500ms wait for operation completion - this is functionally necessary
   await page.waitForTimeout(500);
-    
+    //before toggling we need to make sure that we shift to configuration tab 
+    await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
+    await page.getByRole('tab', { name: 'Configuration' }).click();
     await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor();
     await pageManager.unflattenedPage.storeOriginalDataToggle.click();
     

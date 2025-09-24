@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use config::datafusion::request::Request;
 use datafusion::{
     common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
     logical_expr::LogicalPlan,
@@ -25,7 +26,6 @@ use hashbrown::HashSet;
 use crate::service::search::{
     cache::cacher::handle_histogram,
     cluster::flight::{SearchContextBuilder, register_table},
-    request::Request,
     sql::Sql,
 };
 

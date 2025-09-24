@@ -132,10 +132,10 @@ pub enum StreamType {
 }
 
 impl StreamType {
-    pub fn is_basic_type(&self) -> bool {
+    pub fn support_index(&self) -> bool {
         matches!(
             *self,
-            StreamType::Logs | StreamType::Metrics | StreamType::Traces
+            StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Metadata
         )
     }
 
@@ -187,18 +187,22 @@ impl std::fmt::Display for StreamType {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
 #[serde(default)]
 pub struct StreamParams {
+    #[schema(value_type = String)]
     pub org_id: faststr::FastStr,
+    #[schema(value_type = String)]
     pub stream_name: faststr::FastStr,
     pub stream_type: StreamType,
 }
 
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
 #[serde(default)]
 pub struct RemoteStreamParams {
+    #[schema(value_type = String)]
     pub org_id: faststr::FastStr,
+    #[schema(value_type = String)]
     pub destination_name: faststr::FastStr,
 }
 
@@ -488,20 +492,22 @@ impl std::ops::Sub<&StreamStats> for &StreamStats {
     type Output = StreamStats;
 
     fn sub(self, rhs: &StreamStats) -> Self::Output {
-        let mut ret = StreamStats {
+        StreamStats {
             created_at: self.created_at,
             file_num: self.file_num - rhs.file_num,
             doc_num: self.doc_num - rhs.doc_num,
-            doc_time_min: self.doc_time_min.min(rhs.doc_time_min),
+            doc_time_min: if self.doc_time_min == 0 {
+                rhs.doc_time_min
+            } else if rhs.doc_time_min == 0 {
+                self.doc_time_min
+            } else {
+                self.doc_time_min.min(rhs.doc_time_min)
+            },
             doc_time_max: self.doc_time_max.max(rhs.doc_time_max),
             storage_size: self.storage_size - rhs.storage_size,
             compressed_size: self.compressed_size - rhs.compressed_size,
             index_size: self.index_size - rhs.index_size,
-        };
-        if ret.doc_time_min == 0 {
-            ret.doc_time_min = rhs.doc_time_min;
         }
-        ret
     }
 }
 
@@ -509,20 +515,22 @@ impl std::ops::Add<&StreamStats> for &StreamStats {
     type Output = StreamStats;
 
     fn add(self, rhs: &StreamStats) -> Self::Output {
-        let mut ret = StreamStats {
+        StreamStats {
             created_at: self.created_at,
             file_num: self.file_num + rhs.file_num,
             doc_num: self.doc_num + rhs.doc_num,
-            doc_time_min: self.doc_time_min.min(rhs.doc_time_min),
+            doc_time_min: if self.doc_time_min == 0 {
+                rhs.doc_time_min
+            } else if rhs.doc_time_min == 0 {
+                self.doc_time_min
+            } else {
+                self.doc_time_min.min(rhs.doc_time_min)
+            },
             doc_time_max: self.doc_time_max.max(rhs.doc_time_max),
             storage_size: self.storage_size + rhs.storage_size,
             compressed_size: self.compressed_size + rhs.compressed_size,
             index_size: self.index_size + rhs.index_size,
-        };
-        if ret.doc_time_min == 0 {
-            ret.doc_time_min = rhs.doc_time_min;
         }
-        ret
     }
 }
 
@@ -627,7 +635,7 @@ pub struct UpdateSettingsWrapper<D> {
     pub remove: Vec<D>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, ToSchema)]
 pub struct PatternAssociation {
     pub field: String,
     pub pattern_name: String,
@@ -776,23 +784,23 @@ impl TimeRange {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, ToSchema, PartialEq)]
+#[derive(Clone, Debug, Deserialize, ToSchema, PartialEq)]
 pub struct StreamSettings {
-    #[serde(skip_serializing_if = "Option::None")]
+    #[serde(default)]
     pub partition_time_level: Option<PartitionTimeLevel>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub partition_keys: Vec<StreamPartition>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub full_text_search_keys: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub index_fields: Vec<String>,
     #[serde(default)]
     pub bloom_filter_fields: Vec<String>,
     #[serde(default)]
     pub data_retention: i64,
-    #[serde(skip_serializing_if = "Option::None")]
+    #[serde(default)]
     pub flatten_level: Option<i64>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub defined_schema_fields: Vec<String>,
     #[serde(default)]
     pub max_query_range: i64, // hours
@@ -800,7 +808,7 @@ pub struct StreamSettings {
     pub store_original_data: bool,
     #[serde(default)]
     pub approx_partition: bool,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub distinct_value_fields: Vec<DistinctField>,
     #[serde(default)]
     pub index_updated_at: i64,
@@ -812,6 +820,30 @@ pub struct StreamSettings {
     pub index_all_values: bool,
     #[serde(default)]
     pub enable_distinct_fields: bool,
+}
+
+impl Default for StreamSettings {
+    fn default() -> Self {
+        Self {
+            partition_time_level: None,
+            partition_keys: Vec::new(),
+            full_text_search_keys: Vec::new(),
+            index_fields: Vec::new(),
+            bloom_filter_fields: Vec::new(),
+            data_retention: 0,
+            flatten_level: None,
+            defined_schema_fields: Vec::new(),
+            max_query_range: 0,
+            store_original_data: false,
+            approx_partition: false,
+            distinct_value_fields: Vec::new(),
+            index_updated_at: 0,
+            extended_retention_days: Vec::new(),
+            index_original_data: false,
+            index_all_values: false,
+            enable_distinct_fields: true,
+        }
+    }
 }
 
 impl Serialize for StreamSettings {
@@ -841,7 +873,7 @@ impl Serialize for StreamSettings {
         state.serialize_field("extended_retention_days", &self.extended_retention_days)?;
         state.serialize_field("index_original_data", &self.index_original_data)?;
         state.serialize_field("index_all_values", &self.index_all_values)?;
-        state.serialize_field("disable_distinct_fields", &self.enable_distinct_fields)?;
+        state.serialize_field("enable_distinct_fields", &self.enable_distinct_fields)?;
 
         if !self.defined_schema_fields.is_empty() {
             let mut fields = self.defined_schema_fields.clone();
@@ -1235,6 +1267,35 @@ pub struct EnrichmentTableMetaStreamStats {
     pub start_time: i64,
     pub end_time: i64,
     pub size: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub enum FileListBookKeepMode {
+    History,
+    #[default]
+    Deleted,
+    None,
+}
+
+impl std::fmt::Display for FileListBookKeepMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FileListBookKeepMode::History => write!(f, "history"),
+            FileListBookKeepMode::Deleted => write!(f, "deleted"),
+            FileListBookKeepMode::None => write!(f, "none"),
+        }
+    }
+}
+
+impl From<&str> for FileListBookKeepMode {
+    fn from(s: &str) -> Self {
+        match s {
+            "history" => FileListBookKeepMode::History,
+            "deleted" => FileListBookKeepMode::Deleted,
+            "none" => FileListBookKeepMode::None,
+            _ => FileListBookKeepMode::default(),
+        }
+    }
 }
 
 #[cfg(test)]

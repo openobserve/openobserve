@@ -29,7 +29,6 @@ static CLIENT: Lazy<Box<dyn SchemaHistory>> = Lazy::new(connect);
 pub fn connect() -> Box<dyn SchemaHistory> {
     match config::get_config().common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteSchemaHistory>::default(),
-        MetaStore::Etcd => Box::<sqlite::SqliteSchemaHistory>::default(),
         MetaStore::Nats => Box::<sqlite::SqliteSchemaHistory>::default(),
         MetaStore::MySQL => Box::<mysql::MysqlSchemaHistory>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresSchemaHistory>::default(),

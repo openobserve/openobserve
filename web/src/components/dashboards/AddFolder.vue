@@ -103,6 +103,7 @@ import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const defaultValue = () => {
   return {
@@ -144,6 +145,7 @@ export default defineComponent({
     const { t } = useI18n();
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
+    const { track } = useReo();
 
     const onSubmit = useLoading(async () => {
       await addFolderForm.value.validate().then(async (valid: any) => {
@@ -187,6 +189,10 @@ export default defineComponent({
             { timeout: 2000 }
           );
         }
+        track("Button Click", {
+          button: "Save New Folder",
+          page: "Dashboards",
+        });
       });
     });
 

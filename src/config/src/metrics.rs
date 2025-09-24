@@ -24,10 +24,7 @@ use prometheus::{
 pub const NAMESPACE: &str = "zo";
 const HELP_SUFFIX: &str =
     "Please include 'organization, 'stream type', and 'stream' labels for this metric.";
-pub const SPAN_METRICS_BUCKET: [f64; 15] = [
-    0.1, 0.5, 1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0,
-    60000.0,
-];
+
 // http latency
 pub static HTTP_INCOMING_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -1050,6 +1047,73 @@ pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// Tokio runtime metrics - consolidated into fewer metrics with different labels
+pub static TOKIO_RUNTIME_TASKS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("tokio_runtime_tasks", "Tokio runtime task statistics")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["runtime", "metric_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static TOKIO_RUNTIME_TASKS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "tokio_runtime_tasks_total",
+            "Total tokio runtime task counters",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["runtime", "metric_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static TOKIO_RUNTIME_WORKER_METRICS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "tokio_runtime_worker_metrics_total",
+            "Tokio runtime worker metrics",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["runtime", "worker", "metric_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static TOKIO_RUNTIME_WORKER_DURATION_SECONDS: Lazy<CounterVec> = Lazy::new(|| {
+    CounterVec::new(
+        Opts::new(
+            "tokio_runtime_worker_duration_seconds_total",
+            "Tokio runtime worker duration metrics in seconds",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["runtime", "worker"],
+    )
+    .expect("Metric created")
+});
+
+pub static TOKIO_RUNTIME_WORKER_POLL_TIME_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "tokio_runtime_worker_poll_time_seconds",
+            "Tokio runtime worker poll time distribution in seconds",
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![
+            0.000001, 0.000005, 0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1,
+            0.5, 1.0,
+        ])
+        .const_labels(create_const_labels()),
+        &["runtime", "worker"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -1324,6 +1388,23 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(TANTIVY_RESULT_CACHE_HITS_TOTAL.clone()))
+        .expect("Metric registered");
+
+    // tokio runtime metrics
+    registry
+        .register(Box::new(TOKIO_RUNTIME_TASKS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TOKIO_RUNTIME_TASKS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TOKIO_RUNTIME_WORKER_METRICS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TOKIO_RUNTIME_WORKER_DURATION_SECONDS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TOKIO_RUNTIME_WORKER_POLL_TIME_SECONDS.clone()))
         .expect("Metric registered");
 }
 

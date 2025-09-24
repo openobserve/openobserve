@@ -250,7 +250,7 @@ export class AlertsPage {
     async moveAllAlertsToFolder(targetFolderName) {
         // Select all alerts
         await this.page.getByRole('row', { name: '# Name Owner Period Frequency' }).getByRole('checkbox').click();
-        await expect(this.page.getByText(/Showing 1 - [12] of/).nth(1)).toBeVisible();
+        await expect(this.page.getByText(/Showing 1 - [12] of/)).toBeVisible();
 
         // Click move across folders button
         await this.page.locator(this.moveAcrossFoldersButton).click();
@@ -367,12 +367,12 @@ export class AlertsPage {
      */
     async verifySearchResults(expectedCount) {
         const resultText = expectedCount === 1 ? 'Showing 1 - 1 of' : 'Showing 1 - 2 of';
-        await expect(this.page.getByText(resultText).nth(1)).toBeVisible();
+        await expect(this.page.getByText(resultText)).toBeVisible();
     }
 
     async verifySearchResultsUIValidation(expectedCount) {
         const resultText = expectedCount === 1 ? 'Showing 1 - 1 of' : 'Showing 1 - 2 of';
-        await expect(this.page.getByText(resultText).nth(1)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.getByText(resultText)).toBeVisible({ timeout: 10000 });
     }
 
     /**
@@ -436,8 +436,8 @@ export class AlertsPage {
 
         // Add SQL query
         await this.page.getByRole('button', { name: 'View Editor' }).click();
-        await this.page.locator('.cm-line').first().click();
-        await this.page.locator('[data-test="scheduled-alert-sql-editor"]').locator('.cm-content')
+        await this.page.locator('.view-line').first().click();
+        await this.page.locator('[data-test="scheduled-alert-sql-editor"]').locator('.inputarea')
             .fill('SELECT name\n  FROM "auto_playwright_stream"\n  WHERE \n    gender = \'Male\'\n    AND age > 60\n    AND country IN (\'Germany\', \'Japan\', \'USA\')');
         await this.page.getByRole('button', { name: 'Run Query' }).click();
         await this.page.waitForLoadState('networkidle');
@@ -561,8 +561,8 @@ export class AlertsPage {
     }
 
     async verifyAlertCounts() {
-        const scheduledAlertsCount = await this.page.locator('div:nth-child(3) > .q-w-sm > .row > div > .text-h6').first().textContent();
-        const realTimeAlertsCount = await this.page.locator('div:nth-child(3) > .q-w-sm > .row > div:nth-child(3) > .text-h6').textContent();
+        const scheduledAlertsCount = await this.page.locator('div:has-text("Alerts") >> text=Scheduled').locator('xpath=following::*[1]').first().textContent();
+        const realTimeAlertsCount = await this.page.locator('div:has-text("Alerts") >> text="Real time"').locator('xpath=following::*[1]').first().textContent();
         return { scheduledAlertsCount, realTimeAlertsCount };
     }
 
@@ -579,9 +579,9 @@ export class AlertsPage {
         await this.page.locator('[data-test="tab-scheduled"]').click();
         await expect(this.page.getByText('No data available')).toBeVisible();
         await this.page.locator('[data-test="tab-realTime"]').click();
-        await expect(this.page.getByText('Showing 1 - 1 of').nth(1)).toBeVisible();
+        await expect(this.page.getByText('Showing 1 - 1 of')).toBeVisible();
         await this.page.locator('[data-test="tab-all"]').click();
-        await expect(this.page.getByText('Showing 1 - 1 of').nth(1)).toBeVisible();
+        await expect(this.page.getByText('Showing 1 - 1 of')).toBeVisible();
     }
 
     async verifyFolderSearch(folderName) {

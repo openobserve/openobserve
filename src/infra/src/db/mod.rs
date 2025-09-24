@@ -24,7 +24,6 @@ use tokio::sync::{OnceCell, mpsc};
 
 use crate::errors::{DbError, Error, Result};
 
-pub mod etcd;
 pub mod mysql;
 pub mod nats;
 pub mod postgres;
@@ -97,22 +96,18 @@ pub async fn get_super_cluster() -> &'static Box<dyn Db> {
 }
 
 pub async fn init() -> Result<()> {
-    etcd::init().await;
     create_table().await?;
     Ok(())
 }
 
 async fn default() -> Box<dyn Db> {
     let cfg = get_config();
-    if !cfg.common.local_mode
-        && (cfg.common.meta_store == "sled" || cfg.common.meta_store == "sqlite")
-    {
+    if !cfg.common.local_mode && cfg.common.meta_store == "sqlite" {
         panic!("cluster mode is not supported for ZO_META_STORE=sqlite");
     }
 
     match cfg.common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteDb>::default(),
-        MetaStore::Etcd => Box::<etcd::Etcd>::default(),
         MetaStore::Nats => Box::<nats::NatsDb>::default(),
         MetaStore::MySQL => Box::<mysql::MysqlDb>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresDb>::default(),
@@ -133,7 +128,7 @@ async fn init_cluster_coordinator() -> Box<dyn Db> {
     } else {
         match cfg.common.cluster_coordinator.as_str().into() {
             MetaStore::Nats => Box::<nats::NatsDb>::default(),
-            _ => Box::<etcd::Etcd>::default(),
+            _ => Box::<nats::NatsDb>::default(),
         }
     }
 }

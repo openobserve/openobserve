@@ -64,7 +64,7 @@ use openobserve::{
     },
 };
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
-use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_otlp::{WithExportConfig, WithHttpConfig, WithTonicConfig};
 use opentelemetry_proto::tonic::collector::{
     logs::v1::logs_service_server::LogsServiceServer,
     metrics::v1::metrics_service_server::MetricsServiceServer,
@@ -277,24 +277,19 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("job init failed: {e}");
             }
 
-            // init meter provider
-            let Ok(meter_provider) = job::metrics::init_meter_provider().await else {
-                job_init_tx.send(false).ok();
-                panic!("meter provider init failed");
-            };
+            // Register job runtime for metrics collection
+            if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                openobserve::service::runtime_metrics::register_runtime("job".to_string(), handle);
+            }
 
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
 
-            // shutdown meter provider
-            let _ = meter_provider.shutdown();
-
             // flush distinct values
             _ = metadata::close().await;
             // flush WAL cache to disk
             _ = ingester::flush_all().await;
-            common_infra::wal::flush_all_to_disk().await;
             // flush compact offset cache to disk disk
             _ = db::compact::files::sync_cache_to_db().await;
             // flush db
@@ -327,6 +322,13 @@ async fn main() -> Result<(), anyhow::Error> {
             .max_blocking_threads(cfg.limit.grpc_runtime_blocking_worker_num)
             .build()
             .expect("grpc runtime init failed");
+
+        // Register gRPC runtime for metrics collection
+        openobserve::service::runtime_metrics::register_runtime(
+            "grpc".to_string(),
+            rt.handle().clone(),
+        );
+
         let _guard = rt.enter();
         rt.block_on(async move {
             let ret = if config::cluster::LOCAL_NODE.is_router() {
@@ -344,8 +346,16 @@ async fn main() -> Result<(), anyhow::Error> {
     // wait for gRPC init
     grpc_init_rx.await.ok();
 
+    // Register main HTTP runtime for metrics collection
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        openobserve::service::runtime_metrics::register_runtime("http".to_string(), handle);
+    }
+
+    // Start runtime metrics collector
+    openobserve::service::runtime_metrics::start_metrics_collector().await;
+
     // let node online
-    let _ = cluster::set_online(false).await;
+    let _ = cluster::set_online().await;
 
     // initialize the jobs are deferred until the gRPC service starts
     job::init_deferred()
@@ -564,7 +574,7 @@ async fn init_common_grpc_server(
         tonic::transport::Server::builder()
     };
     let ret = builder
-        .layer(tonic::service::interceptor(check_auth))
+        .layer(tonic::service::InterceptorLayer::new(check_auth))
         .add_service(event_svc)
         .add_service(search_svc)
         .add_service(metrics_svc)
@@ -629,7 +639,7 @@ async fn init_router_grpc_server(
         tonic::transport::Server::builder()
     };
     let ret = builder
-        .layer(tonic::service::interceptor(check_auth))
+        .layer(tonic::service::InterceptorLayer::new(check_auth))
         .add_service(logs_svc)
         .add_service(metrics_svc)
         .add_service(traces_svc)
@@ -664,7 +674,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     let server = HttpServer::new(move || {
         let cfg = get_config();
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.common.feature_per_thread_lock {
+        if cfg.limit.mem_table_bucket_num > 1 {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
         let scheme = if cfg.http.tls_enabled {
@@ -769,7 +779,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     let server = HttpServer::new(move || {
         let cfg = get_config();
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.common.feature_per_thread_lock {
+        if cfg.limit.mem_table_bucket_num > 1 {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
 
@@ -894,7 +904,7 @@ async fn graceful_shutdown(handle: ServerHandle) {
     // println!("ctrl-c received!");
 
     // offline the node
-    if let Err(e) = cluster::set_offline(true).await {
+    if let Err(e) = cluster::set_offline().await {
         log::error!("set offline failed: {e}");
     }
     log::info!("Node is offline");
@@ -949,65 +959,82 @@ pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
     guard
 }
 
-fn enable_tracing() -> Result<opentelemetry_sdk::trace::TracerProvider, anyhow::Error> {
+fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyhow::Error> {
     let cfg = get_config();
     opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
-    let tracer = opentelemetry_otlp::new_pipeline().tracing();
+    let tracer = opentelemetry_sdk::trace::SdkTracerProvider::builder();
     let tracer = if cfg.common.otel_otlp_grpc_url.is_empty() {
-        tracer.with_exporter({
-            let mut headers = HashMap::new();
-            headers.insert(
-                cfg.common.tracing_header_key.clone(),
-                cfg.common.tracing_header_value.clone(),
-            );
-            opentelemetry_otlp::new_exporter()
-                .http()
-                .with_http_client(
-                    reqwest::Client::builder()
+        tracer.with_span_processor(
+            opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
+                {
+                    let mut headers = HashMap::new();
+                    headers.insert(
+                        cfg.common.tracing_header_key.clone(),
+                        cfg.common.tracing_header_value.clone(),
+                    );
+                    opentelemetry_otlp::SpanExporter::builder()
+                        .with_http()
+                        .with_http_client(
+                            reqwest::Client::builder()
                         .danger_accept_invalid_certs(true)
                         .timeout(Duration::from_secs(10))           // Overall request timeout
                         .connect_timeout(Duration::from_secs(5))    // Connection establishment timeout
                         .pool_idle_timeout(Duration::from_secs(60)) // How long to keep idle connections
                         .pool_max_idle_per_host(10) // How many idle connections to keep per host
                         .build()?,
-                )
-                .with_endpoint(&cfg.common.otel_otlp_url)
-                .with_headers(headers)
-        })
+                        )
+                        .with_endpoint(&cfg.common.otel_otlp_url)
+                        .with_headers(headers)
+                        .build()?
+                },
+                opentelemetry_sdk::runtime::Tokio,
+            )
+            .build(),
+        )
     } else {
-        tracer.with_exporter({
-            let mut metadata = MetadataMap::new();
-            metadata.insert(
-                MetadataKey::from_str(&cfg.common.tracing_header_key).unwrap(),
-                MetadataValue::from_str(&cfg.common.tracing_header_value).unwrap(),
-            );
-            metadata.insert(
-                MetadataKey::from_str(&cfg.grpc.org_header_key).unwrap(),
-                MetadataValue::from_str(&cfg.common.tracing_grpc_header_org).unwrap(),
-            );
-            metadata.insert(
-                MetadataKey::from_str(&cfg.grpc.stream_header_key).unwrap(),
-                MetadataValue::from_str(&cfg.common.tracing_grpc_header_stream_name).unwrap(),
-            );
-            opentelemetry_otlp::new_exporter()
-                .tonic()
-                .with_endpoint(&cfg.common.otel_otlp_grpc_url)
-                .with_metadata(metadata)
-                .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-        })
+        tracer.with_span_processor(
+            opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
+                {
+                    let mut metadata = MetadataMap::new();
+                    metadata.insert(
+                        MetadataKey::from_str(&cfg.common.tracing_header_key).unwrap(),
+                        MetadataValue::from_str(&cfg.common.tracing_header_value).unwrap(),
+                    );
+                    metadata.insert(
+                        MetadataKey::from_str(&cfg.grpc.org_header_key).unwrap(),
+                        MetadataValue::from_str(&cfg.common.tracing_grpc_header_org).unwrap(),
+                    );
+                    metadata.insert(
+                        MetadataKey::from_str(&cfg.grpc.stream_header_key).unwrap(),
+                        MetadataValue::from_str(&cfg.common.tracing_grpc_header_stream_name)
+                            .unwrap(),
+                    );
+                    opentelemetry_otlp::SpanExporter::builder()
+                        .with_tonic()
+                        .with_endpoint(&cfg.common.otel_otlp_grpc_url)
+                        .with_metadata(metadata)
+                        .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                        .build()?
+                },
+                opentelemetry_sdk::runtime::Tokio,
+            )
+            .build(),
+        )
     };
 
     // Store the tracer provider before installing batch processor
-    let tracer = tracer.with_trace_config(
-        opentelemetry_sdk::trace::Config::default().with_resource(Resource::new(vec![
-            KeyValue::new("service.name", cfg.common.node_role.to_string()),
-            KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
-            KeyValue::new("service.version", config::VERSION),
-        ])),
+    let tracer = tracer.with_resource(
+        Resource::builder()
+            .with_attributes(vec![
+                KeyValue::new("service.name", cfg.common.node_role.to_string()),
+                KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
+                KeyValue::new("service.version", config::VERSION),
+            ])
+            .build(),
     );
 
-    // Install batch processor
-    let tracer = tracer.install_batch(opentelemetry_sdk::runtime::Tokio)?;
+    // build
+    let tracer = tracer.build();
 
     let layer = if cfg.log.json_format {
         tracing_subscriber::fmt::layer()
@@ -1054,7 +1081,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
     let server = HttpServer::new(move || {
         let cfg = get_config();
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.common.feature_per_thread_lock {
+        if cfg.limit.mem_table_bucket_num > 1 {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
         let scheme = if cfg.http.tls_enabled {

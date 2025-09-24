@@ -15,30 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div v-if="beingUpdated" class="text-h6">
+  <q-card class="add-service-account-dialog column full-height">
+    <q-card-section class=" q-py-md tw-w-full">
+      <div class="row items-center no-wrap q-py-sm">
+        <div class="col ">
+          <div v-if="beingUpdated" style="font-size: 18px">
             {{ t("serviceAccounts.update") }}
           </div>
-          <div v-else class="text-h6">{{ t("serviceAccounts.add") }}</div>
+          <div v-else style="font-size: 18px">{{ t("serviceAccounts.add") }}</div>
         </div>
         <div class="col-auto">
-          <q-btn
-            v-close-popup="true"
-            round
-            flat
-            icon="cancel"
-            data-test="close-button"
-            @click="
-              router.push({
-                name: 'serviceAccounts',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              })
-            "
+          <q-icon
+            data-test="add-service-account-close-dialog-btn"
+            name="cancel"
+            class="cursor-pointer"
+            size="20px"
+            @click="$emit('cancel:hideform')"
           />
         </div>
       </div>
@@ -46,7 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator />
       <div>
         <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-
           <q-input
             v-if="!beingUpdated"
             v-model="formData.email"
@@ -77,24 +68,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
           />
-          <div class="flex justify-center q-mt-lg">
+          <div class="flex justify-start">
             <q-btn
               v-close-popup="true"
-              class="q-mb-md text-bold"
+              class="q-mr-md o2-secondary-button tw-h-[36px]"
               :label="t('user.cancel')"
-              text-color="light-text"
-              padding="sm md"
-              data-test="cancel-button"
               no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              data-test="cancel-button"
               @click="$emit('cancel:hideform')"
             />
             <q-btn
               :label="t('user.save')"
-              class="q-mb-md text-bold no-border q-ml-md"
-              color="secondary"
-              padding="sm xl"
+              class="o2-primary-button no-border tw-h-[36px]"
               type="submit"
               no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             />
           </div>
         </q-form>
@@ -104,20 +95,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
+import { defineComponent, ref, onActivated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
-import userServiece from "@/services/users";
-import {
-  getImageURL,
-  useLocalCurrentUser,
-  useLocalUserInfo,
-  invlidateLoginData,
-} from "@/utils/zincutils";
-import config from "@/aws-exports";
+import { getImageURL } from "@/utils/zincutils";
 import service_accounts from "@/services/service_accounts";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const defaultValue: any = () => {
   return {
@@ -139,13 +124,14 @@ export default defineComponent({
     isUpdated: {
       type: Boolean,
       default: false,
-    }
+    },
   },
   emits: ["update:modelValue", "updated", "cancel:hideform"],
   setup(props) {
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
+    const { track } = useReo();
     const $q = useQuasar();
     const formData: any = ref(defaultValue());
     const existingUser = ref(false);
@@ -161,7 +147,6 @@ export default defineComponent({
       formData.value.organization = store.state.selectedOrganization.identifier;
     });
 
-
     return {
       t,
       $q,
@@ -176,6 +161,7 @@ export default defineComponent({
       loadingOrganizations,
       logout_confirm,
       firstName,
+      track,
     };
   },
   created() {
@@ -188,12 +174,11 @@ export default defineComponent({
       this.modelValue.email != ""
     ) {
       this.beingUpdated = true;
-      this.formData = {...this.modelValue};
+      this.formData = { ...this.modelValue };
       this.firstName = this.modelValue?.first_name;
     }
   },
   methods: {
-
     onSubmit() {
       const dismiss = this.$q.notify({
         spinner: true,
@@ -201,7 +186,8 @@ export default defineComponent({
         timeout: 2000,
       });
       let selectedOrg = this.store.state.selectedOrganization.identifier;
-      this.formData.organization = this.store.state.selectedOrganization.identifier;
+      this.formData.organization =
+        this.store.state.selectedOrganization.identifier;
       if (selectedOrg == "other") {
         selectedOrg = encodeURIComponent(this.formData.other_organization);
       }
@@ -212,12 +198,12 @@ export default defineComponent({
         service_accounts
           .update(this.formData, selectedOrg, userEmail)
           .then((res: any) => {
-              this.formData.email = userEmail;
-              this.$emit("updated", res.data, this.formData, "updated");
+            this.formData.email = userEmail;
+            this.$emit("updated", res.data, this.formData, "updated");
           })
           .catch((err: any) => {
-            if(err.response?.status != 403){
-              if(err?.response?.data?.message ) {
+            if (err.response?.status != 403) {
+              if (err?.response?.data?.message) {
                 this.$q.notify({
                   color: "negative",
                   message: err?.response?.data?.message,
@@ -225,9 +211,13 @@ export default defineComponent({
                 });
               }
             }
-            
+
             dismiss();
             this.formData.email = userEmail;
+          });
+          this.track("Button Click", {
+            button: "Update Service Account",
+            page: "Add Service Account"
           });
       } else {
           service_accounts
@@ -249,8 +239,18 @@ export default defineComponent({
               
               dismiss();
             });
+          this.track("Button Click", {
+            button: "Create Service Account",
+            page: "Add Service Account"
+          });
       }
     },
   },
 });
 </script>
+
+<style lang="scss" scoped>
+.add-service-account-dialog {
+  width: 30vw;
+}
+</style>

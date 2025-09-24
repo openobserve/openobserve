@@ -100,7 +100,7 @@ mod tests {
 
         log::info!("starting gRPC server at {}", gaddr);
         tonic::transport::Server::builder()
-            .layer(tonic::service::interceptor(check_auth))
+            .layer(tonic::service::InterceptorLayer::new(check_auth))
             .add_service(search_svc)
             .add_service(flight_svc)
             .serve(gaddr)
@@ -137,11 +137,11 @@ mod tests {
         config::init().await.unwrap();
         // init infra
         migration::init_db().await.unwrap();
-        infra::init().await.unwrap();
         // ensure database tables are created
         infra::db::create_table().await.unwrap();
         // db migration steps, since it's separated out
         infra::table::migrate().await.unwrap();
+        infra::init().await.unwrap();
         openobserve::common::infra::init().await.unwrap();
         // ingester init
         ingester::init().await.unwrap();
@@ -269,10 +269,6 @@ mod tests {
         e2e_handle_derived_stream_max_retries().await;
         e2e_handle_derived_stream_evaluation_failure().await;
         e2e_cleanup_test_pipeline().await;
-
-        // syslog
-        e2e_post_syslog_route().await;
-        e2e_list_syslog_routes().await;
 
         // others
         e2e_health_check().await;
@@ -2436,59 +2432,6 @@ mod tests {
         .await;
         let req = test::TestRequest::get()
             .uri("/config")
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-    }
-
-    async fn e2e_post_syslog_route() {
-        let auth = setup();
-        let body_str = r#"{
-                                "orgId": "acceptLogs",
-                                "streamName":"syslog",
-                                "subnets": [
-                                            "192.168.0.0/16",
-                                            "127.0.0.0/8",
-                                            "172.16.0.0/12"
-                                        ]
-                            }"#;
-
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/syslog-routes", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-    }
-
-    async fn e2e_list_syslog_routes() {
-        let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/syslog-routes", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();

@@ -24,7 +24,6 @@ pub mod dashboards;
 pub mod db;
 pub mod enrichment;
 pub mod enrichment_table;
-pub mod exporter;
 pub mod file_list;
 pub mod file_list_dump;
 pub mod folders;
@@ -43,6 +42,7 @@ pub mod pipeline;
 pub mod promql;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
+pub mod runtime_metrics;
 pub mod schema;
 pub mod search;
 pub mod tantivy;
@@ -53,8 +53,6 @@ pub mod self_reporting;
 pub mod session;
 pub mod short_url;
 pub mod stream;
-#[deprecated(since = "0.15.0", note = "syslog is deprecated")]
-pub mod syslogs_route;
 pub mod tls;
 pub mod traces;
 pub mod users;

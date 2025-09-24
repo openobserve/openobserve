@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use config::{
     cluster::LOCAL_NODE,
+    datafusion::request::{FlightSearchRequest, Request},
     meta::{
         cluster::{IntoArcVec, RoleGroup},
         search::{ScanStats, SearchEventType},
@@ -51,7 +52,6 @@ use crate::service::{
             exec::{DataFusionContextBuilder, register_udf},
         },
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        request::{FlightSearchRequest, Request},
         utils::AsyncDefer,
     },
 };
@@ -77,6 +77,7 @@ pub async fn search(
     let cfg = config::get_config();
     let mut req: Request = (*flight_request).clone().into();
     let trace_id = trace_id.to_string();
+    let org_id = req.org_id.clone();
 
     // create datafusion context, just used for decode plan, the params can use default
     let mut ctx = DataFusionContextBuilder::new()
@@ -90,7 +91,7 @@ pub async fn search(
     datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes
-    let proto = get_physical_extension_codec();
+    let proto = get_physical_extension_codec(org_id);
     let mut physical_plan = physical_plan_from_bytes_with_extension_codec(
         &flight_request.search_info.plan,
         &ctx,

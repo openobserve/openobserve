@@ -334,6 +334,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :runId="runId"
       :tabId="props.tabId"
       :tabName="props.tabName"
+      :dashboardName="props.dashboardName"
+      :folderName="props.folderName"
       @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
       @limit-number-of-series-warning-message-update="
@@ -442,6 +444,8 @@ export default defineComponent({
     "runId",
     "tabId",
     "tabName",
+    "dashboardName",
+    "folderName",
   ],
   components: {
     PanelSchemaRenderer,
@@ -607,9 +611,12 @@ export default defineComponent({
         "org_identifier",
         store.state.selectedOrganization.identifier,
       );
-      logsUrl.searchParams.set("quick_mode", "false");
+      if (store.state.zoConfig.quick_mode_enabled) {
+        logsUrl.searchParams.set("quick_mode", "true");
+      } else {
+        logsUrl.searchParams.set("quick_mode", "false");
+      }
       logsUrl.searchParams.set("show_histogram", "false");
-
       return logsUrl;
     };
 

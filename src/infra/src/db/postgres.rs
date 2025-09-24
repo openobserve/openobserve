@@ -82,6 +82,11 @@ async fn cache_indices() -> HashSet<DBIndex> {
         Err(_) => HashSet::new(),
     }
 }
+
+pub async fn shutdown_ddl_pool() -> Result<()> {
+    CLIENT_DDL.close().await;
+    Ok(())
+}
 pub struct PostgresDb {}
 
 impl PostgresDb {

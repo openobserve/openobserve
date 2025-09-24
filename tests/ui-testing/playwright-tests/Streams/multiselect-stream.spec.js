@@ -2,6 +2,7 @@ const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
 const { getHeaders, getIngestionUrl, sendRequest } = require('../../utils/apiUtils.js');
+const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
 
@@ -33,7 +34,7 @@ test.describe("Stream multiselect testcases", () => {
         e2e: "1",
       };
       const response = await sendRequest(page, ingestionUrl, payload, headers);
-      console.log(`Response from ${streamName}:`, response);
+      testLogger.debug('API response received', { streamName, response });
     }
 
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
@@ -57,7 +58,7 @@ async function multistreamselect(page) {
 
     //before we click on fn editor we need to turn on the function editor if is toggled off
     await page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
-    await page.locator('#fnEditor').getByRole('textbox').click()
+    await page.locator('#fnEditor').locator('.monaco-editor').click()
 //   await page.locator('[data-test="log-search-index-list-stream-toggle-e2e_stream1"] div').nth(2).click({force:true});
     const cell = await page.getByRole('cell', { name: /Common Group Fields/ });
 
@@ -79,7 +80,7 @@ async function multistreamselect(page) {
 
   test("should add a function and display it in streams", async ({ page }) => {
 await multistreamselect(page);
-await page.locator('#fnEditor').getByRole('textbox').fill('.a=2');
+await page.locator('#fnEditor').locator('.inputarea').fill('.a=2');
 await page.waitForTimeout(1000);
     await applyQueryButton(page);
     await page

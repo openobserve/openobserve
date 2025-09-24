@@ -112,7 +112,7 @@ mod tests {
         ));
 
         // encode
-        let proto = super::super::get_physical_extension_codec();
+        let proto = super::super::get_physical_extension_codec("test".to_string());
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode

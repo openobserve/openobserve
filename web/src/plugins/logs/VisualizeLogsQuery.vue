@@ -37,8 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'scatter',
             'table',
           ]"
-          v-model:selectedChartType="dashboardPanelData.data.type"
-          @update:selected-chart-type="resetAggregationFunction"
+          :selectedChartType="dashboardPanelData.data.type"
+          @update:selected-chart-type="handleChartTypeChange"
         />
       </div>
       <q-separator vertical />
@@ -405,6 +405,9 @@ import { onActivated } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import CustomChartEditor from "@/components/dashboards/addPanel/CustomChartEditor.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
+import { useSearchStream } from "@/composables/useLogs/useSearchStream";
+import { searchState } from "@/composables/useLogs/searchState";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -478,6 +481,9 @@ export default defineComponent({
       metaData.value = metadata;
     };
     const { showErrorNotification } = useNotifications();
+    
+    const { searchObj } = searchState();
+    const { buildSearch } = useSearchStream();
 
     const { visualizeChartData, is_ui_histogram }: any = toRefs(props);
     const chartData = ref(visualizeChartData.value);
@@ -518,6 +524,36 @@ export default defineComponent({
         window.dispatchEvent(new Event("resize"));
       },
     );
+
+    // Handle chart type change with validation
+    const handleChartTypeChange = (newType: string) => {
+      // Get the actual logs page query, handling SQL mode
+      let logsPageQuery = "";
+      
+      // Handle sql mode - same as in Index.vue
+      if(!searchObj.meta.sqlMode){
+        const queryBuild = buildSearch();
+        logsPageQuery = queryBuild?.query?.sql ?? "";
+      } else {
+        logsPageQuery = searchObj.data.query;
+      }
+      
+      // Check if query is SELECT * and trying to switch chart type
+      if (
+        store.state.zoConfig.quick_mode_enabled === true &&
+        isSimpleSelectAllQuery(logsPageQuery)
+      ) {
+        showErrorNotification(
+          "Select * query is not supported for visualization.",
+        );
+        // Prevent the change by not updating the type
+        return;
+      }
+
+      // If validation passes, proceed with the change
+      dashboardPanelData.data.type = newType;
+      resetAggregationFunction();
+    };
 
     // resize the chart when query editor is opened and closed
     watch(
@@ -817,6 +853,8 @@ export default defineComponent({
       onResultMetadataUpdate,
       hoveredSeriesState,
       resultMetaData,
+      isSimpleSelectAllQuery,
+      handleChartTypeChange,
     };
   },
 });

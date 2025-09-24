@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="tableRef"
         :title="title"
         :rows="rows"
-        :columns="(columns as [])"
+        :columns="columns as []"
         :table-colspan="9"
         row-key="index"
         :virtual-scroll="virtualScroll"
@@ -50,7 +50,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tr>
         </template>
         <template v-slot:body="props">
-          <q-tr :props="props" :key="`m_${props.row.index}`" class="cursor-pointer">
+          <q-tr
+            :props="props"
+            :key="`m_${props.row.index}`"
+            class="cursor-pointer"
+          >
             <q-td
               v-for="col in props.cols"
               :key="col.name"
@@ -129,6 +133,8 @@ defineProps({
 
 const emit = defineEmits(["event-emitted"]);
 
+// TODO OK: action_play is hardcoded here because of Session List component
+// it should be a prop and be handled by the component that uses the table
 const handleDataClick = (columnName: string, row: any) => {
   emit("event-emitted", "cell-click", { columnName: "action_play", row });
 };

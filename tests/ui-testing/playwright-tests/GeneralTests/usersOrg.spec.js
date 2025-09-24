@@ -289,7 +289,7 @@ test.describe("Users and Organizations", () => {
         await pageManager.createOrgPage.clickCancelButton();
         await pageManager.createOrgPage.navigateToOrg();
         await pageManager.createOrgPage.searchOrg(uniqueOrgName);
-        await pageManager.createOrgPage.verifyOrgNotExists(expect);
+        await pageManager.createOrgPage.verifyOrgNotExists();
         
         testLogger.info('Test completed successfully');
     });

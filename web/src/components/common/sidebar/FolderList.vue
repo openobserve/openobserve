@@ -17,29 +17,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-    <div class="text-bold q-px-md q-pt-sm">
-       Folders
-    </div>
-    <div class="folders-tabs">
-    <!-- Search Input -->
-    <div style="width: 100%;" class="flex folder-item q-py-xs">
-          <q-input
+    <div class="folder-header sticky-top" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
+      <div class="text-bold q-px-sm  q-py-sm tw-flex tw-items-center tw-justify-between tw-gap-2">
+         Folders
+         <div>
+          <q-btn
+            class="text-bold o2-secondary-button tw-h-[28px] tw-w-[32px]"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            no-caps
+            style="min-width: 0px !important; min-height: 0px !important;"
+            flat
+            @click.stop="addFolder"
+            data-test="dashboard-new-folder-btn"
+            title="Add Folder"
+          >
+          <q-icon name="add" size="xs" />
+        </q-btn>
+         </div>
+      </div>
+      <q-separator class="tw-mb-1 tw-mt-[3px]" size="2px"></q-separator>
+      
+      <!-- Search Input -->
+      <div style="width: 100%;" class="flex folder-item q-py-xs">
+        <q-input
           v-model="searchQuery"   
           dense
-          filled
           borderless
           data-test="folder-search"
           placeholder="Search Folder"
           style="width: 100%;"
           clearable
+          class="o2-search-input tw-mx-1 q-px-xs"
+          :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
         >
           <template #prepend>
-            <q-icon name="search" />
+            <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
           </template>
         </q-input>
-              <div>
-        </div>
-          </div>
+      </div>
+    </div>
+    <div class="folders-tabs">
       <q-tabs
         indicator-color="transparent"
         inline-label
@@ -107,21 +124,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tab>
     </q-tabs>
     </div>
-    <div
-        class="row justify-center full-width q-px-xs q-pb-xs"
-        style="position: sticky; bottom: 0px"
-    >
-      <q-btn
-          class="text-bold no-border full-width"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          label="New Folder"
-          @click.stop="addFolder"
-          data-test="dashboard-new-folder-btn"
-        />
-    </div>
-
       <q-dialog
           v-model="showAddFolderDialog"
           position="right"
@@ -130,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-folder-dialog"
         >
         <AddFolder  
+        style="width: 30vw;"
         @update:modelValue="updateFolderList"
         :edit-mode="isFolderEditMode"
         :folder-id="selectedFolderToEdit ?? 'default'"
@@ -191,6 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { filter, forIn } from "lodash-es";
   import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
   import { useLoading } from "@/composables/useLoading";
+  import { useReo } from "@/services/reodotdev_analytics";
 
   const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
     return import("@/components/common/sidebar/MoveAcrossFolders.vue");
@@ -228,6 +232,7 @@ export default defineComponent({
       const selectedFolderDelete = ref(null);
       const confirmDeleteFolderDialog = ref(false);
       const searchQuery = ref('');
+      const { track } = useReo();
 
 
       const router = useRouter();
@@ -251,6 +256,10 @@ export default defineComponent({
       const addFolder = () => {
       isFolderEditMode.value = false;
       showAddFolderDialog.value = true;
+      track("Button Click", {
+        button: "Add Folder",
+        page: "Folders",
+      });
      };
 
       const updateFolderList = async (folders: any) => {
@@ -337,6 +346,22 @@ export default defineComponent({
   </script>
 
 <style lang="scss" scoped>
+.folder-header {
+  &.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  &.folder-header-light {
+    background-color: white;
+  }
+
+  &.folder-header-dark {
+    background-color: #1a1a1a;
+  }
+}
+
 .folders-tabs {
   .test-class {
     min-height: 1.5rem;

@@ -31,7 +31,7 @@ use config::{
         json::{self, estimate_json_bytes},
     },
 };
-use infra::errors::Result;
+use infra::{errors::Result, schema::get_flatten_level};
 use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
@@ -248,8 +248,10 @@ pub async fn handle_request(
                 } else {
                     let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
                     *_size += estimate_json_bytes(&rec);
-                    // JSON Flattening
-                    rec = flatten::flatten_with_level(rec, cfg.limit.ingest_flatten_level)?;
+                    // JSON Flattening - use per-stream flatten level
+                    let flatten_level =
+                        get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+                    rec = flatten::flatten_with_level(rec, flatten_level)?;
 
                     // get json object
                     let mut local_val = match rec.take() {
@@ -343,6 +345,7 @@ pub async fn handle_request(
                     if !derived_streams.contains(&destination_stream) {
                         derived_streams.insert(destination_stream.clone());
                     }
+
                     if !user_defined_schema_map.contains_key(&destination_stream) {
                         // a new dynamically created stream. need to check the two maps again
                         crate::service::ingestion::get_uds_and_original_data_streams(

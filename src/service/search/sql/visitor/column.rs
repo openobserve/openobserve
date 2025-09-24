@@ -20,7 +20,8 @@ use datafusion::common::TableReference;
 use hashbrown::{HashMap, HashSet};
 use infra::schema::SchemaCache;
 use sqlparser::ast::{
-    Expr, GroupByExpr, OrderByKind, Query, SelectItem, Value, ValueWithSpan, VisitMut, VisitorMut,
+    Expr, GroupByExpr, OrderByKind, Query, SelectItem, SetExpr, Value, ValueWithSpan, VisitMut,
+    VisitorMut,
 };
 
 use crate::service::search::{sql::visitor::utils::FieldNameVisitor, utils::trim_quotes};
@@ -146,22 +147,53 @@ impl VisitorMut for ColumnVisitor<'_> {
             if select.distinct.is_some() {
                 self.is_distinct = true;
             }
-        }
-        if let Some(limit) = query.limit.as_ref()
-            && let Expr::Value(ValueWithSpan { value, span: _ }) = limit
-            && let Value::Number(n, _) = value
-            && let Ok(num) = n.to_string().parse::<i64>()
+        } else if let sqlparser::ast::SetExpr::SetOperation { left, right, .. } =
+            query.body.as_mut()
+            && (has_wildcard(left) || has_wildcard(right))
         {
-            self.limit = Some(num);
+            self.is_wildcard = true;
         }
-        if let Some(offset) = query.offset.as_ref()
-            && let Expr::Value(ValueWithSpan { value, span: _ }) = &offset.value
-            && let Value::Number(n, _) = value
-            && let Ok(num) = n.to_string().parse::<i64>()
+        let mut has_limit = false;
+        if let Some(limit_clause) = query.limit_clause.as_ref()
+            && let sqlparser::ast::LimitClause::LimitOffset { limit, offset, .. } = limit_clause
         {
-            self.offset = Some(num);
+            if let Some(limit) = limit.as_ref()
+                && let Expr::Value(ValueWithSpan { value, span: _ }) = limit
+                && let Value::Number(n, _) = value
+                && let Ok(num) = n.to_string().parse::<i64>()
+                && self.limit.is_none()
+            {
+                has_limit = true;
+                self.limit = Some(num);
+            }
+            if let Some(offset) = offset.as_ref()
+                && let Expr::Value(ValueWithSpan { value, span: _ }) = &offset.value
+                && let Value::Number(n, _) = value
+                && let Ok(num) = n.to_string().parse::<i64>()
+                && self.offset.is_none()
+            {
+                self.offset = Some(num);
+            }
+        }
+        if has_limit && self.offset.is_none() {
+            self.offset = Some(0);
         }
         ControlFlow::Continue(())
+    }
+}
+
+fn has_wildcard(set: &SetExpr) -> bool {
+    match set {
+        SetExpr::Select(select) => {
+            for item in select.projection.iter() {
+                if let SelectItem::Wildcard(_) = item {
+                    return true;
+                }
+            }
+            false
+        }
+        SetExpr::SetOperation { left, right, .. } => has_wildcard(left) || has_wildcard(right),
+        _ => false,
     }
 }
 
@@ -201,5 +233,57 @@ mod tests {
             column_visitor.order_by,
             vec![("name".to_string(), OrderBy::Asc)]
         );
+    }
+
+    #[test]
+    fn test_column_visitor_with_limit() {
+        let sql = "SELECT name, age, COUNT(*) FROM users WHERE status in (select distinct status from users order by status limit 10) GROUP BY name, age ORDER BY name limit 1000";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut schemas = HashMap::new();
+        let schema = Schema::new(vec![
+            Arc::new(Field::new("name", DataType::Utf8, false)),
+            Arc::new(Field::new("age", DataType::Int32, false)),
+            Arc::new(Field::new("status", DataType::Utf8, false)),
+        ]);
+        schemas.insert(
+            TableReference::from("users"),
+            Arc::new(SchemaCache::new(schema)),
+        );
+
+        let mut column_visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut column_visitor);
+
+        // Should extract limit
+        assert_eq!(column_visitor.limit, Some(1000));
+    }
+
+    #[test]
+    fn test_column_visitor_with_wildcard() {
+        let sql = "SELECT * FROM users union select * from users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut schemas = HashMap::new();
+        let schema = Schema::new(vec![
+            Arc::new(Field::new("name", DataType::Utf8, false)),
+            Arc::new(Field::new("age", DataType::Int32, false)),
+            Arc::new(Field::new("status", DataType::Utf8, false)),
+        ]);
+        schemas.insert(
+            TableReference::from("users"),
+            Arc::new(SchemaCache::new(schema)),
+        );
+
+        let mut column_visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut column_visitor);
+
+        // Should extract columns, group by, order by, and detect aggregate function
+        assert!(column_visitor.is_wildcard);
     }
 }

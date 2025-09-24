@@ -1,6 +1,7 @@
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
+const testLogger = require('../utils/test-logger.js');
 
 test.describe("Alerts E2E Flow", () => {
   // Shared test variables
@@ -22,7 +23,7 @@ test.describe("Alerts E2E Flow", () => {
     // Generate shared random value if not already generated
     if (!sharedRandomValue) {
       sharedRandomValue = pm.alertsPage.generateRandomString();
-      console.log('Generated shared random value for this run:', sharedRandomValue);
+      testLogger.info('Generated shared random value for this run', { sharedRandomValue });
     }
 
     await pm.commonActions.skipDataIngestionForScheduledAlert(testInfo.title);
@@ -61,21 +62,21 @@ test.describe("Alerts E2E Flow", () => {
     const folderName = 'auto_' + sharedRandomValue;
     await pm.alertsPage.createFolder(folderName, 'Test Automation Folder');
     await pm.alertsPage.verifyFolderCreated(folderName);
-    console.log('Successfully created folder:', folderName);
+    testLogger.info('Successfully created folder', { folderName });
 
     // Navigate to folder and create first alert
     await pm.alertsPage.navigateToFolder(folderName);
     const alertName = await pm.alertsPage.createAlert(streamName, column, value, createdDestinationName, sharedRandomValue);
     await pm.alertsPage.verifyAlertCreated(alertName);
-    console.log('Successfully created alert:', alertName);
+    testLogger.info('Successfully created alert', { alertName });
 
     // Clone first alert
     await pm.alertsPage.cloneAlert(alertName, 'logs', streamName);
-    console.log('Successfully cloned alert:', alertName);
+    testLogger.info('Successfully cloned alert', { alertName });
 
     // Delete all instances of the cloned alert
     await pm.alertsPage.deleteImportedAlert(alertName);
-    console.log('Successfully deleted all instances of alert:', alertName);
+    testLogger.info('Successfully deleted all instances of alert', { alertName });
 
     // ===== Second Iteration: New Alert Creation and Management =====
     // Navigate back to folder and create new alert
@@ -84,24 +85,24 @@ test.describe("Alerts E2E Flow", () => {
 
     const newAlertName = await pm.alertsPage.createAlert(streamName, column, value, createdDestinationName, sharedRandomValue);
     await pm.alertsPage.verifyAlertCreated(newAlertName);
-    console.log('Successfully created new alert:', newAlertName);
+    testLogger.info('Successfully created new alert', { alertName: newAlertName });
 
     // Update the new alert's operator
     await pm.alertsPage.updateAlert(newAlertName);
-    console.log('Successfully updated new alert:', newAlertName);
+    testLogger.info('Successfully updated new alert', { alertName: newAlertName });
 
     // Clone the new alert
     await pm.alertsPage.cloneAlert(newAlertName, 'logs', streamName);
-    console.log('Successfully cloned new alert:', newAlertName);
+    testLogger.info('Successfully cloned new alert', { alertName: newAlertName });
 
     // ===== Alert Pause and Resume =====
     // Pause the new alert
     await pm.alertsPage.pauseAlert(newAlertName);
-    console.log('Successfully paused alert:', newAlertName);
+    testLogger.info('Successfully paused alert', { alertName: newAlertName });
 
     // Resume the new alert
     await pm.alertsPage.resumeAlert(newAlertName);
-    console.log('Successfully resumed alert:', newAlertName);
+    testLogger.info('Successfully resumed alert', { alertName: newAlertName });
 
     // ===== Alert Movement and Cleanup =====
     // Move alerts to target folder

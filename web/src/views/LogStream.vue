@@ -18,84 +18,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
-    <div style="height: calc(100vh - 57px); overflow-y: auto;" >
-    <div class="flex items-center justify-between tw-py-3 tw-px-4"
-    :class="store.state.theme === 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+    <div style="height: calc(100vh - 41px); overflow-y: auto;" >
+    <div class="flex items-center justify-between tw-py-3 tw-px-4 tw-h-[71px] tw-border-b-[1px]"
+    :class="store.state.theme === 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
     >
-      <div class="q-table__title" data-test="log-stream-title-text">
+      <div class="q-table__title tw-font-[600]" data-test="log-stream-title-text">
         {{ t("logStream.header") }}
       </div>
       <div class="flex items-start">
-        <div class="flex justify-between items-end q-px-md">
-          <div
-            style="
-              border: 1px solid #cacaca;
-              padding: 4px;
-              border-radius: 2px;
-            "
-          >
-            <template
-              v-for="visual in streamFilterValues"
-              :key="visual.value"
-            >
-              <q-btn
-                :color="
-                  visual.value === selectedStreamType ? 'primary' : ''
-                "
-                :flat="visual.value === selectedStreamType ? false : true"
-                dense
-                emit-value
-                no-caps
-                class="visual-selection-btn"
-                style="height: 30px; margin: 0 2px; padding: 4px 12px"
-                @click="onChangeStreamFilter(visual.value)"
-              >
-                {{ visual.label }}</q-btn
-              >
-            </template>
+        <div class="flex justify-between items-end">
+
+            <div class="app-tabs-container tw-h-[36px] q-mr-md" :class="store.state.theme === 'dark' ? 'app-tabs-container-dark' : 'app-tabs-container-light'">
+                <app-tabs
+                class="tabs-selection-container"
+                :class="store.state.theme === 'dark' ? 'tabs-selection-container-dark' : 'tabs-selection-container-light'"
+                :tabs="streamTabs"
+                v-model:active-tab="streamActiveTab"
+                @update:active-tab="filterLogStreamByTab"
+              />
           </div>
         </div>
         <div data-test="streams-search-stream-input">
           <q-input
             v-model="filterQuery"
             borderless
-            filled
             dense
-            class="q-ml-auto no-border"
+            class="q-ml-auto no-border o2-search-input tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             :placeholder="t('logStream.search')"
             debounce="300"
           >
             <template #prepend>
-              <q-icon name="search" />
+              <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
             </template>
           </q-input>
         </div>
         <q-btn
           data-test="log-stream-refresh-stats-btn"
-          class="q-ml-md text-bold no-border"
-          padding="sm lg"
-          color="secondary"
+          class="q-ml-md text-bold no-border o2-secondary-button tw-h-[36px]"
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           no-caps
-          :label="t(`logStream.refreshStats`)"
           @click="getLogStream(true)"
-        />
+        >
+          <q-icon name="refresh" size="18px" />
+          <span class="tw-ml-2">{{ t(`logStream.refreshStats`) }}</span>
+      </q-btn>
         <q-btn
           v-if="isSchemaUDSEnabled"
           data-test="log-stream-add-stream-btn"
-          class="q-ml-md text-bold no-border"
-          padding="sm lg"
-          color="secondary"
+          class="q-ml-md o2-primary-button tw-h-[36px]"
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           no-caps
           :label="t(`logStream.add`)"
           @click="addStream"
         />
       </div>
     </div>
-
     <q-table
       data-test="log-stream-table"
-      class="o2-quasar-table"
-      :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+      class="o2-quasar-table o2-quasar-table-header-sticky"
+      :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
       ref="qTable"
       v-model:selected="selected"
       :rows="logStream"
@@ -106,7 +90,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:pagination="pagination"
       :filter="filterQuery"
       :filter-method="filterData"
-      style="width: 100%; "
+      :style="logStream?.length
+            ? 'width: 100%; height: calc(100vh - 114px)' 
+            : 'width: 100%'"
       :rows-per-page-options="perPageOptions"
       @request="onRequest"
     >
@@ -122,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="sm" :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'" class="o2-table-checkbox" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
@@ -161,53 +147,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </q-td>
       </template>
-
-      <template #top="scope">
-        <div class="flex justify-between items-center full-width" style="font-size: 12px">
-          <div class="q-table__separator col text-bold tw-text-[14px]">
-            {{scope.pagination.rowsNumber}} Stream(s)
-          </div>
-          <div class="q-table__control tw-font-[600]" v-if="scope.pagination.rowsNumber > 0">
-            Showing {{ ((scope.pagination.page - 1) * scope.pagination.rowsPerPage) + 1 }} - {{((scope.pagination.page * scope.pagination.rowsPerPage) > scope.pagination.rowsNumber) ? scope.pagination.rowsNumber : scope.pagination.page * scope.pagination.rowsPerPage}} of {{scope.pagination.rowsNumber}}
-            <div class=" row no-wrap inline tw-ml-4">
-              <q-btn-group>
-                <q-btn
-                  icon="chevron_left"
-                  :text-color="scope.isFirstPage ? '$light-text2' : '$dark'"
-                  class="pageNav"
-                  color="#FAFBFD"
-                  size="sm"
-                  flat
-                  :disable="scope.isFirstPage"
-                  @click="scope.prevPage"
-                />
-                <q-separator vertical />
-                <q-btn
-                  icon="chevron_right"
-                  :text-color="scope.isLastPage ? '$light-text2' : '$dark'"
-                  class="pageNav"
-                  color="#FAFBFD"
-                  size="sm"
-                  flat
-                  :disable="scope.isLastPage"
-                  @click="scope.nextPage"
-                />
-              </q-btn-group>
-            </div>
-          </div>
-        </div>
-      </template>
       <template v-slot:pagination="scope">
         <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4">
-          <q-btn
-          v-if="selected.length > 0"
-          class="delete-btn absolute-bottom-left q-pl-lg tw-ml-4"
-          color="red"
-          icon="delete"
-          :label="isDeleting ? 'Deleting...' : 'Delete'"
-          :disable="isDeleting"
-          @click="confirmBatchDeleteAction"
-        />
+
 
         <div class="q-btn-group row no-wrap inline q-ml-md">
           <q-btn
@@ -247,7 +189,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-checkbox
                   v-model="props.selected"
                   size="sm"
-                  color="secondary"
+                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                  class="o2-table-checkbox"
                   @update:model-value="props.select"
                 />
               </q-th>
@@ -264,6 +207,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-th>
             </q-tr>
           </template>
+
+      <template v-slot:bottom="scope">
+        <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+          <div class="q-table__separator tw-flex tw-items-center tw-w-full text-bold tw-text-[14px]">
+            {{scope.pagination.rowsNumber}} Stream(s)
+            <q-btn
+            v-if="selected.length > 0"
+            class="o2-secondary-button tw-h-[36px] tw-ml-4"
+            no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :disable="isDeleting"
+            @click="confirmBatchDeleteAction"
+          >
+            <q-icon name="delete" size="16px" />
+            <span class="tw-ml-2">{{ isDeleting ? 'Deleting...' : 'Delete' }}</span>
+        </q-btn>
+          </div>
+          <QTablePagination
+            :scope="scope"
+            :position="'bottom'"
+            :resultTotal="pagination.rowsNumber"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
+        </div>
+
+      </template>
 
     </q-table> 
   </div>    
@@ -380,10 +351,11 @@ import { cloneDeep } from "lodash-es";
 import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
-
+import AppTabs from "@/components/common/AppTabs.vue";
+import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, AddStream },
+  components: { QTablePagination, SchemaIndex, NoData, AddStream, AppTabs },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();
@@ -407,6 +379,8 @@ export default defineComponent({
     const loadingState = ref(true);
     const searchKeyword = ref("");
     const deleteAssociatedAlertsPipelines = ref(true);
+    const streamActiveTab = ref("logs");
+    const { track } = useReo();
 
     const perPageOptions: any = [20, 50, 100, 250, 500];
     const maxRecordToReturn = ref<number>(100);
@@ -430,7 +404,7 @@ export default defineComponent({
 
     const pageRecordsPerPage = ref(pagination.value.rowsPerPage);
 
-    const streamFilterValues = [
+    const streamTabs = [
       { label: t("logStream.labelLogs"), value: "logs" },
       { label: t("logStream.labelMetrics"), value: "metrics" },
       { label: t("logStream.labelTraces"), value: "traces" },
@@ -573,7 +547,7 @@ export default defineComponent({
         });
         logStream.value = [];
 
-        let counter = 1;
+        let counter = 1 + pageOffset.value;
         let streamResponse;
         // if(selectedStreamType.value == "all") {
         //   streamResponse = getStreams(selectedStreamType.value || "", false, false);
@@ -874,6 +848,7 @@ export default defineComponent({
           refresh: "0",
           query: "",
           type: "stream_explorer",
+          quick_mode: store.state.zoConfig.quick_mode_enabled ? "true" : "false",
           org_identifier: store.state.selectedOrganization.identifier,
           ...dateTime,
         },
@@ -912,6 +887,13 @@ export default defineComponent({
 
     const addStream = () => {
       addStreamDialog.value.show = true;
+      track("Button Click", {
+        button: "Add Stream",
+        pageTitle: "Stream Explorer",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Streams",
+      });
       // router.push({
       //   name: "addStream",
       //   query: {
@@ -954,6 +936,19 @@ export default defineComponent({
       loadingState.value = false;
     };
 
+    const filterLogStreamByTab = (tab: string) => {
+      streamActiveTab.value = tab;
+      onChangeStreamFilter(tab);
+    };
+    const changePagination = (val: { label: string; value: any }) => {
+      selectedPerPage.value = val.hasOwnProperty("value") ? val.value : val;
+      pagination.value.rowsPerPage = val.hasOwnProperty("value") ? val.value : val;
+      pagination.value.page = 1; // Reset to first page when changing records per page
+      qTable.value?.requestServerInteraction({
+        pagination: pagination.value
+      });
+    };
+
     return {
       t,
       qTable,
@@ -987,7 +982,7 @@ export default defineComponent({
       verifyOrganizationStatus,
       exploreStream,
       selectedStreamType,
-      streamFilterValues,
+      streamTabs,
       onChangeStreamFilter,
       addStreamDialog,
       addStream,
@@ -998,6 +993,9 @@ export default defineComponent({
       searchKeyword,
       onRequest,
       deleteAssociatedAlertsPipelines,
+      filterLogStreamByTab,
+      streamActiveTab,
+      changePagination,
     };
   },
 });

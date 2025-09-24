@@ -68,6 +68,9 @@ pub mod cacher;
 pub mod multi;
 pub mod result_utils;
 
+// Define cache version
+const CACHE_VERSION: &str = "v2";
+
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
 #[allow(clippy::too_many_arguments)]
 pub async fn search(
@@ -95,7 +98,7 @@ pub async fn search(
     let mut origin_sql = in_req.query.sql.clone();
     let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or(true);
     let (stream_name, all_streams) = match resolve_stream_names(&origin_sql) {
-        // TODO: cache don't not support multiple stream names
+        // result cache doesn't support multiple stream names
         Ok(v) => (v[0].clone(), v.join(",")),
         Err(e) => {
             return Err(Error::Message(e.to_string()));
@@ -126,8 +129,8 @@ pub async fn search(
         .as_ref()
         .and_then(|v| svix_ksuid::Ksuid::from_str(v).ok());
 
-    // calculate hash for the query
-    let mut hash_body = vec![origin_sql.to_string()];
+    // calculate hash for the query with version
+    let mut hash_body = vec![CACHE_VERSION.to_string(), origin_sql.to_string()];
     if let Some(vrl_function) = &query_fn {
         hash_body.push(vrl_function.to_string());
     }
@@ -147,7 +150,7 @@ pub async fn search(
 
     let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
     let mut c_resp: MultiCachedQueryResponse = if use_cache {
-        // cache layer
+        // if cache is used, we need to check the cache
         check_cache(
             trace_id,
             org_id,
@@ -160,6 +163,7 @@ pub async fn search(
         )
         .await
     } else {
+        // if cache is not used, we need to parse the sql to get the ts column and is descending
         let query: SearchQuery = req.query.clone().into();
         match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
             Ok(v) => {
@@ -204,6 +208,8 @@ pub async fn search(
     let mut results = Vec::new();
     let mut work_group_set = Vec::new();
     let mut res = if !should_exec_query {
+        // no need to search, just merge the cached response
+        // TODO: which case we don't need to search?
         merge_response(
             trace_id,
             &mut c_resp
@@ -219,6 +225,7 @@ pub async fn search(
             c_resp.order_by,
         )
     } else {
+        // run the searches
         if let Some(vrl_function) = &query_fn
             && !vrl_function.trim().ends_with('.')
         {
@@ -267,6 +274,7 @@ pub async fn search(
 
         let mut tasks = Vec::new();
         let partition_num = c_resp.deltas.len();
+        // fire all the deltas search requests in parallel
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
             let mut req = req.clone();
             let org_id = org_id.to_string();
@@ -309,6 +317,7 @@ pub async fn search(
         for res in &results {
             work_group_set.push(res.work_group.clone());
         }
+        // merge the cached response and the search response
         if c_resp.has_cached_data {
             merge_response(
                 trace_id,
@@ -325,19 +334,13 @@ pub async fn search(
                 c_resp.order_by,
             )
         } else {
-            // let mut reps = results[0].clone();
-            // sort_response(
-            //     c_resp.is_descending,
-            //     &mut reps,
-            //     &c_resp.ts_column,
-            //     &c_resp.order_by,
-            // );
-            // reps
+            // if there is no cached response, we return the first search response, because there is
+            // no delta, we only run a full time range search
             results[0].clone()
         }
     };
 
-    // do search
+    // search is done
     let took_time = start.elapsed().as_secs_f64();
     log::info!(
         "{}",
@@ -373,9 +376,6 @@ pub async fn search(
         &search_type,
         &search_group,
     );
-
-    // Create a deep copy for caching BEFORE any modifications
-    // let cache_res = deep_copy_response(&res);
 
     res.set_trace_id(trace_id.to_string());
     res.set_took(took_time as usize);
@@ -461,9 +461,6 @@ pub async fn search(
         .ok()
         .map(|(is_eligible, _)| is_eligible);
 
-    let write_res = deep_copy_response(&res);
-    let mut local_res = deep_copy_response(&res);
-
     // There are 3 types of partial responses:
     // 1. VRL error
     // 2. Super cluster error
@@ -482,12 +479,12 @@ pub async fn search(
         && (results.first().is_some_and(|res| !res.hits.is_empty())
             || results.last().is_some_and(|res| !res.hits.is_empty()))
     {
-        write_results_v2(
+        write_results(
             trace_id,
             &c_resp.ts_column,
             req.query.start_time,
             req.query.end_time,
-            &write_res,
+            deep_copy_response(&res),
             file_path,
             is_aggregate,
             c_resp.is_descending,
@@ -502,22 +499,16 @@ pub async fn search(
         org_id,
         &stream_name,
         stream_type,
-        &mut local_res,
+        &mut res,
     )
     .await?;
 
     if is_result_array_skip_vrl {
-        local_res.hits = apply_vrl_to_response(
-            backup_query_fn,
-            &mut local_res,
-            org_id,
-            &stream_name,
-            trace_id,
-        );
-        return Ok(local_res);
+        res.hits = apply_vrl_to_response(backup_query_fn, &mut res, org_id, &stream_name, trace_id);
+        return Ok(res);
     }
 
-    Ok(local_res)
+    Ok(res)
 }
 
 // based on _timestamp of first record in config::meta::search::Response either add it in start
@@ -535,7 +526,6 @@ pub fn merge_response(
     order_by: Vec<(String, OrderBy)>,
 ) -> config::meta::search::Response {
     cache_responses.retain(|res| !res.hits.is_empty());
-
     search_response.retain(|res| !res.hits.is_empty());
 
     if cache_responses.is_empty() && search_response.is_empty() {
@@ -550,9 +540,7 @@ pub fn merge_response(
         for res in cache_responses {
             resp.total += res.total;
             resp.scan_size += res.scan_size;
-
             resp.scan_records += res.scan_records;
-
             if res.hits.is_empty() {
                 continue;
             }
@@ -642,6 +630,10 @@ pub fn merge_response(
         .first()
         .map(|res| res.order_by)
         .unwrap_or_default();
+    cache_response.order_by_metadata = search_response
+        .first()
+        .map(|res| res.order_by_metadata.clone())
+        .unwrap_or_default();
     cache_response.result_cache_ratio = (((cache_hits_len as f64) * 100_f64)
         / ((result_cache_len + cache_hits_len) as f64))
         as usize;
@@ -713,125 +705,19 @@ fn sort_response(
     });
 }
 
-#[allow(clippy::too_many_arguments, unused_variables)]
-pub async fn _write_results(
-    trace_id: &str,
-    ts_column: &str,
-    req_query_start_time: i64,
-    req_query_end_time: i64,
-    res: &config::meta::search::Response,
-    file_path: String,
-    is_aggregate: bool,
-    is_descending: bool,
-) {
-    // disable write_results_v1
-    // return;
-    // #[allow(unreachable_code)]
-    let mut local_resp = deep_copy_response(res);
-    let remove_hit = if is_descending {
-        local_resp.hits.last()
-    } else {
-        local_resp.hits.first()
-    };
-
-    if !local_resp.hits.is_empty()
-        && let Some(remove_hit) = remove_hit
-    {
-        let ts_value_to_remove = remove_hit.get(ts_column).cloned();
-
-        if let Some(ts_value) = ts_value_to_remove {
-            local_resp
-                .hits
-                .retain(|hit| hit.get(ts_column) != Some(&ts_value));
-        }
-    }
-
-    if local_resp.hits.is_empty() || local_resp.hits.len() < 2 {
-        return;
-    }
-
-    let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
-    let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
-
-    let smallest_ts = std::cmp::min(first_rec_ts, last_rec_ts);
-    let discard_duration = second_micros(get_config().limit.cache_delay_secs);
-
-    if (last_rec_ts - first_rec_ts).abs() < discard_duration
-        && smallest_ts > Utc::now().timestamp_micros() - discard_duration
-    {
-        return;
-    }
-
-    let largest_ts = std::cmp::max(first_rec_ts, last_rec_ts);
-
-    let cache_end_time = if largest_ts > 0 && largest_ts < req_query_end_time {
-        largest_ts
-    } else {
-        req_query_end_time
-    };
-
-    let cache_start_time = if smallest_ts > 0 && smallest_ts > req_query_start_time {
-        smallest_ts
-    } else {
-        req_query_start_time
-    };
-
-    let file_name = format!(
-        "{}_{}_{}_{}.json",
-        cache_start_time,
-        cache_end_time,
-        if is_aggregate { 1 } else { 0 },
-        if is_descending { 1 } else { 0 }
-    );
-
-    let res_cache = json::to_string(&local_resp).unwrap();
-    let query_key = file_path.replace('/', "_");
-    let trace_id = trace_id.to_string();
-    tokio::spawn(async move {
-        let file_path_local = file_path.clone();
-
-        match SearchService::cache::cacher::cache_results_to_disk(
-            &file_path_local,
-            &file_name,
-            res_cache,
-        )
-        .await
-        {
-            Ok(_) => {
-                let mut w = QUERY_RESULT_CACHE.write().await;
-                w.entry(query_key)
-                    .or_insert_with(Vec::new)
-                    .push(ResultCacheMeta {
-                        start_time: cache_start_time,
-                        end_time: cache_end_time,
-                        is_aggregate,
-                        is_descending,
-                    });
-                drop(w);
-            }
-            Err(e) => {
-                log::error!("Cache results to disk failed: {e}");
-            }
-        }
-    });
-}
-
 /// Caches search results to disk after applying filtering and validation strategies.
 ///
 /// # Caching Strategy
-/// 1. **Select Hit for Deduplication**:
-///    - Selects either the first or last record based on the `is_descending` flag.
-///      - `is_descending = true`: Selects the last record.
-///      - `is_descending = false`: Selects the first record.
 ///
-/// 2. **Remove All Hits Within the Same Date, Hour, Minute, and Second for Deduplication**:
-///    - Identifies the timestamp of the hit to remove (based on the `is_descending` flag, either
-///      the first or the last record is chosen).
-///    - Removes all hits that match the exact same date, hour, minute, and second
-///      (`YYYY-MM-DDTHH:MM:SS`) as the identified hit.
-///      - Example: If the timestamp to remove is `2024-12-06T04:15:30`, only hits with the exact
-///        timestamp `2024-12-06T04:15:30` are removed, while others with different seconds (e.g.,
-///        `2024-12-06T04:15:29` or `2024-12-06T04:15:31`) are retained.
+/// 1. **Remove incomplete records for histogram**:
+///    - Check the histogram interval, if the time range is not a multiple of the histogram
+///      interval, we need to remove the incomplete records: first & last record.
+///
+/// 2. **Remove Records with Discard Duration**:
+///    - Removes records that are older than the configured `discard_duration`.
+///    - The `discard_duration` is the time difference between the current time and the time when
+///      the record was created.
+///    - The `discard_duration` is configured by `ZO_CACHE_DELAY_SECS`.
 ///
 /// 3. **Skip Caching for Empty or Insufficient Hits**:
 ///    - If no hits remain after removing one, caching is skipped.
@@ -849,87 +735,80 @@ pub async fn _write_results(
 /// 6. **Cache to Disk**:
 ///    - Saves the filtered response to a file named:
 ///      `"<start_time>_<end_time>_<is_aggregate>_<is_descending>.json"`.
-#[tracing::instrument(name = "service:search:cache:write_results_v2", skip_all)]
+#[tracing::instrument(name = "service:search:cache:write_results", skip_all)]
 #[allow(clippy::too_many_arguments)]
-pub async fn write_results_v2(
+pub async fn write_results(
     trace_id: &str,
     ts_column: &str,
     req_query_start_time: i64,
     req_query_end_time: i64,
-    res: &config::meta::search::Response,
+    mut res: config::meta::search::Response,
     file_path: String,
     is_aggregate: bool,
     is_descending: bool,
 ) {
-    let mut local_resp = res.clone();
-
-    let remove_hit = if is_descending {
-        local_resp.hits.last()
-    } else {
-        local_resp.hits.first()
-    };
-
-    if !local_resp.hits.is_empty() && remove_hit.is_some() {
-        let ts_value_to_remove = remove_hit.unwrap().get(ts_column).cloned();
-
-        if let Some(ts_value) = ts_value_to_remove {
-            // Extract the date, hour, minute from the timestamp
-            if let Some(ts_datetime) = convert_ts_value_to_datetime(&ts_value) {
-                // Extract the target date, hour, minute, and second (e.g., "2024-12-06T04:15:23")
-                let target_date_hour_minute_second =
-                    ts_datetime.format("%Y-%m-%dT%H:%M:%S").to_string();
-
-                // Retain only the hits that do NOT fall within the
-                // same date, hour, minute as the hit to remove
-                local_resp.hits.retain(|hit| {
-                    if let Some(hit_ts) = hit.get(ts_column)
-                        && let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts)
-                    {
-                        // Extract the date, hour, minute, and second for the current hit
-                        let hit_date_hour_minute_second =
-                            hit_ts_datetime.format("%Y-%m-%dT%H:%M:%S").to_string();
-                        return hit_date_hour_minute_second != target_date_hour_minute_second;
-                    }
-                    false
-                });
-            }
-        }
-
-        local_resp.total = local_resp.hits.len();
-        local_resp.size = local_resp.hits.len() as i64;
+    if res.hits.is_empty() {
+        return;
     }
 
-    if local_resp.hits.is_empty() {
+    // 1. remove incomplete records for histogram
+    if let Some(interval) = res.histogram_interval {
+        let interval = interval * 1000 * 1000; // convert to microseconds
+        if req_query_start_time % interval != 0 || req_query_end_time % interval != 0 {
+            res.hits.remove(0); // remove first record
+            res.hits.pop(); // remove last record
+            res.total = res.hits.len();
+            res.size = res.hits.len() as i64;
+        }
+    }
+
+    // 2. get the latest record, used to check if need to remove records with discard_duration
+    let delay_ts = second_micros(get_config().limit.cache_delay_secs);
+    let max_ts = Utc::now().timestamp_micros() - delay_ts;
+    let remove_item = if is_descending {
+        res.hits.first()
+    } else {
+        res.hits.last()
+    };
+    if let Some(item) = remove_item
+        && let Some(val) = item.get(ts_column)
+        && let Some(ts) = convert_ts_value_to_datetime(val)
+        && ts.timestamp_micros() > max_ts
+    {
+        res.hits.retain(|hit| {
+            if let Some(hit_ts) = hit.get(ts_column)
+                && let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts)
+            {
+                hit_ts_datetime.timestamp_micros() <= max_ts
+            } else {
+                true
+            }
+        });
+        res.total = res.hits.len();
+        res.size = res.hits.len() as i64;
+    }
+
+    // 3. check if the hits is empty
+    if res.hits.is_empty() {
         log::info!("[trace_id {trace_id}] No hits found for caching, skipping caching");
         return;
     }
 
-    let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
-    let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
-
-    let smallest_ts = std::cmp::min(first_rec_ts, last_rec_ts);
-    let discard_duration = second_micros(get_config().limit.cache_delay_secs);
-
-    if (last_rec_ts - first_rec_ts).abs() < discard_duration
-        && smallest_ts > Utc::now().timestamp_micros() - discard_duration
-    {
+    // 4. check if the time range is less than discard_duration
+    let last_rec_ts = get_ts_value(ts_column, res.hits.last().unwrap());
+    let first_rec_ts = get_ts_value(ts_column, res.hits.first().unwrap());
+    let cache_start_time = std::cmp::min(first_rec_ts, last_rec_ts);
+    let mut cache_end_time = std::cmp::max(first_rec_ts, last_rec_ts);
+    if (cache_end_time - cache_start_time) < delay_ts {
         return;
     }
 
-    let largest_ts = std::cmp::max(first_rec_ts, last_rec_ts);
+    // 5. adjust the cache time range
+    if let Some(interval) = res.histogram_interval {
+        cache_end_time += interval * 1000 * 1000;
+    }
 
-    let cache_end_time = if largest_ts > 0 && largest_ts < req_query_end_time {
-        largest_ts
-    } else {
-        req_query_end_time
-    };
-
-    let cache_start_time = if smallest_ts > 0 && smallest_ts > req_query_start_time {
-        smallest_ts
-    } else {
-        req_query_start_time
-    };
-
+    // 6. cache to disk
     let file_name = format!(
         "{}_{}_{}_{}.json",
         cache_start_time,
@@ -937,22 +816,17 @@ pub async fn write_results_v2(
         if is_aggregate { 1 } else { 0 },
         if is_descending { 1 } else { 0 }
     );
-
-    let res_cache = json::to_string(&local_resp).unwrap();
+    let res_cache = json::to_string(&res).unwrap();
     let query_key = file_path.replace('/', "_");
     tokio::spawn(async move {
-        let file_path_local = file_path.clone();
-
-        match SearchService::cache::cacher::cache_results_to_disk(
-            &file_path_local,
-            &file_name,
-            res_cache,
-        )
-        .await
+        match SearchService::cache::cacher::cache_results_to_disk(&file_path, &file_name, res_cache)
+            .await
         {
             Ok(_) => {
-                let mut w = QUERY_RESULT_CACHE.write().await;
-                w.entry(query_key)
+                QUERY_RESULT_CACHE
+                    .write()
+                    .await
+                    .entry(query_key)
                     .or_insert_with(Vec::new)
                     .push(ResultCacheMeta {
                         start_time: cache_start_time,
@@ -960,7 +834,6 @@ pub async fn write_results_v2(
                         is_aggregate,
                         is_descending,
                     });
-                drop(w);
             }
             Err(e) => {
                 log::error!("Cache results to disk failed: {e}");

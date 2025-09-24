@@ -59,7 +59,7 @@ fn main() -> Result<()> {
         )
         .extern_path(".datafusion_common", "::datafusion_proto::protobuf")
         .extern_path(".datafusion", "::datafusion_proto::protobuf")
-        .compile(
+        .compile_protos(
             &[
                 "proto/cluster/common.proto",
                 "proto/cluster/event.proto",
@@ -131,7 +131,7 @@ fn main() -> Result<()> {
             "#[derive(serde::Deserialize,serde::Serialize)]",
         )
         .type_attribute("count", "#[derive(serde::Deserialize,serde::Serialize)]")
-        .compile(
+        .compile_protos(
             &[
                 "proto/prometheus/remote.proto",
                 "proto/prometheus/types.proto",

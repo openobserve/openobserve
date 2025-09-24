@@ -159,7 +159,7 @@ pub async fn read_from_memtable(
     let cfg = get_config();
     let key = WriterKey::new(org_id, stream_type);
     // fast past
-    if !cfg.common.feature_per_thread_lock {
+    if cfg.limit.mem_table_bucket_num <= 1 {
         let idx = get_table_idx(0, stream_name);
         let w = WRITERS[idx].read().await;
         return match w.get(&key) {
@@ -203,15 +203,15 @@ pub async fn check_ttl() -> Result<()> {
 }
 
 pub async fn flush_all() -> Result<()> {
+    log::info!("[INGESTER:MEM] start flush all writers");
     for w in WRITERS.iter() {
         let mut w = w.write().await;
         let keys = w.keys().cloned().collect::<Vec<_>>();
-        for r in w.values() {
-            r.close().await?; // close writer
-            metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
-        }
         for key in keys {
-            w.remove(&key);
+            if let Some(r) = w.remove(&key) {
+                r.flush().await?; // close writer
+                metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
+            }
         }
     }
     Ok(())
@@ -277,7 +277,7 @@ impl Writer {
                     },
                 }
                 total += 1;
-                if total % 1000 == 0 {
+                if total.is_multiple_of(1000) {
                     log::info!(
                         "[INGESTER:MEM:{idx}] writer queue consuming, total: {}, in queue: {}",
                         total,
@@ -483,7 +483,7 @@ impl Writer {
         Ok(())
     }
 
-    pub async fn close(&self) -> Result<()> {
+    pub async fn flush(&self) -> Result<()> {
         // wait for all messages to be processed
         if let Err(e) = self
             .write_queue
@@ -493,6 +493,7 @@ impl Writer {
             log::error!("[INGESTER:MEM:{}] close writer error: {}", self.idx, e);
         }
         self.write_queue.closed().await;
+        log::info!("[INGESTER:MEM:{}] writer queue closed", self.idx);
 
         // rotation wal
         let mut wal = self.wal.write().await;

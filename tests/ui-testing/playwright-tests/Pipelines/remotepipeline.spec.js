@@ -3,6 +3,7 @@ import logData from "../../fixtures/log.json";
 // import { log } from "console";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
+const testLogger = require('../utils/test-logger.js');
 // import { pipeline } from "stream";
 // import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
@@ -36,7 +37,7 @@ export const b64EncodeStandard = (str) => {
       })
     );
   } catch (e) {
-    console.log("Error: getBase64Encode: error while encoding.");
+    testLogger.error('Base64 encoding error');
   }
 };
 
@@ -86,7 +87,7 @@ async function ingestion(page) {
       logsdata: logsdata,
     }
   );
-  console.log(response);
+  testLogger.debug('API response received', { response });
 }
 
 const selectStream = async (page, stream) => {
@@ -203,7 +204,6 @@ test.describe("Pipeline testcases", () => {
   let pageManager;
   // let logData;
   function removeUTFCharacters(text) {
-    // console.log(text, "tex");
     // Remove UTF characters using regular expression
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
@@ -329,7 +329,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.toggleCreateFunction();
     await pipelinePage.enterFunctionName(randomFunctionName);
     await page
-      .locator('[data-test="logs-vrl-function-editor"] .cm-content')
+      .locator('[data-test="logs-vrl-function-editor"] .view-lines')
       .click();
     // Type the function text with a delay to ensure each character registers
     await page.keyboard.type(".a=41", { delay: 100 });
@@ -442,7 +442,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.toggleCreateFunction();
     await pipelinePage.enterFunctionName(randomFunctionName);
     await page
-      .locator('[data-test="logs-vrl-function-editor"] .cm-content')
+      .locator('[data-test="logs-vrl-function-editor"] .view-lines')
       .click();
     // Type the function text with a delay to ensure each character registers
     await page.keyboard.type(".new_k8s_id=.kubernetes_namespace_name", {

@@ -122,6 +122,7 @@ use crate::{common::meta, handler::http::request};
         request::alerts::delete_alert,
         request::alerts::list_alerts,
         request::alerts::enable_alert,
+        request::alerts::enable_alert_bulk,
         request::alerts::trigger_alert,
         request::alerts::move_alerts,
         request::alerts::templates::list_templates,
@@ -138,10 +139,6 @@ use crate::{common::meta, handler::http::request};
         request::kv::set,
         request::kv::delete,
         request::kv::list,
-        request::syslog::create_route,
-        request::syslog::update_route,
-        request::syslog::list_routes,
-        request::syslog::delete_route,
         request::clusters::list_clusters,
         request::short_url::shorten,
         request::short_url::retrieve,
@@ -159,6 +156,7 @@ use crate::{common::meta, handler::http::request};
         request::pipeline::delete_pipeline,
         request::pipeline::update_pipeline,
         request::pipeline::enable_pipeline,
+        request::pipeline::enable_pipeline_bulk,
         request::dashboards::reports::create_report,
         request::dashboards::reports::update_report,
         request::dashboards::reports::list_reports,
@@ -242,11 +240,8 @@ use crate::{common::meta, handler::http::request};
             config::meta::timed_annotations::TimedAnnotationDelete,
             config::meta::timed_annotations::TimedAnnotationUpdate,
             // Dashboards
-            crate::handler::http::models::dashboards::CreateDashboardRequestBody,
-            crate::handler::http::models::dashboards::CreateDashboardResponseBody,
-            crate::handler::http::models::dashboards::GetDashboardResponseBody,
-            crate::handler::http::models::dashboards::UpdateDashboardRequestBody,
-            crate::handler::http::models::dashboards::UpdateDashboardResponseBody,
+            crate::handler::http::models::dashboards::DashboardRequestBody,
+            crate::handler::http::models::dashboards::DashboardResponseBody,
             crate::handler::http::models::dashboards::ListDashboardsResponseBody,
             crate::handler::http::models::dashboards::ListDashboardsResponseBodyItem,
             crate::handler::http::models::dashboards::MoveDashboardRequestBody,
@@ -365,7 +360,6 @@ use crate::{common::meta, handler::http::request};
         (name = "KV", description = "Key Value retrieval & management operations"),
         (name = "Metrics", description = "Metrics data ingestion operations"),
         (name = "Traces", description = "Traces data ingestion operations"),
-        (name = "Syslog Routes", description = "Syslog Routes retrieval & management operations"),
         (name = "Clusters", description = "Super cluster operations"),
         (name = "Short Url", description = "Short Url Service"),
         (name = "Ratelimit", description = "Ratelimit operations"),
@@ -403,29 +397,53 @@ pub async fn openapi_info() -> OpenapiInfo {
     let mut tag_operations: OpenapiInfo = std::collections::HashMap::new();
 
     for (path, path_item) in &api.paths.paths {
-        for (method, operation) in path_item.operations.clone() {
+        for (method, operation) in [
+            (utoipa::openapi::HttpMethod::Get, path_item.get.as_ref()),
+            (utoipa::openapi::HttpMethod::Post, path_item.post.as_ref()),
+            (utoipa::openapi::HttpMethod::Put, path_item.put.as_ref()),
+            (
+                utoipa::openapi::HttpMethod::Delete,
+                path_item.delete.as_ref(),
+            ),
+            (utoipa::openapi::HttpMethod::Patch, path_item.patch.as_ref()),
+            (utoipa::openapi::HttpMethod::Head, path_item.head.as_ref()),
+            (
+                utoipa::openapi::HttpMethod::Options,
+                path_item.options.as_ref(),
+            ),
+            (utoipa::openapi::HttpMethod::Trace, path_item.trace.as_ref()),
+        ]
+        .into_iter()
+        .filter_map(|(method, op)| op.map(|operation| (method, operation)))
+        {
             let tags = operation
                 .tags
                 .clone()
                 .unwrap_or_else(|| vec!["untagged".to_string()]);
 
             let method = match method {
-                utoipa::openapi::PathItemType::Get => "GET",
-                utoipa::openapi::PathItemType::Post => "POST",
-                utoipa::openapi::PathItemType::Put => "PUT",
-                utoipa::openapi::PathItemType::Delete => "DELETE",
-                utoipa::openapi::PathItemType::Patch => "PATCH",
-                utoipa::openapi::PathItemType::Head => "HEAD",
-                utoipa::openapi::PathItemType::Options => "OPTIONS",
-                utoipa::openapi::PathItemType::Trace => "TRACE",
-                utoipa::openapi::PathItemType::Connect => "CONNECT",
+                utoipa::openapi::HttpMethod::Get => "GET",
+                utoipa::openapi::HttpMethod::Post => "POST",
+                utoipa::openapi::HttpMethod::Put => "PUT",
+                utoipa::openapi::HttpMethod::Delete => "DELETE",
+                utoipa::openapi::HttpMethod::Patch => "PATCH",
+                utoipa::openapi::HttpMethod::Head => "HEAD",
+                utoipa::openapi::HttpMethod::Options => "OPTIONS",
+                utoipa::openapi::HttpMethod::Trace => "TRACE",
             };
+
+            let extensions: std::collections::HashMap<String, serde_json::Value> = operation
+                .extensions
+                .as_ref()
+                .map(|ext| ext.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                .unwrap_or_default();
 
             let operation_info = (
                 method.to_string(),
                 path.clone(),
                 operation.clone().description,
                 tags.clone(),
+                extensions,
             );
 
             for tag in tags {

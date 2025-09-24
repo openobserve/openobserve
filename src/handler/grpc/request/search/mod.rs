@@ -19,9 +19,9 @@ use config::{
 };
 use proto::cluster_rpc::{
     CancelQueryRequest, CancelQueryResponse, DeleteResultRequest, DeleteResultResponse,
-    GetResultRequest, GetResultResponse, QueryStatusRequest, QueryStatusResponse,
-    SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse,
-    search_server::Search,
+    GetResultRequest, GetResultResponse, GetTableRequest, GetTableResponse, QueryStatusRequest,
+    QueryStatusResponse, SearchPartitionRequest, SearchPartitionResponse, SearchRequest,
+    SearchResponse, search_server::Search,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -86,7 +86,25 @@ impl Searcher {
 
     // get all task status that is leader
     pub async fn get_task_status(&self) -> Vec<proto::cluster_rpc::QueryStatus> {
-        self.query_manager.get_task_status().await
+        let mut status = self.query_manager.get_task_status().await;
+
+        // Enrich search event context with dashboard name if needed
+        for query_status in &mut status {
+            if let Some(ref mut ctx) = query_status.search_event_context
+                && matches!(query_status.search_type.as_deref(), Some("dashboards"))
+                && let Some(dashboard_id) = &ctx.dashboard_id
+                && ctx.dashboard_name.is_none()
+                && let Some(org_id) = &query_status.org_id
+                && let Ok((folder, dashboard)) =
+                    crate::service::dashboards::get_folder_and_dashboard(org_id, dashboard_id).await
+            {
+                ctx.dashboard_name = Some(dashboard.title().unwrap_or("").to_string());
+                ctx.dashboard_folder_name = Some(folder.name);
+                ctx.dashboard_folder_id = Some(folder.folder_id);
+            }
+        }
+
+        status
     }
 
     // add file stats
@@ -236,6 +254,17 @@ impl Search for Searcher {
             }
             Err(e) => Err(Status::internal(format!("search partition failed: {e}"))),
         }
+    }
+
+    async fn get_table(
+        &self,
+        req: Request<GetTableRequest>,
+    ) -> Result<Response<GetTableResponse>, Status> {
+        let path = req.into_inner().path;
+        let res = infra::storage::get_bytes("", &path)
+            .await
+            .map_err(|e| Status::internal(format!("failed to get table: {e}")))?;
+        Ok(Response::new(GetTableResponse { data: res.to_vec() }))
     }
 
     #[cfg(feature = "enterprise")]

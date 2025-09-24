@@ -400,6 +400,14 @@ export default defineComponent({
       type: String,
       default: null,
     },
+    dashboardName: {
+      type: String,
+      default: null,
+    },
+    folderName: {
+      type: String,
+      default: null,
+    },
     searchResponse: {
       required: false,
       type: Object,
@@ -463,6 +471,8 @@ export default defineComponent({
       runId,
       tabId,
       tabName,
+      dashboardName,
+      folderName,
       searchResponse,
       is_ui_histogram,
     } = toRefs(props);
@@ -494,6 +504,8 @@ export default defineComponent({
       tabName,
       searchResponse,
       is_ui_histogram,
+      dashboardName,
+      folderName,
     );
 
     const {
@@ -735,10 +747,13 @@ export default defineComponent({
       { deep: true },
     );
 
-    watch(panelData, () => {
-      emit("series-data-update", panelData.value);
-    },
-    { deep: true });
+    watch(
+      panelData,
+      () => {
+        emit("series-data-update", panelData.value);
+      },
+      { deep: true },
+    );
 
     // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
     watch(
@@ -794,13 +809,21 @@ export default defineComponent({
         case "h-stacked":
         case "line":
         case "scatter":
-        case "gauge":
-        case "table": {
+        case "gauge": {
           // return data.value[0].some((it: any) => {return (xAlias.every((x: any) => it[x]) && yAlias.every((y: any) => it[y]))});
           return (
             data.value[0]?.length > 1 ||
             (xAlias.every((x: any) => data.value[0][0][x] != null) &&
               yAlias.every((y: any) => data.value[0][0][y]) != null)
+          );
+        }
+        case "table": {
+          // For tables, simply check if there's any data in the array
+          return (
+            data.value[0]?.length > 1 ||
+            (data.value[0]?.length == 1 &&
+              (xAlias.some((x: any) => data.value[0][0][x] != null) ||
+                yAlias.some((y: any) => data.value[0][0][y] != null)))
           );
         }
         case "metric": {
@@ -1260,7 +1283,11 @@ export default defineComponent({
         "org_identifier",
         store.state.selectedOrganization.identifier,
       );
-      logsUrl.searchParams.set("quick_mode", "false");
+      if (store.state.zoConfig.quick_mode_enabled) {
+        logsUrl.searchParams.set("quick_mode", "true");
+      } else {
+        logsUrl.searchParams.set("quick_mode", "false");
+      }
       logsUrl.searchParams.set("show_histogram", "false");
 
       return logsUrl;
@@ -1415,6 +1442,9 @@ export default defineComponent({
                       drilldownParams[0].value.length - 1
                     ]
                   : drilldownParams[0].value,
+                __axisValue:
+                  drilldownParams?.[0]?.value?.[0] ??
+                  drilldownParams?.[0]?.name,
               };
             }
 

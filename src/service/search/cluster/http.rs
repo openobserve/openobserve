@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use ::datafusion::arrow::record_batch::RecordBatch;
 use config::{
+    datafusion::request::Request,
     meta::{function::VRLResultResolver, search, sql::TableReferenceExt},
     metrics::QUERY_PARQUET_CACHE_RATIO,
     utils::{
@@ -35,7 +36,7 @@ use o2_enterprise::enterprise::actions::{
 use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
-use crate::service::search::{cluster::flight, request::Request, sql::Sql};
+use crate::service::search::{cluster::flight, sql::Sql};
 
 #[tracing::instrument(name = "service:search:cluster", skip_all)]
 pub async fn search(
@@ -183,12 +184,13 @@ pub async fn search(
                             .ok_or(Error::Message("Expected array".to_string()))?
                             .iter()
                             .filter_map(|v| {
-                                (!v.is_null()).then_some(flatten::flatten(v.clone()).map_err(|e| {
-                                    log::error!("Failed to flatten value: {}", e);
-                                    Error::Message(format!("Failed to flatten value: {e}"))
-                                }))
+                                if !v.is_null() && v.is_object() {
+                                    flatten::flatten(v.clone()).ok()
+                                } else {
+                                    None
+                                }
                             })
-                            .collect::<Result<Vec<_>, _>>()?
+                            .collect::<Vec<_>>()
                     } else {
                         json_rows
                             .into_iter()
@@ -204,14 +206,13 @@ pub async fn search(
                                     &sql.org_id,
                                     &stream_names,
                                 );
-                                (!ret_val.is_null()).then_some(flatten::flatten(ret_val).map_err(
-                                    |e| {
-                                        log::error!("Failed to flatten value: {}", e);
-                                        Error::Message(format!("Failed to flatten value: {e}"))
-                                    },
-                                ))
+                                if !ret_val.is_null() && ret_val.is_object() {
+                                    flatten::flatten(ret_val).ok()
+                                } else {
+                                    None
+                                }
                             })
-                            .collect::<Result<Vec<_>, _>>()?
+                            .collect::<Vec<_>>()
                     }
                 }
                 None => json_rows
@@ -255,8 +256,13 @@ pub async fn search(
 
         if use_query_fn {
             for source in sources {
-                result
-                    .add_hit(&flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?);
+                if source.is_object() {
+                    result.add_hit(
+                        &flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?,
+                    );
+                } else {
+                    result.add_hit(&source);
+                }
             }
         } else {
             for source in sources {

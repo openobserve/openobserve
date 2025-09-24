@@ -266,36 +266,6 @@ describe("LogStream Component", () => {
         rowsNumber: 1, // Since we have 1 test stream from our mock
       });
     });
-
-    it("should have correct stream filter values", () => {
-      const actualValues = wrapper.vm.streamFilterValues;
-      
-      // First verify we have an array
-      expect(Array.isArray(actualValues)).toBe(true);
-      
-      // More flexible check - accept 4 or 5 values since some might be conditionally shown
-      expect(actualValues.length).toBeGreaterThanOrEqual(4);
-      expect(actualValues.length).toBeLessThanOrEqual(5);
-      
-      // Verify core values that should always exist
-      const actualValuesList = actualValues.map((item: any) => item.value);
-      const coreValues = ["logs", "metrics", "traces"];
-      
-      coreValues.forEach((expectedValue) => {
-        expect(actualValuesList).toContain(expectedValue);
-      });
-      
-      // Verify first few items for order (if they exist)
-      if (actualValues.length > 0) {
-        expect(actualValues[0].value).toBe("logs");
-      }
-      if (actualValues.length > 1) {
-        expect(actualValues[1].value).toBe("metrics");
-      }
-      if (actualValues.length > 2) {
-        expect(actualValues[2].value).toBe("traces");
-      }
-    });
   });
 
   describe("Computed Properties", () => {

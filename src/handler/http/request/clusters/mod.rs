@@ -24,17 +24,22 @@ use {
 };
 
 /// ListClusters
-///
-/// #{"ratelimit_module":"Clusters", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Clusters",
     operation_id = "ListClusters",
+    summary = "List available clusters",
+    description = "Retrieves a list of all available clusters organized by region. Each region contains a list of cluster names \
+                   that can be used for data processing and storage. This information is useful for understanding your \
+                   deployment topology and selecting appropriate clusters for workload distribution.",
     security(
         ("Authorization"= [])
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HashMap<String, Vec<String>>),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Clusters", "operation": "get"}))
     )
 )]
 #[get("/clusters")]

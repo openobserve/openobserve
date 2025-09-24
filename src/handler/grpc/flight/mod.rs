@@ -21,10 +21,13 @@ use arrow_flight::{
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
     flight_service_server::FlightService,
 };
-use config::{cluster::LOCAL_NODE, meta::search::ScanStats};
+use config::{
+    PARQUET_BATCH_SIZE, cluster::LOCAL_NODE, datafusion::request::FlightSearchRequest,
+    meta::search::ScanStats,
+};
 use datafusion::{
     common::{DataFusionError, Result},
-    physical_plan::execute_stream,
+    physical_plan::{coalesce_batches::CoalesceBatchesExec, execute_stream},
 };
 use flight::common::{MetricsInfo, PreCustomMessage};
 use futures::{StreamExt, stream::BoxStream};
@@ -50,7 +53,6 @@ use crate::{
     service::search::{
         grpc::flight as grpcFlight,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        request::FlightSearchRequest,
         utils::AsyncDefer,
     },
 };
@@ -157,6 +159,10 @@ impl FlightService for FlightServiceImpl {
                 return Err(Status::internal(e.to_string()));
             }
         };
+        // https://github.com/openobserve/openobserve/issues/8280
+        // https://github.com/apache/datafusion/pull/11587
+        // add coalesce batches exec to trigger StringView gc to reduce memory usage
+        let physical_plan = Arc::new(CoalesceBatchesExec::new(physical_plan, PARQUET_BATCH_SIZE));
 
         log::info!(
             "[trace_id {trace_id}] flight->search: executing stream, is super cluster: {is_super_cluster}"

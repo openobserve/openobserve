@@ -22,24 +22,20 @@ use config::{
     utils::json,
 };
 use infra::{
-    db::{NEED_WATCH, get_coordinator, nats},
+    db::{NEED_WATCH, get_coordinator},
     dist_lock,
     errors::{Error, Result},
 };
-use tokio::{sync::mpsc, task};
-
-use crate::common::infra::config::update_cache;
+use tokio::task;
 
 /// Register and keep alive the node to cluster
 pub(crate) async fn register_and_keep_alive() -> Result<()> {
-    // first, init NATs client with channel communicating NATs events
-    let (nats_event_tx, nats_event_rx) = mpsc::channel::<nats::NatsEvent>(10);
-    if let Err(e) = nats::init_nats_client(nats_event_tx).await {
-        log::error!("[CLUSTER] NATs client init failed: {e}");
-        return Err(e);
+    // if local node is single node or meta store is not nats, return ok
+    let cfg = get_config();
+    let meta_store: config::meta::meta_store::MetaStore = cfg.common.queue_store.as_str().into();
+    if cfg.common.local_mode || meta_store != config::meta::meta_store::MetaStore::Nats {
+        return Ok(());
     }
-    // a child task to handle NATs event
-    task::spawn(async move { update_cache(nats_event_rx).await });
 
     if let Err(e) = register().await {
         log::error!("[CLUSTER] register failed: {e}");
@@ -90,6 +86,18 @@ async fn register() -> Result<()> {
             log::error!("[CLUSTER] nats register failed: {e}");
             e
         })?;
+
+    // create the coordinator stream if not exists
+    log::info!("[COORDINATOR] initializing coordinator");
+    if let Err(e) = infra::coordinator::events::init().await {
+        dist_lock::unlock(&locker).await.map_err(|e| {
+            log::error!("[CLUSTER] nats unlock failed: {}", e);
+            e
+        })?;
+        return Err(Error::Message(format!(
+            "[COORDINATOR] Failed to init coordinator events: {e}",
+        )));
+    }
 
     // 2. watch node list
     task::spawn(async move { super::watch_node_list().await });
@@ -251,10 +259,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     if node_ids.iter().filter(|&v| *v == node.id).count() > 1 {
         let new_node_id = super::generate_node_id(node_ids);
         node.id = new_node_id;
-        log::warn!(
-            "[CLUSTER] node id is duplicated, generate new node id: {}",
-            new_node_id
-        );
+        log::warn!("[CLUSTER] node id is duplicated, generate new node id: {new_node_id}");
         // update local id
         LOCAL_NODE_ID.store(new_node_id, Ordering::Relaxed);
         // reset snowflake id generator
@@ -323,15 +328,21 @@ mod tests {
         let _ = leave().await.is_err();
     }
 
-    // #[tokio::test]
-    // async fn test_nats_register_and_keep_alive() {
-    //     config::cache_instance_id("instance");
-    //     let _ = register_and_keep_alive().await.is_err();
-    // }
+    #[tokio::test]
+    async fn test_nats_register_and_keep_alive() {
+        config::cache_instance_id("instance");
+        infra::db_init().await.unwrap();
+        let ret = register_and_keep_alive().await;
+        println!("[CLUSTER::TEST] test_nats_register_and_keep_alive: {ret:?}");
+        assert!(ret.is_ok());
+    }
 
     #[tokio::test]
     async fn test_nats_register() {
         config::cache_instance_id("instance");
-        let _ = register().await.is_err();
+        infra::db_init().await.unwrap();
+        let ret = register().await;
+        println!("[CLUSTER::TEST] test_nats_register: {ret:?}");
+        assert!(ret.is_ok());
     }
 }

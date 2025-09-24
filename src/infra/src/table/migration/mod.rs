@@ -36,7 +36,7 @@ mod m20241227_000100_populate_organizations_table;
 mod m20241227_000200_create_users_table;
 mod m20241227_000300_create_org_users_table;
 mod m20241227_000400_populate_users_table;
-mod m20241227_000500_delete_meta_users_table;
+// mod m20241227_000500_delete_meta_users_table;
 mod m20250107_160900_delete_bad_dashboards;
 mod m20250109_092400_recreate_tables_with_ksuids;
 mod m20250113_144600_create_unique_folder_name_idx;
@@ -54,7 +54,6 @@ mod m20250213_000001_add_dashboard_updated_at;
 mod m20250217_115548_ratelimit_table;
 mod m20250320_000001_remove_alert_name_unique_constraint;
 mod m20250422_000001_add_alert_align_time;
-#[cfg(feature = "cloud")]
 mod m20250520_000001_add_trial_end_col;
 mod m20250611_000001_create_reports_table;
 mod m20250611_000002_populate_reports_table;
@@ -64,6 +63,7 @@ mod m20250612_000002_create_re_pattern_stream_map_table;
 mod m20250716_000001_create_enrichment_table;
 mod m20250731_000001_create_compactor_manual_jobs;
 mod m20250801_000001_create_system_prompts_table;
+mod m20250822_093713_add_updated_at_for_file_list_table;
 
 pub struct Migrator;
 
@@ -110,7 +110,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20250217_115548_ratelimit_table::Migration),
             Box::new(m20250320_000001_remove_alert_name_unique_constraint::Migration),
             Box::new(m20250422_000001_add_alert_align_time::Migration),
-            #[cfg(feature = "cloud")]
             Box::new(m20250520_000001_add_trial_end_col::Migration),
             Box::new(m20250611_000001_create_reports_table::Migration),
             Box::new(m20250611_000002_populate_reports_table::Migration),
@@ -120,6 +119,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250716_000001_create_enrichment_table::Migration),
             Box::new(m20250731_000001_create_compactor_manual_jobs::Migration),
             Box::new(m20250801_000001_create_system_prompts_table::Migration),
+            Box::new(m20250822_093713_add_updated_at_for_file_list_table::Migration),
         ]
     }
 }

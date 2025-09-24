@@ -19,7 +19,9 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config, is_local_disk_storage,
-    meta::stream::{FileKey, FileListDeleted, PartitionTimeLevel, StreamType, TimeRange},
+    meta::stream::{
+        FileKey, FileListBookKeepMode, FileListDeleted, PartitionTimeLevel, StreamType, TimeRange,
+    },
     utils::time::{BASE_TIME, day_micros, get_ymdh_from_micros, hour_micros},
 };
 use infra::{
@@ -397,10 +399,7 @@ pub async fn delete_by_date(
     delete_from_file_list(org_id, stream_type, stream_name, time_range)
         .await
         .map_err(|e| {
-            log::error!(
-                "[COMPACTOR] delete_by_date delete_from_file_list failed: {}",
-                e
-            );
+            log::error!("[COMPACTOR] delete_by_date delete_from_file_list failed: {e}");
             e
         })?;
 
@@ -513,10 +512,13 @@ async fn write_file_list(
         let created_at = Utc::now().timestamp_micros();
         for _ in 0..5 {
             // only store the file_list into history, don't delete files
-            if cfg.compact.data_retention_history
+            if cfg
+                .compact
+                .file_list_deleted_mode
+                .eq(&FileListBookKeepMode::History.to_string())
                 && let Err(e) = infra_file_list::batch_add_history(&events).await
             {
-                log::error!("[COMPACTOR] file_list batch_add_history failed: {e}");
+                log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
                 return Err(e.into());
             }
             // delete from file_list table
@@ -526,7 +528,11 @@ async fn write_file_list(
                 continue;
             }
             // store to file_list_deleted table, pending delete
-            if !cfg.compact.data_retention_history {
+            if cfg
+                .compact
+                .file_list_deleted_mode
+                .eq(&FileListBookKeepMode::Deleted.to_string())
+            {
                 let del_items = events
                     .iter()
                     .map(|v| FileListDeleted {
@@ -564,7 +570,7 @@ fn generate_local_dirs(
 ) -> Vec<PathBuf> {
     let cfg = get_config();
     let mut dirs_to_delete = Vec::new();
-    while date_start <= date_end {
+    while date_start < date_end {
         let day_dir = format!(
             "{}files/{org_id}/{stream_type}/{stream_name}/{}",
             cfg.common.data_stream_dir,
@@ -601,7 +607,7 @@ async fn handle_delete_by_date_done(
     db::compact::retention::delete_stream_done(org_id, stream_type, stream_name, Some(date_range))
         .await
         .map_err(|e| {
-            log::error!("[COMPACTOR] delete_by_date mark delete done failed: {}", e);
+            log::error!("[COMPACTOR] delete_by_date mark delete done failed: {e}");
             e
         })?;
 
@@ -625,10 +631,7 @@ async fn handle_delete_by_date_done(
     let _ = db::compact::compactor_manual_jobs::bulk_update_jobs(jobs)
         .await
         .map_err(|e| {
-            log::error!(
-                "[COMPACTOR] delete_by_date bulk update manual job failed: {}",
-                e
-            );
+            log::error!("[COMPACTOR] delete_by_date bulk update manual job failed: {e}");
             e
         });
 

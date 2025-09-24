@@ -201,7 +201,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   val="false"
                   dense
                   :label="t('alerts.scheduled')"
-                  class="q-ml-none"
+                  class="q-ml-none o2-radio-button"
+                  :class="store.state.theme == 'dark' ? 'o2-radio-button-dark' : 'o2-radio-button-light'"
                 />
                 <q-radio
                   data-test="add-alert-realtime-alert-radio"
@@ -212,8 +213,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   val="true"
                   dense
                   :label="t('alerts.realTime')"
-                  class="q-ml-none"
-                />
+                  class="q-ml-none o2-radio-button"
+                  :class="store.state.theme == 'dark' ? 'o2-radio-button-dark' : 'o2-radio-button-light'" 
+                  />
               </div>
               </div>
             </div>
@@ -404,22 +406,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-btn
         data-test="add-alert-cancel-btn"
         v-close-popup="true"
-        class=" text-bold"
+        class="q-mr-md o2-secondary-button tw-h-[36px]"
         :label="t('alerts.cancel')"
-        text-color="light-text"
-        padding="sm md"
         no-caps
+        flat
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         @click="$emit('cancel:hideform')"
       />
       <q-btn
         data-test="add-alert-submit-btn"
+        class="o2-primary-button no-border tw-h-[36px]"
         :label="t('alerts.save')"
-        class=" text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
         type="submit"
-        @click="onSubmit"
         no-caps
+        flat
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+        @click="onSubmit"
       />
     </div>
 
@@ -467,7 +469,6 @@ import segment from "../../services/segment_analytics";
 import {
   getUUID,
   getTimezoneOffset,
-  b64EncodeUnicode,
   b64DecodeUnicode,
   isValidResourceName,
   getTimezonesByOffset,
@@ -478,14 +479,39 @@ import useStreams from "@/composables/useStreams";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
-import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
+import {
+  generateSqlQuery,
+} from "@/utils/alerts/alertQueryBuilder";
+import {
+  validateInputs as validateInputsUtil,
+  validateSqlQuery as validateSqlQueryUtil,
+  saveAlertJson as saveAlertJsonUtil,
+  type ValidationContext,
+  type JsonValidationContext,
+} from "@/utils/alerts/alertValidation";
+import {
+  getAlertPayload as getAlertPayloadUtil,
+  prepareAndSaveAlert as prepareAndSaveAlertUtil,
+  type PayloadContext,
+  type SaveAlertContext,
+} from "@/utils/alerts/alertPayload";
+import {
+  getParser as getParserUtil,
+  type SqlUtilsContext,
+} from "@/utils/alerts/alertSqlUtils";
 
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
-import cronParser from "cron-parser";
 import AlertsContainer from "./AlertsContainer.vue";
 import JsonEditor from "../common/JsonEditor.vue";
-import { validateAlert } from "@/utils/validateAlerts";
+import { useReo } from "@/services/reodotdev_analytics";
+import {
+  updateGroup as updateGroupUtil,
+  removeConditionGroup as removeConditionGroupUtil,
+  transformFEToBE as transformFEToBEUtil,
+  retransformBEToFE as retransformBEToFEUtil,
+  type TransformContext,
+} from "@/utils/alerts/alertDataTransforms";
 
 const defaultValue: any = () => {
   return {
@@ -649,6 +675,8 @@ export default defineComponent({
     const showJsonEditorDialog = ref(false);
     const validationErrors = ref([]);
 
+    const { track } = useReo();
+
     const activeFolderId = ref(router.currentRoute.value.query.folder || "default");
 
     const updateActiveFolderId = (folderId: any) => {
@@ -678,31 +706,6 @@ export default defineComponent({
       return formData.value.stream_type && formData.value.stream_name;
     });
 
-    const updateConditions = (e: any) => {
-      try {
-        const ast = parser.astify(e.target.value);
-        if (ast) sqlAST.value = ast;
-        else return;
-
-        // If sqlAST.value.columns is not type of array then return
-        if (!sqlAST.value) return;
-        if (!Array.isArray(sqlAST.value?.columns)) return;
-
-        sqlAST.value.columns.forEach(function (item: any) {
-          let val;
-          if (item["as"] === undefined || item["as"] === null) {
-            val = item["expr"]["column"];
-          } else {
-            val = item["as"];
-          }
-          if (!triggerCols.value.includes(val)) {
-            triggerCols.value.push(val);
-          }
-        });
-      } catch (e) {
-        console.log("Alerts: Error while parsing SQL query");
-      }
-    };
     const editorData = ref("");
     const prefixCode = ref("");
     const suffixCode = ref("");
@@ -853,7 +856,7 @@ export default defineComponent({
 
     const previewAlert = async () => {
       if (getSelectedTab.value === "custom"){
-        previewQuery.value = generateSqlQuery();
+        previewQuery.value = generateSqlQueryLocal();
 
       }
       else if (getSelectedTab.value === "sql")
@@ -862,7 +865,7 @@ export default defineComponent({
         previewQuery.value = formData.value.query_condition.promql.trim();
 
       if (formData.value.is_real_time === "true") {
-        previewQuery.value = generateSqlQuery();
+        previewQuery.value = generateSqlQueryLocal();
       }
 
       await nextTick();
@@ -871,174 +874,16 @@ export default defineComponent({
       }
     };
 
-    const getFormattedCondition = (
-      column: string,
-      operator: string,
-      value: number | string,
-    ) => {
-      let condition = "";
-      switch (operator) {
-        case "=":
-        case "<>":
-        case "<":
-        case ">":
-        case "<=":
-        case ">=":
-          condition = column + ` ${operator} ${value}`;
-          break;
-          //this is done because when we get from BE the response includes the operator in lowercase
-          //so we need to handle it separately
-        case "contains":
-          condition = column + ` LIKE '%${value}%'`;
-          break;
-        //this is done because when we get from BE the response includes the operator in lowercase and converted NotContains to not_contains
-        //so we need to handle it separately
-        case "not_contains":
-          condition = column + ` NOT LIKE '%${value}%'`;
-          break;
-          //this is done because in the FE we are not converting the operator to lowercase
-          //so we need to handle it separately
-        case 'Contains':
-          condition = column + ` LIKE '%${value}%'`;
-          break;
-          //this is done because in the FE we are not converting the operator to lowercase
-        case 'NotContains':
-          condition = column + ` NOT LIKE '%${value}%'`;
-          break;
-        default:
-          condition = column + ` ${operator} ${value}`;
-          break;
-      }
-
-      return condition;
-    };
-
-    //this method is used to generate the where clause
-    //for new format of conditions we need to iterate over the items and get the conditions
-    //and then we need to format the conditions
-    // then we need to return the where clause
-
-    function generateWhereClause(group: any, streamFieldsMap: any) {
-      //this method is used to format the value
-      //if the value is a number or a string and the operator is contains or not contains then we need to return the value as it is
-      //else we need to return the value as a string and add single quotes to it
-      function formatValue(column: any, operator: any, value: any) {
-        return streamFieldsMap[column]?.type === "Int64" ||
-          operator === "contains" ||
-          operator === "not_contains" ||
-          operator === "Contains" ||
-          operator === "NotContains"
-          ? value
-          : `'${value}'`;
-      }
-
-      //this method is used to format the condition
-      //if the column and operator and value are present then we need to return the condition
-      //else we need to return an empty string
-      function formatCondition(column: any, operator: any, value: any) {
-        return `${column} ${operator} ${value}`;
-      }
-
-      //this method is used to parse the group
-      //if the group is not present or the items are not present then we need to return an empty string
-      //else we need to iterate over the items and get the conditions
-      //and then we need to return the where clause
-      function parseGroup(groupNode: any) {
-        if (!groupNode || !Array.isArray(groupNode.items)) return "";
-
-        const parts = groupNode.items.map((item: any) => {
-          // Nested group
-          if (item.items && Array.isArray(item.items)) {
-            return `(${parseGroup(item)})`;
-          }
-
-          // Single condition
-          if (item.column && item.operator && item.value !== undefined) {
-            const formattedValue = formatValue(item.column, item.operator, item.value);
-              return getFormattedCondition(item.column, item.operator, formattedValue);
-          }
-
-          return "";
-        }).filter(Boolean);
-
-        return parts.join(` ${groupNode.label.toUpperCase()} `);
-      }
-
-      //this method is used to generate the where clause
-
-      const clause = parseGroup(group);
-      return clause.trim().length ? "WHERE " + clause : "";
-  }
 
 
-    const generateSqlQuery = () => {
-      // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, COUNT(*) as zo_sql_val FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC
 
-      // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, avg(action_error_count) as zo_sql_val, geo_info_city FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key,geo_info_city ORDER BY zo_sql_key ASC;
-      let query = `SELECT histogram(${
+    const generateSqlQueryLocal = () => {
+      return generateSqlQuery(
+        formData.value,
+        streamFieldsMap.value,
+        isAggregationEnabled.value,
         store.state.zoConfig.timestamp_column || "_timestamp"
-      }) AS zo_sql_key,`;
-      //this method is used to generate the where clause
-      //previously it was just iterating over the conditions and getting the where clause
-      //now we are using the new format of conditions and getting the where clause using generateWhereClause method
-      let whereClause = generateWhereClause(formData.value.query_condition.conditions, streamFieldsMap);
-
-      if (!isAggregationEnabled.value) {
-        query +=
-          ` COUNT(*) as zo_sql_val FROM \"${formData.value.stream_name}\" ` +
-          whereClause +
-          " GROUP BY zo_sql_key ORDER BY zo_sql_key ASC";
-      } else {
-        const aggFn = formData.value.query_condition.aggregation.function;
-        const column = formData.value.query_condition.aggregation.having.column;
-
-        const isAggValid = aggFn?.trim()?.length && column?.trim()?.length;
-
-        let groupByAlias = "";
-        let groupByCols: string[] = [];
-        formData.value.query_condition.aggregation.group_by.forEach(
-          (column: any) => {
-            if (column.trim().length) groupByCols.push(column);
-          },
-        );
-
-        let concatGroupBy = "";
-        if (groupByCols.length) {
-          groupByAlias = ", x_axis_2";
-          concatGroupBy = `, concat(${groupByCols.join(
-            ",' : ',",
-          )}) as x_axis_2`;
-        }
-
-        const percentileFunctions: any = {
-          p50: 0.5,
-          p75: 0.75,
-          p90: 0.9,
-          p95: 0.95,
-          p99: 0.99,
-        };
-
-        if (isAggValid) {
-          if (percentileFunctions[aggFn]) {
-            query +=
-              ` approx_percentile_cont(${column}, ${percentileFunctions[aggFn]}) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
-              whereClause +
-              ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
-          } else {
-            query +=
-              ` ${aggFn}(${column}) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
-              whereClause +
-              ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
-          }
-        } else {
-          query +=
-            ` COUNT(*) as zo_sql_val ${concatGroupBy} FROM \"${formData.value.stream_name}\" ` +
-            whereClause +
-            ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
-        }
-      }
-
-      return query;
+      );
     };
 
     const debouncedPreviewAlert = debounce(previewAlert, 500);
@@ -1049,249 +894,49 @@ export default defineComponent({
       }
     };
     const getParser = (sqlQuery: string) => {
-      try {
-        // As default is a reserved keyword in sql-parser, we are replacing it with default1
-        const regex = /\bdefault\b/g;
-        const columns = parser.astify(
-          sqlQuery.replace(regex, "default1"),
-        ).columns;
-        for (const column of columns) {
-          if (column.expr.column === "*") {
-            sqlQueryErrorMsg.value = "Selecting all columns is not allowed";
-            return false;
-          }
-        }
-        return true;
-      } catch (error) {
-        // In catch block we are returning true, as we just wanted to validate if user have added * in the query to select all columns
-        // select field from default // here default is not wrapped in "" so node sql parser will throw error as default is a reserved keyword. But our Backend supports this query without quotes
-        // Query will be validated in the backend
-        console.log(error);
-        return true;
-      }
+      const sqlUtilsContext: SqlUtilsContext = {
+        parser,
+        sqlQueryErrorMsg,
+      };
+      return getParserUtil(sqlQuery, sqlUtilsContext);
     };
 
     const getAlertPayload = () => {
-      const payload = cloneDeep(formData.value);
-
-      // Deleting uuid from payload as it was added for reference of frontend
-      if (payload.uuid) delete payload.uuid;
-
-      payload.is_real_time = payload.is_real_time === "true";
-
-      payload.context_attributes = {};
-
-      payload.query_condition.type = payload.is_real_time
-        ? "custom"
-        : formData.value.query_condition.type;
-
-      formData.value.context_attributes.forEach((attr: any) => {
-        if (attr.key?.trim() && attr.value?.trim())
-          payload.context_attributes[attr.key] = attr.value;
-      });
-
-      payload.trigger_condition.threshold = parseInt(
-        formData.value.trigger_condition.threshold,
-      );
-
-      payload.trigger_condition.period = parseInt(
-        formData.value.trigger_condition.period,
-      );
-
-      payload.trigger_condition.frequency = parseInt(
-        formData.value.trigger_condition.frequency,
-      );
-
-      payload.trigger_condition.silence = parseInt(
-        formData.value.trigger_condition.silence,
-      );
-
-      payload.description = formData.value.description.trim();
-
-      if (!isAggregationEnabled.value || getSelectedTab.value !== "custom") {
-        payload.query_condition.aggregation = null;
-      }
-
-      if (getSelectedTab.value === "sql" || getSelectedTab.value === "promql")
-        payload.query_condition.conditions = [];
-
-      if (getSelectedTab.value === "sql" || getSelectedTab.value === "custom") {
-        payload.query_condition.promql_condition = null;
-      }
-
-      if (getSelectedTab.value === "promql") {
-        payload.query_condition.sql = "";
-      }
-
-      if (formData.value.query_condition.vrl_function) {
-        payload.query_condition.vrl_function = b64EncodeUnicode(
-          formData.value.query_condition.vrl_function.trim(),
-        );
-      }
-
-      if (beingUpdated) {
-        payload.updatedAt = new Date().toISOString();
-        payload.lastEditedBy = store.state.userInfo.email;
-      } else {
-        payload.createdAt = new Date().toISOString();
-        payload.owner = store.state.userInfo.email;
-        payload.lastTriggeredAt = new Date().getTime();
-        payload.lastEditedBy = store.state.userInfo.email;
-        formData.value.updatedAt = new Date().toISOString();
-      }
-
-      return payload;
+      const payloadContext: PayloadContext = {
+        store,
+        isAggregationEnabled,
+        getSelectedTab,
+        beingUpdated,
+      };
+      return getAlertPayloadUtil(formData.value, payloadContext);
     };
 
     const validateInputs = (input: any, notify: boolean = true) => {
-      if (isNaN(Number(input.trigger_condition.silence))) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Silence Notification should not be empty",
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      if (input.is_real_time) return true;
-
-      if (
-        Number(input.trigger_condition.period) < 1 ||
-        isNaN(Number(input.trigger_condition.period))
-      ) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Period should be greater than 0",
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      if (input.query_condition.aggregation) {
-        if (
-          isNaN(input.trigger_condition.threshold) ||
-          !input.query_condition.aggregation.having.value.toString().trim()
-            .length ||
-          !input.query_condition.aggregation.having.column ||
-          !input.query_condition.aggregation.having.operator
-        ) {
-          notify &&
-            q.notify({
-              type: "negative",
-              message: "Threshold should not be empty",
-              timeout: 1500,
-            });
-          return false;
-        }
-
-        return true;
-      }
-
-      if (
-        isNaN(input.trigger_condition.threshold) ||
-        input.trigger_condition.threshold < 1 ||
-        !input.trigger_condition.operator
-      ) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Threshold should not be empty",
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      if (input.trigger_condition.frequency_type === "cron") {
-        try {
-          cronParser.parseExpression(input.trigger_condition.cron);
-        } catch (err) {
-          console.log(err);
-          scheduledAlertRef.value.cronJobError = "Invalid cron expression!";
-          return;
-        }
-      }
-
-      scheduledAlertRef.value?.validateFrequency(input.trigger_condition);
-
-      if (scheduledAlertRef.value.cronJobError) {
-        notify &&
-          q.notify({
-            type: "negative",
-            message: scheduledAlertRef.value.cronJobError,
-            timeout: 1500,
-          });
-        return false;
-      }
-
-      return true;
+      const validationContext: ValidationContext = {
+        q,
+        store,
+        scheduledAlertRef,
+        validateSqlQueryPromise,
+        sqlQueryErrorMsg,
+        vrlFunctionError,
+        buildQueryPayload,
+        getParser,
+      };
+      return validateInputsUtil(input, validationContext, notify);
     };
 
     const validateSqlQuery = async () => {
-      // Delaying the validation by 300ms, as editor has debounce of 300ms. Else old value will be used for validation
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      if (!getParser(formData.value.query_condition.sql)) {
-        return;
-      }
-
-      const query = buildQueryPayload({
-        sqlMode: true,
-        streamName: formData.value.stream_name,
-      });
-
-      delete query.aggs;
-
-      // We get 15 minutes time range for the query, so reducing it by 13 minutes to get 2 minute data
-      query.query.start_time = query.query.start_time + 780000000;
-
-      query.query.sql = formData.value.query_condition.sql;
-
-      if (formData.value.query_condition.vrl_function)
-        query.query.query_fn = b64EncodeUnicode(
-          formData.value.query_condition.vrl_function,
-        );
-
-      validateSqlQueryPromise.value = new Promise((resolve, reject) => {
-        searchService
-          .search({
-            org_identifier: store.state.selectedOrganization.identifier,
-            query,
-            page_type: formData.value.stream_type,
-          })
-          .then((res: any) => {
-            sqlQueryErrorMsg.value = "";
-
-            if (res.data?.function_error) {
-              vrlFunctionError.value = res.data.function_error;
-              q.notify({
-                type: "negative",
-                message: "Invalid VRL Function",
-                timeout: 3000,
-              });
-              reject("function_error");
-            } else vrlFunctionError.value = "";
-
-            resolve("");
-          })
-          .catch((err: any) => {
-            sqlQueryErrorMsg.value = err.response?.data?.message
-              ? err.response?.data?.message
-              : "Invalid SQL Query";
-
-            // Show error only if it is not real time alert
-            // This case happens when user enters invalid query and then switches to real time alert
-            if (formData.value.query_condition.type === "sql")
-              q.notify({
-                type: "negative",
-                message: "Invalid SQL Query : " + err.response?.data?.message,
-                timeout: 3000,
-              });
-
-            reject("sql_error");
-          });
-      });
+      const validationContext: ValidationContext = {
+        q,
+        store,
+        scheduledAlertRef,
+        validateSqlQueryPromise,
+        sqlQueryErrorMsg,
+        vrlFunctionError,
+        buildQueryPayload,
+        getParser,
+      };
+      return validateSqlQueryUtil(formData.value, validationContext);
     };
 
     const updateFunctionVisibility = () => {
@@ -1347,41 +992,13 @@ export default defineComponent({
 
 
 // Method to handle the emitted changes and update the structure
-//this method is used to update the group
-//we need to update the group if it is changed 
-  function updateGroup(updatedGroup:any) {
-    formData.value.query_condition.conditions.items.forEach((element:any) => {
-      if(element.groupId === updatedGroup.groupId){
-        element.items = updatedGroup.items;
-      }
-    });
-  }
-//this method is used to remove the condition group
-//we need to remove the condition group if it is empty because we cannot simply show empty group in the UI
-  const removeConditionGroup = (targetGroupId: string, currentGroup: any = formData.value.query_condition.conditions) => {
-    if (!currentGroup?.items || !Array.isArray(currentGroup.items)) return;
-
-    // Recursive function to filter empty groups
-    const filterEmptyGroups = (items: any[]): any[] => {
-      return items.filter((item: any) => {
-        // If this is the target group to remove, filter it out
-        if (item.groupId === targetGroupId) {
-          return false;
-        }
-
-        // If it's a group, recursively filter its items
-        if (item.items && Array.isArray(item.items)) {
-          item.items = filterEmptyGroups(item.items);
-          // Remove groups that are empty after filtering
-          return item.items.length > 0;
-        }
-
-        return true;
-      });
-    };
-
-    // Apply the filtering to the root group
-    currentGroup.items = filterEmptyGroups(currentGroup.items);
+  const updateGroup = (updatedGroup: any) => {
+    const transformContext: TransformContext = { formData: formData.value };
+    updateGroupUtil(updatedGroup, transformContext);
+  };
+  const removeConditionGroup = (targetGroupId: string, currentGroup?: any) => {
+    const transformContext: TransformContext = { formData: formData.value };
+    removeConditionGroupUtil(targetGroupId, currentGroup, transformContext);
   };
 
 
@@ -1397,33 +1014,9 @@ export default defineComponent({
   // {
   //   and: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
   // }
-    const transformFEToBE = (node:any) => {
-    if (!node || !node.items || !Array.isArray(node.items)) return {};
-
-    const groupLabel = node.label?.toLowerCase(); // 'or' or 'and'
-    if (!groupLabel || (groupLabel !== 'or' && groupLabel !== 'and')) return {};
-
-    const transformedItems = node.items.map((item:any) => {
-      // If the item has its own groupId and items, it's a nested group
-      //that means the item is a group and we need to iterate over that group to get further conditions
-      if (item.groupId && item.items) {
-        return transformFEToBE(item);
-      }
-
-      //if not its a condition so we can simply return the condition
-      return {
-        column: item.column,
-        operator: item.operator,
-        value: item.value,
-        ignore_case: !!item.ignore_case
-      };
-    });
-
-    //return the transformed items in the format of the backend
-    return {
-      [groupLabel]: transformedItems
-    };
-  }
+  const transformFEToBE = (node: any) => {
+    return transformFEToBEUtil(node);
+  };
 
   // Method to transform the backend data to the frontend format
   //when we get response from the BE we need to transform it to the frontend format
@@ -1437,43 +1030,9 @@ export default defineComponent({
   //   label: 'and',
   //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
   // }
-  const retransformBEToFE = (data:any) => {
-    if(!data) return null;
-    const keys = Object.keys(data);
-    if (keys.length !== 1) return null;
-
-    const label = keys[0]; // 'and' or 'or'
-    const itemsArray = data[label];
-
-    const items = itemsArray.map((item: any) => {
-      if (item.and || item.or) {
-          // Nested group
-          //so we need to iterate over the item and get the conditions and map that to one group
-        return retransformBEToFE(item);
-      } else {
-        //if not its a condition so we can simply return the condition
-        return {
-          column: item.column,
-          operator: item.operator,
-          value: item.value,
-          ignore_case: item.ignore_case,
-          id: getUUID()
-        };
-      }
-    });
-    //here we will return the group with the conditions
-    //the foramt looks like 
-    //{
-    //   groupId: '123',
-    //   label: 'and',
-    //   items: [{column: 'name', operator: '=', value: 'John', ignore_case: false}]
-    // }
-    return {
-      groupId:  getUUID(),
-      label,
-      items
-    };
-  }
+  const retransformBEToFE = (data: any) => {
+    return retransformBEToFEUtil(data);
+  };
   const validateFormAndNavigateToErrorField = async (formRef: any) => {
       const isValid = await formRef.validate().then(async (valid: any) => {
         return valid;
@@ -1497,159 +1056,36 @@ export default defineComponent({
     };
 
     const saveAlertJson = async (json: any) => {
-      let jsonPayload = JSON.parse(json);
-      let destinationsList = [];
-      props.destinations.forEach((destination: any) => {
-        destinationsList.push(destination.name);
-      });
-      let streamList = [];
-      if(!streams.value[jsonPayload.stream_type]){
-        try{
-          const response: any = await getStreams(jsonPayload.stream_type,false);
-          streams.value[jsonPayload.stream_type] = response.list;
-        }catch(err: any){
-          if(err.response.status !== 403){
-            q.notify({
-              type: "negative",
-              message: err.response?.data?.message || "Error fetching streams",
-              timeout: 3000,
-            });
-          }
-        }
-      }
-      streams.value[jsonPayload.stream_type].forEach((stream: any) => {
-        streamList.push(stream.name);
-      });
+      const saveContext: SaveAlertContext = {
+        q,
+        store,
+        props,
+        emit,
+        router,
+        isAggregationEnabled,
+        activeFolderId: { value: Array.isArray(activeFolderId.value) ? activeFolderId.value[0] : activeFolderId.value },
+        handleAlertError,
+      };
 
-      const validationResult = validateAlert(jsonPayload,{
-        streamList: streamList,
-        selectedOrgId: store.state.selectedOrganization.identifier,
-        destinationsList: destinationsList
-      });
-      
-      if (!validationResult.isValid) {
-        validationErrors.value = validationResult.errors;
-        return;
-      }
-      
-      // Validate SQL query if type is sql and not real-time
-      if (jsonPayload.is_real_time === false && jsonPayload.query_condition.type === 'sql') {
-        try {
-          // First check if query has SELECT *
-          if (!getParser(jsonPayload.query_condition.sql)) {
-            validationErrors.value = ['Selecting all columns is not allowed. Please specify the columns explicitly'];
-            return;
-          }
+      const prepareAndSaveAlertFunction = (data: any) => prepareAndSaveAlertUtil(data, saveContext);
 
-          // Set up query for validation
-          const query = buildQueryPayload({
-            sqlMode: true,
-            streamName: jsonPayload.stream_name,
-          });
+      const jsonValidationContext: JsonValidationContext = {
+        q,
+        store,
+        streams,
+        getParser,
+        buildQueryPayload,
+        prepareAndSaveAlert: prepareAndSaveAlertFunction,
+      };
 
-          delete query.aggs;
-          query.query.start_time = query.query.start_time + 780000000;
-          query.query.sql = jsonPayload.query_condition.sql;
-
-          if (jsonPayload.query_condition.vrl_function) {
-            query.query.query_fn = b64EncodeUnicode(jsonPayload.query_condition.vrl_function);
-          }
-
-          // Validate SQL query
-          await searchService.search({
-            org_identifier: store.state.selectedOrganization.identifier,
-            query,
-            page_type: jsonPayload.stream_type,
-          });
-
-          // If we get here, SQL is valid
-          showJsonEditorDialog.value = false;
-          formData.value = jsonPayload;
-          await prepareAndSaveAlert(jsonPayload);
-
-        } catch (err: any) {
-          // Handle SQL validation errors
-          const errorMessage = err.response?.data?.message || 'Invalid SQL Query';
-          validationErrors.value = [`SQL validation error: ${errorMessage}`];
-          return;
-        }
-      } else {
-        // If not SQL or is real-time, just close and update
-        showJsonEditorDialog.value = false;
-        formData.value = jsonPayload;
-        await prepareAndSaveAlert(jsonPayload);
-      }
-    };
-    const prepareAndSaveAlert = async (data: any) => {
-      const payload = cloneDeep(data);
-      if(!isAggregationEnabled.value){
-        payload.query_condition.aggregation = null;
-      }
-      if(Array.isArray(payload.context_attributes) && payload.context_attributes.length == 0){
-        payload.context_attributes = {};
-      }
-      
-      // Transform conditions to backend format
-      payload.query_condition.conditions = transformFEToBE(payload.query_condition.conditions);
-      
-      // Convert string boolean to actual boolean
-      payload.is_real_time = payload.is_real_time === "true" || payload.is_real_time === true;
-      
-      // Handle VRL function encoding if present
-      if (payload.query_condition.vrl_function) {
-        payload.query_condition.vrl_function = b64EncodeUnicode(
-          payload.query_condition.vrl_function.trim()
-        );
-      }
-
-      // Set timestamps and metadata
-      if (props.isUpdated) {
-        payload.updatedAt = new Date().toISOString();
-        payload.lastEditedBy = store.state.userInfo.email;
-        payload.folder_id = router.currentRoute.value.query.folder || "default";
-      } else {
-        payload.createdAt = new Date().toISOString();
-        payload.owner = store.state.userInfo.email;
-        payload.lastTriggeredAt = new Date().getTime();
-        payload.lastEditedBy = store.state.userInfo.email;
-        payload.folder_id = activeFolderId.value;
-      }
-
-      try {
-        const dismiss = q.notify({
-          spinner: true,
-          message: "Please wait...",
-          timeout: 2000,
-        });
-
-
-        if (props.isUpdated) {
-          await alertsService.update_by_alert_id(
-            store.state.selectedOrganization.identifier,
-            payload,
-            activeFolderId.value
-          );
-          emit("update:list", activeFolderId.value);
-          q.notify({
-            type: "positive",
-            message: "Alert updated successfully.",
-          });
-        } else {
-          await alertsService.create_by_alert_id(
-            store.state.selectedOrganization.identifier,
-            payload,
-            activeFolderId.value
-          );
-          emit("update:list", activeFolderId.value);
-          q.notify({
-            type: "positive",
-            message: "Alert saved successfully.",
-          });
-        }
-        dismiss();
-      } catch (err: any) {
-        handleAlertError(err);
-      }
+      await saveAlertJsonUtil(
+        json,
+        props,
+        validationErrors,
+        showJsonEditorDialog,
+        formData,
+        jsonValidationContext,
+      );
     };
 
 
@@ -1672,7 +1108,6 @@ export default defineComponent({
       selectedRelativePeriod,
       relativePeriods,
       editorUpdate,
-      updateConditions,
       updateStreamFields,
       updateEditorContent,
       triggerCols,
@@ -1738,8 +1173,8 @@ export default defineComponent({
       saveAlertJson,
       validationErrors,
       originalStreamFields,
-      generateSqlQuery,
-      generateWhereClause
+      generateSqlQuery: generateSqlQueryLocal,
+      track,
     };
   },
 
@@ -1972,6 +1407,10 @@ export default defineComponent({
               dismiss();
               this.handleAlertError(err);
             });
+          this.track("Button Click", {
+            button: "Update Alert",
+            page: "Alerts"
+          });
           segment.track("Button Click", {
             button: "Update Alert",
             user_org: this.store.state.selectedOrganization.identifier,
@@ -2004,6 +1443,10 @@ export default defineComponent({
               dismiss();
               this.handleAlertError(err);
             });
+          this.track("Button Click", {
+            button: "Create Alert",
+            page: "Alerts"
+          });
           segment.track("Button Click", {
             button: "Save Alert",
             user_org: this.store.state.selectedOrganization.identifier,

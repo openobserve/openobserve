@@ -59,12 +59,21 @@ use crate::{
 pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
-        log::error!("Metrics ingestion error: {e}");
-        return Ok(IngestionResponse {
-            code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
-            status: vec![],
-            error: Some(e.to_string()),
-        });
+        // we do not want to log trial period expired errors
+        if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            return Ok(IngestionResponse {
+                code: http::StatusCode::TOO_MANY_REQUESTS.into(),
+                status: vec![],
+                error: Some(e.to_string()),
+            });
+        } else {
+            log::error!("Metrics ingestion error: {e}");
+            return Ok(IngestionResponse {
+                code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                status: vec![],
+                error: Some(e.to_string()),
+            });
+        }
     }
 
     let start = std::time::Instant::now();
@@ -223,6 +232,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                         if stream_params.stream_type != StreamType::Metrics {
                             continue;
                         }
+
                         // add partition keys
                         if !stream_partitioning_map.contains_key(stream_params.stream_name.as_str())
                         {
@@ -493,7 +503,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         ])
         .inc();
 
-    // only one trigger per request, as it updates etcd
+    // only one trigger per request
     for (_, entry) in stream_trigger_map {
         if let Some(entry) = entry {
             evaluate_trigger(entry).await;

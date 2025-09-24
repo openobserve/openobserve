@@ -25,6 +25,7 @@ use datafusion_proto::physical_plan::PhysicalExtensionCodec;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::datafusion::distributed_plan::{
     aggregate_topk_exec::AggregateTopkExec, streaming_aggs_exec::StreamingAggsExec,
+    tmp_exec::TmpExec,
 };
 use prost::Message;
 use proto::cluster_rpc;
@@ -33,7 +34,10 @@ use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyEx
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
 #[derive(Debug)]
-pub struct PhysicalPlanNodePhysicalExtensionCodec;
+pub struct PhysicalPlanNodePhysicalExtensionCodec {
+    #[allow(dead_code)]
+    pub org_id: String,
+}
 
 impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
     fn try_decode(
@@ -57,7 +61,11 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             }
             #[cfg(feature = "enterprise")]
             Some(cluster_rpc::physical_plan_node::Plan::StreamingAggs(node)) => {
-                super::streaming_aggs_exec::try_decode(node, inputs, registry)
+                super::streaming_aggs_exec::try_decode(node, inputs, registry, &self.org_id)
+            }
+            #[cfg(feature = "enterprise")]
+            Some(cluster_rpc::physical_plan_node::Plan::TmpExec(node)) => {
+                super::tmp_exec::try_decode(node, inputs, registry)
             }
             #[cfg(not(feature = "enterprise"))]
             Some(_) => {
@@ -77,6 +85,8 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             super::aggregate_topk_exec::try_encode(node, buf)
         } else if node.as_any().downcast_ref::<StreamingAggsExec>().is_some() {
             super::streaming_aggs_exec::try_encode(node, buf)
+        } else if node.as_any().downcast_ref::<TmpExec>().is_some() {
+            super::tmp_exec::try_encode(node, buf)
         } else {
             internal_err!("Not supported")
         }
@@ -112,7 +122,7 @@ mod tests {
         ));
 
         // encode
-        let proto = super::super::get_physical_extension_codec();
+        let proto = super::super::get_physical_extension_codec("test".to_string());
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode

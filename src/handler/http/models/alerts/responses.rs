@@ -30,9 +30,10 @@ pub struct ListAlertsResponseBody {
     pub list: Vec<ListAlertsResponseBodyItem>,
 }
 
-/// An item in the list returned by the `ListDashboards` endpoint.
+/// An item in the list returned by the `ListAlerts` endpoint.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ListAlertsResponseBodyItem {
+    #[schema(value_type = String)]
     pub alert_id: Ksuid,
     pub folder_id: String,
     pub folder_name: String,
@@ -105,4 +106,12 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             is_real_time: alert.is_real_time,
         })
     }
+}
+#[derive(Default, Serialize, ToSchema)]
+pub struct AlertBulkEnableResponse {
+    #[schema(value_type = Vec<String>)]
+    pub successful: Vec<Ksuid>,
+    #[schema(value_type = Vec<String>)]
+    pub unsuccessful: Vec<Ksuid>,
+    pub err: Option<String>,
 }

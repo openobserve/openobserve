@@ -264,7 +264,9 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
             .service(status::flush_node)
             .service(status::list_node)
             .service(status::node_metrics)
-            .service(status::consistent_hash),
+            .service(status::consistent_hash)
+            .service(status::refresh_nodes_list)
+            .service(status::refresh_user_sessions),
     );
 
     if get_config().common.swagger_enabled {
@@ -376,6 +378,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(users::update)
         .service(users::add_user_to_org)
         .service(users::list_invitations)
+        .service(users::decline_invitation)
         .service(users::list_roles)
         .service(organization::org::organizations)
         .service(organization::settings::get)
@@ -496,6 +499,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::delete_alert)
         .service(alerts::list_alerts)
         .service(alerts::enable_alert)
+        .service(alerts::enable_alert_bulk)
         .service(alerts::trigger_alert)
         .service(alerts::move_alerts)
         .service(alerts::deprecated::save_alert)
@@ -520,11 +524,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(kv::set)
         .service(kv::delete)
         .service(kv::list)
-        .service(syslog::list_routes)
-        .service(syslog::create_route)
-        .service(syslog::delete_route)
-        .service(syslog::update_route)
-        .service(syslog::toggle_state)
         .service(enrichment_table::save_enrichment_table)
         .service(logs::ingest::handle_kinesis_request)
         .service(logs::ingest::handle_gcp_request)
@@ -551,6 +550,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(pipeline::list_streams_with_pipeline)
         .service(pipeline::delete_pipeline)
         .service(pipeline::enable_pipeline)
+        .service(pipeline::enable_pipeline_bulk)
         .service(search::multi_streams::search_multi)
         .service(search::multi_streams::_search_partition_multi)
         .service(search::multi_streams::around_multi)
@@ -610,6 +610,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
     let service = service
         .service(organization::org::get_org_invites)
         .service(organization::org::generate_org_invite)
+        .service(organization::org::delete_org_invite)
         .service(organization::org::accept_org_invite)
         .service(cloud::billings::create_checkout_session)
         .service(cloud::billings::process_session_detail)

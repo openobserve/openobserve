@@ -130,25 +130,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
           </div>
-          <div class="col-12 flex justify-center">
+          <div class="col-12 flex justify-start">
             <q-btn
-              data-test="add-template-cancel-btn"
-              v-close-popup="true"
-              class="text-bold"
+              v-close-popup
+              class="q-mr-md o2-secondary-button tw-h-[36px]"
               :label="t('alerts.cancel')"
-              text-color="light-text"
-              padding="sm md"
               no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               @click="$emit('cancel:hideform')"
+              data-test="add-template-cancel-btn"
             />
             <q-btn
-              data-test="add-template-submit-btn"
+              class="o2-primary-button no-border tw-h-[36px]"
               :label="t('alerts.save')"
-              class="text-bold no-border q-ml-md"
-              color="secondary"
-              padding="sm xl"
-              @click="saveTemplate"
               no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              @click="saveTemplate"
+              data-test="add-template-submit-btn"
             />
           </div>
         </div>
@@ -227,6 +227,7 @@ import type { TemplateData, Template } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { useReo } from "@/services/reodotdev_analytics";
 
 const props = defineProps<{ template: TemplateData | null }>();
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
@@ -246,6 +247,7 @@ const store = useStore();
 const q = useQuasar();
 const editorRef: any = ref(null);
 const isUpdatingTemplate = ref(false);
+const { track } = useReo();
 const sampleTemplates = [
   {
     name: "Slack",
@@ -390,6 +392,10 @@ const saveTemplate = () => {
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
+    track("Button Click", {
+      button: "Update Template",
+      page: "Add Template"
+    });
   } else {
     {
       templateService
@@ -422,6 +428,10 @@ const saveTemplate = () => {
             message: err.response?.data?.error || err.response?.data?.message,
           });
         });
+      track("Button Click", {
+        button: "Create Template",
+        page: "Add Template"
+      });
     }
   }
 };

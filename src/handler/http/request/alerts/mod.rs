@@ -22,15 +22,20 @@ use hashbrown::HashMap;
 use infra::db::{ORM_CLIENT, connect_to_orm};
 use svix_ksuid::Ksuid;
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::search::utils::check_resource_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
         models::alerts::{
             requests::{
-                CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery, MoveAlertsRequestBody,
-                UpdateAlertRequestBody,
+                AlertBulkEnableRequest, CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery,
+                MoveAlertsRequestBody, UpdateAlertRequestBody,
             },
-            responses::{EnableAlertResponseBody, GetAlertResponseBody, ListAlertsResponseBody},
+            responses::{
+                AlertBulkEnableResponse, EnableAlertResponseBody, GetAlertResponseBody,
+                ListAlertsResponseBody,
+            },
         },
         request::dashboards::{get_folder, is_overwrite},
     },
@@ -83,12 +88,12 @@ impl From<AlertError> for HttpResponse {
 }
 
 /// CreateAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "CreateAlert",
+    summary = "Create new alert",
+    description = "Creates a new alert with specified conditions, triggers, and notifications. Users can define custom queries, thresholds, and notification destinations to monitor their data and receive timely alerts when conditions are met.",
     security(
         ("Authorization"= [])
     ),
@@ -98,8 +103,11 @@ impl From<AlertError> for HttpResponse {
       ),
     request_body(content = CreateAlertRequestBody, description = "Alert data", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"}))
     )
 )]
 #[post("/v2/{org_id}/alerts")]
@@ -133,23 +141,26 @@ pub async fn create_alert(
 }
 
 /// GetAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetAlert",
+    summary = "Get alert details",
+    description = "Retrieves detailed information about a specific alert including its configuration, conditions, triggers, notification settings, and current status. Useful for viewing and understanding existing alert setups.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("alert_id" = String, Path, description = "Alert ID"),
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = GetAlertResponseBody),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/{alert_id}")]
@@ -171,23 +182,26 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 }
 
 /// ExportAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"get"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "ExportAlert",
+    summary = "Export alert configuration",
+    description = "Exports the complete configuration of a specific alert in a format suitable for backup, sharing, or importing into other environments. Includes all alert settings, conditions, and notification configurations.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("alert_id" = String, Path, description = "Alert ID"),
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = GetAlertResponseBody),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/{alert_id}/export")]
@@ -209,24 +223,27 @@ pub async fn export_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 }
 
 /// UpdateAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "UpdateAlert",
+    summary = "Update alert configuration",
+    description = "Updates an existing alert's configuration including conditions, queries, thresholds, notification destinations, and scheduling. Allows users to modify alert behavior and settings as monitoring requirements change.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("alert_id" = String, Path, description = "Alert ID"),
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
       ),
     request_body(content = UpdateAlertRequestBody, description = "Alert data", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
 #[put("/v2/{org_id}/alerts/{alert_id}")]
@@ -250,23 +267,26 @@ pub async fn update_alert(
 }
 
 /// DeleteAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"delete"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "DeleteAlert",
+    summary = "Delete alert",
+    description = "Permanently removes an alert and all its configurations including conditions, triggers, and notification settings. This action cannot be undone and will stop all monitoring and notifications for the deleted alert.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("alert_id" = String, Path, description = "Alert ID"),
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"}))
     )
 )]
 #[delete("/v2/{org_id}/alerts/{alert_id}")]
@@ -281,12 +301,12 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 }
 
 /// ListAlerts
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "ListAlerts",
+    summary = "List organization alerts",
+    description = "Retrieves a list of all alerts in the organization with filtering and pagination options. Shows alert summaries including names, status, folder organization, and basic configuration details for monitoring and management purposes.",
     security(
         ("Authorization"= [])
     ),
@@ -296,6 +316,9 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = ListAlertsResponseBody),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
     )
 )]
 #[get("/v2/{org_id}/alerts")]
@@ -342,24 +365,27 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
 }
 
 /// EnableAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "EnableAlert",
+    summary = "Enable or disable alert",
+    description = "Toggles the active status of an alert to enable or disable its monitoring and notification functionality. When disabled, the alert will stop evaluating conditions and sending notifications until re-enabled.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("alert_id" = String, Path, description = "Alert ID"),
         EnableAlertQuery,
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/{alert_id}/enable")]
@@ -382,25 +408,112 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
     }
 }
 
-/// TriggerAlert
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
+/// EnableAlertBulk
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
-    operation_id = "TriggerAlert",
+    operation_id = "EnableAlertBulk",
+    summary = "Enable or disable alert in bulk",
+    description = "Toggles the active status of alerts to enable or disable its monitoring and notification functionality in bulk. When disabled, the alert will stop evaluating conditions and sending notifications until re-enabled.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        EnableAlertQuery,
+    ),
+    request_body(content = AlertBulkEnableRequest, description = "Alert id list", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+    )
+)]
+#[post("/v2/{org_id}/alerts/bulk/enable")]
+async fn enable_alert_bulk(
+    path: web::Path<String>,
+    body: web::Bytes,
+    in_req: HttpRequest,
+) -> HttpResponse {
+    let org_id = path.into_inner();
+    let Ok(query) = web::Query::<EnableAlertQuery>::from_query(in_req.query_string()) else {
+        return MetaHttpResponse::bad_request("Error parsing query parameters");
+    };
+    let should_enable = query.0.value;
+
+    let req: AlertBulkEnableRequest = match serde_json::from_slice(&body) {
+        Ok(v) => v,
+        Err(_) => return MetaHttpResponse::bad_request("invalid body"),
+    };
+
+    #[cfg(feature = "enterprise")]
+    {
+        let user_id = in_req
+            .headers()
+            .get("user_id")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+
+        for id in &req.ids {
+            if let Some(res) =
+                check_resource_permissions(&org_id, &user_id, "alerts", &id.to_string(), "PUT")
+                    .await
+            {
+                return res;
+            }
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    for id in req.ids {
+        match alert::enable_by_id(client, &org_id, id, should_enable).await {
+            Ok(_) => {
+                successful.push(id);
+            }
+            Err(e) => {
+                log::error!("error in enabling alert {id} : {e}");
+                unsuccessful.push(id);
+                err = Some(e.to_string());
+            }
+        }
+    }
+    MetaHttpResponse::json(AlertBulkEnableResponse {
+        successful,
+        unsuccessful,
+        err,
+    })
+}
+
+/// TriggerAlert
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "TriggerAlert",
+    summary = "Manually trigger alert",
+    description = "Manually triggers an alert to test its functionality and notification delivery. Useful for testing alert configurations, verifying notification channels, and ensuring alerts work as expected before relying on them for monitoring.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = String, Path, description = "Alert ID"),
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/{alert_id}/trigger")]
@@ -415,12 +528,12 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 }
 
 /// MoveAlerts
-///
-/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "MoveAlerts",
+    summary = "Move alerts between folders",
+    description = "Moves one or more alerts from their current folder to a specified destination folder. Helps organize alerts into logical groups and manage access permissions when using role-based access control.",
     security(
         ("Authorization"= [])
     ),
@@ -430,9 +543,12 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     ),
     request_body(content = MoveAlertsRequestBody, description = "Identifies alerts and the destination folder", content_type = "application/json"),    
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/move")]

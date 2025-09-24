@@ -1,8 +1,12 @@
-import { test, expect } from "@playwright/test";
-import { login } from "./utils/dashLogin.js";
+const {
+  test,
+  expect,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
 import { ingestion } from "./utils/dashIngestion.js";
 import logData from "../../fixtures/log.json";
 import PageManager from "../../pages/page-manager";
+import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
 
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 
@@ -46,16 +50,19 @@ const largeDatasetSqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_i
 
 const histogramQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1"  FROM "${STREAM_NAME}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC `;
 
+// Query without aliases for testing error message
+const queryWithoutAliases = `SELECT count(kubernetes_container_hash), count(kubernetes_container_name), count(kubernetes_host) FROM "${STREAM_NAME}" WHERE kubernetes_namespace_name IS NOT NULL GROUP BY kubernetes_annotations_kubectl_kubernetes_io_default_container`;
+
 test.describe("logs testcases", () => {
   test.beforeEach(async ({ page }) => {
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestion(page);
-    await page.waitForTimeout(2000);
 
-    await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    );
+    // Navigate to logs page
+    const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
+
+    await page.goto(logsUrl);
+    await page.waitForLoadState("networkidle");
 
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
@@ -131,7 +138,7 @@ test.describe("logs testcases", () => {
     // Reload the page
     await page.reload();
     // Verify the field is empty
-    await expect(page.locator(".cm-line").first()).toBeEmpty();
+    await expect(page.locator(".view-line").first()).toBeEmpty();
   });
 
   test.skip("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
@@ -190,7 +197,7 @@ test.describe("logs testcases", () => {
 
     const queryEditor = page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole("textbox");
+      .locator(".monaco-editor");
     await expect(queryEditor).toBeVisible();
 
     // Step 2: Fill and apply the initial query
@@ -437,20 +444,26 @@ test.describe("logs testcases", () => {
 
     await pm.logsVisualise.openVisualiseTab();
 
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+
     await pm.logsVisualise.verifyChartRenders(page);
 
     await pm.logsVisualise.addPanelToNewDashboard(
       randomDashboardName,
       panelName
     );
-    await page.waitForTimeout(2000);
+
+    // Wait for and assert the success message
+    const successMessage = page.getByText("Panel added to dashboard");
+    await expect(successMessage).toBeVisible({ timeout: 10000 });
 
     await page
       .locator('[data-test="dashboard-edit-panel-' + panelName + '-dropdown"]')
       .click();
     await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
 
-    await page.waitForTimeout(2000);
+    await pm.logsVisualise.waitForQueryInspector(page);
+
     await expect(
       page
         .getByRole("cell", {
@@ -479,20 +492,24 @@ test.describe("logs testcases", () => {
 
     await pm.logsVisualise.openVisualiseTab();
 
-    await page.waitForTimeout(2000);
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     await pm.logsVisualise.addPanelToNewDashboard(
       randomDashboardName,
       panelName
     );
 
-    await page.waitForTimeout(2000);
+    // Wait for and assert the success message
+    const successMessage = page.getByText("Panel added to dashboard");
+    await expect(successMessage).toBeVisible({ timeout: 10000 });
+
     await page
       .locator('[data-test="dashboard-edit-panel-' + panelName + '-dropdown"]')
       .click();
     await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
 
-    await page.waitForTimeout(2000);
+    await pm.logsVisualise.waitForQueryInspector(page);
+
     await expect(
       page
         .getByRole("cell", {
@@ -504,5 +521,122 @@ test.describe("logs testcases", () => {
 
     await page.locator('[data-test="dashboard-back-btn"]').click();
     await deleteDashboard(page, randomDashboardName);
+  });
+
+  test("should render line chart for SELECT * query and save to dashboard with correct query in inspector", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+
+    const selectAllQuery = `SELECT * FROM "${STREAM_NAME}"`;
+
+    await pm.logsVisualise.fillLogsQueryEditor(selectAllQuery);
+
+    await pm.logsVisualise.setRelative("6", "w");
+
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    await pm.logsVisualise.openVisualiseTab();
+
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    // Expect line chart to be the selected/default visualization
+    await pm.logsVisualise.verifyChartTypeSelected(page, "line", true);
+
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+
+    await pm.logsVisualise.addPanelToNewDashboard(
+      randomDashboardName,
+      panelName
+    );
+
+    // Wait for and assert the success message
+    const successMessage = page.getByText("Panel added to dashboard");
+    await expect(successMessage).toBeVisible({ timeout: 10000 });
+
+    // Open Query Inspector from the panel actions
+    await page
+      .locator('[data-test="dashboard-edit-panel-' + panelName + '-dropdown"]')
+      .click();
+    await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
+
+    await pm.logsVisualise.waitForQueryInspector(page);
+
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "e2e_automate" GROUP BY zo_sql_key ORDER BY zo_sql_key DESC',
+        })
+        .first()
+    ).toBeVisible();
+
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await deleteDashboard(page, randomDashboardName);
+  });
+
+  test("should show error message when using aggregation functions without aliases in SQL query", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    // Step 1: Open logs page
+    await pm.logsVisualise.openLogs();
+
+    // Step 2: Fill the query editor with SQL query without aliases
+    await pm.logsVisualise.fillLogsQueryEditor(queryWithoutAliases);
+
+    // Step 3: Set relative time
+    await pm.logsVisualise.setRelative("6", "w");
+
+    // Step 4: Apply the query
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // Step 5: Open the visualize tab
+    await pm.logsVisualise.openVisualiseTab();
+
+    // Step 6: Wait for error message to appear
+    const errorMessage = page.getByText(
+      "Fields using aggregation functions must have aliases"
+    );
+
+    // Wait for the error message to appear on the page
+    await errorMessage.waitFor({ state: "visible", timeout: 10000 });
+
+    // Step 7: Check for the specific error message using getByText
+    // Verify the error message is displayed
+    await expect(errorMessage.first()).toBeVisible();
+  });
+  test("should show quick mode as true when toggling to visualize tab", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+
+    await pm.logsVisualise.logsSelectStream("e2e_automate");
+
+    await waitForDateTimeButtonToBeEnabled(page);
+
+    await pm.logsVisualise.setRelative("6", "w");
+
+    // Step 4: Apply the query
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // Step 5: Open the visualize tab
+    await pm.logsVisualise.openVisualiseTab();
+
+    // Step 7: Verify quick mode toggle is true
+    const quickModeState = await pm.logsVisualise.verifyQuickModeToggle(false);
+    expect(quickModeState).toBe(false);
+
+    // Additional assertion using Playwright's expect for the toggle state
+    const quickModeToggle = page.locator(
+      '[data-test="logs-search-bar-quick-mode-toggle-btn"]'
+    );
+    await expect(quickModeToggle).toHaveAttribute("aria-checked", "false");
   });
 });

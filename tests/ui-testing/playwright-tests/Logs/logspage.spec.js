@@ -1,8 +1,8 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const logsdata = require("../../../test-data/logs_data.json");
-const testLogger = require('../utils/test-logger.js');
 const { waitUtils } = require('../utils/wait-helpers.js');
 
 // Utility Functions
@@ -34,7 +34,7 @@ async function ingestTestData(page) {
     streamName: streamName,
     logsdata: logsdata
   });
-  console.log(response);
+  testLogger.debug('API response received', { response });
 }
 
 async function applyQueryButton(page) {
@@ -51,7 +51,6 @@ async function applyQueryButton(page) {
 }
 
 function removeUTFCharacters(text) {
-  // console.log(text, "tex");
   // Remove UTF characters using regular expression
   return text.replace(/[^\x00-\x7F]/g, " ");
 }
@@ -412,9 +411,14 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickVrlEditor();
     await page.waitForLoadState('domcontentloaded'); // Replace hard wait
     await pm.logsPage.clickRefreshButton();
+    // Wait for VRL function to be applied and data to load
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
     await pm.logsPage.clickMenuLinkMetricsItem();
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.clickMenuLinkLogsItem();
+    // Wait for page to stabilize after navigation
+    await page.waitForLoadState('networkidle');
     await pm.logsPage.expectPageContainsText(".a=2");
     
     testLogger.info('Function persistence test completed');

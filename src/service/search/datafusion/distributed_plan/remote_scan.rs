@@ -17,7 +17,10 @@ use std::{any::Any, sync::Arc};
 
 use arrow_schema::SchemaRef;
 use config::{
-    meta::search::{ScanStats, SearchEventType},
+    meta::{
+        inverted_index::IndexOptimizeMode,
+        search::{ScanStats, SearchEventType},
+    },
     utils::rand::generate_random_string,
 };
 use datafusion::{
@@ -70,7 +73,7 @@ impl RemoteScanExec {
         let cache = Self::compute_properties(Arc::clone(&input.schema()), output_partitions);
 
         // serialize the input plan and set it as the plan for the remote scan node
-        let proto = get_physical_extension_codec();
+        let proto = get_physical_extension_codec(remote_scan_node.query_identifier.org_id.clone());
         let physical_plan_bytes =
             physical_plan_to_bytes_with_extension_codec(input.clone(), &proto)?;
         remote_scan_node.set_plan(physical_plan_bytes.to_vec());
@@ -83,7 +86,7 @@ impl RemoteScanExec {
             .filter_map(|(idx, n)| if n.is_querier() { Some(idx) } else { None })
             .collect::<Vec<_>>();
         // random shuffle the node ids
-        node_ids.shuffle(&mut rand::thread_rng());
+        node_ids.shuffle(&mut rand::rng());
         let enrich_mode_node_idx = node_ids.pop().unwrap_or_default();
 
         Ok(RemoteScanExec {
@@ -111,6 +114,21 @@ impl RemoteScanExec {
         self.cluster_metrics.clone()
     }
 
+    pub fn with_scan_stats(mut self, scan_stats: Arc<Mutex<ScanStats>>) -> Self {
+        self.scan_stats = scan_stats;
+        self
+    }
+
+    pub fn with_partial_err(mut self, partial_err: Arc<Mutex<String>>) -> Self {
+        self.partial_err = partial_err;
+        self
+    }
+
+    pub fn with_cluster_metrics(mut self, cluster_metrics: Arc<Mutex<Vec<Metrics>>>) -> Self {
+        self.cluster_metrics = cluster_metrics;
+        self
+    }
+
     fn output_partitioning_helper(n_partitions: usize) -> Partitioning {
         Partitioning::UnknownPartitioning(n_partitions)
     }
@@ -133,6 +151,25 @@ impl RemoteScanExec {
     pub fn set_analyze(mut self) -> Self {
         self.remote_scan_node.search_infos.is_analyze = true;
         self
+    }
+
+    pub fn set_index_optimize_mode(mut self, index_optimize_mode: IndexOptimizeMode) -> Self {
+        self.remote_scan_node.index_info.index_optimize_mode = Some(index_optimize_mode.into());
+        self
+    }
+
+    #[cfg(test)]
+    pub fn analyze(&self) -> bool {
+        self.remote_scan_node.search_infos.is_analyze
+    }
+
+    #[cfg(test)]
+    pub fn index_optimize_mode(&self) -> Option<IndexOptimizeMode> {
+        self.remote_scan_node
+            .index_info
+            .index_optimize_mode
+            .clone()
+            .map(|x| x.into())
     }
 }
 
@@ -175,10 +212,11 @@ impl ExecutionPlan for RemoteScanExec {
         if children.is_empty() {
             return Ok(self);
         }
-        Ok(Arc::new(Self::new(
-            children[0].clone(),
-            self.remote_scan_node.clone(),
-        )?))
+        let remote_scan = Self::new(children[0].clone(), self.remote_scan_node.clone())?
+            .with_scan_stats(self.scan_stats.clone())
+            .with_partial_err(self.partial_err.clone())
+            .with_cluster_metrics(self.cluster_metrics.clone());
+        Ok(Arc::new(remote_scan))
     }
 
     fn execute(
@@ -234,6 +272,7 @@ async fn get_remote_batch(
     let is_querier = node.is_querier();
     let is_ingester = node.is_ingester();
     let grpc_addr = node.get_grpc_addr();
+    let node_name = node.get_name();
     let search_type = remote_scan_node
         .super_cluster_info
         .search_event_type
@@ -275,7 +314,7 @@ async fn get_remote_batch(
     request.query_identifier.enrich_mode = enrich_mode;
 
     log::info!(
-        "[trace_id {trace_id}] flight->search: request node: {grpc_addr}, query_type: {}, is_super: {is_super}, is_querier: {is_querier}, timeout: {timeout}, files: {}",
+        "[trace_id {trace_id}] flight->search: request node: {grpc_addr}, name: {node_name}, query_type: {}, is_super: {is_super}, is_querier: {is_querier}, timeout: {timeout}, files: {}",
         search_type.unwrap_or(SearchEventType::UI),
         request.search_info.file_id_list.len(),
     );
@@ -297,7 +336,7 @@ async fn get_remote_batch(
     };
 
     log::info!(
-        "[trace_id {trace_id}] flight->search: prepare to request node: {grpc_addr}, is_super: {is_super}, is_querier: {is_querier}",
+        "[trace_id {trace_id}] flight->search: prepare to request node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}",
     );
 
     let stream = match client.do_get(request).await {
@@ -307,7 +346,7 @@ async fn get_remote_batch(
                 return Ok(get_empty_stream(empty_stream.with_error(e)));
             }
             log::error!(
-                "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
+                "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
                 start.elapsed().as_millis(),
             );
             return Err(DataFusionError::Execution(e.to_string()));
@@ -316,7 +355,7 @@ async fn get_remote_batch(
     .into_inner();
 
     log::info!(
-        "[trace_id {trace_id}] flight->search: prepare to response node: {grpc_addr}, is_super: {is_super}, is_querier: {is_querier}",
+        "[trace_id {trace_id}] flight->search: prepare to response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}",
     );
 
     let query_context = QueryContext::new(node)
@@ -344,7 +383,7 @@ async fn get_remote_batch(
                 _ = &mut timeout => {
                     let e = tonic::Status::new(tonic::Code::DeadlineExceeded, "timeout");
                     log::error!(
-                        "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
+                        "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
                         start.elapsed().as_millis(),
                     );
                     process_partial_err(partial_err, e);

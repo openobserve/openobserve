@@ -18,7 +18,7 @@ use std::{fmt::Debug, pin::Pin, task::Poll};
 use arrow::array::RecordBatch;
 use arrow_flight::{FlightData, error::Result};
 use arrow_schema::SchemaRef;
-use config::utils::size::bytes_to_human_readable;
+use config::{meta::search::ScanStats, utils::size::bytes_to_human_readable};
 use datafusion::physical_plan::metrics::{BaselineMetrics, RecordOutput};
 use flight::{
     common::{CustomMessage, FlightMessage},
@@ -37,6 +37,7 @@ pub struct FlightDecoderStream {
     inner: FlightDataDecoder,
     metrics: BaselineMetrics,
     query_context: QueryContext,
+    scan_stats: ScanStats,
 }
 
 impl FlightDecoderStream {
@@ -51,12 +52,14 @@ impl FlightDecoderStream {
             inner: FlightDataDecoder::new(inner, Some(schema), metrics.clone()),
             metrics,
             query_context,
+            scan_stats: ScanStats::default(),
         }
     }
 
-    pub fn process_custom_message(&self, message: CustomMessage) {
+    pub fn process_custom_message(&mut self, message: CustomMessage) {
         match message {
             CustomMessage::ScanStats(stats) => {
+                self.scan_stats.add(&stats);
                 self.query_context.scan_stats.lock().add(&stats);
             }
             CustomMessage::Metrics(metrics) => {
@@ -86,9 +89,10 @@ impl Stream for FlightDecoderStream {
                 }
                 Some(Err(e)) => {
                     log::error!(
-                        "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, err: {e:?}, took: {} ms",
+                        "[trace_id {}] flight->search: response node: {}, name: {}, is_super: {}, is_querier: {}, err: {e:?}, took: {} ms",
                         self.query_context.trace_id,
                         self.query_context.node.get_grpc_addr(),
+                        self.query_context.node.get_name(),
                         self.query_context.is_super,
                         self.query_context.is_querier,
                         self.query_context.start.elapsed().as_millis(),
@@ -124,7 +128,6 @@ impl Drop for FlightDecoderStream {
             node,
             is_super,
             is_querier,
-            scan_stats,
             start,
             num_rows,
             ..
@@ -135,20 +138,17 @@ impl Drop for FlightDecoderStream {
         } else {
             "follower".to_string()
         };
-        let scan_stats = { *scan_stats.lock() };
+        let scan_stats = self.scan_stats;
 
         log::info!(
             "{}",
             search_inspector_fields(
                 format!(
-                    "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
-                    trace_id,
+                    "[trace_id {trace_id}] flight->search: response node: {}, name: {}, is_super: {is_super}, is_querier: {is_querier}, files: {}, scan_size: {} mb, num_rows: {num_rows}, took: {} ms",
                     node.get_grpc_addr(),
-                    is_super,
-                    is_querier,
+                    node.get_name(),
                     scan_stats.files,
                     scan_stats.original_size / 1024 / 1024,
-                    num_rows,
                     start.elapsed().as_millis(),
                 ),
                 SearchInspectorFieldsBuilder::new()

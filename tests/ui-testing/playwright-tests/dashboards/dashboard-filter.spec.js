@@ -1,6 +1,9 @@
-import { test, expect } from "../baseFixtures";
+const {
+  test,
+  expect,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
 import logData from "../../fixtures/log.json";
-import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
@@ -14,10 +17,8 @@ test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard filter testcases", () => {
   test.beforeEach(async ({ page }) => {
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestion(page);
-    await page.waitForTimeout(2000);
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
@@ -566,8 +567,11 @@ test.describe("dashboard filter testcases", () => {
 
     // Expect error message
     await expect(
-      page.getByText(
-        /(sql parser error: Expected:|Search field not found:|Schema error: No field named controller\.?)/i).first()
+      page
+        .getByText(
+          /(sql parser error: Expected:|Search field not found:|Schema error: No field named controller\.?)/i
+        )
+        .first()
     ).toBeVisible();
 
     // Fix filter condition (change to "=" operator)
@@ -673,6 +677,116 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
+    await pm.dashboardPanelActions.savePanel();
+
+    // Delete the dashboard
+    await pm.dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.searchDashboard(randomDashboardName);
+    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+  });
+  test("should verify the custom value search from variable dropdown", async ({
+    page,
+  }) => {
+    const valuesResponses = [];
+
+    // Listen for all responses to capture _values API calls
+    page.on("response", async (response) => {
+      const url = response.url();
+      if (url.includes("/_values?")) {
+        valuesResponses.push({
+          url,
+          status: response.status(),
+        });
+      }
+    });
+
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+
+    // Navigate to dashboards
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await page
+      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
+      .waitFor({
+        state: "visible",
+      });
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardVariables.addDashboardVariable(
+      "variablename",
+      "logs",
+      "e2e_automate",
+      "kubernetes_container_name",
+      true
+    );
+
+    // await page.waitForLoadState('networkidle');
+
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+
+    // Select stream and add fields
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "y"
+    );
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+
+    await waitForDateTimeButtonToBeEnabled(page);
+
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
+
+    // Perform custom value search in variable dropdown to trigger _values API calls
+    const variableInput = page.getByLabel("variablename", { exact: true });
+    await variableInput.waitFor({ state: "visible", timeout: 10000 });
+    await variableInput.click();
+
+    // Type partial search terms to trigger multiple _values API calls
+    const searchTerms = ["zi", "zio", "ziox"];
+    for (const term of searchTerms) {
+      await variableInput.fill(term);
+      await page.waitForLoadState('networkidle'); // Allow API calls to complete
+    }
+
+    // Select the final value
+    const option = page.getByRole("option", { name: "ziox" });
+    await option.waitFor({ state: "visible", timeout: 10000 });
+    await option.click();
+
+    // Wait for any remaining network activity to settle
+    await page.waitForLoadState('networkidle');
+
+    // Assert that we captured at least one _values API call
+    expect(valuesResponses.length).toBeGreaterThan(0);
+
+    // Assert all collected responses have 200 status
+    for (const res of valuesResponses) {
+      expect(res.status).toBe(200);
+    }
+
+    // Add filter field and set value
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "filter"
+    );
+
+    await pm.dashboardFilter.addFilterCondition(
+      0,
+      "kubernetes_container_name",
+      "",
+      "IN",
+      "$variablename"
+    );
+
+    // Save panel and cleanup
     await pm.dashboardPanelActions.savePanel();
 
     // Delete the dashboard

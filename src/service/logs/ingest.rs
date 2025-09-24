@@ -34,7 +34,10 @@ use config::{
     },
 };
 use flate2::read::GzDecoder;
-use infra::errors::{Error, Result};
+use infra::{
+    errors::{Error, Result},
+    schema::get_flatten_level,
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use opentelemetry_proto::tonic::{
@@ -228,16 +231,19 @@ pub async fn ingest(
             None // `item` won't be flattened, no need to store original
         };
 
+        // we report stream size before pushing data to pipeline
+        // this is to capture the actual size of stream at the time of ingestion
+        let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
+        *_size += estimate_json_bytes(&item);
+
         if executable_pipeline.is_some() {
             // buffer the records, timestamp, and originals for pipeline batch processing
             pipeline_inputs.push(item);
             original_options.push(original_data);
         } else {
-            let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
-            *_size += estimate_json_bytes(&item);
-
-            // JSON Flattening
-            let mut res = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
+            // JSON Flattening - use per-stream flatten level
+            let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+            let mut res = flatten::flatten_with_level(item, flatten_level)?;
 
             // handle timestamp
             let timestamp = match handle_timestamp(&mut res, min_ts, max_ts) {
@@ -454,10 +460,14 @@ pub async fn ingest(
                         ts_data.push((timestamp, local_val));
                         *fn_num = need_usage_report.then_some(function_no);
 
-                        let _size = size_by_stream
-                            .entry(destination_stream.clone())
-                            .or_insert(0);
-                        *_size += original_size;
+                        // Since we report the size for the original stream before the pipeline
+                        // execution we need to skip reporting the actual size on disk.
+                        if destination_stream.ne(&stream_name) {
+                            let _size = size_by_stream
+                                .entry(destination_stream.clone())
+                                .or_insert(0);
+                            *_size += original_size;
+                        }
 
                         tokio::task::coop::consume_budget().await;
                     }
@@ -565,10 +575,16 @@ pub fn handle_timestamp(
         .as_object_mut()
         .ok_or_else(|| anyhow::Error::msg("Value is not an object"))?;
     let timestamp = match local_val.get(TIMESTAMP_COL_NAME) {
-        Some(v) => match parse_timestamp_micro_from_value(v) {
-            Ok(t) => t,
-            Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
-        },
+        Some(v) => {
+            if !v.is_null() {
+                match parse_timestamp_micro_from_value(v) {
+                    Ok(t) => t,
+                    Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
+                }
+            } else {
+                Utc::now().timestamp_micros()
+            }
+        }
         None => Utc::now().timestamp_micros(),
     };
     // check ingestion time

@@ -31,6 +31,8 @@ use crate::{
     context_path = "/api",
     tag = "Marketing",
     operation_id = "HandleUserAttributionEvent",
+    summary = "Handle user attribution event for marketing",
+    description = "Processes user attribution data for marketing analytics and campaign tracking",
     security(
         ("Authorization" = [])
     ),
@@ -46,8 +48,8 @@ use crate::{
         }),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
 )]
 #[post("/{org_id}/billings/new_user_attribution")]
@@ -75,8 +77,18 @@ pub async fn handle_new_attribution_event(
             json::Value::String(chrono::Local::now().format("%Y-%m-%d").to_string()),
         ),
     ]);
-    telemetry::Telemetry::new()
+    let mut telemetry_instance = telemetry::Telemetry::new();
+    telemetry_instance
         .send_track_event(
+            "OpenObserve - New user attribution",
+            Some(segment_event_data.clone()),
+            false,
+            false,
+        )
+        .await;
+
+    telemetry_instance
+        .send_keyevent_track_event(
             "OpenObserve - New user attribution",
             Some(segment_event_data),
             false,

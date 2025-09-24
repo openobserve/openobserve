@@ -67,8 +67,10 @@ pub(crate) async fn create_tantivy_index(
         return Ok(0);
     };
 
-    if get_config().cache_latest_files.cache_index
-        && get_config().cache_latest_files.download_from_node
+    let cfg = get_config();
+    if cfg.cache_latest_files.enabled
+        && cfg.cache_latest_files.cache_index
+        && cfg.cache_latest_files.download_from_node
     {
         infra::cache::file_data::disk::set(&idx_file_name, Bytes::from(puffin_bytes.clone()))
             .await?;
@@ -360,7 +362,7 @@ mod tests {
             fields.push(Field::new("status", DataType::Utf8, false));
             let status: Vec<String> = (0..num_rows)
                 .map(|i| {
-                    if i % 2 == 0 {
+                    if i.is_multiple_of(2) {
                         "success".to_string()
                     } else {
                         "error".to_string()

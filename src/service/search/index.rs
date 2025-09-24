@@ -20,10 +20,12 @@ use std::{
 
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, get_config,
+    meta::inverted_index::UNKNOWN_NAME,
     utils::tantivy::{query::contains_query::ContainsQuery, tokenizer::o2_collect_tokens},
 };
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
+    config::ConfigOptions,
     logical_expr::Operator,
     physical_expr::ScalarFunctionExpr,
     physical_plan::{
@@ -35,7 +37,6 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use hashbrown::HashSet;
-use serde::{Deserialize, Serialize};
 use sqlparser::ast::{
     BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, UnaryOperator,
 };
@@ -88,7 +89,7 @@ pub fn get_index_condition_from_expr(
 }
 
 // note the condition in IndexCondition is connection by AND operator
-#[derive(Default, Clone, Serialize, Deserialize, Hash)]
+#[derive(Default, Clone, Hash, Eq, PartialEq)]
 pub struct IndexCondition {
     pub conditions: Vec<Condition>,
 }
@@ -106,10 +107,6 @@ impl IndexCondition {
 
     pub fn add_condition(&mut self, condition: Condition) {
         self.conditions.push(condition);
-    }
-
-    pub fn merge(&mut self, index_condition: IndexCondition) {
-        self.conditions.extend(index_condition.conditions);
     }
 }
 
@@ -145,16 +142,6 @@ impl IndexCondition {
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(Box::new(BooleanQuery::from(queries)))
-    }
-
-    // get the fields use for search in tantivy
-    pub fn get_tantivy_fields(&self) -> HashSet<String> {
-        self.conditions
-            .iter()
-            .fold(HashSet::new(), |mut acc, condition| {
-                acc.extend(condition.get_tantivy_fields());
-                acc
-            })
     }
 
     // get the fields use for search in datafusion(for add filter back logical)
@@ -210,6 +197,10 @@ impl IndexCondition {
     // the simple str match condition is like str_match(field, 'value')
     // use for check if the distinct query can be optimized
     pub fn is_simple_str_match(&self, field: &str) -> bool {
+        if self.is_condition_all() {
+            return true;
+        }
+
         if self.conditions.len() != 1 {
             return false;
         }
@@ -238,7 +229,7 @@ impl IndexCondition {
 }
 
 // single condition
-#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum Condition {
     // field, value
     Equal(String, String),
@@ -294,6 +285,7 @@ impl Condition {
         }
     }
 
+    // NOTE: current only used in [`use_inverted_index`]
     pub fn from_expr(expr: &Expr) -> Self {
         match expr {
             Expr::BinaryOp {
@@ -513,16 +505,15 @@ impl Condition {
                 })?;
                 if value.is_empty() || value == "*" {
                     Box::new(AllQuery {})
-                } else if value.starts_with("*") && value.ends_with("*") {
-                    let value = format!(".*{}.*", value.trim_matches('*'));
-                    Box::new(RegexQuery::from_pattern(&value, default_field)?)
                 } else {
-                    if value.is_empty() {
-                        return Err(anyhow::anyhow!(
-                            "The value of match_all() function can't be empty"
-                        ));
-                    }
                     let mut tokens = o2_collect_tokens(value);
+                    let contains_search =
+                        tokens.len() == 1 && value.starts_with("*") && value.ends_with("*");
+                    let first_prefix = if value.starts_with("*") && !tokens.is_empty() {
+                        Some(tokens.remove(0))
+                    } else {
+                        None
+                    };
                     let last_prefix = if value.ends_with("*") {
                         tokens.pop()
                     } else {
@@ -535,6 +526,14 @@ impl Condition {
                             Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _
                         })
                         .collect();
+                    if let Some(value) = first_prefix {
+                        terms.push(if contains_search {
+                            Box::new(ContainsQuery::new_case_insensitive(&value, default_field)?)
+                        } else {
+                            let value = format!(".*{value}");
+                            Box::new(RegexQuery::from_pattern(&value, default_field)?)
+                        });
+                    }
                     if let Some(value) = last_prefix {
                         terms.push(Box::new(PhrasePrefixQuery::new_with_offset(vec![(
                             0,
@@ -774,6 +773,7 @@ impl Condition {
                             distance.clone(),
                         ],
                         schema,
+                        Arc::new(ConfigOptions::default()),
                     )?);
                     expr_list.push(new_expr);
                 }
@@ -822,6 +822,7 @@ impl Condition {
 // check if function is match_all and only have one argument
 // check if binary operator is equal and one side is field and the other side is value
 // and the field is in the index_fields
+// NOTE: current only used in [`use_inverted_index`]
 fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool {
     match expr {
         Expr::BinaryOp {
@@ -902,12 +903,26 @@ fn get_value(expr: &Expr) -> String {
     }
 }
 
+// TODO: duplication with datafusion/optimizer/physical_optimizer/utils.rs
 fn is_physical_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    expr.as_any().downcast_ref::<Column>().is_some()
+    if expr.as_any().downcast_ref::<Column>().is_some() {
+        true
+    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
+        is_physical_column(expr.expr())
+    } else {
+        false
+    }
 }
 
+// TODO: duplication with datafusion/optimizer/physical_optimizer/utils.rs
 fn get_physical_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
-    expr.as_any().downcast_ref::<Column>().unwrap().name()
+    if let Some(expr) = expr.as_any().downcast_ref::<Column>() {
+        expr.name()
+    } else if let Some(expr) = expr.as_any().downcast_ref::<CastExpr>() {
+        get_physical_column_name(expr.expr())
+    } else {
+        UNKNOWN_NAME
+    }
 }
 
 fn is_physical_value(expr: &Arc<dyn PhysicalExpr>) -> bool {
@@ -925,7 +940,7 @@ fn get_physical_value(expr: &Arc<dyn PhysicalExpr>) -> String {
             ScalarValue::LargeUtf8(Some(s)) => s.clone(),
             ScalarValue::Utf8View(Some(s)) => s.clone(),
             ScalarValue::Binary(Some(b)) => String::from_utf8_lossy(b).to_string(),
-            _ => unimplemented!(),
+            _ => unimplemented!("get_physical_value not support {:?}", literal),
         }
     } else {
         unreachable!()
@@ -986,7 +1001,7 @@ pub(crate) fn get_arg_name(args: &FunctionArg) -> String {
         FunctionArg::ExprNamed { name, .. } => get_field_name(name),
         FunctionArg::Unnamed(arg) => match arg {
             FunctionArgExpr::Expr(expr) => get_field_name(expr),
-            _ => unimplemented!("str_match not support filed type: {:?}", arg),
+            _ => UNKNOWN_NAME.to_string(),
         },
     }
 }
@@ -1039,6 +1054,7 @@ fn create_str_match_expr(
         udf.clone(),
         vec![left, right],
         schema,
+        Arc::new(ConfigOptions::default()),
     )?);
     Ok(udf_expr)
 }
@@ -1241,50 +1257,6 @@ mod tests {
 
         assert_eq!(fields.len(), 1);
         assert!(fields.contains("поле"));
-    }
-
-    #[test]
-    fn test_index_condition_get_tantivy_fields() {
-        let mut index_condition = IndexCondition::new();
-        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-        index_condition.add_condition(Condition::MatchAll("search_term".to_string()));
-        index_condition.add_condition(Condition::In(
-            "field2".to_string(),
-            vec!["val1".to_string()],
-            false,
-        ));
-
-        let fields = index_condition.get_tantivy_fields();
-
-        assert_eq!(fields.len(), 3);
-        assert!(fields.contains("field1"));
-        assert!(fields.contains("field2"));
-        assert!(fields.contains(INDEX_FIELD_NAME_FOR_ALL));
-    }
-
-    #[test]
-    fn test_index_condition_get_tantivy_fields_empty() {
-        let index_condition = IndexCondition::new();
-        let fields = index_condition.get_tantivy_fields();
-
-        assert_eq!(fields.len(), 0);
-    }
-
-    #[test]
-    fn test_index_condition_get_tantivy_fields_duplicate_fields() {
-        let mut index_condition = IndexCondition::new();
-        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-        index_condition.add_condition(Condition::Equal("field1".to_string(), "value2".to_string()));
-        index_condition.add_condition(Condition::Regex(
-            "field1".to_string(),
-            "pattern.*".to_string(),
-        ));
-
-        let fields = index_condition.get_tantivy_fields();
-
-        // Should deduplicate the field names
-        assert_eq!(fields.len(), 1);
-        assert!(fields.contains("field1"));
     }
 
     // add some test for str_match
@@ -1754,21 +1726,6 @@ mod tests {
     }
 
     #[test]
-    fn test_index_condition_add_index_condition() {
-        let mut index_condition1 = IndexCondition::new();
-        index_condition1
-            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-
-        let mut index_condition2 = IndexCondition::new();
-        index_condition2
-            .add_condition(Condition::Equal("field2".to_string(), "value2".to_string()));
-
-        index_condition1.merge(index_condition2);
-
-        assert_eq!(index_condition1.conditions.len(), 2);
-    }
-
-    #[test]
     fn test_index_condition_to_query() {
         let mut index_condition = IndexCondition::new();
         index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
@@ -2095,5 +2052,76 @@ mod tests {
             "field1",
         ))));
         assert_eq!(get_arg_name(&arg), "field1");
+    }
+
+    #[test]
+    fn test_get_arg_name() {
+        use sqlparser::ast::{
+            Expr, FunctionArg, FunctionArgExpr, FunctionArgOperator, Ident, ObjectName,
+        };
+
+        // Test FunctionArg::Named
+        let named_arg = FunctionArg::Named {
+            name: Ident::new("field_name"),
+            arg: FunctionArgExpr::Expr(Expr::Identifier(Ident::new("value"))),
+            operator: FunctionArgOperator::Equals,
+        };
+        assert_eq!(get_arg_name(&named_arg), "field_name");
+
+        // Test FunctionArg::ExprNamed with field expression
+        let expr_named_field = FunctionArg::ExprNamed {
+            name: Expr::Identifier(Ident::new("field_name")),
+            arg: FunctionArgExpr::Expr(Expr::Identifier(Ident::new("value"))),
+            operator: FunctionArgOperator::Equals,
+        };
+        assert_eq!(get_arg_name(&expr_named_field), "field_name");
+
+        // Test FunctionArg::ExprNamed with compound identifier
+        let expr_named_compound = FunctionArg::ExprNamed {
+            name: Expr::CompoundIdentifier(vec![Ident::new("table"), Ident::new("field_name")]),
+            arg: FunctionArgExpr::Expr(Expr::Identifier(Ident::new("value"))),
+            operator: FunctionArgOperator::Equals,
+        };
+        assert_eq!(get_arg_name(&expr_named_compound), "field_name");
+
+        // Test FunctionArg::ExprNamed with non-field expression (should return UNKNOWN_NAME)
+        let expr_named_non_field = FunctionArg::ExprNamed {
+            name: Expr::Value(sqlparser::ast::Value::Number("123".to_string(), false).into()),
+            arg: FunctionArgExpr::Expr(Expr::Identifier(Ident::new("value"))),
+            operator: FunctionArgOperator::Equals,
+        };
+        assert_eq!(get_arg_name(&expr_named_non_field), UNKNOWN_NAME);
+
+        // Test FunctionArg::Unnamed with field expression
+        let unnamed_field = FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(
+            Ident::new("field_name"),
+        )));
+        assert_eq!(get_arg_name(&unnamed_field), "field_name");
+
+        // Test FunctionArg::Unnamed with compound identifier
+        let unnamed_compound =
+            FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::CompoundIdentifier(vec![
+                Ident::new("table"),
+                Ident::new("field_name"),
+            ])));
+        assert_eq!(get_arg_name(&unnamed_compound), "field_name");
+
+        // Test FunctionArg::Unnamed with non-field expression (should return UNKNOWN_NAME)
+        let unnamed_non_field = FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
+            sqlparser::ast::Value::Number("123".to_string(), false).into(),
+        )));
+        assert_eq!(get_arg_name(&unnamed_non_field), UNKNOWN_NAME);
+
+        // Test FunctionArg::Unnamed with Wildcard (should return UNKNOWN_NAME)
+        let unnamed_wildcard = FunctionArg::Unnamed(FunctionArgExpr::Wildcard);
+        assert_eq!(get_arg_name(&unnamed_wildcard), UNKNOWN_NAME);
+
+        // Test FunctionArg::Unnamed with other FunctionArgExpr variants (should return
+        // UNKNOWN_NAME)
+        let unnamed_other =
+            FunctionArg::Unnamed(FunctionArgExpr::QualifiedWildcard(ObjectName(vec![
+                sqlparser::ast::ObjectNamePart::Identifier(Ident::new("table")),
+            ])));
+        assert_eq!(get_arg_name(&unnamed_other), UNKNOWN_NAME);
     }
 }

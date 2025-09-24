@@ -441,19 +441,6 @@
     "internalLabel": "Remarque : utilisez cette option si le collecteur est installé dans le même cluster que O2",
     "redirectionIngestionMsg": "Remarque : Pour accéder à des pages autres que l'IAM, l'ingestion de données doit être initiée au sein de l'organisation actuelle."
   },
-  "syslog": {
-    "stream": "Stream",
-    "organization": "Organisation",
-    "subnets": "Sous-réseaux",
-    "deleteRoute": "Supprimer l'itinéraire",
-    "syslog_addroute": "Ajouter un itinéraire",
-    "save": "Sauver",
-    "cancel": "annuler",
-    "delete": "Supprimer",
-    "edit": "Modifier",
-    "on": "Allumer",
-    "off": "Éteindre"
-  },
   "dashboard": {
     "selectField": "Champ",
     "selectIndex": "Stream",

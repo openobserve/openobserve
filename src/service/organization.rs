@@ -19,10 +19,11 @@ use config::{
         alerts::alert::ListAlertsParams,
         dashboards::ListDashboardsParams,
         pipeline::components::PipelineSource,
+        self_reporting::usage,
         stream::StreamType,
         user::{UserOrg, UserRole},
     },
-    utils::rand::generate_random_string,
+    utils::{json, rand::generate_random_string, time},
 };
 use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
@@ -45,11 +46,13 @@ use crate::{
         meta::organization::{
             AlertSummary, CUSTOM, DEFAULT_ORG, IngestionPasscode, IngestionTokensContainer,
             OrgSummary, Organization, PipelineSummary, RumIngestionToken, StreamSummary,
+            TriggerStatus, TriggerStatusSearchResult,
         },
         utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
     service::{
         db::{self, org_users},
+        self_reporting,
         stream::get_streams,
         users::add_admin_to_org,
     },
@@ -70,6 +73,20 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
         }
     }
 
+    let sql = format!(
+        "SELECT module, status FROM {} WHERE org = '{}' GROUP BY module, status, key",
+        usage::TRIGGERS_USAGE_STREAM,
+        org_id
+    );
+    let end_time = time::now_micros();
+    let start_time = end_time - time::second_micros(900); // 15 mins
+    let trigger_status_results = self_reporting::search::get_usage(sql, start_time, end_time)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|v| json::from_value::<TriggerStatusSearchResult>(v).ok())
+        .collect::<Vec<_>>();
+
     let pipelines = db::pipeline::list_by_org(org_id).await.unwrap_or_default();
     let pipeline_summary = PipelineSummary {
         num_realtime: pipelines
@@ -80,6 +97,10 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             .iter()
             .filter(|p| matches!(p.source, PipelineSource::Scheduled(_)))
             .count() as i64,
+        trigger_status: TriggerStatus::from_search_results(
+            &trigger_status_results,
+            usage::TriggerDataType::DerivedStream,
+        ),
     };
 
     let alerts = super::alerts::alert::list_with_folders_db(ListAlertsParams::new(org_id))
@@ -88,6 +109,10 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     let alert_summary = AlertSummary {
         num_realtime: alerts.iter().filter(|(_, a)| a.is_real_time).count() as i64,
         num_scheduled: alerts.iter().filter(|(_, a)| !a.is_real_time).count() as i64,
+        trigger_status: TriggerStatus::from_search_results(
+            &trigger_status_results,
+            usage::TriggerDataType::Alert,
+        ),
     };
 
     let functions = db::functions::list(org_id).await.unwrap_or_default();
@@ -257,6 +282,16 @@ pub async fn create_org(
     }
     org.name = org.name.trim().to_owned();
 
+    let has_valid_chars = org
+        .name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == ' ' || c == '_');
+    if !has_valid_chars {
+        return Err(anyhow::anyhow!(
+            "Only alphanumeric characters (A-Z, a-z, 0-9), spaces, and underscores are allowed"
+        ));
+    }
+
     org.identifier = ider::uuid();
     #[cfg(not(feature = "cloud"))]
     let org_type = CUSTOM.to_owned();
@@ -372,6 +407,15 @@ pub async fn rename_org(
         return Err(anyhow::anyhow!("Not allowed to rename org"));
     }
 
+    let has_valid_chars = name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == ' ' || c == '_');
+    if !has_valid_chars {
+        return Err(anyhow::anyhow!(
+            "Only alphanumeric characters (A-Z, a-z, 0-9), spaces, and underscores are allowed"
+        ));
+    }
+
     if get_org(org_id).await.is_none() {
         return Err(anyhow::anyhow!("Organization doesn't exist"));
     }
@@ -440,6 +484,12 @@ pub async fn get_invitations_for_org(
 }
 
 #[cfg(feature = "cloud")]
+pub async fn delete_invite_by_token(org_id: &str, token: &str) -> Result<(), anyhow::Error> {
+    org_invites::delete_invite_by_token(org_id, token).await?;
+    Ok(())
+}
+
+#[cfg(feature = "cloud")]
 pub async fn generate_invitation(
     org_id: &str,
     user_email: &str,
@@ -460,6 +510,16 @@ pub async fn generate_invitation(
                 }
             }
             None => return Err(anyhow::anyhow!("Unauthorized access")),
+        }
+    }
+    for invitee in &invites.invites {
+        match get_user(Some(org_id), invitee).await {
+            None => {}
+            Some(_) => {
+                return Err(anyhow::anyhow!(
+                    "user with email {invitee} already part of the organization"
+                ));
+            }
         }
     }
     if let Some(org) = get_org(org_id).await {
@@ -490,7 +550,14 @@ pub async fn generate_invitation(
             if !cfg.smtp.smtp_reply_to.is_empty() {
                 email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
             }
-            let msg = get_invite_email_body(org_id, &org.name, &inviter_name, &invite_token);
+            let msg = get_invite_email_body(
+                org_id,
+                &org.name,
+                &inviter_name,
+                &invite_token,
+                invites.role,
+                expires_at,
+            );
             let email = email.singlepart(SinglePart::html(msg)).unwrap();
 
             // Send the email
@@ -572,6 +639,31 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
         stream_name: None,
     })
     .await;
+    Ok(())
+}
+
+#[cfg(feature = "cloud")]
+pub async fn decline_invitation(user_email: &str, token: &str) -> Result<(), anyhow::Error> {
+    let invite = org_invites::get_by_token_user(token, user_email)
+        .await
+        .map_err(|e| {
+            log::info!("error getting token {token} for email {user_email} : {e}");
+            anyhow::anyhow!("Provided Token is not valid for this email id")
+        })?;
+
+    let now = chrono::Utc::now().timestamp_micros();
+
+    if invite.expires_at < now {
+        return Err(anyhow::anyhow!("Invalid token"));
+    }
+
+    if let Err(e) =
+        org_invites::update_invite_status(token, user_email, OrgInviteStatus::Rejected).await
+    {
+        log::error!("Error updating the invite status in the db: {e}");
+        return Err(anyhow::anyhow!("Error updating status"));
+    }
+
     Ok(())
 }
 
