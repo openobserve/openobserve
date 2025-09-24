@@ -27,6 +27,7 @@ use std::{
 
 use actix_web::{App, HttpServer, dev::ServerHandle, http::KeepAlive, middleware, web};
 use actix_web_opentelemetry::RequestTracing;
+use anyhow::ensure;
 use arrow_flight::flight_service_server::FlightServiceServer;
 use config::{get_config, utils::size::bytes_to_human_readable};
 use log::LevelFilter;
@@ -105,6 +106,16 @@ use tracing_subscriber::{
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    // CLI provides the path to the config file (if any)
+    // In case a custom path is provided, the file will be read first
+    // and config variables will be loaded.
+    // This has to happen as the foremost step as any call to
+    // get_config without this would be loaded from local `.env`
+    // or environment itself.
+    if cli::cli().await? {
+        return Ok(());
+    }
+
     #[cfg(feature = "tokio-console")]
     console_subscriber::ConsoleLayer::builder()
         .retention(Duration::from_secs(
@@ -158,11 +169,6 @@ async fn main() -> Result<(), anyhow::Error> {
     } else {
         None
     };
-
-    // cli mode
-    if cli::cli().await? {
-        return Ok(());
-    }
 
     let cfg = get_config();
 
@@ -964,6 +970,11 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
     opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
     let tracer = opentelemetry_sdk::trace::SdkTracerProvider::builder();
     let tracer = if cfg.common.otel_otlp_grpc_url.is_empty() {
+        ensure!(
+            !cfg.common.otel_otlp_url.is_empty(),
+            "otel otlp url needs to be set, to enable tracing"
+        );
+
         tracer.with_span_processor(
             opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
                 {
