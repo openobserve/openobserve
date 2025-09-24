@@ -15,23 +15,25 @@
 
 use std::ops::ControlFlow;
 
-use sqlparser::ast::{Expr, FunctionArguments, Query, TableFactor, VisitorMut};
+use sqlparser::ast::{Expr, FunctionArguments, Query, TableFactor, VisitorMut, visit_expressions};
 
 use crate::service::search::datafusion::udf::match_all_udf::{
     FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME,
 };
 
+// TODO: check if from clause is a subquery and where caluse has match_all
+
 /// get all item from match_all functions
 pub struct MatchVisitor {
     pub has_match_all: bool,
-    pub is_multi_stream: bool,
+    pub is_support_match_all: bool,
 }
 
 impl MatchVisitor {
     pub fn new() -> Self {
         Self {
             has_match_all: false,
-            is_multi_stream: false,
+            is_support_match_all: true,
         }
     }
 }
@@ -40,39 +42,70 @@ impl VisitorMut for MatchVisitor {
     type Break = ();
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        if !self.has_match_all && has_match_all(expr) {
+            self.has_match_all = true;
+        }
+        ControlFlow::Continue(())
+    }
+
+    // match_all will not support the below case
+    //    1. join
+    //    1. from clause is a subquery/cte and outside has match_all, select * from (select
+    //       kubernetes_namespace_name, count(*) from t1 group by kubernetes_namespace_name order by
+    //       count(*)) where match_all('error')
+    // match_all support in subquery like below, for example:
+    //    1. select * from (select * from t1 where match_all('error'))
+    //    2. select * from t1 where id in (select id from t2 where match_all('error')) and
+    //       match_all('critical')
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
+            // if from clause has more than one table, where clause should not have match_all
+            if select.from.len() > 1 && select.selection.as_ref().is_some_and(has_match_all) {
+                self.is_support_match_all = false;
+            }
+
+            // if from clause has join, where clause should not have match_all
+            if select.from.iter().any(|from| !from.joins.is_empty())
+                && select.selection.as_ref().is_some_and(has_match_all)
+            {
+                self.is_support_match_all = false;
+            }
+
+            // if from clause has a subquery, where clause should not have match_all
+            if select
+                .from
+                .iter()
+                .any(|from| matches!(from.relation, TableFactor::Derived { .. }))
+                && select.selection.as_ref().is_some_and(has_match_all)
+            {
+                self.is_support_match_all = false;
+            }
+
+            // if query has CTE (Common Table Expression), where clause should not have match_all
+            if query.with.is_some() && select.selection.as_ref().is_some_and(has_match_all) {
+                self.is_support_match_all = false;
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+pub fn has_match_all(expr: &Expr) -> bool {
+    let mut has_match_all = false;
+    let _ = visit_expressions(expr, |expr| {
         if let Expr::Function(func) = expr {
             let name = func.name.to_string().to_lowercase();
             if (name == MATCH_ALL_UDF_NAME || name == FUZZY_MATCH_ALL_UDF_NAME)
                 && let FunctionArguments::List(list) = &func.args
                 && !list.args.is_empty()
             {
-                self.has_match_all = true;
+                has_match_all = true;
+                return ControlFlow::Break(());
             }
         }
-        if matches!(
-            expr,
-            Expr::Subquery(_) | Expr::Exists { .. } | Expr::InSubquery { .. }
-        ) {
-            self.is_multi_stream = true;
-        }
         ControlFlow::Continue(())
-    }
-
-    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref()
-            && (select.from.len() > 1
-                || select.from.iter().any(|from| {
-                    !from.joins.is_empty()
-                        || matches!(
-                            from.relation,
-                            TableFactor::Derived { .. } | TableFactor::Function { .. }
-                        )
-                }))
-        {
-            self.is_multi_stream = true;
-        }
-        ControlFlow::Continue(())
-    }
+    });
+    has_match_all
 }
 
 #[cfg(test)]
@@ -108,7 +141,7 @@ mod tests {
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
 
-        assert!(match_visitor.is_multi_stream);
+        assert!(match_visitor.is_support_match_all);
         assert!(!match_visitor.has_match_all);
     }
 
@@ -123,7 +156,7 @@ mod tests {
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
 
-        assert!(match_visitor.is_multi_stream);
+        assert!(match_visitor.is_support_match_all);
         assert!(!match_visitor.has_match_all);
     }
 
@@ -138,7 +171,7 @@ mod tests {
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
 
-        assert!(match_visitor.is_multi_stream);
+        assert!(match_visitor.is_support_match_all);
         assert!(!match_visitor.has_match_all);
     }
 
@@ -153,7 +186,7 @@ mod tests {
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
 
-        assert!(match_visitor.is_multi_stream);
+        assert!(match_visitor.is_support_match_all);
         assert!(!match_visitor.has_match_all);
     }
 
@@ -168,7 +201,7 @@ mod tests {
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
 
-        assert!(match_visitor.is_multi_stream);
+        assert!(match_visitor.is_support_match_all);
         assert!(!match_visitor.has_match_all);
     }
 
@@ -183,7 +216,7 @@ mod tests {
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
 
-        assert!(!match_visitor.is_multi_stream);
+        assert!(match_visitor.is_support_match_all);
         assert!(!match_visitor.has_match_all);
     }
 
@@ -198,7 +231,67 @@ mod tests {
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
 
-        assert!(match_visitor.is_multi_stream);
+        assert!(!match_visitor.is_support_match_all);
+        assert!(match_visitor.has_match_all);
+    }
+
+    #[test]
+    fn test_is_multi_from_with_match_all_unsupported() {
+        let sql = "SELECT * FROM logs, users WHERE match_all('error')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut match_visitor = MatchVisitor::new();
+        let _ = statement.visit(&mut match_visitor);
+
+        assert!(!match_visitor.is_support_match_all);
+        assert!(match_visitor.has_match_all);
+    }
+
+    #[test]
+    fn test_derived_table_with_outer_match_all_unsupported() {
+        let sql = "SELECT * FROM (SELECT id FROM users) u WHERE match_all('error')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut match_visitor = MatchVisitor::new();
+        let _ = statement.visit(&mut match_visitor);
+
+        assert!(!match_visitor.is_support_match_all);
+        assert!(match_visitor.has_match_all);
+    }
+
+    #[test]
+    fn test_inner_derived_match_all_supported() {
+        let sql = "SELECT * FROM (SELECT * FROM logs WHERE match_all('error')) t";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut match_visitor = MatchVisitor::new();
+        let _ = statement.visit(&mut match_visitor);
+
+        assert!(match_visitor.is_support_match_all);
+        assert!(match_visitor.has_match_all);
+    }
+
+    #[test]
+    fn test_cte_with_match_all_unsupported() {
+        let sql = "WITH cte AS (SELECT id FROM users) SELECT * FROM cte WHERE match_all('error')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut match_visitor = MatchVisitor::new();
+        let _ = statement.visit(&mut match_visitor);
+
+        assert!(!match_visitor.is_support_match_all);
         assert!(match_visitor.has_match_all);
     }
 }
