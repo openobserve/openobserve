@@ -146,6 +146,11 @@ impl Sql {
             let schema = infra::schema::get(org_id, &stream_name, stream_type)
                 .await
                 .unwrap_or_else(|_| Schema::empty());
+            if schema.fields().is_empty() {
+                return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                    stream_name,
+                )));
+            }
             total_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(schema)));
         }
 
@@ -2684,7 +2689,20 @@ pub async fn get_group_by_fields(sql: &Sql) -> Result<Vec<String>, Error> {
     let sql_arc = Arc::new(sql.clone());
     let ctx = generate_context(&Request::default(), &sql_arc, 0).await?;
     register_table(&ctx, &sql_arc).await?;
-    let plan = ctx.state().create_logical_plan(&sql_arc.sql).await?;
+    let plan = ctx
+        .state()
+        .create_logical_plan(&sql_arc.sql)
+        .await
+        .inspect_err(|e| {
+            log::error!(
+                "failed to create logical plan for sql: {}, error: {}",
+                sql_arc.sql,
+                e
+            );
+
+            // also print the sql object
+            log::error!("sql object: {:?}", sql_arc);
+        })?;
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     // visit group by fields
