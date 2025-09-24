@@ -108,7 +108,7 @@ pub fn get_start_time_from_trace_id(trace_id: &str) -> Option<i64> {
 
 /// Generate a new span_id.
 pub fn generate_span_id() -> String {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut bytes = [0u8; 8];
     rng.fill(&mut bytes);
 

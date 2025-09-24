@@ -1762,7 +1762,7 @@ mod tests {
 
         // Test with very long names
         let long_name = "a".repeat(1000);
-        let module_key = format!("logs/org123/{}/pipeline_id", long_name);
+        let module_key = format!("logs/org123/{long_name}/pipeline_id");
         let result = get_pipeline_info_from_module_key(&module_key);
 
         assert!(result.is_ok());
