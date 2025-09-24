@@ -329,12 +329,12 @@ mod tests {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let plan: Arc<dyn ExecutionPlan> = Arc::new(NewEmptyExec::new(
             "my_table",
-            schema.clone().into(),
+            schema.clone(),
             None,
             &[],
             None,
             false,
-            schema.clone().into(),
+            schema.clone(),
         ));
 
         let mut visitor = TableNameVisitor::new();
@@ -352,12 +352,12 @@ mod tests {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let child: Arc<dyn ExecutionPlan> = Arc::new(NewEmptyExec::new(
             "child",
-            schema.clone().into(),
+            schema.clone(),
             None,
             &[],
             None,
             false,
-            schema.clone().into(),
+            schema.clone(),
         ));
 
         let remote_node =
