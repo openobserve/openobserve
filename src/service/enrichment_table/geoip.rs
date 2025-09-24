@@ -21,7 +21,7 @@ use config::{MMDB_CITY_FILE_NAME, get_config};
 #[cfg(feature = "enterprise")]
 use maxminddb::geoip2::Enterprise;
 use maxminddb::{
-    MaxMindDBError, Reader,
+    Reader,
     geoip2::{City, ConnectionType, Isp},
 };
 use serde::{Deserialize, Serialize};
@@ -144,7 +144,9 @@ impl Geoip {
         };
 
         match result {
-            Ok(_) | Err(MaxMindDBError::AddressNotFoundError(_)) => Ok(Geoip {
+            // Returns Ok(None) when IP is valid but not found
+            // [Changelog](https://github.com/oschwald/maxminddb-rust/blob/main/CHANGELOG.md#0260---2025-03-28)
+            Ok(_) => Ok(Geoip {
                 last_modified: fs::metadata(&config.path)?.modified()?,
                 dbreader,
                 dbkind,
@@ -173,7 +175,7 @@ impl Geoip {
 
         match self.dbkind {
             DatabaseKind::Asn | DatabaseKind::Isp => {
-                let data = self.dbreader.lookup::<Isp>(ip).ok()?;
+                let data = self.dbreader.lookup::<Isp>(ip).ok()??;
 
                 add_field!("autonomous_system_number", data.autonomous_system_number);
                 add_field!(
@@ -184,7 +186,7 @@ impl Geoip {
                 add_field!("organization", data.organization);
             }
             DatabaseKind::City => {
-                let data = self.dbreader.lookup::<City>(ip).ok()?;
+                let data = self.dbreader.lookup::<City>(ip).ok()??;
 
                 add_field!(
                     "city_name",
@@ -225,13 +227,13 @@ impl Geoip {
                 add_field!("postal_code", data.postal.and_then(|p| p.code));
             }
             DatabaseKind::ConnectionType => {
-                let data = self.dbreader.lookup::<ConnectionType>(ip).ok()?;
+                let data = self.dbreader.lookup::<ConnectionType>(ip).ok()??;
 
                 add_field!("connection_type", data.connection_type);
             }
             #[cfg(feature = "enterprise")]
             DatabaseKind::Enterprise => {
-                let data = self.dbreader.lookup::<Enterprise>(ip).ok()?;
+                let data = self.dbreader.lookup::<Enterprise>(ip).ok()??;
 
                 add_field!(
                     "city_name",
@@ -335,9 +337,10 @@ impl Table for Geoip {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        _wildcard: Option<&Value>, // Use not known yet
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String> {
-        let mut rows = self.find_table_rows(case, condition, select, index)?;
+        let mut rows = self.find_table_rows(case, condition, select, _wildcard, index)?;
 
         match rows.pop() {
             Some(row) if rows.is_empty() => Ok(row),
@@ -354,6 +357,7 @@ impl Table for Geoip {
         _: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        _wildcard: Option<&Value>, // Use not known yet
         _: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         match condition.first() {

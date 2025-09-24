@@ -128,7 +128,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                             );
                             // update metrics
                             metrics::FILE_DOWNLOADER_NORMAL_QUEUE_SIZE
-                                .with_label_values(&[])
+                                .with_label_values::<&str>(&[])
                                 .dec();
                             continue;
                         }
@@ -161,7 +161,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
                         // update metrics
                         metrics::FILE_DOWNLOADER_NORMAL_QUEUE_SIZE
-                            .with_label_values(&[])
+                            .with_label_values::<&str>(&[])
                             .dec();
                     }
                 }
@@ -218,7 +218,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                     );
                                     // update metrics
                                     metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
-                                        .with_label_values(&[])
+                                        .with_label_values::<&str>(&[])
                                         .dec();
                                     return;
                                 }
@@ -247,7 +247,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
                                 // update metrics
                                 metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
-                                    .with_label_values(&[])
+                                    .with_label_values::<&str>(&[])
                                     .dec();
                             }
                             None => {
@@ -505,7 +505,7 @@ pub async fn queue_download(
 
         // update metrics
         metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
-            .with_label_values(&[])
+            .with_label_values::<&str>(&[])
             .inc();
     } else {
         FILE_DOWNLOAD_CHANNEL
@@ -522,7 +522,7 @@ pub async fn queue_download(
 
         // update metrics
         metrics::FILE_DOWNLOADER_NORMAL_QUEUE_SIZE
-            .with_label_values(&[])
+            .with_label_values::<&str>(&[])
             .inc();
     }
     Ok(())

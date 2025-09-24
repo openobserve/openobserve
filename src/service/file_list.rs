@@ -142,7 +142,7 @@ pub async fn query_by_ids(
 ) -> Result<Vec<FileKey>> {
     let cfg = get_config();
     FILE_LIST_ID_SELECT_COUNT
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(ids.len() as i64);
     // 1. first query from local cache
     let (mut files, ids) = if !cfg.common.local_mode {
@@ -179,7 +179,7 @@ pub async fn query_by_ids(
         );
 
         FILE_LIST_CACHE_HIT_COUNT
-            .with_label_values(&[])
+            .with_label_values::<&str>(&[])
             .set(cached_ids.len() as i64);
 
         (

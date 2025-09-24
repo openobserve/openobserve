@@ -660,16 +660,16 @@ async fn update_node_status_metrics() -> NodeMetrics {
         .with_label_values(&[config::VERSION])
         .set(1);
     config::metrics::NODE_CPU_TOTAL
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(node_status.cpu_total as i64);
     config::metrics::NODE_CPU_USAGE
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(node_status.cpu_usage as i64);
     config::metrics::NODE_MEMORY_TOTAL
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(node_status.memory_total as i64);
     config::metrics::NODE_MEMORY_USAGE
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(node_status.memory_usage as i64);
     config::metrics::NODE_TCP_CONNECTIONS
         .with_label_values(&["total"])
