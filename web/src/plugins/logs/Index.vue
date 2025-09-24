@@ -1553,6 +1553,27 @@ export default defineComponent({
               isFirstVisualizationToggle.value = false;
             }
 
+            let logsPageQuery = "";
+
+            // handle sql mode
+            if (!searchObj.meta.sqlMode) {
+              const queryBuild = buildSearch();
+              logsPageQuery = queryBuild?.query?.sql ?? "";
+            } else {
+              logsPageQuery = searchObj.data.query;
+            }
+
+            // Check if query is SELECT * which is not supported for visualization
+            if (
+              store.state.zoConfig.quick_mode_enabled === true &&
+              isSimpleSelectAllQuery(logsPageQuery)
+            ) {
+              showErrorNotification(
+                "Select * query is not supported for visualization",
+              );
+              return;
+            }
+
             // Use conditional auto-selection based on first toggle and URL chart type
             isRestoringFromUrl.value = true;
             shouldUseHistogramQuery.value = await extractVisualizationFields(

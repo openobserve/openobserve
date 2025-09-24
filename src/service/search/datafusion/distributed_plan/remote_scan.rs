@@ -86,7 +86,7 @@ impl RemoteScanExec {
             .filter_map(|(idx, n)| if n.is_querier() { Some(idx) } else { None })
             .collect::<Vec<_>>();
         // random shuffle the node ids
-        node_ids.shuffle(&mut rand::thread_rng());
+        node_ids.shuffle(&mut rand::rng());
         let enrich_mode_node_idx = node_ids.pop().unwrap_or_default();
 
         Ok(RemoteScanExec {
