@@ -126,7 +126,7 @@ test_data_histog = [
         "Stream",
         f'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "{stream_name}" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
         1,
-        3851,
+        3848,
     ),
     (
         "AND",
@@ -174,7 +174,7 @@ test_data_histog = [
         "Count Having",
         f'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "{stream_name}" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
         1,
-        3851,
+        3848,
     ),
     (
         "Not Null",

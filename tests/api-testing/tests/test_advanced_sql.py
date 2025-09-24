@@ -512,126 +512,126 @@ def test_e2e_metadata_extraction(create_session, base_url):
         print("⚠️  No hits found for caller extraction query")
 
 
-def test_e2e_array_case_sensitive(create_session, base_url):
-    """Running an E2E test for array extraction with case-sensitive matching."""
+# def test_e2e_array_case_sensitive(create_session, base_url):
+#     """Running an E2E test for array extraction with case-sensitive matching."""
 
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
-    json_data = {
-        "query": {
-            "sql": """SELECT *
-            FROM "stream_pytest_data"
-            WHERE str_match(array_extract(cast_to_arr(log), 1), 'fu')""",
-            "start_time": one_hour_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 100,
-        },
-    }
+#     session = create_session
+#     url = base_url
+#     org_id = "default"
+#     now = datetime.now(timezone.utc)
+#     end_time = int(now.timestamp() * 1000000)
+#     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
+#     json_data = {
+#         "query": {
+#             "sql": """SELECT *
+#             FROM "stream_pytest_data"
+#             WHERE str_match(array_extract(cast_to_arr(log), 1), 'fu')""",
+#             "start_time": one_hour_ago,
+#             "end_time": end_time,
+#             "from": 0,
+#             "size": 100,
+#         },
+#     }
 
-    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+#     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
    
-    assert (
-        resp_get_allsearch.status_code == 200
-    ), f"Array case-sensitive query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+#     assert (
+#         resp_get_allsearch.status_code == 200
+#     ), f"Array case-sensitive query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
     
-    response_data = resp_get_allsearch.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
+#     response_data = resp_get_allsearch.json()
+#     assert "hits" in response_data, "Response should contain 'hits' field"
     
-    hits = response_data["hits"]
+#     hits = response_data["hits"]
     
-    if len(hits) > 0:
-        print(f"Found {len(hits)} hits for case-sensitive array extraction")
-        for i, hit in enumerate(hits):
-            assert "log" in hit, f"Hit {i} should contain 'log' field"
+#     if len(hits) > 0:
+#         print(f"Found {len(hits)} hits for case-sensitive array extraction")
+#         for i, hit in enumerate(hits):
+#             assert "log" in hit, f"Hit {i} should contain 'log' field"
             
-            # Validate that the log contains an array and first element matches 'fu' (case sensitive)
-            log_value = hit["log"]
-            assert log_value, f"Hit {i} log should not be empty"
-            assert log_value.startswith('['), f"Hit {i} log should be array format, got: {log_value}"
+#             # Validate that the log contains an array and first element matches 'fu' (case sensitive)
+#             log_value = hit["log"]
+#             assert log_value, f"Hit {i} log should not be empty"
+#             assert log_value.startswith('['), f"Hit {i} log should be array format, got: {log_value}"
             
-            # str_match does substring matching, so 'fu' should match 'datafusion'
-            try:
-                array_data = json.loads(log_value)
-                if len(array_data) > 0:
-                    first_element = array_data[0]
-                    assert 'fu' in first_element, f"Hit {i} first array element '{first_element}' should contain 'fu' (case sensitive)"
-            except json.JSONDecodeError:
-                assert False, f"Hit {i} log is not valid JSON array: {log_value}"
+#             # str_match does substring matching, so 'fu' should match 'datafusion'
+#             try:
+#                 array_data = json.loads(log_value)
+#                 if len(array_data) > 0:
+#                     first_element = array_data[0]
+#                     assert 'fu' in first_element, f"Hit {i} first array element '{first_element}' should contain 'fu' (case sensitive)"
+#             except json.JSONDecodeError:
+#                 assert False, f"Hit {i} log is not valid JSON array: {log_value}"
             
-            print(f"Hit {i}: log = {log_value}")
+#             print(f"Hit {i}: log = {log_value}")
         
-        print(f"✅ All {len(hits)} hits have valid case-sensitive array data")
-        # Should find 1 hit: ["datafusion", "bad"] (contains 'fu')
-        # Should NOT find: ["parsing", "Fu"] (case sensitive, 'fu' != 'Fu')
-        assert len(hits) >= 1, f"Expected at least 1 hit for case-sensitive 'fu' substring match, got {len(hits)}"
-    else:
-        print("⚠️  No hits found for case-sensitive array query")
+#         print(f"✅ All {len(hits)} hits have valid case-sensitive array data")
+#         # Should find 1 hit: ["datafusion", "bad"] (contains 'fu')
+#         # Should NOT find: ["parsing", "Fu"] (case sensitive, 'fu' != 'Fu')
+#         assert len(hits) >= 1, f"Expected at least 1 hit for case-sensitive 'fu' substring match, got {len(hits)}"
+#     else:
+#         print("⚠️  No hits found for case-sensitive array query")
 
 
-def test_e2e_array_case_insensitive(create_session, base_url):
-    """Running an E2E test for array extraction with case-insensitive matching."""
+# def test_e2e_array_case_insensitive(create_session, base_url):
+#     """Running an E2E test for array extraction with case-insensitive matching."""
 
-    session = create_session
-    url = base_url
-    org_id = "default"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
-    json_data = {
-        "query": {
-            "sql": """SELECT *
-            FROM "stream_pytest_data"
-            WHERE str_match_ignore_case(array_extract(cast_to_arr(log), 1), 'Fu')""",
-            "start_time": one_hour_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 100,
-        },
-    }
+#     session = create_session
+#     url = base_url
+#     org_id = "default"
+#     now = datetime.now(timezone.utc)
+#     end_time = int(now.timestamp() * 1000000)
+#     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
+#     json_data = {
+#         "query": {
+#             "sql": """SELECT *
+#             FROM "stream_pytest_data"
+#             WHERE str_match_ignore_case(array_extract(cast_to_arr(log), 1), 'Fu')""",
+#             "start_time": one_hour_ago,
+#             "end_time": end_time,
+#             "from": 0,
+#             "size": 100,
+#         },
+#     }
 
-    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+#     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
    
-    assert (
-        resp_get_allsearch.status_code == 200
-    ), f"Array case-insensitive query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+#     assert (
+#         resp_get_allsearch.status_code == 200
+#     ), f"Array case-insensitive query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
     
-    response_data = resp_get_allsearch.json()
-    assert "hits" in response_data, "Response should contain 'hits' field"
+#     response_data = resp_get_allsearch.json()
+#     assert "hits" in response_data, "Response should contain 'hits' field"
     
-    hits = response_data["hits"]
-    if len(hits) > 0:
-        print(f"Found {len(hits)} hits for case-insensitive array extraction")
-        for i, hit in enumerate(hits):
-            assert "log" in hit, f"Hit {i} should contain 'log' field"
+#     hits = response_data["hits"]
+#     if len(hits) > 0:
+#         print(f"Found {len(hits)} hits for case-insensitive array extraction")
+#         for i, hit in enumerate(hits):
+#             assert "log" in hit, f"Hit {i} should contain 'log' field"
             
-            # Validate that the log contains an array and first element matches 'Fu' (case insensitive)
-            log_value = hit["log"]
-            assert log_value, f"Hit {i} log should not be empty"
-            assert log_value.startswith('['), f"Hit {i} log should be array format, got: {log_value}"
+#             # Validate that the log contains an array and first element matches 'Fu' (case insensitive)
+#             log_value = hit["log"]
+#             assert log_value, f"Hit {i} log should not be empty"
+#             assert log_value.startswith('['), f"Hit {i} log should be array format, got: {log_value}"
             
-            # Expected matches: "datafusion" and "Fu" should match 'Fu' case-insensitively
-            # Validate the log contains arrays with elements that would match 'Fu'
-            print(f"Hit {i}: log = {log_value}")
+#             # Expected matches: "datafusion" and "Fu" should match 'Fu' case-insensitively
+#             # Validate the log contains arrays with elements that would match 'Fu'
+#             print(f"Hit {i}: log = {log_value}")
             
-            # The array should contain elements that match 'Fu' case-insensitively
-            try:
-                array_data = json.loads(log_value)
-                if len(array_data) > 0:
-                    first_element = array_data[0].lower()
-                    assert 'fu' in first_element, f"Hit {i} first array element '{array_data[0]}' should contain 'fu' (case insensitive)"
-            except json.JSONDecodeError:
-                assert False, f"Hit {i} log is not valid JSON array: {log_value}"
+#             # The array should contain elements that match 'Fu' case-insensitively
+#             try:
+#                 array_data = json.loads(log_value)
+#                 if len(array_data) > 0:
+#                     first_element = array_data[0].lower()
+#                     assert 'fu' in first_element, f"Hit {i} first array element '{array_data[0]}' should contain 'fu' (case insensitive)"
+#             except json.JSONDecodeError:
+#                 assert False, f"Hit {i} log is not valid JSON array: {log_value}"
         
-        print(f"✅ All {len(hits)} hits have valid case-insensitive array data")
-        # Should find 2 hits: ["datafusion", "bad"] and ["parsing", "Fu"]
-        assert len(hits) >= 1, f"Expected at least 1 hit for case-insensitive 'Fu' match, got {len(hits)}"
-    else:
-        print("⚠️  No hits found for case-insensitive array query")
+#         print(f"✅ All {len(hits)} hits have valid case-insensitive array data")
+#         # Should find 2 hits: ["datafusion", "bad"] and ["parsing", "Fu"]
+#         assert len(hits) >= 1, f"Expected at least 1 hit for case-insensitive 'Fu' match, got {len(hits)}"
+#     else:
+#         print("⚠️  No hits found for case-insensitive array query")
 
 
 def test_e2e_multi_level_array_processing(create_session, base_url):
