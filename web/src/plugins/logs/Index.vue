@@ -565,7 +565,6 @@ export default defineComponent({
       cancelQuery,
       getRegionInfo,
       sendCancelSearchMessage,
-      setCommunicationMethod,
     } = useSearchBar();
     let {
       getJobData,
@@ -576,12 +575,10 @@ export default defineComponent({
       handleRunQuery,
       enableRefreshInterval,
       clearSearchObj,
-      processHttpHistogramResults,
       loadVisualizeData,
     } = useLogs();
 
     const {
-      getHistogramQueryData,
       resetHistogramWithError,
       generateHistogramData,
       generateHistogramSkeleton,
@@ -2334,7 +2331,6 @@ export default defineComponent({
       redirectBackToLogs,
       handleRunQuery,
       refreshTimezone,
-      getHistogramQueryData,
       generateHistogramSkeleton,
       setInterestingFieldInSQLQuery,
       handleQuickModeChange,
@@ -2356,12 +2352,10 @@ export default defineComponent({
       isDistinctQuery,
       isWithQuery,
       isStreamingEnabled,
-      setCommunicationMethod,
       sendToAiChat,
       processInterestingFiledInSQLQuery,
       removeFieldByName,
       dashboardPanelData,
-      processHttpHistogramResults,
       searchResponseForVisualization,
       shouldUseHistogramQuery,
       clearSchemaCache,
@@ -2494,7 +2488,7 @@ export default defineComponent({
           // this.handleRunQuery();
           this.searchObj.loadingHistogram = true;
 
-          this.setCommunicationMethod();
+          // this.setCommunicationMethod();
 
           // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
@@ -2518,21 +2512,21 @@ export default defineComponent({
             return;
           }
 
-          this.processHttpHistogramResults(
-            this.searchObj.data.customDownloadQueryObj,
-          )
-            .then((res: any) => {
-              this.refreshTimezone();
-              const timeout = setTimeout(() => {
-                if (this.searchResultRef) this.searchResultRef.reDrawChart();
-              }, 100);
+          // this.processHttpHistogramResults(
+          //   this.searchObj.data.customDownloadQueryObj,
+          // )
+          //   .then((res: any) => {
+          //     this.refreshTimezone();
+          //     const timeout = setTimeout(() => {
+          //       if (this.searchResultRef) this.searchResultRef.reDrawChart();
+          //     }, 100);
 
-              // Store timeout reference for cleanup
-              this.chartRedrawTimeout = timeout;
-            })
-            .finally(() => {
-              this.searchObj.loadingHistogram = false;
-            });
+          //     // Store timeout reference for cleanup
+          //     this.chartRedrawTimeout = timeout;
+          //   })
+          //   .finally(() => {
+          //     this.searchObj.loadingHistogram = false;
+          //   });
         }
       }
 
