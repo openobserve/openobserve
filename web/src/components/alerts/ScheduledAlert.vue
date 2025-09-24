@@ -210,12 +210,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div style="width: calc(100% - 190px)" class="position-relative">
             <template v-if="_isAggregationEnabled && aggregationData">
-              <div class="flex tw-flex-col justify-start items-start">
+              <div class="flex tw-flex-col justify-start items-start tw-gap-2">
                 <div class="tw-flex tw-items-center">
                   <div
                   data-test="scheduled-alert-threshold-function-select"
                   class=" q-mr-xs o2-input"
-                  :class="isHavingError ? 'tw-mb-[12px]':''"
                 >
                   <q-select
                     v-model="aggregationData.function"
@@ -255,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="width: 250px"
                     @update:model-value="updateAggregation"
                     hide-bottom-space
-                    :error="isHavingError"
+                    :error="aggregationData.having.column.length == 0"
                     error-message="Field is required!"
 
                   />
@@ -270,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="aggregationData.having.operator"
                     :options="triggerOperators"
                     color="input-border"
-                  :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
+                    :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                     class="no-case q-py-none"
                     filled
                     borderless
@@ -297,6 +296,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       min="0"
                       placeholder="Value"
                       @update:model-value="updateAggregation"
+                      hide-bottom-space
+                      :rules="[(val: any) => !!val || 'Field is required!']"
                     />
                   </div>
                 </div>
