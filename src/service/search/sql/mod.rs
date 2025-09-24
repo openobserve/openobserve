@@ -183,7 +183,7 @@ impl Sql {
         let _ = statement.visit(&mut match_visitor);
 
         // 7. check if have full text search filed in stream
-        if !match_visitor.is_support_match_all {
+        if match_visitor.has_match_all && !match_visitor.is_support_match_all {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Using match_all() function in a subquery/join is not supported".to_string(),
             )));

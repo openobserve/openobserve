@@ -294,4 +294,49 @@ mod tests {
         assert!(!match_visitor.is_support_match_all);
         assert!(match_visitor.has_match_all);
     }
+
+    #[test]
+    fn test_cte_with_match_all_supported() {
+        let sql = "WITH cte AS (SELECT id FROM users WHERE match_all('error')) SELECT * FROM cte";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut match_visitor = MatchVisitor::new();
+        let _ = statement.visit(&mut match_visitor);
+
+        assert!(match_visitor.is_support_match_all);
+        assert!(match_visitor.has_match_all);
+    }
+
+    #[test]
+    fn test_cte_with_match_all_supported2() {
+        let sql = "WITH cte AS (SELECT id FROM users WHERE match_all('error')) SELECT * FROM users where id in (select id from cte)";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut match_visitor = MatchVisitor::new();
+        let _ = statement.visit(&mut match_visitor);
+
+        assert!(match_visitor.is_support_match_all);
+        assert!(match_visitor.has_match_all);
+    }
+
+    #[test]
+    fn test_cte_with_match_all_supported3() {
+        let sql = "WITH cte AS (SELECT id FROM users where log like '%error%') SELECT * FROM users where id in (select id from cte)";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut match_visitor = MatchVisitor::new();
+        let _ = statement.visit(&mut match_visitor);
+
+        assert!(match_visitor.is_support_match_all);
+        assert!(!match_visitor.has_match_all);
+    }
 }
