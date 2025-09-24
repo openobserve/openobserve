@@ -185,7 +185,7 @@ impl Sql {
         // 7. check if have full text search filed in stream
         if match_visitor.has_match_all && !match_visitor.is_support_match_all {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                "Using match_all() function in a subquery/join is not supported".to_string(),
+                "match_all() should directly apply to table, the from clause should not be subuqery/cte".to_string(),
             )));
         }
 
