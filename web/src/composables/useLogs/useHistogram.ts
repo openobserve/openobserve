@@ -16,42 +16,24 @@
 import { useStore } from "vuex";
 
 import { searchState } from "@/composables/useLogs/searchState";
-import useNotifications from "@/composables/useNotifications";
-import searchService from "@/services/search";
-import { logsErrorMessage } from "@/utils/common";
 
 import { INTERVAL_MAP } from "@/utils/logs/constants";
 
-import {
-  formatSizeFromMB,
-  histogramDateTimezone,
-  generateTraceContext,
-} from "@/utils/zincutils";
+import { formatSizeFromMB, histogramDateTimezone } from "@/utils/zincutils";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
-import { convertDateToTimestamp } from "@/utils/date";
 
 export const useHistogram = () => {
   const store = useStore();
   let {
     searchObj,
-    searchObjDebug,
     notificationMsg,
     histogramMappedData,
     histogramResults,
     searchAggData,
   } = searchState();
 
-  const {
-    fnParsedSQL,
-    hasAggregation,
-    addTraceId,
-    removeTraceId,
-    showCancelSearchNotification,
-    isTimestampASC,
-  } = logsUtils();
-
-  const { showErrorNotification } = useNotifications();
+  const { fnParsedSQL, hasAggregation } = logsUtils();
 
   const getHistogramTitle = () => {
     try {
@@ -316,282 +298,282 @@ export const useHistogram = () => {
     );
   };
 
-  const getHistogramQueryData = (queryReq: any) => {
-    return new Promise((resolve, reject) => {
-      if (searchObj.data.isOperationCancelled) {
-        searchObj.loadingHistogram = false;
-        searchObj.data.isOperationCancelled = false;
+  // const getHistogramQueryData = (queryReq: any) => {
+  //   return new Promise((resolve, reject) => {
+  //     if (searchObj.data.isOperationCancelled) {
+  //       searchObj.loadingHistogram = false;
+  //       searchObj.data.isOperationCancelled = false;
 
-        if (!searchObj.data.histogram?.xData?.length) {
-          notificationMsg.value = "Search query was cancelled";
-          searchObj.data.histogram.errorMsg = "Search query was cancelled";
-          searchObj.data.histogram.errorDetail = "Search query was cancelled";
-        }
+  //       if (!searchObj.data.histogram?.xData?.length) {
+  //         notificationMsg.value = "Search query was cancelled";
+  //         searchObj.data.histogram.errorMsg = "Search query was cancelled";
+  //         searchObj.data.histogram.errorDetail = "Search query was cancelled";
+  //       }
 
-        showCancelSearchNotification();
-        return;
-      }
+  //       showCancelSearchNotification();
+  //       return;
+  //     }
 
-      const dismiss = () => {};
-      try {
-        // Set histogram interval
-        if (searchObj.data.queryResults.histogram_interval) {
-          //1. here we need to send the histogram interval to the BE so that it will honor this we get this from the search partition response
-          //2. if user passes the histogram interval in the query BE will honor that and give us histogram interval in the parition response
-          searchObj.data.histogramInterval =
-            searchObj.data.queryResults.histogram_interval * 1000000;
-          queryReq.query.histogram_interval =
-            searchObj.data.queryResults.histogram_interval;
-        }
+  //     const dismiss = () => {};
+  //     try {
+  //       // Set histogram interval
+  //       if (searchObj.data.queryResults.histogram_interval) {
+  //         //1. here we need to send the histogram interval to the BE so that it will honor this we get this from the search partition response
+  //         //2. if user passes the histogram interval in the query BE will honor that and give us histogram interval in the parition response
+  //         searchObj.data.histogramInterval =
+  //           searchObj.data.queryResults.histogram_interval * 1000000;
+  //         queryReq.query.histogram_interval =
+  //           searchObj.data.queryResults.histogram_interval;
+  //       }
 
-        if (!searchObj.data.histogramInterval) {
-          console.error(
-            "Error processing histogram data:",
-            "histogramInterval is not set",
-          );
-          searchObj.loadingHistogram = false;
-          return;
-        }
-        const { traceparent, traceId } = generateTraceContext();
-        addTraceId(traceId);
-        queryReq.query.size = -1;
-        searchService
-          .search(
-            {
-              org_identifier: searchObj.organizationIdentifier,
-              query: queryReq,
-              page_type: searchObj.data.stream.streamType,
-              traceparent,
-              is_ui_histogram: true,
-            },
-            "ui",
-            searchObj.data.stream.selectedStream.length > 1 &&
-              searchObj.meta.sqlMode == false
-              ? true
-              : false,
-          )
-          .then(async (res: any) => {
-            removeTraceId(traceId);
-            searchObjDebug["histogramProcessingStartTime"] = performance.now();
+  //       if (!searchObj.data.histogramInterval) {
+  //         console.error(
+  //           "Error processing histogram data:",
+  //           "histogramInterval is not set",
+  //         );
+  //         searchObj.loadingHistogram = false;
+  //         return;
+  //       }
+  //       const { traceparent, traceId } = generateTraceContext();
+  //       addTraceId(traceId);
+  //       queryReq.query.size = -1;
+  //       searchService
+  //         .search(
+  //           {
+  //             org_identifier: searchObj.organizationIdentifier,
+  //             query: queryReq,
+  //             page_type: searchObj.data.stream.streamType,
+  //             traceparent,
+  //             is_ui_histogram: true,
+  //           },
+  //           "ui",
+  //           searchObj.data.stream.selectedStream.length > 1 &&
+  //             searchObj.meta.sqlMode == false
+  //             ? true
+  //             : false,
+  //         )
+  //         .then(async (res: any) => {
+  //           removeTraceId(traceId);
+  //           searchObjDebug["histogramProcessingStartTime"] = performance.now();
 
-            searchObj.loading = false;
-            if (searchObj.data.queryResults.aggs == null) {
-              searchObj.data.queryResults.aggs = [];
-            }
+  //           searchObj.loading = false;
+  //           if (searchObj.data.queryResults.aggs == null) {
+  //             searchObj.data.queryResults.aggs = [];
+  //           }
 
-            // copy converted_histogram_query to queryResults
-            searchObj.data.queryResults.converted_histogram_query =
-              res?.data?.converted_histogram_query ?? "";
+  //           // copy converted_histogram_query to queryResults
+  //           searchObj.data.queryResults.converted_histogram_query =
+  //             res?.data?.converted_histogram_query ?? "";
 
-            const parsedSQL: any = fnParsedSQL();
-            const partitions = JSON.parse(
-              JSON.stringify(
-                searchObj.data.queryResults.partitionDetail.partitions,
-              ),
-            );
+  //           const parsedSQL: any = fnParsedSQL();
+  //           const partitions = JSON.parse(
+  //             JSON.stringify(
+  //               searchObj.data.queryResults.partitionDetail.partitions,
+  //             ),
+  //           );
 
-            // is _timestamp orderby ASC then reverse the partition array
-            if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
-              partitions.reverse();
-            }
+  //           // is _timestamp orderby ASC then reverse the partition array
+  //           if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
+  //             partitions.reverse();
+  //           }
 
-            if (
-              searchObj.data.queryResults.aggs.length == 0 &&
-              res.data.hits.length > 0
-            ) {
-              for (const partition of partitions) {
-                if (
-                  partition[0] == queryReq.query.start_time &&
-                  partition[1] == queryReq.query.end_time
-                ) {
-                  histogramResults = [];
-                  let date = new Date();
-                  const startDateTime =
-                    searchObj.data.customDownloadQueryObj.query.start_time /
-                    1000;
+  //           if (
+  //             searchObj.data.queryResults.aggs.length == 0 &&
+  //             res.data.hits.length > 0
+  //           ) {
+  //             for (const partition of partitions) {
+  //               if (
+  //                 partition[0] == queryReq.query.start_time &&
+  //                 partition[1] == queryReq.query.end_time
+  //               ) {
+  //                 histogramResults = [];
+  //                 let date = new Date();
+  //                 const startDateTime =
+  //                   searchObj.data.customDownloadQueryObj.query.start_time /
+  //                   1000;
 
-                  const endDateTime =
-                    searchObj.data.customDownloadQueryObj.query.end_time / 1000;
+  //                 const endDateTime =
+  //                   searchObj.data.customDownloadQueryObj.query.end_time / 1000;
 
-                  const nowString = res.data.hits[0].zo_sql_key;
-                  const now = new Date(nowString);
+  //                 const nowString = res.data.hits[0].zo_sql_key;
+  //                 const now = new Date(nowString);
 
-                  const day = String(now.getDate()).padStart(2, "0");
-                  const month = String(now.getMonth() + 1).padStart(2, "0");
-                  const year = now.getFullYear();
+  //                 const day = String(now.getDate()).padStart(2, "0");
+  //                 const month = String(now.getMonth() + 1).padStart(2, "0");
+  //                 const year = now.getFullYear();
 
-                  const dateToBePassed = `${day}-${month}-${year}`;
-                  const hours = String(now.getHours()).padStart(2, "0");
-                  let minutes = String(now.getMinutes()).padStart(2, "0");
-                  if (searchObj.data.histogramInterval / 1000 <= 9999) {
-                    minutes = String(now.getMinutes() + 1).padStart(2, "0");
-                  }
+  //                 const dateToBePassed = `${day}-${month}-${year}`;
+  //                 const hours = String(now.getHours()).padStart(2, "0");
+  //                 let minutes = String(now.getMinutes()).padStart(2, "0");
+  //                 if (searchObj.data.histogramInterval / 1000 <= 9999) {
+  //                   minutes = String(now.getMinutes() + 1).padStart(2, "0");
+  //                 }
 
-                  const time = `${hours}:${minutes}`;
+  //                 const time = `${hours}:${minutes}`;
 
-                  const currentTimeToBePassed = convertDateToTimestamp(
-                    dateToBePassed,
-                    time,
-                    "UTC",
-                  );
-                  for (
-                    let currentTime: any =
-                      currentTimeToBePassed.timestamp / 1000;
-                    currentTime < endDateTime;
-                    currentTime += searchObj.data.histogramInterval / 1000
-                  ) {
-                    date = new Date(currentTime);
-                    histogramResults.push({
-                      zo_sql_key: date.toISOString().slice(0, 19),
-                      zo_sql_num: 0,
-                    });
-                  }
-                  for (
-                    let currentTime: any =
-                      currentTimeToBePassed.timestamp / 1000;
-                    currentTime > startDateTime;
-                    currentTime -= searchObj.data.histogramInterval / 1000
-                  ) {
-                    date = new Date(currentTime);
-                    histogramResults.push({
-                      zo_sql_key: date.toISOString().slice(0, 19),
-                      zo_sql_num: 0,
-                    });
-                  }
-                }
-              }
-            }
+  //                 const currentTimeToBePassed = convertDateToTimestamp(
+  //                   dateToBePassed,
+  //                   time,
+  //                   "UTC",
+  //                 );
+  //                 for (
+  //                   let currentTime: any =
+  //                     currentTimeToBePassed.timestamp / 1000;
+  //                   currentTime < endDateTime;
+  //                   currentTime += searchObj.data.histogramInterval / 1000
+  //                 ) {
+  //                   date = new Date(currentTime);
+  //                   histogramResults.push({
+  //                     zo_sql_key: date.toISOString().slice(0, 19),
+  //                     zo_sql_num: 0,
+  //                   });
+  //                 }
+  //                 for (
+  //                   let currentTime: any =
+  //                     currentTimeToBePassed.timestamp / 1000;
+  //                   currentTime > startDateTime;
+  //                   currentTime -= searchObj.data.histogramInterval / 1000
+  //                 ) {
+  //                   date = new Date(currentTime);
+  //                   histogramResults.push({
+  //                     zo_sql_key: date.toISOString().slice(0, 19),
+  //                     zo_sql_num: 0,
+  //                   });
+  //                 }
+  //               }
+  //             }
+  //           }
 
-            const order_by = res?.data?.order_by ?? "desc";
+  //           const order_by = res?.data?.order_by ?? "desc";
 
-            if (order_by?.toLowerCase() === "desc") {
-              searchObj.data.queryResults.aggs.push(...res.data.hits);
-            } else {
-              searchObj.data.queryResults.aggs.unshift(...res.data.hits);
-            }
+  //           if (order_by?.toLowerCase() === "desc") {
+  //             searchObj.data.queryResults.aggs.push(...res.data.hits);
+  //           } else {
+  //             searchObj.data.queryResults.aggs.unshift(...res.data.hits);
+  //           }
 
-            searchObj.data.queryResults.scan_size += res.data.scan_size;
-            searchObj.data.queryResults.took += res.data.took;
-            searchObj.data.queryResults.result_cache_ratio +=
-              res.data.result_cache_ratio;
-            const currentStartTime = queryReq.query.start_time;
-            const currentEndTime = queryReq.query.end_time;
-            let totalHits = 0;
-            searchObj.data.queryResults.partitionDetail.partitions.map(
-              (item: any, index: any) => {
-                if (item[0] == currentStartTime && item[1] == currentEndTime) {
-                  totalHits = res.data.hits.reduce(
-                    (accumulator: number, currentValue: any) =>
-                      accumulator +
-                      Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
-                    0,
-                  );
+  //           searchObj.data.queryResults.scan_size += res.data.scan_size;
+  //           searchObj.data.queryResults.took += res.data.took;
+  //           searchObj.data.queryResults.result_cache_ratio +=
+  //             res.data.result_cache_ratio;
+  //           const currentStartTime = queryReq.query.start_time;
+  //           const currentEndTime = queryReq.query.end_time;
+  //           let totalHits = 0;
+  //           searchObj.data.queryResults.partitionDetail.partitions.map(
+  //             (item: any, index: any) => {
+  //               if (item[0] == currentStartTime && item[1] == currentEndTime) {
+  //                 totalHits = res.data.hits.reduce(
+  //                   (accumulator: number, currentValue: any) =>
+  //                     accumulator +
+  //                     Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
+  //                   0,
+  //                 );
 
-                  searchObj.data.queryResults.partitionDetail.partitionTotal[
-                    index
-                  ] = totalHits;
+  //                 searchObj.data.queryResults.partitionDetail.partitionTotal[
+  //                   index
+  //                 ] = totalHits;
 
-                  return;
-                }
-              },
-            );
+  //                 return;
+  //               }
+  //             },
+  //           );
 
-            queryReq.query.start_time =
-              searchObj.data.queryResults.partitionDetail.paginations[
-                searchObj.data.resultGrid.currentPage - 1
-              ][0].startTime;
-            queryReq.query.end_time =
-              searchObj.data.queryResults.partitionDetail.paginations[
-                searchObj.data.resultGrid.currentPage - 1
-              ][0].endTime;
+  //           queryReq.query.start_time =
+  //             searchObj.data.queryResults.partitionDetail.paginations[
+  //               searchObj.data.resultGrid.currentPage - 1
+  //             ][0].startTime;
+  //           queryReq.query.end_time =
+  //             searchObj.data.queryResults.partitionDetail.paginations[
+  //               searchObj.data.resultGrid.currentPage - 1
+  //             ][0].endTime;
 
-            // check if histogram interval is undefined, then set current response as histogram response
-            // for visualization, will require to set histogram interval to fill missing values
-            // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
-            // created new attribute visualization_histogram_interval to avoid this issue
-            if (
-              !searchObj.data.queryResults.visualization_histogram_interval &&
-              res.data?.histogram_interval
-            ) {
-              searchObj.data.queryResults.visualization_histogram_interval =
-                res.data?.histogram_interval;
-            }
+  //           // check if histogram interval is undefined, then set current response as histogram response
+  //           // for visualization, will require to set histogram interval to fill missing values
+  //           // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+  //           // created new attribute visualization_histogram_interval to avoid this issue
+  //           if (
+  //             !searchObj.data.queryResults.visualization_histogram_interval &&
+  //             res.data?.histogram_interval
+  //           ) {
+  //             searchObj.data.queryResults.visualization_histogram_interval =
+  //               res.data?.histogram_interval;
+  //           }
 
-            // if (hasAggregationFlag) {
-            //   searchObj.data.queryResults.total = res.data.total;
-            // }
+  //           // if (hasAggregationFlag) {
+  //           //   searchObj.data.queryResults.total = res.data.total;
+  //           // }
 
-            // searchObj.data.histogram.chartParams.title = getHistogramTitle();
+  //           // searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
-            searchObjDebug["histogramProcessingEndTime"] = performance.now();
-            searchObjDebug["histogramEndTime"] = performance.now();
+  //           searchObjDebug["histogramProcessingEndTime"] = performance.now();
+  //           searchObjDebug["histogramEndTime"] = performance.now();
 
-            dismiss();
-            resolve(true);
-          })
-          .catch((err) => {
-            searchObj.loadingHistogram = false;
+  //           dismiss();
+  //           resolve(true);
+  //         })
+  //         .catch((err) => {
+  //           searchObj.loadingHistogram = false;
 
-            // Reset cancel query on search error
-            searchObj.data.isOperationCancelled = false;
+  //           // Reset cancel query on search error
+  //           searchObj.data.isOperationCancelled = false;
 
-            let trace_id = "";
+  //           let trace_id = "";
 
-            if (err?.request?.status != 429) {
-              searchObj.data.histogram.errorMsg =
-                typeof err == "string" && err
-                  ? err
-                  : "Error while processing histogram request.";
-              if (err.response != undefined) {
-                searchObj.data.histogram.errorMsg = err.response.data.error;
-                if (err.response.data.hasOwnProperty("trace_id")) {
-                  trace_id = err.response.data?.trace_id;
-                }
-              } else {
-                searchObj.data.histogram.errorMsg = err.message;
-                if (err.hasOwnProperty("trace_id")) {
-                  trace_id = err?.trace_id;
-                }
-              }
+  //           if (err?.request?.status != 429) {
+  //             searchObj.data.histogram.errorMsg =
+  //               typeof err == "string" && err
+  //                 ? err
+  //                 : "Error while processing histogram request.";
+  //             if (err.response != undefined) {
+  //               searchObj.data.histogram.errorMsg = err.response.data.error;
+  //               if (err.response.data.hasOwnProperty("trace_id")) {
+  //                 trace_id = err.response.data?.trace_id;
+  //               }
+  //             } else {
+  //               searchObj.data.histogram.errorMsg = err.message;
+  //               if (err.hasOwnProperty("trace_id")) {
+  //                 trace_id = err?.trace_id;
+  //               }
+  //             }
 
-              const customMessage = logsErrorMessage(err?.response?.data.code);
-              searchObj.data.histogram.errorCode = err?.response?.data.code;
-              searchObj.data.histogram.errorDetail =
-                err?.response?.data?.error_detail;
+  //             const customMessage = logsErrorMessage(err?.response?.data.code);
+  //             searchObj.data.histogram.errorCode = err?.response?.data.code;
+  //             searchObj.data.histogram.errorDetail =
+  //               err?.response?.data?.error_detail;
 
-              if (customMessage != "") {
-                searchObj.data.histogram.errorMsg = t(customMessage);
-              }
+  //             if (customMessage != "") {
+  //               searchObj.data.histogram.errorMsg = t(customMessage);
+  //             }
 
-              notificationMsg.value = searchObj.data.histogram.errorMsg;
+  //             notificationMsg.value = searchObj.data.histogram.errorMsg;
 
-              if (trace_id) {
-                searchObj.data.histogram.errorMsg +=
-                  " <br><span class='text-subtitle1'>TraceID:" +
-                  trace_id +
-                  "</span>";
-                notificationMsg.value += " TraceID:" + trace_id;
-                trace_id = "";
-              }
-            }
+  //             if (trace_id) {
+  //               searchObj.data.histogram.errorMsg +=
+  //                 " <br><span class='text-subtitle1'>TraceID:" +
+  //                 trace_id +
+  //                 "</span>";
+  //               notificationMsg.value += " TraceID:" + trace_id;
+  //               trace_id = "";
+  //             }
+  //           }
 
-            reject(false);
-          })
-          .finally(() => {
-            removeTraceId(traceId);
-          });
-      } catch (e: any) {
-        dismiss();
-        // searchObj.data.histogram.errorMsg = e.message;
-        // searchObj.data.histogram.errorCode = e.code;
-        searchObj.loadingHistogram = false;
-        notificationMsg.value = searchObj.data.histogram.errorMsg;
-        showErrorNotification("Error while fetching histogram data");
+  //           reject(false);
+  //         })
+  //         .finally(() => {
+  //           removeTraceId(traceId);
+  //         });
+  //     } catch (e: any) {
+  //       dismiss();
+  //       // searchObj.data.histogram.errorMsg = e.message;
+  //       // searchObj.data.histogram.errorCode = e.code;
+  //       searchObj.loadingHistogram = false;
+  //       notificationMsg.value = searchObj.data.histogram.errorMsg;
+  //       showErrorNotification("Error while fetching histogram data");
 
-        reject(false);
-      }
-    });
-  };
+  //       reject(false);
+  //     }
+  //   });
+  // };
 
   return {
     getHistogramTitle,
@@ -600,7 +582,6 @@ export const useHistogram = () => {
     generateHistogramSkeleton,
     setMultiStreamHistogramQuery,
     isHistogramEnabled,
-    getHistogramQueryData,
   };
 };
 
