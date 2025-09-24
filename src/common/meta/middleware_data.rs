@@ -123,7 +123,9 @@ impl RumExtraData {
 
             let maxminddb_client = MAXMIND_DB_CLIENT.read().await;
             let geo_info = if let Some(client) = maxminddb_client.as_ref() {
-                if let Ok(city_info) = client.city_reader.lookup::<maxminddb::geoip2::City>(ip) {
+                if let Ok(Some(city_info)) =
+                    client.city_reader.lookup::<maxminddb::geoip2::City>(ip)
+                {
                     let country = city_info
                         .country
                         .as_ref()
