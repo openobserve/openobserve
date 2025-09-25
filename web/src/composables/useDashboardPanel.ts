@@ -401,6 +401,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     ];
   };
 
+  const getStreamNameFromStreamAlias = (streamAlias: string) => {
+    if (!streamAlias)
+      return dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.stream;
+    const allStreams = getAllSelectedStreams();
+    return allStreams.find((field: any) => field.streamAlias == streamAlias)
+      ?.stream;
+  };
+
   const isAddXAxisNotAllowed = computed((e: any) => {
     switch (dashboardPanelData.data.type) {
       case "pie":
@@ -590,7 +600,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     updateArrayAlias();
   };
 
-  const addBreakDownAxisItem = (row: { name: string; streamAlias?: string }) => {
+  const addBreakDownAxisItem = (row: {
+    name: string;
+    streamAlias?: string;
+  }) => {
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1549,7 +1562,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     ].fields.value = null;
   };
 
-  const addFilteredItem = async (name: string) => {
+  const addFilteredItem = async (row: {
+    name: string;
+    streamAlias?: string;
+    stream: string;
+  }) => {
     const currentQuery =
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1568,7 +1585,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     currentQuery.fields.filter.conditions.push({
       type: "list",
       values: [],
-      column: name,
+      column: { field: row.name, streamAlias: row.streamAlias },
       operator: null,
       value: null,
       logicalOperator: "AND",
@@ -1583,14 +1600,14 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     try {
       const queryReq = {
         org_identifier: store.state.selectedOrganization.identifier,
-        stream_name: currentQuery.fields.stream,
+        stream_name: row.stream,
         start_time: new Date(
           dashboardPanelData.meta.dateTime["start_time"].toISOString(),
         ).getTime(),
         end_time: new Date(
           dashboardPanelData.meta.dateTime["end_time"].toISOString(),
         ).getTime(),
-        fields: [name],
+        fields: [row.name],
         size: 100,
         type: currentQuery.fields.stream_type,
         no_count: true,
@@ -1599,7 +1616,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       const res = await valuesWebSocket.fetchFieldValues(
         queryReq,
         dashboardPanelData,
-        name,
+        row,
       );
     } catch (error: any) {
       const errorDetailValue =
@@ -1615,21 +1632,25 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
 
-  const loadFilterItem = async (name: any) => {
+  const loadFilterItem = async (row: {
+    field: string;
+    streamAlias?: string;
+  }) => {
     try {
       const queryReq = {
         org_identifier: store.state.selectedOrganization.identifier,
-        stream_name:
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream,
+        stream_name: row.streamAlias
+          ? getStreamNameFromStreamAlias(row.streamAlias)
+          : dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream,
         start_time: new Date(
           dashboardPanelData?.meta?.dateTime?.["start_time"]?.toISOString(),
         ).getTime(),
         end_time: new Date(
           dashboardPanelData?.meta?.dateTime?.["end_time"]?.toISOString(),
         ).getTime(),
-        fields: [name],
+        fields: [row.field],
         size: 100,
         type: dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -1640,7 +1661,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       const response = await valuesWebSocket.fetchFieldValues(
         queryReq,
         dashboardPanelData,
-        name,
+        row,
       );
     } catch (error: any) {
       const errorDetailValue =
@@ -3713,6 +3734,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     convertSchemaToFields,
     setFieldsBasedOnChartTypeValidation,
     getDefaultDashboardPanelData,
+    getStreamNameFromStreamAlias,
   };
 };
 export default useDashboardPanelData;
