@@ -105,6 +105,16 @@ use tracing_subscriber::{
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    // CLI provides the path to the config file (if any)
+    // In case a custom path is provided, the file will be read first
+    // and config variables will be loaded.
+    // This has to happen as the foremost step as any call to
+    // get_config without this would be loaded from local `.env`
+    // or environment itself.
+    if cli::cli().await? {
+        return Ok(());
+    }
+
     #[cfg(feature = "tokio-console")]
     console_subscriber::ConsoleLayer::builder()
         .retention(Duration::from_secs(
@@ -158,11 +168,6 @@ async fn main() -> Result<(), anyhow::Error> {
     } else {
         None
     };
-
-    // cli mode
-    if cli::cli().await? {
-        return Ok(());
-    }
 
     let cfg = get_config();
 
