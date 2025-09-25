@@ -565,7 +565,7 @@ pub async fn prepare_cache_response(
                     cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
                 if let Some(interval) = v.histogram_interval {
-                    file_path = format!("{}_{}_{}", file_path, interval, ts_column);
+                    file_path = format!("{file_path}_{interval}_{ts_column}");
                 }
                 let clear_cache = force_clear_cache.unwrap_or(!is_http2_streaming);
 
