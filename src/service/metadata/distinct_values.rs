@@ -137,7 +137,7 @@ fn handle_channel() -> Arc<mpsc::Sender<DvEvent>> {
             };
             if let DvEventType::Shutudown = event.ev_type {
                 if let Err(e) = INSTANCE.flush().await {
-                    log::error!("[DISTINCT_VALUES] flush error: {}", e);
+                    log::error!("[DISTINCT_VALUES] flush error: {e}");
                 }
                 INSTANCE.shutdown.store(true, Ordering::Release);
                 break;
@@ -231,7 +231,7 @@ impl Metadata for DistinctValues {
                 )
                 .await
                 {
-                    log::error!("[DISTINCT_VALUES] error while setting schema: {}", e);
+                    log::error!("[DISTINCT_VALUES] error while setting schema: {e}");
                     return Err(Error::Message(e.to_string()));
                 }
             }
