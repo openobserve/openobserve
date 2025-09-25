@@ -62,7 +62,7 @@ def execute_query_with_vrl(
     start_execution = time.time()
     
     response = session.post(
-        f"{base_url}api/{org_id}/_search?type=logs&search_type=ui&use_cache=true",
+        f"{base_url}api/{org_id}/_search_stream?type=logs&search_type=ui&use_cache=true",
         json=json_data,
         headers=headers
     )
@@ -77,13 +77,38 @@ def execute_query_with_vrl(
     }
     
     if response.status_code == 200:
-        response_data = response.json()
+        # Handle streaming response
+        response_text = response.text
+        hits = []
+        total = 0
+        took = 0
+        cached = False
+        result_cache_ratio = 0
+        
+        # Parse server-sent events format
+        for line in response_text.strip().split('\n'):
+            if line.startswith('data: '):
+                try:
+                    data = json.loads(line[6:])  # Remove 'data: ' prefix
+                    if 'hits' in data:
+                        hits.extend(data['hits'])
+                    if 'total' in data:
+                        total = data['total']
+                    if 'took' in data:
+                        took = data['took']
+                    if 'cached' in data:
+                        cached = data['cached']
+                    if 'result_cache_ratio' in data:
+                        result_cache_ratio = data['result_cache_ratio']
+                except json.JSONDecodeError:
+                    continue
+        
         result.update({
-            "hits": response_data.get("hits", []),
-            "total": response_data.get("total", 0),
-            "took": response_data.get("took", 0),
-            "cached": response_data.get("cached", False),
-            "result_cache_ratio": response_data.get("result_cache_ratio", 0),
+            "hits": hits,
+            "total": total,
+            "took": took,
+            "cached": cached,
+            "result_cache_ratio": result_cache_ratio,
         })
     else:
         result["error"] = response.text
@@ -95,14 +120,14 @@ def test_vrl_cache_bug_simple(create_session, base_url):
     
     session = create_session
     
-    # Use recent time range that has data
+    # Use recent time range but longer to get more data
     end_time = datetime.now(timezone.utc) - timedelta(minutes=30)
-    start_time = end_time - timedelta(hours=6)
+    start_time = end_time - timedelta(hours=24)  # 24 hour window
     
     start_time_us = int(start_time.timestamp() * 1000000)
     end_time_us = int(end_time.timestamp() * 1000000)
     
-    # Find stream with data
+    # Go back to stream_pytest_data which had data before
     sql = '''
         SELECT *
         FROM "stream_pytest_data"
@@ -117,8 +142,8 @@ def test_vrl_cache_bug_simple(create_session, base_url):
     
     if discovery_result["status_code"] != 200 or len(discovery_result.get("hits", [])) == 0:
         logger.info("🔍 Trying other streams...")
-        # Try other streams
-        for stream_candidate in ["default", "logs", "stream_pytest_data", "test_stream"]:
+        # Try other streams with historical data focus
+        for stream_candidate in ["default", "logs", "stream_pytest_data", "test_stream", "nginx", "app"]:
             test_sql = f'SELECT * FROM "{stream_candidate}" ORDER BY _timestamp DESC LIMIT 20'
             test_result = execute_query_with_vrl(session, base_url, test_sql, start_time_us, end_time_us)
             
@@ -152,20 +177,20 @@ def test_vrl_cache_bug_simple(create_session, base_url):
     
     vrl_function_1 = create_vrl_function('.test_vrl = "first_value"')
     
-    # Build cache with multiple runs
+    # Build cache with multiple runs - more aggressive caching
     cache_ratios = []
-    for i in range(5):
+    for i in range(10):  # More runs to build higher cache
         result = execute_query_with_vrl(session, base_url, sql, start_time_us, end_time_us, vrl_function_1)
         cache_ratio = result.get("result_cache_ratio", 0)
         cache_ratios.append(cache_ratio)
-        logger.info(f"  Test 1 - Run {i+1}/5: Cache ratio: {cache_ratio}%")
-        time.sleep(1)
+        logger.info(f"  Test 1 - Run {i+1}/10: Cache ratio: {cache_ratio}%")
+        time.sleep(0.5)  # Shorter delay to build cache faster
     
     final_result_1 = result
     total_hits_1 = len(final_result_1.get("hits", []))
     first_value_count = sum(1 for hit in final_result_1["hits"] if "test_vrl" in hit and hit["test_vrl"] == "first_value")
     
-    logger.info(f"📊 Test 1 Cache progression: {' → '.join([f'{r}%' for r in cache_ratios])}")
+    logger.info(f"📊 Test 1 Cache progression: {' → '.join([f'{r}%' for r in cache_ratios[-5:]])}")  # Show last 5
     logger.info(f"🔍 Test 1 Final: {total_hits_1} hits, {first_value_count} with 'first_value'")
     
     # Console log first 3 and last 3 hits from TEST 1 (not all 50)
@@ -260,7 +285,7 @@ def test_vrl_cache_bug_simple(create_session, base_url):
     logger.info("🎯 CRITICAL VRL CACHE BUG VALIDATION")
     logger.info("="*60)
     
-    if cache_ratio_2 > 50:
+    if cache_ratio_2 > 10:  # Lower threshold to catch bugs at lower cache ratios
         logger.info(f"⚠️  High cache ratio ({cache_ratio_2}%) - validating VRL cache behavior...")
         
         # Bug check 1: Old VRL should not exist
