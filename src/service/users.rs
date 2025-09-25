@@ -636,9 +636,7 @@ pub async fn add_user_to_org(
     let email = email.trim().to_lowercase();
     let existing_user = db::user::get_user_record(&email).await;
     let root_user = ROOT_USER.clone();
-    if existing_user.is_ok() {
-        let existing_user = existing_user.unwrap();
-
+    if let Ok(existing_user) = existing_user {
         // If the user is root, we don't need to add to the org, as root user
         // already has access to all organizations.
         if existing_user.is_root {
