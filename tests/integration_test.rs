@@ -37,7 +37,7 @@ mod tests {
         utils::json,
     };
     use openobserve::{
-        common::meta::ingestion::IngestionResponse,
+        common::meta::{ingestion::IngestionResponse, user::UserList},
         handler::{
             grpc::{auth::check_auth, flight::FlightServiceImpl},
             http::{
@@ -181,6 +181,7 @@ mod tests {
         e2e_update_user().await;
         e2e_update_user_with_empty().await;
         e2e_add_user_to_org().await;
+        e2e_add_root_user_to_org().await;
         e2e_list_users().await;
         e2e_get_organizations().await;
         e2e_get_user_passcode().await;
@@ -778,6 +779,24 @@ mod tests {
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        println!("list users resp: {body_str:?}");
+        // deserialize the body into UserList
+        let user_list: UserList = serde_json::from_str(&body_str).unwrap();
+        assert!(!user_list.data.is_empty());
+        assert!(
+            user_list
+                .data
+                .iter()
+                .any(|user| user.email == "admin@example.com")
+        );
+        assert!(
+            user_list
+                .data
+                .iter()
+                .any(|user| user.email == "nonadmin@example.com")
+        );
     }
 
     async fn e2e_get_organizations() {
@@ -973,7 +992,7 @@ mod tests {
         assert!(!resp.status().is_success());
     }
 
-    async fn e2e_add_user_to_org() {
+    async fn e2e_add_root_user_to_org() {
         let auth = setup();
         let body_str = r#"{
             "role":"member"
@@ -990,6 +1009,64 @@ mod tests {
         .await;
         let req = test::TestRequest::post()
             .uri(&format!("/api/{}/users/{}", "e2e", "root@example.com"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        // It should fail as root user cannot be added to an organization
+        assert!(!resp.status().is_success());
+    }
+
+    async fn e2e_add_user_to_org() {
+        let auth = setup();
+        let body_str = r#"{
+            "role":"admin"
+        }"#;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/users/{}", "e2e", "admin@example.com"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        // Should fail as the user still does not exist
+        assert!(resp.status().is_client_error());
+
+        // Add the user
+        let body_str = r#"{
+            "email": "admin@example.com",
+            "password": "Abcd12345",
+            "role": "admin"
+        }"#;
+
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/users", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // Role in the default organization
+        let body_str = r#"{
+            "role":"admin"
+        }"#;
+
+        // Add the user to the default organization with role admin
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/users/{}", "default", "admin@example.com"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .set_payload(body_str)
