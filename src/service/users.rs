@@ -640,8 +640,8 @@ pub async fn add_user_to_org(
         // If the user is root, we don't need to add to the org, as root user
         // already has access to all organizations.
         if existing_user.is_root {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                http::StatusCode::BAD_REQUEST,
+            return Ok(HttpResponse::Conflict().json(MetaHttpResponse::message(
+                http::StatusCode::CONFLICT,
                 "User is root user, no need to add to organization.",
             )));
         }
