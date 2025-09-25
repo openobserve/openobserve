@@ -1003,39 +1003,34 @@ pub async fn write_results_v2(
                 if res.histogram_interval.is_some() {
                     let mut removed_boundary = false;
                     local_resp.hits.retain(|hit| {
-                                if !removed_boundary {
-                                    if let Some(hit_ts) = hit.get(ts_column).and_then(|v| v.as_i64()) {
-                                        if hit_ts == boundary_ts && hit == &remove_hit_record {
-                                            log::info!("[CACHE_DEBUG] Removing duplicate boundary record for aggregate query with ts: {}", hit_ts);
-                                            removed_boundary = true;
-                                            return false;
-                                        }
+                                if !removed_boundary
+                                    && let Some(hit_ts) = hit.get(ts_column).and_then(|v| v.as_i64())
+                                    && hit_ts == boundary_ts && hit == &remove_hit_record {
+                                        log::info!("[CACHE_DEBUG] Removing duplicate boundary record for aggregate query with ts: {}", hit_ts);
+                                        removed_boundary = true;
+                                        return false;
                                     }
-                                }
                                 true
                             });
 
                     let final_count = local_resp.hits.len();
                     log::info!(
-                        "[CACHE_DEBUG] After aggregate boundary dedup: {} records (removed: {})",
-                        final_count,
+                        "[CACHE_DEBUG] After aggregate boundary dedup: {final_count} records (removed: {})",
                         original_count - final_count
                     );
                 } else {
                     local_resp.hits.retain(|hit| {
-                            if let Some(hit_ts) = hit.get(ts_column).and_then(|v| v.as_i64()) {
-                                if hit_ts == boundary_ts  {
+                            if let Some(hit_ts) = hit.get(ts_column).and_then(|v| v.as_i64())
+                                && hit_ts == boundary_ts  {
                                     log::info!("[CACHE_DEBUG] Removing duplicate boundary record for aggregate query with ts: {}", hit_ts);
                                     return false;
                                 }
-                        }
                         true
                     });
 
                     let final_count = local_resp.hits.len();
                     log::info!(
-                        "[CACHE_DEBUG] After aggregate boundary dedup: {} records (removed: {})",
-                        final_count,
+                        "[CACHE_DEBUG] After aggregate boundary dedup: {final_count} records (removed: {})",
                         original_count - final_count
                     );
                 }
@@ -1213,6 +1208,102 @@ pub fn apply_vrl_to_response(
     local_res.hits
 }
 
+<<<<<<< HEAD
+=======
+#[tracing::instrument(name = "service:search:cacher:check_cache_v2", skip_all)]
+pub async fn check_cache_v2(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    in_req: &search::Request,
+    use_cache: bool,
+) -> Result<MultiCachedQueryResponse, Error> {
+    // Result caching check start
+    let mut origin_sql = in_req.query.sql.clone();
+    origin_sql = origin_sql.replace('\n', " ");
+    let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
+    let stream_name = match resolve_stream_names(&origin_sql) {
+        // TODO: cache don't not support multiple stream names
+        Ok(v) => v[0].clone(),
+        Err(e) => {
+            return Err(Error::Message(e.to_string()));
+        }
+    };
+
+    let mut req = in_req.clone();
+    let query_fn = req
+        .query
+        .query_fn
+        .as_ref()
+        .and_then(|v| base64::decode_url(v).ok());
+
+    // calculate hash for the query
+    let mut hash_body = vec![origin_sql.to_string()];
+    if let Some(vrl_function) = &query_fn {
+        hash_body.push(vrl_function.to_string());
+    }
+    if !req.regions.is_empty() {
+        hash_body.extend(req.regions.clone());
+    }
+    if !req.clusters.is_empty() {
+        hash_body.extend(req.clusters.clone());
+    }
+    let mut h = config::utils::hash::gxhash::new();
+    let hashed_query = h.sum64(&hash_body.join(","));
+
+    let mut should_exec_query = true;
+
+    let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
+    Ok(if use_cache {
+        let mut resp = check_cache(
+            trace_id,
+            org_id,
+            stream_type,
+            &mut req,
+            &mut origin_sql,
+            &mut file_path,
+            is_aggregate,
+            &mut should_exec_query,
+            true,
+        )
+        .await;
+        resp.is_aggregate = is_aggregate;
+        resp.trace_id = trace_id.to_string();
+        resp.file_path = file_path;
+        resp
+    } else {
+        let query = req.query.into();
+        match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
+            Ok(v) => {
+                let (ts_column, is_descending) =
+                    cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
+                        .unwrap_or_default();
+
+                if let Some(interval) = v.histogram_interval {
+                    file_path = format!("{file_path}_{interval}_{ts_column}");
+                }
+
+                MultiCachedQueryResponse {
+                    ts_column,
+                    is_descending,
+                    file_path: file_path.clone(),
+                    cache_query_response: true,
+                    limit: v.limit,
+                    is_aggregate,
+                    clear_cache: true,
+                    trace_id: trace_id.to_string(),
+                    ..Default::default()
+                }
+            }
+            Err(e) => {
+                log::error!("[trace_id {}]: Error parsing sql: {:?}", trace_id, e);
+                MultiCachedQueryResponse::default()
+            }
+        }
+    })
+}
+
+>>>>>>> branch-v0.14.6-rc9
 fn _convert_ts_value_to_datetime(ts_value: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
     match ts_value {
         // Handle the case where ts_value is a number (microseconds)

@@ -618,16 +618,13 @@ pub async fn cache_results_to_disk(
             start.elapsed().as_millis(),
         );
     }
-    let file = format!("results/{}/{}", file_path, file_name);
+    let file = format!("results/{file_path}/{file_name}");
     if disk::exist(&file).await {
-        log::info!("cached file already exists on disk, removing it: {}", file);
+        log::info!("cached file already exists on disk, removing it: {file}");
         match disk::remove(&file).await {
             Ok(_) => (),
             Err(e) => {
-                log::error!(
-                    "[trace_id {trace_id}] Error removing cached results from disk: {:?}",
-                    e
-                );
+                log::error!("[trace_id {trace_id}] Error removing cached results from disk: {e:?}");
             }
         }
     };
@@ -639,14 +636,8 @@ pub async fn cache_results_to_disk(
             );
         }
         Err(e) => {
-            log::error!(
-                "[trace_id {trace_id}] Error caching results to disk: {:?}",
-                e
-            );
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Error caching results to disk",
-            ));
+            log::error!("[trace_id {trace_id}] Error caching results to disk: {e:?}");
+            return Err(std::io::Error::other("Error caching results to disk"));
         }
     }
 
@@ -658,7 +649,7 @@ pub async fn cache_results_to_disk(
 }
 
 pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<String> {
-    let file = format!("results/{}/{}", file_path, file_name);
+    let file = format!("results/{file_path}/{file_name}");
     match disk::get(&file, None).await {
         Some(v) => Ok(String::from_utf8(v.to_vec()).unwrap()),
         None => Err(std::io::Error::new(
@@ -731,10 +722,10 @@ enum DeletionCriteria {
 fn parse_cache_file_timestamps(file_path: &str) -> Option<(i64, i64)> {
     let file_name = file_path.split('/').next_back()?;
     let parts: Vec<&str> = file_name.split('_').collect();
-    if parts.len() >= 2 {
-        if let (Ok(start_ts), Ok(end_ts)) = (parts[0].parse::<i64>(), parts[1].parse::<i64>()) {
-            return Some((start_ts, end_ts));
-        }
+    if parts.len() >= 2
+        && let (Ok(start_ts), Ok(end_ts)) = (parts[0].parse::<i64>(), parts[1].parse::<i64>())
+    {
+        return Some((start_ts, end_ts));
     }
     None
 }
