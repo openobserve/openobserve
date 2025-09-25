@@ -13,6 +13,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
+use datafusion::{common::tree_node::TreeNode, physical_plan::ExecutionPlan};
+
+// check if the plan contains join, union, interleave, unnest, partial sort(use for streaming
+// table), bounded window agg, window agg
+pub fn is_complex_plan(node: &Arc<dyn ExecutionPlan>) -> bool {
+    node.exists(|plan| {
+        Ok(plan.name() == "HashJoinExec"
+            || plan.name() == "RecursiveQueryExec"
+            || plan.name() == "UnionExec"
+            || plan.name() == "InterleaveExec"
+            || plan.name() == "UnnestExec"
+            || plan.name() == "CrossJoinExec"
+            || plan.name() == "NestedLoopJoinExec"
+            || plan.name() == "SymmetricHashJoinExec"
+            || plan.name() == "SortMergeJoinExec"
+            || plan.name() == "PartialSortExec"
+            || plan.name() == "BoundedWindowAggExec"
+            || plan.name() == "WindowAggExec"
+            || plan.children().len() > 1)
+    })
+    .unwrap_or(true)
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use std::sync::Arc;
@@ -27,6 +52,8 @@ pub(crate) mod tests {
             aggregates::{AggregateExec, AggregateMode},
         },
     };
+
+    use crate::service::search::datafusion::distributed_plan::remote_scan::RemoteScanExec;
 
     // get the first final aggregate plan from bottom to top
     pub(crate) fn get_partial_aggregate_plan(
@@ -73,6 +100,44 @@ pub(crate) mod tests {
             } else {
                 Ok(TreeNodeRecursion::Continue)
             }
+        }
+    }
+
+    pub(crate) fn get_remote_scan(plan: Arc<dyn ExecutionPlan>) -> Vec<Arc<RemoteScanExec>> {
+        let mut visitor = RemoteScanVisitor::new();
+        let _ = plan.visit(&mut visitor);
+        visitor.get_data()
+    }
+
+    struct RemoteScanVisitor {
+        data: Vec<Arc<RemoteScanExec>>,
+    }
+
+    impl RemoteScanVisitor {
+        fn new() -> Self {
+            Self { data: Vec::new() }
+        }
+
+        fn get_data(&self) -> Vec<Arc<RemoteScanExec>> {
+            self.data.clone()
+        }
+    }
+
+    impl Default for RemoteScanVisitor {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl<'n> TreeNodeVisitor<'n> for RemoteScanVisitor {
+        type Node = Arc<dyn ExecutionPlan>;
+
+        fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+            if node.name() == "RemoteScanExec" {
+                let remote_scan = node.as_any().downcast_ref::<RemoteScanExec>().unwrap();
+                self.data.push(Arc::new(remote_scan.clone()));
+            }
+            Ok(TreeNodeRecursion::Continue)
         }
     }
 }

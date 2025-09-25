@@ -18,29 +18,49 @@ use config::meta::{
     dashboards::{Dashboard as MetaDashboard, v1, v2, v3, v4, v5},
     folder::Folder as MetaFolder,
 };
-use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::{Map, Value};
 use utoipa::ToSchema;
 
-/// HTTP request body for the `CreateDashboard` endpoint.
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct CreateDashboardRequestBody(JsonValue);
+/// HTTP request body for the `CreateDashboard`/`UpdateDashboard` endpoints.
+#[derive(Debug, ToSchema)]
+pub enum DashboardRequestBody {
+    V1(v1::Dashboard),
+    V2(v2::Dashboard),
+    V3(v3::Dashboard),
+    V4(v4::Dashboard),
+    V5(v5::Dashboard),
+}
 
-/// HTTP response body for `CreateDashboard` endpoint.
+impl<'de> Deserialize<'de> for DashboardRequestBody {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = Map::<String, Value>::deserialize(deserializer)?;
+
+        let version = value.get("version").and_then(Value::as_i64).unwrap_or(1);
+
+        let dash = match version {
+            1 => Self::V1(v1::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
+            2 => Self::V2(v2::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
+            3 => Self::V3(v3::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
+            4 => Self::V4(v4::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
+            5 => Self::V5(v5::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),
+            _ => {
+                return Err(serde::de::Error::custom(format!(
+                    "unsupported version: {version}"
+                )));
+            }
+        };
+
+        Ok(dash)
+    }
+}
+
+/// HTTP response body for `CreateDashboard`/`UpdateDashboard` endpoints.
 #[derive(Debug, Serialize, ToSchema)]
-pub struct CreateDashboardResponseBody(DashboardDetails);
-
-/// HTTP response body for `GetDashboard` endpoint.
-#[derive(Debug, Serialize, ToSchema)]
-pub struct GetDashboardResponseBody(DashboardDetails);
-
-/// HTTP request body for `UpdateDashboard` endpoint.
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct UpdateDashboardRequestBody(JsonValue);
-
-/// HTTP response body for `UpdateDashboard` endpoint.
-#[derive(Debug, Serialize, ToSchema)]
-pub struct UpdateDashboardResponseBody(DashboardDetails);
+pub struct DashboardResponseBody(MetaDashboard);
 
 /// HTTP URL query component that contains parameters for listing dashboards.
 #[derive(Debug, Deserialize, utoipa::IntoParams)]
@@ -123,53 +143,21 @@ pub struct MoveDashboardsRequestBody {
     pub dst_folder_id: String,
 }
 
-/// Version-specific dashboard details and hash.
-#[derive(Debug, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct DashboardDetails {
-    pub v1: Option<v1::Dashboard>,
-    pub v2: Option<v2::Dashboard>,
-    pub v3: Option<v3::Dashboard>,
-    pub v4: Option<v4::Dashboard>,
-    pub v5: Option<v5::Dashboard>,
-    pub version: i32,
-    pub hash: String,
-    pub updated_at: i64,
-}
-
-impl TryFrom<CreateDashboardRequestBody> for MetaDashboard {
-    type Error = serde_json::Error;
-
-    fn try_from(value: CreateDashboardRequestBody) -> Result<Self, Self::Error> {
-        let json = value.0;
-        parse_dashboard_request(json)
+impl From<DashboardRequestBody> for MetaDashboard {
+    fn from(value: DashboardRequestBody) -> Self {
+        match value {
+            DashboardRequestBody::V1(d) => d.into(),
+            DashboardRequestBody::V2(d) => d.into(),
+            DashboardRequestBody::V3(d) => d.into(),
+            DashboardRequestBody::V4(d) => d.into(),
+            DashboardRequestBody::V5(d) => d.into(),
+        }
     }
 }
 
-impl From<MetaDashboard> for CreateDashboardResponseBody {
+impl From<MetaDashboard> for DashboardResponseBody {
     fn from(value: MetaDashboard) -> Self {
-        Self(value.into())
-    }
-}
-
-impl From<MetaDashboard> for GetDashboardResponseBody {
-    fn from(value: MetaDashboard) -> Self {
-        Self(value.into())
-    }
-}
-
-impl TryFrom<UpdateDashboardRequestBody> for MetaDashboard {
-    type Error = serde_json::Error;
-
-    fn try_from(value: UpdateDashboardRequestBody) -> Result<Self, Self::Error> {
-        let json = value.0;
-        parse_dashboard_request(json)
-    }
-}
-
-impl From<MetaDashboard> for UpdateDashboardResponseBody {
-    fn from(value: MetaDashboard) -> Self {
-        Self(value.into())
+        Self(value)
     }
 }
 
@@ -260,54 +248,4 @@ impl From<(MetaFolder, MetaDashboard)> for ListDashboardsResponseBodyItem {
             v5: dashboard.v5,
         }
     }
-}
-
-impl From<MetaDashboard> for DashboardDetails {
-    fn from(value: MetaDashboard) -> Self {
-        Self {
-            version: value.version,
-            v1: value.v1,
-            v2: value.v2,
-            v3: value.v3,
-            v4: value.v4,
-            v5: value.v5,
-            hash: value.hash,
-            updated_at: value.updated_at,
-        }
-    }
-}
-
-/// Parses the JSON value from an HTTP request body into a dashboard.
-fn parse_dashboard_request(value: JsonValue) -> Result<MetaDashboard, serde_json::Error> {
-    // Pull the version field out of the JSON. If it doesn't exist, assume the
-    // default version is 1.
-    let version = value
-        .as_object()
-        .and_then(|o| o.get("version"))
-        .and_then(|v| v.as_i64())
-        .unwrap_or(1);
-
-    let dash = match version {
-        1 => {
-            let inner: v1::Dashboard = serde_json::from_value(value)?;
-            inner.into()
-        }
-        2 => {
-            let inner: v2::Dashboard = serde_json::from_value(value)?;
-            inner.into()
-        }
-        3 => {
-            let inner: v3::Dashboard = serde_json::from_value(value)?;
-            inner.into()
-        }
-        4 => {
-            let inner: v4::Dashboard = serde_json::from_value(value)?;
-            inner.into()
-        }
-        _ => {
-            let inner: v5::Dashboard = serde_json::from_value(value)?;
-            inner.into()
-        }
-    };
-    Ok(dash)
 }

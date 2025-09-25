@@ -28,8 +28,9 @@ use datafusion::{
     },
 };
 
-use crate::service::search::datafusion::optimizer::physical_optimizer::utils::{
-    get_column_name, is_column, is_only_timestamp_filter,
+use crate::service::search::datafusion::optimizer::physical_optimizer::{
+    index_optimizer::utils::is_complex_plan,
+    utils::{get_column_name, is_column, is_only_timestamp_filter},
 };
 
 #[rustfmt::skip]
@@ -144,19 +145,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
             // If projection doesn't have exactly 2 expressions, stop visiting
             self.simple_distinct = None;
             return Ok(TreeNodeRecursion::Stop);
-        } else if node.name() == "HashJoinExec"
-            || node.name() == "RecursiveQueryExec"
-            || node.name() == "UnionExec"
-            || node.name() == "InterleaveExec"
-            || node.name() == "UnnestExec"
-            || node.name() == "CrossJoinExec"
-            || node.name() == "NestedLoopJoinExec"
-            || node.name() == "SymmetricHashJoinExec"
-            || node.name() == "SortMergeJoinExec"
-            || node.name() == "PartialSortExec"
-            || node.name() == "BoundedWindowAggExec"
-            || node.name() == "WindowAggExec"
-        {
+        } else if is_complex_plan(node) {
             // if encounter complex plan, stop visiting
             self.simple_distinct = None;
             return Ok(TreeNodeRecursion::Stop);

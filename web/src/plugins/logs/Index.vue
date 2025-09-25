@@ -1098,7 +1098,7 @@ export default defineComponent({
             (currentQuery.toLowerCase() === "select" ||
               currentQuery.toLowerCase().indexOf("select ") == 0);
           //check if user try to applied saved views in which sql mode is enabled.
-          if (currentQuery.indexOf("SELECT") >= 0) {
+          if (currentQuery.toLowerCase().indexOf("select") >= 0) {
             return;
           }
 
@@ -1554,6 +1554,27 @@ export default defineComponent({
             // Mark that we've processed the first toggle
             if (isFirstVisualizationToggle.value) {
               isFirstVisualizationToggle.value = false;
+            }
+
+            let logsPageQuery = "";
+
+            // handle sql mode
+            if (!searchObj.meta.sqlMode) {
+              const queryBuild = buildSearch();
+              logsPageQuery = queryBuild?.query?.sql ?? "";
+            } else {
+              logsPageQuery = searchObj.data.query;
+            }
+
+            // Check if query is SELECT * which is not supported for visualization
+            if (
+              store.state.zoConfig.quick_mode_enabled === true &&
+              isSimpleSelectAllQuery(logsPageQuery)
+            ) {
+              showErrorNotification(
+                "Select * query is not supported for visualization",
+              );
+              return;
             }
 
             // Use conditional auto-selection based on first toggle and URL chart type

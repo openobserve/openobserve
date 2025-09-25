@@ -1009,22 +1009,16 @@ async fn handle_derived_stream_triggers(
     let (_, max_retries) = get_scheduler_max_retries();
 
     // module_key format: stream_type/org_id/pipeline_name/pipeline_id
-    let columns = trigger.module_key.split('/').collect::<Vec<_>>();
-    if columns.len() < 4 {
-        log::warn!(
-            "[SCHEDULER trace_id {trace_id}] Invalid module_key format: {}.",
-            trigger.module_key
-        );
-        return Err(anyhow::anyhow!(
-            "[SCHEDULER trace_id {trace_id}] Invalid module_key format: {}.",
-            trigger.module_key
-        ));
-    }
-    let stream_type: StreamType = columns[0].into();
-    let org_id = columns[1];
-    let pipeline_name = columns[2];
-    // Handles the case where the pipeline name contains a `/`
-    let pipeline_id = columns[columns.len() - 1];
+    let (org_id, stream_type, pipeline_name, pipeline_id) =
+        match get_pipeline_info_from_module_key(&trigger.module_key) {
+            Ok(info) => info,
+            Err(e) => {
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] error getting pipeline module key {e}"
+                );
+                return Err(anyhow::anyhow!("[SCHEDULER trace_id {trace_id}] {e}"));
+            }
+        };
 
     let mut new_trigger = db::scheduler::Trigger {
         next_run_at: Utc::now().timestamp_micros(),
@@ -1037,7 +1031,7 @@ async fn handle_derived_stream_triggers(
     } else {
         ScheduledTriggerData::from_json_string(&trigger.data).unwrap()
     };
-    let Ok(pipeline) = db::pipeline::get_by_id(pipeline_id).await else {
+    let Ok(pipeline) = db::pipeline::get_by_id(&pipeline_id).await else {
         let err_msg = format!(
             "Pipeline associated with trigger not found: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
         );
@@ -1448,7 +1442,7 @@ async fn handle_derived_stream_triggers(
                         log::error!("{err_msg}");
                         ingestion_error_msg = Some(err_msg);
                     }
-                    Ok(exec_pl) => match exec_pl.process_batch(org_id, local_val, None).await {
+                    Ok(exec_pl) => match exec_pl.process_batch(&org_id, local_val, None).await {
                         Err(e) => {
                             let err_msg = format!(
                                 "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({org_id}/{pipeline_name}) failed to process DerivedStream query results. Caused by: {e}"
@@ -1668,4 +1662,356 @@ async fn handle_derived_stream_triggers(
     }
 
     Ok(())
+}
+
+pub fn get_pipeline_info_from_module_key(
+    module_key: &str,
+) -> Result<(String, StreamType, String, String), anyhow::Error> {
+    let columns = module_key.split('/').collect::<Vec<_>>();
+    if columns.len() < 4 {
+        return Err(anyhow::anyhow!(
+            "Invalid module_key format: {}.",
+            module_key
+        ));
+    }
+    let stream_type: StreamType = columns[0].into();
+    let org_id = columns[1];
+    let pipeline_name = columns[2];
+    // Handles the case where the pipeline name contains a `/`
+    let pipeline_id = columns[columns.len() - 1];
+    Ok((
+        org_id.to_string(),
+        stream_type,
+        pipeline_name.to_string(),
+        pipeline_id.to_string(),
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::StreamType;
+
+    use super::*;
+
+    #[test]
+    fn test_get_pipeline_info_from_module_key_valid_input() {
+        // Test with valid module key format
+        let module_key = "logs/org123/pipeline_name/pipeline_id_456";
+        let result = get_pipeline_info_from_module_key(module_key);
+
+        assert!(result.is_ok());
+        let (org_id, stream_type, pipeline_name, pipeline_id) = result.unwrap();
+        assert_eq!(org_id, "org123");
+        assert_eq!(stream_type, StreamType::Logs);
+        assert_eq!(pipeline_name, "pipeline_name");
+        assert_eq!(pipeline_id, "pipeline_id_456");
+    }
+
+    #[test]
+    fn test_get_pipeline_info_from_module_key_different_stream_types() {
+        // Test different stream types
+        let test_cases = vec![
+            ("logs/org1/pipeline1/id1", StreamType::Logs),
+            ("metrics/org2/pipeline2/id2", StreamType::Metrics),
+            ("traces/org3/pipeline3/id3", StreamType::Traces),
+            (
+                "enrichment_tables/org4/pipeline4/id4",
+                StreamType::EnrichmentTables,
+            ),
+        ];
+
+        for (module_key, expected_stream_type) in test_cases {
+            let result = get_pipeline_info_from_module_key(module_key);
+            assert!(result.is_ok());
+            let (_, stream_type, ..) = result.unwrap();
+            assert_eq!(stream_type, expected_stream_type);
+        }
+    }
+
+    #[test]
+    fn test_get_pipeline_info_from_module_key_invalid_inputs() {
+        // Test with insufficient parts
+        let invalid_cases = vec![
+            "logs/org123",          // Only 2 parts
+            "logs/org123/pipeline", // Only 3 parts
+            "logs",                 // Only 1 part
+            "",                     // Empty string
+            "single_part",          // Single part
+        ];
+
+        for invalid_module_key in invalid_cases {
+            let result = get_pipeline_info_from_module_key(invalid_module_key);
+            assert!(result.is_err());
+            let error_msg = result.unwrap_err().to_string();
+            assert!(error_msg.contains("Invalid module_key format"));
+            assert!(error_msg.contains(invalid_module_key));
+        }
+    }
+
+    #[test]
+    fn test_get_pipeline_info_from_module_key_edge_cases() {
+        // Test with empty parts
+        let module_key = "logs//pipeline_name/pipeline_id";
+        let result = get_pipeline_info_from_module_key(module_key);
+
+        assert!(result.is_ok());
+        let (org_id, _, pipeline_name, pipeline_id) = result.unwrap();
+        assert_eq!(org_id, "");
+        assert_eq!(pipeline_name, "pipeline_name");
+        assert_eq!(pipeline_id, "pipeline_id");
+
+        // Test with very long names
+        let long_name = "a".repeat(1000);
+        let module_key = format!("logs/org123/{long_name}/pipeline_id");
+        let result = get_pipeline_info_from_module_key(&module_key);
+
+        assert!(result.is_ok());
+        let (_, _, pipeline_name, _) = result.unwrap();
+        assert_eq!(pipeline_name, long_name);
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_with_cron() {
+        // Test with cron expression
+        let supposed_to_run_at = 1640995200000000; // 2022-01-01 00:00:00 UTC in microseconds
+        let cron = "0 */5 * * * *"; // Every 5 minutes
+        let tz_offset = 0; // UTC
+        let frequency = 300; // 5 minutes in seconds
+        let delay = 600000000; // 10 minutes in microseconds
+        let align_time = false;
+        let now = 1640995800000000; // 2022-01-01 00:10:00 UTC
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+        );
+
+        // Should have skipped timestamps for 5:00, 5:05, 5:10
+        assert!(!skipped_timestamps.is_empty());
+        assert!(skipped_timestamps.len() >= 2);
+
+        // Final timestamp should be the current time when align_time is false
+        assert_eq!(final_timestamp, now);
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_with_frequency() {
+        // Test with frequency-based scheduling (no cron)
+        let supposed_to_run_at = 1640995200000000; // 2022-01-01 00:00:00 UTC
+        let cron = ""; // Empty cron means frequency-based
+        let tz_offset = 0; // UTC
+        let frequency = 300; // 5 minutes in seconds
+        let delay = 600000000; // 10 minutes in microseconds
+        let align_time = false;
+        let now = 1640995800000000; // 2022-01-01 00:10:00 UTC
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+        );
+
+        // Should have skipped timestamps for 5:00, 5:05, 5:10
+        assert!(!skipped_timestamps.is_empty());
+        assert!(skipped_timestamps.len() >= 2);
+
+        // Final timestamp should be the current time when align_time is false
+        assert_eq!(final_timestamp, now);
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_with_align_time() {
+        // Test with align_time = true
+        let supposed_to_run_at = 1640995200000000; // 2022-01-01 00:00:00 UTC
+        let cron = "";
+        let tz_offset = 0;
+        let frequency = 300; // 5 minutes
+        let delay = 300000000; // 5 minutes in microseconds
+        let align_time = true;
+        let now = 1640995500000000; // 2022-01-01 00:05:00 UTC
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+        );
+
+        // When align_time is true and there are skipped timestamps,
+        // final_timestamp should be the supposed_to_run_at or adjusted value
+        if !skipped_timestamps.is_empty() {
+            // Should be aligned to the frequency
+            assert!(final_timestamp >= supposed_to_run_at);
+        }
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_with_timezone() {
+        // Test with timezone offset (UTC+5:30 for India)
+        let supposed_to_run_at = 1640995200000000; // 2022-01-01 00:00:00 UTC
+        let cron = "0 */5 * * * *"; // Every 5 minutes
+        let tz_offset = 330; // UTC+5:30 in minutes
+        let frequency = 300;
+        let delay = 600000000;
+        let align_time = false;
+        let now = 1640995800000000;
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+        );
+
+        // Should still work with timezone offset
+        assert!(skipped_timestamps.len() >= 2);
+        assert_eq!(final_timestamp, now);
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_no_delay() {
+        // Test with no delay (delay = 0)
+        let supposed_to_run_at = 1640995200000000;
+        let cron = "";
+        let tz_offset = 0;
+        let frequency = 300;
+        let delay = 0; // No delay
+        let align_time = false;
+        let now = 1640995200000000; // Same as supposed_to_run_at
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+        );
+
+        // Should have no skipped timestamps when delay is 0
+        assert!(skipped_timestamps.is_empty());
+        assert_eq!(final_timestamp, now);
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_large_delay() {
+        // Test with large delay
+        let supposed_to_run_at = 1640995200000000;
+        let cron = "";
+        let tz_offset = 0;
+        let frequency = 60; // 1 minute
+        let delay = 3600000000; // 1 hour in microseconds
+        let align_time = false;
+        let now = 1640998800000000; // 1 hour later
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+        );
+
+        // Should have many skipped timestamps (60 minutes worth)
+        assert!(skipped_timestamps.len() >= 50);
+        assert_eq!(final_timestamp, now);
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_invalid_cron() {
+        // Test with invalid cron expression - should panic
+        let supposed_to_run_at = 1640995200000000;
+        let cron = "invalid cron";
+        let tz_offset = 0;
+        let frequency = 300;
+        let delay = 600000000;
+        let align_time = false;
+        let now = 1640995800000000;
+
+        // This should panic due to invalid cron expression
+        let result = std::panic::catch_unwind(|| {
+            get_skipped_timestamps(
+                supposed_to_run_at,
+                cron,
+                tz_offset,
+                frequency,
+                delay,
+                align_time,
+                now,
+            )
+        });
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_edge_case_empty_skipped_timestamps() {
+        // Test case where skipped_timestamps is empty and align_time is true
+        let supposed_to_run_at = 1640995200000000;
+        let cron = "";
+        let tz_offset = 0;
+        let frequency = 300;
+        let delay = 0; // No delay, so no skipped timestamps
+        let align_time = true;
+        let now = 1640995200000000;
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+        );
+
+        assert!(skipped_timestamps.is_empty());
+        assert_eq!(final_timestamp, supposed_to_run_at);
+    }
+
+    #[test]
+    fn test_get_skipped_timestamps_pop_last_timestamp() {
+        // Test case where the last timestamp is greater than supposed_to_run_at
+        let supposed_to_run_at = 1640995200000000;
+        let cron = "";
+        let tz_offset = 0;
+        let frequency = 60; // 1 minute
+        let delay = 120000000; // 2 minutes
+        let align_time = true;
+        let now = 1640995320000000; // 2 minutes later
+
+        let (skipped_timestamps, final_timestamp) = get_skipped_timestamps(
+            supposed_to_run_at,
+            cron,
+            tz_offset,
+            frequency,
+            delay,
+            align_time,
+            now,
+        );
+
+        // Should have some skipped timestamps
+        assert!(!skipped_timestamps.is_empty());
+
+        // The final timestamp should be adjusted based on the logic
+        assert!(final_timestamp >= supposed_to_run_at);
+    }
 }
