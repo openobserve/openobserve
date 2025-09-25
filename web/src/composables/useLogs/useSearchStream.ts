@@ -47,8 +47,11 @@ import {
   addSpacesToOperators,
 } from "@/utils/zincutils";
 
+import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+
 export const useSearchStream = () => {
   const { showErrorNotification } = useNotifications();
+  const { processHitsInChunks, clearCache } = useLogsHighlighter();
   const {
     fnParsedSQL,
     hasAggregation,
@@ -338,6 +341,7 @@ export const useSearchStream = () => {
   const initializeSearchConnection = (
     payload: any,
   ): string | Promise<void> | null => {
+    clearCache();
     // Use the appropriate method to fetch data
     if (searchObj.communicationMethod === "ws") {
       return fetchQueryDataWithWebSocket(payload, {
@@ -427,6 +431,13 @@ export const useSearchStream = () => {
     } else if (appendResult) {
       searchObj.data.queryResults.hits.push(...response.content.results.hits);
     }
+
+    processHitsInChunks(
+      searchObj.data.queryResults.hits,
+      searchObj.data.resultGrid?.columns,
+      !(isPagination && searchPartitionMap[payload.traceId].partition === 1) ||
+        !appendResult,
+    );
 
     if (searchObj.meta.refreshInterval == 0) {
       updatePageCountTotal(
