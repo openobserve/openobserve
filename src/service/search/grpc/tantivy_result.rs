@@ -29,7 +29,7 @@ use tantivy::{
         AggregationCollector, Key,
         agg_req::{Aggregation, AggregationVariants},
         agg_result::{AggregationResult, BucketResult},
-        bucket::TermsAggregation,
+        bucket::{CustomOrder, Order, OrderTarget, TermsAggregation},
     },
     query::Query,
 };
@@ -152,15 +152,22 @@ impl TantivyResult {
         query: Box<dyn Query>,
         field: &str,
         limit: usize,
-        _ascend: bool, // TODO: support ascend
+        ascend: bool,
     ) -> anyhow::Result<Self> {
-        // collector
+        let order = if ascend {
+            Some(CustomOrder {
+                target: OrderTarget::Count,
+                order: Order::Asc,
+            })
+        } else {
+            None
+        };
         let limit = (limit * 4).max(1000) as u32;
         let aggregation = Aggregation {
             agg: AggregationVariants::Terms(TermsAggregation {
                 field: field.to_string(),
                 size: Some(limit),
-                order: None,
+                order,
                 missing: None,
                 min_doc_count: Some(1),
                 show_term_doc_count_error: Some(false),
