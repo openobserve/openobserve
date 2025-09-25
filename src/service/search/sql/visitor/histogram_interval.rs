@@ -20,6 +20,7 @@ use sqlparser::ast::{Expr, FunctionArguments, VisitorMut};
 
 #[derive(Debug)]
 pub struct HistogramIntervalVisitor {
+    pub is_histogram: bool,
     pub interval: Option<i64>,
     time_range: Option<(i64, i64)>,
 }
@@ -27,6 +28,7 @@ pub struct HistogramIntervalVisitor {
 impl HistogramIntervalVisitor {
     pub fn new(time_range: Option<(i64, i64)>) -> Self {
         Self {
+            is_histogram: false,
             interval: None,
             time_range,
         }
@@ -40,6 +42,7 @@ impl VisitorMut for HistogramIntervalVisitor {
         if let Expr::Function(func) = expr
             && func.name.to_string().eq_ignore_ascii_case("histogram")
         {
+            self.is_histogram = true;
             if let FunctionArguments::List(list) = &func.args {
                 let mut args = list.args.iter();
                 // first is field
