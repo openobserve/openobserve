@@ -31,7 +31,7 @@ use datafusion::{arrow::datatypes::Schema, common::TableReference};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::{SchemaCache, get_stream_setting_fts_fields, unwrap_stream_settings},
+    schema::{SchemaCache, unwrap_stream_settings},
 };
 use once_cell::sync::Lazy;
 use proto::cluster_rpc::SearchQuery;
@@ -179,29 +179,19 @@ impl Sql {
         }
 
         // 6. get match_all() value
-        let mut match_visitor = MatchVisitor::new();
+        let mut match_visitor = MatchVisitor::new(&total_schemas);
         let _ = statement.visit(&mut match_visitor);
 
         // 7. check if have full text search filed in stream
-        if match_visitor.has_match_all {
-            if match_visitor.is_multi_stream {
-                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                    "Using match_all() function in a subquery/join is not supported".to_string(),
-                )));
-            }
-            let schema = total_schemas.values().next().unwrap();
-            let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
-            let fts_fields = get_stream_setting_fts_fields(&stream_settings);
-            // check if schema don't have full text search field
-            if fts_fields
-                .into_iter()
-                .all(|field| !schema.contains_field(&field))
-            {
-                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                    "Using match_all() function in a stream that don't have full text search field"
-                        .to_string(),
-                )));
-            }
+        if match_visitor.has_match_all && !match_visitor.is_support_match_all {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "match_all() should directly apply to stream, FROM clause should not be join/subuqery/cte".to_string(),
+            )));
+        } else if match_visitor.match_all_wrong_streams {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "match_all() should only apply to the stream that have full text search fields"
+                    .to_string(),
+            )));
         }
 
         // 8. generate used schema
