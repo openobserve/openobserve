@@ -15,7 +15,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 -->
 
-
 <!--
 LogsHighLighting Component
 ===============================
@@ -36,31 +35,25 @@ Usage Examples:
 - <LogsHighLighting :data="1234567890123" />  // Timestamp-like number
 -->
 <template>
-  <span class="logs-highlight-json" v-html="colorizedJson"></span>
+  <span
+    class="logs-highlight-json"
+    v-html="processedResults[`${props.column.id}_${props.index}`]"
+  ></span>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, withDefaults } from "vue";
-import { getThemeColors } from "@/utils/logs/keyValueParser";
-import { useStore } from "vuex";
-import { useTextHighlighter } from "@/composables/useTextHighlighter";
+import { computed, withDefaults } from "vue";
 
 /**
  * Component Props Interface
  */
 interface Props {
-  data: any;
-  showBraces?: boolean;
-  showQuotes?: boolean;
-  queryString?: string;
-  simpleMode?: boolean; // Only highlighting, no semantic colorization
+  column: any; // Only highlighting, no semantic colorization
+  index: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  showBraces: true,
-  showQuotes: false,
-  queryString: "",
-  simpleMode: false,
+  column: {},
 });
 
 const store = useStore();
@@ -329,4 +322,7 @@ function isLogLineWithMixedContent(value: string): boolean {
   word-break: break-word;
   display: inline;
 }
+
+/* Import log highlighting CSS classes */
+@import '@/assets/styles/log-highlighting.css';
 </style>

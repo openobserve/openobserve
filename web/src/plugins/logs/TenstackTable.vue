@@ -427,6 +427,7 @@ import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
+import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 
 const props = defineProps({
   rows: {
@@ -505,6 +506,7 @@ const sorting = ref<SortingState>([]);
 
 const store = useStore();
 const { isFTSColumn } = useTextHighlighter();
+const { processedResults } = useLogsHighlighter();
 
 const getSortingHandler = (e: Event, fn: any) => {
   return fn(e);
@@ -949,6 +951,9 @@ defineExpose({
   selectedStreamFtsKeys,
 });
 </script>
+<style>
+@import "@/assets/styles/log-highlighting.css";
+</style>
 <style scoped lang="scss">
 @import "@/styles/logs/tenstack-table.scss";
 </style>
