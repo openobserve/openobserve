@@ -149,7 +149,9 @@ pub(crate) fn get_folder(query: &Query<HashMap<String, String>>) -> String {
 #[inline(always)]
 pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> String {
     let cfg = config::get_config();
-    if let Some(traceparent) = headers.get("traceparent") {
+    if let Some(traceparent) = headers.get("traceparent")
+        && traceparent.len() >= 32
+    {
         if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
             // OpenTelemetry is initialized -> can use propagator to get traceparent
             let ctx = global::get_text_map_propagator(|propagator| {
