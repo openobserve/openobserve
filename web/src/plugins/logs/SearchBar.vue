@@ -1917,7 +1917,6 @@ export default defineComponent({
     );
 
     onBeforeUnmount(() => {
-      console.log("onBeforeUnmount");
       queryEditorRef.value = null;
       fnEditorRef.value = null;
     });
@@ -2005,7 +2004,6 @@ export default defineComponent({
       //   searchObj.meta.jobId = "";
       //   getQueryData(false);
       // }
-      console.log("value", value);
       searchObj.data.editorValue = value;
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
