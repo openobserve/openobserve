@@ -66,7 +66,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <!-- {{ searchObj.data.histogram.errorMsg }} -->
-            <q-icon name="info" color="warning" size="sm"> </q-icon>
+            <q-icon name="info" color="warning"
+size="sm"> </q-icon>
             <q-tooltip position="top" class="tw-text-sm tw-font-semi-bold">
               {{ searchObj.data.histogram.errorMsg }}
             </q-tooltip>
@@ -155,7 +156,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <h3 class="text-center">
             <span style="min-height: 50px">
-              <q-icon name="warning" color="warning" size="xs"></q-icon> No data
+              <q-icon name="warning" color="warning"
+size="xs"></q-icon> No data
               found for histogram.</span
             >
           </h3>
@@ -199,7 +201,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.histogram.errorCode != -1
           "
         >
-          <q-icon name="warning" color="warning" size="xs"></q-icon> Error while
+          <q-icon name="warning" color="warning"
+size="xs"></q-icon> Error while
           fetching histogram data.
           <q-btn
             @click="toggleErrorDetails"
@@ -331,7 +334,7 @@ import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
 import useLogs from "../../composables/useLogs";
-import {useSearchStream} from "@/composables/useLogs/useSearchStream";
+import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { convertLogData } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useRouter } from "vue-router";
@@ -398,7 +401,7 @@ export default defineComponent({
           this.searchObj.data.stream.selectedStream
         ] = [...newColOrder];
 
-        if(newColOrder.length > 0){
+        if (newColOrder.length > 0) {
           this.searchObj.organizationIdentifier =
             this.store.state.selectedOrganization.identifier;
           let selectedFields = this.reorderSelectedFields();
@@ -531,14 +534,12 @@ export default defineComponent({
     const router = useRouter();
     const { searchAroundData } = useSearchAround();
     const { refreshPagination } = useSearchStream();
-    const { refreshPartitionPagination, refreshJobPagination } = usePagination();
+    const { refreshPartitionPagination, refreshJobPagination } =
+      usePagination();
     const { updatedLocalLogFilterField } = logsUtils();
     const { extractFTSFields, filterHitsColumns } = useStreamFields();
 
-    const {
-      reorderSelectedFields,
-      getFilterExpressionByFieldType,
-    } = useLogs();
+    const { reorderSelectedFields, getFilterExpressionByFieldType } = useLogs();
 
     const { searchObj } = searchState();
 
@@ -742,13 +743,13 @@ export default defineComponent({
         plotChart.value = {};
         searchObj.meta.resetPlotChart = false;
       }
-    });    
-    
+    });
+
     const selectedStreamFullTextSearchKeys = computed(() => {
       const defaultFTSKeys = store?.state?.zoConfig?.default_fts_keys || [];
-      const selectedStreamFTSKeys = searchObj.data.stream.selectedStreamFields.filter(
-        (field: string) => field.ftsKey
-      ).map((field: any) => field.name);
+      const selectedStreamFTSKeys = searchObj.data.stream.selectedStreamFields
+        .filter((field: string) => field.ftsKey)
+        .map((field: any) => field.name);
       //merge default FTS keys with selected stream FTS keys
       return [...new Set([...defaultFTSKeys, ...selectedStreamFTSKeys])];
     });
@@ -799,7 +800,7 @@ export default defineComponent({
       getSocketPaginations,
       resetPlotChart,
       columnSizes,
-      selectedStreamFullTextSearchKeys
+      selectedStreamFullTextSearchKeys,
     };
   },
   computed: {
