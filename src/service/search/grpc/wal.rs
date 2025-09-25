@@ -69,6 +69,7 @@ pub async fn search_parquet(
     file_stat_cache: Option<FileStatisticsCache>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
+    watch_time: Option<i64>,
 ) -> super::SearchTable {
     let load_start = std::time::Instant::now();
     // get file list
@@ -670,7 +671,7 @@ async fn get_file_list_inner(
         }
         
         // If watch_time is set, filter out files created after watch_time to avoid duplicates
-        if let Some(watch_time) = query.watch_time {
+        if let Some(watch_time_value) = watch_time {
             match is_exists(file).and_then(|path| path.metadata()) {
                 Ok(metadata) => {
                     if let Ok(modified_time) = metadata.modified() {
@@ -678,12 +679,12 @@ async fn get_file_list_inner(
                             .duration_since(std::time::UNIX_EPOCH)
                             .unwrap_or_default()
                             .as_micros() as i64;
-                        if modified_micros > watch_time {
+                        if modified_micros > watch_time_value {
                             log::debug!(
                                 "[trace_id {}] skip wal parquet file created after watch_time: {} watch_time: {} modified_time: {}",
                                 query.trace_id,
                                 &file,
-                                watch_time,
+                                watch_time_value,
                                 modified_micros
                             );
                             wal::release_files(std::slice::from_ref(file));

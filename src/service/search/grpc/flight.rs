@@ -201,7 +201,6 @@ pub async fn search(
             && cfg.common.inverted_index_enabled
             && (!index_condition.as_ref().unwrap().is_condition_all()
                 || idx_optimize_rule.is_some()),
-        watch_time: None,
     });
 
     log::info!(
@@ -329,12 +328,9 @@ pub async fn search(
     if LOCAL_NODE.is_ingester() {
         // Set watch_time before searching memtable to avoid duplicates with parquet
         let watch_time = config::utils::time::now_micros();
-        let mut query_params_with_watch_time = (*query_params).clone();
-        query_params_with_watch_time.watch_time = Some(watch_time);
-        let query_params_with_watch_time = Arc::new(query_params_with_watch_time);
         
         let (tbls, stats) = match super::wal::search_memtable(
-            query_params_with_watch_time.clone(),
+            query_params.clone(),
             latest_schema.clone(),
             &search_partition_keys,
             empty_exec.sorted_by_time(),
@@ -356,13 +352,14 @@ pub async fn search(
 
         // Now search in WAL parquet with watch_time filter
         let (tbls, stats) = match super::wal::search_parquet(
-            query_params_with_watch_time,
+            query_params.clone(),
             latest_schema.clone(),
             &search_partition_keys,
             empty_exec.sorted_by_time(),
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
+            Some(watch_time),
         )
         .await
         {
