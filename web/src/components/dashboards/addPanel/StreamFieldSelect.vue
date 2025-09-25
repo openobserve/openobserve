@@ -4,15 +4,15 @@
       <q-select
         ref="streamFieldSelect"
         filled
-        v-model="internalModel"
+        v-model="displayValue"
         :options="filteredOptions"
         dense
         use-input
         input-debounce="0"
         behavior="menu"
         hide-selected
+        fill-input
         @filter="filterFields"
-        @blur="updateInputValue(internalModel.value?.field)"
         data-test="stream-field-select"
       >
         <template v-slot:option="scope">
@@ -80,6 +80,7 @@ export default defineComponent({
     );
 
     const internalModel = ref(props.modelValue);
+    const displayValue = ref(props.modelValue?.field || "");
     const options = ref<Option[]>([]);
     const filteredOptions = ref<Option[]>([]);
 
@@ -111,14 +112,17 @@ export default defineComponent({
     }
 
     function updateInputValue(val: string) {
-      streamFieldSelect?.value?.updateInputValue?.(val);
+      if (val !== undefined && val !== null) {
+        displayValue.value = val;
+        streamFieldSelect?.value?.updateInputValue?.(val);
+      }
     }
 
     async function fetchFieldsForStreams() {
       if (!props.streams || props.streams.length === 0) {
         options.value = [];
         filteredOptions.value = [];
-        updateInputValue(internalModel.value?.field);
+        displayValue.value = internalModel.value?.field || "";
         return;
       }
 
@@ -142,25 +146,24 @@ export default defineComponent({
       // Initialize filtered options with all options
       filteredOptions.value = [...options?.value];
 
-      updateInputValue(internalModel.value?.field);
+      displayValue.value = internalModel.value?.field || "";
     }
 
-    function filterFields(val: string | object, update: any) {
-      // Handle both string and object values for val
+    function filterFields(val: string, update: any) {
+      // val is now always a string since we're using displayValue
       let searchText = "";
 
-      if (val === "" || val === internalModel.value?.field) {
+      if (val === "" || val === displayValue.value) {
         update(() => {
           filteredOptions.value = [...options?.value];
         });
         return;
       }
 
-      // Check if val is string or object
-      if (typeof val === "string" && val !== "") {
+      // val is always string now
+      if (val !== "") {
         searchText = val.toLowerCase();
       } else {
-        // If we can't determine the search text, just show all options
         update(() => {
           filteredOptions.value = [...options?.value];
         });
@@ -200,12 +203,20 @@ export default defineComponent({
         streamAlias: field?.stream?.streamAlias,
         field: field.name,
       };
+      displayValue.value = field.name;
       updateInputValue(field.name);
     }
 
     // Watch for v-model changes
     watch(internalModel, (newValue) => {
       emit("update:modelValue", newValue);
+      displayValue.value = newValue?.field || "";
+    });
+
+    // Watch for external modelValue changes
+    watch(() => props.modelValue, (newValue) => {
+      internalModel.value = newValue;
+      displayValue.value = newValue?.field || "";
     });
 
     // Watch for streams changes
@@ -213,6 +224,7 @@ export default defineComponent({
 
     return {
       internalModel,
+      displayValue,
       options,
       filteredOptions,
       selectField,
