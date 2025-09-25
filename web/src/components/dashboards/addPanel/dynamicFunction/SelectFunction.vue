@@ -266,22 +266,45 @@ export default {
 
     const filteredFunctions: any = ref([]);
 
+    // Initialize filteredFunctions with all available options
+    const initializeFunctions = () => {
+      let filteredFunctionsValidation = functionValidation;
+      // if allowAggregation is false, filter out aggregation functions
+      if (props.allowAggregation === false) {
+        filteredFunctionsValidation = filteredFunctionsValidation.filter(
+          (v) => !v.isAggregation,
+        );
+      }
+
+      // None is already included in functionValidation.json, just map all functions
+      filteredFunctions.value = filteredFunctionsValidation.map((v) => ({
+        label: v.functionLabel,
+        value: v.functionName,
+      }));
+    };
+
+    // Initialize on mount
+    initializeFunctions();
+
     const filterFunctionsOptions = (val: string, update: any) => {
       update(() => {
         let filteredFunctionsValidation = functionValidation;
-        // if allowAggregation is true, then filter the functions based on isAggregation
+        // if allowAggregation is false, filter out aggregation functions
         if (props.allowAggregation === false) {
           filteredFunctionsValidation = filteredFunctionsValidation.filter(
             (v) => !v.isAggregation,
           );
         }
 
+        const searchVal = val?.toLowerCase();
+
+        // Filter all functions including None (which is in functionValidation.json)
         filteredFunctions.value = filteredFunctionsValidation
           .map((v) => ({
             label: v.functionLabel,
             value: v.functionName,
           }))
-          .filter((v) => v.label.toLowerCase().indexOf(val.toLowerCase()) > -1);
+          .filter((v) => v.label.toLowerCase().indexOf(searchVal) > -1);
       });
     };
 
@@ -509,6 +532,7 @@ export default {
       // filteredSchemaOptions,
       filteredFunctions,
       filterFunctionsOptions,
+      initializeFunctions,
       onArgTypeChange,
       getAllSelectedStreams,
       getIconBasedOnArgType,
