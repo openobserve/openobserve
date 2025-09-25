@@ -30,7 +30,7 @@ use config::{
 };
 use infra::{
     errors::{Error, Result},
-    schema::unwrap_partition_time_level,
+    schema::{SchemaCache, unwrap_partition_time_level},
 };
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
