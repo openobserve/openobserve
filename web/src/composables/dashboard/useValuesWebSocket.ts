@@ -144,9 +144,11 @@ const useValuesWebSocket = () => {
           dashboardPanelData.meta.filterValue = [];
         }
 
-        // Find existing entry for this column
+        // Find existing entry for this column and stream
         const existingIndex = dashboardPanelData.meta.filterValue.findIndex(
-          (item: any) => item.column === variableObject.name,
+          (item: any) =>
+            item.column === variableObject.name &&
+            item.stream === variableObject.stream,
         );
 
         // Get existing values or initialize empty array
@@ -170,6 +172,7 @@ const useValuesWebSocket = () => {
           // Add new entry
           dashboardPanelData.meta.filterValue.push({
             column: variableObject.name,
+            stream: variableObject.stream,
             value: mergedValues,
           });
         }
@@ -207,8 +210,11 @@ const useValuesWebSocket = () => {
   const fetchFieldValues = async (
     queryReq: any,
     dashboardPanelData: any,
-    name: any,
+    fieldObj: any,
   ) => {
+    // Extract name and stream from the parameter
+    const name = fieldObj.field;
+    const stream = queryReq.stream_name;
     if (isWebSocketEnabled(store.state)) {
       // Use WebSocket
       const wsPayload = {
@@ -231,6 +237,7 @@ const useValuesWebSocket = () => {
 
       const res = initializeWebSocketConnection(wsPayload, {
         name: name,
+        stream: stream,
         dashboardPanelData: dashboardPanelData,
       });
 
@@ -257,6 +264,7 @@ const useValuesWebSocket = () => {
 
       const res = initializeWebSocketConnection(wsPayload, {
         name: name,
+        stream: stream,
         dashboardPanelData: dashboardPanelData,
       });
 
@@ -275,7 +283,7 @@ const useValuesWebSocket = () => {
           no_count: queryReq.no_count,
         });
         const find = dashboardPanelData.meta.filterValue.findIndex(
-          (it: any) => it.column == name,
+          (it: any) => it.column == name && it.stream == stream,
         );
         if (find >= 0) {
           dashboardPanelData.meta.filterValue.splice(find, 1);
@@ -283,6 +291,7 @@ const useValuesWebSocket = () => {
 
         return dashboardPanelData.meta.filterValue.push({
           column: name,
+          stream: stream,
           value: response?.data?.hits?.[0]?.values
             .map((it: any) => it.zo_sql_key)
             .filter((it: any) => it)

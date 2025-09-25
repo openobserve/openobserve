@@ -211,7 +211,7 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const { getAllSelectedStreams, buildCondition } = useDashboardPanelData(
+    const { getAllSelectedStreams, buildCondition, getStreamNameFromStreamAlias } = useDashboardPanelData(
       dashboardPanelDataPageKey,
     );
     const { t } = useI18n();
@@ -223,8 +223,8 @@ export default defineComponent({
       const options = props.dashboardPanelData.meta.filterValue
         .find(
           (it: any) =>
-            it.filterItem.field == props?.condition?.column?.field &&
-            it.filterItem.streamAlias == props?.condition?.column?.streamAlias,
+            it.column == props?.condition?.column?.field &&
+            it.stream == getStreamNameFromStreamAlias(props?.condition?.column?.stream),
         )
         ?.value?.filter((option: any) =>
           option?.toLowerCase().includes(searchTerm.value.toLowerCase()),
