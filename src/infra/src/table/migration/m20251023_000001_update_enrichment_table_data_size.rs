@@ -51,7 +51,7 @@ fn increase_data_column_size_statement() -> TableAlterStatement {
         .to_owned()
 }
 
-/// Identifiers used in queries on the folders table.
+/// Identifiers used in queries on the enrichment tables table.
 #[derive(DeriveIden)]
 enum EnrichmentTables {
     Table,
