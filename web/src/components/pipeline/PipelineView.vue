@@ -195,29 +195,101 @@ const queryImage = getImageURL("images/pipeline/query.svg");
   width: auto;
 
   .vue-flow__node {
-    padding: 0px;
+    padding: 8px 16px;
     width: auto;
+    min-height: 44px;
+    transition: all 0.3s ease;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+    
+    &:active {
+      cursor: grabbing;
+    }
   }
 
   .o2vf_node_input,
   .vue-flow__node-input {
-    background-color: #c8d6f5;
-    border-color: 1px solid #2c6b2f;
-    color: black;
+    border: 1px solid #60a5fa;
+    border-left: 4px solid #3b82f6;
+    color: #1f2937;
+    border-radius: 12px;
+    background: rgba(239, 246, 255, 0.8);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+    transition: all 0.3s ease;
+    cursor: grab;
+    min-height: 36px;
+    padding: 8px 16px;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
+      border-color: #3b82f6;
+      background: rgba(239, 246, 255, 0.95);
+    }
+    
+    &:active {
+      cursor: grabbing;
+    }
   }
 
   .o2vf_node_output,
   .vue-flow__node-output {
-    background-color: #8fd4b8;
-    border-color: 1px solid #3b6f3f;
-    color: black;
+    border: 1px solid #4ade80;
+    border-left: 4px solid #22c55e;
+    color: #1f2937;
+    border-radius: 12px;
+    background: rgba(240, 253, 244, 0.8);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.1);
+    transition: all 0.3s ease;
+    cursor: grab;
+    min-height: 36px;
+    padding: 8px 16px;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(34, 197, 94, 0.2);
+      border-color: #22c55e;
+      background: rgba(240, 253, 244, 0.95);
+    }
+    
+    &:active {
+      cursor: grabbing;
+    }
   }
 
   .o2vf_node_default,
   .vue-flow__node-default {
-    background-color: #efefef;
-    border-color: 1px solid #171e25;
-    color: black;
+    border: 1px solid #6b7280;
+    border-left: 4px solid #374151;
+    color: #1f2937;
+    border-radius: 12px;
+    background: rgba(249, 250, 251, 0.8);
+    box-shadow: 0 4px 12px rgba(55, 65, 81, 0.1);
+    transition: all 0.3s ease;
+    cursor: grab;
+    min-height: 36px;
+    padding: 8px 16px;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(55, 65, 81, 0.2);
+      border-color: #374151;
+      background: rgba(249, 250, 251, 0.95);
+    }
+    
+    &:active {
+      cursor: grabbing;
+    }
   }
 }
 
