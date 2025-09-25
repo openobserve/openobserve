@@ -463,6 +463,18 @@ export const useSearchStream = () => {
     isPagination: boolean,
     appendResult: boolean = false,
   ) => {
+    // check if histogram interval is undefined, then set current response as histogram response
+    // for visualization, will require to set histogram interval to fill missing values
+    // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+    // created new attribute visualization_histogram_interval to avoid this issue
+    if (
+      !searchObj.data.queryResults.visualization_histogram_interval &&
+      response.content?.results?.histogram_interval
+    ) {
+      searchObj.data.queryResults.visualization_histogram_interval =
+        response.content?.results?.histogram_interval;
+    }
+
     ////// Handle function error ///////
     handleFunctionError(payload.queryReq, response);
 
