@@ -98,10 +98,8 @@ import {
   escapeSingleQuotes,
   generateTraceContext,
   isStreamingEnabled,
-  isWebSocketEnabled,
 } from "@/utils/zincutils";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
-import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
@@ -248,13 +246,6 @@ export default defineComponent({
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
     const variableFirstResponseProcessed = ref<{ [key: string]: boolean }>({});
 
-    // ------------- Start WebSocket Implementation -------------
-    const {
-      fetchQueryDataWithWebSocket,
-      sendSearchMessageBasedOnRequestId,
-      cancelSearchQueryBasedOnRequestId,
-    } = useSearchWebSocket();
-
     // Utility functions
     const addTraceId = (field: string, traceId: string) => {
       if (!traceIdMapper.value[field]) {
@@ -284,18 +275,6 @@ export default defineComponent({
         // Clear the trace IDs after cancellation
         traceIdMapper.value[field] = [];
       }
-
-      if (isWebSocketEnabled(store.state) && traceIds && traceIds.length > 0) {
-        traceIds.forEach((traceId) => {
-          cancelSearchQueryBasedOnRequestId({
-            trace_id: traceId,
-            org_id: store?.state?.selectedOrganization?.identifier,
-          });
-        });
-
-        // Clear the trace IDs after cancellation
-        traceIdMapper.value[field] = [];
-      }
     };
 
     // onUnmounted want to cancel the values api call for all http2, websocket and streaming
@@ -312,30 +291,6 @@ export default defineComponent({
       });
     });
 
-    const sendSearchMessage = (queryReq: any) => {
-      const payload = {
-        type: "values",
-        content: {
-          trace_id: queryReq.traceId,
-          payload: queryReq.queryReq,
-          stream_type: queryReq.queryReq.stream_type || "logs",
-          search_type: "ui",
-          use_cache: (window as any).use_cache ?? true,
-          org_id: store.state.selectedOrganization.identifier,
-        },
-      };
-
-      if (
-        Object.hasOwn(queryReq.queryReq, "regions") &&
-        Object.hasOwn(queryReq.queryReq, "clusters")
-      ) {
-        payload.content.payload["regions"] = queryReq.queryReq.regions;
-        payload.content.payload["clusters"] = queryReq.queryReq.clusters;
-      }
-
-      sendSearchMessageBasedOnRequestId(payload);
-    };
-
     const handleSearchClose = (
       payload: any,
       response: any,
@@ -343,23 +298,6 @@ export default defineComponent({
     ) => {
       variableObject.isLoading = false;
       variableObject.isVariableLoadingPending = false;
-
-      const errorCodes = [1001, 1006, 1010, 1011, 1012, 1013];
-      if (errorCodes.includes(response.code)) {
-        handleSearchError(
-          payload,
-          {
-            content: {
-              message: "WebSocket connection terminated unexpectedly",
-              trace_id: payload.traceId,
-              code: response.code,
-              error_details: response.error_details,
-            },
-            type: "error",
-          },
-          variableObject,
-        );
-      }
 
       removeTraceId(variableObject.name, payload.traceId);
     };
@@ -612,18 +550,6 @@ export default defineComponent({
         });
         return;
       }
-
-      if (isWebSocketEnabled(store.state)) {
-        fetchQueryDataWithWebSocket(payload, {
-          open: sendSearchMessage,
-          close: (p: any, r: any) => handleSearchClose(p, r, variableObject),
-          error: (p: any, r: any) => handleSearchError(p, r, variableObject),
-          message: (p: any, r: any) =>
-            handleSearchResponse(p, r, variableObject),
-          reset: handleSearchReset,
-        }) as string;
-        return;
-      }
     };
     const fetchFieldValuesWithWebsocket = (
       variableObject: any,
@@ -674,17 +600,16 @@ export default defineComponent({
         meta: payload,
       };
       try {
-        // Start new connection
+        // Start new connection via streaming/http2
         initializeWebSocketConnection(wsPayload, variableObject);
         addTraceId(variableObject.name, wsPayload.traceId);
       } catch (error) {
-        console.error("WebSocket connection failed:", error);
         variableObject.isLoading = false;
         variableObject.isVariableLoadingPending = false;
       }
     };
 
-    // ------------- End WebSocket Implementation -------------
+    // ------------- End Streaming Implementation -------------
 
     // reset variables data
     // it will executed once on mount
