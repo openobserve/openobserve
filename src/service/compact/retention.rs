@@ -151,7 +151,7 @@ pub async fn delete_by_stream(
     // get schema
     let stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
     let created_at = stats.doc_time_min;
-    if created_at == 0 {
+    if stats.doc_time_min == 0 && stats.doc_time_max == 0 {
         return Ok(0); // no data, just skip
     }
     let created_at: DateTime<Utc> = Utc.timestamp_nanos(created_at * 1000);
