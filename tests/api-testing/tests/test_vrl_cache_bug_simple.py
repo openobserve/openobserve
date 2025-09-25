@@ -18,6 +18,7 @@ import logging
 import time
 from typing import Dict, Any
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -44,8 +45,8 @@ def execute_query_with_vrl(
             "start_time": start_time,
             "end_time": end_time,
             "from": 0,
-            "size": 50,
-            "quick_mode": True,
+            "size": 100,  # Larger result set to increase chance of detecting cache bug
+            "quick_mode": True,  # Enable quick mode as it might be required for caching
             "sql_mode": "context",
             "track_total_hits": False
         }
@@ -120,9 +121,9 @@ def test_vrl_cache_bug_simple(create_session, base_url):
     
     session = create_session
     
-    # Use recent time range but longer to get more data
-    end_time = datetime.now(timezone.utc) - timedelta(minutes=30)
-    start_time = end_time - timedelta(hours=24)  # 24 hour window
+    # Use older time range to avoid mixing with freshly ingested data from current test run
+    end_time = datetime.now(timezone.utc) - timedelta(hours=2)  # 2 hours ago
+    start_time = end_time - timedelta(hours=1)  # 1 hour window, 2-3 hours ago
     
     start_time_us = int(start_time.timestamp() * 1000000)
     end_time_us = int(end_time.timestamp() * 1000000)
@@ -179,12 +180,12 @@ def test_vrl_cache_bug_simple(create_session, base_url):
     
     # Build cache with multiple runs - more aggressive caching
     cache_ratios = []
-    for i in range(10):  # More runs to build higher cache
+    for i in range(20):  # More runs to build higher cache
         result = execute_query_with_vrl(session, base_url, sql, start_time_us, end_time_us, vrl_function_1)
         cache_ratio = result.get("result_cache_ratio", 0)
         cache_ratios.append(cache_ratio)
-        logger.info(f"  Test 1 - Run {i+1}/10: Cache ratio: {cache_ratio}%")
-        time.sleep(0.5)  # Shorter delay to build cache faster
+        logger.info(f"  Test 1 - Run {i+1}/20: Cache ratio: {cache_ratio}%")
+        # No sleep - run queries back-to-back to maximize cache usage
     
     final_result_1 = result
     total_hits_1 = len(final_result_1.get("hits", []))
@@ -213,8 +214,8 @@ def test_vrl_cache_bug_simple(create_session, base_url):
     assert total_hits_1 > 0, "No data found"
     assert first_value_count > 0, f"First VRL should work, got {first_value_count}/{total_hits_1}"
     
-    logger.info("⏳ Waiting 3 seconds before test 2...")
-    time.sleep(3)
+    logger.info("⏳ Waiting 2 seconds before test 2 to allow cache to settle...")
+    time.sleep(2)
     
     # ========================================
     # TEST 2: Run with DIFFERENT VRL for SAME time range
@@ -245,8 +246,13 @@ def test_vrl_cache_bug_simple(create_session, base_url):
     
     # Console log ALL hits from TEST 2 - THIS IS CRITICAL
     logger.info("\\n📋 TEST 2 - ALL HITS WITH VRL DETAILS:")
+    vrl_values = []  # Track all VRL values to detect mixed values
+    unique_vrl_values = set()
+    
     for i, hit in enumerate(result_2.get("hits", [])):
         vrl_value = hit.get("test_vrl", "MISSING")
+        vrl_values.append(vrl_value)
+        unique_vrl_values.add(vrl_value)
         timestamp = hit.get("_timestamp", "NO_TIME")
         logger.info(f"  Hit {i}: test_vrl = '{vrl_value}', _timestamp = '{timestamp}'")
         
@@ -254,29 +260,43 @@ def test_vrl_cache_bug_simple(create_session, base_url):
         if "test_vrl" in hit:
             logger.info(f"    🎯 COMPLETE HIT {i}: {json.dumps({k: v for k, v in hit.items() if k in ['_timestamp', 'test_vrl']})}")
     
-    # Detailed position analysis
-    if total_hits_2 > 0:
-        positions_with_second_value = []
-        for i, hit in enumerate(result_2["hits"]):
-            if "test_vrl" in hit and hit["test_vrl"] == "second_value":
-                positions_with_second_value.append(i)
+    # *** NEW CRITICAL CHECK: Detect mixed VRL values in single response ***
+    logger.info(f"\\n🔍 VRL VALUE ANALYSIS:")
+    logger.info(f"  Unique VRL values in response: {list(unique_vrl_values)}")
+    logger.info(f"  Total unique VRL values: {len(unique_vrl_values)}")
+    
+    # Check for mixed VRL values (cache bug signature)
+    if len(unique_vrl_values) > 1:
+        logger.error("🚨 VRL CACHE BUG DETECTED!")
+        logger.error("🔴 MIXED VRL VALUES found in single response!")
+        logger.error(f"   Expected: All hits should have 'second_value'")
+        logger.error(f"   Actual: Found multiple VRL values: {list(unique_vrl_values)}")
         
-        logger.info(f"  Positions with 'second_value': {positions_with_second_value}")
+        # Show position mapping
+        old_vrl_positions = [i for i, val in enumerate(vrl_values) if val == "first_value"]
+        new_vrl_positions = [i for i, val in enumerate(vrl_values) if val == "second_value"]
         
-        # Check for specific "first and last only" bug pattern
-        if len(positions_with_second_value) >= 2 and total_hits_2 > 2:
-            first_has_new_vrl = 0 in positions_with_second_value
-            last_has_new_vrl = (total_hits_2 - 1) in positions_with_second_value
+        logger.error(f"   Positions with OLD VRL 'first_value': {old_vrl_positions}")
+        logger.error(f"   Positions with NEW VRL 'second_value': {new_vrl_positions}")
+        
+        # Check for specific "first and last only" pattern
+        if len(new_vrl_positions) >= 2 and total_hits_2 > 2:
+            first_has_new_vrl = 0 in new_vrl_positions
+            last_has_new_vrl = (total_hits_2 - 1) in new_vrl_positions
             middle_positions = set(range(1, total_hits_2 - 1))
-            middle_with_new_vrl = [pos for pos in positions_with_second_value if pos in middle_positions]
+            middle_with_new_vrl = [pos for pos in new_vrl_positions if pos in middle_positions]
             
             if first_has_new_vrl and last_has_new_vrl and len(middle_with_new_vrl) == 0:
-                logger.error("🚨 VRL CACHE BUG DETECTED!")
-                logger.error("🔴 VRL 'second_value' ONLY appears in FIRST and LAST positions!")
+                logger.error("🚨 SPECIFIC PATTERN: First and Last Only Cache Bug!")
                 logger.error(f"   First position (0): {'✓' if first_has_new_vrl else '✗'}")
                 logger.error(f"   Last position ({total_hits_2-1}): {'✓' if last_has_new_vrl else '✗'}")
                 logger.error(f"   Middle positions ({len(middle_positions)}): {len(middle_with_new_vrl)} have new VRL")
-                assert False, "VRL Cache Bug: New VRL only appears in first and last results, not in middle results"
+        
+        assert False, f"VRL Cache Bug: Mixed VRL values in single response: {list(unique_vrl_values)}"
+    
+    # Track positions for legacy validation
+    positions_with_second_value = [i for i, val in enumerate(vrl_values) if val == "second_value"]
+    logger.info(f"  Positions with 'second_value': {positions_with_second_value}")
     
     # ========================================
     # CRITICAL VALIDATION
