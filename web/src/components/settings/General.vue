@@ -57,24 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               The scrape interval is the frequency, in seconds, at which the monitoring system collects metrics.
             </span>
           </div>
-          <!-- enable web socket search section -->
-          <div v-if="store.state.zoConfig.websocket_enabled" class="settings-grid-item">
-            <span class="individual-setting-title">
-              {{ t('settings.enableWebsocketSearch') }}
-            </span>
-            <q-toggle
-              style="width: 120px;"
-              v-model="enableWebsocketSearch"
-              :label="'Enabled'"
-              size="lg"
-              data-test="general-settings-enable-websocket"
-              class=" showLabelOnTop o2-toggle-button-lg"
-              :class="store.state.theme == 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-            />
-            <span class="individual-setting-description">
-              Websockets Search uses sockets logic to improve performance.
-            </span>
-          </div>
           <!-- enable search streaming section -->
           <div v-if="store.state.zoConfig.streaming_enabled" class="settings-grid-item">
             <span class="individual-setting-title">
@@ -370,11 +352,6 @@ export default defineComponent({
         15,
     );
 
-    const enableWebsocketSearch = ref(
-      store.state?.organizationData?.organizationSettings
-        ?.enable_websocket_search ?? false,
-    );
-
     const enableStreamingSearch = ref(
       store.state?.organizationData?.organizationSettings
         ?.enable_streaming_search ?? false,
@@ -396,10 +373,6 @@ export default defineComponent({
       scrapeIntereval.value =
         store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15;
-
-      enableWebsocketSearch.value =
-        store.state?.organizationData?.organizationSettings
-          ?.enable_websocket_search ?? false;
 
       enableStreamingSearch.value =
         store.state?.organizationData?.organizationSettings
@@ -438,7 +411,6 @@ export default defineComponent({
         store.dispatch("setOrganizationSettings", {
           ...store.state?.organizationData?.organizationSettings,
           scrape_interval: scrapeIntereval.value,
-          enable_websocket_search: enableWebsocketSearch.value,
           enable_streaming_search: enableStreamingSearch.value,
           streaming_aggregation_enabled: enableStreamingAggregation.value,
         });
@@ -657,7 +629,6 @@ export default defineComponent({
       config,
       router,
       scrapeIntereval,
-      enableWebsocketSearch,
       onSubmit,
       files,
       counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any }) {

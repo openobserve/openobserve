@@ -384,14 +384,14 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep, debounce } from "lodash-es";
-import { buildSqlQuery, getFieldsFromQuery, isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
+import { isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
-import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
+import { isStreamingEnabled } from "@/utils/zincutils";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import useAiChat from "@/composables/useAiChat";
 import queryService from "@/services/search";
@@ -572,7 +572,6 @@ export default defineComponent({
       cancelQuery,
       getRegionInfo,
       sendCancelSearchMessage,
-      setCommunicationMethod,
     } = useSearchBar();
     let {
       getJobData,
@@ -583,12 +582,10 @@ export default defineComponent({
       handleRunQuery,
       enableRefreshInterval,
       clearSearchObj,
-      processHttpHistogramResults,
       loadVisualizeData,
     } = useLogs();
 
     const {
-      getHistogramQueryData,
       resetHistogramWithError,
       generateHistogramData,
       generateHistogramSkeleton,
@@ -2321,7 +2318,6 @@ export default defineComponent({
       redirectBackToLogs,
       handleRunQuery,
       refreshTimezone,
-      getHistogramQueryData,
       generateHistogramSkeleton,
       setInterestingFieldInSQLQuery,
       handleQuickModeChange,
@@ -2337,19 +2333,16 @@ export default defineComponent({
       buildWebSocketPayload,
       initializeSearchConnection,
       addTraceId,
-      isWebSocketEnabled,
       showJobScheduler,
       showSearchScheduler,
       closeSearchSchedulerFn,
       isDistinctQuery,
       isWithQuery,
       isStreamingEnabled,
-      setCommunicationMethod,
       sendToAiChat,
       processInterestingFiledInSQLQuery,
       removeFieldByName,
       dashboardPanelData,
-      processHttpHistogramResults,
       searchResponseForVisualization,
       shouldUseHistogramQuery,
       clearSchemaCache,
@@ -2482,16 +2475,10 @@ export default defineComponent({
           // this.handleRunQuery();
           this.searchObj.loadingHistogram = true;
 
-          this.setCommunicationMethod();
-
           // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
 
-          if (
-            this.searchObj.communicationMethod === "ws" ||
-            this.searchObj.communicationMethod === "streaming"
-          ) {
-            // Use WebSocket for histogram data
+          if (this.searchObj.communicationMethod === "streaming") {
             const payload = this.buildWebSocketPayload(
               this.searchObj.data.histogramQuery,
               false,
@@ -2509,22 +2496,6 @@ export default defineComponent({
 
             return;
           }
-
-          this.processHttpHistogramResults(
-            this.searchObj.data.customDownloadQueryObj,
-          )
-            .then((res: any) => {
-              this.refreshTimezone();
-              const timeout = setTimeout(() => {
-                if (this.searchResultRef) this.searchResultRef.reDrawChart();
-              }, 100);
-
-              // Store timeout reference for cleanup
-              this.chartRedrawTimeout = timeout;
-            })
-            .finally(() => {
-              this.searchObj.loadingHistogram = false;
-            });
         }
       }
 
@@ -2536,24 +2507,6 @@ export default defineComponent({
           this.searchObj.config.splitterModel > 0;
       }
     },
-    // changeStream: {
-    //   handler(stream, streamOld) {
-    //     if (
-    //       this.searchObj.data.stream.selectedStream.hasOwnProperty("value") &&
-    //       this.searchObj.data.stream.selectedStream.value != ""
-    //     ) {
-    //       this.searchObj.data.tempFunctionContent = "";
-    //       this.searchBarRef.resetFunctionContent();
-    //       if (streamOld.value) this.searchObj.data.query = "";
-    //       if (streamOld.value) this.setQuery(this.searchObj.meta.sqlMode);
-    //       this.searchObj.loading = true;
-    //       // setTimeout(() => {
-    //       //   this.runQueryFn();
-    //       // }, 500);
-    //     }
-    //   },
-    //   immediate: false,
-    // },
     updateSelectedColumns() {
       this.searchObj.meta.resultGrid.manualRemoveFields = true;
       // Clear any existing timeout
