@@ -1243,3 +1243,17 @@ fn deep_copy_response(res: &config::meta::search::Response) -> config::meta::sea
     let serialized = serde_json::to_string(res).expect("Failed to serialize response");
     serde_json::from_str(&serialized).expect("Failed to deserialize response")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_result_array_skip_vrl() {
+        let query_fn = "#ResultArray#SkipVRL#
+ .message_length = length!(.flag_url)
+ .test=25
+ .";
+        assert!(is_result_array_skip_vrl(query_fn));
+    }
+}
