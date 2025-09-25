@@ -207,10 +207,10 @@ def test_vrl_historical_cache_bug_detection(create_session, base_url):
     discovery_start_time_us = int(discovery_start_time.timestamp() * 1000000)
     discovery_end_time_us = int(discovery_end_time.timestamp() * 1000000)
     
-    # First, let's find what streams exist and have data
+    # Try a different stream name to see if that affects cache behavior
     discovery_sql = '''
         SELECT *
-        FROM "stream_pytest_data"
+        FROM "vrl_cache_bug"
         ORDER BY _timestamp DESC
         LIMIT 20
     '''
@@ -222,7 +222,7 @@ def test_vrl_historical_cache_bug_detection(create_session, base_url):
         logger.warning("No data in stream_pytest_data, trying broader search...")
         
         # Try different stream names that might exist
-        for stream_candidate in ["default", "logs", "stream_pytest_data", "test_stream"]:
+        for stream_candidate in ["vrl_cache_bug", "default", "logs", "stream_pytest_data", "test_stream"]:
             test_sql = f'SELECT * FROM "{stream_candidate}" ORDER BY _timestamp DESC LIMIT 5'
             test_result = execute_query_with_vrl(session, base_url, test_sql, discovery_start_time_us, discovery_end_time_us)
             
