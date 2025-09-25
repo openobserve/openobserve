@@ -15,6 +15,7 @@
 
 //! Increase the data column size for mysql db
 
+use sea_orm::sea_query::extension::mysql::MySqlType;
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -47,7 +48,11 @@ async fn increase_data_column_size(manager: &SchemaManager<'_>) -> Result<(), Db
 fn increase_data_column_size_statement() -> TableAlterStatement {
     Table::alter()
         .table(EnrichmentTables::Table)
-        .modify_column(ColumnDef::new(EnrichmentTables::Data).blob().to_owned())
+        .modify_column(
+            ColumnDef::new(EnrichmentTables::Data)
+                .custom(MySqlType::LongBlob)
+                .to_owned(),
+        )
         .to_owned()
 }
 
@@ -67,7 +72,7 @@ mod tests {
         let statement = increase_data_column_size_statement();
         assert_eq!(
             statement.to_string(MysqlQueryBuilder),
-            "ALTER TABLE `enrichment_tables` MODIFY COLUMN `data` blob"
+            "ALTER TABLE `enrichment_tables` MODIFY COLUMN `data` longblob"
         );
     }
 }
