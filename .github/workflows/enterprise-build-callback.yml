@@ -1,0 +1,29 @@
+name: Enterprise Build Callback
+
+permissions: {}
+
+on:
+  repository_dispatch:
+    types: [enterprise-build-complete]
+
+jobs:
+  handle-completion:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check enterprise build result
+        env:
+          CONCLUSION: ${{ github.event.client_payload.conclusion }}
+          RUN_URL: ${{ github.event.client_payload.run_url }}
+          COMMIT_SHA: ${{ github.event.client_payload.commit_sha }}
+        run: |
+          echo "Enterprise build completed with: $CONCLUSION"
+          echo "Build URL: $RUN_URL"
+          echo "Commit SHA: $COMMIT_SHA"
+
+          if [ "$CONCLUSION" = "success" ]; then
+            echo "✅ Enterprise build passed"
+          else
+            echo "❌ Enterprise build failed"
+            exit 1
+          fi

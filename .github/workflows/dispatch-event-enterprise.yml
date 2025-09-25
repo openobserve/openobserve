@@ -36,8 +36,17 @@ jobs:
         env:
           TOKEN: ${{ steps.generate_token.outputs.token }}
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+          BUILD_ID: ${{ github.run_id }}-${{ env.SHORT_COMMIT_ID }}
         with:
           token: ${{ env.TOKEN }} # GitHub App installation access token
           repository: openobserve/o2-enterprise
           event-type: initiate-enterprise-build
-          client-payload: '{"o2_enterprise_repo": "${{ env.BRANCH_NAME }}", "o2_opensource_repo": "${{ env.BRANCH_NAME }}" ,"o2_commit_id": "${{ env.SHORT_COMMIT_ID }}"}'
+          client-payload: |
+            {
+              "o2_enterprise_repo": "${{ env.BRANCH_NAME }}",
+              "o2_opensource_repo": "${{ env.BRANCH_NAME }}",
+              "o2_commit_id": "${{ env.SHORT_COMMIT_ID }}",
+              "build_id": "${{ env.BUILD_ID }}",
+              "commit_sha": "${{ env.GITHUB_HEAD_SHA }}",
+              "callback_repo": "${{ github.repository }}"
+            }
