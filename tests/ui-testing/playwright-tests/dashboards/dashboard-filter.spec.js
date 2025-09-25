@@ -566,10 +566,18 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Expect error message
+    // await expect(
+    //   page
+    //     .getByText(
+    //       /(sql parser error: Expected:|Search field not found:|Schema error: No field named controller\.?)/i
+    //     )
+    //     .first()
+    // ).toBeVisible();
+
     await expect(
       page
         .getByText(
-          /(sql parser error: Expected:|Search field not found:|Schema error: No field named controller\.?)/i
+          "Schema error: No field named array. Valid fields are e2e_automate._timestamp, e2e_automate.kubernetes_container_name" 
         )
         .first()
     ).toBeVisible();
