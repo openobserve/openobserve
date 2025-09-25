@@ -271,8 +271,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Select table chart type
     await pm.chartTypeSelector.selectChartType("table");
-
-
+    
     // Now we can access the field removal buttons
     await pm.chartTypeSelector.removeField("_timestamp", "x");
 
@@ -319,8 +318,7 @@ test.describe("dashboard UI testcases", () => {
 
     if (transposeErrorResult.hasErrors) {
       transposeErrorResult.errors.forEach((error, index) => {
-        console.log(`Transpose Error ${index + 1}: ${error}`);
-      });
+      testLogger.error(`Transpose Error ${index + 1}: ${error}`);});
 
       // Fail the test with detailed error information
       expect(transposeErrorResult.errorTextCount).toBe(0);
@@ -329,11 +327,6 @@ test.describe("dashboard UI testcases", () => {
 
     // Save the panel
     await pm.dashboardPanelActions.savePanel();
-
-    // Assert no dashboard errors occurred after transpose
-    expect(transposeErrorResult.errorTextCount).toBe(0);
-    expect(transposeErrorResult.errorListCount).toBe(0);
-
     // Delete the created dashboard
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
