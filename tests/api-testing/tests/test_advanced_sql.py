@@ -1,6 +1,7 @@
 import json
 import requests
 import pytest
+import logging
 
 from datetime import datetime, timezone, timedelta
 import time
@@ -47,7 +48,7 @@ def test_e2e_error_rate_analysis(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for info rate analysis")
+        logging.info(f"Found {len(hits)} hits for info rate analysis")
         for i, hit in enumerate(hits):
             assert "pvcount" in hit, f"Hit {i} should contain 'pvcount' field"
             assert "infocount" in hit, f"Hit {i} should contain 'infocount' field"
@@ -59,9 +60,9 @@ def test_e2e_error_rate_analysis(create_session, base_url):
             info_rate = hit["inforate"]
             assert info_rate >= 0, f"Hit {i} info rate should be >= 0, got {info_rate}"
         
-        print(f"✅ All {len(hits)} hits have valid info rate analysis data")
+        logging.info(f"✅ All {len(hits)} hits have valid info rate analysis data")
     else:
-        print("⚠️  No hits found for info rate analysis query")
+        logging.warning("⚠️  No hits found for info rate analysis query")
 
 
 def test_e2e_performance_percentiles(create_session, base_url):
@@ -101,7 +102,7 @@ def test_e2e_performance_percentiles(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for performance percentiles")
+        logging.info(f"Found {len(hits)} hits for performance percentiles")
         for i, hit in enumerate(hits):
             assert "_time" in hit, f"Hit {i} should contain '_time' field (time bucket)"
             assert "p95" in hit, f"Hit {i} should contain 'p95' field"
@@ -119,9 +120,9 @@ def test_e2e_performance_percentiles(create_session, base_url):
             if p95 is not None and p75 is not None and p50 is not None:
                 assert p95 >= p75 >= p50, f"Hit {i} percentiles should be ordered: P95({p95}) >= P75({p75}) >= P50({p50})"
         
-        print(f"✅ All {len(hits)} hits have valid performance percentile data")
+        logging.info(f"✅ All {len(hits)} hits have valid performance percentile data")
     else:
-        print("⚠️  No hits found for performance percentiles query")
+        logging.warning("⚠️  No hits found for performance percentiles query")
 
 
 def test_e2e_log_volume_analysis(create_session, base_url):
@@ -162,7 +163,7 @@ def test_e2e_log_volume_analysis(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for log volume analysis")
+        logging.info(f"Found {len(hits)} hits for log volume analysis")
         for i, hit in enumerate(hits):
             assert "time_bucket" in hit, f"Hit {i} should contain 'time_bucket' field"
             assert "total_logs" in hit, f"Hit {i} should contain 'total_logs' field"
@@ -175,9 +176,9 @@ def test_e2e_log_volume_analysis(create_session, base_url):
             info_count = hit["info_count"]
             assert info_count <= total_logs, f"Hit {i} info_count({info_count}) should be <= total_logs({total_logs})"
         
-        print(f"✅ All {len(hits)} hits have valid log volume analysis data")
+        logging.info(f"✅ All {len(hits)} hits have valid log volume analysis data")
     else:
-        print("⚠️  No hits found for log volume analysis query")
+        logging.warning("⚠️  No hits found for log volume analysis query")
 
 
 def test_e2e_source_analysis(create_session, base_url):
@@ -216,7 +217,7 @@ def test_e2e_source_analysis(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for source analysis")
+        logging.info(f"Found {len(hits)} hits for source analysis")
         for i, hit in enumerate(hits):
             assert "platform" in hit, f"Hit {i} should contain 'platform' field"
             assert "source_group" in hit, f"Hit {i} should contain 'source_group' field"
@@ -226,9 +227,9 @@ def test_e2e_source_analysis(create_session, base_url):
             log_count = hit["log_count"]
             assert log_count > 0, f"Hit {i} log_count should be > 0, got {log_count}"
         
-        print(f"✅ All {len(hits)} hits have valid source analysis data")
+        logging.info(f"✅ All {len(hits)} hits have valid source analysis data")
     else:
-        print("⚠️  No hits found for source analysis query")
+        logging.warning("⚠️  No hits found for source analysis query")
 
 
 def test_e2e_host_performance(create_session, base_url):
@@ -272,7 +273,7 @@ def test_e2e_host_performance(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for host performance analysis")
+        logging.info(f"Found {len(hits)} hits for host performance analysis")
         for i, hit in enumerate(hits):
             assert "hostname" in hit, f"Hit {i} should contain 'hostname' field"
             assert "unique_stream_count" in hit, f"Hit {i} should contain 'unique_stream_count' field"
@@ -281,9 +282,9 @@ def test_e2e_host_performance(create_session, base_url):
             assert "min_float_value" in hit, f"Hit {i} should contain 'min_float_value' field"
             assert "max_float_value" in hit, f"Hit {i} should contain 'max_float_value' field"
         
-        print(f"✅ All {len(hits)} hits have valid host performance data")
+        logging.info(f"✅ All {len(hits)} hits have valid host performance data")
     else:
-        print("⚠️  No hits found for host performance query")
+        logging.warning("⚠️  No hits found for host performance query")
 
 
 def test_e2e_component_percentiles(create_session, base_url):
@@ -326,7 +327,7 @@ def test_e2e_component_percentiles(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for component percentiles")
+        logging.info(f"Found {len(hits)} hits for component percentiles")
         for i, hit in enumerate(hits):
             assert "component" in hit, f"Hit {i} should contain 'component' field"
             assert "p99_took" in hit, f"Hit {i} should contain 'p99_took' field"
@@ -341,9 +342,9 @@ def test_e2e_component_percentiles(create_session, base_url):
             if p99 is not None and p95 is not None and median is not None:
                 assert p99 >= p95 >= median, f"Hit {i} percentiles should be ordered: P99({p99}) >= P95({p95}) >= Median({median})"
         
-        print(f"✅ All {len(hits)} hits have valid component percentile data")
+        logging.info(f"✅ All {len(hits)} hits have valid component percentile data")
     else:
-        print("⚠️  No hits found for component percentiles query")
+        logging.warning("⚠️  No hits found for component percentiles query")
 
 
 def test_e2e_api_log_analysis(create_session, base_url):
@@ -387,7 +388,7 @@ def test_e2e_api_log_analysis(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for API log analysis")
+        logging.info(f"Found {len(hits)} hits for API log analysis")
         for i, hit in enumerate(hits):
             assert "api" in hit, f"Hit {i} should contain 'api' field"
             assert "log_level" in hit, f"Hit {i} should contain 'log_level' field"
@@ -396,9 +397,9 @@ def test_e2e_api_log_analysis(create_session, base_url):
             assert "platform" in hit, f"Hit {i} should contain 'platform' field"
             assert "counter" in hit, f"Hit {i} should contain 'counter' field"
         
-        print(f"✅ All {len(hits)} hits have valid API log analysis data")
+        logging.info(f"✅ All {len(hits)} hits have valid API log analysis data")
     else:
-        print("⚠️  No hits found for API log analysis query")
+        logging.warning("⚠️  No hits found for API log analysis query")
 
 
 def test_e2e_error_categorization(create_session, base_url):
@@ -448,7 +449,7 @@ def test_e2e_error_categorization(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for error categorization")
+        logging.info(f"Found {len(hits)} hits for error categorization")
         for i, hit in enumerate(hits):
             assert "count" in hit, f"Hit {i} should contain 'count' field"
             assert "log_category" in hit, f"Hit {i} should contain 'log_category' field"
@@ -458,9 +459,9 @@ def test_e2e_error_categorization(create_session, base_url):
             count = hit["count"]
             assert count > 0, f"Hit {i} count should be > 0, got {count}"
         
-        print(f"✅ All {len(hits)} hits have valid error categorization data")
+        logging.info(f"✅ All {len(hits)} hits have valid error categorization data")
     else:
-        print("⚠️  No hits found for error categorization query")
+        logging.warning("⚠️  No hits found for error categorization query")
 
 
 def test_e2e_metadata_extraction(create_session, base_url):
@@ -498,7 +499,7 @@ def test_e2e_metadata_extraction(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for caller extraction")
+        logging.info(f"Found {len(hits)} hits for caller extraction")
         for i, hit in enumerate(hits):
             assert "caller" in hit, f"Hit {i} should contain 'caller' field"
             assert "count" in hit, f"Hit {i} should contain 'count' field"
@@ -507,199 +508,9 @@ def test_e2e_metadata_extraction(create_session, base_url):
             count = hit["count"]
             assert count > 0, f"Hit {i} count should be > 0, got {count}"
         
-        print(f"✅ All {len(hits)} hits have valid caller extraction data")
+        logging.info(f"✅ All {len(hits)} hits have valid caller extraction data")
     else:
-        print("⚠️  No hits found for caller extraction query")
-
-
-# def test_e2e_array_case_sensitive(create_session, base_url):
-#     """Running an E2E test for array extraction with case-sensitive matching."""
-
-#     session = create_session
-#     url = base_url
-#     org_id = "default"
-#     now = datetime.now(timezone.utc)
-#     end_time = int(now.timestamp() * 1000000)
-#     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
-#     json_data = {
-#         "query": {
-#             "sql": """SELECT *
-#             FROM "stream_pytest_data"
-#             WHERE str_match(array_extract(cast_to_arr(log), 1), 'fu')""",
-#             "start_time": one_hour_ago,
-#             "end_time": end_time,
-#             "from": 0,
-#             "size": 100,
-#         },
-#     }
-
-#     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
-#     assert (
-#         resp_get_allsearch.status_code == 200
-#     ), f"Array case-sensitive query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
-    
-#     response_data = resp_get_allsearch.json()
-#     assert "hits" in response_data, "Response should contain 'hits' field"
-    
-#     hits = response_data["hits"]
-    
-#     if len(hits) > 0:
-#         print(f"Found {len(hits)} hits for case-sensitive array extraction")
-#         for i, hit in enumerate(hits):
-#             assert "log" in hit, f"Hit {i} should contain 'log' field"
-            
-#             # Validate that the log contains an array and first element matches 'fu' (case sensitive)
-#             log_value = hit["log"]
-#             assert log_value, f"Hit {i} log should not be empty"
-#             assert log_value.startswith('['), f"Hit {i} log should be array format, got: {log_value}"
-            
-#             # str_match does substring matching, so 'fu' should match 'datafusion'
-#             try:
-#                 array_data = json.loads(log_value)
-#                 if len(array_data) > 0:
-#                     first_element = array_data[0]
-#                     assert 'fu' in first_element, f"Hit {i} first array element '{first_element}' should contain 'fu' (case sensitive)"
-#             except json.JSONDecodeError:
-#                 assert False, f"Hit {i} log is not valid JSON array: {log_value}"
-            
-#             print(f"Hit {i}: log = {log_value}")
-        
-#         print(f"✅ All {len(hits)} hits have valid case-sensitive array data")
-#         # Should find 1 hit: ["datafusion", "bad"] (contains 'fu')
-#         # Should NOT find: ["parsing", "Fu"] (case sensitive, 'fu' != 'Fu')
-#         assert len(hits) >= 1, f"Expected at least 1 hit for case-sensitive 'fu' substring match, got {len(hits)}"
-#     else:
-#         print("⚠️  No hits found for case-sensitive array query")
-
-
-# def test_e2e_array_case_insensitive(create_session, base_url):
-#     """Running an E2E test for array extraction with case-insensitive matching."""
-
-#     session = create_session
-#     url = base_url
-#     org_id = "default"
-#     now = datetime.now(timezone.utc)
-#     end_time = int(now.timestamp() * 1000000)
-#     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
-#     json_data = {
-#         "query": {
-#             "sql": """SELECT *
-#             FROM "stream_pytest_data"
-#             WHERE str_match_ignore_case(array_extract(cast_to_arr(log), 1), 'Fu')""",
-#             "start_time": one_hour_ago,
-#             "end_time": end_time,
-#             "from": 0,
-#             "size": 100,
-#         },
-#     }
-
-#     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
-#     assert (
-#         resp_get_allsearch.status_code == 200
-#     ), f"Array case-insensitive query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
-    
-#     response_data = resp_get_allsearch.json()
-#     assert "hits" in response_data, "Response should contain 'hits' field"
-    
-#     hits = response_data["hits"]
-#     if len(hits) > 0:
-#         print(f"Found {len(hits)} hits for case-insensitive array extraction")
-#         for i, hit in enumerate(hits):
-#             assert "log" in hit, f"Hit {i} should contain 'log' field"
-            
-#             # Validate that the log contains an array and first element matches 'Fu' (case insensitive)
-#             log_value = hit["log"]
-#             assert log_value, f"Hit {i} log should not be empty"
-#             assert log_value.startswith('['), f"Hit {i} log should be array format, got: {log_value}"
-            
-#             # Expected matches: "datafusion" and "Fu" should match 'Fu' case-insensitively
-#             # Validate the log contains arrays with elements that would match 'Fu'
-#             print(f"Hit {i}: log = {log_value}")
-            
-#             # The array should contain elements that match 'Fu' case-insensitively
-#             try:
-#                 array_data = json.loads(log_value)
-#                 if len(array_data) > 0:
-#                     first_element = array_data[0].lower()
-#                     assert 'fu' in first_element, f"Hit {i} first array element '{array_data[0]}' should contain 'fu' (case insensitive)"
-#             except json.JSONDecodeError:
-#                 assert False, f"Hit {i} log is not valid JSON array: {log_value}"
-        
-#         print(f"✅ All {len(hits)} hits have valid case-insensitive array data")
-#         # Should find 2 hits: ["datafusion", "bad"] and ["parsing", "Fu"]
-#         assert len(hits) >= 1, f"Expected at least 1 hit for case-insensitive 'Fu' match, got {len(hits)}"
-#     else:
-#         print("⚠️  No hits found for case-insensitive array query")
-
-
-# def test_e2e_multi_level_array_processing(create_session, base_url):
-#     """Running an E2E test for multi-level array processing with conditional logic."""
-
-#     session = create_session
-#     url = base_url
-#     org_id = "default"
-#     now = datetime.now(timezone.utc)
-#     end_time = int(now.timestamp() * 1000000)
-#     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
-#     json_data = {
-#         "query": {
-#             "sql": """SELECT 
-#                 kubernetes_container_name AS service,
-#                 COUNT(*) AS total_logs,
-#                 COUNT(CASE 
-#                     WHEN array_length(cast_to_arr(log)) > 1 
-#                         AND str_match_ignore_case(array_extract(cast_to_arr(log), 2), 'bad|good|error') 
-#                     THEN 1 
-#                 END) AS status_logs,
-#                 array_to_string(
-#                     array_agg(DISTINCT array_extract(cast_to_arr(log), 1)), 
-#                     ','
-#                 ) AS unique_components
-#             FROM "stream_pytest_data"
-#             WHERE log LIKE '[%' 
-#                 AND array_length(cast_to_arr(log)) >= 2
-#             GROUP BY service
-#             HAVING total_logs > 0
-#             ORDER BY status_logs DESC""",
-#             "start_time": one_hour_ago,
-#             "end_time": end_time,
-#             "from": 0,
-#             "size": 100,
-#         },
-#     }
-
-#     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
-#     assert (
-#         resp_get_allsearch.status_code == 200
-#     ), f"Multi-level array processing query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
-    
-#     response_data = resp_get_allsearch.json()
-#     assert "hits" in response_data, "Response should contain 'hits' field"
-    
-#     hits = response_data["hits"]
-#     if len(hits) > 0:
-#         print(f"Found {len(hits)} hits for multi-level array processing")
-#         for i, hit in enumerate(hits):
-#             assert "service" in hit, f"Hit {i} should contain 'service' field"
-#             assert "total_logs" in hit, f"Hit {i} should contain 'total_logs' field"
-#             assert "status_logs" in hit, f"Hit {i} should contain 'status_logs' field"
-#             assert "unique_components" in hit, f"Hit {i} should contain 'unique_components' field"
-            
-#             # Validate counts are non-negative
-#             total_logs = hit["total_logs"]
-#             status_logs = hit["status_logs"]
-#             assert total_logs > 0, f"Hit {i} total_logs should be > 0, got {total_logs}"
-#             assert status_logs >= 0, f"Hit {i} status_logs should be >= 0, got {status_logs}"
-#             assert status_logs <= total_logs, f"Hit {i} status_logs({status_logs}) should be <= total_logs({total_logs})"
-            
-#             print(f"Hit {i}: service={hit['service']}, total_logs={total_logs}, status_logs={status_logs}, components={hit['unique_components']}")
-        
-#         print(f"✅ All {len(hits)} hits have valid multi-level array processing data")
-#     else:
-#         print("⚠️  No hits found for multi-level array processing query")
+        logging.warning("⚠️  No hits found for caller extraction query")
 
 
 def test_e2e_time_series_window_functions(create_session, base_url):
@@ -760,7 +571,7 @@ def test_e2e_time_series_window_functions(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for time-series window functions")
+        logging.info(f"Found {len(hits)} hits for time-series window functions")
         for i, hit in enumerate(hits):
             assert "time_bucket" in hit, f"Hit {i} should contain 'time_bucket' field"
             assert "environment" in hit, f"Hit {i} should contain 'environment' field"
@@ -775,11 +586,11 @@ def test_e2e_time_series_window_functions(create_session, base_url):
             environment = hit["environment"]
             assert environment in ['production', 'staging', 'monitoring', 'default'], f"Hit {i} unexpected environment: {environment}"
             
-            print(f"Hit {i}: {environment} at {hit['time_bucket']}, count={current_count}, growth={hit['growth_rate_percent']}%")
+            logging.debug(f"Hit {i}: {environment} at {hit['time_bucket']}, count={current_count}, growth={hit['growth_rate_percent']}%")
         
-        print(f"✅ All {len(hits)} hits have valid time-series window function data")
+        logging.info(f"✅ All {len(hits)} hits have valid time-series window function data")
     else:
-        print("⚠️  No hits found for time-series window functions query")
+        logging.warning("⚠️  No hits found for time-series window functions query")
 
 
 def test_e2e_advanced_regex_json_path(create_session, base_url):
@@ -834,7 +645,7 @@ def test_e2e_advanced_regex_json_path(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for advanced regex JSON path extraction")
+        logging.info(f"Found {len(hits)} hits for advanced regex JSON path extraction")
         for i, hit in enumerate(hits):
             assert "api_group" in hit, f"Hit {i} should contain 'api_group' field"
             assert "endpoint" in hit, f"Hit {i} should contain 'endpoint' field"
@@ -856,11 +667,11 @@ def test_e2e_advanced_regex_json_path(create_session, base_url):
             health_status = hit["health_status"]
             assert health_status in ['Critical', 'Warning', 'Slow', 'Healthy'], f"Hit {i} unexpected health_status: {health_status}"
             
-            print(f"Hit {i}: {hit['api_group']}/{hit['endpoint']} ({hit['http_method']}) - {health_status}, errors={error_count}")
+            logging.debug(f"Hit {i}: {hit['api_group']}/{hit['endpoint']} ({hit['http_method']}) - {health_status}, errors={error_count}")
         
-        print(f"✅ All {len(hits)} hits have valid advanced regex JSON path data")
+        logging.info(f"✅ All {len(hits)} hits have valid advanced regex JSON path data")
     else:
-        print("⚠️  No hits found for advanced regex JSON path query")
+        logging.warning("⚠️  No hits found for advanced regex JSON path query")
 
 
 def test_e2e_complex_nested_aggregation(create_session, base_url):
@@ -932,7 +743,7 @@ def test_e2e_complex_nested_aggregation(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for complex nested aggregation")
+        logging.info(f"Found {len(hits)} hits for complex nested aggregation")
         for i, hit in enumerate(hits):
             assert "environment" in hit, f"Hit {i} should contain 'environment' field"
             assert "service" in hit, f"Hit {i} should contain 'service' field"
@@ -957,9 +768,9 @@ def test_e2e_complex_nested_aggregation(create_session, base_url):
             service_status = hit["service_status"]
             assert service_status in ['High Latency', 'High Issues', 'High Volume', 'Normal'], f"Hit {i} unexpected service_status: {service_status}"
             
-            print(f"Hit {i}: {hit['environment']}/{hit['service']} - {service_status}, rank={issue_rank}, share={log_share_percent}%")
+            logging.debug(f"Hit {i}: {hit['environment']}/{hit['service']} - {service_status}, rank={issue_rank}, share={log_share_percent}%")
         
-        print(f"✅ All {len(hits)} hits have valid complex nested aggregation data")
+        logging.info(f"✅ All {len(hits)} hits have valid complex nested aggregation data")
     else:
-        print("⚠️  No hits found for complex nested aggregation query")
+        logging.warning("⚠️  No hits found for complex nested aggregation query")
 
