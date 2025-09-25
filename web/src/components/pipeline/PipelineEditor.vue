@@ -88,12 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="nodes-drag-container q-pr-md">
       <div
         data-test="pipeline-editor-nodes-list-title"
-        class="text-bold q-mb-sm q-mx-sm"
+        class="nodes-header q-mb-sm q-mx-sm"
       >
         {{ t("pipeline.nodes") }}
       </div>
 
-      <q-separator class="q-mb-md" />
 
       <div class="flex q-mt-sm">
         <NodeSidebar
@@ -224,13 +223,13 @@ import JsonEditor from "../common/JsonEditor.vue";
 import { validatePipeline as validatePipelineUtil, type ValidationResult } from '../../utils/validatePipeline';
 import { useReo } from "@/services/reodotdev_analytics";
 
-const functionImage = getImageURL("images/pipeline/function.svg");
-const streamImage = getImageURL("images/pipeline/stream.svg");
-const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
-const externalOutputImage = getImageURL("images/pipeline/externalOutput.svg");
+const functionImage = getImageURL("images/pipeline/transform_function.png");
+const streamImage = getImageURL("images/pipeline/input_stream.png");
+const streamOutputImage = getImageURL("images/pipeline/output_stream.png");
+const externalOutputImage = getImageURL("images/pipeline/output_remote.png");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
-const conditionImage = getImageURL("images/pipeline/condition.svg");
-const queryImage = getImageURL("images/pipeline/query.svg");
+const conditionImage = getImageURL("images/pipeline/transform_condition.png");
+const queryImage = getImageURL("images/pipeline/input_query.png");
 import useStreams from "@/composables/useStreams";
 import usePipelines from "@/composables/usePipelines";
 
@@ -1098,6 +1097,29 @@ const savePipelineJson = async (json: string) => {
   width: 200px;
 }
 
+.nodes-header {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  padding: 0 4px 8px 4px;
+  text-align: center;
+  margin-bottom: 16px !important;
+  border-bottom: 2px solid #e5e7eb;
+  letter-spacing: 0.05em;
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: #8b5cf6;
+    border-radius: 1px;
+  }
+}
+
 .node-type-row {
   cursor: grab;
   padding: 5px;
@@ -1116,29 +1138,114 @@ const savePipelineJson = async (json: string) => {
   width: auto;
 
   .vue-flow__node {
-    padding: 0px;
+    padding: 8px 16px;
     width: auto;
+    min-height: 44px;
+    transition: all 0.3s ease;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+    
+    &:active {
+      cursor: grabbing;
+    }
   }
 
   .o2vf_node_input,
   .vue-flow__node-input {
-    background-color: #c8d6f5;
-    border-color: 1px solid #2c6b2f;
-    color: black;
+    border: 1px solid #60a5fa;
+    border-left: 4px solid #3b82f6;
+    color: #1f2937;
+    border-radius: 12px;
+    background: rgba(239, 246, 255, 0.8);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+    transition: all 0.3s ease;
+    cursor: grab;
+    min-height: 36px;
+    padding: 8px 16px;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
+      border-color: #3b82f6;
+      background: rgba(239, 246, 255, 0.95);
+    }
+    
+    &:active {
+      cursor: grabbing;
+    }
   }
 
   .o2vf_node_output,
   .vue-flow__node-output {
-    background-color: #8fd4b8;
-    border-color: 1px solid #3b6f3f;
-    color: black;
+    border: 1px solid #4ade80;
+    border-left: 4px solid #22c55e;
+    color: #1f2937;
+    border-radius: 12px;
+    background: rgba(240, 253, 244, 0.8);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.1);
+    transition: all 0.3s ease;
+    cursor: grab;
+    min-height: 36px;
+    padding: 8px 16px;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(34, 197, 94, 0.2);
+      border-color: #22c55e;
+      background: rgba(240, 253, 244, 0.95);
+    }
+    
+    &:active {
+      cursor: grabbing;
+    }
   }
 
   .o2vf_node_default,
   .vue-flow__node-default {
-    background-color: #efefef;
-    border-color: 1px solid #171e25;
-    color: black;
+    border: 1px solid #f59e0b;
+    border-left: 4px solid #d97706;
+    color: #1f2937;
+    border-radius: 12px;
+    background: rgba(255, 251, 235, 0.8);
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.1);
+    transition: all 0.3s ease;
+    cursor: grab;
+    min-height: 36px;
+    padding: 8px 16px;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(217, 119, 6, 0.2);
+      border-color: #d97706;
+      background: rgba(255, 251, 235, 0.95);
+    }
+    
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+}
+
+// Dark mode nodes header styling
+.body--dark {
+  .nodes-header {
+    color: rgba(255, 255, 255, 0.95) !important;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.2) !important;
+
+    &::after {
+      background: #a855f7 !important;
+    }
   }
 }
 </style>
