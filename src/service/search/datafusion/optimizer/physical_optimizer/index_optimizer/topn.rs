@@ -99,11 +99,6 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
                     self.simple_topn = None;
                     return Ok(TreeNodeRecursion::Stop);
                 }
-                // only support desc order by count(*)
-                if !sort_merge.expr().first().options.descending {
-                    self.simple_topn = None;
-                    return Ok(TreeNodeRecursion::Stop);
-                }
                 self.simple_topn = Some((
                     "".to_string(), // Will be set when we find the group by field
                     fetch,
@@ -202,7 +197,7 @@ mod tests {
             ),
             (
                 "select name, count(*) as cnt from t where match_all('error') group by name order by cnt asc limit 10",
-                None,
+                Some(IndexOptimizeMode::SimpleTopN("name".to_string(), 10, true)),
             ),
             (
                 "select name as key, count(*) as cnt from t where match_all('error') group by key order by cnt desc limit 10",
