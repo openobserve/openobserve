@@ -111,12 +111,14 @@ pub async fn handle_values_request(
         let order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
 
         if search_req.query.from == 0 {
-            let c_resp = cache::check_cache_v2(
+            let (c_resp, _) = cache::prepare_cache_response(
                 &trace_id,
                 org_id,
                 stream_type,
-                &search_req,
+                &mut search_req.clone(),
                 search_req.use_cache,
+                false,
+                Some(true),
             )
             .instrument(ws_values_span.clone())
             .await?;

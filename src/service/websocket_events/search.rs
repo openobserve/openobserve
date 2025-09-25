@@ -209,10 +209,17 @@ pub async fn handle_search_request(
 
     // Step 1: Search result cache
     if req.payload.query.from == 0 {
-        let c_resp =
-            cache::check_cache_v2(&trace_id, org_id, stream_type, &req.payload, req.use_cache)
-                .instrument(ws_search_span.clone())
-                .await?;
+        let (c_resp, _) = cache::prepare_cache_response(
+            &trace_id,
+            org_id,
+            stream_type,
+            &mut req.payload.clone(),
+            req.use_cache,
+            false,
+            Some(true),
+        )
+        .instrument(ws_search_span.clone())
+        .await?;
         let local_c_resp = c_resp.clone();
         let cached_resp = local_c_resp.cached_response;
         let mut deltas = local_c_resp.deltas;
