@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 8;
+pub const DB_SCHEMA_VERSION: u64 = 9;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
