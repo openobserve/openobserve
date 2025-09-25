@@ -6,6 +6,9 @@ import string
 from pathlib import Path
 import base64
 
+# Set OpenObserve configuration for pytest
+os.environ.setdefault('ZO_INGEST_ALLOWED_UPTO', '24')  # Allow 24 hours back data for tests
+
 BASE_URL = os.environ["ZO_BASE_URL"]
 root_dir = Path(__file__).parent.parent.parent
 

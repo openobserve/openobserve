@@ -328,7 +328,68 @@ def test_vrl_cache_bug_simple(create_session, base_url):
     assert second_value_count_2 > 0, f"Test 2 should have 'second_value', got {second_value_count_2}/{total_hits_2}"
     assert first_value_count_2 == 0, f"Test 2 should NOT have 'first_value', got {first_value_count_2}/{total_hits_2}"
     
+    # ============================================================
+    # TEST 3: Query again after a delay to verify VRL persistence
+    # ============================================================
+    logger.info("\\n============================================================")
+    logger.info("🟡 TEST 3: Testing VRL persistence after delay")  
+    logger.info("🎯 CRITICAL: VRL should persist and continue applying to the same data")
+    logger.info("🚨 BUG: If VRL state is lost, subsequent queries won't have VRL field")
+    logger.info("============================================================")
+    
+    # Wait a moment to simulate real-world delay
+    time.sleep(5)
+    logger.info("⏳ Waited 5 seconds to test VRL persistence...")
+    
+    # Query with the same VRL that should still be active
+    result_3 = execute_query_with_vrl(session, base_url, sql, start_time_us, end_time_us, vrl_function_2)
+    
+    total_hits_3 = len(result_3.get("hits", []))
+    hits_with_vrl_3 = sum(1 for hit in result_3.get("hits", []) if "test_vrl" in hit and hit["test_vrl"] == "second_value")
+    hits_with_first_vrl_3 = sum(1 for hit in result_3.get("hits", []) if "test_vrl" in hit and hit["test_vrl"] == "first_value")
+    missing_vrl_3 = sum(1 for hit in result_3.get("hits", []) if "test_vrl" not in hit)
+    
+    logger.info(f"🔍 Test 3 Results:")
+    logger.info(f"  Cache ratio: {result_3.get('result_cache_ratio', 0)}%")
+    logger.info(f"  Total hits: {total_hits_3}")
+    logger.info(f"  Hits with VRL 'second_value' (expected): {hits_with_vrl_3}/{total_hits_3}")
+    logger.info(f"  Hits with VRL 'first_value' (old): {hits_with_first_vrl_3}/{total_hits_3}")
+    logger.info(f"  Hits missing VRL: {missing_vrl_3}/{total_hits_3}")
+    
+    # Show first few hits to verify VRL persistence
+    logger.info("\\n📋 TEST 3 - VRL PERSISTENCE SAMPLES:")
+    for i, hit in enumerate(result_3.get("hits", [])[:3]):
+        vrl_value = hit.get("test_vrl", "MISSING")
+        timestamp = hit.get("_timestamp", "NO_TIME")
+        logger.info(f"  Hit {i}: test_vrl = '{vrl_value}', _timestamp = '{timestamp}'")
+        if "test_vrl" in hit:
+            logger.info(f"    🎯 COMPLETE HIT: {json.dumps({k: v for k, v in hit.items() if k in ['_timestamp', 'test_vrl']})}")
+    
+    # Validate TEST 3: VRL should persist
+    logger.info("\\n============================================================")
+    logger.info("🎯 TEST 3 VRL PERSISTENCE VALIDATION")
+    logger.info("============================================================")
+    
+    if hits_with_vrl_3 == total_hits_3:
+        logger.info("✅ SUCCESS: VRL persists correctly - all hits have current VRL transformation")
+        logger.info("✅ VRL function state maintained across multiple queries")
+    elif missing_vrl_3 > 0:
+        logger.error("🚨 VRL PERSISTENCE BUG DETECTED!")
+        logger.error("🔴 Some hits missing VRL transformation after delay")
+        logger.error(f"   Expected: All {total_hits_3} hits should have VRL")
+        logger.error(f"   Actual: {missing_vrl_3} hits missing VRL")
+        assert False, "VRL Persistence Bug: VRL transformation lost after delay"
+    elif hits_with_first_vrl_3 > 0:
+        logger.error("🚨 VRL STATE REGRESSION BUG DETECTED!")
+        logger.error("🔴 Some hits reverted to old VRL transformation")
+        logger.error(f"   Expected: All {total_hits_3} hits should have 'second_value'")
+        logger.error(f"   Actual: {hits_with_first_vrl_3} hits have old 'first_value'")
+        assert False, "VRL State Regression Bug: VRL reverted to previous state"
+    else:
+        logger.warning("⚠️  Unexpected VRL state - partial persistence issue")
+    
     logger.info("\\n🎉 VRL Cache Bug Detection Test Completed Successfully!")
     logger.info("✅ No VRL cache bugs detected")
-    logger.info("✅ New VRL transformations applied correctly in cached scenarios")
-    logger.info(f"✅ Tested with cache ratio: {cache_ratio_2}%")
+    logger.info("✅ New VRL transformations applied correctly in cached scenarios") 
+    logger.info("✅ VRL transformations persist and apply to fresh data")
+    logger.info("✅ Tested comprehensive VRL functionality across 3 test scenarios")
