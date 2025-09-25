@@ -155,7 +155,6 @@ pub async fn chat_stream(
         ai::meta::AiServerRequest::new(req_body.messages, req_body.model),
         org_id.clone(),
         auth_str,
-        user_id.clone(),
     )
     .await
     {
