@@ -668,6 +668,42 @@ async fn get_file_list_inner(
                 continue;
             }
         }
+        
+        // If watch_time is set, filter out files created after watch_time to avoid duplicates
+        if let Some(watch_time) = query.watch_time {
+            match is_exists(file).and_then(|path| path.metadata()) {
+                Ok(metadata) => {
+                    if let Ok(modified_time) = metadata.modified() {
+                        let modified_micros = modified_time
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_micros() as i64;
+                        if modified_micros > watch_time {
+                            log::debug!(
+                                "[trace_id {}] skip wal parquet file created after watch_time: {} watch_time: {} modified_time: {}",
+                                query.trace_id,
+                                &file,
+                                watch_time,
+                                modified_micros
+                            );
+                            wal::release_files(std::slice::from_ref(file));
+                            continue;
+                        }
+                    }
+                }
+                Err(_) => {
+                    // If we can't get file metadata, skip it to be safe
+                    log::debug!(
+                        "[trace_id {}] skip wal parquet file due to metadata error: {}",
+                        query.trace_id,
+                        &file
+                    );
+                    wal::release_files(std::slice::from_ref(file));
+                    continue;
+                }
+            }
+        }
+        
         if match_source(stream_params.clone(), time_range, &filters, &file_key).await {
             result.push(file_key);
         } else {

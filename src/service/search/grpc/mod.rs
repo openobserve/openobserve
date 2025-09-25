@@ -36,4 +36,5 @@ pub struct QueryParams {
     pub time_range: Option<(i64, i64)>,
     pub work_group: Option<String>,
     pub use_inverted_index: bool,
+    pub watch_time: Option<i64>,
 }
