@@ -165,7 +165,7 @@ pub async fn search(
                     cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
                 if let Some(interval) = v.histogram_interval {
-                    file_path = format!("{}_{}_{}", file_path, interval, ts_column);
+                    file_path = format!("{file_path}_{interval}_{ts_column}");
                 }
 
                 let order_by = v.order_by;
@@ -941,39 +941,34 @@ pub async fn write_results_v2(
                 if res.histogram_interval.is_some() {
                     let mut removed_boundary = false;
                     local_resp.hits.retain(|hit| {
-                                if !removed_boundary {
-                                    if let Some(hit_ts) = hit.get(ts_column).and_then(|v| v.as_i64()) {
-                                        if hit_ts == boundary_ts && hit == &remove_hit_record {
-                                            log::info!("[CACHE_DEBUG] Removing duplicate boundary record for aggregate query with ts: {}", hit_ts);
-                                            removed_boundary = true;
-                                            return false;
-                                        }
+                                if !removed_boundary
+                                    && let Some(hit_ts) = hit.get(ts_column).and_then(|v| v.as_i64())
+                                    && hit_ts == boundary_ts && hit == &remove_hit_record {
+                                        log::info!("[CACHE_DEBUG] Removing duplicate boundary record for aggregate query with ts: {}", hit_ts);
+                                        removed_boundary = true;
+                                        return false;
                                     }
-                                }
                                 true
                             });
 
                     let final_count = local_resp.hits.len();
                     log::info!(
-                        "[CACHE_DEBUG] After aggregate boundary dedup: {} records (removed: {})",
-                        final_count,
+                        "[CACHE_DEBUG] After aggregate boundary dedup: {final_count} records (removed: {})",
                         original_count - final_count
                     );
                 } else {
                     local_resp.hits.retain(|hit| {
-                            if let Some(hit_ts) = hit.get(ts_column).and_then(|v| v.as_i64()) {
-                                if hit_ts == boundary_ts  {
+                            if let Some(hit_ts) = hit.get(ts_column).and_then(|v| v.as_i64())
+                                && hit_ts == boundary_ts  {
                                     log::info!("[CACHE_DEBUG] Removing duplicate boundary record for aggregate query with ts: {}", hit_ts);
                                     return false;
                                 }
-                        }
                         true
                     });
 
                     let final_count = local_resp.hits.len();
                     log::info!(
-                        "[CACHE_DEBUG] After aggregate boundary dedup: {} records (removed: {})",
-                        final_count,
+                        "[CACHE_DEBUG] After aggregate boundary dedup: {final_count} records (removed: {})",
                         original_count - final_count
                     );
                 }
@@ -1221,7 +1216,7 @@ pub async fn check_cache_v2(
                         .unwrap_or_default();
 
                 if let Some(interval) = v.histogram_interval {
-                    file_path = format!("{}_{}_{}", file_path, interval, ts_column);
+                    file_path = format!("{file_path}_{interval}_{ts_column}");
                 }
 
                 MultiCachedQueryResponse {
