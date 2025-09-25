@@ -1963,8 +1963,23 @@ export const useSearchStream = () => {
           }
 
           const preSQLQuery = req.query.sql;
-          req.query.sql = [];
-
+          // req.query.sql = [];
+          let multiStreamQueries: any = [];
+          const listOfFields: any = [];
+          searchObj.data.stream.selectedStreamFields.some((stream: any) => {
+            if (stream.group == "common") {
+              if (
+                !Object.hasOwn(stream, "label") &&
+                (searchObj.meta.quickMode === false ||
+                  (searchObj.meta.quickMode === true &&
+                    stream.isInterestingField === true))
+              ) {
+                listOfFields.push(stream.name);
+              }
+            } else {
+              return true;
+            }
+          });
           streams
             .join(",")
             .split(",")
@@ -1974,44 +1989,37 @@ export const useSearchStream = () => {
                 item,
               );
 
-              // const finalHistogramQuery: string = preHistogramSQLQuery.replace(
-              //   "[INDEX_NAME]",
-              //   item
-              // );
-
-              const listOfFields: any = [];
-              let streamField: any = {};
-              for (const field of searchObj.data.stream.interestingFieldList) {
-                for (streamField of searchObj.data.stream
-                  .selectedStreamFields) {
-                  if (
-                    streamField?.name == field &&
-                    streamField?.streams.indexOf(item) > -1 &&
-                    listOfFields.indexOf(field) == -1
-                  ) {
-                    listOfFields.push(field);
-                  }
-                }
-              }
+              // let streamField: any = {};
+              // for (const field of searchObj.data.stream.interestingFieldList) {
+              //   for (streamField of searchObj.data.stream
+              //     .selectedStreamFields) {
+              //     if (
+              //       streamField?.name == field &&
+              //       streamField?.streams.indexOf(item) > -1 &&
+              //       listOfFields.indexOf(field) == -1
+              //     ) {
+              //       listOfFields.push(field);
+              //     }
+              //   }
+              // }
 
               let queryFieldList: string = "";
               if (listOfFields.length > 0) {
                 queryFieldList = "," + listOfFields.join(",");
               }
 
+              finalQuery = finalQuery.replace("*", "[FIELD_LIST]");
               finalQuery = finalQuery.replace(
                 "[FIELD_LIST]",
                 `'${item}' as _stream_name` + queryFieldList,
               );
 
-              // finalHistogramQuery = finalHistogramQuery.replace(
-              //   "[FIELD_LIST]",
-              //   `'${item}' as _stream_name,` + listOfFields.join(",")
-              // );
-
-              req.query.sql.push(finalQuery);
+              // req.query.sql.push(finalQuery);
+              multiStreamQueries.push(finalQuery);
               // req.aggs.histogram.push(finalHistogramQuery);
             });
+
+          req.query.sql = multiStreamQueries.join(" UNION ");
         } else {
           req.query.sql = req.query.sql.replace(
             "[INDEX_NAME]",
