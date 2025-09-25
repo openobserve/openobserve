@@ -112,7 +112,7 @@ impl DistinctValues {
             get_config().limit.distinct_values_interval,
             {
                 if let Err(e) = INSTANCE.flush().await {
-                    log::error!("[DISTINCT_VALUES] error flush data to wal: {}", e);
+                    log::error!("[DISTINCT_VALUES] error flush data to wal: {e}");
                 }
             }
         );
@@ -219,7 +219,7 @@ impl Metadata for DistinctValues {
                 infra::schema::get_cache(&org_id, &distinct_stream_name, StreamType::Metadata)
                     .await?;
             let mut is_new = false;
-            if db_schema.fields_map().is_empty() {
+            if !db_schema.fields_map().contains_key(TIMESTAMP_COL_NAME) {
                 is_new = true;
                 let schema = default_schema.as_ref().clone();
                 if let Err(e) = db::schema::merge(
