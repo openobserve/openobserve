@@ -637,6 +637,17 @@ pub async fn add_user_to_org(
     let existing_user = db::user::get_user_record(&email).await;
     let root_user = ROOT_USER.clone();
     if existing_user.is_ok() {
+        let existing_user = existing_user.unwrap();
+
+        // If the user is root, we don't need to add to the org, as root user
+        // already has access to all organizations.
+        if existing_user.is_root {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                http::StatusCode::BAD_REQUEST,
+                "User is root user, no need to add to organization.",
+            )));
+        }
+
         let initiating_user = if is_root_user(initiator_id) {
             let local_org = org_id.replace(' ', "_");
             // If the org does not exist, create it
@@ -718,8 +729,8 @@ pub async fn add_user_to_org(
                 "User added to org successfully",
             )))
         } else {
-            Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-                http::StatusCode::UNAUTHORIZED,
+            Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                http::StatusCode::FORBIDDEN,
                 "Not Allowed",
             )))
         }
