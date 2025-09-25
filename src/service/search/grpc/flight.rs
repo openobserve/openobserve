@@ -325,10 +325,10 @@ pub async fn search(
     }
 
     // search in WAL memory first to capture the watch_time
+    let mut watch_time = None;
     if LOCAL_NODE.is_ingester() {
         // Set watch_time before searching memtable to avoid duplicates with parquet
-        let watch_time = config::utils::time::now_micros();
-        
+        watch_time = Some(config::utils::time::now_micros());
         let (tbls, stats) = match super::wal::search_memtable(
             query_params.clone(),
             latest_schema.clone(),
@@ -349,8 +349,10 @@ pub async fn search(
         };
         tables.extend(tbls);
         scan_stats.add(&stats);
+    }
 
-        // Now search in WAL parquet with watch_time filter
+    // Now search in WAL parquet with watch_time filter
+    if LOCAL_NODE.is_ingester() {
         let (tbls, stats) = match super::wal::search_parquet(
             query_params.clone(),
             latest_schema.clone(),
@@ -359,7 +361,7 @@ pub async fn search(
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
-            Some(watch_time),
+            watch_time,
         )
         .await
         {
