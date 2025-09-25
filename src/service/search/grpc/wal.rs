@@ -606,7 +606,7 @@ async fn get_file_list(
             // If watch_time is set, filter out files created after watch_time to avoid duplicates
             if let Some(watch_micros) = watch_time
             && let Ok(meta) =  config::utils::file::get_file_meta(f)
-            && let Ok(modified_time) = meta.created() {
+            && let Ok(modified_time) = meta.modified() {
                 let modified_micros = modified_time
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
