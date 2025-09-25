@@ -23,7 +23,7 @@ use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use roaring::RoaringBitmap;
 
-use crate::service::search::grpc::utils::TantivyResult;
+use crate::service::search::grpc::tantivy_result::TantivyResult;
 
 pub static GLOBAL_CACHE: Lazy<Arc<TantivyResultCache>> =
     Lazy::new(|| Arc::new(TantivyResultCache::default()));

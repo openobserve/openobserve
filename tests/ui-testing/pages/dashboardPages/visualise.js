@@ -252,12 +252,12 @@ export default class LogsVisualise {
     const errorContainerExists = await dashboardErrorContainer.count();
 
     if (errorContainerExists === 0) {
-      return { hasErrors: false, errors: [] };
+      return { hasErrors: false, errors: [], errorTextCount: 0, errorListCount: 0 };
     }
 
     const isErrorVisible = await dashboardErrorContainer.first().isVisible();
     if (!isErrorVisible) {
-      return { hasErrors: false, errors: [] };
+      return { hasErrors: false, errors: [], errorTextCount: 0, errorListCount: 0 };
     }
 
     const errors = [];
