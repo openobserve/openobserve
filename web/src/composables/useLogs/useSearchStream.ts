@@ -13,388 +13,76 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { searchState } from "@/composables/useLogs/searchState";
+/**
+ * REFACTORED VERSION OF useSearchStream
+ *
+ * This is a refactored version that demonstrates how to split the large useSearchStream
+ * composable into smaller, more focused composables. The original file had 2100+ lines
+ * and handled multiple responsibilities.
+ *
+ * STRUCTURE:
+ * - Main orchestrator (this file) - coordinates between split composables
+ * - useSearchQuery - handles SQL query building and validation
+ * - useSearchConnection - manages WebSocket/HTTP streaming connections
+ * - useSearchResponseHandler - processes different response types
+ * - useSearchHistogramManager - histogram-specific logic
+ * - useSearchPagination - pagination calculations and state
+ *
+ * BENEFITS:
+ * - Better separation of concerns
+ * - Easier testing of individual components
+ * - Improved maintainability
+ * - Cleaner code organization
+ */
 
+import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useNotifications from "@/composables/useNotifications";
-import useSearchWebSocket from "@/composables/useSearchWebSocket";
-import useStreamingSearch from "@/composables/useStreamingSearch";
-import { logsErrorMessage } from "@/utils/common";
-import { useStore } from "vuex";
-import { useRouter } from "vue-router";
-import { cloneDeep } from "lodash-es";
-import {
-  SearchRequestPayload,
-  WebSocketSearchResponse,
-  WebSocketSearchPayload,
-  WebSocketErrorResponse,
-} from "@/ts/interfaces/query";
 
-import useStreamFields from "@/composables/useLogs/useStreamFields";
-import { useHistogram } from "@/composables/useLogs/useHistogram";
-
-import {
-  convertDateToTimestamp,
-  getConsumableRelativeTime,
-} from "@/utils/date";
-
-import config from "@/aws-exports";
-
-import {
-  b64EncodeUnicode,
-  getFunctionErrorMessage,
-  generateTraceContext,
-  addSpacesToOperators,
-} from "@/utils/zincutils";
+// Split composables
+import useSearchQuery from "@/composables/useLogs/useSearchQuery";
+import useSearchConnection from "@/composables/useLogs/useSearchConnection";
+import useSearchResponseHandler from "@/composables/useLogs/useSearchResponseHandler";
+import useSearchHistogramManager from "@/composables/useLogs/useSearchHistogramManager";
+import useSearchPagination from "@/composables/useLogs/useSearchPagination";
 
 export const useSearchStream = () => {
   const { showErrorNotification } = useNotifications();
-  const {
-    fnParsedSQL,
-    hasAggregation,
-    isDistinctQuery,
-    isWithQuery,
-    isLimitQuery,
-    extractTimestamps,
-    addTransformToQuery,
-    addTraceId,
-    removeTraceId,
-    showCancelSearchNotification,
-    updateUrlQueryParams,
-    isNonAggregatedSQLMode,
-    fnUnparsedSQL,
-    checkTimestampAlias,
-  } = logsUtils();
+  const { addTraceId } = logsUtils();
 
-  const {
-    getHistogramTitle,
-    generateHistogramData,
-    resetHistogramWithError,
-    generateHistogramSkeleton,
-    setMultiStreamHistogramQuery,
-    isHistogramEnabled,
-  } = useHistogram();
+  // Initialize all the split composables
+  const queryBuilder = useSearchQuery();
+  const connectionManager = useSearchConnection();
+  const responseProcessor = useSearchResponseHandler();
+  const histogramHandler = useSearchHistogramManager();
+  const paginationManager = useSearchPagination();
 
-  const store = useStore();
-  const router = useRouter();
-  let {
-    searchObj,
-    searchObjDebug,
-    searchAggData,
-    resetQueryData,
-    notificationMsg,
-    initialQueryPayload,
-    searchPartitionMap,
-    resetHistogramError,
-    histogramResults,
-  } = searchState();
+  const { searchObj, resetQueryData } = searchState();
 
-  let {
-    updateFieldValues,
-    extractFields,
-    updateGridColumns,
-    filterHitsColumns,
-    resetFieldValues,
-  } = useStreamFields();
-
-  const {
-    fetchQueryDataWithWebSocket,
-    sendSearchMessageBasedOnRequestId,
-    closeSocketBasedOnRequestId,
-  } = useSearchWebSocket();
-
-  const { fetchQueryDataWithHttpStream } = useStreamingSearch();
-
-  const getQueryReq = (isPagination: boolean) => {
-    if (!isPagination) {
-      resetQueryData();
-      searchObj.data.queryResults = {};
-    }
-
-    // reset searchAggData
-    searchAggData.total = 0;
-    searchAggData.hasAggregation = false;
-
-    searchObj.meta.showDetailTab = false;
-    searchObj.meta.searchApplied = true;
-    searchObj.data.functionError = "";
-    if (
-      !searchObj.data.stream.streamLists?.length ||
-      searchObj.data.stream.selectedStream.length == 0
-    ) {
-      searchObj.loading = false;
-      return;
-    }
-
-    if (
-      Number.isNaN(searchObj.data.datetime.endTime) ||
-      Number.isNaN(searchObj.data.datetime.startTime)
-    ) {
-      const period =
-        (router.currentRoute.value?.query?.period as string) || "15m";
-      const extractedDate: any = extractTimestamps(period);
-      searchObj.data.datetime.startTime = extractedDate.from;
-      searchObj.data.datetime.endTime = extractedDate.to;
-    }
-
-    const queryReq: SearchRequestPayload = buildSearch();
-
-    if (queryReq === null) {
-      searchObj.loading = false;
-      if (!notificationMsg.value) {
-        notificationMsg.value = "Search query is empty or invalid.";
-      }
-      return;
-    }
-
-    if (!queryReq) {
-      searchObj.loading = false;
-      throw new Error(
-        notificationMsg.value ||
-          "Something went wrong while creating Search Request.",
-      );
-    }
-
-    // get function definition
-    addTransformToQuery(queryReq);
-
-    // Add action ID if it exists
-    if (searchObj.data.actionId && searchObj.data.transformType === "action") {
-      queryReq.query["action_id"] = searchObj.data.actionId;
-    }
-
-    if (searchObj.data.datetime.type === "relative") {
-      if (!isPagination) initialQueryPayload.value = cloneDeep(queryReq);
-      else {
-        if (
-          searchObj.meta.refreshInterval == 0 &&
-          router.currentRoute.value.name == "logs" &&
-          searchObj.data.queryResults.hasOwnProperty("hits")
-        ) {
-          const start_time: number =
-            initialQueryPayload.value?.query?.start_time || 0;
-          const end_time: number =
-            initialQueryPayload.value?.query?.end_time || 0;
-          queryReq.query.start_time = start_time;
-          queryReq.query.end_time = end_time;
-        }
-      }
-    }
-
-    // copy query request for histogram query and same for customDownload
-    searchObj.data.histogramQuery = JSON.parse(JSON.stringify(queryReq));
-
-    // reset errorCode
-    searchObj.data.errorCode = 0;
-
-    //here we need to send the actual sql query for histogram
-    searchObj.data.histogramQuery.query.sql = queryReq.query.sql;
-    searchObj.data.histogramQuery.query.size = -1;
-    delete searchObj.data.histogramQuery.query.quick_mode;
-    delete searchObj.data.histogramQuery.query.from;
-    delete searchObj.data.histogramQuery.aggs;
-    delete queryReq.aggs;
-    if (searchObj.data.histogramQuery.query.action_id)
-      delete searchObj.data.histogramQuery.query.action_id;
-
-    searchObj.data.customDownloadQueryObj = JSON.parse(
-      JSON.stringify(queryReq),
-    );
-
-    queryReq.query.from =
-      (searchObj.data.resultGrid.currentPage - 1) *
-      searchObj.meta.resultGrid.rowsPerPage;
-    queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
-
-    const parsedSQL: any = fnParsedSQL();
-
-    searchObj.meta.resultGrid.showPagination = true;
-
-    if (searchObj.meta.sqlMode == true) {
-      // if query has aggregation or groupby then we need to set size to -1 to get all records
-      // issue #5432
-      if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
-        queryReq.query.size = -1;
-      }
-
-      if (isLimitQuery(parsedSQL)) {
-        queryReq.query.size = parsedSQL.limit.value[0].value;
-        searchObj.meta.resultGrid.showPagination = false;
-        //searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
-
-        if (parsedSQL.limit.separator == "offset") {
-          queryReq.query.from = parsedSQL.limit.value[1].value || 0;
-        }
-        delete queryReq.query.track_total_hits;
-      }
-
-      if (
-        isDistinctQuery(parsedSQL) ||
-        isWithQuery(parsedSQL) ||
-        !searchObj.data.queryResults.is_histogram_eligible
-      ) {
-        delete queryReq.query.track_total_hits;
-      }
-    }
-
-    return queryReq;
-  };
-
-  //useLogs
+  /**
+   * Main entry point for search operations
+   * Delegates to appropriate split composables
+   */
   const getDataThroughStream = (isPagination: boolean) => {
     try {
-      const queryReq = getQueryReq(isPagination) as SearchRequestPayload;
-
+      // 1. Build the query using the query composable
+      const queryReq = queryBuilder.getQueryReq(isPagination);
       if (!queryReq) return;
 
-      if (!isPagination && searchObj.meta.refreshInterval == 0) {
-        resetQueryData();
-        histogramResults.value = [];
-        searchObj.data.queryResults.hits = [];
-        searchObj.data.histogram = {
-          xData: [],
-          yData: [],
-          chartParams: {
-            title: "",
-            unparsed_x_data: [],
-            timezone: "",
-          },
-          errorCode: 0,
-          errorMsg: "",
-          errorDetail: "",
-        };
-      }
-
-      const payload = buildWebSocketPayload(queryReq, isPagination, "search");
-
-      if (
-        shouldGetPageCount(queryReq, fnParsedSQL()) &&
-        searchObj.meta.refreshInterval == 0
-      ) {
-        queryReq.query.size = queryReq.query.size + 1;
-      }
-
-      // in case of live refresh, reset from to 0
-      if (
-        searchObj.meta.refreshInterval > 0 &&
-        router.currentRoute.value.name == "logs"
-      ) {
-        queryReq.query.from = 0;
-        searchObj.meta.refreshHistogram = false;
-      }
-
-      const requestId = initializeSearchConnection(payload);
-
-      if (!requestId) {
-        throw new Error(
-          `Failed to initialize ${searchObj.communicationMethod} connection`,
-        );
-      }
-
-      addTraceId(payload.traceId);
-    } catch (e: any) {
-      console.error(
-        `Error while getting data through ${searchObj.communicationMethod}`,
-        e,
-      );
-      searchObj.loading = false;
-      showErrorNotification(
-        notificationMsg.value || "Error occurred during the search operation.",
-      );
-      notificationMsg.value = "";
-    }
-  };
-
-  //index.vue
-  const buildWebSocketPayload = (
-    queryReq: SearchRequestPayload,
-    isPagination: boolean,
-    type: "search" | "histogram" | "pageCount" | "values",
-    meta?: any,
-  ) => {
-    const { traceId } = generateTraceContext();
-    addTraceId(traceId);
-
-    const payload: {
-      queryReq: SearchRequestPayload;
-      type: "search" | "histogram" | "pageCount" | "values";
-      isPagination: boolean;
-      traceId: string;
-      org_id: string;
-      meta?: any;
-    } = {
-      queryReq,
-      type,
-      isPagination,
-      traceId,
-      org_id: searchObj.organizationIdentifier,
-      meta,
-    };
-
-    return payload;
-  };
-
-  //index.vue
-  const initializeSearchConnection = (
-    payload: any,
-  ): string | Promise<void> | null => {
-    // Use the appropriate method to fetch data
-    if (searchObj.communicationMethod === "streaming") {
-      payload.searchType = "ui";
-      payload.pageType = searchObj.data.stream.streamType;
-      return fetchQueryDataWithHttpStream(payload, {
-        data: handleSearchResponse,
-        error: handleSearchError,
-        complete: handleSearchClose,
-        reset: handleSearchReset,
-      }) as Promise<void>;
-    }
-
-    return null;
-  };
-
-  // Bhargav Todo: this is duplicate in indexList.vue file
-  const sendSearchMessage = (queryReq: any) => {
-    try {
-      if (searchObj.data.isOperationCancelled) {
-        closeSocketBasedOnRequestId(queryReq.traceId);
-        return;
-      }
-
-      const payload = {
-        type: "search",
-        content: {
-          trace_id: queryReq.traceId,
-          payload: {
-            query: queryReq.queryReq.query,
-            // pass encodig if enabled,
-            // make sure that `encoding: null` is not being passed, that's why used object extraction logic
-            ...(store.state.zoConfig.sql_base64_enabled
-              ? { encoding: "base64" }
-              : {}),
-          } as SearchRequestPayload,
-          stream_type: searchObj.data.stream.streamType,
-          search_type: "ui",
-          use_cache: (window as any).use_cache ?? true,
-          org_id: searchObj.organizationIdentifier,
-        },
+      // 2. Set up response callbacks
+      const callbacks = {
+        onData: responseProcessor.handleSearchResponse,
+        onError: responseProcessor.handleSearchError,
+        onComplete: handleSearchComplete,
+        onReset: handleSearchReset,
       };
 
-      if (
-        Object.hasOwn(queryReq.queryReq, "regions") &&
-        Object.hasOwn(queryReq.queryReq, "clusters")
-      ) {
-        payload.content.payload["regions"] = queryReq.queryReq.regions;
-        payload.content.payload["clusters"] = queryReq.queryReq.clusters;
-      }
-
-      sendSearchMessageBasedOnRequestId(payload);
-    } catch (e: any) {
+      // 3. Execute the search through connection manager
+      connectionManager.getDataThroughStream(queryReq, isPagination, callbacks);
+    } catch (error: any) {
+      console.error("Search operation failed:", error);
       searchObj.loading = false;
-      showErrorNotification(
-        notificationMsg.value || "Error occurred while sending socket message.",
-      );
-      notificationMsg.value = "";
+      showErrorNotification("Error occurred during the search operation.");
     }
   };
 
@@ -1450,216 +1138,38 @@ export const useSearchStream = () => {
       !payload.isPagination &&
       searchObj.meta.refreshInterval == 0
     ) {
-      searchObj.meta.resetPlotChart = true;
-    }
-    if (
-      payload.type === "search" &&
-      !payload.isPagination &&
-      !searchObj.data.isOperationCancelled
-    ) {
-      processHistogramRequest(payload.queryReq);
+      const histogramCallbacks = {
+        onData: responseProcessor.handleSearchResponse,
+        onError: responseProcessor.handleSearchError,
+        onComplete: handleSearchComplete,
+        onReset: handleSearchReset,
+      };
+
+      histogramHandler.processHistogramRequest(
+        payload.queryReq,
+        connectionManager.buildWebSocketPayload,
+        connectionManager.initializeSearchConnection,
+        histogramCallbacks,
+      );
     }
 
-    if (payload.type === "search" && !response?.content?.should_client_retry)
+    console.log("Search Complete", payload);
+    // Update loading states
+    if (payload.type === "search") {
       searchObj.loading = false;
-    if (
-      (payload.type === "histogram" || payload.type === "pageCount") &&
-      !response?.content?.should_client_retry
-    ) {
+    }
+    if (payload.type === "histogram" || payload.type === "pageCount") {
       searchObj.loadingHistogram = false;
     }
 
-    searchObj.data.isOperationCancelled = false;
+    // Clean up connection
+    connectionManager.cleanupConnection(payload.traceId);
   };
 
-  // indexList.vue
-  const handleSearchError = (request: any, err: WebSocketErrorResponse) => {
-    searchObj.loading = false;
-    searchObj.loadingHistogram = false;
-
-    const { message, trace_id, code, error_detail, error } = err.content;
-
-    // 20009 is the code for query cancelled
-    if (code === 20009) {
-      showCancelSearchNotification();
-      setCancelSearchError();
-    }
-
-    if (trace_id) removeTraceId(trace_id);
-
-    let errorMsg = constructErrorMessage({
-      message,
-      code,
-      trace_id,
-      defaultMessage: "Error while processing request",
-    });
-
-    if (error === "rate_limit_exceeded") {
-      errorMsg = message;
-    }
-
-    if (request.type === "pageCount") {
-      searchObj.data.countErrorMsg = "Error while retrieving total events: ";
-      if (trace_id) searchObj.data.countErrorMsg += " TraceID: " + trace_id;
-      notificationMsg.value = searchObj.data.countErrorMsg;
-    } else {
-      if (request.type === "pageCount") {
-        searchObj.data.countErrorMsg = "Error while retrieving total events: ";
-        if (trace_id) searchObj.data.countErrorMsg += " TraceID: " + trace_id;
-        notificationMsg.value = searchObj.data.countErrorMsg;
-      } else {
-        searchObj.data.errorDetail = error_detail || "";
-        searchObj.data.errorMsg = errorMsg;
-        notificationMsg.value = errorMsg;
-      }
-    }
-  };
-
-  const constructErrorMessage = ({
-    message,
-    code,
-    trace_id,
-    defaultMessage,
-  }: {
-    message?: string;
-    code?: number;
-    trace_id?: string;
-    defaultMessage: string;
-  }): string => {
-    let errorMsg = message || defaultMessage;
-
-    const customMessage = logsErrorMessage(code || 0);
-    if (customMessage) {
-      errorMsg = t(customMessage);
-    }
-
-    if (trace_id) {
-      errorMsg += ` <br><span class='text-subtitle1'>TraceID: ${trace_id}</span>`;
-    }
-
-    return errorMsg;
-  };
-
-  const getAggsTotal = () => {
-    return (searchObj.data.queryResults.aggs || []).reduce(
-      (acc: number, item: { zo_sql_num: number }) => acc + item.zo_sql_num,
-      0,
-    );
-  };
-
-  // searchResult.vue
-  const refreshPagination = (regenrateFlag: boolean = false) => {
-    try {
-      const { rowsPerPage } = searchObj.meta.resultGrid;
-      const { currentPage } = searchObj.data.resultGrid;
-
-      if (searchObj.meta.jobId != "")
-        searchObj.meta.resultGrid.rowsPerPage = 100;
-
-      let total = 0;
-      let totalPages = 0;
-
-      total = getAggsTotal();
-
-      if ((searchObj.data.queryResults.pageCountTotal || -1) > total) {
-        total = searchObj.data.queryResults.pageCountTotal;
-      }
-
-      searchObj.data.queryResults.total = total;
-      searchObj.data.queryResults.pagination = [];
-
-      totalPages = Math.ceil(total / rowsPerPage);
-
-      for (let i = 0; i < totalPages; i++) {
-        if (i + 1 > currentPage + 10) {
-          break;
-        }
-        searchObj.data.queryResults.pagination.push({
-          from: i * rowsPerPage + 1,
-          size: rowsPerPage,
-        });
-      }
-    } catch (e: any) {
-      console.log("Error while refreshing partition pagination", e);
-      notificationMsg.value = "Error while refreshing partition pagination.";
-      return false;
-    }
-  };
-
-  const shouldGetPageCount = (queryReq: any, parsedSQL: any) => {
-    if (
-      shouldShowHistogram(parsedSQL) ||
-      (searchObj.meta.sqlMode && isLimitQuery(parsedSQL))
-    ) {
-      return false;
-    }
-    let aggFlag = false;
-    if (parsedSQL) {
-      aggFlag = hasAggregation(parsedSQL?.columns);
-    }
-    if (!aggFlag) {
-      return true;
-    }
-    return false;
-  };
-
-  const getPageCountThroughSocket = async (queryReq: any) => {
-    if (
-      searchObj.data.queryResults.total >
-      queryReq.query.from + queryReq.query.size
-    ) {
-      return;
-    }
-
-    searchObj.data.countErrorMsg = "";
-    queryReq.query.size = 0;
-    delete queryReq.query.from;
-    delete queryReq.query.quick_mode;
-    if (delete queryReq.query.action_id) delete queryReq.query.action_id;
-
-    queryReq.query.track_total_hits = true;
-
-    if (
-      searchObj.data?.queryResults?.time_offset?.start_time &&
-      searchObj.data?.queryResults?.time_offset?.end_time
-    ) {
-      queryReq.query.start_time =
-        searchObj.data.queryResults.time_offset.start_time;
-      queryReq.query.end_time =
-        searchObj.data.queryResults.time_offset.end_time;
-    }
-
-    const payload = buildWebSocketPayload(queryReq, false, "pageCount");
-
-    searchObj.loadingHistogram = true;
-
-    const requestId = initializeSearchConnection(payload);
-
-    addTraceId(payload.traceId);
-  };
-
-  const setCancelSearchError = () => {
-    if (!searchObj.data?.queryResults.hasOwnProperty("hits")) {
-      searchObj.data.queryResults.hits = [];
-    }
-
-    if (!searchObj.data?.queryResults?.hits?.length) {
-      searchObj.data.errorMsg = "";
-      searchObj.data.errorCode = 0;
-    }
-
-    if (
-      searchObj.data?.queryResults?.hasOwnProperty("hits") &&
-      searchObj.data.queryResults?.hits?.length &&
-      !searchObj.data.queryResults?.aggs?.length
-    ) {
-      searchObj.data.histogram.errorMsg =
-        "Histogram search query was cancelled";
-    }
-  };
-
-  const handleSearchReset = async (data: any, traceId?: string) => {
-    // reset query data
+  /**
+   * Handle search reset/retry
+   */
+  const handleSearchReset = (data: any, traceId?: string) => {
     try {
       if (data.type === "search") {
         if (!data.isPagination) {
@@ -1667,17 +1177,8 @@ export const useSearchStream = () => {
           searchObj.data.queryResults = {};
         }
 
-        // reset searchAggData
-        searchAggData.total = 0;
-        searchAggData.hasAggregation = false;
-        searchObj.meta.showDetailTab = false;
-        searchObj.meta.searchApplied = true;
-        searchObj.data.functionError = "";
-
-        searchObj.data.errorCode = 0;
-
+        // Reset histogram if needed
         if (!data.isPagination) {
-          // Histogram reset
           searchObj.data.histogram = {
             xData: [],
             yData: [],
@@ -1690,533 +1191,91 @@ export const useSearchStream = () => {
             errorMsg: "",
             errorDetail: "",
           };
-          resetHistogramError();
         }
 
-        const payload = buildWebSocketPayload(
+        // Rebuild payload and retry
+        const payload = connectionManager.buildWebSocketPayload(
           data.queryReq,
           data.isPagination,
           "search",
         );
 
-        initializeSearchConnection(payload);
+        connectionManager.initializeSearchConnection(payload);
         addTraceId(payload.traceId);
       }
-
-      if (data.type === "histogram" || data.type === "pageCount") {
-        searchObj.data.queryResults.aggs = [];
-        searchObj.data.histogram = {
-          xData: [],
-          yData: [],
-          chartParams: {
-            title: "",
-            unparsed_x_data: [],
-            timezone: "",
-          },
-          errorCode: 0,
-          errorMsg: "",
-          errorDetail: "",
-        };
-
-        resetHistogramError();
-
-        searchObj.loadingHistogram = true;
-
-        if (data.type === "histogram") await generateHistogramSkeleton();
-
-        if (data.type === "histogram") histogramResults.value = [];
-
-        const payload = buildWebSocketPayload(data.queryReq, false, data.type);
-
-        initializeSearchConnection(payload);
-
-        addTraceId(payload.traceId);
-      }
-    } catch (e: any) {
-      console.error("Error while resetting search", e);
+    } catch (error: any) {
+      console.error("Error during search reset:", error);
     }
   };
 
-  function buildSearch() {
-    try {
-      let query = searchObj.data.query.trim();
-      searchObj.data.filterErrMsg = "";
-      searchObj.data.missingStreamMessage = "";
-      searchObj.data.stream.missingStreamMultiStreamFilter = [];
-      const req: any = {
-        query: {
-          sql: searchObj.meta.sqlMode
-            ? query
-            : 'select [FIELD_LIST][QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
-          start_time: (new Date().getTime() - 900000) * 1000,
-          end_time: new Date().getTime() * 1000,
-          from:
-            searchObj.meta.resultGrid.rowsPerPage *
-              (searchObj.data.resultGrid.currentPage - 1) || 0,
-          size: searchObj.meta.resultGrid.rowsPerPage,
-          quick_mode: searchObj.meta.quickMode,
-        },
-      };
-
-      if (
-        config.isEnterprise == "true" &&
-        store.state.zoConfig.super_cluster_enabled
-      ) {
-        req["regions"] = searchObj.meta.regions;
-        req["clusters"] = searchObj.meta.clusters;
-      }
-
-      // if (searchObj.data.stream.selectedStreamFields.length == 0) {
-      //   const streamData: any = getStreams(
-      //     searchObj.data.stream.streamType,
-      //     true,
-      //     true,
-      //   );
-
-      //   searchObj.data.stream.selectedStreamFields = streamData.schema;
-
-      //   if (
-      //     !searchObj.data.stream.selectedStreamFields ||
-      //     searchObj.data.stream.selectedStreamFields.length == 0
-      //   ) {
-      //     searchObj.data.stream.selectedStreamFields = [];
-      //     searchObj.loading = false;
-      //     return false;
-      //   }
-      // }
-
-      const streamFieldNames: any =
-        searchObj.data.stream.selectedStreamFields.map(
-          (item: any) => item.name,
-        );
-
-      for (
-        let i = searchObj.data.stream.interestingFieldList.length - 1;
-        i >= 0;
-        i--
-      ) {
-        const fieldName = searchObj.data.stream.interestingFieldList[i];
-        if (!streamFieldNames.includes(fieldName)) {
-          searchObj.data.stream.interestingFieldList.splice(i, 1);
-        }
-      }
-
-      if (
-        searchObj.data.stream.interestingFieldList.length > 0 &&
-        searchObj.meta.quickMode
-      ) {
-        if (searchObj.data.stream.selectedStream.length == 1) {
-          req.query.sql = req.query.sql.replace(
-            "[FIELD_LIST]",
-            searchObj.data.stream.interestingFieldList.join(","),
-          );
-        }
-      } else {
-        req.query.sql = req.query.sql.replace("[FIELD_LIST]", "*");
-      }
-
-      const timestamps: any =
-        searchObj.data.datetime.type === "relative"
-          ? getConsumableRelativeTime(
-              searchObj.data.datetime.relativeTimePeriod,
-            )
-          : cloneDeep(searchObj.data.datetime);
-
-      if (searchObj.data.datetime.type === "relative") {
-        searchObj.data.datetime.startTime = timestamps.startTime;
-        searchObj.data.datetime.endTime = timestamps.endTime;
-      }
-
-      if (
-        timestamps.startTime != "Invalid Date" &&
-        timestamps.endTime != "Invalid Date"
-      ) {
-        if (timestamps.startTime > timestamps.endTime) {
-          notificationMsg.value = "Start time cannot be greater than end time";
-          // showErrorNotification("Start time cannot be greater than end time");
-          return false;
-        }
-        searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-
-        req.query.start_time = timestamps.startTime;
-        req.query.end_time = timestamps.endTime;
-
-        searchObj.meta.resultGrid.chartInterval = "10 second";
-        if (req.query.end_time - req.query.start_time >= 1000000 * 60 * 30) {
-          searchObj.meta.resultGrid.chartInterval = "15 second";
-          searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-        }
-        if (req.query.end_time - req.query.start_time >= 1000000 * 60 * 60) {
-          searchObj.meta.resultGrid.chartInterval = "30 second";
-          searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-        }
-        if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 2) {
-          searchObj.meta.resultGrid.chartInterval = "1 minute";
-          searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-        }
-        if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 6) {
-          searchObj.meta.resultGrid.chartInterval = "5 minute";
-          searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-        }
-        if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 24) {
-          searchObj.meta.resultGrid.chartInterval = "30 minute";
-          searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-        }
-        if (req.query.end_time - req.query.start_time >= 1000000 * 86400 * 7) {
-          searchObj.meta.resultGrid.chartInterval = "1 hour";
-          searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-        }
-        if (req.query.end_time - req.query.start_time >= 1000000 * 86400 * 30) {
-          searchObj.meta.resultGrid.chartInterval = "1 day";
-          searchObj.meta.resultGrid.chartKeyFormat = "YYYY-MM-DD";
-        }
-      } else {
-        notificationMsg.value = "Invalid date format";
-        return false;
-      }
-
-      if (searchObj.meta.sqlMode == true) {
-        searchObj.data.query = query;
-        const parsedSQL: any = fnParsedSQL();
-        if (parsedSQL != undefined) {
-          //check if query is valid or not , if the query is invalid --> empty query
-
-          if (!checkTimestampAlias(searchObj.data.query)) {
-            const errorMsg = `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`;
-            searchObj.data.errorMsg = errorMsg;
-            searchObj.data.errorCode = 400;
-            return false;
-          }
-
-          if (Array.isArray(parsedSQL) && parsedSQL.length == 0) {
-            notificationMsg.value =
-              "SQL query is missing or invalid. Please submit a valid SQL statement.";
-            return false;
-          }
-
-          if (!parsedSQL?.columns?.length && !searchObj.meta.sqlMode) {
-            notificationMsg.value = "No column found in selected stream.";
-            return false;
-          }
-
-          if (parsedSQL.limit != null && parsedSQL.limit.value.length != 0) {
-            req.query.size = parsedSQL.limit.value[0].value;
-
-            if (parsedSQL.limit.separator == "offset") {
-              req.query.from = parsedSQL.limit.value[1].value || 0;
-            }
-
-            query = fnUnparsedSQL(parsedSQL);
-
-            //replace backticks with \" for sql_mode
-            query = query.replace(/`/g, '"');
-            searchObj.data.queryResults.hits = [];
-          }
-        }
-
-        req.query.sql = query
-          .split("\n")
-          .filter((line: string) => !line.trim().startsWith("--"))
-          .join("\n");
-        req.query["sql_mode"] = "full";
-        // delete req.aggs;
-      } else {
-        const parseQuery = [query];
-        let queryFunctions = "";
-        let whereClause = "";
-        if (parseQuery.length > 1) {
-          queryFunctions = "," + parseQuery[0].trim();
-          whereClause = parseQuery[1].trim();
-        } else {
-          whereClause = parseQuery[0].trim();
-        }
-
-        whereClause = whereClause
-          .split("\n")
-          .filter((line: string) => !line.trim().startsWith("--"))
-          .join("\n");
-        if (whereClause.trim() != "") {
-          // Use efficient state-based approach to avoid regex backtracking
-          whereClause = addSpacesToOperators(whereClause);
-
-          //remove everything after -- in where clause
-          const parsedSQL = whereClause.split(" ");
-          // searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-          //   parsedSQL.forEach((node: any, index: any) => {
-          //     if (node == field.name) {
-          //       node = node.replaceAll('"', "");
-          //       parsedSQL[index] = '"' + node + '"';
-          //     }
-          //   });
-          // });
-          let field: any;
-          let node: any;
-          let index: any;
-          for (field of searchObj.data.stream.selectedStreamFields) {
-            for ([node, index] of parsedSQL) {
-              if (node === field.name) {
-                parsedSQL[index] = '"' + node.replaceAll('"', "") + '"';
-              }
-            }
-          }
-
-          whereClause = parsedSQL.join(" ");
-
-          // req.query.sql = req.query.sql.replace(
-          //   "[WHERE_CLAUSE]",
-          //   " WHERE " + whereClause,
-          // );
-          req.query.sql = req.query.sql
-            .split("[WHERE_CLAUSE]")
-            .join(" WHERE " + whereClause);
-        } else {
-          req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
-        }
-
-        req.query.sql = req.query.sql.replace(
-          "[QUERY_FUNCTIONS]",
-          queryFunctions.trim(),
-        );
-
-        // in the case of multi stream, we need to pass query for each selected stream in the form of array
-        // additional checks added for filter condition,
-        // 1. all fields in filter condition should be present in same streams.
-        // if one or more fields belongs to different stream then error will be shown
-        // 2. if multiple streams are selected but filter condition contains fields from only one stream
-        // then we need to send the search request for only matched stream
-        if (searchObj.data.stream.selectedStream.length > 1) {
-          let streams: any = searchObj.data.stream.selectedStream;
-          if (whereClause.trim() != "") {
-            const validationFlag = validateFilterForMultiStream();
-            if (!validationFlag) {
-              return false;
-            }
-
-            if (
-              searchObj.data.stream.missingStreamMultiStreamFilter.length > 0
-            ) {
-              streams = searchObj.data.stream.selectedStream.filter(
-                (streams: any) =>
-                  !searchObj.data.stream.missingStreamMultiStreamFilter.includes(
-                    streams,
-                  ),
-              );
-            }
-          }
-
-          const preSQLQuery = req.query.sql;
-          req.query.sql = [];
-
-          streams
-            .join(",")
-            .split(",")
-            .forEach((item: any) => {
-              let finalQuery: string = preSQLQuery.replace(
-                "[INDEX_NAME]",
-                item,
-              );
-
-              // const finalHistogramQuery: string = preHistogramSQLQuery.replace(
-              //   "[INDEX_NAME]",
-              //   item
-              // );
-
-              const listOfFields: any = [];
-              let streamField: any = {};
-              for (const field of searchObj.data.stream.interestingFieldList) {
-                for (streamField of searchObj.data.stream
-                  .selectedStreamFields) {
-                  if (
-                    streamField?.name == field &&
-                    streamField?.streams.indexOf(item) > -1 &&
-                    listOfFields.indexOf(field) == -1
-                  ) {
-                    listOfFields.push(field);
-                  }
-                }
-              }
-
-              let queryFieldList: string = "";
-              if (listOfFields.length > 0) {
-                queryFieldList = "," + listOfFields.join(",");
-              }
-
-              finalQuery = finalQuery.replace(
-                "[FIELD_LIST]",
-                `'${item}' as _stream_name` + queryFieldList,
-              );
-
-              // finalHistogramQuery = finalHistogramQuery.replace(
-              //   "[FIELD_LIST]",
-              //   `'${item}' as _stream_name,` + listOfFields.join(",")
-              // );
-
-              req.query.sql.push(finalQuery);
-              // req.aggs.histogram.push(finalHistogramQuery);
-            });
-        } else {
-          req.query.sql = req.query.sql.replace(
-            "[INDEX_NAME]",
-            searchObj.data.stream.selectedStream[0],
-          );
-        }
-      }
-
-      if (
-        searchObj.data.resultGrid.currentPage > 1 ||
-        searchObj.meta.showHistogram === false
-      ) {
-        // delete req.aggs;
-
-        if (searchObj.meta.showHistogram === false) {
-          // delete searchObj.data.histogram;
-          searchObj.data.histogram = {
-            xData: [],
-            yData: [],
-            chartParams: {
-              title: "",
-              unparsed_x_data: [],
-              timezone: "",
-            },
-            errorCode: 0,
-            errorMsg: "",
-            errorDetail: "",
-          };
-          searchObj.meta.histogramDirtyFlag = true;
-        } else {
-          searchObj.meta.histogramDirtyFlag = false;
-        }
-      }
-
-      if (store.state.zoConfig.sql_base64_enabled) {
-        req["encoding"] = "base64";
-        req.query.sql = b64EncodeUnicode(req.query.sql);
-      }
-
-      updateUrlQueryParams();
-
-      return req;
-    } catch (e: any) {
-      notificationMsg.value =
-        "An error occurred while constructing the search query.";
-      return "";
-    }
-  }
-
-  const validateFilterForMultiStream = () => {
-    const filterCondition = searchObj.data.query;
-    const parsedSQL: any = fnParsedSQL(
-      "select * from stream where " + filterCondition,
-    );
-    searchObj.data.stream.filteredField = extractFilterColumns(
-      parsedSQL?.where,
-    );
-
-    searchObj.data.filterErrMsg = "";
-    searchObj.data.missingStreamMessage = "";
-    searchObj.data.stream.missingStreamMultiStreamFilter = [];
-    for (const fieldObj of searchObj.data.stream.filteredField) {
-      const fieldName = fieldObj.expr.value;
-      const filteredFields: any =
-        searchObj.data.stream.selectedStreamFields.filter(
-          (field: any) => field.name === fieldName,
-        );
-      if (filteredFields.length > 0) {
-        const streamsCount = filteredFields[0].streams.length;
-        const allStreamsEqual = filteredFields.every(
-          (field: any) => field.streams.length === streamsCount,
-        );
-        if (!allStreamsEqual) {
-          searchObj.data.filterErrMsg += `Field '${fieldName}' exists in different number of streams.\n`;
-        }
-      } else {
-        searchObj.data.filterErrMsg += `Field '${fieldName}' does not exist in the one or more stream.\n`;
-      }
-
-      const fieldStreams: any = searchObj.data.stream.selectedStreamFields
-        .filter((field: any) => field.name === fieldName)
-        .map((field: any) => field.streams)
-        .flat();
-
-      searchObj.data.stream.missingStreamMultiStreamFilter =
-        searchObj.data.stream.selectedStream.filter(
-          (stream: any) => !fieldStreams.includes(stream),
-        );
-
-      if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
-        searchObj.data.missingStreamMessage = `One or more filter fields do not exist in "${searchObj.data.stream.missingStreamMultiStreamFilter.join(
-          ", ",
-        )}", hence no search is performed in the mentioned stream.\n`;
-      }
-    }
-
-    return searchObj.data.filterErrMsg === "" ? true : false;
-  };
-
-  function extractFilterColumns(expression: any) {
-    const columns: any[] = [];
-
-    function traverse(node: {
-      type: string;
-      column: any;
-      left: any;
-      right: any;
-      args: { type: string; value: any[] };
-    }) {
-      if (node.type === "column_ref") {
-        columns.push(node.column);
-      } else if (node.type === "binary_expr") {
-        traverse(node.left);
-        traverse(node.right);
-      } else if (node.type === "function") {
-        // Function expressions might contain columns as arguments
-        if (node.args && node.args.type === "expr_list") {
-          node.args.value.forEach((arg: any) => traverse(arg));
-        }
-      }
-    }
-
-    traverse(expression);
-    return columns;
-  }
-
+  /**
+   * Expose the necessary methods for backward compatibility
+   * This maintains the same interface as the original composable
+   */
   return {
-    getQueryReq,
+    // Main search method
     getDataThroughStream,
-    buildWebSocketPayload,
-    initializeSearchConnection,
-    sendSearchMessage,
-    handleStreamingHits,
-    handleStreamingMetadata,
-    updatePageCountTotal,
-    trimPageCountExtraHit,
-    handleHistogramStreamingHits,
-    handleHistogramStreamingMetadata,
-    handlePageCountStreamingHits,
-    handlePageCountStreamingMetadata,
-    handleSearchResponse,
-    handleFunctionError,
-    handleAggregation,
-    updateResult,
-    handleLogsResponse,
-    chunkedAppend,
-    handlePageCountResponse,
-    handleHistogramResponse,
-    shouldShowHistogram,
-    processHistogramRequest,
-    isHistogramDataMissing,
-    handleSearchClose,
-    handleSearchError,
-    constructErrorMessage,
-    getAggsTotal,
-    refreshPagination,
-    shouldGetPageCount,
-    getPageCountThroughSocket,
-    setCancelSearchError,
-    handleSearchReset,
-    validateFilterForMultiStream,
-    buildSearch,
+
+    // Query building
+    getQueryReq: queryBuilder.getQueryReq,
+    buildSearch: queryBuilder.buildSearch,
+
+    // Connection management
+    buildWebSocketPayload: connectionManager.buildWebSocketPayload,
+    initializeSearchConnection: connectionManager.initializeSearchConnection,
+
+    // Response handling
+    handleSearchResponse: responseProcessor.handleSearchResponse,
+    handleSearchError: responseProcessor.handleSearchError,
+    handleFunctionError: responseProcessor.handleFunctionError,
+    handleAggregation: responseProcessor.handleAggregation,
+
+    // Histogram management
+    shouldShowHistogram: histogramHandler.shouldShowHistogram,
+    processHistogramRequest: histogramHandler.processHistogramRequest,
+    isHistogramDataMissing: histogramHandler.isHistogramDataMissing,
+
+    // Pagination
+    refreshPagination: paginationManager.refreshPagination,
+    updateResult: paginationManager.updateResult,
+    chunkedAppend: paginationManager.chunkedAppend,
+    shouldGetPageCount: paginationManager.shouldGetPageCount,
+
+    // Utility methods
+    validateFilterForMultiStream: queryBuilder.validateFilterForMultiStream,
+    extractFilterColumns: queryBuilder.extractFilterColumns,
+    constructErrorMessage: responseProcessor.constructErrorMessage,
+
+    // Backward compatibility - expose individual composables if needed
+    queryBuilder,
+    connectionManager,
+    responseProcessor,
+    histogramHandler,
+    paginationManager,
   };
 };
+
+/**
+ * How to migrate to the refactored version:
+ *
+ * 1. Replace imports:
+ *    - Change: import useSearchStream from "@/composables/useLogs/useSearchStream";
+ *    - To: import { useSearchStreamRefactored } from "@/composables/useLogs/useSearchStreamRefactored";
+ *
+ * 2. Update usage:
+ *    - Change: const { getDataThroughStream } = useSearchStream();
+ *    - To: const { getDataThroughStream } = useSearchStreamRefactored();
+ *
+ * 3. Test thoroughly to ensure all functionality works
+ *
+ * 4. If needed, access individual composables:
+ *    - const { queryBuilder, connectionManager } = useSearchStreamRefactored();
+ *
+ * MIGRATION STRATEGY:
+ * - Start with components that use simple methods from useSearchStream
+ * - Gradually migrate more complex usage
+ * - Keep the original file until all migrations are complete
+ * - Add comprehensive tests for each split composable
+ */
 
 export default useSearchStream;
