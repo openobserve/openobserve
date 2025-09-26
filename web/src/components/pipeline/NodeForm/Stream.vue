@@ -176,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="dialog.show"
     :title="dialog.title"
     :message="dialog.message"
+    :warning-message="dialog.warningMessage"
     @update:ok="dialog.okCallback"
     @update:cancel="dialog.show = false"
   />
@@ -194,6 +195,7 @@ import AddStream from "@/components/logstream/AddStream.vue";
 import { useQuasar } from "quasar";
 
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
 
 const emit = defineEmits(["cancel:hideform"]);
 
@@ -204,7 +206,7 @@ const { t } = useI18n();
 
 const store = useStore();
 
-const { addNode, pipelineObj , deletePipelineNode} = useDragAndDrop();
+const { addNode, pipelineObj , deletePipelineNode, checkIfDefaultDestinationNode} = useDragAndDrop();
 const { getUsedStreamsList } = usePipelines();
 
 const { getStreams } = useStreams();
@@ -383,6 +385,7 @@ const dialog = ref({
   show: false,
   title: "",
   message: "",
+  warningMessage:"",
   okCallback: () => {},
 });
 
@@ -390,6 +393,7 @@ const openCancelDialog = () => {
   dialog.value.show = true;
   dialog.value.title = "Discard Changes";
   dialog.value.message = "Are you sure you want to cancel changes?";
+  dialog.value.warningMessage = "";
   dialog.value.okCallback = () => emit("cancel:hideform");
   pipelineObj.userClickedNode = {};
   pipelineObj.userSelectedNode = {};
@@ -400,6 +404,13 @@ const openDeleteDialog = () => {
   dialog.value.title = "Delete Node";
   dialog.value.message =
     "Are you sure you want to delete stream association?";
+  //here we will check if the destination node is added by default if yes then we will show a warning message to the user
+  if(pipelineObj.currentSelectedNodeData?.data.hasOwnProperty('node_type') && pipelineObj.currentSelectedNodeData?.data.node_type === 'stream' && checkIfDefaultDestinationNode(pipelineObj.currentSelectedNodeID)){
+      dialog.value.warningMessage = defaultDestinationNodeWarningMessage
+  }
+  else{
+    dialog.value.warningMessage = "";
+  }
   dialog.value.okCallback = deleteNode;
 };
 

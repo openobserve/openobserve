@@ -1,0 +1,1 @@
+export const defaultDestinationNodeWarningMessage = "If you delete this default destination node, data from the source stream will no longer be ingested into the destination stream. Instead, it will flow only to the newly added destination stream."
