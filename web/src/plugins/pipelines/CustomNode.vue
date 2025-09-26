@@ -49,6 +49,7 @@ const menu = ref(false)
 const showButtons = ref(false)
 const showEditTooltip = ref(false)
 const showDeleteTooltip = ref(false)
+const showFunctionDialog = ref(false)
 let hideButtonsTimeout = null
 
 // Edge color mapping for different node types
@@ -117,8 +118,12 @@ const handleNodeLeave = (nodeId) => {
   }, 200);
 };
 
-const hanldeMouseOver = () => {
-  console.log("mouse over")
+const handleFunctionHover = () => {
+  showFunctionDialog.value = true;
+}
+
+const closeFunctionDialog = () => {
+  showFunctionDialog.value = false;
 }
 
 
@@ -283,17 +288,9 @@ function getIcon(data, ioType) {
       "
       @mouseenter="handleNodeHover(id, io_type)"
       @mouseleave="handleNodeLeave(id)"
+      @click="handleFunctionHover()"
     >
 
-    <q-tooltip :style="{ maxWidth: '300px', whiteSpace: 'pre-wrap' }">
-  <div>
-    <strong>Name:</strong> {{ functionInfo(data).name }}<br />
-    <strong>Definition:</strong><br />
-    <div style="border: 1px solid lightgray; padding: 4px; border-radius: 1px ;">
-      {{ functionInfo(data).function }}
-    </div>
-  </div>
-</q-tooltip>
 
       <div class="icon-container " style="display: flex; align-items: center">
         <!-- Icon -->
@@ -329,7 +326,7 @@ function getIcon(data, ioType) {
           dense
           icon="edit"
           size="0.6em"
-          @click="editNode(id)"
+          @click.stop="editNode(id)"
           class="node-action-btn edit-btn"
           @mouseenter="showEditTooltip = true"
           @mouseleave="showEditTooltip = false"
@@ -345,7 +342,7 @@ function getIcon(data, ioType) {
           dense
           icon="delete"
           size="0.6em"
-          @click="deleteNode(id)"
+          @click.stop="deleteNode(id)"
           class="node-action-btn delete-btn"
           @mouseenter="showDeleteTooltip = true"
           @mouseleave="showDeleteTooltip = false"
@@ -420,7 +417,7 @@ function getIcon(data, ioType) {
           dense
           icon="edit"
           size="0.6em"
-          @click="editNode(id)"
+          @click.stop="editNode(id)"
           class="node-action-btn edit-btn"
           @mouseenter="showEditTooltip = true"
           @mouseleave="showEditTooltip = false"
@@ -436,7 +433,7 @@ function getIcon(data, ioType) {
           dense
           icon="delete"
           size="0.6em"
-          @click="deleteNode(id)"
+          @click.stop="deleteNode(id)"
           class="node-action-btn delete-btn"
           @mouseenter="showDeleteTooltip = true"
           @mouseleave="showDeleteTooltip = false"
@@ -497,7 +494,7 @@ function getIcon(data, ioType) {
           dense
           icon="edit"
           size="0.6em"
-          @click="editNode(id)"
+          @click.stop="editNode(id)"
           class="node-action-btn edit-btn"
           @mouseenter="showEditTooltip = true"
           @mouseleave="showEditTooltip = false"
@@ -513,7 +510,7 @@ function getIcon(data, ioType) {
           dense
           icon="delete"
           size="0.6em"
-          @click="deleteNode(id)"
+          @click.stop="deleteNode(id)"
           class="node-action-btn delete-btn"
           @mouseenter="showDeleteTooltip = true"
           @mouseleave="showDeleteTooltip = false"
@@ -586,7 +583,7 @@ function getIcon(data, ioType) {
           dense
           icon="edit"
           size="0.6em"
-          @click="editNode(id)"
+          @click.stop="editNode(id)"
           class="node-action-btn edit-btn"
           @mouseenter="showEditTooltip = true"
           @mouseleave="showEditTooltip = false"
@@ -602,7 +599,7 @@ function getIcon(data, ioType) {
           dense
           icon="delete"
           size="0.6em"
-          @click="deleteNode(id)"
+          @click.stop="deleteNode(id)"
           class="node-action-btn delete-btn"
           @mouseenter="showDeleteTooltip = true"
           @mouseleave="showDeleteTooltip = false"
@@ -663,7 +660,7 @@ function getIcon(data, ioType) {
           dense
           icon="edit"
           size="0.6em"
-          @click="editNode(id)"
+          @click.stop="editNode(id)"
           class="node-action-btn edit-btn"
           @mouseenter="showEditTooltip = true"
           @mouseleave="showEditTooltip = false"
@@ -679,7 +676,7 @@ function getIcon(data, ioType) {
           dense
           icon="delete"
           size="0.6em"
-          @click="deleteNode(id)"
+          @click.stop="deleteNode(id)"
           class="node-action-btn delete-btn"
           @mouseenter="showDeleteTooltip = true"
           @mouseleave="showDeleteTooltip = false"
@@ -706,6 +703,52 @@ function getIcon(data, ioType) {
     @update:cancel="resetConfirmDialog"
     v-model="confirmDialogMeta.show"
   />
+   
+  <!-- Function Details Side Panel Dialog -->
+  <q-dialog 
+    v-model="showFunctionDialog" 
+    position="right" 
+    maximized
+    class="function-details-dialog q-pa-none q-ma-none"
+  >
+    <q-card class="card" style="width: 400px; max-width: none;">
+      <q-card-section class="row items-center q-pb-none tw-flex tw-items-center tw-my-2">
+        <div class="text-h6">Function Details</div>
+        <q-space />
+        <q-btn 
+          icon="cancel" 
+          flat 
+          round 
+          dense 
+          v-close-popup
+          @click="closeFunctionDialog"
+        />
+      </q-card-section>
+      
+      <q-separator />
+      
+      <q-card-section class="q-pt-md">
+        <div class="function-info">
+          <div class="function-name-section">
+            <strong class="text-subtitle1">Function Name:</strong>
+            <div class="function-name">{{ functionInfo(data)?.name || data.name }}</div>
+          </div>
+          
+          <div class="function-timing-section">
+            <strong class="text-subtitle1">Execution Timing:</strong>
+            <div class="function-timing">{{ data.after_flatten ? "Run After Flattening" : "Run Before Flattening" }}</div>
+          </div>
+          
+          <div class="function-definition-section">
+            <strong class="text-subtitle1">Function Definition:</strong>
+            <div class="function-definition">
+              <pre class="function-code">{{ functionInfo(data)?.function || 'No definition available' }}</pre>
+            </div>
+          </div>
+        </div>
+      </q-card-section>
+    </q-card>
+  </q-dialog>
 </template>
 
 <style lang="scss">
@@ -874,6 +917,113 @@ function getIcon(data, ioType) {
 
 .delete-arrow {
   border-top-color: #dc2626;
+}
+
+// Function Details Dialog Styles
+.function-details-dialog {
+  .q-dialog__inner {
+    padding: 0;
+  }
+}
+
+.function-details-card {
+  border-radius: 0;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.function-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.function-name-section,
+.function-timing-section,
+.function-definition-section {
+  .text-subtitle1 {
+    color: #1976d2;
+    margin-bottom: 8px;
+    display: block;
+  }
+}
+
+.function-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  padding: 8px 12px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  border-left: 4px solid #1976d2;
+}
+
+.function-timing {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  border-left: 4px solid #28a745;
+}
+
+.function-definition {
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
+}
+
+.function-code {
+  color: #333;
+  background-color: transparent;
+  margin: 0;
+  padding: 12px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+}
+
+// Dark mode support
+.body--dark {
+  .function-details-card {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    
+    .q-card-section {
+      background-color: #1e1e1e;
+    }
+  }
+  
+  .function-name {
+    background-color: #2d2d2d;
+    color: #ffffff;
+    border-left-color: #64b5f6;
+  }
+  
+  .function-timing {
+    background-color: #2d2d2d;
+    color: #ffffff;
+    border-left-color: #4caf50;
+  }
+  
+  .function-definition {
+    background-color: #2d2d2d;
+    border-color: #444;
+  }
+  
+  .function-code {
+    color: #ffffff;
+  }
+  
+  .function-definition-section .text-subtitle1,
+  .function-name-section .text-subtitle1,
+  .function-timing-section .text-subtitle1 {
+    color: #64b5f6;
+  }
 }
 
 </style>
