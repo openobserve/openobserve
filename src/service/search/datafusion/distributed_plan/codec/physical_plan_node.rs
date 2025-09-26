@@ -24,8 +24,7 @@ use datafusion::{
 use datafusion_proto::physical_plan::PhysicalExtensionCodec;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::datafusion::distributed_plan::{
-    aggregate_topk_exec::AggregateTopkExec, streaming_aggs_exec::StreamingAggsExec,
-    tmp_exec::TmpExec,
+    agg_topk_exec::AggregateTopkExec, streaming_aggs_exec::StreamingAggsExec, tmp_exec::TmpExec,
 };
 use prost::Message;
 use proto::cluster_rpc;
