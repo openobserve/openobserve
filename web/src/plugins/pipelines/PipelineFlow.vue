@@ -169,7 +169,7 @@ export default {
         console.log('Auto-hiding notification')
         showEdgeHelpNotification.value = false
         notificationTimeout = null
-      }, 2000)
+      }, 2500)
     }
 
     // Handle edge double-click events
