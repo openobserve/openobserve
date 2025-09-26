@@ -112,6 +112,11 @@ pub async fn search(
     }
 
     // Result caching check start
+    let force_clear_cache = if !use_cache && !is_http2_streaming {
+        Some(true)
+    } else {
+        None
+    };
     let (mut c_resp, should_exec_query) = prepare_cache_response(
         trace_id,
         org_id,
@@ -119,7 +124,7 @@ pub async fn search(
         &mut req,
         use_cache,
         is_http2_streaming,
-        None,
+        force_clear_cache,
     )
     .await?;
     let file_path = c_resp.file_path.clone();
@@ -1250,10 +1255,13 @@ mod tests {
 
     #[test]
     fn test_is_result_array_skip_vrl() {
-        let query_fn = "#ResultArray#SkipVRL#
- .message_length = length!(.flag_url)
- .test=25
- .";
+        let query_fn = r#"#ResultArray#SkipVRL#
+        arr1_final = []
+        for_each(array!(.)) -> |index, value| {
+            value.arr = {"a": 4}
+            arr1_final = push(arr1_final,value)
+        }
+        . = arr1_final"#;
         assert!(is_result_array_skip_vrl(query_fn));
     }
 }

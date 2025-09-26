@@ -17,7 +17,11 @@ use std::sync::Arc;
 
 use ::datafusion::arrow::record_batch::RecordBatch;
 use config::{
-    meta::{function::VRLResultResolver, search, sql::TableReferenceExt},
+    meta::{
+        function::{RESULT_ARRAY, VRLResultResolver},
+        search,
+        sql::TableReferenceExt,
+    },
     metrics::QUERY_PARQUET_CACHE_RATIO,
     utils::{
         arrow::record_batches_to_json_rows,
@@ -76,7 +80,7 @@ pub async fn search(
     // this being to avoid performance impact of query fn being applied during query
     // execution
     let use_query_fn = query.uses_zo_fn;
-    let mut query_fn = query.query_fn.clone();
+    let query_fn = query.query_fn.clone();
     #[cfg(feature = "enterprise")]
     let action_id = query.action_id.clone();
 
@@ -135,10 +139,8 @@ pub async fn search(
             // compile vrl function & apply the same before returning the response
             let input_fn = query_fn.trim();
 
-            let apply_over_hits = super::super::RESULT_ARRAY.is_match(input_fn);
-            if apply_over_hits {
-                query_fn = super::super::RESULT_ARRAY.replace(input_fn, "").to_string();
-            }
+            let apply_over_hits = RESULT_ARRAY.is_match(input_fn);
+
             let mut runtime = crate::common::utils::functions::init_vrl_runtime();
             let program =
                 match crate::service::ingestion::compile_vrl_function(&query_fn, &sql.org_id) {

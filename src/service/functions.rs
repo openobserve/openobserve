@@ -92,9 +92,6 @@ pub async fn test_run_function(
     }
 
     let apply_over_hits = RESULT_ARRAY.is_match(&function);
-    if apply_over_hits {
-        function = RESULT_ARRAY.replace(&function, "").to_string();
-    }
 
     let runtime_config = match compile_vrl_function(&function, org_id) {
         Ok(program) => {
