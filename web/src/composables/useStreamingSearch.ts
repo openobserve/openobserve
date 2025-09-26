@@ -232,12 +232,20 @@ const useHttpStreaming = () => {
 
       if (!response.ok) {
         try {
+          console.log("before onerror:",response);
           onError(traceId, {
             status: response.status,
             ...(await response.json()),
           });
           return;
         } catch (e) {
+          console.log("inside catch:",response);
+          if((response as any).status === 401) {
+            store.dispatch("logout");
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.reload();
+          }
           throw response;
         }
       }
