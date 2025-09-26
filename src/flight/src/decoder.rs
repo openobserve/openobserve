@@ -22,18 +22,18 @@ use arrow_flight::{
     utils::flight_data_to_arrow_batch,
 };
 use arrow_schema::{Schema, SchemaRef};
-use datafusion::{parquet::data_type::AsBytes, physical_plan::metrics::BaselineMetrics};
+use datafusion::parquet::data_type::AsBytes;
 use futures::{Stream, StreamExt, ready};
 use tonic::Streaming;
 
-use crate::common::{CustomMessage, FlightMessage};
+use crate::common::{CustomMessage, FlightMessage, RemoteScanMetrics};
 
 pub struct FlightDataDecoder {
     response: Streaming<FlightData>,
     schema: Option<SchemaRef>,
     dictionaries_by_field: HashMap<i64, ArrayRef>,
     done: bool,
-    metrics: BaselineMetrics,
+    metrics: RemoteScanMetrics,
 }
 
 impl Debug for FlightDataDecoder {
@@ -52,7 +52,7 @@ impl FlightDataDecoder {
     pub fn new(
         response: Streaming<FlightData>,
         schema: Option<SchemaRef>,
-        metrics: BaselineMetrics,
+        metrics: RemoteScanMetrics,
     ) -> Self {
         Self {
             response,
@@ -70,7 +70,7 @@ impl FlightDataDecoder {
 
     /// Extracts flight data from the next message
     fn extract_message(&mut self, data: FlightData) -> Result<Option<FlightMessage>> {
-        let timer = self.metrics.elapsed_compute().timer();
+        let timer = self.metrics.decode_time.timer();
         let message = arrow::ipc::root_as_message(&data.data_header[..])
             .map_err(|e| FlightError::DecodeError(format!("Error decoding header: {e}")))?;
 
