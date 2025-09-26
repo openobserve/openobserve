@@ -20,7 +20,7 @@ use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
 use sqlparser::ast::{BinaryOperator, Expr};
 use tokio::sync::Mutex;
 
-use super::{DATAFUSION_RUNTIME, datafusion::distributed_plan::remote_scan::RemoteScanExec};
+use super::{DATAFUSION_RUNTIME, datafusion::distributed_plan::remote_scan_exec::RemoteScanExec};
 
 type Cleanup = Pin<Box<dyn Future<Output = ()> + Send>>;
 

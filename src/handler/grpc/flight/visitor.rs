@@ -26,7 +26,7 @@ use datafusion::{
 use flight::common::Metrics;
 use parking_lot::Mutex;
 
-use crate::service::search::datafusion::distributed_plan::remote_scan::RemoteScanExec;
+use crate::service::search::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
 
 pub fn get_scan_stats(plan: Arc<dyn ExecutionPlan>) -> Option<Arc<Mutex<ScanStats>>> {
     let mut visitor = RemoteScanVisitor::new();

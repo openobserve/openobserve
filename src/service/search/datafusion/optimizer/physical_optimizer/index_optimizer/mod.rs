@@ -42,7 +42,7 @@ mod topn;
 mod utils;
 
 use crate::service::search::datafusion::{
-    distributed_plan::{empty_exec::NewEmptyExec, remote_scan::RemoteScanExec},
+    distributed_plan::{empty_exec::NewEmptyExec, remote_scan_exec::RemoteScanExec},
     optimizer::physical_optimizer::index_optimizer::{
         count::is_simple_count, distinct::is_simple_distinct, histogram::is_simple_histogram,
         select::is_simple_select, topn::is_simple_topn, utils::is_complex_plan,
@@ -318,6 +318,7 @@ mod tests {
 
     use super::*;
     use crate::service::search::datafusion::{
+        distributed_plan::node::RemoteScanNode,
         optimizer::physical_optimizer::{
             index_optimizer::utils::tests::get_remote_scan, remote_scan::RemoteScanRule,
         },
@@ -360,13 +361,8 @@ mod tests {
             schema.clone(),
         ));
 
-        let remote_node =
-            crate::service::search::datafusion::distributed_plan::node::RemoteScanNode::default();
-        let remote =
-            crate::service::search::datafusion::distributed_plan::remote_scan::RemoteScanExec::new(
-                Arc::clone(&child),
-                remote_node,
-            )
+        let remote_node = RemoteScanNode::default();
+        let remote = RemoteScanExec::new(Arc::clone(&child), remote_node)
             .expect("construct remote scan exec");
         let plan: Arc<dyn ExecutionPlan> = Arc::new(remote);
 

@@ -53,7 +53,7 @@ pub(crate) mod tests {
         },
     };
 
-    use crate::service::search::datafusion::distributed_plan::remote_scan::RemoteScanExec;
+    use crate::service::search::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
 
     // get the first final aggregate plan from bottom to top
     pub(crate) fn get_partial_aggregate_plan(

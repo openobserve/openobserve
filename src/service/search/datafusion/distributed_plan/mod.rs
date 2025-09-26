@@ -29,12 +29,14 @@ pub mod codec;
 mod common;
 mod decoder_stream;
 pub mod display;
-pub mod distribute_analyze;
+pub mod distribute_analyze_exec;
 pub mod empty_exec;
 pub mod enrich_exec;
+pub mod enrichment_exec;
 pub mod node;
-pub mod remote_scan;
+pub mod remote_scan_exec;
 pub mod rewrite;
+
 mod utils;
 
 pub struct NewEmptyExecVisitor {
