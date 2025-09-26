@@ -34,13 +34,20 @@ mod tests {
             stream::StreamType,
             triggers::{ScheduledTriggerData, Trigger, TriggerModule, TriggerStatus},
         },
-        utils::json,
+        utils::{
+            enrichment_local_cache::{get_key, get_table_dir, get_table_path},
+            json,
+        },
     };
+    use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS};
     use openobserve::{
-        common::meta::{ingestion::IngestionResponse, user::UserList},
+        common::{
+            infra::config::ENRICHMENT_TABLES, meta::ingestion::IngestionResponse, user::UserList,
+        },
         handler::{
             grpc::{auth::check_auth, flight::FlightServiceImpl},
             http::{
+                self,
                 models::{
                     alerts::responses::{GetAlertResponseBody, ListAlertsResponseBody},
                     destinations::{Destination, DestinationType},
@@ -268,8 +275,12 @@ mod tests {
         e2e_handle_derived_stream_success().await;
         e2e_handle_derived_stream_pipeline_not_found().await;
         e2e_handle_derived_stream_max_retries().await;
+        test_derived_stream_invalid_timerange_delay_scenario().await;
+        test_derived_stream_invalid_timerange_with_cron_frequency().await;
         e2e_handle_derived_stream_evaluation_failure().await;
         e2e_cleanup_test_pipeline().await;
+
+        test_enrichment_table_integration().await;
 
         // others
         e2e_health_check().await;
@@ -938,8 +949,12 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
+        // print the body from resp
         println!("post user resp: {resp:?}");
-        assert!(resp.status().is_success());
+        let is_success = resp.status().is_success();
+        let body = test::read_body(resp).await;
+        println!("post user body: {}", String::from_utf8_lossy(&body));
+        assert!(is_success);
     }
 
     async fn e2e_update_user() {
@@ -2652,6 +2667,10 @@ mod tests {
                 .num_microseconds()
                 .unwrap();
         let module_key = format!("logs/e2e/test_derived_stream/{}", pipeline.id);
+        println!(
+            "e2e handle derived stream success module_key: {}, where pipeline name is {}",
+            module_key, pipeline.name
+        );
 
         let trigger = Trigger {
             id: 1,
@@ -2894,22 +2913,7 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success(), "Failed to delete fields");
 
-        let req = test::TestRequest::get()
-            .uri("/api/e2e/pipelines")
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success(), "Failed to list pipelines");
-        let body = test::read_body(resp).await;
-        let pipeline_response: openobserve::handler::http::models::pipelines::PipelineList =
-            json::from_slice(&body).unwrap();
-        // Get the pipeline that matches the pipeline name
-        let pipeline = pipeline_response
-            .list
-            .iter()
-            .find(|p| p.name == pipeline_data.name);
-        assert!(pipeline.is_some(), "Pipeline not found");
-        let pipeline = pipeline.unwrap();
+        let pipeline = get_pipeline_from_api(pipeline_data.name.as_str()).await;
 
         let now = Utc::now().timestamp_micros();
         let mins_5_later = now
@@ -2952,6 +2956,353 @@ mod tests {
         let _ = openobserve::service::db::pipeline::delete(&pipeline.id).await;
     }
 
+    // Test to handle case where pipeline triggers for invalid timerange where start time
+    // is greater than end time because of the delay feature which is turned on after alert
+    // is already created and is running for some time.
+
+    async fn test_derived_stream_invalid_timerange_delay_scenario() {
+        // Create a pipeline with derived stream that has delay configured
+        let pipeline_data = Pipeline {
+            id: "test_invalid_timerange_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "e2e".to_string(),
+            name: "test_invalid_timerange_pipeline".to_string(),
+            description: "Test pipeline for invalid timerange delay scenario".to_string(),
+            source: PipelineSource::Scheduled(DerivedStream {
+                org_id: "e2e".to_string(),
+                stream_type: StreamType::Logs,
+                query_condition: QueryCondition {
+                    query_type: config::meta::alerts::QueryType::SQL,
+                    sql: Some("SELECT _timestamp, city FROM \"olympics_schema\"".to_string()),
+                    ..Default::default()
+                },
+                trigger_condition: TriggerCondition {
+                    period: 5,      // 5 minutes
+                    frequency: 300, // 5 minutes in seconds
+                    ..Default::default()
+                },
+                tz_offset: 0,
+                start_at: None,
+                delay: Some(10), // 10 minutes delay
+            }),
+            nodes: vec![
+                // Source node (query node for scheduled pipeline)
+                config::meta::pipeline::components::Node::new(
+                    "source-node-1".to_string(),
+                    config::meta::pipeline::components::NodeData::Query(DerivedStream {
+                        org_id: "e2e".to_string(),
+                        stream_type: StreamType::Logs,
+                        query_condition: QueryCondition {
+                            query_type: config::meta::alerts::QueryType::SQL,
+                            sql: Some(
+                                "SELECT _timestamp, city FROM \"olympics_schema\"".to_string(),
+                            ),
+                            ..Default::default()
+                        },
+                        trigger_condition: TriggerCondition {
+                            period: 5,
+                            frequency: 300,
+                            ..Default::default()
+                        },
+                        tz_offset: 0,
+                        start_at: None,
+                        delay: Some(10), // 10 minutes delay
+                    }),
+                    100.0,
+                    50.0,
+                    "input".to_string(),
+                ),
+                // Destination node (output stream)
+                config::meta::pipeline::components::Node::new(
+                    "dest-node-1".to_string(),
+                    config::meta::pipeline::components::NodeData::Stream(
+                        config::meta::stream::StreamParams {
+                            org_id: "e2e".to_string().into(),
+                            stream_name: "derived_stream".to_string().into(),
+                            stream_type: StreamType::Logs,
+                        },
+                    ),
+                    100.0,
+                    200.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![config::meta::pipeline::components::Edge::new(
+                "source-node-1".to_string(),
+                "dest-node-1".to_string(),
+            )],
+        };
+
+        // Create the pipeline
+        e2e_post_pipeline(pipeline_data.clone()).await;
+        let pipeline = get_pipeline_from_api(pipeline_data.name.as_str()).await;
+
+        // Create a trigger that will cause invalid timerange scenario
+        // Simulate a scenario where the trigger was created before delay was enabled
+        // and now the start time is greater than end time due to delay
+        let current_time = Utc::now().timestamp_micros();
+        // 5 minutes is period of the pipeline and 1 min is delay in processing the pipeline
+        let period_micros = Duration::try_minutes(6)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+        let timeout = Duration::try_minutes(2)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+
+        // Create trigger with start time that will be greater than end time after delay
+        let trigger_start_time = current_time - period_micros; // 5 minutes ago
+
+        let trigger = Trigger {
+            id: 1,
+            org: "e2e".to_string(),
+            module: TriggerModule::DerivedStream,
+            module_key: format!("logs/e2e/test_invalid_timerange_pipeline/{}", pipeline.id),
+            next_run_at: current_time,
+            start_time: Some(current_time),
+            end_time: Some(current_time + timeout),
+            is_realtime: false,
+            is_silenced: false,
+            status: config::meta::triggers::TriggerStatus::Processing,
+            retries: 0,
+            data: serde_json::json!({
+                "period_end_time": trigger_start_time // This will cause start > end
+            })
+            .to_string(),
+        };
+
+        // Process the trigger - this should handle invalid timerange gracefully
+        let trace_id = "test_invalid_timerange_trace_id";
+        let result = handle_triggers(trace_id, trigger).await;
+
+        // Should not return an error, but should handle invalid timerange gracefully
+        assert!(result.is_ok());
+
+        // Get the trigger from the database
+        let trigger = openobserve::service::db::scheduler::get(
+            "e2e",
+            TriggerModule::DerivedStream,
+            &format!("logs/e2e/test_invalid_timerange_pipeline/{}", pipeline.id),
+        )
+        .await;
+        assert!(trigger.is_ok());
+        let trigger = trigger.unwrap();
+        // Next run at should be greater than current time
+        assert!(trigger.next_run_at > current_time);
+
+        // And last period end time should not change
+        assert_eq!(
+            trigger.data,
+            serde_json::json!({
+                "period_end_time": trigger_start_time
+            })
+            .to_string()
+        );
+
+        // Clean up
+        let _ = openobserve::service::db::pipeline::delete(&pipeline.id).await;
+        // Also delete the trigger job from scheduled jobs table
+        let _ = openobserve::service::db::scheduler::delete(
+            "e2e",
+            TriggerModule::DerivedStream,
+            &format!("logs/e2e/test_invalid_timerange_pipeline/{}", pipeline.id),
+        )
+        .await;
+    }
+
+    async fn test_derived_stream_invalid_timerange_with_cron_frequency() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes),
+        )
+        .await;
+
+        // Create a pipeline with derived stream using cron frequency
+        let pipeline_data = Pipeline {
+            id: "test_cron_invalid_timerange_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "e2e".to_string(),
+            name: "test_cron_invalid_timerange_pipeline".to_string(),
+            description: "Test pipeline for invalid timerange with cron frequency".to_string(),
+            source: PipelineSource::Scheduled(DerivedStream {
+                org_id: "e2e".to_string(),
+                stream_type: StreamType::Logs,
+                query_condition: QueryCondition {
+                    query_type: config::meta::alerts::QueryType::SQL,
+                    sql: Some("SELECT _timestamp, city FROM \"olympics_schema\"".to_string()),
+                    ..Default::default()
+                },
+                trigger_condition: TriggerCondition {
+                    period: 5,                         // 5 minutes
+                    frequency: 0,                      // 0 for cron frequency
+                    cron: "0 */5 * * * *".to_string(), // Every 5 minutes
+                    frequency_type: config::meta::alerts::FrequencyType::Cron,
+                    ..Default::default()
+                },
+                tz_offset: 0,
+                start_at: None,
+                delay: Some(10), // 10 minutes delay
+            }),
+            nodes: vec![
+                // Source node (query node for scheduled pipeline)
+                config::meta::pipeline::components::Node::new(
+                    "source-node-1".to_string(),
+                    config::meta::pipeline::components::NodeData::Query(DerivedStream {
+                        org_id: "e2e".to_string(),
+                        stream_type: StreamType::Logs,
+                        query_condition: QueryCondition {
+                            query_type: config::meta::alerts::QueryType::SQL,
+                            sql: Some(
+                                "SELECT _timestamp, city FROM \"olympics_schema\"".to_string(),
+                            ),
+                            ..Default::default()
+                        },
+                        trigger_condition: TriggerCondition {
+                            period: 5,
+                            frequency: 0,
+                            cron: "0 */5 * * * *".to_string(),
+                            frequency_type: config::meta::alerts::FrequencyType::Cron,
+                            ..Default::default()
+                        },
+                        tz_offset: 0,
+                        start_at: None,
+                        delay: Some(10), // 10 minutes delay
+                    }),
+                    100.0,
+                    50.0,
+                    "input".to_string(),
+                ),
+                // Destination node (output stream)
+                config::meta::pipeline::components::Node::new(
+                    "dest-node-1".to_string(),
+                    config::meta::pipeline::components::NodeData::Stream(
+                        config::meta::stream::StreamParams {
+                            org_id: "e2e".to_string().into(),
+                            stream_name: "derived_stream".to_string().into(),
+                            stream_type: StreamType::Logs,
+                        },
+                    ),
+                    100.0,
+                    200.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![config::meta::pipeline::components::Edge::new(
+                "source-node-1".to_string(),
+                "dest-node-1".to_string(),
+            )],
+        };
+
+        // Create the pipeline
+        let req = test::TestRequest::post()
+            .uri("/api/e2e/pipelines")
+            .append_header(auth.clone())
+            .set_json(&pipeline_data)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        println!(
+            "test derived stream invalid timerange with cron frequency resp: {:?}",
+            resp
+        );
+        assert!(resp.status().is_success());
+
+        let pipeline = get_pipeline_from_api(pipeline_data.name.as_str()).await;
+
+        // Create trigger that will cause invalid timerange with cron frequency
+        let current_time = Utc::now().timestamp_micros();
+        let dur_20_mins = Duration::try_minutes(20)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+        let period_micros = Duration::try_minutes(5)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+
+        // Say, this trigger was last run at 15 mins ago
+        let last_end_time = current_time - dur_20_mins;
+        // Current end time needs to be aligned (as this is cron frequency)
+        let current_next_run_time =
+            TriggerCondition::align_time(last_end_time + period_micros, 0, Some(300)); // This will cause start > end
+        let timeout = Duration::try_minutes(2)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+
+        let trigger = Trigger {
+            id: 3,
+            org: "e2e".to_string(),
+            module: TriggerModule::DerivedStream,
+            module_key: format!(
+                "logs/e2e/test_cron_invalid_timerange_pipeline/{}",
+                pipeline.id
+            ),
+            next_run_at: current_next_run_time,
+            start_time: Some(current_time),
+            end_time: Some(current_time + timeout), // end < start
+            is_realtime: false,
+            is_silenced: false,
+            status: config::meta::triggers::TriggerStatus::Processing,
+            retries: 0,
+            data: serde_json::json!({
+                "period_end_time": last_end_time // This will cause start > end
+            })
+            .to_string(),
+        };
+
+        // Process the trigger
+        let trace_id = "test_cron_invalid_timerange_trace_id";
+        let result = handle_triggers(trace_id, trigger).await;
+
+        // Should handle invalid timerange with cron frequency gracefully
+        assert!(result.is_ok());
+
+        // Get the trigger from the database
+        let trigger = openobserve::service::db::scheduler::get(
+            "e2e",
+            TriggerModule::DerivedStream,
+            &format!(
+                "logs/e2e/test_cron_invalid_timerange_pipeline/{}",
+                pipeline.id
+            ),
+        )
+        .await;
+        assert!(trigger.is_ok());
+        let trigger = trigger.unwrap();
+        // Next run at should be greater than current time
+        assert!(trigger.next_run_at > current_next_run_time);
+        // Next run at should be less than current time, because the frequency is 5 mins
+        assert!(trigger.next_run_at < current_time);
+        assert_eq!(
+            trigger.data,
+            serde_json::json!({
+                "period_end_time": last_end_time
+            })
+            .to_string()
+        );
+
+        // Clean up
+        let _ = openobserve::service::db::pipeline::delete(&pipeline.id).await;
+        // Also delete the trigger job from scheduled jobs table
+        let _ = openobserve::service::db::scheduler::delete(
+            "e2e",
+            TriggerModule::DerivedStream,
+            &format!(
+                "logs/e2e/test_cron_invalid_timerange_pipeline/{}",
+                pipeline.id
+            ),
+        )
+        .await;
+    }
+
     async fn e2e_cleanup_test_pipeline() {
         // list the pipelines and choose the first one using API
         let auth = setup();
@@ -2979,5 +3330,472 @@ mod tests {
 
         // Clean up test pipelines
         let _ = openobserve::service::db::pipeline::delete(&pipeline.id).await;
+    }
+
+    async fn get_pipeline_from_api(pipeline_name: &str) -> http::models::pipelines::Pipeline {
+        let auth = setup();
+        // Check if pipeline was saved successfully by doing a list using API
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri("/api/e2e/pipelines")
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success(), "Failed to list pipelines");
+        let body = test::read_body(resp).await;
+        let pipeline_response: openobserve::handler::http::models::pipelines::PipelineList =
+            json::from_slice(&body).unwrap();
+        // Get the pipeline that matches the pipeline name
+        let pipeline = pipeline_response
+            .list
+            .iter()
+            .find(|p| p.name == pipeline_name);
+        assert!(pipeline.is_some(), "Pipeline not found");
+        let pipeline = pipeline.unwrap();
+        pipeline.clone()
+    }
+
+    // ==================== ENRICHMENT TABLE TESTS ====================
+
+    async fn e2e_save_enrichment_data_new_table() {
+        let _auth = setup();
+        let org_id = "e2e";
+        let table_name = "test_enrichment_table";
+
+        // Create test data
+        let mut payload = Vec::new();
+        let mut record1 = json::Map::new();
+        record1.insert("name".to_string(), json::Value::String("John".to_string()));
+        record1.insert("age".to_string(), json::Value::String("25".to_string()));
+        record1.insert(
+            "city".to_string(),
+            json::Value::String("New York".to_string()),
+        );
+        payload.push(record1);
+
+        let mut record2 = json::Map::new();
+        record2.insert("name".to_string(), json::Value::String("Jane".to_string()));
+        record2.insert("age".to_string(), json::Value::String("30".to_string()));
+        record2.insert(
+            "city".to_string(),
+            json::Value::String("Los Angeles".to_string()),
+        );
+        payload.push(record2);
+
+        // Call save_enrichment_data
+        let result = openobserve::service::enrichment_table::save_enrichment_data(
+            org_id, table_name, payload, false, // append_data = false
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert!(response.status().is_success());
+
+        // Verify schema was created in database
+        let schema_exists = openobserve::service::schema::stream_schema_exists(
+            org_id,
+            table_name,
+            config::meta::stream::StreamType::EnrichmentTables,
+            &mut std::collections::HashMap::new(),
+        )
+        .await;
+
+        println!("schema_exists: {:?}", schema_exists);
+
+        assert!(schema_exists.has_fields);
+
+        // Verify schema cache was updated
+        let schema_key = format!(
+            "{}/{}/{}",
+            org_id,
+            config::meta::stream::StreamType::EnrichmentTables,
+            table_name
+        );
+        let stream_schemas = STREAM_SCHEMAS.read().await;
+        assert!(stream_schemas.contains_key(&schema_key));
+        drop(stream_schemas);
+
+        // Verify latest schema cache was updated
+        let stream_schemas_latest = STREAM_SCHEMAS_LATEST.read().await;
+        assert!(stream_schemas_latest.contains_key(&schema_key));
+        drop(stream_schemas_latest);
+
+        // Verify stream settings cache was updated
+        let stream_settings = STREAM_SETTINGS.read().await;
+        assert!(stream_settings.contains_key(&schema_key));
+        drop(stream_settings);
+
+        // Get the meta table stats for enrichment table
+        let meta_table_stats =
+            openobserve::service::db::enrichment_table::get_meta_table_stats(org_id, table_name)
+                .await;
+        assert!(meta_table_stats.is_some());
+        let meta_table_stats = meta_table_stats.unwrap();
+        assert_ne!(meta_table_stats.size, 0);
+        assert_ne!(meta_table_stats.start_time, 0);
+
+        // Check get_enrichment_table function, it should return same data
+        let data = openobserve::service::enrichment::get_enrichment_table(org_id, table_name).await;
+        assert!(data.is_ok());
+        let data = data.unwrap();
+        assert!(data.len() == 2);
+        println!("save enrichment data new tabledata: {:?}", data);
+        println!(
+            "save enrichment data new table data[0]: {:?}",
+            data[0].get("name").unwrap().to_string()
+        );
+        assert!(data[0].get("name").unwrap().to_string().eq("\"John\""));
+        assert!(data[1].get("name").unwrap().to_string().eq("\"Jane\""));
+        assert!(data[0].get("age").unwrap().to_string().eq("\"25\""));
+        assert!(data[1].get("age").unwrap().to_string().eq("\"30\""));
+        assert!(data[0].get("city").unwrap().to_string().eq("\"New York\""));
+        assert!(
+            data[1]
+                .get("city")
+                .unwrap()
+                .to_string()
+                .eq("\"Los Angeles\"")
+        );
+
+        // wait for 1 second
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+        // Check the ENRICHMENT_TABLES cache to check if the table is created
+        let enrichment_tables = ENRICHMENT_TABLES.clone();
+        println!(
+            "save enrichment data new table enrichment_tables: {:?}",
+            enrichment_tables
+        );
+        assert!(enrichment_tables.contains_key(&schema_key));
+        assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 2);
+
+        drop(enrichment_tables);
+
+        println!(
+            "save enrichment data new table meta_table_stats: {:?}",
+            meta_table_stats
+        );
+        // Also, it should store the cache in the disk
+        check_enrichment_table_local_disk_cache(org_id, table_name, meta_table_stats.end_time)
+            .await;
+        // Clean up
+        e2e_cleanup_enrichment_table(org_id, table_name).await;
+    }
+
+    async fn e2e_cleanup_enrichment_table(org_id: &str, stream_name: &str) {
+        // Clean up the enrichment table and its schema
+        openobserve::service::enrichment_table::delete_enrichment_table(
+            org_id,
+            stream_name,
+            config::meta::stream::StreamType::EnrichmentTables,
+            (0, chrono::Utc::now().timestamp_micros()),
+        )
+        .await;
+
+        // Verify schema caches are cleaned up
+        let schema_key = format!(
+            "{}/{}/{}",
+            org_id,
+            config::meta::stream::StreamType::EnrichmentTables,
+            stream_name
+        );
+
+        // Check that schema caches are cleared
+        let stream_schemas = STREAM_SCHEMAS.read().await;
+        assert!(!stream_schemas.contains_key(&schema_key));
+        drop(stream_schemas);
+
+        let stream_schemas_latest = STREAM_SCHEMAS_LATEST.read().await;
+        assert!(!stream_schemas_latest.contains_key(&schema_key));
+        drop(stream_schemas_latest);
+
+        let stream_settings = STREAM_SETTINGS.read().await;
+        assert!(!stream_settings.contains_key(&schema_key));
+        drop(stream_settings);
+
+        // wait for 2 seconds
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Check the ENRICHMENT_TABLES cache to check if the table is deleted
+        let enrichment_tables = ENRICHMENT_TABLES.clone();
+        println!(
+            "enrichment data cleanup enrichment_tables: {:?}",
+            enrichment_tables
+        );
+        assert!(!enrichment_tables.contains_key(&schema_key));
+        drop(enrichment_tables);
+
+        // Check the local disk cache to check if the table is deleted
+        check_enrichment_table_local_disk_cache_deleted(org_id, stream_name).await;
+    }
+
+    async fn e2e_save_enrichment_data_append_mode() {
+        let _auth = setup();
+        let org_id = "e2e";
+        let table_name = "test_enrichment_table_append";
+
+        // First, create initial data
+        let mut initial_payload = Vec::new();
+        let mut record1 = json::Map::new();
+        record1.insert("name".to_string(), json::Value::String("John".to_string()));
+        record1.insert("age".to_string(), json::Value::String("25".to_string()));
+        record1.insert(
+            "city".to_string(),
+            json::Value::String("New York".to_string()),
+        );
+        initial_payload.push(record1);
+
+        let result1 = openobserve::service::enrichment_table::save_enrichment_data(
+            org_id,
+            table_name,
+            initial_payload,
+            false, // append_data = false
+        )
+        .await;
+        assert!(result1.is_ok());
+
+        // Get the meta table stats for enrichment table
+        let meta_table_stats_first =
+            openobserve::service::db::enrichment_table::get_meta_table_stats(org_id, table_name)
+                .await;
+        assert!(meta_table_stats_first.is_some());
+        let meta_table_stats_first = meta_table_stats_first.unwrap();
+        assert_ne!(meta_table_stats_first.size, 0);
+        assert_ne!(meta_table_stats_first.start_time, 0);
+        let schema_key = format!(
+            "{}/{}/{}",
+            org_id,
+            config::meta::stream::StreamType::EnrichmentTables,
+            table_name
+        );
+
+        // Wait for 2 seconds
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Check the ENRICHMENT_TABLES cache to check if the table is created
+        let enrichment_tables = ENRICHMENT_TABLES.clone();
+        assert!(enrichment_tables.contains_key(&schema_key));
+        assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 1);
+        drop(enrichment_tables);
+
+        println!(
+            "save enrichment data append mode check_enrichment_table_local_disk_cache meta_table_stats_first.start_time 1: {:?}",
+            meta_table_stats_first.start_time
+        );
+        // Check the local disk cache to check if the table is created
+        check_enrichment_table_local_disk_cache(
+            org_id,
+            table_name,
+            meta_table_stats_first.end_time,
+        )
+        .await;
+
+        // Now append more data
+        let mut append_payload = Vec::new();
+        let mut record2 = json::Map::new();
+        record2.insert("name".to_string(), json::Value::String("Jane".to_string()));
+        record2.insert("age".to_string(), json::Value::String("30".to_string()));
+        record2.insert(
+            "city".to_string(),
+            json::Value::String("Los Angeles".to_string()),
+        );
+        append_payload.push(record2);
+
+        let result2 = openobserve::service::enrichment_table::save_enrichment_data(
+            org_id,
+            table_name,
+            append_payload,
+            true, // append_data = true
+        )
+        .await;
+        assert!(result2.is_ok());
+
+        // Verify schema still exists and is valid
+        let schema_exists = openobserve::service::schema::stream_schema_exists(
+            org_id,
+            table_name,
+            config::meta::stream::StreamType::EnrichmentTables,
+            &mut std::collections::HashMap::new(),
+        )
+        .await;
+
+        assert!(schema_exists.has_fields);
+
+        // Get the meta table stats for enrichment table
+        let meta_table_stats_second =
+            openobserve::service::db::enrichment_table::get_meta_table_stats(org_id, table_name)
+                .await;
+        assert!(meta_table_stats_second.is_some());
+        let meta_table_stats_second = meta_table_stats_second.unwrap();
+        assert_ne!(meta_table_stats_second.size, 0);
+        assert_ne!(meta_table_stats_second.start_time, 0);
+        assert_eq!(
+            meta_table_stats_second.start_time,
+            meta_table_stats_first.start_time
+        );
+        assert!(meta_table_stats_second.end_time > meta_table_stats_first.end_time);
+
+        // Wait for 2 seconds
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Check the ENRICHMENT_TABLES cache to check if the table is created
+        let enrichment_tables = ENRICHMENT_TABLES.clone();
+        assert!(enrichment_tables.contains_key(&schema_key));
+        assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 2);
+        drop(enrichment_tables);
+        println!(
+            "save enrichment data append mode check_enrichment_table_local_disk_cache meta_table_stats_second.start_time 2: {:?}",
+            meta_table_stats_second.start_time
+        );
+
+        // Check the local disk cache to check if the table is created
+        check_enrichment_table_local_disk_cache(
+            org_id,
+            table_name,
+            meta_table_stats_second.end_time,
+        )
+        .await;
+
+        // Clean up
+        e2e_cleanup_enrichment_table(org_id, table_name).await;
+    }
+
+    async fn e2e_save_enrichment_data_schema_evolution() {
+        let _auth = setup();
+        let org_id = "e2e";
+        let table_name = "test_enrichment_table_evolution";
+
+        // First, create initial data with basic fields
+        let mut initial_payload = Vec::new();
+        let mut record1 = json::Map::new();
+        record1.insert("name".to_string(), json::Value::String("John".to_string()));
+        record1.insert("age".to_string(), json::Value::String("25".to_string()));
+        initial_payload.push(record1);
+
+        let result1 = openobserve::service::enrichment_table::save_enrichment_data(
+            org_id,
+            table_name,
+            initial_payload,
+            false, // append_data = false
+        )
+        .await;
+        assert!(result1.is_ok());
+
+        let schema_key = format!(
+            "{}/{}/{}",
+            org_id,
+            config::meta::stream::StreamType::EnrichmentTables,
+            table_name
+        );
+
+        // wait for 2 seconds
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Check the ENRICHMENT_TABLES cache to check if the table is created
+        let enrichment_tables = ENRICHMENT_TABLES.clone();
+        assert!(enrichment_tables.contains_key(&schema_key));
+        assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 1);
+        drop(enrichment_tables);
+
+        // Now append data with additional fields (schema evolution)
+        let mut append_payload = Vec::new();
+        let mut record2 = json::Map::new();
+        record2.insert("name".to_string(), json::Value::String("Jane".to_string()));
+        record2.insert("age".to_string(), json::Value::String("30".to_string()));
+        record2.insert(
+            "city".to_string(),
+            json::Value::String("Los Angeles".to_string()),
+        ); // New field
+        record2.insert(
+            "country".to_string(),
+            json::Value::String("USA".to_string()),
+        ); // New field
+        append_payload.push(record2);
+
+        let result2 = openobserve::service::enrichment_table::save_enrichment_data(
+            org_id,
+            table_name,
+            append_payload,
+            true, // append_data = true
+        )
+        .await;
+        assert!(result2.is_ok());
+        // wait for 2 seconds
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Verify schema was evolved to include new fields
+        let mut stream_schema_map = std::collections::HashMap::new();
+        let schema_exists = openobserve::service::schema::stream_schema_exists(
+            org_id,
+            table_name,
+            config::meta::stream::StreamType::EnrichmentTables,
+            &mut stream_schema_map,
+        )
+        .await;
+
+        assert!(schema_exists.has_fields);
+
+        // Verify the schema cache contains the evolved schema
+        let schema_key = format!(
+            "{}/{}/{}",
+            org_id,
+            config::meta::stream::StreamType::EnrichmentTables,
+            table_name
+        );
+        let stream_schemas = STREAM_SCHEMAS.read().await;
+        assert!(stream_schemas.contains_key(&schema_key));
+        drop(stream_schemas);
+
+        // Get the latest SchemaCache
+        let stream_schemas_latest = STREAM_SCHEMAS_LATEST.read().await;
+        assert!(stream_schemas_latest.contains_key(&schema_key));
+        let schema_cache = stream_schemas_latest.get(&schema_key).unwrap();
+
+        // Verify the schema cache contains the evolved schema
+        assert!(schema_cache.contains_field("city"));
+        assert!(schema_cache.contains_field("country"));
+        drop(stream_schemas_latest);
+
+        // Check the ENRICHMENT_TABLES cache to check if the table is created
+        let enrichment_tables = ENRICHMENT_TABLES.clone();
+        assert!(enrichment_tables.contains_key(&schema_key));
+        assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 2);
+        drop(enrichment_tables);
+
+        // Clean up
+        e2e_cleanup_enrichment_table(org_id, table_name).await;
+    }
+
+    // Test runner function that calls all enrichment table tests
+    async fn test_enrichment_table_integration() {
+        e2e_save_enrichment_data_new_table().await;
+        e2e_save_enrichment_data_append_mode().await;
+        e2e_save_enrichment_data_schema_evolution().await;
+    }
+
+    async fn check_enrichment_table_local_disk_cache(
+        org_id: &str,
+        table_name: &str,
+        updated_at: i64,
+    ) {
+        let key = get_key(org_id, table_name);
+        let table_dir = get_table_dir(&key);
+        let file_path = get_table_path(table_dir.to_str().unwrap(), updated_at);
+        assert!(file_path.exists());
+    }
+
+    async fn check_enrichment_table_local_disk_cache_deleted(org_id: &str, table_name: &str) {
+        let key = get_key(org_id, table_name);
+        let table_dir = get_table_dir(&key);
+        assert!(!table_dir.exists());
     }
 }
