@@ -1186,6 +1186,10 @@ const updatePermissionVisibility = (
 
     // If we need to show child by default show parent
 
+    if (filteredEntities?.length) {
+      permission.show = true;
+    }
+
     if (
       permission.show &&
       (permission.name === "logs" ||
@@ -1197,10 +1201,6 @@ const updatePermissionVisibility = (
         filter.value.permissions === "all"
           ? [...filteredEntities.slice(0, 50)]
           : [...filteredEntities];
-    }
-
-    if (filteredEntities?.length) {
-      permission.show = true;
     }
 
     filteredEntities.length = 0;

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div :style="{ marginTop: 0 }" class="app-table-container">
       <div
         data-test="edit-role-permissions-table-no-permissions-title"
-        v-if="!level && !rows.length"
+        v-if="!level && !getFilteredRows.length"
         class="w-full text-center q-mt-lg text-bold text-grey-9"
         style="margin-top: 64px; font-size: 18px"
       >
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         data-test="edit-role-permissions-table-no-resources-title"
-        v-if="level && !parent.is_loading && !rows.length"
+        v-if="level && !parent.is_loading && !getFilteredRows.length"
         class="q-py-sm text-left text-subtitle text-grey-9"
         :style="{
           paddingLeft: level
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div>Loading Resources...</div>
       </div>
       <div
-        v-if="level && rows.length === 50"
+        v-if="level && getFilteredRows.length === 50"
         class="q-py-sm text-left text-grey-10 bg-white relative-position"
         :style="{
           paddingLeft: level
@@ -104,16 +104,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :style="{
           'max-height': level > 0 ? '400px' : '100%',
         }"
-        :items-size="rows.length"
+        :items-size="getFilteredRows.length"
         :virtual-scroll-item-size="39"
         :virtual-scroll-slice-size="20"
         :virtual-scroll-slice-ratio-before="20"
         type="table"
-        :items="rows"
+        :items="getFilteredRows"
         flat
         bordered
         ref="permissionsTableRef"
-        :rows="rows"
+        :rows="getFilteredRows"
         :columns="columns as []"
         :table-colspan="9"
         row-key="name"
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -372,6 +372,9 @@ const handlePermissionChange = (row: any, permission: string) => {
   emits("updated:permission", row, permission);
 };
 
+const getFilteredRows = computed(() => {
+  return props.rows.filter((row: any) => row?.show);
+})
 defineExpose({
   permissionsTableRef,
 });
