@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div :style="{ marginTop: 0 }" class="app-table-container">
       <div
         data-test="edit-role-permissions-table-no-permissions-title"
-        v-if="!level && !getFilteredRows.length"
+        v-if="!level && !rows.length"
         class="w-full text-center q-mt-lg text-bold text-grey-9"
         style="margin-top: 64px; font-size: 18px"
       >
