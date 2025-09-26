@@ -307,7 +307,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="row"
+          class="row node-label-text"
           align="left"
           style="
             text-align: left;
@@ -387,7 +387,7 @@ function getIcon(data, ioType) {
       <div class="container">
         <div
         v-if=" data.stream_name &&  data.stream_name.hasOwnProperty('label')"
-          class="row"
+          class="row node-label-text"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -399,7 +399,7 @@ function getIcon(data, ioType) {
         </div>
         <div
         v-else
-          class="row"
+          class="row node-label-text"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -476,7 +476,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="row"
+          class="row node-label-text"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -564,7 +564,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="row"
+          class="row node-label-text"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -640,6 +640,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
+    class="node-label-text"
     style="
       text-align: left;
       text-wrap: wrap;
@@ -917,6 +918,13 @@ function getIcon(data, ioType) {
 
 .delete-arrow {
   border-top-color: #dc2626;
+}
+
+// Node label text styling
+.node-label-text {
+  font-size: 15px !important;
+  font-weight: 900 !important;
+  line-height: 1.4 !important;
 }
 
 // Function Details Dialog Styles
