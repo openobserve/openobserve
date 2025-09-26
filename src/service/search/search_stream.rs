@@ -27,7 +27,10 @@ use config::{
         stream::StreamType,
         websocket::SearchResultType,
     },
-    utils::json::{Value, get_string_value},
+    utils::{
+        json::{Value, get_string_value},
+        time::hour_micros,
+    },
 };
 use log;
 #[cfg(feature = "enterprise")]
@@ -166,9 +169,17 @@ pub async fn process_search_stream_request(
 
     if req.query.from == 0 && !req.query.track_total_hits && req.query.streaming_id.is_none() {
         // check cache for the first page
-        let c_resp = match cache::check_cache_v2(&trace_id, &org_id, stream_type, &req, use_cache)
-            .instrument(search_span.clone())
-            .await
+        let (c_resp, _should_exec_query) = match cache::prepare_cache_response(
+            &trace_id,
+            &org_id,
+            stream_type,
+            &mut req,
+            use_cache,
+            false,
+            Some(true),
+        )
+        .instrument(search_span.clone())
+        .await
         {
             Ok(v) => v,
             Err(e) => {
@@ -249,10 +260,13 @@ pub async fn process_search_stream_request(
         // handle cache responses and deltas
         if !cached_resp.is_empty() && cached_hits > 0 {
             // `max_query_range` is used initialize `remaining_query_range`
-            // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
-            // for cache only search
+            // set max_query_range to `end_time - start_time` as hour if it is 0, to ensure
+            // unlimited query range for cache only search
             let remaining_query_range = if max_query_range == 0 {
-                i64::MAX
+                std::cmp::max(
+                    1,
+                    (req.query.end_time - req.query.start_time) / hour_micros(1),
+                )
             } else {
                 max_query_range
             }; // hours

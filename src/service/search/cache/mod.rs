@@ -64,6 +64,9 @@ pub mod cacher;
 pub mod multi;
 pub mod result_utils;
 
+// Define cache version
+const CACHE_VERSION: &str = "v2";
+
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
 #[allow(clippy::too_many_arguments)]
@@ -88,18 +91,9 @@ pub async fn search(
         false
     };
 
-    // Result caching check start
-    let mut origin_sql = in_req.query.sql.clone();
-    let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
-    let (stream_name, all_streams) = match resolve_stream_names(&origin_sql) {
-        // TODO: cache don't not support multiple stream names
-        Ok(v) => (v[0].clone(), v.join(",")),
-        Err(e) => {
-            return Err(Error::Message(e.to_string()));
-        }
-    };
-
     let mut req = in_req.clone();
+
+    // check the original query function first
     let mut query_fn = req
         .query
         .query_fn
@@ -117,76 +111,27 @@ pub async fn search(
         query_fn = None;
     }
 
-    let action = req
-        .query
-        .action_id
-        .as_ref()
-        .and_then(|v| svix_ksuid::Ksuid::from_str(v).ok());
+    // Result caching check start
+    let (mut c_resp, should_exec_query) = prepare_cache_response(
+        trace_id,
+        org_id,
+        stream_type,
+        &mut req,
+        use_cache,
+        is_http2_streaming,
+        None,
+    )
+    .await?;
+    let file_path = c_resp.file_path.clone();
 
-    // calculate hash for the query
-    let mut hash_body = vec![origin_sql.to_string()];
-    if let Some(vrl_function) = &query_fn {
-        hash_body.push(vrl_function.to_string());
-    }
-    if let Some(action_id) = action {
-        hash_body.push(action_id.to_string());
-    }
-    if !req.regions.is_empty() {
-        hash_body.extend(req.regions.clone());
-    }
-    if !req.clusters.is_empty() {
-        hash_body.extend(req.clusters.clone());
-    }
-    let mut h = config::utils::hash::gxhash::new();
-    let hashed_query = h.sum64(&hash_body.join(","));
-
-    let mut should_exec_query = true;
-
-    let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
-    let mut c_resp: MultiCachedQueryResponse = if use_cache {
-        // cache layer
-        check_cache(
-            trace_id,
-            org_id,
-            stream_type,
-            &mut req,
-            &mut origin_sql,
-            &mut file_path,
-            is_aggregate,
-            &mut should_exec_query,
-            false,
-        )
-        .await
-    } else {
-        let query: SearchQuery = req.query.clone().into();
-        match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
-            Ok(v) => {
-                let (ts_column, is_descending) =
-                    cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
-                        .unwrap_or_default();
-                if let Some(interval) = v.histogram_interval {
-                    file_path = format!("{file_path}_{interval}_{ts_column}");
-                }
-
-                let order_by = v.order_by;
-
-                MultiCachedQueryResponse {
-                    ts_column,
-                    is_descending,
-                    order_by,
-                    is_aggregate,
-                    limit: v.limit,
-                    file_path: file_path.clone(),
-                    cache_query_response: true,
-                    clear_cache: !is_http2_streaming,
-                    trace_id: trace_id.to_string(),
-                    ..Default::default()
-                }
-            }
-            Err(e) => {
-                log::error!("Error parsing sql: {:?}", e);
-                MultiCachedQueryResponse::default()
-            }
+    // get the modified original sql from req
+    let origin_sql = in_req.query.sql.clone();
+    let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or(true);
+    let (stream_name, all_streams) = match resolve_stream_names(&origin_sql) {
+        // result cache doesn't support multiple stream names
+        Ok(v) => (v[0].clone(), v.join(",")),
+        Err(e) => {
+            return Err(Error::Message(e.to_string()));
         }
     };
 
@@ -527,6 +472,123 @@ pub async fn search(
     }
 
     Ok(res)
+}
+
+#[tracing::instrument(name = "service:search:cacher:prepare_cache_response", skip_all)]
+pub async fn prepare_cache_response(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    req: &mut search::Request,
+    use_cache: bool,
+    is_http2_streaming: bool,
+    force_clear_cache: Option<bool>,
+) -> Result<(MultiCachedQueryResponse, bool), Error> {
+    let mut origin_sql = req.query.sql.clone();
+    let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or(true);
+    let stream_name = match resolve_stream_names(&origin_sql) {
+        // result cache doesn't support multiple stream names
+        Ok(v) => {
+            if v.is_empty() {
+                return Err(Error::Message("Stream name is empty".to_string()));
+            } else {
+                v[0].clone()
+            }
+        }
+        Err(e) => {
+            return Err(Error::Message(e.to_string()));
+        }
+    };
+
+    let mut query_fn = req
+        .query
+        .query_fn
+        .as_ref()
+        .map(|v| match base64::decode_url(v) {
+            Ok(v) => v,
+            Err(_) => v.to_string(),
+        });
+    let is_result_array_skip_vrl = query_fn
+        .as_ref()
+        .map(|v| is_result_array_skip_vrl(v))
+        .unwrap_or(false);
+    if is_result_array_skip_vrl {
+        query_fn = None;
+    }
+
+    let action = req
+        .query
+        .action_id
+        .as_ref()
+        .and_then(|v| svix_ksuid::Ksuid::from_str(v).ok());
+
+    // calculate hash for the query with version
+    let mut hash_body = vec![CACHE_VERSION.to_string(), origin_sql.to_string()];
+    if let Some(vrl_function) = &query_fn {
+        hash_body.push(vrl_function.to_string());
+    }
+    if let Some(action_id) = action {
+        hash_body.push(action_id.to_string());
+    }
+    if !req.regions.is_empty() {
+        hash_body.extend(req.regions.clone());
+    }
+    if !req.clusters.is_empty() {
+        hash_body.extend(req.clusters.clone());
+    }
+    let mut h = config::utils::hash::gxhash::new();
+    let hashed_query = h.sum64(&hash_body.join(","));
+
+    let mut should_exec_query = true;
+
+    let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
+    let resp = if use_cache {
+        // if cache is used, we need to check the cache
+        check_cache(
+            trace_id,
+            org_id,
+            stream_type,
+            req,
+            &mut origin_sql,
+            &mut file_path,
+            is_aggregate,
+            &mut should_exec_query,
+            is_http2_streaming, // TODO: check this again
+        )
+        .await
+    } else {
+        // if cache is not used, we need to parse the sql to get the ts column and is descending
+        let query: SearchQuery = req.query.clone().into();
+        match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
+            Ok(v) => {
+                let (ts_column, is_descending) =
+                    cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
+                        .unwrap_or_default();
+                if let Some(interval) = v.histogram_interval {
+                    file_path = format!("{file_path}_{interval}_{ts_column}");
+                }
+                let clear_cache = force_clear_cache.unwrap_or(!is_http2_streaming);
+
+                MultiCachedQueryResponse {
+                    ts_column,
+                    is_descending,
+                    order_by: v.order_by,
+                    is_aggregate,
+                    limit: v.limit,
+                    file_path: file_path.clone(),
+                    cache_query_response: true,
+                    clear_cache,
+                    trace_id: trace_id.to_string(),
+                    ..Default::default()
+                }
+            }
+            Err(e) => {
+                log::error!("Error parsing sql: {e}");
+                MultiCachedQueryResponse::default()
+            }
+        }
+    };
+    Ok((resp, should_exec_query))
 }
 
 // based on _timestamp of first record in config::meta::search::Response either add it in start
@@ -1146,99 +1208,6 @@ pub fn apply_vrl_to_response(
     local_res.hits
 }
 
-#[tracing::instrument(name = "service:search:cacher:check_cache_v2", skip_all)]
-pub async fn check_cache_v2(
-    trace_id: &str,
-    org_id: &str,
-    stream_type: StreamType,
-    in_req: &search::Request,
-    use_cache: bool,
-) -> Result<MultiCachedQueryResponse, Error> {
-    // Result caching check start
-    let mut origin_sql = in_req.query.sql.clone();
-    origin_sql = origin_sql.replace('\n', " ");
-    let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
-    let stream_name = match resolve_stream_names(&origin_sql) {
-        // TODO: cache don't not support multiple stream names
-        Ok(v) => v[0].clone(),
-        Err(e) => {
-            return Err(Error::Message(e.to_string()));
-        }
-    };
-
-    let mut req = in_req.clone();
-    let query_fn = req
-        .query
-        .query_fn
-        .as_ref()
-        .and_then(|v| base64::decode_url(v).ok());
-
-    // calculate hash for the query
-    let mut hash_body = vec![origin_sql.to_string()];
-    if let Some(vrl_function) = &query_fn {
-        hash_body.push(vrl_function.to_string());
-    }
-    if !req.regions.is_empty() {
-        hash_body.extend(req.regions.clone());
-    }
-    if !req.clusters.is_empty() {
-        hash_body.extend(req.clusters.clone());
-    }
-    let mut h = config::utils::hash::gxhash::new();
-    let hashed_query = h.sum64(&hash_body.join(","));
-
-    let mut should_exec_query = true;
-
-    let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
-    Ok(if use_cache {
-        let mut resp = check_cache(
-            trace_id,
-            org_id,
-            stream_type,
-            &mut req,
-            &mut origin_sql,
-            &mut file_path,
-            is_aggregate,
-            &mut should_exec_query,
-            true,
-        )
-        .await;
-        resp.is_aggregate = is_aggregate;
-        resp.trace_id = trace_id.to_string();
-        resp.file_path = file_path;
-        resp
-    } else {
-        let query = req.query.into();
-        match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
-            Ok(v) => {
-                let (ts_column, is_descending) =
-                    cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
-                        .unwrap_or_default();
-
-                if let Some(interval) = v.histogram_interval {
-                    file_path = format!("{file_path}_{interval}_{ts_column}");
-                }
-
-                MultiCachedQueryResponse {
-                    ts_column,
-                    is_descending,
-                    file_path: file_path.clone(),
-                    cache_query_response: true,
-                    limit: v.limit,
-                    is_aggregate,
-                    clear_cache: true,
-                    trace_id: trace_id.to_string(),
-                    ..Default::default()
-                }
-            }
-            Err(e) => {
-                log::error!("[trace_id {}]: Error parsing sql: {:?}", trace_id, e);
-                MultiCachedQueryResponse::default()
-            }
-        }
-    })
-}
-
 fn _convert_ts_value_to_datetime(ts_value: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
     match ts_value {
         // Handle the case where ts_value is a number (microseconds)
@@ -1273,4 +1242,18 @@ pub fn is_result_array_skip_vrl(vrl_fn: &str) -> bool {
 fn deep_copy_response(res: &config::meta::search::Response) -> config::meta::search::Response {
     let serialized = serde_json::to_string(res).expect("Failed to serialize response");
     serde_json::from_str(&serialized).expect("Failed to deserialize response")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_result_array_skip_vrl() {
+        let query_fn = "#ResultArray#SkipVRL#
+ .message_length = length!(.flag_url)
+ .test=25
+ .";
+        assert!(is_result_array_skip_vrl(query_fn));
+    }
 }
