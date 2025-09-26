@@ -48,6 +48,59 @@ const emit = defineEmits(["delete:node"]);
 const { pipelineObj, deletePipelineNode,onDragStart,onDrop, checkIfDefaultDestinationNode } = useDragAndDrop();
 const menu = ref(false)
 
+// Edge color mapping for different node types
+const getNodeColor = (ioType) => {
+  const colorMap = {
+    input: '#3b82f6',      // Blue
+    output: '#22c55e',     // Green  
+    default: '#f59e0b'     // Orange/Amber
+  };
+  return colorMap[ioType] || '#6b7280';
+};
+
+// Function to update edge colors on node hover
+const updateEdgeColors = (nodeId, color, reset = false) => {
+  if (pipelineObj.currentSelectedPipeline?.edges) {
+    pipelineObj.currentSelectedPipeline.edges.forEach(edge => {
+      if (edge.source === nodeId) {
+        if (reset) {
+          // Reset to default color
+          edge.style = { 
+            ...edge.style, 
+            stroke: '#6b7280', 
+            strokeWidth: 2 
+          };
+          edge.markerEnd = {
+            ...edge.markerEnd,
+            color: '#6b7280'
+          };
+        } else {
+          // Apply node color to both edge and arrow
+          edge.style = { 
+            ...edge.style, 
+            stroke: color, 
+            strokeWidth: 2 
+          };
+          edge.markerEnd = {
+            ...edge.markerEnd,
+            color: color
+          };
+        }
+      }
+    });
+  }
+};
+
+// Node hover handlers
+const handleNodeHover = (nodeId, ioType) => {
+  const color = getNodeColor(ioType);
+  updateEdgeColors(nodeId, color, false);
+};
+
+const handleNodeLeave = (nodeId) => {
+  updateEdgeColors(nodeId, null, true);
+};
+
 const hanldeMouseOver = () => {
   console.log("mouse over")
 }
@@ -220,6 +273,8 @@ function getIcon(data, ioType) {
         border: none;
         cursor: pointer;
       "
+      @mouseenter="handleNodeHover(id, io_type)"
+      @mouseleave="handleNodeLeave(id)"
     >
 
     <q-tooltip :style="{ maxWidth: '300px', whiteSpace: 'pre-wrap' }">
@@ -299,6 +354,8 @@ function getIcon(data, ioType) {
         padding: 5px 2px;
 
       "
+      @mouseenter="handleNodeHover(id, io_type)"
+      @mouseleave="handleNodeLeave(id)"
      >
   
 
@@ -372,6 +429,8 @@ function getIcon(data, ioType) {
         padding: 5px 2px;
 
       "
+      @mouseenter="handleNodeHover(id, io_type)"
+      @mouseleave="handleNodeLeave(id)"
      >
 
 
@@ -433,6 +492,8 @@ function getIcon(data, ioType) {
         padding: 5px 2px;
 
       "
+      @mouseenter="handleNodeHover(id, io_type)"
+      @mouseleave="handleNodeLeave(id)"
      >
     <q-tooltip :style="{ maxWidth: '300px', whiteSpace: 'pre-wrap' }">
   <div>
@@ -504,6 +565,8 @@ function getIcon(data, ioType) {
         border: none;
         cursor: pointer;
       "
+      @mouseenter="handleNodeHover(id, io_type)"
+      @mouseleave="handleNodeLeave(id)"
      >
 
       <div class="icon-container" style="display: flex; align-items: center">
