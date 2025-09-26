@@ -51,50 +51,6 @@ pub use file_downloader::{download_from_node, queue_download};
 pub use file_list_dump::FILE_LIST_SCHEMA;
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
-#[cfg(feature = "enterprise")]
-async fn get_license_check_lock() -> Result<bool, anyhow::Error> {
-    if !LOCAL_NODE.is_querier() {
-        return Ok(false);
-    }
-    use infra::dist_lock;
-    use o2_enterprise::enterprise::license::{LICENSE_CHECK_DB_KEY, LICENSE_CHECK_NATS_LOCK_KEY};
-
-    use crate::common::infra::cluster::get_node_by_uuid;
-
-    let db = infra::db::get_db().await;
-    let node = db.get(LICENSE_CHECK_DB_KEY).await.ok().unwrap_or_default();
-    let node = String::from_utf8_lossy(&node);
-    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
-        log::info!("[o2::ENT] License check is locked by node {node}");
-        return Ok(false); // other node is processing
-    }
-
-    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
-        let locker = infra::dist_lock::lock(LICENSE_CHECK_NATS_LOCK_KEY, 0).await?;
-        // check the working node again, maybe other node locked it first
-        let node = db.get(LICENSE_CHECK_DB_KEY).await.ok().unwrap_or_default();
-        let node = String::from_utf8_lossy(&node);
-        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
-        {
-            dist_lock::unlock(&locker).await?;
-            return Ok(false); // other node is processing
-        }
-        // set to current node
-        let ret = db
-            .put(
-                LICENSE_CHECK_DB_KEY,
-                LOCAL_NODE.uuid.clone().into(),
-                infra::db::NO_NEED_WATCH,
-                None,
-            )
-            .await;
-        dist_lock::unlock(&locker).await?;
-        log::info!("[o2::ENT] License check lock acquired");
-        ret?;
-    }
-    Ok(true)
-}
-
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
         r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
@@ -199,7 +155,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
         o2_enterprise::enterprise::license::start_license_check(
-            get_license_check_lock,
             crate::service::self_reporting::search::get_usage,
             LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role(),
         )
