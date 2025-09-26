@@ -328,15 +328,7 @@ function getIcon(data, ioType) {
             text-overflow: ellipsis;
           "
         >
-          {{ data.name }}
-        </div>
-        <div class="row">
-          <div style="text-transform: capitalize">
-            Run
-            {{
-              data.after_flatten ? "After Flattening" : "Before Flattening"
-            }}
-          </div>
+          {{ data.name }} - <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
         </div>
       </div>
       <div v-show="showButtons" class="node-action-buttons" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="clearTimeout(hideButtonsTimeout)" @mouseleave="hideButtonsTimeout = setTimeout(() => showButtons = false, 200)">
