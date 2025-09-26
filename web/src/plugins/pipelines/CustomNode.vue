@@ -48,6 +48,8 @@ const emit = defineEmits(["delete:node"]);
 const { pipelineObj, deletePipelineNode,onDragStart,onDrop, checkIfDefaultDestinationNode } = useDragAndDrop();
 const menu = ref(false)
 const showButtons = ref(false)
+const showEditTooltip = ref(false)
+const showDeleteTooltip = ref(false)
 let hideButtonsTimeout = null
 
 // Edge color mapping for different node types
@@ -346,16 +348,14 @@ function getIcon(data, ioType) {
           size="0.6em"
           @click="editNode(id)"
           class="node-action-btn edit-btn"
-        >
-          <q-tooltip
-            :delay="200"
-            anchor="top middle"
-            self="bottom middle"
-            class="bg-grey-8"
-          >
-            Edit Node
-          </q-tooltip>
-        </q-btn>
+          @mouseenter="showEditTooltip = true"
+          @mouseleave="showEditTooltip = false"
+        />
+        <div v-if="showEditTooltip" class="custom-tooltip edit-tooltip" :style="{ backgroundColor: getNodeColor(io_type) }" style="left: 15px;">
+          Edit Node
+          <div class="tooltip-arrow" :style="{ borderTopColor: getNodeColor(io_type) }"></div>
+        </div>
+        
         <q-btn
           flat
           round
@@ -364,16 +364,13 @@ function getIcon(data, ioType) {
           size="0.6em"
           @click="deleteNode(id)"
           class="node-action-btn delete-btn"
-        >
-          <q-tooltip
-            :delay="200"
-            anchor="top middle"
-            self="bottom middle"
-            class="bg-red-7"
-          >
-            Delete Node
-          </q-tooltip>
-        </q-btn>
+          @mouseenter="showDeleteTooltip = true"
+          @mouseleave="showDeleteTooltip = false"
+        />
+        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 41px;">
+          Delete Node
+          <div class="tooltip-arrow delete-arrow"></div>
+        </div>
       </div>
     </div>
 
@@ -442,16 +439,14 @@ function getIcon(data, ioType) {
           size="0.6em"
           @click="editNode(id)"
           class="node-action-btn edit-btn"
-        >
-          <q-tooltip
-            :delay="200"
-            anchor="top middle"
-            self="bottom middle"
-            class="bg-grey-8"
-          >
-            Edit Node
-          </q-tooltip>
-        </q-btn>
+          @mouseenter="showEditTooltip = true"
+          @mouseleave="showEditTooltip = false"
+        />
+        <div v-if="showEditTooltip" class="custom-tooltip edit-tooltip" :style="{ backgroundColor: getNodeColor(io_type) }" style="left: 15px;">
+          Edit Node
+          <div class="tooltip-arrow" :style="{ borderTopColor: getNodeColor(io_type) }"></div>
+        </div>
+        
         <q-btn
           flat
           round
@@ -460,16 +455,13 @@ function getIcon(data, ioType) {
           size="0.6em"
           @click="deleteNode(id)"
           class="node-action-btn delete-btn"
-        >
-          <q-tooltip
-            :delay="200"
-            anchor="top middle"
-            self="bottom middle"
-            class="bg-red-7"
-          >
-            Delete Node
-          </q-tooltip>
-        </q-btn>
+          @mouseenter="showDeleteTooltip = true"
+          @mouseleave="showDeleteTooltip = false"
+        />
+        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 41px;">
+          Delete Node
+          <div class="tooltip-arrow delete-arrow"></div>
+        </div>
       </div>
     </div>
     <div
@@ -524,16 +516,14 @@ function getIcon(data, ioType) {
           size="0.6em"
           @click="editNode(id)"
           class="node-action-btn edit-btn"
-        >
-          <q-tooltip
-            :delay="200"
-            anchor="top middle"
-            self="bottom middle"
-            class="bg-grey-8"
-          >
-            Edit Node
-          </q-tooltip>
-        </q-btn>
+          @mouseenter="showEditTooltip = true"
+          @mouseleave="showEditTooltip = false"
+        />
+        <div v-if="showEditTooltip" class="custom-tooltip edit-tooltip" :style="{ backgroundColor: getNodeColor(io_type) }" style="left: 15px;">
+          Edit Node
+          <div class="tooltip-arrow" :style="{ borderTopColor: getNodeColor(io_type) }"></div>
+        </div>
+        
         <q-btn
           flat
           round
@@ -542,16 +532,13 @@ function getIcon(data, ioType) {
           size="0.6em"
           @click="deleteNode(id)"
           class="node-action-btn delete-btn"
-        >
-          <q-tooltip
-            :delay="200"
-            anchor="top middle"
-            self="bottom middle"
-            class="bg-red-7"
-          >
-            Delete Node
-          </q-tooltip>
-        </q-btn>
+          @mouseenter="showDeleteTooltip = true"
+          @mouseleave="showDeleteTooltip = false"
+        />
+        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 41px;">
+          Delete Node
+          <div class="tooltip-arrow delete-arrow"></div>
+        </div>
       </div>
     </div>
 
@@ -618,16 +605,14 @@ function getIcon(data, ioType) {
           size="0.6em"
           @click="editNode(id)"
           class="node-action-btn edit-btn"
-        >
-          <q-tooltip
-            :delay="200"
-            anchor="top middle"
-            self="bottom middle"
-            class="bg-grey-8"
-          >
-            Edit Node
-          </q-tooltip>
-        </q-btn>
+          @mouseenter="showEditTooltip = true"
+          @mouseleave="showEditTooltip = false"
+        />
+        <div v-if="showEditTooltip" class="custom-tooltip edit-tooltip" :style="{ backgroundColor: getNodeColor(io_type) }" style="left: 15px;">
+          Edit Node
+          <div class="tooltip-arrow" :style="{ borderTopColor: getNodeColor(io_type) }"></div>
+        </div>
+        
         <q-btn
           flat
           round
@@ -636,16 +621,13 @@ function getIcon(data, ioType) {
           size="0.6em"
           @click="deleteNode(id)"
           class="node-action-btn delete-btn"
-        >
-          <q-tooltip
-            :delay="200"
-            anchor="top middle"
-            self="bottom middle"
-            class="bg-red-7"
-          >
-            Delete Node
-          </q-tooltip>
-        </q-btn>
+          @mouseenter="showDeleteTooltip = true"
+          @mouseleave="showDeleteTooltip = false"
+        />
+        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 41px;">
+          Delete Node
+          <div class="tooltip-arrow delete-arrow"></div>
+        </div>
       </div>
     </div>
 
@@ -700,16 +682,14 @@ function getIcon(data, ioType) {
           size="0.6em"
           @click="editNode(id)"
           class="node-action-btn edit-btn"
-        >
-          <q-tooltip
-            :delay="200"
-            anchor="top middle"
-            self="bottom middle"
-            class="bg-grey-8"
-          >
-            Edit Node
-          </q-tooltip>
-        </q-btn>
+          @mouseenter="showEditTooltip = true"
+          @mouseleave="showEditTooltip = false"
+        />
+        <div v-if="showEditTooltip" class="custom-tooltip edit-tooltip" :style="{ backgroundColor: getNodeColor(io_type) }" style="left: 15px;">
+          Edit Node
+          <div class="tooltip-arrow" :style="{ borderTopColor: getNodeColor(io_type) }"></div>
+        </div>
+        
         <q-btn
           flat
           round
@@ -718,16 +698,13 @@ function getIcon(data, ioType) {
           size="0.6em"
           @click="deleteNode(id)"
           class="node-action-btn delete-btn"
-        >
-          <q-tooltip
-            :delay="200"
-            anchor="top middle"
-            self="bottom middle"
-            class="bg-red-7"
-          >
-            Delete Node
-          </q-tooltip>
-        </q-btn>
+          @mouseenter="showDeleteTooltip = true"
+          @mouseleave="showDeleteTooltip = false"
+        />
+        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 41px;">
+          Delete Node
+          <div class="tooltip-arrow delete-arrow"></div>
+        </div>
       </div>
     </div>
     <Handle
@@ -874,6 +851,47 @@ function getIcon(data, ioType) {
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3) !important;
   background: #ef4444 !important;
   border-color: #ef4444 !important;
+}
+
+// Custom tooltips with arrow pointers
+.custom-tooltip {
+  position: absolute;
+  top: -35px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #dc2626;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+  z-index: 20;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+
+.edit-tooltip {
+  color: white;
+}
+
+.delete-tooltip {
+  background: #dc2626;
+}
+
+.tooltip-arrow {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid;
+}
+
+.delete-arrow {
+  border-top-color: #dc2626;
 }
 
 </style>
