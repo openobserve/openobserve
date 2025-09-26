@@ -47,6 +47,8 @@ const props = defineProps({
 const emit = defineEmits(["delete:node"]);
 const { pipelineObj, deletePipelineNode,onDragStart,onDrop, checkIfDefaultDestinationNode } = useDragAndDrop();
 const menu = ref(false)
+const showButtons = ref(false)
+let hideButtonsTimeout = null
 
 // Edge color mapping for different node types
 const getNodeColor = (ioType) => {
@@ -95,10 +97,23 @@ const updateEdgeColors = (nodeId, color, reset = false) => {
 const handleNodeHover = (nodeId, ioType) => {
   const color = getNodeColor(ioType);
   updateEdgeColors(nodeId, color, false);
+  
+  // Clear any existing timeout
+  if (hideButtonsTimeout) {
+    clearTimeout(hideButtonsTimeout);
+    hideButtonsTimeout = null;
+  }
+  
+  showButtons.value = true;
 };
 
 const handleNodeLeave = (nodeId) => {
   updateEdgeColors(nodeId, null, true);
+  
+  // Add delay before hiding buttons
+  hideButtonsTimeout = setTimeout(() => {
+    showButtons.value = false;
+  }, 200);
 };
 
 const hanldeMouseOver = () => {
@@ -322,23 +337,43 @@ function getIcon(data, ioType) {
           </div>
         </div>
       </div>
-      <div class="float-right tw-pl-2">
+      <div v-show="showButtons" class="node-action-buttons" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="clearTimeout(hideButtonsTimeout)" @mouseleave="hideButtonsTimeout = setTimeout(() => showButtons = false, 200)">
         <q-btn
           flat
           round
           dense
           icon="edit"
-          size="0.8em"
+          size="0.6em"
           @click="editNode(id)"
-        />
+          class="node-action-btn edit-btn"
+        >
+          <q-tooltip
+            :delay="200"
+            anchor="top middle"
+            self="bottom middle"
+            class="bg-grey-8"
+          >
+            Edit Node
+          </q-tooltip>
+        </q-btn>
         <q-btn
           flat
           round
           dense
           icon="delete"
-          size="0.8em"
+          size="0.6em"
           @click="deleteNode(id)"
-        />
+          class="node-action-btn delete-btn"
+        >
+          <q-tooltip
+            :delay="200"
+            anchor="top middle"
+            self="bottom middle"
+            class="bg-red-7"
+          >
+            Delete Node
+          </q-tooltip>
+        </q-btn>
       </div>
     </div>
 
@@ -398,23 +433,43 @@ function getIcon(data, ioType) {
           {{ data.stream_type }} - {{    data.stream_name }}
         </div>
       </div>
-      <div class="float-right tw-pl-2">
+      <div v-show="showButtons" class="node-action-buttons" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="clearTimeout(hideButtonsTimeout)" @mouseleave="hideButtonsTimeout = setTimeout(() => showButtons = false, 200)">
         <q-btn
           flat
           round
           dense
           icon="edit"
-          size="0.8em"
+          size="0.6em"
           @click="editNode(id)"
-        />
+          class="node-action-btn edit-btn"
+        >
+          <q-tooltip
+            :delay="200"
+            anchor="top middle"
+            self="bottom middle"
+            class="bg-grey-8"
+          >
+            Edit Node
+          </q-tooltip>
+        </q-btn>
         <q-btn
           flat
           round
           dense
           icon="delete"
-          size="0.8em"
+          size="0.6em"
           @click="deleteNode(id)"
-        />
+          class="node-action-btn delete-btn"
+        >
+          <q-tooltip
+            :delay="200"
+            anchor="top middle"
+            self="bottom middle"
+            class="bg-red-7"
+          >
+            Delete Node
+          </q-tooltip>
+        </q-btn>
       </div>
     </div>
     <div
@@ -460,23 +515,43 @@ function getIcon(data, ioType) {
           {{ data.destination_name }}
         </div>
       </div>
-      <div class="float-right tw-pl-2">
+      <div v-show="showButtons" class="node-action-buttons" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="clearTimeout(hideButtonsTimeout)" @mouseleave="hideButtonsTimeout = setTimeout(() => showButtons = false, 200)">
         <q-btn
           flat
           round
           dense
           icon="edit"
-          size="0.8em"
+          size="0.6em"
           @click="editNode(id)"
-        />
+          class="node-action-btn edit-btn"
+        >
+          <q-tooltip
+            :delay="200"
+            anchor="top middle"
+            self="bottom middle"
+            class="bg-grey-8"
+          >
+            Edit Node
+          </q-tooltip>
+        </q-btn>
         <q-btn
           flat
           round
           dense
           icon="delete"
-          size="0.8em"
+          size="0.6em"
           @click="deleteNode(id)"
-        />
+          class="node-action-btn delete-btn"
+        >
+          <q-tooltip
+            :delay="200"
+            anchor="top middle"
+            self="bottom middle"
+            class="bg-red-7"
+          >
+            Delete Node
+          </q-tooltip>
+        </q-btn>
       </div>
     </div>
 
@@ -534,24 +609,43 @@ function getIcon(data, ioType) {
         </div>
       </div>
 
-      <div class="float-right">
+      <div v-show="showButtons" class="node-action-buttons" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="clearTimeout(hideButtonsTimeout)" @mouseleave="hideButtonsTimeout = setTimeout(() => showButtons = false, 200)">
         <q-btn
           flat
           round
           dense
           icon="edit"
-          size="0.8em"
+          size="0.6em"
           @click="editNode(id)"
-          style="margin-right: 5px"
-        />
+          class="node-action-btn edit-btn"
+        >
+          <q-tooltip
+            :delay="200"
+            anchor="top middle"
+            self="bottom middle"
+            class="bg-grey-8"
+          >
+            Edit Node
+          </q-tooltip>
+        </q-btn>
         <q-btn
           flat
           round
           dense
           icon="delete"
-          size="0.8em"
+          size="0.6em"
           @click="deleteNode(id)"
-        />
+          class="node-action-btn delete-btn"
+        >
+          <q-tooltip
+            :delay="200"
+            anchor="top middle"
+            self="bottom middle"
+            class="bg-red-7"
+          >
+            Delete Node
+          </q-tooltip>
+        </q-btn>
       </div>
     </div>
 
@@ -597,24 +691,43 @@ function getIcon(data, ioType) {
   </div>
       </div>
 
-      <div class="float-right">
+      <div v-show="showButtons" class="node-action-buttons" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="clearTimeout(hideButtonsTimeout)" @mouseleave="hideButtonsTimeout = setTimeout(() => showButtons = false, 200)">
         <q-btn
           flat
           round
           dense
           icon="edit"
-          size="0.8em"
+          size="0.6em"
           @click="editNode(id)"
-          style="margin-right: 5px"
-        />
+          class="node-action-btn edit-btn"
+        >
+          <q-tooltip
+            :delay="200"
+            anchor="top middle"
+            self="bottom middle"
+            class="bg-grey-8"
+          >
+            Edit Node
+          </q-tooltip>
+        </q-btn>
         <q-btn
           flat
           round
           dense
           icon="delete"
-          size="0.8em"
+          size="0.6em"
           @click="deleteNode(id)"
-        />
+          class="node-action-btn delete-btn"
+        >
+          <q-tooltip
+            :delay="200"
+            anchor="top middle"
+            self="bottom middle"
+            class="bg-red-7"
+          >
+            Delete Node
+          </q-tooltip>
+        </q-btn>
       </div>
     </div>
     <Handle
@@ -717,6 +830,50 @@ function getIcon(data, ioType) {
 .menu-list{
   margin: 0px 10px;
   background-color: white;
+}
+
+// Node action buttons - hover to show with matching colors
+.node-action-buttons {
+  position: absolute;
+  top: -30px;
+  right: 0px;
+  display: flex;
+  gap: 6px;
+  transition: all 0.3s ease;
+  z-index: 10;
+  padding: 5px 5px 10px 5px;
+}
+
+.node-action-btn {
+  min-width: 20px !important;
+  width: 20px !important;
+  height: 20px !important;
+  padding: 0 !important;
+  border-radius: 4px !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid var(--node-color) !important;
+  color: var(--node-color) !important;
+  transition: all 0.2s ease !important;
+  
+  .q-icon {
+    font-size: 1.3em !important;
+  }
+  
+  &:hover {
+    background: var(--node-color) !important;
+    color: white !important;
+    transform: scale(1.1) !important;
+  }
+}
+
+.edit-btn:hover {
+  box-shadow: 0 2px 8px rgba(var(--node-color), 0.3) !important;
+}
+
+.delete-btn:hover {
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3) !important;
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
 }
 
 </style>
