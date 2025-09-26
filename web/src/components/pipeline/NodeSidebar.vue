@@ -87,7 +87,7 @@ export default {
 
 <style lang="scss" scoped>
 .nodes {
-  background: rgba(248, 250, 252, 0.95);
+  background: rgba(226, 232, 240, 0.9);
   backdrop-filter: blur(12px);
   border-radius: 12px;
   border: 1px solid rgba(226, 232, 240, 0.8);
@@ -206,7 +206,7 @@ export default {
 .o2vf_node_output {
   border: 1px solid rgba(74, 222, 128, 0.4);
   border-left: 4px solid #22c55e;
-  color: #166534;
+  color: #181a1b;
   border-radius: 8px;
   background: rgba(240, 253, 244, 0.9);
   box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
@@ -286,23 +286,25 @@ export default {
 
   .q-btn.o2vf_node_default,
   .q-btn.node-draggable.o2vf_node_default,
-  .o2vf_node_default {
-    background: rgba(45, 55, 72, 0.9) !important;
+  .q-btn.o2vf_node_default.q-btn--flat,
+  .o2vf_node_default,
+  .node-draggable.o2vf_node_default {
+    background: rgba(120, 53, 15, 0.2) !important;
     border: 1px solid rgba(251, 146, 60, 0.3) !important;
     border-left: 4px solid #f59e0b !important;
     color: rgba(255, 255, 255, 0.9) !important;
 
     &:hover {
-      background: rgba(45, 55, 72, 1) !important;
+      background: rgba(120, 53, 15, 0.3) !important;
       border-color: rgba(251, 146, 60, 0.5) !important;
       box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2) !important;
     }
 
     &.q-btn--flat {
-      background: rgba(45, 55, 72, 0.9) !important;
+      background: rgba(120, 53, 15, 0.2) !important;
 
       &:hover {
-        background: rgba(45, 55, 72, 1) !important;
+        background: rgba(120, 53, 15, 0.3) !important;
       }
     }
   }
