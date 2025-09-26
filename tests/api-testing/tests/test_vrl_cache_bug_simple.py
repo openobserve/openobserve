@@ -121,12 +121,19 @@ def test_vrl_cache_bug_simple(create_session, base_url):
     
     session = create_session
     
-    # Use older time range to avoid mixing with freshly ingested data from current test run
-    end_time = datetime.now(timezone.utc) - timedelta(hours=2)  # 2 hours ago
-    start_time = end_time - timedelta(hours=1)  # 1 hour window, 2-3 hours ago
+    # Use dynamic time range that includes freshly ingested data
+    # conftest.py ingests data at test startup, so create a window that captures it
+    current_time = datetime.now(timezone.utc)
+    
+    # Create a wide window that includes data ingested during test session
+    end_time = current_time + timedelta(minutes=5)  # Slight future buffer
+    start_time = current_time - timedelta(hours=2)  # 2 hours back to capture ingested data
     
     start_time_us = int(start_time.timestamp() * 1000000)
     end_time_us = int(end_time.timestamp() * 1000000)
+    
+    logger.info(f"🕒 Dynamic time range: {start_time.strftime('%H:%M:%S')} to {end_time.strftime('%H:%M:%S')} UTC")
+    logger.info(f"📅 Date: {current_time.strftime('%Y-%m-%d')} (Window: {(end_time-start_time).total_seconds()/3600:.1f} hours)")
     
     # Go back to stream_pytest_data which had data before
     sql = '''
