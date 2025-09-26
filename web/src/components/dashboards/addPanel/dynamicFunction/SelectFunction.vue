@@ -56,12 +56,12 @@
                     argIndex === fields.args.length - 1
                       ? 'calc(100% - 32px)'
                       : '0',
-                  left: '0.5px',
+                  left: '0px',
                 }"
               ></div>
 
               <!-- SubTask Arrow -->
-              <div class="tw-absolute" :style="{ top: '28px', right: '-11px' }">
+              <div class="tw-absolute" style="top: 30px; left: -1px;">
                 <SubTaskArrow />
               </div>
             </div>
