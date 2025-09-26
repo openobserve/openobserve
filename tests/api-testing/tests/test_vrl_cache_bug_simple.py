@@ -116,29 +116,70 @@ def execute_query_with_vrl(
     
     return result
 
+def ingest_vrl_test_data(session, base_url, org_id="default"):
+    """Ingest cache test data specifically for VRL testing."""
+    import os
+    
+    # Set the environment variable for this test only
+    original_value = os.environ.get('ZO_INGEST_ALLOWED_UPTO')
+    os.environ['ZO_INGEST_ALLOWED_UPTO'] = '24'
+    
+    try:
+        # Use cache_test_data.json for VRL testing
+        root_dir = Path(__file__).parent.parent.parent
+        with open(root_dir / "test-data/cache_test_data.json") as f:
+            data = f.read()
+        
+        stream_name = "vrl_cache_test"
+        url = f"{base_url}api/{org_id}/{stream_name}/_json"
+        
+        logger.info(f"🔄 Ingesting VRL test data into stream: {stream_name}")
+        resp = session.post(url, data=data, headers={"Content-Type": "application/json"})
+        logger.info(f"📊 Data ingestion status: {resp.status_code}")
+        
+        if resp.status_code != 200:
+            logger.error(f"❌ Data ingestion failed: {resp.content}")
+        
+        return resp.status_code == 200, stream_name
+        
+    finally:
+        # Restore original value
+        if original_value is None:
+            os.environ.pop('ZO_INGEST_ALLOWED_UPTO', None)
+        else:
+            os.environ['ZO_INGEST_ALLOWED_UPTO'] = original_value
+
 def test_vrl_cache_bug_simple(create_session, base_url):
     """Simple VRL cache bug detection: Test 1 VRL vs Test 2 different VRL same range."""
     
     session = create_session
     
-    # Use dynamic time range that includes freshly ingested data
-    # conftest.py ingests data at test startup, so create a window that captures it
+    # Ingest our own test data
+    success, stream_name = ingest_vrl_test_data(session, base_url)
+    if not success:
+        pytest.skip("Failed to ingest VRL test data")
+    
+    # Wait for data to be indexed
+    logger.info("⏳ Waiting 3 seconds for data indexing...")
+    time.sleep(3)
+    
+    # Use dynamic time range that includes the data we just ingested
     current_time = datetime.now(timezone.utc)
     
-    # Create a wide window that includes data ingested during test session
-    end_time = current_time + timedelta(minutes=5)  # Slight future buffer
-    start_time = current_time - timedelta(hours=2)  # 2 hours back to capture ingested data
+    # Create a window that captures freshly ingested data
+    end_time = current_time + timedelta(minutes=1)  # Small future buffer
+    start_time = current_time - timedelta(minutes=30)  # 30 minutes back
     
     start_time_us = int(start_time.timestamp() * 1000000)
     end_time_us = int(end_time.timestamp() * 1000000)
     
     logger.info(f"🕒 Dynamic time range: {start_time.strftime('%H:%M:%S')} to {end_time.strftime('%H:%M:%S')} UTC")
-    logger.info(f"📅 Date: {current_time.strftime('%Y-%m-%d')} (Window: {(end_time-start_time).total_seconds()/3600:.1f} hours)")
+    logger.info(f"📅 Date: {current_time.strftime('%Y-%m-%d')} (Window: {(end_time-start_time).total_seconds()/60:.1f} minutes)")
     
-    # Go back to stream_pytest_data which had data before
-    sql = '''
+    # Use our dedicated VRL test stream
+    sql = f'''
         SELECT *
-        FROM "stream_pytest_data"
+        FROM "{stream_name}"
         ORDER BY _timestamp DESC
         LIMIT 50
     '''
