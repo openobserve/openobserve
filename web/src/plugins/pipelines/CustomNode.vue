@@ -51,6 +51,7 @@ const showButtons = ref(false)
 const showEditTooltip = ref(false)
 const showDeleteTooltip = ref(false)
 const showFunctionDialog = ref(false)
+const showConditionDialog = ref(false)
 let hideButtonsTimeout = null
 
 // Edge color mapping for different node types
@@ -125,6 +126,14 @@ const handleFunctionHover = () => {
 
 const closeFunctionDialog = () => {
   showFunctionDialog.value = false;
+}
+
+const handleConditionHover = () => {
+  showConditionDialog.value = true;
+}
+
+const closeConditionDialog = () => {
+  showConditionDialog.value = false;
 }
 
 
@@ -632,6 +641,7 @@ function getIcon(data, ioType) {
       "
       @mouseenter="handleNodeHover(id, io_type)"
       @mouseleave="handleNodeLeave(id)"
+      @click="handleConditionHover()"
      >
 
       <div class="icon-container" style="display: flex; align-items: center">
@@ -754,6 +764,51 @@ function getIcon(data, ioType) {
             <strong class="text-subtitle1">Function Definition:</strong>
             <div class="function-definition">
               <pre class="function-code">{{ functionInfo(data)?.function || 'No definition available' }}</pre>
+            </div>
+          </div>
+        </div>
+      </q-card-section>
+    </q-card>
+  </q-dialog>
+
+  <!-- Condition Details Side Panel Dialog -->
+  <q-dialog 
+    v-model="showConditionDialog" 
+    position="right" 
+    maximized
+    class="condition-details-dialog q-pa-none q-ma-none"
+  >
+    <q-card class="card" style="width: 400px; max-width: none;">
+      <q-card-section class="row items-center q-pb-none tw-flex tw-items-center tw-my-2">
+        <div class="text-h6">Condition Details</div>
+        <q-space />
+        <q-btn 
+          icon="cancel" 
+          flat 
+          round 
+          dense 
+          v-close-popup
+          @click="closeConditionDialog"
+        />
+      </q-card-section>
+      
+      <q-separator />
+      
+      <q-card-section class="q-pt-md">
+        <div class="condition-info">
+          <div class="conditions-list-section">
+            <strong class="text-subtitle1">Conditions:</strong>
+            <div class="conditions-container">
+              <div v-for="(condition, index) in data.conditions" :key="condition.id" class="condition-item">
+                <div class="condition-row">
+                  <div class="condition-field">{{ condition.column }}</div>
+                  <div class="condition-operator">{{ condition.operator }}</div>
+                  <div class="condition-value">{{ condition.value }}</div>
+                </div>
+                <div v-if="index < data.conditions.length - 1" class="and-operator">
+                  <div class="and-text">AND</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -944,6 +999,13 @@ function getIcon(data, ioType) {
   }
 }
 
+// Condition Details Dialog Styles
+.condition-details-dialog {
+  .q-dialog__inner {
+    padding: 0;
+  }
+}
+
 .function-details-card {
   border-radius: 0;
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
@@ -1040,6 +1102,120 @@ function getIcon(data, ioType) {
   .function-definition-section .text-subtitle1,
   .function-name-section .text-subtitle1,
   .function-timing-section .text-subtitle1 {
+    color: #64b5f6;
+  }
+}
+
+// Condition Details Styles
+.condition-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.conditions-list-section {
+  .text-subtitle1 {
+    color: #1976d2;
+    margin-bottom: 12px;
+    display: block;
+  }
+}
+
+.conditions-container {
+  background-color: #f5f5f5;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  padding: 16px;
+}
+
+.condition-item {
+  margin-bottom: 12px;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.condition-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background-color: #ffffff;
+  border-radius: 4px;
+  border-left: 4px solid #1976d2;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.condition-field {
+  font-weight: 600;
+  color: #1976d2;
+  min-width: 80px;
+}
+
+.condition-operator {
+  font-weight: 500;
+  color: #666;
+  background-color: #e3f2fd;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.condition-value {
+  font-weight: 500;
+  color: #333;
+  background-color: #f0f0f0;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+}
+
+.and-operator {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0;
+}
+
+.and-text {
+  background-color: #28a745;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 12px;
+  text-align: center;
+  min-width: 40px;
+}
+
+// Dark mode support for conditions
+.body--dark {
+  .conditions-container {
+    background-color: #2d2d2d;
+    border-color: #444;
+  }
+  
+  .condition-row {
+    background-color: #3a3a3a;
+    border-left-color: #64b5f6;
+  }
+  
+  .condition-field {
+    color: #64b5f6;
+  }
+  
+  .condition-operator {
+    background-color: #1e3a8a;
+    color: #bfdbfe;
+  }
+  
+  .condition-value {
+    background-color: #4a4a4a;
+    color: #ffffff;
+  }
+  
+  .conditions-list-section .text-subtitle1 {
     color: #64b5f6;
   }
 }
