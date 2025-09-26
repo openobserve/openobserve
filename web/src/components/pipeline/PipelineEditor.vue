@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="pipeline-json-edit-btn"
           @click="openJsonEditor"
         >
-              <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
+              <q-tooltip>Edit Pipeline Json</q-tooltip>
             </q-btn>
       <q-btn
         data-test="add-pipeline-cancel-btn"
@@ -1115,7 +1115,7 @@ const savePipelineJson = async (json: string) => {
 }
 
 .pipeline-chart-container {
-  height: 84vh;
+  height: 82.6vh;
   border-radius: 12px;
   width: calc(100% - 200px);
 }
