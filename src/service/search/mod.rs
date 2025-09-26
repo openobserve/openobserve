@@ -474,12 +474,9 @@ pub async fn search_multi(
     let mut report_function_usage = false;
     multi_res.hits = if query_fn.is_some() && !multi_res.hits.is_empty() && !multi_res.is_partial {
         // compile vrl function & apply the same before returning the response
-        let mut input_fn = query_fn.unwrap().trim().to_string();
+        let input_fn = query_fn.unwrap().trim().to_string();
 
         let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
-        if apply_over_hits {
-            input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
-        }
         let mut runtime = init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
             Ok(program) => {

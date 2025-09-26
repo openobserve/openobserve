@@ -1359,6 +1359,16 @@ async fn process_delta(
             search_res.hits = top_k_values;
         }
 
+        if is_result_array_skip_vrl {
+            search_res.hits = crate::service::search::cache::apply_vrl_to_response(
+                backup_query_fn.clone(),
+                &mut search_res,
+                org_id,
+                stream_name,
+                &trace_id,
+            );
+        }
+
         let response = StreamResponses::SearchResponse {
             results: search_res.clone(),
             streaming_aggs: is_streaming_aggs,

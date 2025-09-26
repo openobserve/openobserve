@@ -1250,10 +1250,13 @@ mod tests {
 
     #[test]
     fn test_is_result_array_skip_vrl() {
-        let query_fn = "#ResultArray#SkipVRL#
- .message_length = length!(.flag_url)
- .test=25
- .";
+        let query_fn = r#"#ResultArray#SkipVRL#
+        arr1_final = []
+        for_each(array!(.)) -> |index, value| {
+            value.arr = {"a": 4}
+            arr1_final = push(arr1_final,value)
+        }
+        . = arr1_final"#;
         assert!(is_result_array_skip_vrl(query_fn));
     }
 }
