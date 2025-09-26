@@ -1,35 +1,13 @@
 <template>
   <BaseEdge
     :id="id"
-    :style="style"
+    :style="{ ...style, cursor: 'pointer' }"
     :path="path[0]"
     :marker-end="markerEnd"
     type="smoothstep"
   />
-  <EdgeLabelRenderer v-if="!isInView">
-    <div
-      :style="{
-        position: 'absolute',
-        top: `${midY}px`,
-        left: `${midX}px`,
-        transform: 'translate(-50%, -50%)',
-        pointerEvents: 'auto', /* Ensure the button receives events */
-        zIndex: 10, /* Bring it to the front */
-      }"
-    >
-      <button
-        @click="handleClick"
-        class="remove-edge-button"
-        aria-label="Remove edge"
-      >
-      <q-icon name="close"
-      flat
-      dense
-      size="12px"
-      class="red-btn"
-       />
-      </button>
-    </div>
+  <EdgeLabelRenderer>
+    <!-- Delete button removed - use keyboard delete instead -->
   </EdgeLabelRenderer>
 </template>
 
@@ -87,19 +65,14 @@ const props = defineProps({
 })
 const midX = computed(() => (props.sourceX + props.targetX) / 2)
 const midY = computed(() => (props.sourceY + props.targetY) / 2)
-const { removeEdges } = useVueFlow()
-
-
-onMounted(() => {
- 
-})
-
+const { removeEdges, getSelectedEdges, addSelectedEdges, removeSelectedEdges } = useVueFlow()
 
 const path = computed(() => getBezierPath(props))
-function handleClick(event) {
-  event.stopPropagation() // Prevent edge selection
-  removeEdges(props.id)
-}
+
+let clickTimeout = null
+
+// Edge click handling moved to PipelineFlow.vue using VueFlow events
+// These handlers are no longer used but kept for backwards compatibility
 </script>
 
 <script>
@@ -110,18 +83,7 @@ export default {
 
 
 <style scoped>
-.remove-edge-button {
-  background: red;
-  color: white;
-  border: none;
-  border-radius: 100%;
-  cursor: pointer;
-  padding: 0px 6px !important;
-}
-.red-btn{
-  padding: 0px !important;
-  bottom: 1px;
-}
+/* Edge delete button styles removed - using keyboard deletion instead */
 </style>
 
 
