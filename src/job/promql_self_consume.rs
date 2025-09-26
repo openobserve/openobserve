@@ -104,7 +104,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             .gather()
             .into_iter()
             .filter(|mf| {
-                let name = mf.get_name();
+                let name = mf.name();
                 METRICS_WHITELIST.contains(name)
             })
             .collect();

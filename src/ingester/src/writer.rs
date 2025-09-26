@@ -65,7 +65,7 @@ pub struct Writer {
 // check total memtable size
 pub fn check_memtable_size() -> Result<()> {
     let cur_mem = metrics::INGEST_MEMTABLE_ARROW_BYTES
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .get();
     if cur_mem >= get_config().limit.mem_table_max_size as i64 {
         Err(Error::MemoryTableOverflowError {})
@@ -80,7 +80,9 @@ pub fn check_memory_circuit_breaker() -> Result<()> {
     if !cfg.common.memory_circuit_breaker_enabled || cfg.common.memory_circuit_breaker_ratio == 0 {
         return Ok(());
     }
-    let cur_mem = metrics::NODE_MEMORY_USAGE.with_label_values(&[]).get() as usize;
+    let cur_mem = metrics::NODE_MEMORY_USAGE
+        .with_label_values::<&str>(&[])
+        .get() as usize;
     if cur_mem > cfg.limit.mem_total / 100 * cfg.common.memory_circuit_breaker_ratio {
         Err(Error::MemoryCircuitBreakerError {})
     } else {
@@ -210,7 +212,9 @@ pub async fn flush_all() -> Result<()> {
         for key in keys {
             if let Some(r) = w.remove(&key) {
                 r.flush().await?; // close writer
-                metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
+                metrics::INGEST_MEMTABLE_FILES
+                    .with_label_values::<&str>(&[])
+                    .dec();
             }
         }
     }

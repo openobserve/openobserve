@@ -61,10 +61,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn load_query_cache_limit_bytes() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     metrics::QUERY_MEMORY_CACHE_LIMIT_BYTES
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(cfg.memory_cache.max_size as i64);
     metrics::QUERY_DISK_CACHE_LIMIT_BYTES
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set((cfg.disk_cache.max_size * cfg.disk_cache.bucket_num) as i64);
     Ok(())
 }
@@ -117,10 +117,10 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     let db = get_db().await;
     let stats = db.stats().await?;
     metrics::META_STORAGE_BYTES
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(stats.bytes_len);
     metrics::META_STORAGE_KEYS
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(stats.keys_count);
 
     if get_config().common.local_mode {
@@ -162,14 +162,14 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     let stream_types = [StreamType::Logs, StreamType::Metrics, StreamType::Traces];
     let orgs = db::schema::list_organizations_from_cache().await;
     metrics::META_NUM_ORGANIZATIONS
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(orgs.len() as i64);
     for org_id in &orgs {
         for stream_type in stream_types {
             let streams = db::schema::list_streams_from_cache(org_id, stream_type).await;
             if !streams.is_empty() {
                 metrics::META_NUM_STREAMS
-                    .with_label_values(&[org_id.as_str(), stream_type.as_str()])
+                    .with_label_values::<&str>(&[org_id.as_str(), stream_type.as_str()])
                     .set(streams.len() as i64);
             }
         }
@@ -179,7 +179,7 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     let users = USERS.len();
 
     metrics::META_NUM_USERS_TOTAL
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(users as i64);
     for org_id in &orgs {
         let mut count: i64 = 0;
@@ -274,10 +274,10 @@ async fn update_parquet_metadata_cache_metrics() -> Result<(), anyhow::Error> {
     let mem_size = crate::service::search::datafusion::storage::file_statistics_cache::GLOBAL_CACHE
         .memory_size();
     metrics::QUERY_PARQUET_METADATA_CACHE_FILES
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(file_num as i64);
     metrics::QUERY_PARQUET_METADATA_CACHE_USED_BYTES
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .set(mem_size as i64);
     Ok(())
 }

@@ -100,13 +100,13 @@ impl Partition {
             std::cmp::Ordering::Greater => {
                 let diff = new_schema_size - old_schema_size;
                 metrics::INGEST_MEMTABLE_ARROW_BYTES
-                    .with_label_values(&[])
+                    .with_label_values::<&str>(&[])
                     .add(diff as i64);
             }
             std::cmp::Ordering::Less => {
                 let diff = old_schema_size - new_schema_size;
                 metrics::INGEST_MEMTABLE_ARROW_BYTES
-                    .with_label_values(&[])
+                    .with_label_values::<&str>(&[])
                     .sub(diff as i64);
             }
             std::cmp::Ordering::Equal => {}
@@ -295,10 +295,10 @@ impl PartitionFile {
         let arrow_size = batch.data_arrow_size;
         self.data.push(batch);
         metrics::INGEST_MEMTABLE_ARROW_BYTES
-            .with_label_values(&[])
+            .with_label_values::<&str>(&[])
             .add(arrow_size as i64);
         metrics::INGEST_MEMTABLE_BYTES
-            .with_label_values(&[])
+            .with_label_values::<&str>(&[])
             .add(json_size as i64);
         Ok(arrow_size)
     }

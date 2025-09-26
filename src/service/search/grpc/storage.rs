@@ -262,10 +262,10 @@ pub async fn search(
 
     // report cache hit and miss metrics
     metrics::QUERY_DISK_CACHE_HIT_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "parquet"])
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "parquet"])
         .inc_by(cache_hits);
     metrics::QUERY_DISK_CACHE_MISS_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "parquet"])
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "parquet"])
         .inc_by(cache_misses);
 
     scan_stats.idx_took = idx_took as i64;
@@ -559,10 +559,10 @@ pub async fn tantivy_search(
 
     // report cache hit and miss metrics
     metrics::QUERY_DISK_CACHE_HIT_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "index"])
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "index"])
         .inc_by(cache_hits);
     metrics::QUERY_DISK_CACHE_MISS_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "index"])
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "index"])
         .inc_by(cache_misses);
 
     let cached_ratio = (scan_stats.querier_memory_cached_files
@@ -837,12 +837,12 @@ async fn search_tantivy_index(
     let mut cache_key = String::new();
     if cfg.common.inverted_index_result_cache_enabled {
         metrics::TANTIVY_RESULT_CACHE_REQUESTS_TOTAL
-            .with_label_values(&[])
+            .with_label_values::<&str>(&[])
             .inc();
         cache_key = generate_cache_key(&index_condition, &idx_optimize_rule, parquet_file);
         if let Some(result) = tantivy_result_cache::GLOBAL_CACHE.get(&cache_key) {
             metrics::TANTIVY_RESULT_CACHE_HITS_TOTAL
-                .with_label_values(&[])
+                .with_label_values::<&str>(&[])
                 .inc();
             return Ok((parquet_file.key.to_string(), result));
         }
