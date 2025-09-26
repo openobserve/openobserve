@@ -747,6 +747,22 @@ export default defineComponent({
       { deep: true },
     );
 
+    // Listen for layout changes to update chart dimensions
+    const handleWindowLayoutChanges = async () => {
+      if (chartPanelRef.value) {
+        await nextTick();
+        await convertPanelDataCommon();
+      }
+    };
+
+    onMounted(() => {
+      window.addEventListener("resize", handleWindowLayoutChanges);
+    });
+
+    onUnmounted(() => {
+      window.removeEventListener("resize", handleWindowLayoutChanges);
+    });
+
     watch(
       panelData,
       () => {
@@ -1244,7 +1260,11 @@ export default defineComponent({
           variableValue =
             variable.value === null
               ? ""
-              : `${variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value}`;
+              : `${
+                  variable.escapeSingleQuotes
+                    ? escapeSingleQuotes(variable.value)
+                    : variable.value
+                }`;
           // if (query.includes(variableName)) {
           //   metadata.push({
           //     type: "variable",
