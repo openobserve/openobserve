@@ -52,6 +52,7 @@ const showEditTooltip = ref(false)
 const showDeleteTooltip = ref(false)
 const showFunctionDialog = ref(false)
 const showConditionDialog = ref(false)
+const showQueryDialog = ref(false)
 let hideButtonsTimeout = null
 
 // Edge color mapping for different node types
@@ -134,6 +135,14 @@ const handleConditionHover = () => {
 
 const closeConditionDialog = () => {
   showConditionDialog.value = false;
+}
+
+const handleQueryHover = () => {
+  showQueryDialog.value = true;
+}
+
+const closeQueryDialog = () => {
+  showQueryDialog.value = false;
 }
 
 
@@ -554,18 +563,8 @@ function getIcon(data, ioType) {
       "
       @mouseenter="handleNodeHover(id, io_type)"
       @mouseleave="handleNodeLeave(id)"
+      @click="handleQueryHover()"
      >
-    <q-tooltip :style="{ maxWidth: '300px', whiteSpace: 'pre-wrap' }">
-  <div>
-    <strong>{{  data.query_condition.type == 'sql' ? 'SQL' : 'PromQL' }}:</strong> <pre style="max-width: 200px ; text-wrap: wrap;">{{  data.query_condition.type == 'sql' ? data.query_condition.sql : data.query_condition.promql }}</pre><br />
-    <strong>Period:</strong> {{ data.trigger_condition.period }}<br />
-    <strong>Frequency:</strong> {{ data.trigger_condition.frequency }} {{ data.trigger_condition.frequency_type }}<br />
-    <strong>Operator:</strong> {{ data.trigger_condition.operator }}<br />
-    <strong>Threshold:</strong> {{ data.trigger_condition.threshold }}<br />
-    <strong>Cron:</strong> {{ data.trigger_condition.cron || 'None' }}<br />
-    <strong>Silence:</strong> {{ data.trigger_condition.silence }}
-  </div>
-</q-tooltip>
 
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
@@ -815,6 +814,70 @@ function getIcon(data, ioType) {
       </q-card-section>
     </q-card>
   </q-dialog>
+
+  <!-- Query Details Side Panel Dialog -->
+  <q-dialog 
+    v-model="showQueryDialog" 
+    position="right" 
+    maximized
+    class="query-details-dialog q-pa-none q-ma-none"
+  >
+    <q-card class="card" style="width: 500px; max-width: none;">
+      <q-card-section class="row items-center q-pb-none tw-flex tw-items-center tw-my-2">
+        <div class="text-h6">Query Details</div>
+        <q-space />
+        <q-btn 
+          icon="cancel" 
+          flat 
+          round 
+          dense 
+          v-close-popup
+          @click="closeQueryDialog"
+        />
+      </q-card-section>
+      
+      <q-separator />
+      
+      <q-card-section class="q-pt-md">
+        <div class="query-info">
+          <div class="query-type-section">
+            <strong class="text-subtitle1">Query Type:</strong>
+            <div class="query-type">{{ data.query_condition.type === 'sql' ? 'SQL' : 'PromQL' }}</div>
+          </div>
+          
+          <div class="query-content-section">
+            <strong class="text-subtitle1">Query:</strong>
+            <div class="query-content">
+              <pre class="query-code">{{ data.query_condition.type === 'sql' ? data.query_condition.sql : data.query_condition.promql }}</pre>
+            </div>
+          </div>
+          
+          <div class="trigger-details-section">
+            <strong class="text-subtitle1">Trigger Configuration:</strong>
+            <div class="trigger-details">
+              <div class="trigger-row">
+                <span class="trigger-label">Period:</span>
+                <span class="trigger-value">{{ data.trigger_condition.period }}</span>
+              </div>
+              <div class="trigger-row">
+                <span class="trigger-label">Frequency:</span>
+                <span class="trigger-value">{{ data.trigger_condition.frequency }} {{ data.trigger_condition.frequency_type }}</span>
+              </div>
+
+              <div class="trigger-row">
+                <span class="trigger-label">Cron:</span>
+                <span class="trigger-value">{{ data.trigger_condition.cron || 'None' }}</span>
+              </div>
+              <div class="trigger-row">
+                <span class="trigger-label">Silence:</span>
+                <span class="trigger-value">{{ data.trigger_condition.silence }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </q-card-section>
+    </q-card>
+  </q-dialog>
 </template>
 
 <style lang="scss">
@@ -1001,6 +1064,13 @@ function getIcon(data, ioType) {
 
 // Condition Details Dialog Styles
 .condition-details-dialog {
+  .q-dialog__inner {
+    padding: 0;
+  }
+}
+
+// Query Details Dialog Styles
+.query-details-dialog {
   .q-dialog__inner {
     padding: 0;
   }
@@ -1216,6 +1286,143 @@ function getIcon(data, ioType) {
   }
   
   .conditions-list-section .text-subtitle1 {
+    color: #64b5f6;
+  }
+}
+
+// Query Details Styles
+.query-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.query-type-section,
+.query-content-section,
+.trigger-details-section {
+  .text-subtitle1 {
+    color: #1976d2;
+    margin-bottom: 12px;
+    display: block;
+  }
+}
+
+.query-type {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  padding: 8px 12px;
+  background-color: #e3f2fd;
+  border-radius: 4px;
+  border-left: 4px solid #1976d2;
+  text-align: center;
+  max-width: 100px;
+}
+
+.query-content {
+  background-color: #f5f5f5;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.query-code {
+  color: #333;
+  background-color: transparent;
+  margin: 0;
+  padding: 16px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+  min-height: 80px;
+  border: none;
+  resize: none;
+}
+
+.trigger-details {
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trigger-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #e9ecef;
+  
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.trigger-label {
+  font-weight: 600;
+  color: #495057;
+  min-width: 80px;
+}
+
+.trigger-value {
+  font-weight: 500;
+  color: #333;
+  background-color: #ffffff;
+  padding: 4px 8px;
+  border-radius: 3px;
+  border: 1px solid #dee2e6;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+}
+
+// Dark mode support for query dialog
+.body--dark {
+  .query-type {
+    background-color: #1e3a8a;
+    color: #bfdbfe;
+    border-left-color: #64b5f6;
+  }
+  
+  .query-content {
+    background-color: #2d2d2d;
+    border-color: #444;
+  }
+  
+  .query-code {
+    color: #ffffff;
+    background-color: #2d2d2d;
+  }
+  
+  .trigger-details {
+    background-color: #2d2d2d;
+    border-color: #444;
+  }
+  
+  .trigger-row {
+    border-bottom-color: #444;
+  }
+  
+  .trigger-label {
+    color: #e9ecef;
+  }
+  
+  .trigger-value {
+    background-color: #3a3a3a;
+    border-color: #555;
+    color: #ffffff;
+  }
+  
+  .query-type-section .text-subtitle1,
+  .query-content-section .text-subtitle1,
+  .trigger-details-section .text-subtitle1 {
     color: #64b5f6;
   }
 }
