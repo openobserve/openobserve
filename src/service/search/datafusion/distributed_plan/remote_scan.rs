@@ -30,12 +30,12 @@ use datafusion::{
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
-        metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet},
+        metrics::{ExecutionPlanMetricsSet, MetricsSet},
         stream::RecordBatchStreamAdapter,
     },
 };
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
-use flight::common::Metrics;
+use flight::common::{Metrics, RemoteScanMetrics};
 use futures::{StreamExt, TryStreamExt};
 use futures_util::pin_mut;
 use parking_lot::Mutex;
@@ -230,7 +230,7 @@ impl ExecutionPlan for RemoteScanExec {
         partition: usize,
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
-        let baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
+        let baseline_metrics = RemoteScanMetrics::new(partition, &self.metrics);
         let fut = get_remote_batch(
             self.remote_scan_node.clone(),
             partition,
@@ -266,7 +266,7 @@ async fn get_remote_batch(
     scan_stats: Arc<Mutex<ScanStats>>,
     partial_err: Arc<Mutex<String>>,
     cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
-    metrics: BaselineMetrics,
+    metrics: RemoteScanMetrics,
 ) -> Result<SendableRecordBatchStream> {
     let start = std::time::Instant::now();
     let cfg = config::get_config();
