@@ -10,6 +10,7 @@ import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/das
 import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
 
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+const testLogger = require("../utils/test-logger.js");
 
 //Dashboard name
 const randomDashboardName =
@@ -662,9 +663,9 @@ test.describe("logs testcases", () => {
     // Open panel configs and configure override
     const panelConfigs = new DashboardPanelConfigs(page);
     await panelConfigs.openConfigPanel();
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(2000);
     await panelConfigs.scrollDownSidebarUntilOverrideVisible();
-    await page.waitForTimeout(3000);
+
     await panelConfigs.configureOverride({
       columnName: "x_axis_1",
       typeName: "Unique Value Color",
@@ -681,39 +682,19 @@ test.describe("logs testcases", () => {
     );
     await expect(coloredCells.first()).toBeVisible();
     const coloredCount = await coloredCells.count();
-    console.log(`[TEST] Colored cells detected: ${coloredCount}`);
+    testLogger.error(`[TEST] Colored cells detected: ${coloredCount}`);
     expect(coloredCount).toBeGreaterThan(0);
 
     // Capture and log the inline style(s) applied to colored cells
     const coloredStyles = await coloredCells.evaluateAll((nodes) =>
       nodes.map((n) => n.getAttribute("style") || "")
     );
-    console.log("[TEST] Colored cell inline styles:", coloredStyles);
-
-    // // Extract unique background colors and log/assert
-    // const uniqueBgColors = Array.from(
-    //   new Set(
-    //     coloredStyles
-    //       .map((s) => {
-    //         const m = s.match(/background-color:\s*rgb\([^\)]+\)/);
-    //         return m ? m[0] : null;
-    //       })
-    //       .filter(Boolean)
-    //   )
-    // );
-    // console.log("[TEST] Unique background colors:", uniqueBgColors);
-    // expect(uniqueBgColors.length).toBeGreaterThan(0);
-
-    // // Optionally assert that text color is applied as black for at least one cell
-    // const hasBlackText = coloredStyles.some((s) => /color:\s*rgb\(0,\s*0,\s*0\)/.test(s));
-    // expect(hasBlackText).toBeTruthy();
+    testLogger.error("[TEST] Colored cell inline styles:", coloredStyles);
 
      await pm.logsVisualise.addPanelToNewDashboard(
       randomDashboardName,
       panelName
     );
-
-    await page.waitForTimeout(4000);
 
     // Wait for and assert the success message
     const successMessage = page.getByText("Panel added to dashboard");
@@ -724,15 +705,15 @@ test.describe("logs testcases", () => {
       '[data-test="dashboard-panel-table"] tbody .q-td[style*="background-color"]'
     );
     await expect(coloredCellsonPanel.first()).toBeVisible();
-    const coloredCountOnPanel = await coloredCells.count();
-    console.log(`[TEST] Colored cells detected: ${coloredCountOnPanel}`);
+    const coloredCountOnPanel = await coloredCellsonPanel.count();
+    testLogger.error(`[TEST] Colored cells detected: ${coloredCountOnPanel}`);
     expect(coloredCountOnPanel).toBeGreaterThan(0);
 
     // Capture and log the inline style(s) applied to colored cells
     const coloredStylesOnPanel = await coloredCellsonPanel.evaluateAll((nodes) =>
       nodes.map((n) => n.getAttribute("style") || "")
     );
-    console.log("[TEST] Colored cell inline styles:", coloredStylesOnPanel    );
+    testLogger.error("[TEST] Colored cell inline styles:", coloredStylesOnPanel    );
 
     // delete the dashboard
 
