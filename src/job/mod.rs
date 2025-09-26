@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster::LOCAL_NODE, spawn_pausable_job};
+use config::{
+    META_ORG_ID, cluster::LOCAL_NODE, meta::self_reporting::usage::USAGE_STREAM, spawn_pausable_job,
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_enterprise_config;
 #[cfg(feature = "enterprise")]
@@ -25,7 +27,7 @@ use crate::{
         organization::DEFAULT_ORG,
         user::{UserOrgRole, UserRequest},
     },
-    service::{db, self_reporting, users},
+    service::{self, db, self_reporting, users},
 };
 
 mod alert_manager;
@@ -50,6 +52,28 @@ mod stats;
 pub use file_downloader::{download_from_node, queue_download};
 pub use file_list_dump::FILE_LIST_SCHEMA;
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
+
+#[cfg(feature = "enterprise")]
+async fn enforce_usage_stream_retention() {
+    if let Some(s) = infra::schema::get_settings(
+        META_ORG_ID,
+        USAGE_STREAM,
+        config::meta::stream::StreamType::Logs,
+    )
+    .await
+    {
+        if s.data_retention < 32 {
+            service::stream::save_stream_settings(
+                META_ORG_ID,
+                USAGE_STREAM,
+                config::meta::stream::StreamType::Logs,
+                s,
+            )
+            .await
+            .unwrap(); //unwrap is intentional, we should panic if this fails
+        }
+    }
+}
 
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
@@ -154,6 +178,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "enterprise")]
     {
+        tokio::task::spawn(async move {
+            loop {
+                enforce_usage_stream_retention().await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(10 * 60)).await;
+            }
+        });
+
         o2_enterprise::enterprise::license::start_license_check(
             crate::service::self_reporting::search::get_usage,
             LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role(),

@@ -18,9 +18,11 @@ use std::io::Error;
 use actix_web::{HttpResponse, http, http::StatusCode};
 use arrow_schema::DataType;
 use config::{
-    SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
+    META_ORG_ID, SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME, get_config,
+    is_local_disk_storage,
     meta::{
         promql,
+        self_reporting::usage::USAGE_STREAM,
         stream::{
             DistinctField, StreamField, StreamParams, StreamSettings, StreamStats, StreamType,
             UpdateStreamSettings,
@@ -549,7 +551,18 @@ pub async fn update_stream_settings(
     }
 
     if let Some(data_retention) = new_settings.data_retention {
-        settings.data_retention = data_retention;
+        #[cfg(feature = "enterprise")]
+        if org_id == META_ORG_ID && stream_name == USAGE_STREAM {
+            if data_retention >= 32 {
+                settings.data_retention = data_retention;
+            }
+        } else {
+            settings.data_retention = data_retention;
+        }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            settings.data_retention = data_retention;
+        }
     }
 
     if let Some(index_original_data) = new_settings.index_original_data {
