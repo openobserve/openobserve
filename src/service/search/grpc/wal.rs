@@ -70,7 +70,7 @@ pub async fn search_parquet(
     file_stat_cache: Option<FileStatisticsCache>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
-    watch_time: Option<i64>,
+    snapshot_time: Option<i64>,
 ) -> super::SearchTable {
     let load_start = std::time::Instant::now();
     // get file list
@@ -83,7 +83,7 @@ pub async fn search_parquet(
         &stream_settings.partition_keys,
         query.time_range,
         search_partition_keys,
-        watch_time,
+        snapshot_time,
     )
     .await?;
     log::info!(
@@ -558,7 +558,7 @@ async fn get_file_list(
     partition_keys: &[StreamPartition],
     time_range: Option<(i64, i64)>,
     search_partition_keys: &[(String, String)],
-    watch_time: Option<i64>,
+    snapshot_time: Option<i64>,
 ) -> Result<Vec<FileKey>, Error> {
     let wal_dir = match Path::new(&get_config().common.data_wal_dir).canonicalize() {
         Ok(path) => {
@@ -603,17 +603,17 @@ async fn get_file_list(
     let files = files
         .iter()
         .filter_map(|f| {
-            // If watch_time is set, filter out files created after watch_time to avoid duplicates
-            if let Some(watch_micros) = watch_time
+            // If snapshot_time is set, filter out files created after snapshot_time to avoid duplicates
+            if let Some(snapshot_time) = snapshot_time
             && let Ok(meta) =  config::utils::file::get_file_meta(f)
             && let Ok(modified_time) = meta.modified() {
                 let modified_micros = modified_time
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_micros() as i64;
-                if modified_micros > watch_micros {
+                if modified_micros > snapshot_time {
                     log::debug!(
-                        "[trace_id {}] skip wal parquet file created after watch_time: file: {f} watch_time: {watch_micros} modified_time: {modified_micros}",
+                        "[trace_id {}] skip wal parquet file created after snapshot_time: file: {f} snapshot_time: {snapshot_time} modified_time: {modified_micros}",
                         query.trace_id,
                     );
                     return None;
