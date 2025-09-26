@@ -66,13 +66,12 @@ impl TableProvider for EnrichTable {
     async fn scan(
         &self,
         _state: &dyn Session,
-        projection: Option<&Vec<usize>>,
+        _projection: Option<&Vec<usize>>,
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        let projected_schema = project_schema(&self.schema, projection)?;
         Ok(Arc::new(
-            EnrichExec::new(&self.org_id, &self.name, projected_schema)
+            EnrichExec::new(&self.org_id, &self.name, self.schema.clone())
                 .with_partitions(self.partitions),
         ))
     }
