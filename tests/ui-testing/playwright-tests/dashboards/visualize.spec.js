@@ -7,6 +7,7 @@ import { ingestion } from "./utils/dashIngestion.js";
 import logData from "../../fixtures/log.json";
 import PageManager from "../../pages/page-manager";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
+import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
 
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 
@@ -639,4 +640,104 @@ test.describe("logs testcases", () => {
     );
     await expect(quickModeToggle).toHaveAttribute("aria-checked", "false");
   });
+ test("should apply override config after running histogram query", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    // Open logs and prepare histogram query
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.openQueryEditor();
+    await pm.logsVisualise.fillLogsQueryEditor(histogramQuery);
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // Go to visualize and wait for chart to render
+    await pm.logsVisualise.openVisualiseTab();
+
+    await pm.chartTypeSelector.selectChartType("table");
+
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    // Open panel configs and configure override
+    const panelConfigs = new DashboardPanelConfigs(page);
+    await panelConfigs.openConfigPanel();
+    await page.waitForTimeout(3000);
+    await panelConfigs.scrollDownSidebarUntilOverrideVisible();
+    await page.waitForTimeout(3000);
+    await panelConfigs.configureOverride({
+      columnName: "x_axis_1",
+      typeName: "Unique Value Color",
+      enableTypeCheckbox: true,
+    });
+    
+    // Re-run the query to apply override effect and wait for rendering
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.verifyChartRenders(page);
+
+    // Assert that at least one table cell has a background color applied
+    const coloredCells = page.locator(
+      '[data-test="dashboard-panel-table"] tbody .q-td[style*="background-color"]'
+    );
+    await expect(coloredCells.first()).toBeVisible();
+    const coloredCount = await coloredCells.count();
+    console.log(`[TEST] Colored cells detected: ${coloredCount}`);
+    expect(coloredCount).toBeGreaterThan(0);
+
+    // Capture and log the inline style(s) applied to colored cells
+    const coloredStyles = await coloredCells.evaluateAll((nodes) =>
+      nodes.map((n) => n.getAttribute("style") || "")
+    );
+    console.log("[TEST] Colored cell inline styles:", coloredStyles);
+
+    // // Extract unique background colors and log/assert
+    // const uniqueBgColors = Array.from(
+    //   new Set(
+    //     coloredStyles
+    //       .map((s) => {
+    //         const m = s.match(/background-color:\s*rgb\([^\)]+\)/);
+    //         return m ? m[0] : null;
+    //       })
+    //       .filter(Boolean)
+    //   )
+    // );
+    // console.log("[TEST] Unique background colors:", uniqueBgColors);
+    // expect(uniqueBgColors.length).toBeGreaterThan(0);
+
+    // // Optionally assert that text color is applied as black for at least one cell
+    // const hasBlackText = coloredStyles.some((s) => /color:\s*rgb\(0,\s*0,\s*0\)/.test(s));
+    // expect(hasBlackText).toBeTruthy();
+
+     await pm.logsVisualise.addPanelToNewDashboard(
+      randomDashboardName,
+      panelName
+    );
+
+    await page.waitForTimeout(4000);
+
+    // Wait for and assert the success message
+    const successMessage = page.getByText("Panel added to dashboard");
+    await expect(successMessage).toBeVisible({ timeout: 10000 });
+
+      // Assert that at least one table cell has a background color applied
+    const coloredCellsonPanel = page.locator(
+      '[data-test="dashboard-panel-table"] tbody .q-td[style*="background-color"]'
+    );
+    await expect(coloredCellsonPanel.first()).toBeVisible();
+    const coloredCountOnPanel = await coloredCells.count();
+    console.log(`[TEST] Colored cells detected: ${coloredCountOnPanel}`);
+    expect(coloredCountOnPanel).toBeGreaterThan(0);
+
+    // Capture and log the inline style(s) applied to colored cells
+    const coloredStylesOnPanel = await coloredCellsonPanel.evaluateAll((nodes) =>
+      nodes.map((n) => n.getAttribute("style") || "")
+    );
+    console.log("[TEST] Colored cell inline styles:", coloredStylesOnPanel    );
+
+    // delete the dashboard
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await deleteDashboard(page, randomDashboardName);
+  });
+
 });
