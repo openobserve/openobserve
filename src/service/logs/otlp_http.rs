@@ -548,10 +548,27 @@ pub async fn logs_json_handler(
                             .or_insert(0);
                         *_size += original_size;
 
+                        let timestamp = if idx != usize::MAX {
+                            timestamps[idx]
+                        } else {
+                            match local_val.get(TIMESTAMP_COL_NAME) {
+                                Some(v) => match v {
+                                    json::Value::Number(n) => {
+                                        n.as_i64().unwrap_or_else(|| Utc::now().timestamp_micros())
+                                    }
+                                    json::Value::String(s) => s
+                                        .parse::<i64>()
+                                        .unwrap_or_else(|_| Utc::now().timestamp_micros()),
+                                    _ => Utc::now().timestamp_micros(),
+                                },
+                                None => Utc::now().timestamp_micros(),
+                            }
+                        };
+
                         let (ts_data, fn_num) = json_data_by_stream
                             .entry(destination_stream.clone())
                             .or_insert((Vec::new(), None));
-                        ts_data.push((timestamps[idx], local_val));
+                        ts_data.push((timestamp, local_val));
                         *fn_num = Some(function_no); // no pl -> no func
                     }
                 }
