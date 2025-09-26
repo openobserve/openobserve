@@ -27,8 +27,9 @@ use datafusion::{
     },
 };
 
-use crate::service::search::datafusion::optimizer::physical_optimizer::utils::{
-    get_column_name, is_column,
+use crate::service::search::datafusion::optimizer::physical_optimizer::{
+    index_optimizer::utils::is_complex_plan,
+    utils::{get_column_name, is_column},
 };
 
 #[rustfmt::skip]
@@ -98,11 +99,6 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
                     self.simple_topn = None;
                     return Ok(TreeNodeRecursion::Stop);
                 }
-                // only support desc order by count(*)
-                if !sort_merge.expr().first().options.descending {
-                    self.simple_topn = None;
-                    return Ok(TreeNodeRecursion::Stop);
-                }
                 self.simple_topn = Some((
                     "".to_string(), // Will be set when we find the group by field
                     fetch,
@@ -148,19 +144,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
             // If AggregateExec doesn't match SimpleTopN pattern, stop visiting
             self.simple_topn = None;
             return Ok(TreeNodeRecursion::Stop);
-        } else if node.name() == "HashJoinExec"
-            || node.name() == "RecursiveQueryExec"
-            || node.name() == "UnionExec"
-            || node.name() == "InterleaveExec"
-            || node.name() == "UnnestExec"
-            || node.name() == "CrossJoinExec"
-            || node.name() == "NestedLoopJoinExec"
-            || node.name() == "SymmetricHashJoinExec"
-            || node.name() == "SortMergeJoinExec"
-            || node.name() == "PartialSortExec"
-            || node.name() == "BoundedWindowAggExec"
-            || node.name() == "WindowAggExec"
-        {
+        } else if is_complex_plan(node) {
             // If encounter complex plan, stop visiting
             self.simple_topn = None;
             return Ok(TreeNodeRecursion::Stop);
@@ -213,7 +197,7 @@ mod tests {
             ),
             (
                 "select name, count(*) as cnt from t where match_all('error') group by name order by cnt asc limit 10",
-                None,
+                Some(IndexOptimizeMode::SimpleTopN("name".to_string(), 10, true)),
             ),
             (
                 "select name as key, count(*) as cnt from t where match_all('error') group by key order by cnt desc limit 10",

@@ -86,7 +86,7 @@ impl RemoteScanExec {
             .filter_map(|(idx, n)| if n.is_querier() { Some(idx) } else { None })
             .collect::<Vec<_>>();
         // random shuffle the node ids
-        node_ids.shuffle(&mut rand::thread_rng());
+        node_ids.shuffle(&mut rand::rng());
         let enrich_mode_node_idx = node_ids.pop().unwrap_or_default();
 
         Ok(RemoteScanExec {
@@ -161,6 +161,15 @@ impl RemoteScanExec {
     #[cfg(test)]
     pub fn analyze(&self) -> bool {
         self.remote_scan_node.search_infos.is_analyze
+    }
+
+    #[cfg(test)]
+    pub fn index_optimize_mode(&self) -> Option<IndexOptimizeMode> {
+        self.remote_scan_node
+            .index_info
+            .index_optimize_mode
+            .clone()
+            .map(|x| x.into())
     }
 }
 

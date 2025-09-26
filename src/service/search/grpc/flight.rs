@@ -324,33 +324,11 @@ pub async fn search(
         scan_stats.add(&stats);
     }
 
-    // search in WAL parquet
+    // search in WAL memory first to capture the snapshot_time
+    let mut snapshot_time = None;
     if LOCAL_NODE.is_ingester() {
-        let (tbls, stats) = match super::wal::search_parquet(
-            query_params.clone(),
-            latest_schema.clone(),
-            &search_partition_keys,
-            empty_exec.sorted_by_time(),
-            file_stats_cache.clone(),
-            index_condition.clone(),
-            fst_fields.clone(),
-        )
-        .await
-        {
-            Ok(v) => v,
-            Err(e) => {
-                // clear session data
-                super::super::datafusion::storage::file_list::clear(&trace_id);
-                log::error!("[trace_id {trace_id}] flight->search: search wal parquet error: {e}");
-                return Err(e);
-            }
-        };
-        tables.extend(tbls);
-        scan_stats.add(&stats);
-    }
-
-    // search in WAL memory
-    if LOCAL_NODE.is_ingester() {
+        // Set snapshot_time before searching memtable to avoid duplicates with parquet
+        snapshot_time = Some(config::utils::time::now_micros());
         let (tbls, stats) = match super::wal::search_memtable(
             query_params.clone(),
             latest_schema.clone(),
@@ -366,6 +344,32 @@ pub async fn search(
                 log::error!(
                     "[trace_id {trace_id}] flight->search: search wal memtable error: {e:?}"
                 );
+                return Err(e);
+            }
+        };
+        tables.extend(tbls);
+        scan_stats.add(&stats);
+    }
+
+    // Now search in WAL parquet with snapshot_time filter
+    if LOCAL_NODE.is_ingester() {
+        let (tbls, stats) = match super::wal::search_parquet(
+            query_params.clone(),
+            latest_schema.clone(),
+            &search_partition_keys,
+            empty_exec.sorted_by_time(),
+            file_stats_cache.clone(),
+            index_condition.clone(),
+            fst_fields.clone(),
+            snapshot_time,
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                // clear session data
+                super::super::datafusion::storage::file_list::clear(&trace_id);
+                log::error!("[trace_id {trace_id}] flight->search: search wal parquet error: {e}");
                 return Err(e);
             }
         };

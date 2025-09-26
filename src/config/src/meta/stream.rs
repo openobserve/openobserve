@@ -411,14 +411,17 @@ impl StreamStats {
     pub fn add_file_meta(&mut self, meta: &FileMeta) {
         self.file_num += 1;
         self.doc_num = max(0, self.doc_num + meta.records);
-        self.doc_time_min = self.doc_time_min.min(meta.min_ts);
+        self.doc_time_min = if self.doc_time_min == 0 {
+            meta.min_ts
+        } else if meta.min_ts == 0 {
+            self.doc_time_min
+        } else {
+            self.doc_time_min.min(meta.min_ts)
+        };
         self.doc_time_max = self.doc_time_max.max(meta.max_ts);
         self.storage_size += meta.original_size as f64;
         self.compressed_size += meta.compressed_size as f64;
         self.index_size += meta.index_size as f64;
-        if self.doc_time_min == 0 {
-            self.doc_time_min = meta.min_ts;
-        }
         if self.storage_size < 0.0 {
             self.storage_size = 0.0;
         }
@@ -436,16 +439,25 @@ impl StreamStats {
         self.storage_size = stats.storage_size;
         self.compressed_size = stats.compressed_size;
         self.index_size = stats.index_size;
-        self.doc_time_min = self.doc_time_min.min(stats.doc_time_min);
+        self.doc_time_min = if self.doc_time_min == 0 {
+            stats.doc_time_min
+        } else if stats.doc_time_min == 0 {
+            self.doc_time_min
+        } else {
+            self.doc_time_min.min(stats.doc_time_min)
+        };
         self.doc_time_max = self.doc_time_max.max(stats.doc_time_max);
-        if self.doc_time_min == 0 {
-            self.doc_time_min = stats.doc_time_min;
-        }
     }
 
     pub fn merge(&mut self, other: &StreamStats) {
         self.created_at = self.created_at.min(other.created_at);
-        self.doc_time_min = self.doc_time_min.min(other.doc_time_min);
+        self.doc_time_min = if self.doc_time_min == 0 {
+            other.doc_time_min
+        } else if other.doc_time_min == 0 {
+            self.doc_time_min
+        } else {
+            self.doc_time_min.min(other.doc_time_min)
+        };
         self.doc_time_max = self.doc_time_max.max(other.doc_time_max);
         self.doc_num += other.doc_num;
         self.file_num += other.file_num;
