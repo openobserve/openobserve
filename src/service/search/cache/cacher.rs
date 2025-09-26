@@ -284,6 +284,7 @@ pub async fn check_cache(
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.file_path = file_path.to_string();
         multi_resp.order_by = order_by;
+        multi_resp.is_aggregate = is_aggregate;
         multi_resp
     } else {
         let c_resp = match crate::service::search::cluster::cacher::get_cached_results(
@@ -370,6 +371,7 @@ pub async fn check_cache(
         multi_resp.ts_column = result_ts_col;
         multi_resp.file_path = file_path.to_string();
         multi_resp.order_by = order_by;
+        multi_resp.is_aggregate = is_aggregate;
         multi_resp
     }
 }
