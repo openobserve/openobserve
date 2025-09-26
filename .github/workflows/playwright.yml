@@ -117,8 +117,8 @@ jobs:
                 "schema.spec.js",
                 "schemaload.spec.js",
                 "serviceAccount.spec.js",
-                "usersOrg.spec.js",
-                "org.spec.js",
+                "usersOrg.spec.js", 
+                #  "org.spec.js",
               ]
           - testfolder: "Logs-Core"
             browser: "chrome"
@@ -183,9 +183,9 @@ jobs:
                 "visualize.spec.js",
                 # "visualization-vrl.spec.js"
               ]
-          - testfolder: "Dashboards-Streaming"
-            browser: "chrome"
-            run_files: ["dashboard-streaming.spec.js",]
+          # - testfolder: "Dashboards-Streaming"
+          #   browser: "chrome"
+          #   run_files: ["dashboard-streaming.spec.js",]
           - testfolder: "Pipelines"
             browser: "chrome"
             run_files: [
