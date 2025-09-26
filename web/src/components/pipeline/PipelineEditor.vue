@@ -217,7 +217,7 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
 import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
-import { MarkerType } from "@vue-flow/core";
+import { MarkerType, useVueFlow } from "@vue-flow/core";
 import ExternalDestination from "./NodeForm/ExternalDestination.vue";
 import JsonEditor from "../common/JsonEditor.vue";
 import { validatePipeline as validatePipelineUtil, type ValidationResult } from '../../utils/validatePipeline';
@@ -512,8 +512,30 @@ onBeforeMount(() => {
   getFunctions();
 });
 
+// Initialize Vue Flow composables
+const { getSelectedEdges, removeEdges } = useVueFlow()
+
 onMounted(async () => {
   window.addEventListener("beforeunload", beforeUnloadHandler);
+  
+  // Add keyboard handler for edge deletion
+  const handleKeydown = (event) => {
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      const selectedEdges = getSelectedEdges.value
+      
+      if (selectedEdges.length > 0) {
+        event.preventDefault()
+        const edgeIds = selectedEdges.map(edge => edge.id)
+        removeEdges(edgeIds)
+      }
+    }
+  }
+  
+  window.addEventListener("keydown", handleKeydown);
+  
+  // Store handler reference for cleanup
+  (window as any).pipelineKeydownHandler = handleKeydown;
+  
   pipelineDestinationsList.value = await getPipelineDestinations();
   usedStreamsListResponse.value = await getUsedStreamsList();
   const { path, query } = router.currentRoute.value; 
@@ -529,6 +551,11 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);
+  
+  // Cleanup keyboard handler
+  if ((window as any).pipelineKeydownHandler) {
+    window.removeEventListener("keydown", (window as any).pipelineKeydownHandler);
+  }
 });
 
 let forceSkipBeforeUnloadListener = false;

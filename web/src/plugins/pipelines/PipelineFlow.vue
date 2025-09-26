@@ -22,6 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      Unsaved changes detected. Click "Save" to preserve your updates.
    </div>
    
+   <!-- Edge deletion help notification -->
+   <div v-if="showEdgeHelpNotification" class="edge-help-notification">
+     <q-icon name="info" class="q-mr-xs" size="16px" />
+     Double-click edge to delete or press Backspace/Delete
+   </div>
+   
  </div>
 
     <VueFlow
@@ -32,6 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @node-change="onNodeChange"
       @nodes-change="onNodesChange"
       @edges-change="onEdgesChange"
+      @edge-click="onEdgeClick"
+      @edge-double-click="onEdgeDoubleClick"
       @connect="onConnect"
       @dragover="onDragOver"
       :default-viewport="{ zoom: 1.5 }"
@@ -101,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script>
-import { ref, onMounted, onActivated, watch,computed } from "vue";
+import { ref, onMounted, onActivated, watch, computed, nextTick } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import { ControlButton, Controls } from '@vue-flow/controls'
 // import vueFlowConfig from "./vueFlowConfig";
@@ -136,8 +144,38 @@ export default {
 
     const vueFlowRef = ref(null);
     const isCanvasEmpty = computed(() => pipelineObj.currentSelectedPipeline.nodes.length === 0);
+    const showEdgeHelpNotification = ref(false);
+    let notificationTimeout = null;
 
-    const { setViewport } = useVueFlow()
+    const { setViewport, getSelectedEdges, addSelectedEdges, removeSelectedEdges, removeEdges } = useVueFlow()
+
+    // Handle edge click events
+    const onEdgeClick = (event) => {
+      console.log('Edge click event triggered')
+      
+      // Clear any existing timeout
+      if (notificationTimeout) {
+        clearTimeout(notificationTimeout)
+        notificationTimeout = null
+      }
+      
+      // Always show notification on edge click (even if already visible)
+      console.log('Showing notification for edge click')
+      showEdgeHelpNotification.value = true
+      console.log('Notification state set to:', showEdgeHelpNotification.value)
+      
+      // Auto-hide notification after 2.5 seconds (reduced from 4)
+      notificationTimeout = setTimeout(() => {
+        console.log('Auto-hiding notification')
+        showEdgeHelpNotification.value = false
+        notificationTimeout = null
+      }, 2000)
+    }
+
+    // Handle edge double-click events
+    const onEdgeDoubleClick = (event) => {
+      removeEdges([event.edge.id])
+    }
 
 
 
@@ -180,6 +218,9 @@ function resetTransform() {
       onEdgesChange,
       onConnect,
       validateConnection,
+      onEdgeClick,
+      onEdgeDoubleClick,
+      showEdgeHelpNotification,
       zoomIn,
       zoomOut,
       vueFlowRef,
@@ -237,6 +278,53 @@ q-btn {
   border: 1px solid #F5A623;
   border-radius: 2px ;
 }
+
+.edge-help-notification {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: white;
+  color: #374151;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  animation: slideDown 0.3s ease-out;
+  
+  .q-icon {
+    color: #3b82f6;
+  }
+}
+
+/* Dark mode styles */
+.body--dark .edge-help-notification {
+  background: #181a1b;
+  color: #f3f4f6;
+  border: 1px solid #374151;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  
+  .q-icon {
+    color: #60a5fa;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Debug notification removed */
 
   .empty-text {
   position: absolute;
