@@ -162,10 +162,12 @@ async fn query(
     #[cfg(feature = "enterprise")]
     {
         if crate::service::search::check_search_allowed().is_err() {
-            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                http::StatusCode::FORBIDDEN,
-                "installation has exceeded the search quota".to_string(),
-            )));
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    "installation has exceeded the ingestion limit".to_string(),
+                )),
+            );
         }
         use crate::{
             common::utils::auth::{AuthExtractor, is_root_user},
@@ -440,10 +442,12 @@ async fn query_range(
         };
 
         if crate::service::search::check_search_allowed().is_err() {
-            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                http::StatusCode::FORBIDDEN,
-                "installation has exceeded the search quota".to_string(),
-            )));
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    "installation has exceeded the ingestion limit".to_string(),
+                )),
+            );
         }
 
         let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
@@ -703,10 +707,12 @@ async fn series(
     #[cfg(feature = "enterprise")]
     {
         if crate::service::search::check_search_allowed().is_err() {
-            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                http::StatusCode::FORBIDDEN,
-                "installation has exceeded the search quota".to_string(),
-            )));
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    "installation has exceeded the ingestion limit".to_string(),
+                )),
+            );
         }
     }
 

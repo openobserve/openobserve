@@ -229,10 +229,12 @@ pub async fn search(
     #[cfg(feature = "enterprise")]
     {
         if crate::service::search::check_search_allowed().is_err() {
-            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                StatusCode::FORBIDDEN,
-                "installation has exceeded the search quota".to_string(),
-            )));
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    "installation has exceeded the ingestion limit".to_string(),
+                )),
+            );
         }
     }
 
@@ -517,10 +519,12 @@ pub async fn around_v1(
     #[cfg(feature = "enterprise")]
     {
         if crate::service::search::check_search_allowed().is_err() {
-            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                StatusCode::FORBIDDEN,
-                "installation has exceeded the search quota".to_string(),
-            )));
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    "installation has exceeded the ingestion limit".to_string(),
+                )),
+            );
         }
     }
 
@@ -640,10 +644,12 @@ pub async fn around_v2(
     #[cfg(feature = "enterprise")]
     {
         if crate::service::search::check_search_allowed().is_err() {
-            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                StatusCode::FORBIDDEN,
-                "installation has exceeded the search quota".to_string(),
-            )));
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    "installation has exceeded the ingestion limit".to_string(),
+                )),
+            );
         }
     }
 
@@ -746,10 +752,12 @@ pub async fn values(
     #[cfg(feature = "enterprise")]
     {
         if crate::service::search::check_search_allowed().is_err() {
-            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                StatusCode::FORBIDDEN,
-                "installation has exceeded the search quota".to_string(),
-            )));
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    "installation has exceeded the ingestion limit".to_string(),
+                )),
+            );
         }
     }
 
@@ -1400,10 +1408,12 @@ pub async fn search_partition(
     #[cfg(feature = "enterprise")]
     {
         if crate::service::search::check_search_allowed().is_err() {
-            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                StatusCode::FORBIDDEN,
-                "installation has exceeded the search quota".to_string(),
-            )));
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    "installation has exceeded the ingestion limit".to_string(),
+                )),
+            );
         }
     }
 

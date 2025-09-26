@@ -96,9 +96,9 @@ pub async fn search_http2_stream(
     #[cfg(feature = "enterprise")]
     {
         if crate::service::search::check_search_allowed().is_err() {
-            return HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                actix_web::http::StatusCode::FORBIDDEN,
-                "installation has exceeded the search quota".to_string(),
+            return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::TOO_MANY_REQUESTS,
+                "installation has exceeded the ingestion limit".to_string(),
             ));
         }
     }
@@ -554,9 +554,9 @@ pub async fn values_http2_stream(
     #[cfg(feature = "enterprise")]
     {
         if crate::service::search::check_search_allowed().is_err() {
-            return HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                actix_web::http::StatusCode::FORBIDDEN,
-                "installation has exceeded the search quota".to_string(),
+            return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::TOO_MANY_REQUESTS,
+                "installation has exceeded the ingestion limit".to_string(),
             ));
         }
     }

@@ -1486,8 +1486,8 @@ pub fn check_search_allowed() -> Result<(), Error> {
     #[cfg(feature = "enterprise")]
     {
         // this is installation level limit for all orgs combined
-        if !o2_enterprise::enterprise::license::ingestion_allowed() {
-            Err(Error::IngestionError(
+        if !o2_enterprise::enterprise::license::search_allowed() {
+            Err(Error::Message(
                 "installation has exceeded its search quota".to_string(),
             ))
         } else {
