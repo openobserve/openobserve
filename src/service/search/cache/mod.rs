@@ -112,6 +112,11 @@ pub async fn search(
     }
 
     // Result caching check start
+    let force_clear_cache = if !use_cache && !is_http2_streaming {
+        Some(true)
+    } else {
+        None
+    };
     let (mut c_resp, should_exec_query) = prepare_cache_response(
         trace_id,
         org_id,
@@ -119,7 +124,7 @@ pub async fn search(
         &mut req,
         use_cache,
         is_http2_streaming,
-        None,
+        force_clear_cache,
     )
     .await?;
     let file_path = c_resp.file_path.clone();
