@@ -61,6 +61,7 @@ use crate::{
 
 /// search in local WAL, which haven't been sync to object storage
 #[tracing::instrument(name = "service:search:wal:parquet", skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]
+#[allow(clippy::too_many_arguments)]
 pub async fn search_parquet(
     query: Arc<super::QueryParams>,
     schema: Arc<Schema>,
@@ -69,6 +70,7 @@ pub async fn search_parquet(
     file_stat_cache: Option<FileStatisticsCache>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
+    snapshot_time: Option<i64>,
 ) -> super::SearchTable {
     let load_start = std::time::Instant::now();
     // get file list
@@ -81,6 +83,7 @@ pub async fn search_parquet(
         &stream_settings.partition_keys,
         query.time_range,
         search_partition_keys,
+        snapshot_time,
     )
     .await?;
     log::info!(
@@ -549,16 +552,15 @@ pub async fn search_memtable(
     Ok((tables, scan_stats))
 }
 
-#[tracing::instrument(name = "service:search:grpc:wal:get_file_list_inner", skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]
-async fn get_file_list_inner(
+#[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]
+async fn get_file_list(
     query: Arc<super::QueryParams>,
     partition_keys: &[StreamPartition],
     time_range: Option<(i64, i64)>,
     search_partition_keys: &[(String, String)],
-    wal_dir: &str,
-    file_ext: &str,
+    snapshot_time: Option<i64>,
 ) -> Result<Vec<FileKey>, Error> {
-    let wal_dir = match Path::new(wal_dir).canonicalize() {
+    let wal_dir = match Path::new(&get_config().common.data_wal_dir).canonicalize() {
         Ok(path) => {
             let mut path = path.to_str().unwrap().to_string();
             // Hack for windows
@@ -584,11 +586,14 @@ async fn get_file_list_inner(
         DateTime::from_timestamp_micros(s).zip(DateTime::from_timestamp_micros(e))
     }) {
         let skip_count = AsRef::<Path>::as_ref(&pattern).components().count();
-        let extension_pattern = file_ext.to_string();
         // Skip count is the number of segments in the cannonicalised path before
         // <YY>/<MM>/<DD>/<HH>/<file> appear
-        let filter =
-            create_wal_dir_datetime_filter(start_time, end_time, extension_pattern, skip_count + 1);
+        let filter = create_wal_dir_datetime_filter(
+            start_time,
+            end_time,
+            "parquet".to_string(),
+            skip_count + 1,
+        );
 
         scan_files_filtered(&pattern, filter, None).await?
     } else {
@@ -597,13 +602,30 @@ async fn get_file_list_inner(
 
     let files = files
         .iter()
-        .map(|f| {
-            f.strip_prefix(&wal_dir)
+        .filter_map(|f| {
+            // If snapshot_time is set, filter out files created after snapshot_time to avoid duplicates
+            if let Some(snapshot_time) = snapshot_time
+            && let Ok(meta) =  config::utils::file::get_file_meta(f)
+            && let Ok(modified_time) = meta.modified() {
+                let modified_micros = modified_time
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_micros() as i64;
+                if modified_micros > snapshot_time {
+                    log::debug!(
+                        "[trace_id {}] skip wal parquet file created after snapshot_time: file: {f} snapshot_time: {snapshot_time} modified_time: {modified_micros}",
+                        query.trace_id,
+                    );
+                    return None;
+                }
+            }
+
+            Some(f.strip_prefix(&wal_dir)
                 .unwrap()
                 .to_string()
                 .replace('\\', "/")
                 .trim_start_matches('/')
-                .to_string()
+                .to_string())
         })
         .collect::<Vec<_>>();
 
@@ -668,6 +690,7 @@ async fn get_file_list_inner(
                 continue;
             }
         }
+
         if match_source(stream_params.clone(), time_range, &filters, &file_key).await {
             result.push(file_key);
         } else {
@@ -675,26 +698,6 @@ async fn get_file_list_inner(
         }
     }
     Ok(result)
-}
-
-/// get file list from local wal, no need match_source, each file will be
-/// searched
-#[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]
-async fn get_file_list(
-    query: Arc<super::QueryParams>,
-    partition_keys: &[StreamPartition],
-    time_range: Option<(i64, i64)>,
-    search_partition_keys: &[(String, String)],
-) -> Result<Vec<FileKey>, Error> {
-    get_file_list_inner(
-        query,
-        partition_keys,
-        time_range,
-        search_partition_keys,
-        &get_config().common.data_wal_dir,
-        "parquet",
-    )
-    .await
 }
 
 fn adapt_batch(

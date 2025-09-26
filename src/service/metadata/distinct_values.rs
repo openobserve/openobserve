@@ -30,7 +30,7 @@ use config::{
 };
 use infra::{
     errors::{Error, Result},
-    schema::unwrap_partition_time_level,
+    schema::{SchemaCache, unwrap_partition_time_level},
 };
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -215,14 +215,14 @@ impl Metadata for DistinctValues {
                 stream_name
             );
             // check for schema
-            let db_schema =
+            let mut db_schema =
                 infra::schema::get_cache(&org_id, &distinct_stream_name, StreamType::Metadata)
                     .await?;
             let mut is_new = false;
-            if db_schema.fields_map().is_empty() {
+            if !db_schema.fields_map().contains_key(TIMESTAMP_COL_NAME) {
                 is_new = true;
                 let schema = default_schema.as_ref().clone();
-                if let Err(e) = db::schema::merge(
+                match db::schema::merge(
                     &org_id,
                     &distinct_stream_name,
                     StreamType::Metadata,
@@ -231,9 +231,13 @@ impl Metadata for DistinctValues {
                 )
                 .await
                 {
-                    log::error!("[DISTINCT_VALUES] error while setting schema: {e}");
-                    return Err(Error::Message(e.to_string()));
-                }
+                    Ok(None) => {}
+                    Ok(Some((s, _))) => db_schema = SchemaCache::new(s),
+                    Err(e) => {
+                        log::error!("[DISTINCT_VALUES] error while setting schema: {e}");
+                        return Err(Error::Message(e.to_string()));
+                    }
+                };
             }
 
             let inferred_schema =
@@ -248,14 +252,14 @@ impl Metadata for DistinctValues {
                 )
                 .await
                 {
+                    Ok(None) => db_schema.schema().clone(),
+                    Ok(Some((s, _))) => Arc::new(s),
                     Err(e) => {
                         log::error!(
                             "[DISTINCT_VALUES] error while updating schema for {org_id}/{stream_name} : {e}"
                         );
                         return Err(Error::Message(e.to_string()));
                     }
-                    Ok(None) => db_schema.schema().clone(),
-                    Ok(Some((s, _))) => Arc::new(s),
                 }
             } else {
                 db_schema.schema().clone()

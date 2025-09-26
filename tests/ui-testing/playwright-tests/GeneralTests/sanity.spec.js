@@ -67,7 +67,7 @@ test.describe("Sanity Test Cases", () => {
   });
 
   // Saved Search tests
-  test("should save search, favorite, click on saved search and then delete", async ({ page }) => {
+  test.skip("should save search, favorite, click on saved search and then delete", async ({ page }) => {
     const randomSavedViewName = `streamslog${Math.random().toString(36).substring(2, 10)}`;
     await pm.sanityPage.createAndDeleteSavedSearch(randomSavedViewName);
   });

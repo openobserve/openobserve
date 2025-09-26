@@ -38,6 +38,7 @@ pub async fn get_cached_results(
         );
         return res;
     };
+    cache_metas.sort_by_key(|meta| meta.start_time);
 
     let selection_strategy = ResultCacheSelectionStrategy::from(
         config::get_config()
@@ -51,17 +52,23 @@ pub async fn get_cached_results(
         }) else {
             break;
         };
-        let cache_meta = cache_metas.remove(idx);
+        let best_cache_meta = cache_metas.remove(idx);
         if let Some(result) = super::cacher::get_cached_results(
             trace_id,
             file_path,
             cache_req.clone(),
-            Some(vec![cache_meta]),
+            Some(vec![best_cache_meta.clone()]),
         )
         .await
         {
             res.push(result);
         }
+        // Remove all overlapping metas with the selected largest meta and call recursively
+        cache_metas.retain(|meta| {
+            !best_cache_meta.eq(meta)
+                && (meta.end_time <= best_cache_meta.start_time
+                    || meta.start_time >= best_cache_meta.end_time)
+        });
     }
 
     res

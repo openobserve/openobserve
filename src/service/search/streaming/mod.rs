@@ -20,10 +20,13 @@
 
 use std::time::Instant;
 
-use config::meta::{
-    search::{StreamResponses, ValuesEventContext},
-    sql::OrderBy,
-    stream::StreamType,
+use config::{
+    meta::{
+        search::{StreamResponses, ValuesEventContext},
+        sql::OrderBy,
+        stream::StreamType,
+    },
+    utils::time::hour_micros,
 };
 use log;
 #[cfg(feature = "enterprise")]
@@ -135,11 +138,11 @@ pub async fn process_search_stream_request(
 
     if req.query.from == 0 && !req.query.track_total_hits && req.query.streaming_id.is_none() {
         // check cache for the first page
-        let c_resp = match search_cache::check_cache_v2(
+        let (c_resp, _should_exec_query) = match search_cache::prepare_cache_response(
             &trace_id,
             &org_id,
             stream_type,
-            &req,
+            &mut req,
             use_cache,
         )
         .instrument(search_span.clone())
@@ -187,6 +190,7 @@ pub async fn process_search_stream_request(
                 return;
             }
         };
+
         let local_c_resp = c_resp.clone();
         let cached_resp = local_c_resp.cached_response;
         let mut deltas = local_c_resp.deltas;
@@ -208,17 +212,20 @@ pub async fn process_search_stream_request(
             .unwrap_or_default();
 
         log::info!(
-            "[HTTP2_STREAM trace_id {trace_id}] found cache responses len:{}, cache_start_time: {c_start_time}, cache_end_time: {c_end_time}",
+            "[HTTP2_STREAM trace_id {trace_id}] found cached files: {}, records: {cached_hits}, cache_time: {c_start_time} - {c_end_time}",
             cached_resp.len(),
         );
 
         // handle cache responses and deltas
         if !cached_resp.is_empty() && cached_hits > 0 {
             // `max_query_range` is used initialize `remaining_query_range`
-            // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
-            // for cache only search
+            // set max_query_range to `end_time - start_time` as hour if it is 0, to ensure
+            // unlimited query range for cache only search
             let remaining_query_range = if max_query_range == 0 {
-                i64::MAX
+                std::cmp::max(
+                    1,
+                    (req.query.end_time - req.query.start_time) / hour_micros(1),
+                )
             } else {
                 max_query_range
             }; // hours

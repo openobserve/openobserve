@@ -409,3 +409,119 @@ impl std::fmt::Debug for Geoip {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_database_kind_from_str() {
+        match DatabaseKind::from("GeoLite2-ASN") {
+            DatabaseKind::Asn => {}
+            _ => panic!("Expected DatabaseKind::Asn for 'GeoLite2-ASN'"),
+        }
+
+        match DatabaseKind::from("GeoIP2-ISP") {
+            DatabaseKind::Isp => {}
+            _ => panic!("Expected DatabaseKind::Isp for 'GeoIP2-ISP'"),
+        }
+
+        match DatabaseKind::from("GeoIP2-Connection-Type") {
+            DatabaseKind::ConnectionType => {}
+            _ => panic!("Expected DatabaseKind::ConnectionType for 'GeoIP2-Connection-Type'"),
+        }
+
+        #[cfg(feature = "enterprise")]
+        match DatabaseKind::from("GeoIP2-Enterprise") {
+            DatabaseKind::Enterprise => {}
+            _ => panic!("Expected DatabaseKind::Enterprise for 'GeoIP2-Enterprise'"),
+        }
+
+        match DatabaseKind::from("GeoLite2-City") {
+            DatabaseKind::City => {}
+            _ => panic!("Expected DatabaseKind::City for 'GeoLite2-City'"),
+        }
+
+        match DatabaseKind::from("Unknown-Type") {
+            DatabaseKind::City => {}
+            _ => panic!("Expected DatabaseKind::City for 'Unknown-Type'"),
+        }
+    }
+
+    #[test]
+    fn test_default_locale() {
+        assert_eq!(default_locale(), "en");
+    }
+
+    #[test]
+    fn test_geoip_config_default() {
+        let config = GeoipConfig::default();
+        assert_eq!(config.locale, "en");
+        assert!(config.path.contains("GeoLite2-City.mmdb"));
+    }
+
+    #[test]
+    fn test_geoip_config_new() {
+        let config = GeoipConfig::new("test.mmdb");
+        assert_eq!(config.locale, "en");
+        assert!(config.path.contains("test.mmdb"));
+    }
+
+    #[test]
+    fn test_geoip_config_equality() {
+        let config1 = GeoipConfig {
+            path: "/test/path.mmdb".to_string(),
+            locale: "en".to_string(),
+        };
+
+        let config2 = GeoipConfig {
+            path: "/test/path.mmdb".to_string(),
+            locale: "en".to_string(),
+        };
+
+        let config3 = GeoipConfig {
+            path: "/different/path.mmdb".to_string(),
+            locale: "en".to_string(),
+        };
+
+        assert_eq!(config1, config2);
+        assert_ne!(config1, config3);
+    }
+
+    #[test]
+    fn test_geoip_config_clone() {
+        let config = GeoipConfig {
+            path: "/test/path.mmdb".to_string(),
+            locale: "en".to_string(),
+        };
+
+        let cloned = config.clone();
+        assert_eq!(config, cloned);
+    }
+
+    #[test]
+    fn test_geoip_config_serialization() {
+        let config = GeoipConfig {
+            path: "/test/path.mmdb".to_string(),
+            locale: "fr".to_string(),
+        };
+
+        let serialized = serde_json::to_string(&config).unwrap();
+        let deserialized: GeoipConfig = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(config.path, deserialized.path);
+        assert_eq!(config.locale, deserialized.locale);
+    }
+
+    #[test]
+    fn test_geoip_new_with_invalid_path() {
+        let config = GeoipConfig {
+            path: "/nonexistent/path.mmdb".to_string(),
+            locale: "en".to_string(),
+        };
+
+        let result = Geoip::new(config);
+        assert!(result.is_err());
+    }
+}

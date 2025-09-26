@@ -250,4 +250,85 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
+
+  test("should not show an error when transpose is enabled from config with custom SQL query", async ({
+    page,
+  }) => {
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
+
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+
+    // Navigate to the dashboards list
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard and add a panel
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+
+    // Select table chart type
+    await pm.chartTypeSelector.selectChartType("table");
+    
+    // Now we can access the field removal buttons
+    await pm.chartTypeSelector.removeField("_timestamp", "x");
+
+    // Open Custom SQL editor
+    await page.locator('[data-test="dashboard-customSql"]').click();
+
+    // Focus on the editor and enter the custom SQL query
+    await page.locator(".view-line").first().click();
+    await page
+      .locator('[data-test="dashboard-panel-query-editor"]')
+      .locator(".monaco-editor")
+      .click();
+    await page
+      .locator('[data-test="dashboard-panel-query-editor"]')
+      .locator(".inputarea")
+      .fill(
+        'SELECT kubernetes_namespace_name as "xAxis", count(kubernetes_namespace_name) as "y_axis_1"  FROM "e2e_automate"  GROUP BY "xAxis"'
+      );
+
+    await pm.chartTypeSelector.searchAndAddField("y_axis_1", "x");
+    await pm.chartTypeSelector.searchAndAddField("xAxis", "y");
+    
+    // Set relative time range  
+     await pm.dashboardTimeRefresh.setRelative("6", "w");    
+
+    await pm.dashboardPanelActions.waitForChartToRender();
+
+    // Open the configuration panel and enable transpose
+    await pm.dashboardPanelConfigs.openConfigPanel();
+    await pm.dashboardPanelConfigs.selectTranspose();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+
+    // Wait for chart to render after transpose and check for errors
+    await pm.dashboardPanelActions.waitForChartToRender();
+
+    // await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(1000);
+
+    // Check for dashboard errors ONLY after transpose is applied
+    const transposeErrorResult = await pm.logsVisualise.checkDashboardErrors(
+      page,
+      "Table (After Transpose)"
+    );
+
+    if (transposeErrorResult.hasErrors) {
+      transposeErrorResult.errors.forEach((error, index) => {
+      testLogger.error(`Transpose Error ${index + 1}: ${error}`);});
+
+      // Fail the test with detailed error information
+      expect(transposeErrorResult.errorTextCount).toBe(0);
+      expect(transposeErrorResult.errorListCount).toBe(0);
+    }
+
+    // Save the panel
+    await pm.dashboardPanelActions.savePanel();
+    // Delete the created dashboard
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, randomDashboardName);
+  });
 });
