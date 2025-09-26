@@ -147,23 +147,21 @@ pub fn convert_from_vrl(value: &vrl::value::Value) -> json::Value {
         vrl::value::Value::Null => json::Value::Null,
         vrl::value::Value::Boolean(b) => json::Value::Bool(*b),
         vrl::value::Value::Integer(i) => json::Value::Number(json::Number::from(*i)),
-        vrl::value::Value::Float(f) => {
-            json::Value::Number(json::Number::from_f64(f.into_inner()).unwrap_or(json::Number::from(0)))
-        }
+        vrl::value::Value::Float(f) => json::Value::Number(
+            json::Number::from_f64(f.into_inner()).unwrap_or(json::Number::from(0)),
+        ),
         vrl::value::Value::Bytes(b) => json::Value::String(String::from_utf8_lossy(b).to_string()),
         vrl::value::Value::Array(arr) => {
             json::Value::Array(arr.iter().map(convert_from_vrl).collect())
         }
-        vrl::value::Value::Object(obj) => {
-            json::Value::Object(
-                obj.iter()
-                    .map(|(k, v)| (k.to_string(), convert_from_vrl(v)))
-                    .collect(),
-            )
-        }
-        vrl::value::Value::Timestamp(ts) => {
-            json::Value::Number(json::Number::from(ts.timestamp_nanos_opt().unwrap_or(0) / 1000))
-        }
+        vrl::value::Value::Object(obj) => json::Value::Object(
+            obj.iter()
+                .map(|(k, v)| (k.to_string(), convert_from_vrl(v)))
+                .collect(),
+        ),
+        vrl::value::Value::Timestamp(ts) => json::Value::Number(json::Number::from(
+            ts.timestamp_nanos_opt().unwrap_or(0) / 1000,
+        )),
         vrl::value::Value::Regex(_) => json::Value::String("regex".to_string()),
     }
 }
@@ -514,7 +512,6 @@ mod tests {
 
     #[test]
     fn test_json_to_vrl_round_trip() {
-
         // Test null
         let null_json = json::Value::Null;
         let vrl_value = convert_to_vrl(&null_json);
@@ -582,9 +579,15 @@ mod tests {
         // Test object
         let mut object = serde_json::Map::new();
         object.insert("name".to_string(), json::Value::String("John".to_string()));
-        object.insert("age".to_string(), json::Value::Number(json::Number::from(30)));
+        object.insert(
+            "age".to_string(),
+            json::Value::Number(json::Number::from(30)),
+        );
         object.insert("active".to_string(), json::Value::Bool(true));
-        object.insert("score".to_string(), json::Value::Number(json::Number::from_f64(98.5).unwrap()));
+        object.insert(
+            "score".to_string(),
+            json::Value::Number(json::Number::from_f64(98.5).unwrap()),
+        );
         let object_json = json::Value::Object(object);
         let vrl_value = convert_to_vrl(&object_json);
         let back_to_json = convert_from_vrl(&vrl_value);
@@ -628,8 +631,8 @@ mod tests {
 
     #[test]
     fn test_vrl_to_json_round_trip() {
-        use vrl::prelude::NotNan;
         use chrono::{DateTime, Utc};
+        use vrl::prelude::NotNan;
 
         // Test null
         let null_vrl = vrl::value::Value::Null;
@@ -699,7 +702,6 @@ mod tests {
 
     #[test]
     fn test_edge_cases_and_special_values() {
-
         // Test zero values
         let zero_int_json = json::Value::Number(json::Number::from(0));
         let vrl_value = convert_to_vrl(&zero_int_json);
@@ -753,7 +755,8 @@ mod tests {
         let back_to_json = convert_from_vrl(&vrl_value);
         assert_eq!(deeply_nested, back_to_json);
 
-        // Note: Regex conversion is tested separately as it requires specific VRL regex construction
-        // For now, we'll test that our conversion functions handle all other cases without data loss
+        // Note: Regex conversion is tested separately as it requires specific VRL regex
+        // construction For now, we'll test that our conversion functions handle all other
+        // cases without data loss
     }
 }

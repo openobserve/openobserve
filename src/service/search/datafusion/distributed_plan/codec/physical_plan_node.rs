@@ -22,17 +22,18 @@ use datafusion::{
     physical_plan::ExecutionPlan,
 };
 use datafusion_proto::physical_plan::PhysicalExtensionCodec;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::{
-    aggregate_topk_exec::AggregateTopkExec, streaming_aggs_exec::StreamingAggsExec,
-    tmp_exec::TmpExec,
-};
 use prost::Message;
 use proto::cluster_rpc;
-
-use crate::service::search::datafusion::distributed_plan::{
-    empty_exec::NewEmptyExec, enrichment_exec::EnrichmentExec,
+#[cfg(feature = "enterprise")]
+use {
+    crate::service::search::datafusion::distributed_plan::enrichment_exec::EnrichmentExec,
+    o2_enterprise::enterprise::search::datafusion::distributed_plan::{
+        aggregate_topk_exec::AggregateTopkExec, streaming_aggs_exec::StreamingAggsExec,
+        tmp_exec::TmpExec,
+    },
 };
+
+use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyExec;
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
 #[derive(Debug)]
