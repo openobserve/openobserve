@@ -2365,11 +2365,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         .filter(Boolean);
 
       let groupQuery = "";
-      groupConditions.forEach((cond: any, index: any) => {
+      groupConditions.forEach((c: any, index: any) => {
         if (index > 0) {
           groupQuery += ` ${logicalOperators[index]} `;
         }
-        groupQuery += cond;
+        groupQuery += c;
       });
 
       return groupConditions.length ? `(${groupQuery})` : "";
