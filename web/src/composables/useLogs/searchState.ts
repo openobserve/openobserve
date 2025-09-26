@@ -104,7 +104,7 @@ const searchPartitionMap = reactive<Record<string, SearchPartition>>({});
 
 const histogramMappedData: any = [];
 
-const histogramResults: any = [];
+const histogramResults: any = ref([]);
 
 const initialQueryPayload: Ref<SearchRequestPayload | null> = ref(null);
 
