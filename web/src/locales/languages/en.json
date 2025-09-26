@@ -527,7 +527,8 @@
     "edit": "Edit",
     "delete": "Delete",
     "view": "View",
-    "delay": "Delay"
+    "delay": "Delay",
+    "editJson": "Edit Pipeline JSON"
   },
   "function": {
     "header": "Functions",

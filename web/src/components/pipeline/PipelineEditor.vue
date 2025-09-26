@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="pipeline-json-edit-btn"
           @click="openJsonEditor"
         >
-              <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
+              <q-tooltip>{{ t("pipeline.editJson") }}</q-tooltip>
             </q-btn>
       <q-btn
         data-test="add-pipeline-cancel-btn"
