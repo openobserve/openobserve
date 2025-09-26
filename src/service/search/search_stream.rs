@@ -1365,7 +1365,7 @@ async fn process_delta(
                 &mut search_res,
                 org_id,
                 stream_name,
-                &trace_id,
+                trace_id,
             );
         }
 
