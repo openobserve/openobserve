@@ -839,7 +839,9 @@ mod tests {
             claims,
         };
 
-        let result = process_token((validation_response, Some(token_data))).await;
+        let result = process_token((validation_response, Some(token_data)))
+            .await
+            .unwrap();
         assert!(result.is_none() || result == Some((false, false)));
     }
 
