@@ -279,7 +279,7 @@ function getIcon(data, ioType) {
       v-if="data.node_type == 'function'"
       class="q-pa-none btn-fixed-width"
       style="
-      padding: 5px 2px;
+      padding: 5px 0px;
         width: fit-content;
         display: flex;
         align-items: center;
@@ -296,8 +296,8 @@ function getIcon(data, ioType) {
         <!-- Icon -->
         <q-icon
           :name="getIcon(data, io_type)"
-          size="1em"
-          class="q-ma-sm"
+          size="1.5em"
+          class="q-my-sm q-mr-sm"
         />
       </div>
 
@@ -363,7 +363,7 @@ function getIcon(data, ioType) {
         align-items: center;
         border: none;
         cursor: pointer;
-        padding: 5px 2px;
+        padding: 5px 0px;
 
       "
       @mouseenter="handleNodeHover(id, io_type)"
@@ -375,8 +375,8 @@ function getIcon(data, ioType) {
         <!-- Icon -->
         <q-icon
           :name="getIcon(data, io_type)"
-          size="1em"
-          class="q-ma-sm"
+           size="1.5em"
+          class="q-my-sm q-mr-sm"
         />
       </div>
 
@@ -453,7 +453,7 @@ function getIcon(data, ioType) {
         align-items: center;
         border: none;
         cursor: pointer;
-        padding: 5px 2px;
+        padding: 5px 0px;
 
       "
       @mouseenter="handleNodeHover(id, io_type)"
@@ -465,8 +465,8 @@ function getIcon(data, ioType) {
         <!-- Icon -->
         <q-icon
           :name="getIcon(data, io_type)"
-          size="1em"
-          class="q-ma-sm"
+          size="1.5em"
+          class="q-my-sm q-mr-sm"
         />
       </div>
 
@@ -531,7 +531,7 @@ function getIcon(data, ioType) {
         align-items: center;
         border: none;
         cursor: pointer;
-        padding: 5px 2px;
+        padding: 5px 0px;
 
       "
       @mouseenter="handleNodeHover(id, io_type)"
@@ -553,8 +553,8 @@ function getIcon(data, ioType) {
         <!-- Icon -->
         <q-icon
           :name="getIcon(data, io_type)"
-          size="1em"
-          class="q-ma-sm"
+          size="1.5em"
+          class="q-my-sm q-mr-sm"
         />
       </div>
 
@@ -629,8 +629,8 @@ function getIcon(data, ioType) {
         <!-- Icon -->
         <q-icon
           :name="getIcon(data, io_type)"
-          size="1em"
-          class="q-ma-sm"
+          size="1.5em"
+          class="q-my-sm q-mr-sm"
         />
       </div>
 
