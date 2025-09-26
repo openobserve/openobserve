@@ -51,7 +51,7 @@ export default {
           anchor="center right"
           self="center left"
           :offset="[10, 0]"
-          class="custom-tooltip"
+          class="custom-tooltip-nodes"
           transition-show="scale"
           transition-hide="scale"
           :delay="300"
@@ -235,8 +235,8 @@ export default {
   }
 }
 
-.custom-tooltip {
-  background: rgba(30, 35, 40, 0.95);
+.custom-tooltip-nodes {
+  background: rgba(30, 35, 40, 0.95) !important;
   backdrop-filter: blur(10px);
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
