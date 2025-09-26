@@ -137,10 +137,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon name="info" color="orange" class="q-mr-sm" />
                   <span><span class="highlight">RAF (Run After Flattening):</span> Function executes after data structure is flattened</span>
                 </div>
-                <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
-                  <span>Choose timing based on when your function needs to access the data structure.</span>
-                </div>
               </q-banner>
             </q-card-section>
           </q-card>
