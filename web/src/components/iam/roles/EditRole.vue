@@ -1344,6 +1344,8 @@ const getPermissionHash = (
  * @param typeOf - Type to assign the new entities that we get from the server
  */
 const getResourceEntities = (resource: Resource | Entity) => {
+  if (!resource) return Promise.resolve(true);
+
   const listEntitiesFnMap: {
     [key: string]: (resource: Resource | Entity) => Promise<any>;
   } = {
