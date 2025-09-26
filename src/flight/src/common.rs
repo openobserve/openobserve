@@ -23,10 +23,47 @@ use config::{
 };
 use datafusion::{
     self,
-    physical_plan::{ExecutionPlan, display::DisplayableExecutionPlan},
+    physical_plan::{
+        ExecutionPlan,
+        display::DisplayableExecutionPlan,
+        metrics::{self, ExecutionPlanMetricsSet, MetricBuilder},
+    },
 };
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone)]
+pub struct RemoteScanMetrics {
+    /// Time in nanos to execute child operator and fetch batches
+    pub fetch_time: metrics::Time,
+    /// Time in nanos to perform decoding
+    pub decode_time: metrics::Time,
+    /// output rows
+    pub output_rows: metrics::Count,
+}
+
+impl RemoteScanMetrics {
+    pub fn new(input_partition: usize, metrics: &ExecutionPlanMetricsSet) -> Self {
+        // Time in nanos to execute child operator and fetch batches
+        let fetch_time = MetricBuilder::new(metrics).subset_time("fetch_time", input_partition);
+
+        // Time in nanos to perform decoding
+        let decode_time = MetricBuilder::new(metrics).subset_time("decode_time", input_partition);
+
+        // Output rows
+        let output_rows = MetricBuilder::new(metrics).output_rows(input_partition);
+
+        Self {
+            fetch_time,
+            decode_time,
+            output_rows,
+        }
+    }
+
+    pub fn record_output(&self, n: usize) {
+        self.output_rows.add(n);
+    }
+}
 
 #[derive(Debug)]
 pub enum FlightMessage {
