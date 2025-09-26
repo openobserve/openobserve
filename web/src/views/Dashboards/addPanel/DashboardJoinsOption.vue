@@ -220,4 +220,10 @@ export default defineComponent({
 .axis-container {
   margin: 5px;
 }
+
+.add-btn {
+  margin-top: 4px;
+  height: 24px !important;
+  padding: 0 !important;
+}
 </style>
