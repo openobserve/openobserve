@@ -373,7 +373,7 @@ const handlePermissionChange = (row: any, permission: string) => {
 };
 
 const getFilteredRows = computed(() => {
-  return props.rows.filter((row) => row?.show);
+  return props.rows.filter((row: any) => row?.show);
 })
 defineExpose({
   permissionsTableRef,
