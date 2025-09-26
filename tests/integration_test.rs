@@ -42,7 +42,8 @@ mod tests {
     use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS};
     use openobserve::{
         common::{
-            infra::config::ENRICHMENT_TABLES, meta::ingestion::IngestionResponse, user::UserList,
+            infra::config::ENRICHMENT_TABLES,
+            meta::{ingestion::IngestionResponse, user::UserList},
         },
         handler::{
             grpc::{auth::check_auth, flight::FlightServiceImpl},
