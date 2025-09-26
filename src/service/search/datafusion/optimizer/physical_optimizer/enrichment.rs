@@ -18,9 +18,14 @@ use std::sync::Arc;
 use datafusion::{
     common::{
         Result,
-        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
+        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter},
     },
-    physical_plan::{ExecutionPlan, joins::HashJoinExec},
+    physical_plan::{
+        ExecutionPlan,
+        coalesce_partitions::CoalescePartitionsExec,
+        joins::{HashJoinExec, PartitionMode},
+        repartition::RepartitionExec,
+    },
     sql::TableReference,
 };
 
@@ -61,11 +66,29 @@ impl TreeNodeRewriter for EnrichBroadcastJoinRewriter {
             let org_id = self.remote_scan_nodes.req.org_id.clone();
             let trace_id = self.remote_scan_nodes.req.trace_id.clone();
             let mut rewriter = EnrichmentExecRewriter::new(trace_id.clone(), org_id);
-            let hash_join = node.rewrite(&mut rewriter)?.data;
+            let mut plan = node.rewrite(&mut rewriter)?.data;
 
-            // 2. replace the HashJoinExec to EnrichBroadcastJoinExec
-            let hash_join =
-                remote_scan_to_top_if_needed(hash_join, self.remote_scan_nodes.clone())?;
+            // 2. change the HashJoinExec partition mode to CollectLeft
+            // Remove unused RepartitionExec(Hash) for collect left
+            let hash_join = plan.as_any().downcast_ref::<HashJoinExec>().unwrap();
+            if *hash_join.partition_mode() != PartitionMode::CollectLeft {
+                let left_without_repartition =
+                    remove_repartition_from_left_table(hash_join.left().clone());
+                let left = Arc::new(CoalescePartitionsExec::new(left_without_repartition));
+                plan = Arc::new(HashJoinExec::try_new(
+                    left,
+                    hash_join.right().clone(),
+                    hash_join.on().to_vec(),
+                    hash_join.filter().cloned(),
+                    hash_join.join_type(),
+                    hash_join.projection.clone(),
+                    PartitionMode::CollectLeft,
+                    hash_join.null_equality(),
+                )?) as Arc<dyn ExecutionPlan>;
+            }
+
+            // 3. replace the HashJoinExec to EnrichBroadcastJoinExec
+            let hash_join = remote_scan_to_top_if_needed(plan, self.remote_scan_nodes.clone())?;
 
             return Ok(Transformed::yes(hash_join));
         }
@@ -98,7 +121,7 @@ impl TreeNodeRewriter for EnrichmentExecRewriter {
                 let enrichment_exec = Arc::new(EnrichmentExec::new(
                     self.trace_id.clone(),
                     self.org_id.clone(),
-                    new_empty.name().to_string(),
+                    table_name.table().to_string(),
                     new_empty.schema().clone(),
                 ));
                 return Ok(Transformed::new(
@@ -106,6 +129,30 @@ impl TreeNodeRewriter for EnrichmentExecRewriter {
                     true,
                     TreeNodeRecursion::Stop,
                 ));
+            }
+        }
+        Ok(Transformed::no(node))
+    }
+}
+
+/// Remove RepartitionExec from the left table execution plan
+fn remove_repartition_from_left_table(plan: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
+    let mut rewriter = RepartitionRemover {};
+    match plan.clone().rewrite(&mut rewriter) {
+        Ok(transformed) => transformed.data,
+        Err(_) => plan,
+    }
+}
+
+struct RepartitionRemover {}
+
+impl TreeNodeRewriter for RepartitionRemover {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
+        if node.name() == "RepartitionExec" {
+            if let Some(repartition) = node.as_any().downcast_ref::<RepartitionExec>() {
+                return Ok(Transformed::yes(repartition.input().clone()));
             }
         }
         Ok(Transformed::no(node))
@@ -134,118 +181,76 @@ pub fn should_use_enrichment_broadcast_join(plan: &Arc<dyn ExecutionPlan>) -> bo
     .unwrap();
 
     // 2. check if the left table and the right table satisfy the condition
-    let mut visitor = EnrichBroadcastJoinVisitor::new();
-    plan.visit(&mut visitor)
-        .is_ok_and(|_| visitor.use_broadcast_join && count == 1)
-}
-
-#[derive(Debug)]
-struct EnrichBroadcastJoinVisitor {
-    use_broadcast_join: bool,
-}
-
-impl EnrichBroadcastJoinVisitor {
-    fn new() -> Self {
-        EnrichBroadcastJoinVisitor {
-            use_broadcast_join: false,
-        }
+    if count != 1 {
+        return false;
     }
-}
 
-impl<'n> TreeNodeVisitor<'n> for EnrichBroadcastJoinVisitor {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: &'n Arc<dyn ExecutionPlan>) -> Result<TreeNodeRecursion> {
-        if node.name() == "HashJoinExec" {
-            let hash_join = node.as_any().downcast_ref::<HashJoinExec>().unwrap();
-            let left = hash_join.left();
-            let right = hash_join.right();
-            if is_enrich_broadcast_left(left) && is_enrich_broadcast_right(right) {
-                self.use_broadcast_join = true;
+    let mut result = false;
+    let _ = plan.apply(|node| {
+        Ok(if node.name() == "HashJoinExec" {
+            if let Some(hash_join) = node.as_any().downcast_ref::<HashJoinExec>() {
+                result = is_enrichment_table(hash_join.left())
+                    && is_valid_enrich_broadcast_right(hash_join.right());
             }
-            return Ok(TreeNodeRecursion::Stop);
-        }
-        Ok(TreeNodeRecursion::Continue)
-    }
+            TreeNodeRecursion::Stop
+        } else {
+            TreeNodeRecursion::Continue
+        })
+    });
+
+    result
 }
 
-// left table should be enrichment table
-fn is_enrich_broadcast_left(left: &Arc<dyn ExecutionPlan>) -> bool {
-    let mut visitor = LeftVisitor::new();
-    left.visit(&mut visitor)
-        .is_ok_and(|_| visitor.is_enrichment_table)
+fn is_enrichment_table(plan: &Arc<dyn ExecutionPlan>) -> bool {
+    let mut found_enrichment = false;
+    let _ = plan.apply(|node| {
+        Ok(
+            if let Some(new_empty) = node.as_any().downcast_ref::<NewEmptyExec>() {
+                let table_name = TableReference::parse_str(new_empty.name());
+                if matches!(
+                    table_name.schema(),
+                    Some("enrichment_tables") | Some("enrich") // TODO: use TableReferenceExt
+                ) {
+                    found_enrichment = true;
+                    TreeNodeRecursion::Stop
+                } else {
+                    TreeNodeRecursion::Continue
+                }
+            } else {
+                TreeNodeRecursion::Continue
+            },
+        )
+    });
+    found_enrichment
 }
 
-struct LeftVisitor {
-    is_enrichment_table: bool,
-}
-
-impl LeftVisitor {
-    fn new() -> Self {
-        Self {
-            is_enrichment_table: false,
-        }
-    }
-}
-
-impl<'n> TreeNodeVisitor<'n> for LeftVisitor {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: &'n Arc<dyn ExecutionPlan>) -> Result<TreeNodeRecursion> {
-        if let Some(new_empty) = node.as_any().downcast_ref::<NewEmptyExec>() {
-            let table_name = TableReference::parse_str(new_empty.name());
-            self.is_enrichment_table = matches!(
-                table_name.schema(),
-                Some("enrichment_tables") | Some("enrich") // TODO: use TableReferenceExt
-            );
-            return Ok(TreeNodeRecursion::Continue);
-        }
-        Ok(TreeNodeRecursion::Continue)
-    }
-}
-
-// right table should be table scan and filter
-fn is_enrich_broadcast_right(right: &Arc<dyn ExecutionPlan>) -> bool {
-    let mut visitor = RightVisitor::new();
-    right
-        .visit(&mut visitor)
-        .is_ok_and(|_| visitor.is_broadcast_right)
-}
-
-struct RightVisitor {
-    is_broadcast_right: bool,
-}
-
-impl RightVisitor {
-    fn new() -> Self {
-        Self {
-            is_broadcast_right: true,
-        }
-    }
-}
-
-impl<'n> TreeNodeVisitor<'n> for RightVisitor {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: &'n Arc<dyn ExecutionPlan>) -> Result<TreeNodeRecursion> {
-        if let Some(new_empty) = node.as_any().downcast_ref::<NewEmptyExec>() {
-            let table_name = TableReference::parse_str(new_empty.name());
-            if matches!(
-                table_name.schema(),
-                Some("enrichment_tables") | Some("enrich") // TODO: use TableReferenceExt
-            ) {
-                self.is_broadcast_right = false;
-                return Ok(TreeNodeRecursion::Stop);
-            }
-        }
-        if !(node.name() == "NewEmptyExec"
-            || node.name() == "FilterExec"
-            || node.name() == "CooperativeExec"
-            || node.name() == "CoalesceBatchesExec")
-        {
-            self.is_broadcast_right = false;
-            return Ok(TreeNodeRecursion::Stop);
-        }
-        Ok(TreeNodeRecursion::Continue)
-    }
+fn is_valid_enrich_broadcast_right(plan: &Arc<dyn ExecutionPlan>) -> bool {
+    let mut is_valid = true;
+    let _ = plan.apply(|node| {
+        Ok(
+            if let Some(new_empty) = node.as_any().downcast_ref::<NewEmptyExec>() {
+                let table_name = TableReference::parse_str(new_empty.name());
+                if matches!(
+                    table_name.schema(),
+                    Some("enrichment_tables") | Some("enrich") // TODO: use TableReferenceExt
+                ) {
+                    is_valid = false;
+                    TreeNodeRecursion::Stop
+                } else {
+                    TreeNodeRecursion::Continue
+                }
+            } else if !(node.name() == "NewEmptyExec"
+                || node.name() == "FilterExec"
+                || node.name() == "CooperativeExec"
+                || node.name() == "RepartitionExec"
+                || node.name() == "CoalesceBatchesExec")
+            {
+                is_valid = false;
+                TreeNodeRecursion::Stop
+            } else {
+                TreeNodeRecursion::Continue
+            },
+        )
+    });
+    is_valid
 }

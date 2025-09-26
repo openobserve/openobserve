@@ -16,6 +16,7 @@
 use std::{any::Any, sync::Arc};
 
 use arrow::array::RecordBatch;
+use config::utils::record_batch_ext::convert_json_to_record_batch;
 use datafusion::{
     arrow::datatypes::SchemaRef,
     common::{Result, Statistics, internal_err},
@@ -30,10 +31,13 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 
+use crate::{
+    common::infra::config::ENRICHMENT_TABLES, service::db::enrichment_table::convert_from_vrl,
+};
+
 #[derive(Debug, Clone)]
 pub struct EnrichmentExec {
     trace_id: String,
-    #[allow(dead_code)]
     org_id: String,
     stream_name: String,
     schema: SchemaRef,
@@ -61,6 +65,22 @@ impl EnrichmentExec {
             EmissionType::Incremental,
             Boundedness::Bounded,
         )
+    }
+
+    pub fn trace_id(&self) -> &str {
+        &self.trace_id
+    }
+
+    pub fn org_id(&self) -> &str {
+        &self.org_id
+    }
+
+    pub fn stream_name(&self) -> &str {
+        &self.stream_name
+    }
+
+    pub fn schema(&self) -> &SchemaRef {
+        &self.schema
     }
 }
 
@@ -107,6 +127,7 @@ impl ExecutionPlan for EnrichmentExec {
 
         let data = fetch_data(
             self.trace_id.clone(),
+            self.org_id.clone(),
             self.stream_name.clone(),
             Arc::clone(&self.schema),
         );
@@ -123,11 +144,50 @@ impl ExecutionPlan for EnrichmentExec {
 }
 
 async fn fetch_data(
-    _trace_id: String,
-    _stream_name: String,
+    trace_id: String,
+    org_id: String,
+    stream_name: String,
     schema: SchemaRef,
 ) -> Result<SendableRecordBatchStream> {
-    let batches = vec![RecordBatch::new_empty(schema.clone())];
+    let key = format!("{org_id}/enrichment_tables/{stream_name}");
+
+    let enrichment_data = match ENRICHMENT_TABLES.get(&key) {
+        Some(stream_table) => {
+            log::info!(
+                "[trace_id {trace_id}] EnrichmentExec found enrichment table data for key: {key}, data length: {}",
+                stream_table.data.len()
+            );
+            stream_table.data.clone()
+        }
+        None => {
+            log::warn!(
+                "[trace_id {trace_id}] EnrichmentExec no enrichment table data found for key: {key}"
+            );
+            vec![]
+        }
+    };
+
+    if enrichment_data.is_empty() {
+        let batches = vec![RecordBatch::new_empty(schema.clone())];
+        return Ok(Box::pin(MemoryStream::try_new(
+            batches,
+            Arc::clone(&schema),
+            None,
+        )?));
+    }
+
+    let json_values: Vec<Arc<serde_json::Value>> = enrichment_data
+        .into_iter()
+        .map(|vrl_value| {
+            let json_value = convert_from_vrl(&vrl_value);
+            Arc::new(json_value)
+        })
+        .collect();
+
+    let record_batch = convert_json_to_record_batch(&schema, &json_values)
+        .map_err(|e| datafusion::common::DataFusionError::ArrowError(Box::new(e), None))?;
+
+    let batches = vec![record_batch];
     Ok(Box::pin(MemoryStream::try_new(
         batches,
         Arc::clone(&schema),

@@ -30,7 +30,9 @@ use o2_enterprise::enterprise::search::datafusion::distributed_plan::{
 use prost::Message;
 use proto::cluster_rpc;
 
-use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyExec;
+use crate::service::search::datafusion::distributed_plan::{
+    empty_exec::NewEmptyExec, enrichment_exec::EnrichmentExec,
+};
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
 #[derive(Debug)]
@@ -67,6 +69,10 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             Some(cluster_rpc::physical_plan_node::Plan::TmpExec(node)) => {
                 super::tmp_exec::try_decode(node, inputs, registry)
             }
+            #[cfg(feature = "enterprise")]
+            Some(cluster_rpc::physical_plan_node::Plan::EnrichmentExec(node)) => {
+                super::enrichment_exec::try_decode(node, inputs, registry)
+            }
             #[cfg(not(feature = "enterprise"))]
             Some(_) => {
                 internal_err!("Not supported")
@@ -87,6 +93,8 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             super::streaming_aggs_exec::try_encode(node, buf)
         } else if node.as_any().downcast_ref::<TmpExec>().is_some() {
             super::tmp_exec::try_encode(node, buf)
+        } else if node.as_any().downcast_ref::<EnrichmentExec>().is_some() {
+            super::enrichment_exec::try_encode(node, buf)
         } else {
             internal_err!("Not supported")
         }
