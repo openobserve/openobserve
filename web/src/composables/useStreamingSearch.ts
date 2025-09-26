@@ -364,6 +364,7 @@ const useHttpStreaming = () => {
       activeStreamId.value = traceId;
       
     } catch (error) {
+      console.log("last catch:",error);
       if ((error as any).name === 'AbortError') {
        // console.error('Stream was canceled');
       } else if((error as any).status === 401) {
