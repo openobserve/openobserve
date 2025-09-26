@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use datafusion::{
     arrow::datatypes::SchemaRef,
     catalog::Session,
-    common::{Result, project_schema},
+    common::Result,
     datasource::{TableProvider, TableType},
     logical_expr::TableProviderFilterPushDown,
     physical_plan::ExecutionPlan,
