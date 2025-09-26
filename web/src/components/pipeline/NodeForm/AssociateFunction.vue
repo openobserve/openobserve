@@ -123,6 +123,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('pipeline.flatteningLbl')"
             v-model="afterFlattening"
           />
+          
+          <!-- Info note explaining RAF/RBF -->
+          <q-card class="note-container">
+            <q-card-section class="q-pa-sm">
+              <div class="note-heading">Function Execution Guidelines:</div>
+              <q-banner inline dense class="note-info">
+                <div>
+                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <span><span class="highlight">RBF (Run Before Flattening):</span> Function executes before data structure is flattened</span>
+                </div>
+                <div>
+                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <span><span class="highlight">RAF (Run After Flattening):</span> Function executes after data structure is flattened</span>
+                </div>
+                <div>
+                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <span>Choose timing based on when your function needs to access the data structure.</span>
+                </div>
+              </q-banner>
+            </q-card-section>
+          </q-card>
         </div>
 
         <div
@@ -413,6 +434,47 @@ const filterFunctions = (val: any, update: any) => {
   :deep(.add-function-title) {
     display: none;
   }
+}
+
+.note-container {
+  background-color: #F9F290;
+  border-radius: 4px;
+  border: 1px solid #F5A623;
+  color: #865300;
+  width: 100%;
+  margin-bottom: 20px;
+  margin-top: 10px;
+}
+
+.note-container .highlight {
+  font-weight: bold;
+  color: #007bff; /* Blue color to highlight key terms */
+}
+
+.note-container .emphasis {
+  font-style: italic;
+  color: #555; /* Subtle dark gray for emphasis */
+}
+
+.note-container .code {
+  font-family: monospace;
+  padding: 2px 4px;
+  border-radius: 3px;
+  color: #d63384; /* Soft pinkish-red for code */
+}
+
+.note-heading {
+  font-size: medium;
+}
+
+.note-info {
+  font-size: small;
+  color: #865300;
+  background-color: #F9F290;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  justify-content: space-between;
 }
 </style>
 
