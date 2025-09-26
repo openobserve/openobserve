@@ -168,7 +168,7 @@ export const useHistogram = () => {
         searchObj.data.queryResults.aggs
       ) {
         histogramMappedData = new Map(
-          histogramResults.map((item: any) => [
+          histogramResults.value.map((item: any) => [
             item.zo_sql_key,
             JSON.parse(JSON.stringify(item)),
           ]),
@@ -242,7 +242,7 @@ export const useHistogram = () => {
       searchObj.data.queryResults.hasOwnProperty("aggs") &&
       searchObj.data.queryResults.aggs
     ) {
-      histogramResults = [];
+      histogramResults.value = [];
       histogramMappedData = [];
       const intervalMs: any =
         INTERVAL_MAP[searchObj.meta.resultGrid.chartInterval];
@@ -406,7 +406,7 @@ export const useHistogram = () => {
                   partition[0] == queryReq.query.start_time &&
                   partition[1] == queryReq.query.end_time
                 ) {
-                  histogramResults = [];
+                  histogramResults.value = [];
                   let date = new Date();
                   const startDateTime =
                     searchObj.data.customDownloadQueryObj.query.start_time /
@@ -443,7 +443,7 @@ export const useHistogram = () => {
                     currentTime += searchObj.data.histogramInterval / 1000
                   ) {
                     date = new Date(currentTime);
-                    histogramResults.push({
+                    histogramResults.value.push({
                       zo_sql_key: date.toISOString().slice(0, 19),
                       zo_sql_num: 0,
                     });
@@ -455,7 +455,7 @@ export const useHistogram = () => {
                     currentTime -= searchObj.data.histogramInterval / 1000
                   ) {
                     date = new Date(currentTime);
-                    histogramResults.push({
+                    histogramResults.value.push({
                       zo_sql_key: date.toISOString().slice(0, 19),
                       zo_sql_num: 0,
                     });
