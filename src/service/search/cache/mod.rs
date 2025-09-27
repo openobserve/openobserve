@@ -94,18 +94,9 @@ pub async fn search(
         false
     };
 
-    // Result caching check start
-    let mut origin_sql = in_req.query.sql.clone();
-    let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or(true);
-    let (stream_name, all_streams) = match resolve_stream_names(&origin_sql) {
-        // result cache doesn't support multiple stream names
-        Ok(v) => (v[0].clone(), v.join(",")),
-        Err(e) => {
-            return Err(Error::Message(e.to_string()));
-        }
-    };
-
     let mut req = in_req.clone();
+
+    // check the original query function first
     let mut query_fn = req
         .query
         .query_fn
@@ -123,67 +114,19 @@ pub async fn search(
         query_fn = None;
     }
 
-    let action = req
-        .query
-        .action_id
-        .as_ref()
-        .and_then(|v| svix_ksuid::Ksuid::from_str(v).ok());
+    // Result caching check start
+    let (mut c_resp, should_exec_query) =
+        prepare_cache_response(trace_id, org_id, stream_type, &mut req, use_cache).await?;
+    let file_path = c_resp.file_path.clone();
 
-    // calculate hash for the query with version
-    let mut hash_body = vec![CACHE_VERSION.to_string(), origin_sql.to_string()];
-    if let Some(vrl_function) = &query_fn {
-        hash_body.push(vrl_function.to_string());
-    }
-    if let Some(action_id) = action {
-        hash_body.push(action_id.to_string());
-    }
-    if !req.regions.is_empty() {
-        hash_body.extend(req.regions.clone());
-    }
-    if !req.clusters.is_empty() {
-        hash_body.extend(req.clusters.clone());
-    }
-    let mut h = config::utils::hash::gxhash::new();
-    let hashed_query = h.sum64(&hash_body.join(","));
-
-    let mut should_exec_query = true;
-
-    let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
-    let mut c_resp: MultiCachedQueryResponse = if use_cache {
-        // if cache is used, we need to check the cache
-        check_cache(
-            trace_id,
-            org_id,
-            stream_type,
-            &mut req,
-            &mut origin_sql,
-            &mut file_path,
-            is_aggregate,
-            &mut should_exec_query,
-        )
-        .await
-    } else {
-        // if cache is not used, we need to parse the sql to get the ts column and is descending
-        let query: SearchQuery = req.query.clone().into();
-        match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
-            Ok(v) => {
-                let (ts_column, is_descending) =
-                    cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
-                        .unwrap_or_default();
-
-                let order_by = v.order_by;
-
-                MultiCachedQueryResponse {
-                    ts_column,
-                    is_descending,
-                    order_by,
-                    ..Default::default()
-                }
-            }
-            Err(e) => {
-                log::error!("Error parsing sql: {e}");
-                MultiCachedQueryResponse::default()
-            }
+    // get the modified original sql from req
+    let origin_sql = in_req.query.sql.clone();
+    let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or(true);
+    let (stream_name, all_streams) = match resolve_stream_names(&origin_sql) {
+        // result cache doesn't support multiple stream names
+        Ok(v) => (v[0].clone(), v.join(",")),
+        Err(e) => {
+            return Err(Error::Message(e.to_string()));
         }
     };
 
@@ -192,7 +135,6 @@ pub async fn search(
         c_resp.deltas.push(QueryDelta {
             delta_start_time: req.query.start_time,
             delta_end_time: req.query.end_time,
-            delta_removed_hits: false,
         });
     } else if use_cache {
         log::info!(
@@ -252,7 +194,10 @@ pub async fn search(
         log::info!(
             "{}",
             search_inspector_fields(
-                format!("[trace_id {trace_id}] deltas are : {:?}", c_resp.deltas),
+                format!(
+                    "[trace_id {trace_id}] Qeury deltas are: {:?}",
+                    c_resp.deltas
+                ),
                 SearchInspectorFieldsBuilder::new()
                     .node_name(LOCAL_NODE.name.clone())
                     .component("cacher:search deltas".to_string())
@@ -266,8 +211,9 @@ pub async fn search(
                     .build()
             )
         );
+
         log::info!(
-            "[trace_id {trace_id}] Query original start time: {}, end time : {}",
+            "[trace_id {trace_id}] Query original start time: {}, end time: {}",
             req.query.start_time,
             req.query.end_time
         );
@@ -298,7 +244,7 @@ pub async fn search(
                         && c_resp.has_cached_data
                     {
                         log::info!(
-                            "[trace_id {trace_id}] Query new start time: {}, end time : {}",
+                            "[trace_id {trace_id}] Query new start time: {}, end time: {}",
                             req.query.start_time,
                             req.query.end_time
                         );
@@ -509,6 +455,113 @@ pub async fn search(
     }
 
     Ok(res)
+}
+
+#[tracing::instrument(name = "service:search:cacher:prepare_cache_response", skip_all)]
+pub async fn prepare_cache_response(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    req: &mut search::Request,
+    use_cache: bool,
+) -> Result<(MultiCachedQueryResponse, bool), Error> {
+    let mut origin_sql = req.query.sql.clone();
+    let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or(true);
+    let stream_name = match resolve_stream_names(&origin_sql) {
+        // result cache doesn't support multiple stream names
+        Ok(v) => {
+            if v.is_empty() {
+                return Err(Error::Message("Stream name is empty".to_string()));
+            } else {
+                v[0].clone()
+            }
+        }
+        Err(e) => {
+            return Err(Error::Message(e.to_string()));
+        }
+    };
+
+    let mut query_fn = req
+        .query
+        .query_fn
+        .as_ref()
+        .map(|v| match base64::decode_url(v) {
+            Ok(v) => v,
+            Err(_) => v.to_string(),
+        });
+    let is_result_array_skip_vrl = query_fn
+        .as_ref()
+        .map(|v| is_result_array_skip_vrl(v))
+        .unwrap_or(false);
+    if is_result_array_skip_vrl {
+        query_fn = None;
+    }
+
+    let action = req
+        .query
+        .action_id
+        .as_ref()
+        .and_then(|v| svix_ksuid::Ksuid::from_str(v).ok());
+
+    // calculate hash for the query with version
+    let mut hash_body = vec![CACHE_VERSION.to_string(), origin_sql.to_string()];
+    if let Some(vrl_function) = &query_fn {
+        hash_body.push(vrl_function.to_string());
+    }
+    if let Some(action_id) = action {
+        hash_body.push(action_id.to_string());
+    }
+    if !req.regions.is_empty() {
+        hash_body.extend(req.regions.clone());
+    }
+    if !req.clusters.is_empty() {
+        hash_body.extend(req.clusters.clone());
+    }
+    let mut h = config::utils::hash::gxhash::new();
+    let hashed_query = h.sum64(&hash_body.join(","));
+
+    let mut should_exec_query = true;
+
+    let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
+    let resp = if use_cache {
+        // if cache is used, we need to check the cache
+        check_cache(
+            trace_id,
+            org_id,
+            stream_type,
+            req,
+            &mut origin_sql,
+            &mut file_path,
+            is_aggregate,
+            &mut should_exec_query,
+        )
+        .await
+    } else {
+        // if cache is not used, we need to parse the sql to get the ts column and is descending
+        let query: SearchQuery = req.query.clone().into();
+        match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
+            Ok(v) => {
+                let (ts_column, is_descending) =
+                    cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
+                        .unwrap_or_default();
+
+                let order_by = v.order_by;
+
+                MultiCachedQueryResponse {
+                    ts_column,
+                    is_aggregate,
+                    is_descending,
+                    order_by,
+                    ..Default::default()
+                }
+            }
+            Err(e) => {
+                log::error!("Error parsing sql: {e}");
+                MultiCachedQueryResponse::default()
+            }
+        }
+    };
+    Ok((resp, should_exec_query))
 }
 
 // based on _timestamp of first record in config::meta::search::Response either add it in start
@@ -751,35 +804,32 @@ pub async fn write_results(
         return;
     }
 
-    // 1. remove incomplete records for histogram
-    if let Some(interval) = res.histogram_interval {
+    // 1. alignment time range for incomplete records for histogram
+    let mut accept_start_time = req_query_start_time;
+    let mut accept_end_time = req_query_end_time;
+    if is_aggregate && let Some(interval) = res.histogram_interval {
         let interval = interval * 1000 * 1000; // convert to microseconds
-        if req_query_start_time % interval != 0 || req_query_end_time % interval != 0 {
-            res.hits.remove(0); // remove first record
-            res.hits.pop(); // remove last record
-            res.total = res.hits.len();
-            res.size = res.hits.len() as i64;
-        }
+        // next interval of start_time
+        accept_start_time = accept_start_time - (accept_start_time % interval) + interval;
+        // previous interval of end_time
+        accept_end_time = accept_end_time - (accept_end_time % interval) - interval;
     }
 
-    // 2. get the latest record, used to check if need to remove records with discard_duration
+    // 2. get the data time range, check if need to remove records with discard_duration
     let delay_ts = second_micros(get_config().limit.cache_delay_secs);
-    let max_ts = Utc::now().timestamp_micros() - delay_ts;
-    let remove_item = if is_descending {
-        res.hits.first()
-    } else {
-        res.hits.last()
-    };
-    if let Some(item) = remove_item
-        && let Some(val) = item.get(ts_column)
-        && let Some(ts) = convert_ts_value_to_datetime(val)
-        && ts.timestamp_micros() > max_ts
-    {
+    let accept_end_time = std::cmp::min(Utc::now().timestamp_micros() - delay_ts, accept_end_time);
+    let last_rec_ts = get_ts_value(ts_column, res.hits.last().unwrap());
+    let first_rec_ts = get_ts_value(ts_column, res.hits.first().unwrap());
+    let data_start_time = std::cmp::min(first_rec_ts, last_rec_ts);
+    let data_end_time = std::cmp::max(first_rec_ts, last_rec_ts);
+    if data_start_time < accept_start_time || data_end_time > accept_end_time {
         res.hits.retain(|hit| {
             if let Some(hit_ts) = hit.get(ts_column)
                 && let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts)
             {
-                hit_ts_datetime.timestamp_micros() <= max_ts
+                let item_ts = hit_ts_datetime.timestamp_micros();
+                // only keep the records within the accept time range
+                item_ts >= accept_start_time && item_ts <= accept_end_time
             } else {
                 true
             }
@@ -800,11 +850,12 @@ pub async fn write_results(
     let cache_start_time = std::cmp::min(first_rec_ts, last_rec_ts);
     let mut cache_end_time = std::cmp::max(first_rec_ts, last_rec_ts);
     if (cache_end_time - cache_start_time) < delay_ts {
+        log::info!("[trace_id {trace_id}] Time range is too short for caching, skipping caching");
         return;
     }
 
     // 5. adjust the cache time range
-    if let Some(interval) = res.histogram_interval {
+    if is_aggregate && let Some(interval) = res.histogram_interval {
         cache_end_time += interval * 1000 * 1000;
     }
 
@@ -822,18 +873,22 @@ pub async fn write_results(
         match SearchService::cache::cacher::cache_results_to_disk(&file_path, &file_name, res_cache)
             .await
         {
-            Ok(_) => {
-                QUERY_RESULT_CACHE
-                    .write()
-                    .await
-                    .entry(query_key)
-                    .or_insert_with(Vec::new)
-                    .push(ResultCacheMeta {
-                        start_time: cache_start_time,
-                        end_time: cache_end_time,
-                        is_aggregate,
-                        is_descending,
-                    });
+            Ok(success) => {
+                if success {
+                    // success: true, cache to disk success
+                    // success: false, cache to disk already exists, skipping caching
+                    QUERY_RESULT_CACHE
+                        .write()
+                        .await
+                        .entry(query_key)
+                        .or_insert_with(Vec::new)
+                        .push(ResultCacheMeta {
+                            start_time: cache_start_time,
+                            end_time: cache_end_time,
+                            is_aggregate,
+                            is_descending,
+                        });
+                }
             }
             Err(e) => {
                 log::error!("Cache results to disk failed: {e}");
@@ -843,13 +898,12 @@ pub async fn write_results(
 }
 
 pub fn apply_vrl_to_response(
-    backup_query_fn: Option<String>,
+    query_fn: Option<String>,
     res: &mut config::meta::search::Response,
     org_id: &str,
     stream_name: &str,
     trace_id: &str,
 ) -> Vec<serde_json::Value> {
-    let query_fn = backup_query_fn.clone();
     let mut local_res = res.clone();
 
     local_res.hits = if let Some(query_fn) = query_fn
@@ -929,89 +983,6 @@ pub fn apply_vrl_to_response(
         local_res.hits
     };
     local_res.hits
-}
-
-#[tracing::instrument(name = "service:search:cacher:check_cache_v2", skip_all)]
-pub async fn check_cache_v2(
-    trace_id: &str,
-    org_id: &str,
-    stream_type: StreamType,
-    in_req: &search::Request,
-    use_cache: bool,
-) -> Result<MultiCachedQueryResponse, Error> {
-    // Result caching check start
-    let mut origin_sql = in_req.query.sql.clone();
-    origin_sql = origin_sql.replace('\n', " ");
-    let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
-    let stream_name = match resolve_stream_names(&origin_sql) {
-        // TODO: cache don't not support multiple stream names
-        Ok(v) => v[0].clone(),
-        Err(e) => {
-            return Err(Error::Message(e.to_string()));
-        }
-    };
-
-    let mut req = in_req.clone();
-    let query_fn = req
-        .query
-        .query_fn
-        .as_ref()
-        .and_then(|v| base64::decode_url(v).ok());
-
-    // calculate hash for the query
-    let mut hash_body = vec![origin_sql.to_string()];
-    if let Some(vrl_function) = &query_fn {
-        hash_body.push(vrl_function.to_string());
-    }
-    if !req.regions.is_empty() {
-        hash_body.extend(req.regions.clone());
-    }
-    if !req.clusters.is_empty() {
-        hash_body.extend(req.clusters.clone());
-    }
-    let mut h = config::utils::hash::gxhash::new();
-    let hashed_query = h.sum64(&hash_body.join(","));
-
-    let mut should_exec_query = true;
-
-    let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
-    Ok(if use_cache {
-        let mut resp = check_cache(
-            trace_id,
-            org_id,
-            stream_type,
-            &mut req,
-            &mut origin_sql,
-            &mut file_path,
-            is_aggregate,
-            &mut should_exec_query,
-        )
-        .await;
-        resp.is_aggregate = is_aggregate;
-        resp.trace_id = trace_id.to_string();
-        resp.file_path = file_path;
-        resp
-    } else {
-        let query = req.query.into();
-        match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
-            Ok(v) => {
-                let (ts_column, is_descending) =
-                    cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
-                        .unwrap_or_default();
-
-                MultiCachedQueryResponse {
-                    ts_column,
-                    is_descending,
-                    file_path,
-                    ..Default::default()
-                }
-            }
-            Err(e) => {
-                log::error!("[trace_id {trace_id}]: Error parsing sql: {e:?}");
-                MultiCachedQueryResponse::default()
-            }
-        }
-    })
 }
 
 fn convert_ts_value_to_datetime(ts_value: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {

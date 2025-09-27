@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 8;
+pub const DB_SCHEMA_VERSION: u64 = 9;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2312,6 +2312,15 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check search job retention
     if cfg.limit.search_job_retention == 0 {
         return Err(anyhow::anyhow!("search job retention is set to zero"));
+    }
+
+    if cfg.common.tracing_search_enabled
+        && cfg.common.otel_otlp_url.is_empty()
+        && cfg.common.otel_otlp_grpc_url.is_empty()
+    {
+        return Err(anyhow::anyhow!(
+            "Either grpc or http url should be set when enabling tracing search"
+        ));
     }
 
     // HACK instance_name
