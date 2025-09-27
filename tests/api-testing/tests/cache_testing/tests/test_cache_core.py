@@ -4,12 +4,16 @@ Main cache testing using the unified DRY architecture.
 """
 import pytest
 import os
+import logging
 from typing import Dict, Any, List
 
 from ..core.cache_client import create_cache_client, CacheTestScenarios
 from ..core.cache_validator import create_cache_validator
 from ..core.cache_analyzer import create_cache_analyzer
 from ..mock.cache_mock import create_cache_mock, MockCacheConfig
+
+# Configure logging for cache tests
+logger = logging.getLogger(__name__)
 
 
 class TestCacheCore:
@@ -31,9 +35,7 @@ class TestCacheCore:
         stream_name = test_stream_with_data
         sql = "SELECT COUNT(*) as total FROM \\\"{stream}\\\""
         
-        print(f"\\n🔍 Testing cache progression for stream: {stream_name}")
-        print(f"   Query: {sql.replace('{stream}', stream_name)}")
-        print(f"   Mode: {'MOCK' if self.use_mock else 'REAL'}")
+        logger.info(f"Testing cache progression for stream: {stream_name} in {'MOCK' if self.use_mock else 'REAL'} mode")
         
         if self.use_mock:
             # Use mock for consistent CI/CD testing
@@ -57,16 +59,13 @@ class TestCacheCore:
                 iterations=3
             )
         
-        # Print detailed metrics
-        print(f"\\n📊 Cache Progression Results:")
+        # Log result_cache_ratio progression as required
+        cache_ratios = [result.get('result_cache_ratio', 0) for result in results]
+        logger.info(f"result_cache_ratio progression: {cache_ratios}")
+        
+        # Log detailed metrics
         for i, result in enumerate(results, 1):
-            print(f"   Query {i}:")
-            print(f"     • result_cache_ratio: {result.get('result_cache_ratio', 0)}%")
-            print(f"     • cached_ratio (file): {result.get('cached_ratio', 0)}%") 
-            print(f"     • took: {result.get('took', 0)}ms")
-            print(f"     • total records: {result.get('total', 0)}")
-            print(f"     • scan_size: {result.get('scan_size', 0)} bytes")
-            print(f"     • client_time: {result.get('client_time_ms', 0)}ms")
+            logger.debug(f"Query {i}: result_cache={result.get('result_cache_ratio', 0)}%, file_cache={result.get('cached_ratio', 0)}%, took={result.get('took', 0)}ms, total={result.get('total', 0)}")
         
         # Validate results
         for result in results:
@@ -76,19 +75,10 @@ class TestCacheCore:
         # Analyze progression
         analysis = self.analyzer.analyze_cache_progression(results, "basic_cache_progression")
         
-        # Print analysis summary
-        print(f"\\n📈 Cache Analysis Summary:")
-        print(f"   • Cache effectiveness: {analysis.cache_effectiveness}")
-        print(f"   • Performance improvement: {analysis.performance_improvement:.1%}")
-        print(f"   • Max result cache: {analysis.detailed_metrics['max_result_cache']}%")
-        print(f"   • Max file cache: {analysis.detailed_metrics['max_file_cache']}%")
-        print(f"   • Avg response time: {analysis.detailed_metrics['avg_response_time']:.0f}ms")
-        print(f"   • Cache stability: {analysis.detailed_metrics['cache_stability']}")
-        print(f"   • Test duration: {analysis.duration_seconds:.2f}s")
+        # Log analysis summary
+        logger.info(f"Cache Analysis: effectiveness={analysis.cache_effectiveness}, improvement={analysis.performance_improvement:.1%}, max_result_cache={analysis.detailed_metrics['max_result_cache']}%")
         if analysis.recommendations:
-            print(f"   📝 Recommendations: {len(analysis.recommendations)} found")
-            for rec in analysis.recommendations[:2]:  # Show first 2
-                print(f"     - {rec}")
+            logger.debug(f"Recommendations: {', '.join(analysis.recommendations[:2])}")
         
         # Assertions based on test mode
         if self.use_mock:
@@ -200,7 +190,7 @@ class TestCacheCore:
         stream_name = test_stream_with_data
         sql = "SELECT COUNT(*) as total FROM \\\"{stream}\\\""
         
-        print(f"\\n⚡ Testing cache performance correlation for stream: {stream_name}")
+        logger.info(f"Testing cache performance correlation for stream: {stream_name}")
         
         if self.use_mock:
             # Generate progression showing performance improvement
@@ -235,13 +225,10 @@ class TestCacheCore:
         # Analyze performance correlation
         analysis = self.analyzer.analyze_cache_progression(results, "performance_correlation")
         
-        # Print performance metrics
-        print(f"\\n🚀 Performance Correlation Results:")
-        print(f"   Response time progression: {analysis.detailed_metrics['response_time_progression']}")
-        print(f"   Result cache progression: {analysis.detailed_metrics['result_cache_progression']}")
-        print(f"   File cache progression: {analysis.detailed_metrics['file_cache_progression']}")
-        print(f"   Performance improvement: {analysis.performance_improvement:.1%}")
-        print(f"   First query: {analysis.detailed_metrics['first_query_time']}ms → Last query: {analysis.detailed_metrics['last_query_time']}ms")
+        # Log result_cache_ratio progression as required
+        result_cache_progression = analysis.detailed_metrics['result_cache_progression']
+        logger.info(f"result_cache_ratio progression: {result_cache_progression}")
+        logger.info(f"Performance improvement: {analysis.performance_improvement:.1%} (from {analysis.detailed_metrics['first_query_time']}ms to {analysis.detailed_metrics['last_query_time']}ms)")
         
         if self.use_mock:
             # With mock data, we should see clear correlation

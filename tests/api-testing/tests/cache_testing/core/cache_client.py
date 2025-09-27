@@ -127,6 +127,7 @@ class CacheClient:
     def _parse_streaming_response(self, resp: requests.Response, client_time: float) -> Dict[str, Any]:
         """Parse streaming response and extract cache metrics."""
         import re
+        import json
         
         response_text = resp.text
         cache_data = {}
@@ -138,11 +139,11 @@ class CacheClient:
                 if line.startswith('data: {') and 'result_cache_ratio' in line:
                     try:
                         json_str = line[6:]  # Remove 'data: '
-                        data = eval(json_str)  # Parse streaming JSON
+                        data = json.loads(json_str)  # SECURITY FIX: Use json.loads instead of eval
                         cache_data.update(data)
                         break
-                    except:
-                        # Fallback regex extraction
+                    except json.JSONDecodeError:
+                        # Fallback regex extraction for malformed JSON
                         patterns = {
                             'result_cache_ratio': r'result_cache_ratio[\"\']*:\s*(\d+)',
                             'cached_ratio': r'cached_ratio[\"\']*:\s*(\d+)',

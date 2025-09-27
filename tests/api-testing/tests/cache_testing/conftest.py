@@ -216,12 +216,10 @@ def ingest_cache_data(cache_session, cache_base_url, cache_org):
     start_readable = time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(start_time / 1000000))
     end_readable = time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(end_time / 1000000))
     
-    print(f"💾 Cache test data ingested with 2-day-old timestamps:")
-    print(f"   📊 Records: {len(updated_data)}")
-    print(f"   📅 Time range: {start_readable} to {end_readable}")
-    print(f"   🏷️  Stream: {stream_name}")
-    print(f"   📤 Status: {resp.status_code}")
-    print(f"   🔍 Query this data with: start_time={start_time}, end_time={end_time}")
+    # Log cache test data ingestion (keeping essential info for debugging)
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Cache test data ingested: {len(updated_data)} records, stream={stream_name}, status={resp.status_code}, time_range={start_readable} to {end_readable}")
     
     return resp.status_code == 200
 
