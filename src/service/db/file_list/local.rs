@@ -13,141 +13,187 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::path::{Path, PathBuf};
+
 use config::meta::stream::{FileKey, FileListDeleted};
 use hashbrown::HashSet;
-use infra::errors::Result;
+use infra::{
+    errors::Result,
+    file_list::{LOCAL_CACHE, LocalCache},
+};
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
-static PENDING_DELETE_FILES: Lazy<RwLock<HashSet<String>>> =
-    Lazy::new(|| RwLock::new(HashSet::new()));
+pub struct FileDeletionManager {
+    pending: RwLock<HashSet<PathBuf>>,
+    removing: RwLock<HashSet<PathBuf>>,
 
-static REMOVING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
-
-pub async fn exist_pending_delete(file: &str) -> bool {
-    PENDING_DELETE_FILES.read().await.contains(file)
+    local_cache: LocalCache,
 }
 
-pub async fn add_pending_delete(org_id: &str, account: &str, file: &str) -> Result<()> {
-    // add to local db for persistence
-    let ts = config::utils::time::now_micros();
-    infra::file_list::LOCAL_CACHE
-        .batch_add_deleted(
-            org_id,
-            ts,
-            &[FileListDeleted {
-                id: 0,
-                account: account.to_string(),
-                file: file.to_string(),
-                index_file: false,
-                flattened: false,
-            }],
-        )
-        .await?;
-    // add to memory cache
-    PENDING_DELETE_FILES.write().await.insert(file.to_string());
-    Ok(())
-}
+impl FileDeletionManager {
+    pub fn new(local_cache: LocalCache) -> Self {
+        Self {
+            pending: Default::default(),
+            removing: Default::default(),
 
-pub async fn remove_pending_delete(file: &str) -> Result<()> {
-    // remove from local db for persistence
-    infra::file_list::LOCAL_CACHE
-        .batch_remove_deleted(&[FileKey::from_file_name(file)])
-        .await?;
-    // remove from memory cache
-    PENDING_DELETE_FILES.write().await.remove(file);
-    Ok(())
-}
-
-pub async fn get_pending_delete() -> Vec<String> {
-    PENDING_DELETE_FILES.read().await.iter().cloned().collect()
-}
-
-pub async fn filter_by_pending_delete(mut files: Vec<String>) -> Vec<String> {
-    // Acquire locks in a consistent order to prevent deadlocks
-    let pending = PENDING_DELETE_FILES.read().await;
-    let removing = REMOVING_FILES.read().await;
-
-    // Filter in a single pass using both sets
-    files.retain(|file| !pending.contains(file) && !removing.contains(file));
-    drop(pending);
-    drop(removing);
-
-    files
-}
-
-pub async fn load_pending_delete() -> Result<()> {
-    let local_mode = config::get_config().common.local_mode;
-    let files = infra::file_list::LOCAL_CACHE.list_deleted().await?;
-    for file in files {
-        if ingester::is_wal_file(local_mode, &file.file) {
-            PENDING_DELETE_FILES.write().await.insert(file.file);
+            local_cache,
         }
     }
-    Ok(())
+
+    pub async fn is_deletion_pending(&self, file: impl AsRef<Path>) -> bool {
+        self.pending.read().await.contains(file.as_ref())
+    }
+
+    pub async fn queue_for_deletion(
+        &self,
+        org_id: &str,
+        account: &str,
+        file: impl AsRef<str>,
+    ) -> Result<()> {
+        let ts = config::utils::time::now_micros();
+        let file = file.as_ref();
+
+        let file_to_local = file.to_string();
+        let write_to_local = async {
+            let file_list_deleted = FileListDeleted {
+                id: 0,
+                account: account.to_string(),
+                file: file_to_local,
+                index_file: false,
+                flattened: false,
+            };
+
+            infra::file_list::LOCAL_CACHE
+                .batch_add_deleted(org_id, ts, &[file_list_deleted])
+                .await
+        };
+
+        let write_to_inmemory = async { self.pending.write().await.insert(PathBuf::from(file)) };
+
+        let (result, _) = tokio::join!(write_to_local, write_to_inmemory);
+
+        result
+    }
+
+    pub async fn dequeue_from_deletion(&self, file: impl AsRef<str>) -> Result<()> {
+        let file = file.as_ref();
+        let remove_local_cache = async {
+            infra::file_list::LOCAL_CACHE
+                .batch_remove_deleted(&[FileKey::from_file_name(file)])
+                .await
+        };
+
+        // remove from memory cache
+        let remove_from_inmemory = async { self.pending.write().await.remove(Path::new(file)) };
+        let (result, _) = tokio::join!(remove_local_cache, remove_from_inmemory);
+
+        result
+    }
+
+    pub async fn list_pending_delete(&self) -> Vec<PathBuf> {
+        self.pending.read().await.iter().cloned().collect()
+    }
+
+    pub async fn filter_for_active<T>(&self, mut files: Vec<T>) -> Vec<T>
+    where
+        T: AsRef<Path>,
+    {
+        let (removing, pending) = tokio::join!(self.removing.read(), self.pending.read());
+
+        files.retain(|f| {
+            let path_buf = f.as_ref().to_path_buf();
+            !pending.contains(&path_buf) && !removing.contains(&path_buf)
+        });
+
+        files
+    }
+
+    pub async fn start_removing(&self, file: impl AsRef<Path>) -> Result<()> {
+        self.removing
+            .write()
+            .await
+            .insert(file.as_ref().to_path_buf());
+
+        Ok(())
+    }
+
+    pub async fn complete_removal(&self, file: impl AsRef<Path>) -> Result<()> {
+        self.removing.write().await.remove(file.as_ref());
+
+        Ok(())
+    }
+
+    pub async fn reload_pending_from_local(&self) -> Result<()> {
+        let local_mode = config::get_config().common.local_mode;
+        let (mut pending, files) =
+            tokio::join!(self.pending.write(), self.local_cache.list_deleted());
+        files?
+            .into_iter()
+            .filter(|f| ingester::is_wal_file(local_mode, &f.file))
+            .for_each(|f| {
+                pending.insert(PathBuf::from(f.file));
+            });
+
+        Ok(())
+    }
 }
 
-pub async fn add_removing(file: &str) -> Result<()> {
-    // add to memory cache
-    REMOVING_FILES.write().await.insert(file.to_string());
-    Ok(())
-}
-
-pub async fn remove_removing(file: &str) -> Result<()> {
-    // remove from memory cache
-    REMOVING_FILES.write().await.remove(file);
-    Ok(())
-}
+pub static FILE_DELETION_MANAGER: Lazy<FileDeletionManager> =
+    Lazy::new(|| FileDeletionManager::new(LOCAL_CACHE.clone()));
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use infra::file_list::connect_local_cache;
+
     use super::*;
 
     #[tokio::test]
     async fn test_exist_pending_delete() {
         // Test with non-existent file
-        let exists = exist_pending_delete("non_existent_file.parquet").await;
-        assert!(!exists);
+        let file_deletion_manager = FileDeletionManager::new(connect_local_cache());
+        assert!(
+            !file_deletion_manager
+                .is_deletion_pending(
+                    "/a/b/c/d/files/default/logs/olympics/2022/10/03/10/non_existent_file.parquet"
+                )
+                .await
+        );
 
         // Add a file and test it exists
-        let test_file = "test_file_exist.parquet";
-        PENDING_DELETE_FILES
-            .write()
-            .await
-            .insert(test_file.to_string());
+        let test_file =
+            "/a/b/c/d/files/default/logs/olympics/2022/10/03/10/test_file_exist.parquet";
+        let _ = file_deletion_manager
+            .queue_for_deletion("SomeOrg", "SomeAccount", test_file)
+            .await;
 
-        let exists = exist_pending_delete(test_file).await;
-        assert!(exists);
+        // Check if the inmemory state has been updated
+        assert!(file_deletion_manager.is_deletion_pending(test_file).await);
+        // TODO: Check if the local sqlite cache has been updated
 
         // Clean up
-        PENDING_DELETE_FILES.write().await.remove(test_file);
-    }
-
-    #[test]
-    fn test_static_variables() {
-        // Test that static variables are accessible
-        tokio::runtime::Runtime::new().unwrap().block_on(async {
-            let pending_count = PENDING_DELETE_FILES.read().await.len();
-            let removing_count = REMOVING_FILES.read().await.len();
-
-            // Just verify they're accessible (counts can be anything)
-            // Counts are usize so they're always >= 0, just verify they exist
-            let _ = pending_count;
-            let _ = removing_count;
-        });
+        let _ = file_deletion_manager.dequeue_from_deletion(test_file).await;
+        // Check if the inmemory state has been updated
+        assert!(!file_deletion_manager.is_deletion_pending(test_file).await);
+        // TODO: Check if the local sqlite cache has been updated
     }
 
     #[tokio::test]
     async fn test_concurrent_access() {
+        let file_deletion_manager = Arc::new(FileDeletionManager::new(connect_local_cache()));
+
         let test_file = "concurrent_test.parquet";
 
         // Test concurrent read/write access doesn't deadlock
-        let tasks: Vec<_> = (0..10)
+        let tasks: Vec<_> = (0..100)
             .map(|i| {
                 let file = format!("{test_file}_{i}");
+                let file_deletion_manager = file_deletion_manager.clone();
                 tokio::spawn(async move {
-                    let _ = add_removing(&file).await;
-                    let _ = remove_removing(&file).await;
+                    let _ = file_deletion_manager.start_removing(&file).await;
+                    let _ = file_deletion_manager.complete_removal(&file).await;
                 })
             })
             .collect();
@@ -158,9 +204,9 @@ mod tests {
         }
 
         // All files should be removed
-        let removing_files = REMOVING_FILES.read().await;
-        for i in 0..10 {
-            let file = format!("{test_file}_{i}");
+        let removing_files = file_deletion_manager.removing.read().await;
+        for i in 0..100 {
+            let file = PathBuf::from(format!("{test_file}_{i}"));
             assert!(!removing_files.contains(&file));
         }
     }

@@ -52,7 +52,7 @@ use tokio::{
 use crate::{
     common::infra::wal,
     service::{
-        db,
+        db::{self, file_list::local::FILE_DELETION_MANAGER},
         schema::generate_schema_for_defined_schema_fields,
         search::datafusion::exec::{self, MergeParquetResult, TableBuilder},
         tantivy::create_tantivy_index,
@@ -63,8 +63,11 @@ static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::ne
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // add the pending delete files to processing set
-    let pending_delete_files = db::file_list::local::get_pending_delete().await;
-    for file in pending_delete_files {
+    let pending_delete_files = FILE_DELETION_MANAGER.list_pending_delete().await;
+    for file in pending_delete_files
+        .into_iter()
+        .filter_map(|f| f.to_str().map(|s| s.to_string()))
+    {
         PROCESSING_FILES.write().await.insert(file);
     }
 
@@ -120,9 +123,12 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
     let cfg = get_config();
 
     let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
-    let pending_delete_files = db::file_list::local::get_pending_delete().await;
+    let pending_delete_files = FILE_DELETION_MANAGER.list_pending_delete().await;
     let files_num = pending_delete_files.len();
-    for file_key in pending_delete_files {
+    for file_key in pending_delete_files
+        .into_iter()
+        .filter_map(|f| f.to_str().map(String::from))
+    {
         if wal::lock_files_exists(&file_key) {
             continue;
         }
@@ -140,7 +146,7 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
         // need release the file
         PROCESSING_FILES.write().await.remove(&file_key);
         // delete from pending delete list
-        if let Err(e) = db::file_list::local::remove_pending_delete(&file_key).await {
+        if let Err(e) = FILE_DELETION_MANAGER.dequeue_from_deletion(&file_key).await {
             log::error!("[INGESTER:JOB] Failed to remove pending delete file: {file_key}, {e}");
         }
         // deleted successfully then update metrics
@@ -529,9 +535,9 @@ async fn move_files(
                     file.key
                 );
                 // add to pending delete list
-                if let Err(e) =
-                    db::file_list::local::add_pending_delete(&org_id, &file.account, &file.key)
-                        .await
+                if let Err(e) = FILE_DELETION_MANAGER
+                    .queue_for_deletion(&org_id, &file.account, &file.key)
+                    .await
                 {
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",
@@ -541,7 +547,7 @@ async fn move_files(
                 }
                 false
             } else {
-                db::file_list::local::add_removing(&file.key).await?;
+                FILE_DELETION_MANAGER.start_removing(&file.key).await?;
                 true
             };
 
@@ -557,12 +563,9 @@ async fn move_files(
                             e
                         );
                         // add to pending delete list
-                        if let Err(e) = db::file_list::local::add_pending_delete(
-                            &org_id,
-                            &file.account,
-                            &file.key,
-                        )
-                        .await
+                        if let Err(e) = FILE_DELETION_MANAGER
+                            .queue_for_deletion(&org_id, &file.account, &file.key)
+                            .await
                         {
                             log::error!(
                                 "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",
@@ -582,7 +585,7 @@ async fn move_files(
                 }
 
                 // remove the file from removing set
-                db::file_list::local::remove_removing(&file.key).await?;
+                FILE_DELETION_MANAGER.complete_removal(&file.key).await?;
             }
 
             // metrics

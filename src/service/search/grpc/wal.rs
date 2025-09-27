@@ -47,7 +47,8 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use crate::{
     common::infra::wal,
     service::{
-        db, file_list,
+        db::{self, file_list::local::FILE_DELETION_MANAGER},
+        file_list,
         search::{
             datafusion::{exec::TableBuilder, table_provider::memtable::NewMemTable},
             generate_filter_from_equal_items, generate_search_schema_diff,
@@ -634,7 +635,7 @@ async fn get_file_list(
     }
 
     // filter by pending delete
-    let mut files = crate::service::db::file_list::local::filter_by_pending_delete(files).await;
+    let mut files = FILE_DELETION_MANAGER.filter_for_active(files).await;
     if files.is_empty() {
         return Ok(vec![]);
     }
