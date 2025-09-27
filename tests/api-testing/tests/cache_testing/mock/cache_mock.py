@@ -133,7 +133,11 @@ class CacheMock:
             file_cache_ratio=file_cache_ratio,
             response_time=base_time,
             stream_info=stream_info,
-            query_iteration=query_iteration
+            query_iteration=query_iteration,
+            stream=stream,
+            sql=sql,
+            start_time=start_time,
+            end_time=end_time
         )
     
     def mock_production_cache_response(self, stream: str = "otlp-production") -> Dict[str, Any]:
@@ -189,7 +193,8 @@ class CacheMock:
     
     def _create_realistic_response(self, result_cache_ratio: int, file_cache_ratio: int,
                                  response_time: int, stream_info: Dict[str, Any],
-                                 query_iteration: int) -> Dict[str, Any]:
+                                 query_iteration: int, stream: str, sql: str, 
+                                 start_time: int, end_time: int) -> Dict[str, Any]:
         """Create realistic mock response with consistent data."""
         
         # Calculate scan metrics based on cache effectiveness
@@ -217,7 +222,11 @@ class CacheMock:
             'cached_ratio': file_cache_ratio,
             'took': response_time,
             'total': stream_info["total_records"],
-            'hits': self._generate_mock_hits(min(10, stream_info["total_records"])),
+            'hits': self._generate_mock_hits(
+                count=min(10, stream_info["total_records"]),
+                stream_name=stream,
+                query_key=f"{sql}_{start_time}_{end_time}"
+            ),
             'scan_size': actual_scan_size,
             'scan_records': actual_scan_records,
             'took_detail': took_detail,
@@ -239,7 +248,11 @@ class CacheMock:
             'cached_ratio': 0,
             'took': response_time,
             'total': stream_info["total_records"],
-            'hits': self._generate_mock_hits(min(10, stream_info["total_records"])),
+            'hits': self._generate_mock_hits(
+                count=min(10, stream_info["total_records"]),
+                stream_name="no_cache_stream",
+                query_key="no_cache_query"
+            ),
             'scan_size': stream_info["total_records"] * 100,
             'scan_records': stream_info["total_records"],
             'took_detail': {
@@ -251,19 +264,30 @@ class CacheMock:
             'endpoint_type': 'no_cache_mock'
         }
     
-    def _generate_mock_hits(self, count: int) -> List[Dict[str, Any]]:
-        """Generate mock log hits for response."""
+    def _generate_mock_hits(self, count: int, stream_name: str = "mock", query_key: str = "") -> List[Dict[str, Any]]:
+        """Generate consistent mock log hits for response."""
         hits = []
-        current_time = int(time.time() * 1000000)
+        
+        # Use query_key to ensure consistent data across cache states
+        seed_value = hash(f"{stream_name}_{query_key}") % 10000
+        original_state = random.getstate()  # Save random state
+        random.seed(seed_value)  # Consistent random data
+        
+        base_time = int(time.time() * 1000000) - (2 * 24 * 3600 * 1000000)  # 2 days ago
         
         for i in range(count):
-            hit_time = current_time - (i * 60 * 1000000)  # 1 minute apart
+            hit_time = base_time + (i * 60 * 1000000)  # 1 minute apart
             hits.append({
                 '_timestamp': hit_time,
                 'level': random.choice(['INFO', 'DEBUG', 'WARN', 'ERROR']),
-                'message': f'Mock log message {i + 1}',
-                'source': 'cache_test'
+                'message': f'Mock log message {i + 1} from {stream_name}',
+                'source': 'cache_test',
+                'record_id': f'cache_record_{seed_value}_{i}',
+                'query_context': query_key[:16] if query_key else 'default'
             })
+        
+        # Restore random state to avoid affecting other tests
+        random.setstate(original_state)
         
         return hits
     

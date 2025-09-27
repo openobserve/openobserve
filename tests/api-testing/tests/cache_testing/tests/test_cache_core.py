@@ -10,6 +10,7 @@ from typing import Dict, Any, List
 from ..core.cache_client import create_cache_client, CacheTestScenarios
 from ..core.cache_validator import create_cache_validator
 from ..core.cache_analyzer import create_cache_analyzer
+from ..core.cache_hits_validator import create_hits_validator
 from ..mock.cache_mock import create_cache_mock, MockCacheConfig
 
 # Configure logging for cache tests
@@ -25,6 +26,7 @@ class TestCacheCore:
         self.client = create_cache_client(cache_session, cache_config["base_url"], cache_config["org"])
         self.validator = create_cache_validator(strict_mode=False)
         self.analyzer = create_cache_analyzer()
+        self.hits_validator = create_hits_validator()
         self.mock = create_cache_mock()
         
         # Determine if we're in mock mode
@@ -80,11 +82,27 @@ class TestCacheCore:
         if analysis.recommendations:
             logger.debug(f"Recommendations: {', '.join(analysis.recommendations[:2])}")
         
+        # VALIDATE HITS CONSISTENCY - Critical for data integrity
+        if len(results) >= 2:
+            hits_analysis = self.hits_validator.validate_progression_consistency(results)
+            logger.info(f"Hits Consistency: overall_consistent={hits_analysis['overall_consistent']}, avg_integrity_score={hits_analysis['average_integrity_score']:.2%}")
+            
+            if not hits_analysis['overall_consistent']:
+                logger.warning(f"Hits consistency issues detected: {hits_analysis['recommendation']}")
+                for result in hits_analysis['progression_results']:
+                    if not result['consistency']:
+                        logger.error(f"Query {result['iteration']} (cache_ratio={result['result_cache_ratio']}%): {result['errors']}")
+        
         # Assertions based on test mode
         if self.use_mock:
             assert analysis.success, "Mock cache progression should succeed"
             assert analysis.cache_effectiveness != "no_cache_activity"
             assert analysis.detailed_metrics['max_file_cache'] > 0
+            
+            # HITS CONSISTENCY ASSERTION - Ensure cache doesn't corrupt data
+            if len(results) >= 2:
+                assert hits_analysis['overall_consistent'], f"Cache hits must be consistent across queries. Issues: {hits_analysis['recommendation']}"
+                assert hits_analysis['average_integrity_score'] > 0.95, f"Data integrity score too low: {hits_analysis['average_integrity_score']:.2%}"
         else:
             # Real cache may or may not show activity depending on data
             assert len(results) == 3, "Should execute 3 queries"
@@ -307,3 +325,42 @@ class TestCacheCore:
             # Mock should show clear difference
             assert result_with_cache['cached_ratio'] > result_without_cache['cached_ratio']
             assert result_with_cache['took'] < result_without_cache['took']
+    
+    def test_cache_hits_data_consistency(self, test_stream_with_data):
+        """Test critical requirement: hits data must be identical between cache states."""
+        stream_name = test_stream_with_data
+        sql = "SELECT _timestamp, level, message FROM \\\"{stream}\\\" ORDER BY _timestamp DESC LIMIT 15"
+        
+        logger.info(f"Testing hits data consistency for stream: {stream_name}")
+        
+        if self.use_mock:
+            # Generate multiple responses with same query but different cache states
+            baseline_response = self.mock.mock_cache_response(
+                stream=stream_name, sql=sql,
+                start_time=1640995200000000, end_time=1641081600000000,
+                use_cache=True, iteration=1  # result_cache_ratio = 0%
+            )
+            
+            cached_response = self.mock.mock_cache_response(
+                stream=stream_name, sql=sql, 
+                start_time=1640995200000000, end_time=1641081600000000,
+                use_cache=True, iteration=3  # result_cache_ratio > 0%
+            )
+            
+            # CRITICAL VALIDATION: Same query should return identical hits data
+            hits_validation = self.hits_validator.validate_hits_consistency(baseline_response, cached_response)
+            
+            logger.info(f"Hits Consistency: consistent={hits_validation.consistent}, integrity={hits_validation.data_integrity_score:.2%}, baseline_hits={hits_validation.total_hits_baseline}, cached_hits={hits_validation.total_hits_cached}")
+            
+            if not hits_validation.consistent:
+                logger.error(f"Missing records: {len(hits_validation.missing_records)}, Extra: {len(hits_validation.extra_records)}, Mismatches: {len(hits_validation.field_mismatches)}")
+                for error in hits_validation.errors:
+                    logger.error(f"Consistency error: {error}")
+            
+            # ASSERTION: Cache MUST NOT alter query results
+            assert hits_validation.consistent, f"Cache corrupted query results! Errors: {hits_validation.errors}"
+            assert hits_validation.data_integrity_score == 1.0, f"Data integrity compromised: {hits_validation.data_integrity_score:.2%}"
+            assert hits_validation.total_hits_baseline == hits_validation.total_hits_cached, "Hit counts must match"
+            assert len(hits_validation.missing_records) == 0, f"Cache lost {len(hits_validation.missing_records)} records"
+            assert len(hits_validation.extra_records) == 0, f"Cache added {len(hits_validation.extra_records)} phantom records"
+            assert len(hits_validation.field_mismatches) == 0, f"Cache corrupted {len(hits_validation.field_mismatches)} fields"
