@@ -22,3 +22,4 @@ pub mod join_reorder;
 pub mod remote_scan;
 pub mod rewrite_match;
 pub(crate) mod utils;
+pub mod histogram_sort_merge_join;

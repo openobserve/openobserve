@@ -17,6 +17,6 @@ pub mod add_sort_and_limit;
 pub mod add_timestamp;
 #[cfg(feature = "enterprise")]
 pub mod cipher;
-pub mod histogram_sort_merge_join;
+//pub mod histogram_sort_merge_join1;
 pub mod limit_join_right_side;
 pub mod rewrite_histogram;

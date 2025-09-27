@@ -16,7 +16,7 @@ message PhysicalPlanNode {
     AggregateTopkExecNode aggregate_topk = 2;
     StreamingAggsExecNode streaming_aggs = 3;
     TmpExecNode                 tmp_exec = 4;
-    HistogramSortMergeJoinExecNode histogram_sort_merge_join = 4;
+    HistogramSortMergeJoinExecNode histogram_sort_merge_join = 5;
 
   }
 }

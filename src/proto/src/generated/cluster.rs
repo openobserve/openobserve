@@ -2629,7 +2629,7 @@ pub mod query_cache_server {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PhysicalPlanNode {
-    #[prost(oneof = "physical_plan_node::Plan", tags = "1, 2, 3, 4")]
+    #[prost(oneof = "physical_plan_node::Plan", tags = "1, 2, 3, 4, 5")]
     pub plan: ::core::option::Option<physical_plan_node::Plan>,
 }
 /// Nested message and enum types in `PhysicalPlanNode`.
@@ -2707,7 +2707,6 @@ pub struct StreamingAggsExecNode {
         ::datafusion_proto::protobuf::PhysicalPlanNode,
     >,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct HistogramSortMergeJoinExecNode {
     #[prost(string, tag = "1")]
@@ -2727,7 +2726,6 @@ pub struct HistogramSortMergeJoinExecNode {
         ::datafusion_proto::protobuf::PhysicalPlanNode,
     >,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct JoinColumnPair {
     #[prost(string, tag = "1")]

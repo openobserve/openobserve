@@ -58,7 +58,7 @@ use crate::service::search::{
         context::PhysicalOptimizerContext,
         logical_optimizer::{
             add_sort_and_limit::AddSortAndLimitRule, add_timestamp::AddTimestampRule,
-            histogram_sort_merge_join::HistogramSortMergeJoinRule,
+            histogram_sort_merge_join1::HistogramSortMergeJoinRule,
             limit_join_right_side::LimitJoinRightSide, rewrite_histogram::RewriteHistogram,
         },
         physical_optimizer::{

@@ -29,7 +29,7 @@ use datafusion::{
 
 use crate::service::search::datafusion::{
     distributed_plan::histogram_sort_merge_join_exec::HistogramSortMergeJoinExec,
-    optimizer::logical_optimizer::histogram_sort_merge_join::HistogramJoinNode,
+    optimizer::logical_optimizer::histogram_sort_merge_join1::HistogramJoinNode,
 };
 
 /// Extension planner that converts HistogramJoinNode to HistogramSortMergeJoinExec
