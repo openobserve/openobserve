@@ -9,7 +9,7 @@ import requests
 import json
 import base64
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from .core.cache_client import create_cache_client
 from .mock.cache_mock import create_cache_mock
