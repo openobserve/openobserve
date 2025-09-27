@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap as stdHashMap;
+use std::{collections::HashMap as stdHashMap, sync::Arc};
 
 use async_trait::async_trait;
 use config::{
@@ -31,8 +31,10 @@ pub mod mysql;
 pub mod postgres;
 pub mod sqlite;
 
+pub type LocalCache = Arc<dyn FileList>;
+
 static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect_default);
-pub static LOCAL_CACHE: Lazy<Box<dyn FileList>> = Lazy::new(connect_local_cache);
+pub static LOCAL_CACHE: Lazy<Arc<dyn FileList>> = Lazy::new(connect_local_cache);
 
 pub fn connect_default() -> Box<dyn FileList> {
     match config::get_config().common.meta_store.as_str().into() {
@@ -43,8 +45,8 @@ pub fn connect_default() -> Box<dyn FileList> {
     }
 }
 
-pub fn connect_local_cache() -> Box<dyn FileList> {
-    Box::<sqlite::SqliteFileList>::default()
+pub fn connect_local_cache() -> Arc<dyn FileList> {
+    Arc::<sqlite::SqliteFileList>::default()
 }
 
 #[async_trait]
