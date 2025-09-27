@@ -231,6 +231,11 @@ async fn fetch_data(
         })
         .collect();
     vrl_to_json_timer.done();
+    log::info!(
+        "[trace_id {trace_id}] VRL to JSON conversion completed in {} ms, converted {} values",
+        std::time::Duration::from_nanos(metrics.vrl_to_json_time.value() as u64).as_millis(),
+        json_values.len()
+    );
 
     let json_to_record_batch_timer = metrics.json_to_record_batch_time.timer();
     let mut batches = Vec::new();
@@ -242,6 +247,12 @@ async fn fetch_data(
         batches.push(record_batch);
     }
     json_to_record_batch_timer.done();
+    log::info!(
+        "[trace_id {trace_id}] JSON to RecordBatch conversion completed in {} ms, processed {} batches with {total_rows} total rows",
+        std::time::Duration::from_nanos(metrics.json_to_record_batch_time.value() as u64)
+            .as_millis(),
+        batches.len(),
+    );
     metrics.record_output(total_rows);
 
     Ok(Box::pin(MemoryStream::try_new(
