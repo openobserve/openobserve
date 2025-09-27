@@ -33,3 +33,8 @@ CLAUDE.md
 test-results/.last-run.json
 tests/ui-testing/playwright-tests/utils/auth/user.json
 /tests/ui-testing/utils/test-mapping/archived-utils
+
+# Cache testing documentation (internal planning)
+tests/api-testing/tests/cache_testing/PRD_cache.md
+tests/api-testing/tests/cache_testing/IMPLEMENTATION_SUMMARY.md
+tests/api-testing/tests/cache_testing/**/README_*.md

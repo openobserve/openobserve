@@ -1,0 +1,223 @@
+[
+    {
+        "timestamp": 1703689200000000,
+        "level": "INFO",
+        "message": "Cache test - user login successful",
+        "service": "auth-service",
+        "user_id": "user_001",
+        "session_id": "sess_123456",
+        "ip_address": "192.168.1.100",
+        "cache_key": "auth_001",
+        "operation": "login"
+    },
+    {
+        "timestamp": 1703689260000000,
+        "level": "DEBUG",
+        "message": "Cache test - query executed successfully",
+        "service": "query-service", 
+        "query_id": "q_789012",
+        "execution_time_ms": 250,
+        "cache_hit": true,
+        "cache_key": "query_001",
+        "operation": "search"
+    },
+    {
+        "timestamp": 1703689320000000,
+        "level": "WARN",
+        "message": "Cache test - high memory usage detected",
+        "service": "cache-service",
+        "memory_usage": 85.5,
+        "threshold": 80.0,
+        "cache_size": "512MB",
+        "cache_key": "memory_001",
+        "operation": "monitor"
+    },
+    {
+        "timestamp": 1703689380000000,
+        "level": "ERROR", 
+        "message": "Cache test - connection timeout",
+        "service": "database-service",
+        "connection_id": "conn_345678",
+        "timeout_ms": 5000,
+        "retry_count": 3,
+        "cache_key": "db_001",
+        "operation": "connect"
+    },
+    {
+        "timestamp": 1703689440000000,
+        "level": "INFO",
+        "message": "Cache test - file uploaded successfully",
+        "service": "file-service",
+        "file_name": "test_document.pdf",
+        "file_size": 2048576,
+        "upload_time_ms": 1200,
+        "cache_key": "file_001",
+        "operation": "upload"
+    },
+    {
+        "timestamp": 1703689500000000,
+        "level": "DEBUG",
+        "message": "Cache test - metadata cache refreshed",
+        "service": "metadata-service",
+        "refresh_time_ms": 45,
+        "entries_count": 1500,
+        "cache_hit_ratio": 0.92,
+        "cache_key": "meta_001",
+        "operation": "refresh"
+    },
+    {
+        "timestamp": 1703689560000000,
+        "level": "INFO",
+        "message": "Cache test - streaming data processed",
+        "service": "streaming-service",
+        "stream_id": "stream_901234",
+        "records_processed": 10000,
+        "processing_time_ms": 800,
+        "cache_key": "stream_001",
+        "operation": "process"
+    },
+    {
+        "timestamp": 1703689620000000,
+        "level": "WARN",
+        "message": "Cache test - cache eviction triggered",
+        "service": "cache-service",
+        "evicted_entries": 100,
+        "reason": "memory_pressure",
+        "remaining_entries": 8900,
+        "cache_key": "evict_001",
+        "operation": "evict"
+    },
+    {
+        "timestamp": 1703689680000000,
+        "level": "ERROR",
+        "message": "Cache test - tantivy index corruption detected",
+        "service": "search-service",
+        "index_name": "logs_index",
+        "corruption_type": "segment_mismatch",
+        "recovery_action": "rebuild_required",
+        "cache_key": "tantivy_001",
+        "operation": "index"
+    },
+    {
+        "timestamp": 1703689740000000,
+        "level": "DEBUG",
+        "message": "Cache test - performance metrics collected",
+        "service": "metrics-service",
+        "cpu_usage": 45.2,
+        "memory_usage": 68.7,
+        "disk_io": 1024,
+        "network_io": 2048,
+        "cache_key": "metrics_001",
+        "operation": "collect"
+    },
+    {
+        "timestamp": 1703689800000000,
+        "level": "INFO",
+        "message": "Cache test - user session expired",
+        "service": "auth-service",
+        "user_id": "user_002",
+        "session_duration_s": 3600,
+        "logout_reason": "timeout",
+        "cache_key": "auth_002",
+        "operation": "logout"
+    },
+    {
+        "timestamp": 1703689860000000,
+        "level": "DEBUG",
+        "message": "Cache test - query cache miss occurred",
+        "service": "query-service",
+        "query_hash": "abc123def456",
+        "cache_miss_reason": "ttl_expired",
+        "fallback_time_ms": 1500,
+        "cache_key": "query_002",
+        "operation": "search"
+    },
+    {
+        "timestamp": 1703689920000000,
+        "level": "WARN",
+        "message": "Cache test - disk space running low",
+        "service": "storage-service",
+        "available_space_gb": 2.1,
+        "total_space_gb": 100.0,
+        "usage_percent": 97.9,
+        "cache_key": "storage_001",
+        "operation": "monitor"
+    },
+    {
+        "timestamp": 1703689980000000,
+        "level": "INFO",
+        "message": "Cache test - backup completed successfully",
+        "service": "backup-service",
+        "backup_size_gb": 15.7,
+        "backup_time_s": 1800,
+        "destination": "s3://backups/cache-test",
+        "cache_key": "backup_001",
+        "operation": "backup"
+    },
+    {
+        "timestamp": 1703690040000000,
+        "level": "ERROR",
+        "message": "Cache test - API rate limit exceeded",
+        "service": "api-gateway",
+        "client_ip": "10.0.0.50",
+        "requests_per_minute": 1200,
+        "rate_limit": 1000,
+        "cache_key": "rate_001",
+        "operation": "throttle"
+    },
+    {
+        "timestamp": 1703690100000000,
+        "level": "DEBUG",
+        "message": "Cache test - file statistics computed",
+        "service": "stats-service",
+        "file_count": 50000,
+        "total_size_gb": 25.4,
+        "avg_file_size_kb": 527,
+        "cache_key": "stats_001",
+        "operation": "compute"
+    },
+    {
+        "timestamp": 1703690160000000,
+        "level": "INFO",
+        "message": "Cache test - data ingestion pipeline started",
+        "service": "ingestion-service",
+        "pipeline_id": "pipe_567890",
+        "source_type": "kafka",
+        "expected_records": 1000000,
+        "cache_key": "ingest_001",
+        "operation": "start"
+    },
+    {
+        "timestamp": 1703690220000000,
+        "level": "WARN",
+        "message": "Cache test - concurrent modification detected",
+        "service": "cache-service",
+        "resource_id": "resource_123",
+        "modification_count": 3,
+        "lock_timeout_ms": 2000,
+        "cache_key": "concurrency_001",
+        "operation": "modify"
+    },
+    {
+        "timestamp": 1703690280000000,
+        "level": "DEBUG",
+        "message": "Cache test - cache invalidation triggered",
+        "service": "cache-service",
+        "invalidation_reason": "data_update",
+        "affected_keys": 25,
+        "propagation_time_ms": 150,
+        "cache_key": "invalidate_001",
+        "operation": "invalidate"
+    },
+    {
+        "timestamp": 1703690340000000,
+        "level": "ERROR",
+        "message": "Cache test - network partition detected",
+        "service": "cluster-service",
+        "partition_duration_s": 45,
+        "affected_nodes": 2,
+        "recovery_action": "automatic",
+        "cache_key": "partition_001",
+        "operation": "recover"
+    }
+]
