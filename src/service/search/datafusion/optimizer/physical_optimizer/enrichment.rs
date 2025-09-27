@@ -150,10 +150,10 @@ impl TreeNodeRewriter for RepartitionRemover {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
-        if node.name() == "RepartitionExec" {
-            if let Some(repartition) = node.as_any().downcast_ref::<RepartitionExec>() {
-                return Ok(Transformed::yes(repartition.input().clone()));
-            }
+        if node.name() == "RepartitionExec"
+            && let Some(repartition) = node.as_any().downcast_ref::<RepartitionExec>()
+        {
+            return Ok(Transformed::yes(repartition.input().clone()));
         }
         Ok(Transformed::no(node))
     }

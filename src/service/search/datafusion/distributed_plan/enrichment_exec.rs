@@ -16,16 +16,18 @@
 use std::{any::Any, sync::Arc};
 
 use arrow::array::RecordBatch;
-use config::utils::record_batch_ext::convert_json_to_record_batch;
+use config::{PARQUET_BATCH_SIZE, utils::record_batch_ext::convert_json_to_record_batch};
 use datafusion::{
     arrow::datatypes::SchemaRef,
     common::{Result, Statistics, internal_err},
+    error::DataFusionError,
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, Partitioning},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
         memory::MemoryStream,
+        metrics::{self, ExecutionPlanMetricsSet, MetricBuilder, MetricsSet},
         stream::RecordBatchStreamAdapter,
     },
 };
@@ -42,6 +44,7 @@ pub struct EnrichmentExec {
     stream_name: String,
     schema: SchemaRef,
     cache: PlanProperties,
+    metrics: ExecutionPlanMetricsSet,
 }
 
 impl EnrichmentExec {
@@ -53,6 +56,7 @@ impl EnrichmentExec {
             stream_name,
             schema,
             cache,
+            metrics: ExecutionPlanMetricsSet::new(),
         }
     }
 
@@ -87,6 +91,41 @@ impl EnrichmentExec {
 impl DisplayAs for EnrichmentExec {
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "EnrichmentExec: stream_name={}", self.stream_name)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EnrichmentMetrics {
+    /// Time in nanos to convert VRL to JSON
+    pub vrl_to_json_time: metrics::Time,
+    /// Time in nanos to convert JSON to RecordBatch
+    pub json_to_record_batch_time: metrics::Time,
+    /// output rows
+    pub output_rows: metrics::Count,
+}
+
+impl EnrichmentMetrics {
+    pub fn new(input_partition: usize, metrics: &ExecutionPlanMetricsSet) -> Self {
+        // Time in nanos to convert VRL to JSON
+        let vrl_to_json_time =
+            MetricBuilder::new(metrics).subset_time("vrl_to_json_time", input_partition);
+
+        // Time in nanos to convert JSON to RecordBatch
+        let json_to_record_batch_time =
+            MetricBuilder::new(metrics).subset_time("json_to_record_batch_time", input_partition);
+
+        // Output rows
+        let output_rows = MetricBuilder::new(metrics).output_rows(input_partition);
+
+        Self {
+            vrl_to_json_time,
+            json_to_record_batch_time,
+            output_rows,
+        }
+    }
+
+    pub fn record_output(&self, n: usize) {
+        self.output_rows.add(n);
     }
 }
 
@@ -125,11 +164,13 @@ impl ExecutionPlan for EnrichmentExec {
             );
         }
 
+        let metrics = EnrichmentMetrics::new(partition, &self.metrics);
         let data = fetch_data(
             self.trace_id.clone(),
             self.org_id.clone(),
             self.stream_name.clone(),
             Arc::clone(&self.schema),
+            metrics,
         );
         let stream = futures::stream::once(data).try_flatten();
         Ok(Box::pin(RecordBatchStreamAdapter::new(
@@ -141,6 +182,10 @@ impl ExecutionPlan for EnrichmentExec {
     fn statistics(&self) -> Result<Statistics> {
         Ok(Statistics::new_unknown(&self.schema))
     }
+
+    fn metrics(&self) -> Option<MetricsSet> {
+        Some(self.metrics.clone_inner())
+    }
 }
 
 async fn fetch_data(
@@ -148,6 +193,7 @@ async fn fetch_data(
     org_id: String,
     stream_name: String,
     schema: SchemaRef,
+    metrics: EnrichmentMetrics,
 ) -> Result<SendableRecordBatchStream> {
     let key = format!("{org_id}/enrichment_tables/{stream_name}");
 
@@ -176,6 +222,7 @@ async fn fetch_data(
         )?));
     }
 
+    let vrl_to_json_timer = metrics.vrl_to_json_time.timer();
     let json_values: Vec<Arc<serde_json::Value>> = enrichment_data
         .into_iter()
         .map(|vrl_value| {
@@ -183,11 +230,20 @@ async fn fetch_data(
             Arc::new(json_value)
         })
         .collect();
+    vrl_to_json_timer.done();
 
-    let record_batch = convert_json_to_record_batch(&schema, &json_values)
-        .map_err(|e| datafusion::common::DataFusionError::ArrowError(Box::new(e), None))?;
+    let json_to_record_batch_timer = metrics.json_to_record_batch_time.timer();
+    let mut batches = Vec::new();
+    let mut total_rows = 0;
+    for chunk in json_values.chunks(PARQUET_BATCH_SIZE) {
+        let record_batch = convert_json_to_record_batch(&schema, chunk)
+            .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))?;
+        total_rows += record_batch.num_rows();
+        batches.push(record_batch);
+    }
+    json_to_record_batch_timer.done();
+    metrics.record_output(total_rows);
 
-    let batches = vec![record_batch];
     Ok(Box::pin(MemoryStream::try_new(
         batches,
         Arc::clone(&schema),
