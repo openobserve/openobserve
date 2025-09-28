@@ -136,15 +136,8 @@ pub async fn search(
             delta_start_time: req.query.start_time,
             delta_end_time: req.query.end_time,
         });
-    } else if use_cache {
-        if c_resp.deltas.is_empty() {
-            log::info!("[trace_id {trace_id}] Query hit full cache");
-        } else {
-            log::info!(
-                "[trace_id {trace_id}] Query deltas are: {:?}",
-                c_resp.deltas
-            );
-        }
+    } else if use_cache && c_resp.deltas.is_empty() {
+        log::info!("[trace_id {trace_id}] Query hit full cache");
     }
 
     let search_role = "cache".to_string();
