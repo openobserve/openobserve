@@ -236,20 +236,22 @@ pub async fn check_cache(
             .map(|v| v.cached_response.total)
             .sum::<usize>();
 
-        let deltas = if total_hits == (sql.limit as usize) {
+        let (deltas, updated_start_time, cache_duration) = calculate_deltas_multi(
+            &cached_responses,
+            req.query.start_time,
+            req.query.end_time,
+            histogram_interval,
+        );
+        multi_resp.total_cache_duration = cache_duration as usize;
+        if let Some(start_time) = updated_start_time {
+            req.query.start_time = start_time;
+        }
+
+        // Only consider it a full cache hit if we have enough records AND no time gaps
+        let deltas = if total_hits == (sql.limit as usize) && deltas.is_empty() {
             *should_exec_query = false;
             vec![]
         } else {
-            let (deltas, updated_start_time, cache_duration) = calculate_deltas_multi(
-                &cached_responses,
-                req.query.start_time,
-                req.query.end_time,
-                histogram_interval,
-            );
-            multi_resp.total_cache_duration = cache_duration as usize;
-            if let Some(start_time) = updated_start_time {
-                req.query.start_time = start_time;
-            }
             deltas
         };
 
