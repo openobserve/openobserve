@@ -248,7 +248,7 @@ pub async fn check_cache(
         }
 
         // Only consider it a full cache hit if we have enough records AND no time gaps
-        let deltas = if total_hits == (sql.limit as usize) && deltas.is_empty() {
+        let deltas = if total_hits >= (sql.limit as usize) && deltas.is_empty() {
             *should_exec_query = false;
             vec![]
         } else {
