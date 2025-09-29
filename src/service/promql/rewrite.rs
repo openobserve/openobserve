@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::get_config;
 use promql_parser::{
     label::{MatchOp, Matcher},
     parser::VectorSelector,
@@ -28,10 +29,7 @@ impl RemoveFilterAllRewriter {
 
 impl RemoveFilterAllRewriter {
     pub fn rewrite(&self, vs: &mut VectorSelector) {
-        let placeholder = config::get_config()
-            .common
-            .dashboard_placeholder
-            .to_string();
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
 
         vs.matchers
             .matchers
@@ -90,54 +88,55 @@ mod tests {
 
     #[test]
     fn test_match_placeholder_equal_op() {
-        let placeholder = "_o2_all_";
-        let matcher = create_test_matcher("label", MatchOp::Equal, placeholder);
-        assert!(match_placeholder(&matcher, placeholder));
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let matcher = create_test_matcher("label", MatchOp::Equal, &placeholder);
+        assert!(match_placeholder(&matcher, &placeholder));
 
         let non_matching_matcher = create_test_matcher("label", MatchOp::Equal, "other_value");
-        assert!(!match_placeholder(&non_matching_matcher, placeholder));
+        assert!(!match_placeholder(&non_matching_matcher, &placeholder));
     }
 
     #[test]
     fn test_match_placeholder_not_equal_op() {
-        let placeholder = "_o2_all_";
-        let matcher = create_test_matcher("label", MatchOp::NotEqual, placeholder);
-        assert!(match_placeholder(&matcher, placeholder));
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let matcher = create_test_matcher("label", MatchOp::NotEqual, &placeholder);
+        assert!(match_placeholder(&matcher, &placeholder));
 
         let non_matching_matcher = create_test_matcher("label", MatchOp::NotEqual, "other_value");
-        assert!(!match_placeholder(&non_matching_matcher, placeholder));
+        assert!(!match_placeholder(&non_matching_matcher, &placeholder));
     }
 
     #[test]
     fn test_match_placeholder_regex_op() {
-        let placeholder = "_o2_all_";
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
         let matcher =
-            create_test_matcher("label", MatchOp::Re(Regex::new("").unwrap()), placeholder);
-        assert!(match_placeholder(&matcher, placeholder));
+            create_test_matcher("label", MatchOp::Re(Regex::new("").unwrap()), &placeholder);
+        assert!(match_placeholder(&matcher, &placeholder));
 
         let non_matching_matcher =
             create_test_matcher("label", MatchOp::Re(Regex::new("").unwrap()), "other.*");
-        assert!(!match_placeholder(&non_matching_matcher, placeholder));
+        assert!(!match_placeholder(&non_matching_matcher, &placeholder));
     }
 
     #[test]
     fn test_match_placeholder_not_regex_op() {
-        let placeholder = "_o2_all_";
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
         let matcher = create_test_matcher(
             "label",
             MatchOp::NotRe(Regex::new("").unwrap()),
-            placeholder,
+            &placeholder,
         );
-        assert!(match_placeholder(&matcher, placeholder));
+        assert!(match_placeholder(&matcher, &placeholder));
 
         let non_matching_matcher =
             create_test_matcher("label", MatchOp::NotRe(Regex::new("").unwrap()), "other.*");
-        assert!(!match_placeholder(&non_matching_matcher, placeholder));
+        assert!(!match_placeholder(&non_matching_matcher, &placeholder));
     }
 
     #[test]
     fn test_remove_filter_all_removes_placeholder_matchers() {
-        let placeholder_matcher = create_test_matcher("env", MatchOp::Equal, "_o2_all_");
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let placeholder_matcher = create_test_matcher("env", MatchOp::Equal, &placeholder);
         let normal_matcher = create_test_matcher("service", MatchOp::Equal, "web");
 
         let mut vs =
@@ -152,10 +151,14 @@ mod tests {
 
     #[test]
     fn test_remove_filter_all_removes_all_placeholder_matchers() {
-        let placeholder_matcher1 = create_test_matcher("env", MatchOp::Equal, "_o2_all_");
-        let placeholder_matcher2 = create_test_matcher("region", MatchOp::NotEqual, "_o2_all_");
-        let placeholder_matcher3 =
-            create_test_matcher("cluster", MatchOp::Re(Regex::new("").unwrap()), "_o2_all_");
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let placeholder_matcher1 = create_test_matcher("env", MatchOp::Equal, &placeholder);
+        let placeholder_matcher2 = create_test_matcher("region", MatchOp::NotEqual, &placeholder);
+        let placeholder_matcher3 = create_test_matcher(
+            "cluster",
+            MatchOp::Re(Regex::new("").unwrap()),
+            &placeholder,
+        );
 
         let mut vs = create_vector_selector_with_matchers(vec![
             placeholder_matcher1,
@@ -191,7 +194,8 @@ mod tests {
 
     #[test]
     fn test_remove_filter_all_handles_or_matchers() {
-        let placeholder_matcher = create_test_matcher("env", MatchOp::Equal, "_o2_all_");
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let placeholder_matcher = create_test_matcher("env", MatchOp::Equal, &placeholder);
         let normal_matcher = create_test_matcher("service", MatchOp::Equal, "web");
 
         let mut vs = VectorSelector {
