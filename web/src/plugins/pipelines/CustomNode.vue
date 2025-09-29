@@ -101,7 +101,7 @@ const handleNodeHover = (nodeId, ioType) => {
   
   // Clear any existing timeout
   if (hideButtonsTimeout) {
-    clearTimeout(hideButtonsTimeout);
+    window.clearTimeout(hideButtonsTimeout);
     hideButtonsTimeout = null;
   }
   
@@ -112,9 +112,33 @@ const handleNodeLeave = (nodeId) => {
   updateEdgeColors(nodeId, null, true);
   
   // Add delay before hiding buttons
-  hideButtonsTimeout = setTimeout(() => {
+  hideButtonsTimeout = window.setTimeout(() => {
     showButtons.value = false;
   }, 200);
+};
+
+// Handle mouse enter on action buttons to prevent hiding
+const handleActionButtonsEnter = () => {
+  if (hideButtonsTimeout) {
+    window.clearTimeout(hideButtonsTimeout);
+    hideButtonsTimeout = null;
+  }
+};
+
+// Handle mouse leave on action buttons to hide after delay
+const handleActionButtonsLeave = () => {
+  hideButtonsTimeout = window.setTimeout(() => {
+    showButtons.value = false;
+  }, 200);
+};
+
+// Handle delete tooltip show/hide
+const handleDeleteTooltipEnter = () => {
+  showDeleteTooltip.value = true;
+};
+
+const handleDeleteTooltipLeave = () => {
+  showDeleteTooltip.value = false;
 };
 
 
@@ -281,11 +305,14 @@ function getIcon(data, ioType) {
       type="target"
       :position="'top'"
       :class="`node_handle_custom handle_${io_type}`"
+      :data-test="`pipeline-node-${io_type}-input-handle`"
     />
 
     <div
       v-if="data.node_type == 'function'"
       class="q-pa-none btn-fixed-width"
+      :data-test="`pipeline-node-${io_type}-function-node`"
+      data-node-type="function"
       style="
       padding: 5px 0px;
         width: fit-content;
@@ -327,7 +354,7 @@ function getIcon(data, ioType) {
           {{ data.name }} - <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
         </div>
       </div>
-      <div v-show="showButtons" class="node-action-buttons" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="clearTimeout(hideButtonsTimeout)" @mouseleave="hideButtonsTimeout = setTimeout(() => showButtons = false, 200)">
+      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
         
         <q-btn
           flat
@@ -337,8 +364,9 @@ function getIcon(data, ioType) {
           size="0.6em"
           @click.stop="deleteNode(id)"
           class="node-action-btn delete-btn"
-          @mouseenter="showDeleteTooltip = true"
-          @mouseleave="showDeleteTooltip = false"
+          :data-test="`pipeline-node-${io_type}-delete-btn`"
+          @mouseenter="handleDeleteTooltipEnter"
+          @mouseleave="handleDeleteTooltipLeave"
         />
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
@@ -350,6 +378,8 @@ function getIcon(data, ioType) {
     <div
       v-if="data.node_type == 'stream'"
       class=" q-pa-none btn-fixed-width"
+      :data-test="`pipeline-node-${io_type}-stream-node`"
+      data-node-type="stream"
       style="
         width: fit-content;
         display: flex;
@@ -404,7 +434,7 @@ function getIcon(data, ioType) {
           {{ data.stream_type }} - {{    data.stream_name }}
         </div>
       </div>
-      <div v-show="showButtons" class="node-action-buttons" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="clearTimeout(hideButtonsTimeout)" @mouseleave="hideButtonsTimeout = setTimeout(() => showButtons = false, 200)">
+      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
         
         <q-btn
           flat
@@ -414,8 +444,9 @@ function getIcon(data, ioType) {
           size="0.6em"
           @click.stop="deleteNode(id)"
           class="node-action-btn delete-btn"
-          @mouseenter="showDeleteTooltip = true"
-          @mouseleave="showDeleteTooltip = false"
+          :data-test="`pipeline-node-${io_type}-delete-btn`"
+          @mouseenter="handleDeleteTooltipEnter"
+          @mouseleave="handleDeleteTooltipLeave"
         />
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
@@ -426,6 +457,8 @@ function getIcon(data, ioType) {
     <div
       v-if="data.node_type == 'remote_stream'"
       class=" q-pa-none btn-fixed-width"
+      :data-test="`pipeline-node-${io_type}-remote-stream-node`"
+      data-node-type="remote_stream"
       style="
         width: fit-content;
         display: flex;
@@ -467,7 +500,7 @@ function getIcon(data, ioType) {
           {{ data.destination_name }}
         </div>
       </div>
-      <div v-show="showButtons" class="node-action-buttons" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="clearTimeout(hideButtonsTimeout)" @mouseleave="hideButtonsTimeout = setTimeout(() => showButtons = false, 200)">
+      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
         
         <q-btn
           flat
@@ -477,8 +510,9 @@ function getIcon(data, ioType) {
           size="0.6em"
           @click.stop="deleteNode(id)"
           class="node-action-btn delete-btn"
-          @mouseenter="showDeleteTooltip = true"
-          @mouseleave="showDeleteTooltip = false"
+          :data-test="`pipeline-node-${io_type}-delete-btn`"
+          @mouseenter="handleDeleteTooltipEnter"
+          @mouseleave="handleDeleteTooltipLeave"
         />
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
@@ -490,6 +524,8 @@ function getIcon(data, ioType) {
     <div
       v-if="data.node_type == 'query'"
       class=" q-pa-none btn-fixed-width"
+      :data-test="`pipeline-node-${io_type}-query-node`"
+      data-node-type="query"
       style="
         width: fit-content;
         display: flex;
@@ -531,7 +567,7 @@ function getIcon(data, ioType) {
         </div>
       </div>
 
-      <div v-show="showButtons" class="node-action-buttons" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="clearTimeout(hideButtonsTimeout)" @mouseleave="hideButtonsTimeout = setTimeout(() => showButtons = false, 200)">
+      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
         
         <q-btn
           flat
@@ -541,8 +577,9 @@ function getIcon(data, ioType) {
           size="0.6em"
           @click.stop="deleteNode(id)"
           class="node-action-btn delete-btn"
-          @mouseenter="showDeleteTooltip = true"
-          @mouseleave="showDeleteTooltip = false"
+          :data-test="`pipeline-node-${io_type}-delete-btn`"
+          @mouseenter="handleDeleteTooltipEnter"
+          @mouseleave="handleDeleteTooltipLeave"
         />
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
@@ -554,6 +591,8 @@ function getIcon(data, ioType) {
     <div
       v-if="data.node_type == 'condition'"
       class=" q-pa-none btn-fixed-width"
+      :data-test="`pipeline-node-${io_type}-condition-node`"
+      data-node-type="condition"
       style="
         width: fit-content;
         display: flex;
@@ -593,7 +632,7 @@ function getIcon(data, ioType) {
   </div>
       </div>
 
-      <div v-show="showButtons" class="node-action-buttons" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="clearTimeout(hideButtonsTimeout)" @mouseleave="hideButtonsTimeout = setTimeout(() => showButtons = false, 200)">
+      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
         
         <q-btn
           flat
@@ -603,8 +642,9 @@ function getIcon(data, ioType) {
           size="0.6em"
           @click.stop="deleteNode(id)"
           class="node-action-btn delete-btn"
-          @mouseenter="showDeleteTooltip = true"
-          @mouseleave="showDeleteTooltip = false"
+          :data-test="`pipeline-node-${io_type}-delete-btn`"
+          @mouseenter="handleDeleteTooltipEnter"
+          @mouseleave="handleDeleteTooltipLeave"
         />
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
@@ -618,6 +658,7 @@ function getIcon(data, ioType) {
       type="source"
       :position="'bottom'"
       :class="`node_handle_custom handle_${io_type}`"
+      :data-test="`pipeline-node-${io_type}-output-handle`"
     />
   </div>
 

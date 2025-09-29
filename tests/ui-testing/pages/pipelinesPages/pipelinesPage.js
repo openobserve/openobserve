@@ -217,7 +217,7 @@ export class PipelinesPage {
 
     async selectAndDragSecondStream() {
         await this.secondStreamButton.click();
-        await this.dragStreamToTarget(this.secondStreamButton,{ x: 80, y: 80 });
+        await this.dragStreamToTarget(this.secondStreamButton,{ x: 180, y: 180 });
     }
 
     async selectAndDragFunction() {
