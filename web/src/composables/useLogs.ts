@@ -161,7 +161,7 @@ const defaultObject = {
     pageType: "logs", // 'logs' or 'stream
     regions: [],
     clusters: [],
-    useUserDefinedSchemas: "user_defined_schema",
+    useUserDefinedSchemas: "",
     hasUserDefinedSchemas: false,
     selectedTraceStream: "",
     showSearchScheduler: false,
@@ -753,7 +753,11 @@ const useLogs = () => {
       query["type"] = searchObj.meta.pageType;
     }
 
-    query["defined_schemas"] = searchObj.meta.useUserDefinedSchemas;
+
+    if (searchObj.meta.hasUserDefinedSchemas || searchObj.meta.quickMode) {
+      query["defined_schemas"] = searchObj.meta.useUserDefinedSchemas;
+    }
+
     query["org_identifier"] = store.state.selectedOrganization.identifier;
     query["quick_mode"] = searchObj.meta.quickMode;
     query["show_histogram"] = searchObj.meta.showHistogram;
@@ -4679,6 +4683,12 @@ const useLogs = () => {
       await getFunctions();
       if (isActionsEnabled.value) await getActions();
       await extractFields();
+
+      // If uds is present
+      // if route has defined_schemas
+      // If defined_schemas has interesting_fields check if quick_mode is true
+      setFieldSchemaTab(true, true);
+
       if (searchObj.meta.jobId == "") {
         await getQueryData();
       } else {
@@ -4689,6 +4699,47 @@ const useLogs = () => {
       console.log("Error while loading logs data", e);
       searchObj.loading = false;
     }
+  };
+
+  const setFieldSchemaTab = (checkRoute: boolean = false, forceToDefault: boolean = false) => {
+    if(!searchObj.data.stream.selectedStream.length){
+      return;
+    }
+
+    // Priority 1 route
+    const defaultSchemaTab = getDefaultFieldSchemaTab();
+    let definedSchemas = "";
+
+    if(checkRoute || forceToDefault) {
+     definedSchemas = checkRoute && router.currentRoute.value?.query?.defined_schemas ? router.currentRoute.value?.query?.defined_schemas : defaultSchemaTab;
+    }
+
+    
+    if(definedSchemas) {
+      if ((definedSchemas === "interesting_fields" || definedSchemas === "interesting") && searchObj.meta.quickMode) {
+        searchObj.meta.useUserDefinedSchemas = "interesting_fields";
+        return;
+      } else if ((definedSchemas === "user_defined_schema" || definedSchemas === "uds") && searchObj.meta.hasUserDefinedSchemas) {
+        searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
+        return;
+      } else if (definedSchemas === "all_fields" || definedSchemas === "all") {
+        searchObj.meta.useUserDefinedSchemas = "all_fields";
+        return;
+      }
+    }
+
+    // if no default field list is set, then set default tab as all fields
+    if( searchObj.meta.useUserDefinedSchemas === "interesting_fields"){
+      return;
+    } else if (searchObj.meta.hasUserDefinedSchemas){
+      searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
+    } else {
+      searchObj.meta.useUserDefinedSchemas = "all_fields";
+    }
+  };
+
+  const getDefaultFieldSchemaTab = () => {
+    return store.state.zoConfig.log_page_default_field_list;
   };
 
   const loadVisualizeData = async () => {
@@ -5087,7 +5138,8 @@ const useLogs = () => {
           errorMsg: "",
           errorDetail: "",
         };
-        extractFields();
+        await extractFields();
+        setFieldSchemaTab();
       }
     } catch (e: any) {
       console.info("Error while getting stream data:", e);
@@ -7228,7 +7280,8 @@ const useLogs = () => {
     processHttpHistogramResults,
     getVisualizationConfig,
     encodeVisualizationConfig,
-    decodeVisualizationConfig
+    decodeVisualizationConfig,
+    getDefaultFieldSchemaTab
   };
 };
 

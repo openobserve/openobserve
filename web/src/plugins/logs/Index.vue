@@ -588,6 +588,7 @@ export default defineComponent({
       getVisualizationConfig,
       encodeVisualizationConfig,
       decodeVisualizationConfig,
+      getDefaultFieldSchemaTab,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -900,6 +901,7 @@ export default defineComponent({
 
           searchObj.meta.quickMode = isQuickModeEnabled();
           searchObj.meta.showHistogram = isHistogramEnabled();
+          searchObj.meta.useUserDefinedSchemas = getDefaultFieldSchemaTab();
 
           restoreUrlQueryParams(dashboardPanelData);
 

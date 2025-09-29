@@ -1032,18 +1032,6 @@ export default defineComponent({
       },
     );
 
-    /**
-     * Added this watcher to set default field tab when user defined schema toggle is changed
-     * As when user selects stream defineSchema flag is set and there is no any event to identify that
-     * so we are using this watcher to set default field tab as per the stream settings
-     */
-    watch(() => showUserDefinedSchemaToggle.value, () => {
-      setDefaultFieldTab();
-    },
-    {
-      immediate: true,
-    });
-
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
         streamOptions.value = streamList.value;
