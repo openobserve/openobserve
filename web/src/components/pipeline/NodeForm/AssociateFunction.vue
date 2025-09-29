@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-card class="function-definition-card">
             <q-card-section class="function-definition-header q-pb-sm">
               <div class="text-body1 text-weight-medium text-primary">
-                Function Definition
+                {{ t('function.function_definition') }}
               </div>
             </q-card-section>
             <q-separator />

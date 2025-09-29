@@ -567,7 +567,8 @@
     "streamPipeline": "Pipelines",
     "streamRouting": "Stream Routing",
     "testFunction": "Test Function",
-    "errorDetails": "Error"
+    "errorDetails": "Error",
+    "function_definition":"Function Definition"
   },
   "confirmDialog": {
     "cancel": "Cancel",
