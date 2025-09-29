@@ -47,21 +47,18 @@
   <script>
   import { getImageURL } from "@/utils/zincutils";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
-  import { defineComponent, computed, onBeforeMount } from 'vue';
+  import { defineComponent, computed } from 'vue';
   import { VueFlow } from "@vue-flow/core";
-  import { ref, onMounted, onActivated, watch } from "vue";
-import { ControlButton, Controls } from '@vue-flow/controls'
+  import { ref, onMounted } from "vue";
 import CustomNode from '@/plugins/pipelines/CustomNode.vue';
 import CustomEdge from "@/plugins/pipelines/CustomEdge.vue";
 /* import the required styles */
 import "@vue-flow/core/dist/style.css";
-import '@vue-flow/controls/dist/style.css'
 import useDragAndDrop from '@/plugins/pipelines/useDnD';
 const functionImage = getImageURL("images/pipeline/transform_function.png");
 const streamImage = getImageURL("images/pipeline/input_stream.png");
 const streamOutputImage = getImageURL("images/pipeline/output_stream.png");
 const externalOutputImage = getImageURL("images/pipeline/output_remote.png");
-const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/transform_condition.png");
 const queryImage = getImageURL("images/pipeline/input_query.png");
 
@@ -70,7 +67,7 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
     props: {
       pipeline: Object
     },
-    components: { VueFlow, CustomNode, Controls,ControlButton,DropzoneBackground ,CustomEdge},
+    components: { VueFlow, CustomNode, DropzoneBackground, CustomEdge},
     setup(props) {
       const {
       pipelineObj,
@@ -84,9 +81,6 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
         }));
       });
   
-      const edges = computed(() => {
-        return props.pipeline.edges || [];
-      });
 
       onMounted(async () => {
 
@@ -171,24 +165,14 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
       // Return the computed properties
       return {
         lockedNodes,
-        edges,
         vueFlowRef,
         pipelineObj,
-        streamImage,
       };
 
     }
   });
   </script>
   
-  <style lang="scss" scoped>
-  .pipeline-view-tooltip {
-    width: 500px; /* Adjust the width */
-    height: 300px; /* Adjust the height */
-    overflow: auto;
-  }
-  </style>
-
   <style lang="scss">
   /* Simple tooltip styling - let CustomNode handle everything else */
   .pipeline-view-tooltip {
