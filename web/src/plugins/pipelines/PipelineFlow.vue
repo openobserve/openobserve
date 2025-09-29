@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
    <!-- Edge deletion help notification -->
    <div v-if="showEdgeHelpNotification" class="edge-help-notification">
      <q-icon name="info" class="q-mr-xs" size="16px" />
-     Double-click edge to delete or press Backspace/Delete
+     Press Backspace/Delete to remove the edge
    </div>
    
  </div>
@@ -39,7 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @nodes-change="onNodesChange"
       @edges-change="onEdgesChange"
       @edge-click="onEdgeClick"
-      @edge-double-click="onEdgeDoubleClick"
       @connect="onConnect"
       @dragover="onDragOver"
       :default-viewport="{ zoom: 1.5 }"
@@ -164,18 +163,14 @@ export default {
       showEdgeHelpNotification.value = true
       console.log('Notification state set to:', showEdgeHelpNotification.value)
       
-      // Auto-hide notification after 2.5 seconds (reduced from 4)
+      // Auto-hide notification after 3.5 seconds 
       notificationTimeout = setTimeout(() => {
         console.log('Auto-hiding notification')
         showEdgeHelpNotification.value = false
         notificationTimeout = null
-      }, 2500)
+      }, 3500)
     }
 
-    // Handle edge double-click events
-    const onEdgeDoubleClick = (event) => {
-      removeEdges([event.edge.id])
-    }
 
 
 
@@ -219,7 +214,6 @@ function resetTransform() {
       onConnect,
       validateConnection,
       onEdgeClick,
-      onEdgeDoubleClick,
       showEdgeHelpNotification,
       zoomIn,
       zoomOut,
