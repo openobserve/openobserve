@@ -70,7 +70,9 @@ impl TreeNodeRewriter for EnrichBroadcastJoinRewriter {
 
             // 2. change the HashJoinExec partition mode to CollectLeft
             // Remove unused RepartitionExec(Hash) for collect left
-            let hash_join = plan.as_any().downcast_ref::<HashJoinExec>().unwrap();
+            let Some(hash_join) = plan.as_any().downcast_ref::<HashJoinExec>() else {
+                return internal_err!("Expected HashJoinExec but got different execution plan");
+            };
             if *hash_join.partition_mode() != PartitionMode::CollectLeft {
                 let left_without_repartition =
                     remove_repartition_from_left_table(hash_join.left().clone());
