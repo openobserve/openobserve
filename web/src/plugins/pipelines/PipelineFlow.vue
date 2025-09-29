@@ -150,7 +150,6 @@ export default {
 
     // Handle edge click events
     const onEdgeClick = (event) => {
-      console.log('Edge click event triggered')
       
       // Clear any existing timeout
       if (notificationTimeout) {
@@ -159,13 +158,10 @@ export default {
       }
       
       // Always show notification on edge click (even if already visible)
-      console.log('Showing notification for edge click')
       showEdgeHelpNotification.value = true
-      console.log('Notification state set to:', showEdgeHelpNotification.value)
       
       // Auto-hide notification after 3.5 seconds 
       notificationTimeout = setTimeout(() => {
-        console.log('Auto-hiding notification')
         showEdgeHelpNotification.value = false
         notificationTimeout = null
       }, 3500)

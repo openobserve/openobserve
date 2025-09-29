@@ -3,7 +3,7 @@
       <VueFlow 
       ref="vueFlowRef"
         v-model:nodes="lockedNodes"
-        v-model:edges="pipelineObj.currentSelectedPipeline.edges"
+        v-model:edges="edges"
         :options="{ readOnly: true }"
         :default-viewport="{ zoom: 0 }"
 
@@ -79,6 +79,10 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
           ...node,
           type: node.io_type
         }));
+      });
+
+      const edges = computed(() => {
+        return props.pipeline.edges || [];
       });
   
 
@@ -165,8 +169,10 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
       // Return the computed properties
       return {
         lockedNodes,
+        edges,
         vueFlowRef,
         pipelineObj,
+        streamImage,
       };
 
     }
