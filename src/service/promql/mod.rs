@@ -33,6 +33,7 @@ mod engine;
 mod exec;
 mod functions;
 pub mod name_visitor;
+mod rewrite;
 pub mod search;
 pub mod selector_visitor;
 mod utils;
