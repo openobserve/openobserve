@@ -136,11 +136,8 @@ pub async fn search(
             delta_start_time: req.query.start_time,
             delta_end_time: req.query.end_time,
         });
-    } else if use_cache {
-        log::info!(
-            "[trace_id {trace_id}] Query deltas are: {:?}",
-            c_resp.deltas
-        );
+    } else if use_cache && c_resp.deltas.is_empty() {
+        log::info!("[trace_id {trace_id}] Query hit full cache");
     }
 
     let search_role = "cache".to_string();
@@ -807,17 +804,24 @@ pub async fn write_results(
     // 1. alignment time range for incomplete records for histogram
     let mut accept_start_time = req_query_start_time;
     let mut accept_end_time = req_query_end_time;
+    let mut need_adjust_end_time = false;
     if is_aggregate && let Some(interval) = res.histogram_interval {
         let interval = interval * 1000 * 1000; // convert to microseconds
         // next interval of start_time
-        accept_start_time = accept_start_time - (accept_start_time % interval) + interval;
+        if (accept_start_time % interval) != 0 {
+            accept_start_time = accept_start_time - (accept_start_time % interval) + interval;
+        }
         // previous interval of end_time
-        accept_end_time = accept_end_time - (accept_end_time % interval) - interval;
+        if (accept_end_time % interval) != 0 {
+            need_adjust_end_time = true;
+            accept_end_time = accept_end_time - (accept_end_time % interval) - interval;
+        }
     }
 
     // 2. get the data time range, check if need to remove records with discard_duration
     let delay_ts = second_micros(get_config().limit.cache_delay_secs);
-    let accept_end_time = std::cmp::min(Utc::now().timestamp_micros() - delay_ts, accept_end_time);
+    let mut accept_end_time =
+        std::cmp::min(Utc::now().timestamp_micros() - delay_ts, accept_end_time);
     let last_rec_ts = get_ts_value(ts_column, res.hits.last().unwrap());
     let first_rec_ts = get_ts_value(ts_column, res.hits.first().unwrap());
     let data_start_time = std::cmp::min(first_rec_ts, last_rec_ts);
@@ -845,25 +849,24 @@ pub async fn write_results(
     }
 
     // 4. check if the time range is less than discard_duration
-    let last_rec_ts = get_ts_value(ts_column, res.hits.last().unwrap());
-    let first_rec_ts = get_ts_value(ts_column, res.hits.first().unwrap());
-    let cache_start_time = std::cmp::min(first_rec_ts, last_rec_ts);
-    let mut cache_end_time = std::cmp::max(first_rec_ts, last_rec_ts);
-    if (cache_end_time - cache_start_time) < delay_ts {
+    if (accept_end_time - accept_start_time) < delay_ts {
         log::info!("[trace_id {trace_id}] Time range is too short for caching, skipping caching");
         return;
     }
 
     // 5. adjust the cache time range
-    if is_aggregate && let Some(interval) = res.histogram_interval {
-        cache_end_time += interval * 1000 * 1000;
+    if need_adjust_end_time
+        && is_aggregate
+        && let Some(interval) = res.histogram_interval
+    {
+        accept_end_time += interval * 1000 * 1000;
     }
 
     // 6. cache to disk
     let file_name = format!(
         "{}_{}_{}_{}.json",
-        cache_start_time,
-        cache_end_time,
+        accept_start_time,
+        accept_end_time,
         if is_aggregate { 1 } else { 0 },
         if is_descending { 1 } else { 0 }
     );
@@ -883,8 +886,8 @@ pub async fn write_results(
                         .entry(query_key)
                         .or_insert_with(Vec::new)
                         .push(ResultCacheMeta {
-                            start_time: cache_start_time,
-                            end_time: cache_end_time,
+                            start_time: accept_start_time,
+                            end_time: accept_end_time,
                             is_aggregate,
                             is_descending,
                         });
