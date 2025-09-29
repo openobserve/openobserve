@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use datafusion::{
     common::{
-        Result,
+        Result, internal_err,
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter},
     },
     physical_plan::{
