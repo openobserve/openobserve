@@ -500,7 +500,7 @@
     "indexSize": "Index Size",
     "extendedStartDate": "Start Date",
     "extendedEndDate": "End Date",
-    "regexPatterns": "Regex Patterns",
+    "regexPatterns": "SDR",
     "envQuickModeMsg": "Environment quick mode field"
   },
   "pipeline": {
@@ -1323,9 +1323,10 @@
     "searchRegion": "Search Region"
   },
   "regex_patterns": {
+    "title":"Sensitive Data Redaction",
     "header": "Regex Patterns",
-    "create_pattern": "Create Pattern",
-    "search": "Search Regex Pattern",
+    "create_pattern": "Add Pattern",
+    "search": "Search Pattern",
     "no_data": "No Patterns in the Library",
     "name": "Name",
     "pattern": "Pattern",
@@ -1334,14 +1335,15 @@
     "actions": "Actions",
     "edit": "Edit",
     "delete": "Delete",
-    "create_regex_pattern": "Create New Regex Pattern",
+    "create_regex_pattern": "Create Pattern",
     "create_close":"Create and Close",
     "cancel":"Cancel",
-    "edit_regex_pattern": "Edit Regex Pattern",
+    "edit_regex_pattern": "Edit Pattern",
     "update_close": "Update and Close",
     "description": "Description",
     "create_regex_pattern_field": "Redact / Drop using Regex",
     "import": "Import",
-    "import_title": "Import Regex Pattern"
+    "import_title": "Import Pattern",
+    "bottom_header": "Pattern(s)"
   }
 }
