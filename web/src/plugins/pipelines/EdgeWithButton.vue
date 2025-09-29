@@ -61,7 +61,7 @@ export default {
   <!-- You can use the `BaseEdge` component to create your own custom edge more easily -->
   <BaseEdge 
     :id="id" 
-    :style="{ ...style, cursor: 'pointer' }" 
+    :style="{ ...style, cursor: 'pointer', strokeDasharray: 'none' }" 
     :path="path[0]" 
     :marker-end="markerEnd"
   />

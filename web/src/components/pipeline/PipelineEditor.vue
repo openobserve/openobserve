@@ -1186,7 +1186,6 @@ const savePipelineJson = async (json: string) => {
   .o2vf_node_input,
   .vue-flow__node-input {
     border: 1px solid #60a5fa;
-    border-left: 4px solid #3b82f6;
     color: #1f2937;
     border-radius: 12px;
     background: rgba(239, 246, 255, 0.8);
@@ -1208,7 +1207,6 @@ const savePipelineJson = async (json: string) => {
     padding: 8px 16px;
 
     border: 1px solid rgba(74, 222, 128, 0.4);
-    border-left: 4px solid #22c55e;
     color: #181a1B;
     border-radius: 8px;
     background: rgba(240, 253, 244, 0.9);
@@ -1229,7 +1227,6 @@ const savePipelineJson = async (json: string) => {
   .o2vf_node_default,
   .vue-flow__node-default {
     border: 1px solid #f59e0b;
-    border-left: 4px solid #d97706;
     color: #1f2937;
     border-radius: 12px;
     background: rgba(255, 251, 235, 0.8);
@@ -1241,7 +1238,6 @@ const savePipelineJson = async (json: string) => {
     
     &:hover {
       border: 1px solid #f59e0b !important;
-      border-left: 4px solid #d97706 !important;
       background: rgba(255, 251, 235, 0.95) !important;
       box-shadow: 0 6px 16px rgba(217, 119, 6, 0.2) !important;
     }
@@ -1269,7 +1265,6 @@ const savePipelineJson = async (json: string) => {
   .o2vf_node_input {
     background: rgba(30, 58, 138, 0.2) !important;
     border: 1px solid rgba(96, 165, 250, 0.3) !important;
-    border-left: 4px solid #3b82f6 !important;
     color: rgba(255, 255, 255, 0.9) !important;
     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1) !important;
 
@@ -1284,7 +1279,6 @@ const savePipelineJson = async (json: string) => {
   .o2vf_node_output {
     background: rgba(20, 83, 45, 0.2) !important;
     border: 1px solid rgba(74, 222, 128, 0.3) !important;
-    border-left: 4px solid #22c55e !important;
     color: rgba(255, 255, 255, 0.9) !important;
 
     &:hover {
@@ -1299,7 +1293,6 @@ const savePipelineJson = async (json: string) => {
   .o2vf_node_default {
     background: rgba(120, 53, 15, 0.2) !important;
     border: 1px solid rgba(251, 146, 60, 0.3) !important;
-    border-left: 4px solid #f59e0b !important;
     color: rgba(255, 255, 255, 0.9) !important;
     box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1) !important;
 

@@ -1,7 +1,7 @@
 <template>
   <BaseEdge
     :id="id"
-    :style="{ ...style, cursor: 'pointer' }"
+    :style="{ ...style, cursor: 'pointer', strokeDasharray: 'none' }"
     :path="path[0]"
     :marker-end="markerEnd"
     type="smoothstep"
