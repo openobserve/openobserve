@@ -1219,7 +1219,7 @@ def test_streaming_sql_query_range(create_session, base_url):
     sixtyone_min_ago = int((now - timedelta(minutes=61)).timestamp() * 1000000)
     json_sql_query_range = {
         "query": {
-            "sql": f'SELECT * FROM "{stream_name}"',
+            "sql": f'SELECT count(*) AS _max_query_range FROM "{stream_name}"',
             "start_time": sixtyone_min_ago,
             "end_time": end_time,
             "from": 0,
