@@ -91,6 +91,8 @@ pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
 #[cfg(test)]
 mod tests {
 
+    use std::sync::Arc;
+
     use super::*;
 
     #[test]
@@ -143,7 +145,7 @@ mod tests {
         let en_table = crate::service::enrichment::StreamTable {
             org_id: test_org.to_string(),
             stream_name: test_stream.to_string(),
-            data: vec![],
+            data: Arc::new(vec![]),
         };
         ENRICHMENT_TABLES.insert(table_name.to_string(), en_table);
 

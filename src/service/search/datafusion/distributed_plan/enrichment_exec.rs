@@ -32,6 +32,7 @@ use datafusion::{
     },
 };
 use futures::TryStreamExt;
+use rayon::prelude::*;
 
 use crate::{
     common::infra::config::ENRICHMENT_TABLES, service::db::enrichment_table::convert_from_vrl,
@@ -96,6 +97,8 @@ impl DisplayAs for EnrichmentExec {
 
 #[derive(Debug, Clone)]
 pub struct EnrichmentMetrics {
+    /// Time in nanos to get enrichment data from in-memory store
+    pub fetch_data_time: metrics::Time,
     /// Time in nanos to convert VRL to JSON
     pub vrl_to_json_time: metrics::Time,
     /// Time in nanos to convert JSON to RecordBatch
@@ -106,6 +109,10 @@ pub struct EnrichmentMetrics {
 
 impl EnrichmentMetrics {
     pub fn new(input_partition: usize, metrics: &ExecutionPlanMetricsSet) -> Self {
+        // Time in nanos to get enrichment data from in-memory store
+        let fetch_data_time =
+            MetricBuilder::new(metrics).subset_time("fetch_data_time", input_partition);
+
         // Time in nanos to convert VRL to JSON
         let vrl_to_json_time =
             MetricBuilder::new(metrics).subset_time("vrl_to_json_time", input_partition);
@@ -118,6 +125,7 @@ impl EnrichmentMetrics {
         let output_rows = MetricBuilder::new(metrics).output_rows(input_partition);
 
         Self {
+            fetch_data_time,
             vrl_to_json_time,
             json_to_record_batch_time,
             output_rows,
@@ -156,7 +164,7 @@ impl ExecutionPlan for EnrichmentExec {
     fn execute(
         &self,
         partition: usize,
-        _context: Arc<TaskContext>,
+        context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
         if partition != 0 {
             return internal_err!(
@@ -165,11 +173,13 @@ impl ExecutionPlan for EnrichmentExec {
         }
 
         let metrics = EnrichmentMetrics::new(partition, &self.metrics);
+        let target_partition = context.session_config().target_partitions();
         let data = fetch_data(
             self.trace_id.clone(),
             self.org_id.clone(),
             self.stream_name.clone(),
             Arc::clone(&self.schema),
+            target_partition,
             metrics,
         );
         let stream = futures::stream::once(data).try_flatten();
@@ -193,10 +203,12 @@ async fn fetch_data(
     org_id: String,
     stream_name: String,
     schema: SchemaRef,
+    target_partition: usize,
     metrics: EnrichmentMetrics,
 ) -> Result<SendableRecordBatchStream> {
     let key = format!("{org_id}/enrichment_tables/{stream_name}");
 
+    let fetch_data_timer = metrics.fetch_data_time.timer();
     let enrichment_data = match ENRICHMENT_TABLES.get(&key) {
         Some(stream_table) => {
             log::info!(
@@ -209,9 +221,15 @@ async fn fetch_data(
             log::warn!(
                 "[trace_id {trace_id}] EnrichmentExec no enrichment table data found for key: {key}"
             );
-            vec![]
+            Arc::new(vec![])
         }
     };
+    fetch_data_timer.done();
+    log::info!(
+        "[trace_id {trace_id}] Fetched enrichment data in {} ms, target_partition: {target_partition} total records: {}",
+        std::time::Duration::from_nanos(metrics.fetch_data_time.value() as u64).as_millis(),
+        enrichment_data.len()
+    );
 
     if enrichment_data.is_empty() {
         let batches = vec![RecordBatch::new_empty(schema.clone())];
@@ -222,31 +240,82 @@ async fn fetch_data(
         )?));
     }
 
-    let vrl_to_json_timer = metrics.vrl_to_json_time.timer();
-    let json_values: Vec<Arc<serde_json::Value>> = enrichment_data
-        .into_iter()
-        .map(|vrl_value| {
-            let json_value = convert_from_vrl(&vrl_value);
-            Arc::new(json_value)
-        })
-        .collect();
-    vrl_to_json_timer.done();
-    log::info!(
-        "[trace_id {trace_id}] VRL to JSON conversion completed in {} ms, converted {} values",
-        std::time::Duration::from_nanos(metrics.vrl_to_json_time.value() as u64).as_millis(),
-        json_values.len()
-    );
+    let batches_result: Result<Vec<_>, DataFusionError> = if target_partition > 1 {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(target_partition)
+            .build()
+            .map_err(|e| {
+                DataFusionError::Execution(format!("Failed to create thread pool: {e}"))
+            })?;
 
-    let json_to_record_batch_timer = metrics.json_to_record_batch_time.timer();
-    let mut batches = Vec::new();
-    let mut total_rows = 0;
-    for chunk in json_values.chunks(PARQUET_BATCH_SIZE) {
-        let record_batch = convert_json_to_record_batch(&schema, chunk)
-            .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))?;
-        total_rows += record_batch.num_rows();
-        batches.push(record_batch);
-    }
-    json_to_record_batch_timer.done();
+        pool.install(|| {
+            let vrl_to_json_timer = metrics.vrl_to_json_time.timer();
+            let json_values: Vec<Arc<serde_json::Value>> = enrichment_data.as_ref()
+                .into_par_iter()
+                .map(|vrl_value| {
+                    let json_value = convert_from_vrl(vrl_value);
+                    Arc::new(json_value)
+                })
+                .collect();
+            vrl_to_json_timer.done();
+            log::info!(
+                "[trace_id {trace_id}] VRL to JSON conversion completed in {} ms, converted {} values",
+                std::time::Duration::from_nanos(metrics.vrl_to_json_time.value() as u64).as_millis(),
+                json_values.len()
+            );
+
+            let json_to_record_batch_timer = metrics.json_to_record_batch_time.timer();
+            let chunks: Vec<&[Arc<serde_json::Value>]> = json_values.chunks(PARQUET_BATCH_SIZE).collect();
+
+            let result = chunks
+                .into_par_iter()
+                .map(|chunk| {
+                    let record_batch = convert_json_to_record_batch(&schema, chunk)
+                        .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))?;
+                    let num_rows = record_batch.num_rows();
+                    Ok((record_batch, num_rows))
+                })
+                .collect();
+            json_to_record_batch_timer.done();
+            result
+        })
+    } else {
+        let vrl_to_json_timer = metrics.vrl_to_json_time.timer();
+        let json_values: Vec<Arc<serde_json::Value>> = enrichment_data
+            .as_ref()
+            .iter()
+            .map(|vrl_value| {
+                let json_value = convert_from_vrl(vrl_value);
+                Arc::new(json_value)
+            })
+            .collect();
+        vrl_to_json_timer.done();
+        log::info!(
+            "[trace_id {trace_id}] VRL to JSON conversion completed in {} ms, converted {} values",
+            std::time::Duration::from_nanos(metrics.vrl_to_json_time.value() as u64).as_millis(),
+            json_values.len()
+        );
+
+        let json_to_record_batch_timer = metrics.json_to_record_batch_time.timer();
+        let chunks: Vec<&[Arc<serde_json::Value>]> =
+            json_values.chunks(PARQUET_BATCH_SIZE).collect();
+
+        let result = chunks
+            .into_iter()
+            .map(|chunk| {
+                let record_batch = convert_json_to_record_batch(&schema, chunk)
+                    .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))?;
+                let num_rows = record_batch.num_rows();
+                Ok((record_batch, num_rows))
+            })
+            .collect();
+        json_to_record_batch_timer.done();
+        result
+    };
+
+    let batch_data = batches_result?;
+    let total_rows: usize = batch_data.iter().map(|(_, rows)| rows).sum();
+    let batches: Vec<RecordBatch> = batch_data.into_iter().map(|(batch, _)| batch).collect();
     log::info!(
         "[trace_id {trace_id}] JSON to RecordBatch conversion completed in {} ms, processed {} batches with {total_rows} total rows",
         std::time::Duration::from_nanos(metrics.json_to_record_batch_time.value() as u64)

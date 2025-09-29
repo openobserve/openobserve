@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use config::utils::time::parse_str_to_time;
 use vector_enrichment::{Case, IndexHandle, Table};
@@ -27,7 +29,7 @@ pub struct StreamTableConfig {}
 pub struct StreamTable {
     pub org_id: String,
     pub stream_name: String,
-    pub data: Vec<vrl::value::Value>,
+    pub data: Arc<Vec<vrl::value::Value>>,
 }
 
 impl StreamTable {}
