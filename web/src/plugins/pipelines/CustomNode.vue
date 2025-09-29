@@ -223,6 +223,14 @@ const  functionInfo = (data) =>  {
       return pipelineObj.functions[data.name] || null;
   }
 
+const getTruncatedConditions = (conditions) => {
+  const allConditionsText = conditions.map(condition => 
+    `${condition.column} ${condition.operator} ${condition.value}`
+  ).join(', ');
+  
+  return allConditionsText.length > 30 ? allConditionsText.substring(0, 30) + '...' : allConditionsText;
+}
+
 const confirmDialogMeta = ref({
   show: false,
   title: "",
@@ -581,9 +589,7 @@ function getIcon(data, ioType) {
       text-overflow: ellipsis;
     "
   >
-    <span v-for="(condition, index) in data.conditions" :key="index" style="margin-right: 8px; display: inline-block;">
-      {{ condition.column }} {{ condition.operator }} {{ condition.value }}<span v-if="index < data.conditions.length - 1">,</span>
-    </span>
+    {{ getTruncatedConditions(data.conditions) }}
   </div>
       </div>
 
