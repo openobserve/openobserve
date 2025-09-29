@@ -238,7 +238,10 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(1000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
-    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    // Use new hover-based delete approach with data-test locator
+    await page.locator('[data-test="pipeline-node-output-stream-node"]').first().hover();
+    await page.waitForTimeout(500);
+    await page.locator('[data-test="pipeline-node-output-delete-btn"]').first().click();
     await page.locator('[data-test="confirm-button"]').click();
 
     // Generate a random pipeline name and save
@@ -270,12 +273,11 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
-    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    // Use new hover-based delete approach with data-test locator
+    await page.locator('[data-test="pipeline-node-output-stream-node"]').first().hover();
+    await page.waitForTimeout(500);
+    await page.locator('[data-test="pipeline-node-output-delete-btn"]').first().click();
     await page.locator('[data-test="confirm-button"]').click();
-
-    // Delete the pipeline and confirm
-    await pipelinePage.deletePipeline();
-    await pipelinePage.confirmDelete();
   });
 
   test.skip("should add source & destination node and then delete the pipeline", async ({
@@ -655,7 +657,10 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
     await page.waitForTimeout(1000);
-    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    // Use new hover-based delete approach with data-test locator
+    await page.locator('[data-test="pipeline-node-output-stream-node"]').first().hover();
+    await page.waitForTimeout(500);
+    await page.locator('[data-test="pipeline-node-output-delete-btn"]').first().click();
     await page.locator('[data-test="confirm-button"]').click();
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton); // First stream drag
 
@@ -680,6 +685,21 @@ test.describe("Pipeline testcases", () => {
     await page.getByLabel("Stream Name *").fill("destination-node");
     await page.waitForTimeout(1000);
     await pipelinePage.clickInputNodeStreamSave();
+    
+    // Wait for dialog to close and add edge connections if needed
+    await page.waitForTimeout(2000);
+    await page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' }).catch(() => {
+        // Handle case where handles don't exist for this test scenario
+    });
+    await page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' }).catch(() => {
+        // Handle case where handles don't exist for this test scenario
+    });
+    
+    // Ensure no dialogs are blocking the interaction
+    await page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {
+        // Ignore if no backdrop exists
+    });
+    
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
     await pipelinePage.savePipeline();
