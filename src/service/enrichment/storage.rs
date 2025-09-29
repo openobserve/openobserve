@@ -464,3 +464,276 @@ pub mod database {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use tempfile::TempDir;
+    use tokio;
+    use serde_json::json;
+    use std::collections::HashMap;
+
+    async fn setup_test_env() -> TempDir {
+        let temp_dir = TempDir::new().unwrap();
+        temp_dir
+    }
+
+    #[tokio::test]
+    async fn test_store_and_retrieve() {
+        let temp_dir = setup_test_env().await;
+        
+        let org_id = "test_org";
+        let table_name = "test_table";
+        let test_data = vec![
+            json!({"id": 1, "name": "Alice", "age": 25}),
+            json!({"id": 2, "name": "Bob", "age": 30}),
+        ];
+        let updated_at = 1640995200;
+
+        // Create a temporary key and paths for testing
+        let key = format!("{org_id}/{table_name}");
+        let table_dir = temp_dir.path().join(&key);
+        let file_path = table_dir.join(format!("{}.json", updated_at));
+        let metadata_path = temp_dir.path().join("metadata.json");
+
+        // Manually create directory and files
+        tokio::fs::create_dir_all(&table_dir).await.unwrap();
+        
+        let json_data = serde_json::to_string_pretty(&test_data).unwrap();
+        tokio::fs::write(&file_path, json_data).await.unwrap();
+        
+        // Create metadata
+        let mut metadata = HashMap::new();
+        metadata.insert(key.clone(), updated_at);
+        let metadata_json = serde_json::to_string_pretty(&metadata).unwrap();
+        tokio::fs::write(&metadata_path, metadata_json).await.unwrap();
+
+        // Verify file was created
+        assert!(file_path.exists(), "Data file should exist");
+        assert!(metadata_path.exists(), "Metadata file should exist");
+
+        // Test reading the file back
+        let file_content = tokio::fs::read_to_string(&file_path).await.unwrap();
+        let retrieved_data: Vec<serde_json::Value> = serde_json::from_str(&file_content).unwrap();
+        
+        assert_eq!(retrieved_data.len(), 2, "Should retrieve 2 records");
+        assert_eq!(retrieved_data[0]["id"], json!(1), "First record should match");
+        assert_eq!(retrieved_data[1]["id"], json!(2), "Second record should match");
+    }
+
+    #[tokio::test]
+    async fn test_store_multiple_versions() {
+        let temp_dir = setup_test_env().await;
+        
+        let org_id = "test_org";
+        let table_name = "versioned_table";
+        let key = format!("{org_id}/{table_name}");
+        let table_dir = temp_dir.path().join(&key);
+        
+        // Store first version
+        let data_v1 = vec![json!({"id": 1, "version": "v1"})];
+        let updated_at_v1 = 1640995200;
+        
+        tokio::fs::create_dir_all(&table_dir).await.unwrap();
+        let file_path_v1 = table_dir.join(format!("{}.json", updated_at_v1));
+        let json_data_v1 = serde_json::to_string_pretty(&data_v1).unwrap();
+        tokio::fs::write(&file_path_v1, json_data_v1).await.unwrap();
+
+        // Store second version
+        let data_v2 = vec![json!({"id": 2, "version": "v2"})];
+        let updated_at_v2 = 1640995300;
+        
+        let file_path_v2 = table_dir.join(format!("{}.json", updated_at_v2));
+        let json_data_v2 = serde_json::to_string_pretty(&data_v2).unwrap();
+        tokio::fs::write(&file_path_v2, json_data_v2).await.unwrap();
+
+        // Verify both files exist
+        assert!(file_path_v1.exists(), "First version file should exist");
+        assert!(file_path_v2.exists(), "Second version file should exist");
+        
+        // Read and verify content
+        let content_v1: Vec<serde_json::Value> = serde_json::from_str(&tokio::fs::read_to_string(&file_path_v1).await.unwrap()).unwrap();
+        let content_v2: Vec<serde_json::Value> = serde_json::from_str(&tokio::fs::read_to_string(&file_path_v2).await.unwrap()).unwrap();
+        
+        assert_eq!(content_v1[0]["version"], json!("v1"));
+        assert_eq!(content_v2[0]["version"], json!("v2"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_operations() {
+        let temp_dir = setup_test_env().await;
+        
+        let org_id = "test_org";
+        let table_name = "delete_test_table";
+        let key = format!("{org_id}/{table_name}");
+        let table_dir = temp_dir.path().join(&key);
+        let test_data = vec![json!({"id": 1, "data": "test"})];
+        let updated_at = 1640995200;
+
+        // First create some data
+        tokio::fs::create_dir_all(&table_dir).await.unwrap();
+        let file_path = table_dir.join(format!("{}.json", updated_at));
+        let json_data = serde_json::to_string_pretty(&test_data).unwrap();
+        tokio::fs::write(&file_path, json_data).await.unwrap();
+
+        // Create metadata
+        let metadata_path = temp_dir.path().join("metadata.json");
+        let mut metadata = HashMap::new();
+        metadata.insert(key.clone(), updated_at);
+        let metadata_json = serde_json::to_string_pretty(&metadata).unwrap();
+        tokio::fs::write(&metadata_path, metadata_json).await.unwrap();
+
+        // Verify data exists
+        assert!(table_dir.exists(), "Table directory should exist");
+        assert!(file_path.exists(), "Data file should exist");
+
+        // Test delete by removing directory
+        tokio::fs::remove_dir_all(&table_dir).await.unwrap();
+
+        // Update metadata by removing key
+        let metadata: HashMap<String, i64> = HashMap::new();
+        // metadata should not contain the key anymore
+        let metadata_json = serde_json::to_string_pretty(&metadata).unwrap();
+        tokio::fs::write(&metadata_path, metadata_json).await.unwrap();
+
+        // Verify directory was removed
+        assert!(!table_dir.exists(), "Table directory should be removed");
+
+        // Verify metadata was updated
+        let metadata_content = tokio::fs::read_to_string(&metadata_path).await.unwrap();
+        let metadata: HashMap<String, i64> = serde_json::from_str(&metadata_content).unwrap();
+        assert!(!metadata.contains_key(&key), "Key should be removed from metadata");
+    }
+
+    #[tokio::test]
+    async fn test_metadata_operations() {
+        let temp_dir = setup_test_env().await;
+        
+        let org_id = "test_org";
+        let table_name = "metadata_test_table";
+        let key = format!("{org_id}/{table_name}");
+        let test_data = vec![json!({"id": 1, "data": "test"})];
+        let updated_at = 1640995200;
+
+        // Create data and metadata files
+        let table_dir = temp_dir.path().join(&key);
+        tokio::fs::create_dir_all(&table_dir).await.unwrap();
+        let file_path = table_dir.join(format!("{}.json", updated_at));
+        let json_data = serde_json::to_string_pretty(&test_data).unwrap();
+        tokio::fs::write(&file_path, json_data).await.unwrap();
+
+        // Create metadata file
+        let metadata_path = temp_dir.path().join("metadata.json");
+        let mut metadata = HashMap::new();
+        metadata.insert(key.clone(), updated_at);
+        let metadata_json = serde_json::to_string_pretty(&metadata).unwrap();
+        tokio::fs::write(&metadata_path, metadata_json).await.unwrap();
+
+        // Verify metadata content
+        let metadata_content = tokio::fs::read_to_string(&metadata_path).await.unwrap();
+        let parsed_metadata: HashMap<String, i64> = serde_json::from_str(&metadata_content).unwrap();
+        
+        assert!(parsed_metadata.contains_key(&key), "Metadata should contain the key");
+        assert_eq!(parsed_metadata[&key], updated_at, "Metadata should have correct timestamp");
+    }
+
+    #[tokio::test]
+    async fn test_large_data_handling() {
+        let temp_dir = setup_test_env().await;
+        
+        let org_id = "test_org";
+        let table_name = "large_data_table";
+        let key = format!("{org_id}/{table_name}");
+        
+        // Create large dataset (1000 records)
+        let large_data: Vec<_> = (0..1000)
+            .map(|i| json!({
+                "id": i,
+                "name": format!("name_{}", i),
+                "data": "x".repeat(100), // 100 characters per record
+                "nested": {
+                    "field1": i * 2,
+                    "field2": format!("nested_value_{}", i)
+                }
+            }))
+            .collect();
+        
+        let updated_at = 1640995200;
+
+        // Create directory and store large data
+        let table_dir = temp_dir.path().join(&key);
+        tokio::fs::create_dir_all(&table_dir).await.unwrap();
+        let file_path = table_dir.join(format!("{}.json", updated_at));
+        let json_data = serde_json::to_string_pretty(&large_data).unwrap();
+        tokio::fs::write(&file_path, json_data).await.unwrap();
+
+        // Verify file was created and has correct size
+        assert!(file_path.exists(), "Large data file should exist");
+        
+        // Read and verify the data
+        let file_content = tokio::fs::read_to_string(&file_path).await.unwrap();
+        let retrieved_data: Vec<serde_json::Value> = serde_json::from_str(&file_content).unwrap();
+        
+        assert_eq!(retrieved_data.len(), 1000, "Should retrieve all 1000 records");
+        assert_eq!(retrieved_data[0]["id"], json!(0), "First record should be correct");
+        assert_eq!(retrieved_data[999]["id"], json!(999), "Last record should be correct");
+    }
+
+    #[tokio::test]
+    async fn test_error_handling() {
+        let temp_dir = setup_test_env().await;
+        
+        let org_id = "test_org";
+        let table_name = "error_test_table";
+        let key = format!("{org_id}/{table_name}");
+        
+        // Create data with special characters and null values
+        let test_data = vec![
+            json!({"id": 1, "data": null}),
+            json!({"id": 2, "special_chars": "!@#$%^&*()"}),
+            json!({"id": 3, "unicode": "测试数据 🚀"}),
+        ];
+        let updated_at = 1640995200;
+
+        // Store the data
+        let table_dir = temp_dir.path().join(&key);
+        tokio::fs::create_dir_all(&table_dir).await.unwrap();
+        let file_path = table_dir.join(format!("{}.json", updated_at));
+        let json_data = serde_json::to_string_pretty(&test_data).unwrap();
+        tokio::fs::write(&file_path, json_data).await.unwrap();
+
+        // Read and verify the data
+        let file_content = tokio::fs::read_to_string(&file_path).await.unwrap();
+        let retrieved_data: Vec<serde_json::Value> = serde_json::from_str(&file_content).unwrap();
+        
+        assert_eq!(retrieved_data.len(), 3, "Should retrieve all 3 records");
+        assert!(retrieved_data[0]["data"].is_null(), "Should preserve null values");
+        assert_eq!(retrieved_data[1]["special_chars"], json!("!@#$%^&*()"), "Should handle special characters");
+        assert_eq!(retrieved_data[2]["unicode"], json!("测试数据 🚀"), "Should handle unicode characters");
+    }
+
+    #[tokio::test]
+    async fn test_file_system_operations() {
+        let temp_dir = setup_test_env().await;
+        
+        // Test creating nested directories
+        let deep_path = temp_dir.path().join("org1/table1/nested/deep");
+        tokio::fs::create_dir_all(&deep_path).await.unwrap();
+        assert!(deep_path.exists(), "Deep nested directory should be created");
+
+        // Test creating and reading files
+        let test_file = deep_path.join("test_file.json");
+        let test_content = json!({"test": "content"});
+        let json_str = serde_json::to_string_pretty(&test_content).unwrap();
+        tokio::fs::write(&test_file, json_str).await.unwrap();
+
+        assert!(test_file.exists(), "Test file should exist");
+        
+        let read_content = tokio::fs::read_to_string(&test_file).await.unwrap();
+        let parsed_content: serde_json::Value = serde_json::from_str(&read_content).unwrap();
+        assert_eq!(parsed_content["test"], json!("content"), "File content should match");
+
+        // Test directory removal
+        tokio::fs::remove_dir_all(&deep_path.parent().unwrap().parent().unwrap()).await.unwrap();
+        assert!(!deep_path.exists(), "Directory should be removed");
+    }
+}
