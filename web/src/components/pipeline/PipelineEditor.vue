@@ -1154,6 +1154,29 @@ const savePipelineJson = async (json: string) => {
   border-radius: 8px;
   user-select: none;
 }
+
+// Global rule to eliminate ALL transitions during any Vue Flow drag operation
+.vue-flow.dragging,
+.vue-flow:has(.vue-flow__node:active) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+// Ensure dragging nodes have zero lag
+.vue-flow__node.dragging,
+.vue-flow__node:active {
+  transition: none !important;
+  transform: none !important;
+  animation: none !important;
+  
+  * {
+    transition: none !important;
+    transform: none !important; 
+    animation: none !important;
+  }
+}
 </style>
 
 <style lang="scss">
@@ -1177,9 +1200,14 @@ const savePipelineJson = async (json: string) => {
     background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(10px);
     
-    
-    &:active {
+    // Disable ALL transitions when dragging for zero lag
+    &:active,
+    &.dragging {
       cursor: grabbing;
+      transition: none !important;
+      * {
+        transition: none !important;
+      }
     }
   }
 
@@ -1195,9 +1223,14 @@ const savePipelineJson = async (json: string) => {
     min-height: 36px;
     padding: 8px 16px;
     
-    
-    &:active {
+    // Disable transitions during drag for zero lag
+    &:active,
+    &.dragging {
       cursor: grabbing;
+      transition: none !important;
+      * {
+        transition: none !important;
+      }
     }
   }
 
@@ -1218,8 +1251,14 @@ const savePipelineJson = async (json: string) => {
       box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
       border-color: rgba(74, 222, 128, 0.6);
     }
-    &:active {
+    // Disable transitions during drag for zero lag
+    &:active,
+    &.dragging {
       cursor: grabbing;
+      transition: none !important;
+      * {
+        transition: none !important;
+      }
     }
   }
 
@@ -1242,8 +1281,14 @@ const savePipelineJson = async (json: string) => {
       box-shadow: 0 6px 16px rgba(217, 119, 6, 0.2) !important;
     }
     
-    &:active {
+    // Disable transitions during drag for zero lag
+    &:active,
+    &.dragging {
       cursor: grabbing;
+      transition: none !important;
+      * {
+        transition: none !important;
+      }
     }
   }
 
