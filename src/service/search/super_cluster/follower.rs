@@ -47,7 +47,7 @@ use crate::service::{
                 NewEmptyExecVisitor,
                 codec::get_physical_extension_codec,
                 node::{RemoteScanNode, SearchInfos},
-                remote_scan::RemoteScanExec,
+                remote_scan_exec::RemoteScanExec,
             },
             exec::{DataFusionContextBuilder, register_udf},
         },
