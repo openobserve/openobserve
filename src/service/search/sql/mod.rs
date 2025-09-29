@@ -119,6 +119,11 @@ impl Sql {
             let schema = infra::schema::get(org_id, &stream_name, stream_type)
                 .await
                 .unwrap_or_else(|_| Schema::empty());
+            if schema.fields().is_empty() {
+                return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                    stream_name,
+                )));
+            }
             total_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(schema)));
         }
 
