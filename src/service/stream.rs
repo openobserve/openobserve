@@ -17,12 +17,12 @@ use std::io::Error;
 
 use actix_web::{HttpResponse, http, http::StatusCode};
 use arrow_schema::DataType;
+#[cfg(feature = "enterprise")]
+use config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM};
 use config::{
-    META_ORG_ID, SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME, get_config,
-    is_local_disk_storage,
+    SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
         promql,
-        self_reporting::usage::USAGE_STREAM,
         stream::{
             DistinctField, StreamField, StreamParams, StreamSettings, StreamStats, StreamType,
             UpdateStreamSettings,

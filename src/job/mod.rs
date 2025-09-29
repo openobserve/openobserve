@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{
-    META_ORG_ID, cluster::LOCAL_NODE, meta::self_reporting::usage::USAGE_STREAM, spawn_pausable_job,
-};
+use config::{cluster::LOCAL_NODE, spawn_pausable_job};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_enterprise_config;
 #[cfg(feature = "enterprise")]
@@ -27,7 +25,7 @@ use crate::{
         organization::DEFAULT_ORG,
         user::{UserOrgRole, UserRequest},
     },
-    service::{self, db, self_reporting, users},
+    service::{db, self_reporting, users},
 };
 
 mod alert_manager;
@@ -55,23 +53,21 @@ pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 #[cfg(feature = "enterprise")]
 async fn enforce_usage_stream_retention() {
-    if let Some(s) = infra::schema::get_settings(
+    use config::{
         META_ORG_ID,
-        USAGE_STREAM,
-        config::meta::stream::StreamType::Logs,
-    )
-    .await
+        meta::{self_reporting::usage::USAGE_STREAM, stream::StreamType},
+    };
+    if let Some(s) = infra::schema::get_settings(META_ORG_ID, USAGE_STREAM, StreamType::Logs).await
+        && s.data_retention < 32
     {
-        if s.data_retention < 32 {
-            service::stream::save_stream_settings(
-                META_ORG_ID,
-                USAGE_STREAM,
-                config::meta::stream::StreamType::Logs,
-                s,
-            )
-            .await
-            .unwrap(); //unwrap is intentional, we should panic if this fails
-        }
+        crate::service::stream::save_stream_settings(
+            META_ORG_ID,
+            USAGE_STREAM,
+            StreamType::Logs,
+            s,
+        )
+        .await
+        .unwrap(); //unwrap is intentional, we should panic if this fails
     }
 }
 
