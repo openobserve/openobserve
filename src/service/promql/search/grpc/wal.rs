@@ -42,7 +42,7 @@ use crate::{
             datafusion::{
                 distributed_plan::{
                     node::{RemoteScanNode, SearchInfos},
-                    remote_scan::RemoteScanExec,
+                    remote_scan_exec::RemoteScanExec,
                 },
                 exec::DataFusionContextBuilder,
                 table_provider::empty_table::NewEmptyTable,
