@@ -745,14 +745,25 @@ export const logsUtils = () => {
     }
 
     // String-based detection as fallback for complex nested cases that AST parsing might miss
-    // But we need to be smarter - only flag it if we found invalid aliases in the AST check
-    // or if the AST didn't find any timestamp aliases but the string contains the pattern
-    const timestampField = ` as ${timestampColumnName}`;
-    const hasStringAlias = query.toLowerCase().indexOf(timestampField) !== -1;
-    
-    if (hasStringAlias) {
-      // String found alias but AST didn't find any - likely a complex nested case we missed
-      return false;
+    // Only use this as fallback if AST parsing didn't find any timestamp aliases
+    if (timestampAliasFields.length === 0) {
+      // Check for potential timestamp aliases using string matching
+      const timestampAliasPattern = new RegExp(
+        `\\b\\w+\\s+as\\s+${timestampColumnName}\\b`,
+        "i",
+      );
+      const selfAliasPattern = new RegExp(
+        `\\b${timestampColumnName}\\s+as\\s+${timestampColumnName}\\b`,
+        "i",
+      );
+
+      if (timestampAliasPattern.test(query)) {
+        // Found potential timestamp alias, but check if it's self-alias
+        if (selfAliasPattern.test(query)) {
+          return true; // _timestamp AS _timestamp is valid
+        }
+        return false; // Some other field aliased as timestamp
+      }
     }
 
     return true;
