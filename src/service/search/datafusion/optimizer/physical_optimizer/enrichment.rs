@@ -201,7 +201,7 @@ pub fn should_use_enrichment_broadcast_join(plan: &Arc<dyn ExecutionPlan>) -> bo
     result
 }
 
-fn is_enrichment_table(plan: &Arc<dyn ExecutionPlan>) -> bool {
+pub fn is_enrichment_table(plan: &Arc<dyn ExecutionPlan>) -> bool {
     let mut found_enrichment = false;
     let _ = plan.apply(|node| {
         Ok(
