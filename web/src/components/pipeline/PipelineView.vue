@@ -57,15 +57,13 @@ import CustomEdge from "@/plugins/pipelines/CustomEdge.vue";
 import "@vue-flow/core/dist/style.css";
 import '@vue-flow/controls/dist/style.css'
 import useDragAndDrop from '@/plugins/pipelines/useDnD';
-const streamImage = getImageURL("images/pipeline/stream.svg");
-
-const functionImage = getImageURL("images/pipeline/function.svg");
-const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
-const externalOutputImage = getImageURL("images/pipeline/externalOutput.svg");
-
+const functionImage = getImageURL("images/pipeline/transform_function.png");
+const streamImage = getImageURL("images/pipeline/input_stream.png");
+const streamOutputImage = getImageURL("images/pipeline/output_stream.png");
+const externalOutputImage = getImageURL("images/pipeline/output_remote.png");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
-const conditionImage = getImageURL("images/pipeline/condition.svg");
-const queryImage = getImageURL("images/pipeline/query.svg");
+const conditionImage = getImageURL("images/pipeline/transform_condition.png");
+const queryImage = getImageURL("images/pipeline/input_query.png");
 
   
   export default defineComponent({
@@ -183,116 +181,73 @@ const queryImage = getImageURL("images/pipeline/query.svg");
   });
   </script>
   
-  <style >
+  <style lang="scss" scoped>
   .pipeline-view-tooltip {
     width: 500px; /* Adjust the width */
     height: 300px; /* Adjust the height */
     overflow: auto;
   }
+  </style>
 
- 
-.o2vf_node {
-  width: auto;
-
-  .vue-flow__node {
-    padding: 8px 16px;
-    width: auto;
-    min-height: 44px;
-    transition: all 0.3s ease;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    cursor: grab;
-    display: flex;
-    align-items: center;
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(10px);
+  <style lang="scss">
+  /* Simple tooltip styling - let CustomNode handle everything else */
+  .pipeline-view-tooltip {
+    width: 500px;
+    height: 300px; 
+    overflow: auto;
     
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    /* Node background colors */
+    .vue-flow__node-input .btn-fixed-width {
+      background-color: rgba(219, 234, 254, 0.8) !important;
+      border-color: #3b82f6 !important;
+      color: #000000 !important;
+      padding: 8px 12px !important;
+    }
+
+    .vue-flow__node-output .btn-fixed-width {
+      background-color: rgba(220, 252, 231, 0.8) !important;
+      border-color: #22c55e !important;
+      color: #000000 !important;
+      padding: 8px 12px !important;
+    }
+
+    .vue-flow__node-default .btn-fixed-width {
+      background-color: rgba(255, 237, 168, 0.8) !important;
+      border-color: #f59e0b !important;
+      color: #000000 !important;
+      padding: 8px 12px !important;
     }
     
-    &:active {
-      cursor: grabbing;
+    /* Handle colors for tooltip context */
+    .handle_input {
+      background: #dbeafe !important;
+      
+      &::before {
+        background: #3b82f6 !important;
+      }
+    }
+
+    .handle_output {
+      background: #dcfce7 !important;
+      
+      &::before {
+        background: #22c55e !important;
+      }
+    }
+
+    .handle_default {
+      background: #fef3c7 !important;
+      
+      &::before {
+        background: #f59e0b !important;
+      }
+    }
+    
+    /* Hide action buttons in tooltip */
+    .node-action-buttons {
+      display: none !important;
     }
   }
-
-  .o2vf_node_input,
-  .vue-flow__node-input {
-    border: 1px solid #60a5fa;
-    border-left: 4px solid #3b82f6;
-    color: #1f2937;
-    border-radius: 12px;
-    background: rgba(239, 246, 255, 0.8);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
-    transition: all 0.3s ease;
-    cursor: grab;
-    min-height: 36px;
-    padding: 8px 16px;
-    
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
-      border-color: #3b82f6;
-      background: rgba(239, 246, 255, 0.95);
-    }
-    
-    &:active {
-      cursor: grabbing;
-    }
-  }
-
-  .o2vf_node_output,
-  .vue-flow__node-output {
-    border: 1px solid #4ade80;
-    border-left: 4px solid #22c55e;
-    color: #1f2937;
-    border-radius: 12px;
-    background: rgba(240, 253, 244, 0.8);
-    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.1);
-    transition: all 0.3s ease;
-    cursor: grab;
-    min-height: 36px;
-    padding: 8px 16px;
-    
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(34, 197, 94, 0.2);
-      border-color: #22c55e;
-      background: rgba(240, 253, 244, 0.95);
-    }
-    
-    &:active {
-      cursor: grabbing;
-    }
-  }
-
-  .o2vf_node_default,
-  .vue-flow__node-default {
-    border: 1px solid #6b7280;
-    border-left: 4px solid #374151;
-    color: #1f2937;
-    border-radius: 12px;
-    background: rgba(249, 250, 251, 0.8);
-    box-shadow: 0 4px 12px rgba(55, 65, 81, 0.1);
-    transition: all 0.3s ease;
-    cursor: grab;
-    min-height: 36px;
-    padding: 8px 16px;
-    
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(55, 65, 81, 0.2);
-      border-color: #374151;
-      background: rgba(249, 250, 251, 0.95);
-    }
-    
-    &:active {
-      cursor: grabbing;
-    }
-  }
-}
-
 
   </style>
 
