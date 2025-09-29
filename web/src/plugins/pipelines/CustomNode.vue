@@ -50,9 +50,6 @@ const menu = ref(false)
 const showButtons = ref(false)
 const showEditTooltip = ref(false)
 const showDeleteTooltip = ref(false)
-const showFunctionDialog = ref(false)
-const showConditionDialog = ref(false)
-const showQueryDialog = ref(false)
 let hideButtonsTimeout = null
 
 // Edge color mapping for different node types
@@ -121,29 +118,6 @@ const handleNodeLeave = (nodeId) => {
   }, 200);
 };
 
-const handleFunctionHover = () => {
-  showFunctionDialog.value = true;
-}
-
-const closeFunctionDialog = () => {
-  showFunctionDialog.value = false;
-}
-
-const handleConditionHover = () => {
-  showConditionDialog.value = true;
-}
-
-const closeConditionDialog = () => {
-  showConditionDialog.value = false;
-}
-
-const handleQueryHover = () => {
-  showQueryDialog.value = true;
-}
-
-const closeQueryDialog = () => {
-  showQueryDialog.value = false;
-}
 
 
 const onFunctionClick = (data,event,id) =>{
@@ -315,7 +289,6 @@ function getIcon(data, ioType) {
       "
       @mouseenter="handleNodeHover(id, io_type)"
       @mouseleave="handleNodeLeave(id)"
-      @click="handleFunctionHover()"
     >
 
 
@@ -563,7 +536,6 @@ function getIcon(data, ioType) {
       "
       @mouseenter="handleNodeHover(id, io_type)"
       @mouseleave="handleNodeLeave(id)"
-      @click="handleQueryHover()"
      >
 
       <div class="icon-container" style="display: flex; align-items: center">
@@ -640,7 +612,6 @@ function getIcon(data, ioType) {
       "
       @mouseenter="handleNodeHover(id, io_type)"
       @mouseleave="handleNodeLeave(id)"
-      @click="handleConditionHover()"
      >
 
       <div class="icon-container" style="display: flex; align-items: center">
@@ -723,161 +694,6 @@ function getIcon(data, ioType) {
     :warning-message="confirmDialogMeta.warningMessage"
     v-model="confirmDialogMeta.show"
   />
-   
-  <!-- Function Details Side Panel Dialog -->
-  <q-dialog 
-    v-model="showFunctionDialog" 
-    position="right" 
-    maximized
-    class="function-details-dialog q-pa-none q-ma-none"
-  >
-    <q-card class="card" style="width: 400px; max-width: none;">
-      <q-card-section class="row items-center q-pb-none tw-flex tw-items-center tw-my-2">
-        <div class="text-h6">Function Details</div>
-        <q-space />
-        <q-btn 
-          icon="cancel" 
-          flat 
-          round 
-          dense 
-          v-close-popup
-          @click="closeFunctionDialog"
-        />
-      </q-card-section>
-      
-      <q-separator />
-      
-      <q-card-section class="q-pt-md">
-        <div class="function-info">
-          <div class="function-name-section">
-            <strong class="text-subtitle1">Function Name:</strong>
-            <div class="function-name">{{ functionInfo(data)?.name || data.name }}</div>
-          </div>
-          
-          <div class="function-timing-section">
-            <strong class="text-subtitle1">Execution Timing:</strong>
-            <div class="function-timing">{{ data.after_flatten ? "Run After Flattening" : "Run Before Flattening" }}</div>
-          </div>
-          
-          <div class="function-definition-section">
-            <strong class="text-subtitle1">Function Definition:</strong>
-            <div class="function-definition">
-              <pre class="function-code">{{ functionInfo(data)?.function || 'No definition available' }}</pre>
-            </div>
-          </div>
-        </div>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
-
-  <!-- Condition Details Side Panel Dialog -->
-  <q-dialog 
-    v-model="showConditionDialog" 
-    position="right" 
-    maximized
-    class="condition-details-dialog q-pa-none q-ma-none"
-  >
-    <q-card class="card" style="width: 400px; max-width: none;">
-      <q-card-section class="row items-center q-pb-none tw-flex tw-items-center tw-my-2">
-        <div class="text-h6">Condition Details</div>
-        <q-space />
-        <q-btn 
-          icon="cancel" 
-          flat 
-          round 
-          dense 
-          v-close-popup
-          @click="closeConditionDialog"
-        />
-      </q-card-section>
-      
-      <q-separator />
-      
-      <q-card-section class="q-pt-md">
-        <div class="condition-info">
-          <div class="conditions-list-section">
-            <strong class="text-subtitle1">Conditions:</strong>
-            <div class="conditions-container">
-              <div v-for="(condition, index) in data.conditions" :key="condition.id" class="condition-item">
-                <div class="condition-row">
-                  <div class="condition-field">{{ condition.column }}</div>
-                  <div class="condition-operator">{{ condition.operator }}</div>
-                  <div class="condition-value">{{ condition.value }}</div>
-                </div>
-                <div v-if="index < data.conditions.length - 1" class="and-operator">
-                  <div class="and-text">AND</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
-
-  <!-- Query Details Side Panel Dialog -->
-  <q-dialog 
-    v-model="showQueryDialog" 
-    position="right" 
-    maximized
-    class="query-details-dialog q-pa-none q-ma-none"
-  >
-    <q-card class="card" style="width: 500px; max-width: none;">
-      <q-card-section class="row items-center q-pb-none tw-flex tw-items-center tw-my-2">
-        <div class="text-h6">Query Details</div>
-        <q-space />
-        <q-btn 
-          icon="cancel" 
-          flat 
-          round 
-          dense 
-          v-close-popup
-          @click="closeQueryDialog"
-        />
-      </q-card-section>
-      
-      <q-separator />
-      
-      <q-card-section class="q-pt-md">
-        <div class="query-info">
-          <div class="query-type-section">
-            <strong class="text-subtitle1">Query Type:</strong>
-            <div class="query-type">{{ data.query_condition.type === 'sql' ? 'SQL' : 'PromQL' }}</div>
-          </div>
-          
-          <div class="query-content-section">
-            <strong class="text-subtitle1">Query:</strong>
-            <div class="query-content">
-              <pre class="query-code">{{ data.query_condition.type === 'sql' ? data.query_condition.sql : data.query_condition.promql }}</pre>
-            </div>
-          </div>
-          
-          <div class="trigger-details-section">
-            <strong class="text-subtitle1">Trigger Configuration:</strong>
-            <div class="trigger-details">
-              <div class="trigger-row">
-                <span class="trigger-label">Period:</span>
-                <span class="trigger-value">{{ data.trigger_condition.period }}</span>
-              </div>
-              <div class="trigger-row">
-                <span class="trigger-label">Frequency:</span>
-                <span class="trigger-value">{{ data.trigger_condition.frequency }} {{ data.trigger_condition.frequency_type }}</span>
-              </div>
-
-              <div class="trigger-row">
-                <span class="trigger-label">Cron:</span>
-                <span class="trigger-value">{{ data.trigger_condition.cron || 'None' }}</span>
-              </div>
-              <div class="trigger-row">
-                <span class="trigger-label">Silence:</span>
-                <span class="trigger-value">{{ data.trigger_condition.silence }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
 </template>
 
 <style lang="scss">
