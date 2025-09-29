@@ -385,8 +385,15 @@ test.describe("Pipeline testcases", () => {
     }
     await pipelinePage.saveQuery();
     await page.waitForTimeout(2000);
-    await pipelinePage.deletePipeline();
-    await pipelinePage.confirmDelete();
+    
+    // Delete the query node first
+    await page.locator('[data-test="pipeline-node-input-query-node"]').first().hover();
+    await page.waitForTimeout(500);
+    await page.locator('[data-test="pipeline-node-input-delete-btn"]').first().click();
+    await page.locator('[data-test="confirm-button"]').click();
+    
+    // Navigate back from pipeline editing and confirm
+    await page.locator('[data-test="add-pipeline-back-btn"]').click();
   });
 
   test.skip("should add source, function,destination and then delete pipeline", async ({
