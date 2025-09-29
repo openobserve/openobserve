@@ -709,6 +709,55 @@ export const logsUtils = () => {
     return false;
   }
 
+  // validate if timestamp_column should not be used as alias for any other field except timestamp_column field
+  const checkTimestampAlias = (query: string) => {
+    const parsedSQL = fnParsedSQL(query);
+    const timestampColumnName = store.state.zoConfig.timestamp_column;
+
+    // Handle case where parsedSQL is null/undefined or has no columns
+    const columns = parsedSQL?.columns;
+    if (!columns || !Array.isArray(columns)) {
+      return true; // No columns to validate
+    }
+
+    // Find columns that are aliased as timestamp_column
+    const timestampAliasFields = columns.filter(
+      (field) => field.as === timestampColumnName
+    );
+
+    // Check if any non-timestamp field uses timestamp_column as alias
+    for (const field of timestampAliasFields) {
+      let actualFieldName = null;
+
+      // Handle different expression types
+      if (field.expr?.type === "column_ref") {
+        // Simple column reference: field.expr.column.expr.value
+        actualFieldName = field.expr.column?.expr?.value;
+      } else if (field.expr?.type === "aggr_func") {
+        // Aggregate function: field.expr.args.expr.column.expr.value  
+        actualFieldName = field.expr.args?.expr?.column?.expr?.value;
+      }
+      // Add more expression types as needed
+      
+      if (actualFieldName && actualFieldName !== timestampColumnName) {
+        return false; // Invalid: non-timestamp field using timestamp alias
+      }
+    }
+
+    // String-based detection as fallback for complex nested cases that AST parsing might miss
+    // But we need to be smarter - only flag it if we found invalid aliases in the AST check
+    // or if the AST didn't find any timestamp aliases but the string contains the pattern
+    const timestampField = ` as ${timestampColumnName}`;
+    const hasStringAlias = query.toLowerCase().indexOf(timestampField) !== -1;
+    
+    if (hasStringAlias) {
+      // String found alias but AST didn't find any - likely a complex nested case we missed
+      return false;
+    }
+
+    return true;
+  };
+
   return {
     fnParsedSQL,
     fnUnparsedSQL,
@@ -729,6 +778,7 @@ export const logsUtils = () => {
     isNonAggregatedSQLMode,
     updatedLocalLogFilterField,
     isTimestampASC,
+    checkTimestampAlias,
   };
 };
 
