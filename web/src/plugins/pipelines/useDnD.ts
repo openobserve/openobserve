@@ -472,6 +472,7 @@ export default function useDragAndDrop() {
     // pipelineObj.currentSelectedNodeData = dialogObj;
     pipelineObj.userClickedNode = {};
     pipelineObj.userSelectedNode = {};
+    //here we will be adding a default output node when it is a realtime pipeline and user drags teh input node
     if(pipelineObj.currentSelectedNodeData.type == 'input' && pipelineObj.currentSelectedNodeData.data.node_type == 'stream' && pipelineObj.currentSelectedPipeline.nodes.length === 1){
       const position = {x:pipelineObj.currentSelectedNodeData.position.x, y:pipelineObj.currentSelectedNodeData.position.y+200};
 
@@ -579,7 +580,28 @@ export default function useDragAndDrop() {
     pipelineObj.hasInputNode = false;
     pipelineObj.draggedNode = null;
   };
- 
+
+  const getInputNodeStream = () => {
+    const nodes = pipelineObj.currentSelectedPipeline?.nodes ?? [];
+    const inputNode = nodes.find((node: any) => node.io_type === "input");
+    if(inputNode?.data.hasOwnProperty('node_type') &&  inputNode.data.node_type === 'stream'){
+      return inputNode?.data?.stream_name?.value || inputNode.data.stream_name || "";
+    }
+    else {
+      return null;
+    }
+  };
+
+  const checkIfDefaultDestinationNode = (id: string) => {
+    const inputNodeStream = getInputNodeStream();
+    if (!inputNodeStream) return false;
+    const nodes = pipelineObj.currentSelectedPipeline?.nodes ?? [];
+    if(inputNodeStream){
+      return nodes.some((node: any) => node.id === id && node.type === 'output' && (node.data.stream_name.value === inputNodeStream || node.data.stream_name === inputNodeStream));
+    }
+  };
+
+  
 
   return {
     pipelineObj,
@@ -604,5 +626,6 @@ export default function useDragAndDrop() {
     defaultObject,
     defaultPipelineObj,
     dialogObj,
+    checkIfDefaultDestinationNode,
   };
 }
