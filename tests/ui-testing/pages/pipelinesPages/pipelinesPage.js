@@ -217,7 +217,7 @@ export class PipelinesPage {
 
     async selectAndDragSecondStream() {
         await this.secondStreamButton.click();
-        await this.dragStreamToTarget(this.secondStreamButton,{ x: 180, y: 180 });
+        await this.dragStreamToTarget(this.secondStreamButton,{ x: 120, y: 120 });
     }
 
     async selectAndDragFunction() {
@@ -320,7 +320,7 @@ export class PipelinesPage {
     }
 
     async selectAndDragCondition() {
-        await this.dragStreamToTarget(this.conditionButton, { x: 50, y: 50 });
+        await this.dragStreamToTarget(this.conditionButton, { x: 250, y: 250 });
     }
     async fillColumnAndSelectOption(columnName) {
         await this.columnInput.click();
