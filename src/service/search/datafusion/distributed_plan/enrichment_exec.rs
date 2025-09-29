@@ -245,7 +245,7 @@ async fn fetch_data(
             .num_threads(target_partition)
             .build()
             .map_err(|e| {
-                DataFusionError::Execution(format!("Failed to create thread pool: {}", e))
+                DataFusionError::Execution(format!("Failed to create thread pool: {e}"))
             })?;
 
         pool.install(|| {
@@ -283,9 +283,9 @@ async fn fetch_data(
         let vrl_to_json_timer = metrics.vrl_to_json_time.timer();
         let json_values: Vec<Arc<serde_json::Value>> = enrichment_data
             .as_ref()
-            .into_iter()
+            .iter()
             .map(|vrl_value| {
-                let json_value = convert_from_vrl(&vrl_value);
+                let json_value = convert_from_vrl(vrl_value);
                 Arc::new(json_value)
             })
             .collect();
