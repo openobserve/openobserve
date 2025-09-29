@@ -32,6 +32,7 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 
+// EnrichExec is used to read enrichment data from database
 #[derive(Debug)]
 pub struct EnrichExec {
     org_id: String,

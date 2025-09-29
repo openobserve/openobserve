@@ -24,7 +24,7 @@ use datafusion::{
 };
 
 use crate::service::search::datafusion::distributed_plan::{
-    distribute_analyze::DistributeAnalyzeExec, remote_scan::RemoteScanExec,
+    distribute_analyze_exec::DistributeAnalyzeExec, remote_scan_exec::RemoteScanExec,
 };
 
 // replace the AnalyzeExec to DistributeAnalyzeExec
