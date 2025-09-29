@@ -221,7 +221,7 @@ async fn fetch_data(
             log::warn!(
                 "[trace_id {trace_id}] EnrichmentExec no enrichment table data found for key: {key}"
             );
-            vec![]
+            Arc::new(vec![])
         }
     };
     fetch_data_timer.done();
@@ -250,10 +250,10 @@ async fn fetch_data(
 
         pool.install(|| {
             let vrl_to_json_timer = metrics.vrl_to_json_time.timer();
-            let json_values: Vec<Arc<serde_json::Value>> = enrichment_data
+            let json_values: Vec<Arc<serde_json::Value>> = enrichment_data.as_ref()
                 .into_par_iter()
                 .map(|vrl_value| {
-                    let json_value = convert_from_vrl(&vrl_value);
+                    let json_value = convert_from_vrl(vrl_value);
                     Arc::new(json_value)
                 })
                 .collect();
@@ -282,6 +282,7 @@ async fn fetch_data(
     } else {
         let vrl_to_json_timer = metrics.vrl_to_json_time.timer();
         let json_values: Vec<Arc<serde_json::Value>> = enrichment_data
+            .as_ref()
             .into_iter()
             .map(|vrl_value| {
                 let json_value = convert_from_vrl(&vrl_value);

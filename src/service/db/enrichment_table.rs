@@ -364,7 +364,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     StreamTable {
                         org_id: org_id.to_string(),
                         stream_name: stream_name.to_string(),
-                        data,
+                        data: data.into(),
                     },
                 );
             }
