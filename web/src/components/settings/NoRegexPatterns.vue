@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="subtitle-text">Import patterns from your Library or <span class="create-new-text" @click="createNewRegexPattern">Create New</span></span>
         <div class="import-button-container">
             <q-btn no-caps class="q-mt-sm" @click="importRegexPattern">
-              <span class="import-button-text">Import Pattern</span>
+              <span class="import-button-text">{{ t("regex_patterns.import_title") }}</span>
             </q-btn>
         </div>    
     </div>

@@ -423,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="tw-pl-7" v-else-if="col.name === 'patterns'">
                           {{ col.label }}
                           <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
-                            Sensitive Data Redaction
+                            {{ t('logStream.sdr') }}
                           </q-tooltip>
                         </span>
                         <span v-else>

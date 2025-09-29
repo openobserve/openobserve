@@ -501,7 +501,8 @@
     "extendedStartDate": "Start Date",
     "extendedEndDate": "End Date",
     "regexPatterns": "SDR",
-    "envQuickModeMsg": "Environment quick mode field"
+    "envQuickModeMsg": "Environment quick mode field",
+    "sdr":"Sensitive Data Redaction"
   },
   "pipeline": {
     "header": "Pipelines",
