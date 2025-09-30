@@ -308,17 +308,23 @@ pub async fn handle_search_request(
         // Step 3: Write to results cache
         // cache only if from is 0 and is not an aggregate_query
         if req.payload.query.from == 0 {
-            write_results_to_cache(c_resp, start_time, end_time, accumulated_results)
-                .instrument(ws_search_span.clone())
-                .await
-                .map_err(|e| {
-                    log::error!(
-                        "[WS_SEARCH] trace_id: {}, Error writing results to cache: {:?}",
-                        trace_id,
-                        e
-                    );
+            write_results_to_cache(
+                c_resp,
+                start_time,
+                end_time,
+                accumulated_results,
+                req.payload.search_type,
+            )
+            .instrument(ws_search_span.clone())
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[WS_SEARCH] trace_id: {}, Error writing results to cache: {:?}",
+                    trace_id,
                     e
-                })?;
+                );
+                e
+            })?;
         }
     } else {
         // Step 4: Search without cache for req with from > 0
@@ -1157,6 +1163,7 @@ pub async fn write_results_to_cache(
     start_time: i64,
     end_time: i64,
     accumulated_results: &mut Vec<SearchResultType>,
+    search_event_type: Option<SearchEventType>,
 ) -> Result<(), Error> {
     if accumulated_results.is_empty() {
         return Ok(());
@@ -1180,12 +1187,18 @@ pub async fn write_results_to_cache(
         }
     }
 
+    let limit = if search_event_type.as_ref() == Some(&SearchEventType::UI) && c_resp.limit == -1 {
+        cfg.limit.query_default_limit
+    } else {
+        c_resp.limit
+    };
+
     let merged_response = cache::merge_response(
         &c_resp.trace_id,
         &mut cached_responses,
         &mut search_responses,
         &c_resp.ts_column,
-        c_resp.limit,
+        limit,
         c_resp.is_descending,
         c_resp.took,
         c_resp.order_by,

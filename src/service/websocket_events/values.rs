@@ -262,17 +262,23 @@ pub async fn handle_values_request(
                 let safe_start_time = start_time.unwrap_or(0);
                 let safe_end_time = end_time.unwrap_or(0);
 
-                write_results_to_cache(c_resp, safe_start_time, safe_end_time, accumulated_results)
-                    .instrument(ws_values_span.clone())
-                    .await
-                    .map_err(|e| {
-                        log::error!(
-                            "[WS_VALUES] trace_id: {}, Error writing results to cache: {:?}",
-                            trace_id,
-                            e
-                        );
+                write_results_to_cache(
+                    c_resp,
+                    safe_start_time,
+                    safe_end_time,
+                    accumulated_results,
+                    search_req.search_type,
+                )
+                .instrument(ws_values_span.clone())
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[WS_VALUES] trace_id: {}, Error writing results to cache: {:?}",
+                        trace_id,
                         e
-                    })?;
+                    );
+                    e
+                })?;
             }
         } else {
             // Step 4: Search without cache for req with from > 0

@@ -130,6 +130,7 @@ pub async fn process_search_stream_request(
 
     let started_at = chrono::Utc::now().timestamp_micros();
     let mut start = Instant::now();
+    let cfg = config::get_config();
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
     let use_cache = req.use_cache;
     let start_time = req.query.start_time;
@@ -169,6 +170,12 @@ pub async fn process_search_stream_request(
 
     if req.query.from == 0 && !req.query.track_total_hits && req.query.streaming_id.is_none() {
         // check cache for the first page
+        req.query.size =
+            if req.search_type.as_ref() == Some(&SearchEventType::UI) && req.query.size == -1 {
+                cfg.limit.query_default_limit
+            } else {
+                req.query.size
+            };
         let force_clear_cache = if !use_cache { Some(true) } else { None };
         let (c_resp, _should_exec_query) = match cache::prepare_cache_response(
             &trace_id,
@@ -356,7 +363,12 @@ pub async fn process_search_stream_request(
                 "[HTTP2_STREAM trace_id {trace_id}] No cache found, processing search request",
             );
 
-            let size = req.query.size;
+            let size =
+                if req.search_type.as_ref() == Some(&SearchEventType::UI) && req.query.size == -1 {
+                    cfg.limit.query_default_limit
+                } else {
+                    req.query.size
+                };
             if let Err(e) = do_partitioned_search(
                 &mut req,
                 &trace_id,
@@ -433,18 +445,23 @@ pub async fn process_search_stream_request(
         // Step 3: Write to results cache
         // cache only if from is 0 and is not an aggregate_query
         if req.query.from == 0
-            && let Err(e) =
-                write_results_to_cache(c_resp, start_time, end_time, &mut accumulated_results)
-                    .instrument(search_span.clone())
-                    .await
-                    .map_err(|e| {
-                        log::error!(
-                            "[HTTP2_STREAM trace_id {}] Error writing results to cache: {:?}",
-                            trace_id,
-                            e
-                        );
-                        e
-                    })
+            && let Err(e) = write_results_to_cache(
+                c_resp,
+                start_time,
+                end_time,
+                &mut accumulated_results,
+                req.search_type,
+            )
+            .instrument(search_span.clone())
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[HTTP2_STREAM trace_id {}] Error writing results to cache: {:?}",
+                    trace_id,
+                    e
+                );
+                e
+            })
         {
             // send audit response first
             #[cfg(feature = "enterprise")]
@@ -484,7 +501,12 @@ pub async fn process_search_stream_request(
         }
     } else {
         // Step 4: Search without cache for req with from > 0
-        let size = req.query.size;
+        let size = if req.search_type.as_ref() == Some(&SearchEventType::UI) && req.query.size == -1
+        {
+            cfg.limit.query_default_limit
+        } else {
+            req.query.size
+        };
         if let Err(e) = do_partitioned_search(
             &mut req,
             &trace_id,
@@ -1744,7 +1766,10 @@ async fn write_partial_results_to_cache(
                 trace_id
             );
             // write the result to cache
-            match write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await {
+            // TEMPORARY: `search_event_type` to None
+            match write_results_to_cache(c_resp, start_time, end_time, accumulated_results, None)
+                .await
+            {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!(
