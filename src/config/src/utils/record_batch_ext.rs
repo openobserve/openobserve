@@ -287,7 +287,7 @@ pub fn convert_vrl_to_record_batch(
             if obj.len() > max_keys {
                 max_keys = obj.len();
             }
-            for (k, _) in obj {
+            for k in obj.keys() {
                 keys.insert(k.as_str());
             }
         }
@@ -422,13 +422,17 @@ pub fn convert_vrl_to_record_batch(
                             vrl::value::Value::Null => b.append_null(),
                             vrl::value::Value::Integer(i) => b.append_value(*i as f64),
                             vrl::value::Value::Float(f) => b.append_value(f.into_inner()),
-                            vrl::value::Value::Boolean(b_val) => b.append_value(*b_val as i64 as f64),
+                            vrl::value::Value::Boolean(b_val) => {
+                                b.append_value(*b_val as i64 as f64)
+                            }
                             vrl::value::Value::Bytes(bytes) => {
                                 let s = String::from_utf8_lossy(bytes);
                                 b.append_value(s.parse::<f64>().unwrap_or(0.0));
                             }
                             vrl::value::Value::Timestamp(ts) => {
-                                b.append_value(ts.timestamp_nanos_opt().unwrap_or(0) as f64 / 1000.0);
+                                b.append_value(
+                                    ts.timestamp_nanos_opt().unwrap_or(0) as f64 / 1000.0,
+                                );
                             }
                             _ => b.append_value(0.0),
                         }
@@ -485,7 +489,8 @@ pub fn convert_vrl_to_record_batch(
                     }
                     _ => {
                         return Err(ArrowError::SchemaError(
-                            "Cannot convert VRL to RecordBatch from non-basic type value".to_string(),
+                            "Cannot convert VRL to RecordBatch from non-basic type value"
+                                .to_string(),
                         ));
                     }
                 }
@@ -1617,7 +1622,10 @@ mod test {
                 [
                     ("name".into(), vrl::value::Value::from("Alice")),
                     ("age".into(), vrl::value::Value::Integer(25)),
-                    ("score".into(), vrl::value::Value::Float(vrl::prelude::NotNan::new(85.5).unwrap())),
+                    (
+                        "score".into(),
+                        vrl::value::Value::Float(vrl::prelude::NotNan::new(85.5).unwrap()),
+                    ),
                     ("active".into(), vrl::value::Value::Boolean(true)),
                 ]
                 .into_iter()
@@ -1637,7 +1645,10 @@ mod test {
                 [
                     ("name".into(), vrl::value::Value::from("Charlie")),
                     ("age".into(), vrl::value::Value::Integer(35)),
-                    ("score".into(), vrl::value::Value::Float(vrl::prelude::NotNan::new(92.1).unwrap())),
+                    (
+                        "score".into(),
+                        vrl::value::Value::Float(vrl::prelude::NotNan::new(92.1).unwrap()),
+                    ),
                     ("active".into(), vrl::value::Value::Boolean(true)),
                     // extra field that's not in schema should be ignored
                     ("extra".into(), vrl::value::Value::from("ignored")),
