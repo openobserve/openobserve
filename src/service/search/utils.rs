@@ -251,8 +251,7 @@ pub fn check_query_default_limit_exceeded(
     }
 
     if sql.limit > config::QUERY_WITH_NO_LIMIT && sql.limit <= 0 {
-        let capped_limit = query_default_limit;
-        let capped_err = format!("{CAPPED_RESULTS_MSG} limit: {capped_limit}");
+        let capped_err = format!("{CAPPED_RESULTS_MSG} limit: {query_default_limit}");
         if num_rows > query_default_limit {
             if !partial_err.is_empty() {
                 partial_err.push('\n');
