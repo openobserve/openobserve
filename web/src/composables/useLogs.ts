@@ -83,6 +83,7 @@ import config from "@/aws-exports";
 import useSearchWebSocket from "./useSearchWebSocket";
 import useActions from "./useActions";
 import useStreamingSearch from "./useStreamingSearch";
+import { hasHistogramFunction } from "@/utils/query/sqlUtils";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -2683,9 +2684,11 @@ const useLogs = () => {
 
       const isAggregation = searchObj.meta.sqlMode && parsedSQL != undefined && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null);
 
-      // if(searchObj.data.queryResults.histogram_interval) {
-      //   queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
-      // }
+      const isHistograQuery = await hasHistogramFunction(parsedSQL);
+
+      if(searchObj.data.queryResults.histogram_interval && isHistograQuery) {
+        queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
+      }
 
       // check if histogram interval is undefined, then set current response as histogram response
       // for visualization, will require to set histogram interval to fill missing values
