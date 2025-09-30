@@ -242,11 +242,11 @@ pub fn check_query_default_limit_exceeded(
     sql: &Sql,
     search_event_type: Option<String>,
 ) {
-    // Skip limit check for UI searches
-    if search_event_type
-        .as_ref()
-        .and_then(|s| SearchEventType::try_from(s.as_ref()).ok())
-        == Some(SearchEventType::UI)
+    if search_event_type.is_none()
+        || search_event_type
+            .as_ref()
+            .and_then(|s| SearchEventType::try_from(s.as_ref()).ok())
+            != Some(SearchEventType::Dashboards)
     {
         return;
     }
