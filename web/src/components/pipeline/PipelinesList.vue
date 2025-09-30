@@ -208,7 +208,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   round
                   flat
                   color="negative"
-                  :title="t('pipeline.lastError')"
                   @click.stop
                 >
                   <q-tooltip>
