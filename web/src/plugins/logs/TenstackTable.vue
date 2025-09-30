@@ -361,6 +361,9 @@ name="warning" class="q-mr-xs" />
                     processedResults[`${cell.column.id}_${virtualRow.index}`]
                   "
                 />
+                <span v-else>
+                  {{ cell.renderValue() }}
+                </span>
                 <O2AIContextAddBtn
                   v-if="
                     cell.column.columnDef.id ===
