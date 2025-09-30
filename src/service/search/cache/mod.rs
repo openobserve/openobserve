@@ -115,8 +115,21 @@ pub async fn search(
     }
 
     // Result caching check start
-    let (mut c_resp, should_exec_query) =
-        prepare_cache_response(trace_id, org_id, stream_type, &mut req, use_cache).await?;
+    let force_clear_cache = if !use_cache && !is_http2_streaming {
+        Some(true)
+    } else {
+        None
+    };
+    let (mut c_resp, should_exec_query) = prepare_cache_response(
+        trace_id,
+        org_id,
+        stream_type,
+        &mut req,
+        use_cache,
+        is_http2_streaming,
+        force_clear_cache,
+    )
+    .await?;
     let file_path = c_resp.file_path.clone();
 
     // get the modified original sql from req
@@ -431,6 +444,7 @@ pub async fn search(
             file_path,
             is_aggregate,
             c_resp.is_descending,
+            c_resp.clear_cache,
         )
         .await;
     }
@@ -461,6 +475,8 @@ pub async fn prepare_cache_response(
     stream_type: StreamType,
     req: &mut search::Request,
     use_cache: bool,
+    is_http2_streaming: bool,
+    force_clear_cache: Option<bool>,
 ) -> Result<(MultiCachedQueryResponse, bool), Error> {
     let mut origin_sql = req.query.sql.clone();
     let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or(true);
@@ -541,14 +557,21 @@ pub async fn prepare_cache_response(
                 let (ts_column, is_descending) =
                     cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
-
-                let order_by = v.order_by;
+                if let Some(interval) = v.histogram_interval {
+                    file_path = format!("{file_path}_{interval}_{ts_column}");
+                }
+                let clear_cache = force_clear_cache.unwrap_or(!is_http2_streaming);
 
                 MultiCachedQueryResponse {
                     ts_column,
-                    is_aggregate,
                     is_descending,
-                    order_by,
+                    order_by: v.order_by,
+                    is_aggregate,
+                    limit: v.limit,
+                    file_path: file_path.clone(),
+                    cache_query_response: true,
+                    clear_cache,
+                    trace_id: trace_id.to_string(),
                     ..Default::default()
                 }
             }
@@ -659,7 +682,7 @@ pub fn merge_response(
     }
     sort_response(is_descending, &mut cache_response, ts_column, &order_by);
 
-    if cache_response.hits.len() > (limit as usize) {
+    if cache_response.hits.len() > (limit as usize) && limit != -1 {
         cache_response.hits.truncate(limit as usize);
     }
     if limit > 0 {
@@ -796,6 +819,7 @@ pub async fn write_results(
     file_path: String,
     is_aggregate: bool,
     is_descending: bool,
+    clear_cache: bool,
 ) {
     if res.hits.is_empty() {
         return;
@@ -872,9 +896,18 @@ pub async fn write_results(
     );
     let res_cache = json::to_string(&res).unwrap();
     let query_key = file_path.replace('/', "_");
+    let trace_id = trace_id.to_string();
     tokio::spawn(async move {
-        match SearchService::cache::cacher::cache_results_to_disk(&file_path, &file_name, res_cache)
-            .await
+        match SearchService::cache::cacher::cache_results_to_disk(
+            &trace_id,
+            &file_path,
+            &file_name,
+            res_cache,
+            clear_cache,
+            Some(accept_start_time),
+            Some(accept_end_time),
+        )
+        .await
         {
             Ok(success) => {
                 if success {
