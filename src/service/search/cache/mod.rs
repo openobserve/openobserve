@@ -23,7 +23,7 @@ use config::{
     meta::{
         dashboards::usage_report::DashboardInfo,
         function::RESULT_ARRAY_SKIP_VRL,
-        search::{self, ResponseTook},
+        search::{self, ResponseTook, SearchEventType},
         self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
@@ -53,6 +53,7 @@ use crate::{
         search::{
             self as SearchService,
             cache::cacher::check_cache,
+            datafusion::optimizer::utils::QUERY_RESULT_BUFFER_SIZE,
             init_vrl_runtime,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         },
@@ -160,6 +161,11 @@ pub async fn search(
     let cache_took = start.elapsed().as_millis() as usize;
     let mut results = Vec::new();
     let mut work_group_set = Vec::new();
+    let capped_query_limit = if in_req.search_type.as_ref() == Some(&SearchEventType::UI) {
+        cfg.limit.query_default_limit + QUERY_RESULT_BUFFER_SIZE as i64
+    } else {
+        c_resp.limit
+    };
     let mut res = if !should_exec_query {
         merge_response(
             trace_id,
@@ -170,7 +176,7 @@ pub async fn search(
                 .collect(),
             &mut vec![],
             &c_resp.ts_column,
-            c_resp.limit,
+            capped_query_limit,
             c_resp.is_descending,
             c_resp.took,
             c_resp.order_by,
@@ -276,7 +282,7 @@ pub async fn search(
                     .collect(),
                 &mut results,
                 &c_resp.ts_column,
-                c_resp.limit,
+                capped_query_limit,
                 c_resp.is_descending,
                 c_resp.took,
                 c_resp.order_by,
@@ -434,6 +440,9 @@ pub async fn search(
     //     res.function_error.retain(|err| !err.contains(&range_error));
     //     should_cache_results = should_cache_results && res.function_error.is_empty();
     // }
+
+    // if function error is not empty and it only contains query limit error then we need to cache
+    // the results in merge results check if evert type is ui and then pass the query limit
 
     // Update: Don't cache any partial results
     let should_cache_results = res.new_start_time.is_none()

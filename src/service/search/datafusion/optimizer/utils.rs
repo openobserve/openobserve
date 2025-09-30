@@ -32,7 +32,7 @@ use datafusion::{
 
 use crate::service::search::datafusion::table_provider::empty_table::NewEmptyTable;
 
-pub const QUERY_RESULT_BUFFER_SIZE: usize = 5;
+pub const QUERY_RESULT_BUFFER_SIZE: usize = 1;
 
 // check if the plan is a complex query that we can't add sort _timestamp
 pub fn is_complex_query(plan: &LogicalPlan) -> bool {
