@@ -160,11 +160,12 @@ pub async fn search(
     let cache_took = start.elapsed().as_millis() as usize;
     let mut results = Vec::new();
     let mut work_group_set = Vec::new();
-    let capped_query_limit = if in_req.search_type.as_ref() == Some(&SearchEventType::UI) {
-        cfg.limit.query_default_limit
-    } else {
-        c_resp.limit
-    };
+    let capped_query_limit =
+        if in_req.search_type.as_ref() == Some(&SearchEventType::UI) && c_resp.limit == -1 {
+            cfg.limit.query_default_limit
+        } else {
+            c_resp.limit
+        };
     let mut res = if !should_exec_query {
         merge_response(
             trace_id,
