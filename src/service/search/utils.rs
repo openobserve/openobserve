@@ -246,7 +246,7 @@ pub fn check_query_default_limit_exceeded(
     if search_event_type
         .as_ref()
         .and_then(|s| SearchEventType::try_from(s.as_ref()).ok())
-        .map_or(false, |search_type| search_type == SearchEventType::UI)
+        == Some(SearchEventType::UI)
     {
         return;
     }
