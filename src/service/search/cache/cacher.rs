@@ -762,7 +762,7 @@ pub async fn delete_cache(
 
         match disk::remove(
             file.strip_prefix(&prefix)
-                .ok_or_else(|| std::io::Error::other(format!("Invalid file path: {}", file)))?,
+                .ok_or_else(|| std::io::Error::other(format!("Invalid file path: {file}")))?,
         )
         .await
         {
