@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::{json, time::parse_str_to_timestamp_micros_as_option};
+use config::{
+    meta::search::PARTIAL_ERROR_RESPONSE_MESSAGE,
+    utils::{json, time::parse_str_to_timestamp_micros_as_option},
+};
+
+use crate::common::meta::search::CAPPED_RESULTS_MSG;
 
 pub fn get_ts_value(ts_column: &str, record: &json::Value) -> i64 {
     match record.get(ts_column) {
@@ -39,4 +44,63 @@ pub fn round_down_to_nearest_minute(microseconds: i64) -> i64 {
     let adjusted_seconds = total_seconds - seconds_past_minute;
     // Convert the adjusted time back to microseconds
     adjusted_seconds * microseconds_per_second
+}
+
+pub fn is_cachable_function_error(function_error: &[String]) -> bool {
+    if function_error.is_empty() {
+        return true;
+    }
+
+    function_error.iter().all(|error| {
+        // Empty or whitespace-only errors are cachable (no actual error)
+        let trimmed = error.trim();
+        if trimmed.is_empty() {
+            return true;
+        }
+
+        // Check if error contains only cachable messages
+        error.contains(CAPPED_RESULTS_MSG) || error.contains(PARTIAL_ERROR_RESPONSE_MESSAGE)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_cachable_function_error() {
+        let error = vec![];
+        assert_eq!(is_cachable_function_error(&error), true);
+
+        let error = vec!["".to_string()];
+        assert_eq!(is_cachable_function_error(&error), true);
+
+        let error = vec![
+            CAPPED_RESULTS_MSG.to_string(),
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+        ];
+        assert_eq!(is_cachable_function_error(&error), true); // only this is cachable
+
+        let error = vec![
+            CAPPED_RESULTS_MSG.to_string(),
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+            "parquet not found".to_string(),
+        ];
+        assert_eq!(is_cachable_function_error(&error), false);
+
+        let error = vec![
+            "parquet not found".to_string(),
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+        ];
+        assert_eq!(is_cachable_function_error(&error), false);
+
+        let error = vec!["parquet not found".to_string()];
+        assert_eq!(is_cachable_function_error(&error), false);
+
+        let error = vec![
+            "parquet not found".to_string(),
+            CAPPED_RESULTS_MSG.to_string(),
+        ];
+        assert_eq!(is_cachable_function_error(&error), false);
+    }
 }

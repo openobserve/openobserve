@@ -23,7 +23,7 @@ use config::{
     meta::{
         dashboards::usage_report::DashboardInfo,
         function::RESULT_ARRAY_SKIP_VRL,
-        search::{self, ResponseTook, SearchEventType},
+        search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE, ResponseTook, SearchEventType},
         self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
@@ -52,7 +52,7 @@ use crate::{
     service::{
         search::{
             self as SearchService,
-            cache::cacher::check_cache,
+            cache::{cacher::check_cache, result_utils::is_cachable_function_error},
             init_vrl_runtime,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         },
@@ -160,12 +160,6 @@ pub async fn search(
     let cache_took = start.elapsed().as_millis() as usize;
     let mut results = Vec::new();
     let mut work_group_set = Vec::new();
-    let capped_query_limit =
-        if in_req.search_type.as_ref() == Some(&SearchEventType::UI) && c_resp.limit == -1 {
-            cfg.limit.query_default_limit
-        } else {
-            c_resp.limit
-        };
     let mut res = if !should_exec_query {
         merge_response(
             trace_id,
@@ -176,10 +170,11 @@ pub async fn search(
                 .collect(),
             &mut vec![],
             &c_resp.ts_column,
-            capped_query_limit,
+            c_resp.limit,
             c_resp.is_descending,
             c_resp.took,
             c_resp.order_by,
+            req.search_type,
         )
     } else {
         if let Some(vrl_function) = &query_fn
@@ -282,10 +277,11 @@ pub async fn search(
                     .collect(),
                 &mut results,
                 &c_resp.ts_column,
-                capped_query_limit,
+                c_resp.limit,
                 c_resp.is_descending,
                 c_resp.took,
                 c_resp.order_by,
+                req.search_type,
             )
         } else {
             let mut reps = results[0].clone();
@@ -389,7 +385,7 @@ pub async fn search(
     .await;
 
     if res.is_partial {
-        let partial_err = "Please be aware that the response is based on partial data";
+        let partial_err = PARTIAL_ERROR_RESPONSE_MESSAGE;
         res.function_error = if res.function_error.is_empty() {
             vec![partial_err.to_string()]
         } else {
@@ -444,7 +440,7 @@ pub async fn search(
     // Update: Don't cache any partial results
     let should_cache_results = res.new_start_time.is_none()
         && res.new_end_time.is_none()
-        && res.function_error.is_empty()
+        && is_cachable_function_error(&res.function_error)
         && !res.hits.is_empty();
 
     // result cache save changes start
@@ -615,7 +611,14 @@ pub fn merge_response(
     is_descending: bool,
     cache_took: usize,
     order_by: Vec<(String, OrderBy)>,
+    search_event_type: Option<SearchEventType>,
 ) -> config::meta::search::Response {
+    let limit = if search_event_type.as_ref() == Some(&SearchEventType::UI) && limit == -1 {
+        config::get_config().limit.query_default_limit
+    } else {
+        limit
+    };
+
     cache_responses.retain(|res| !res.hits.is_empty());
 
     search_response.retain(|res| !res.hits.is_empty());
@@ -734,6 +737,12 @@ pub fn merge_response(
     if !fn_error.is_empty() {
         cache_response.function_error.extend(fn_error);
         cache_response.is_partial = true;
+    }
+    if search_event_type == Some(SearchEventType::UI)
+        && is_cachable_function_error(&cache_response.function_error)
+    {
+        cache_response.is_partial = false;
+        cache_response.function_error = Vec::new();
     }
     cache_response
 }

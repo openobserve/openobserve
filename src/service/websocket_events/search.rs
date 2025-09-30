@@ -49,7 +49,11 @@ use crate::{
     },
     handler::http::request::ws::session::send_message_2,
     service::{
-        search::{self as SearchService, cache, sql::Sql},
+        search::{
+            self as SearchService,
+            cache::{self, result_utils::is_cachable_function_error},
+            sql::Sql,
+        },
         setup_tracing_with_trace_id,
         websocket_events::{WsServerEvents, calculate_progress_percentage},
     },
@@ -1187,21 +1191,16 @@ pub async fn write_results_to_cache(
         }
     }
 
-    let limit = if search_event_type.as_ref() == Some(&SearchEventType::UI) && c_resp.limit == -1 {
-        cfg.limit.query_default_limit
-    } else {
-        c_resp.limit
-    };
-
     let merged_response = cache::merge_response(
         &c_resp.trace_id,
         &mut cached_responses,
         &mut search_responses,
         &c_resp.ts_column,
-        limit,
+        c_resp.limit,
         c_resp.is_descending,
         c_resp.took,
         c_resp.order_by,
+        search_event_type,
     );
 
     // There are 3 types of partial responses:
@@ -1227,7 +1226,7 @@ pub async fn write_results_to_cache(
     // Update: Don't cache any partial results
     let should_cache_results = merged_response.new_start_time.is_none()
         && merged_response.new_end_time.is_none()
-        && merged_response.function_error.is_empty()
+        && is_cachable_function_error(&merged_response.function_error)
         && !merged_response.hits.is_empty();
 
     if cfg.common.result_cache_enabled && should_cache_results {
