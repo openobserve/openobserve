@@ -406,6 +406,9 @@ import {
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useStreams from "@/composables/useStreams";
+import { contextRegistry } from "@/composables/contextProviders";
+import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
+
 
 export default defineComponent({
   name: "PageSearch",
@@ -652,7 +655,7 @@ export default defineComponent({
       schemaCache.value = null;
     };
 
-    const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
+    const { registerAiChatHandler, removeAiChatHandler, initializeDefaultContext } = useAiChat();
 
     onUnmounted(() => {
       // reset logsVisualizeToggle when user navigate to other page with keepAlive is false and navigate back to logs page
@@ -684,6 +687,7 @@ export default defineComponent({
       }
 
       registerAiContextHandler();
+      setupContextProvider();
     });
 
     onBeforeUnmount(async () => {
@@ -694,6 +698,7 @@ export default defineComponent({
       cancelQuery();
 
       removeAiContextHandler();
+      cleanupContextProvider();
 
       // Clear any pending timeouts
       clearAllTimeouts();
@@ -2274,6 +2279,42 @@ export default defineComponent({
     };
 
     // [END] O2 AI Context Handler
+
+    // [START] Context Provider Setup
+
+    /**
+     * Setup the logs context provider for AI chat integration
+     * 
+     * Example: When user opens logs page, this registers the context provider
+     * that will extract current search state and comprehensive schema information for AI context
+     * Follows the same schema extraction pattern as legacy AI context system
+     */
+    const setupContextProvider = () => {
+      const provider = createLogsContextProvider(
+        searchObj, 
+        store, 
+        getStream, 
+        dashboardPanelData
+      );
+      
+      contextRegistry.register('logs', provider);
+      contextRegistry.setActive('logs');
+    };
+
+    /**
+     * Cleanup logs context provider when leaving logs page
+     * 
+     * Example: When user navigates away from logs, this deactivates the logs provider
+     * but keeps the default provider available for fallback
+     */
+    const cleanupContextProvider = () => {
+      // Only unregister the logs provider, keep default provider
+      contextRegistry.unregister('logs');
+      // Reset to no active provider, so it falls back to default
+      contextRegistry.setActive('');
+    };
+
+    // [END] Context Provider Setup
 
     const sendToAiChat = (value: any) => {
       emit("sendToAiChat", value);
