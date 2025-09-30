@@ -17,8 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup>
 import { Handle } from "@vue-flow/core";
 import useDragAndDrop from "./useDnD";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { getImageURL } from "@/utils/zincutils";
 import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
@@ -49,7 +51,26 @@ const { pipelineObj, deletePipelineNode,onDragStart,onDrop, checkIfDefaultDestin
 const menu = ref(false)
 const showButtons = ref(false)
 const showDeleteTooltip = ref(false)
+const showErrorTooltip = ref(false)
 let hideButtonsTimeout = null
+
+// Check if current node has errors
+const hasNodeError = computed(() => {
+  const lastError = pipelineObj.currentSelectedPipeline?.last_error;
+  if (!lastError || !lastError.node_errors) return false;
+
+  // node_errors is a JSON object with node IDs as keys
+  const nodeErrors = lastError.node_errors;
+  return nodeErrors && nodeErrors[props.id];
+});
+
+// Get error info for current node
+const getNodeErrorInfo = () => {
+  const lastError = pipelineObj.currentSelectedPipeline?.last_error;
+  if (!lastError || !lastError.node_errors) return null;
+
+  return lastError.node_errors[props.id];
+};
 
 // Edge color mapping for different node types
 const getNodeColor = (ioType) => {
@@ -141,6 +162,27 @@ const handleDeleteTooltipLeave = () => {
   showDeleteTooltip.value = false;
 };
 
+// Handle error tooltip show/hide
+const handleErrorTooltipEnter = () => {
+  showErrorTooltip.value = true;
+};
+
+const handleErrorTooltipLeave = () => {
+  showErrorTooltip.value = false;
+};
+
+// Navigate to function page to fix the error
+const navigateToFunction = (functionName) => {
+  router.push({
+    name: "functionList",
+    query: {
+      action: "update",
+      name: functionName,
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
+};
+
 
 
 const onFunctionClick = (data,event,id) =>{
@@ -225,6 +267,8 @@ const onExternalDestinationClick = (data,event,id) =>{
 }
 
 const { t } = useI18n();
+const router = useRouter();
+const store = useStore();
 
 
 const editNode = (id) => {
@@ -354,8 +398,24 @@ function getIcon(data, ioType) {
           {{ data.name }} - <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
         </div>
       </div>
+
+      <!-- Error Badge for Function Nodes -->
+      <div
+        v-if="hasNodeError"
+        class="error-badge"
+        @click.stop="navigateToFunction(data.name)"
+        @mouseenter="handleErrorTooltipEnter"
+        @mouseleave="handleErrorTooltipLeave"
+      >
+        <q-icon name="error" color="red" size="sm" />
+        <div v-if="showErrorTooltip" class="custom-tooltip error-tooltip">
+          Click to fix function error
+          <div class="tooltip-arrow error-arrow"></div>
+        </div>
+      </div>
+
       <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
-        
+
         <q-btn
           flat
           round
@@ -832,6 +892,42 @@ function getIcon(data, ioType) {
 
 .delete-arrow {
   border-top-color: #dc2626;
+}
+
+.error-tooltip {
+  background: #ef4444;
+}
+
+.error-arrow {
+  border-top-color: #ef4444;
+}
+
+// Error badge styling
+.error-badge {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 24px;
+  height: 24px;
+  background: white;
+  border: 2px solid #ef4444;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 15;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.6);
+  }
+
+  .q-icon {
+    font-size: 1.2em !important;
+  }
 }
 
 // Node label text styling

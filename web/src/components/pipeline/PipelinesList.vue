@@ -196,6 +196,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <PipelineView :pipeline="props.row" />
                   </q-tooltip>
                 </q-btn>
+                <!-- Error Indicator -->
+                <q-btn
+                  v-if="props.row.last_error"
+                  :data-test="`pipeline-list-${props.row.name}-error-indicator`"
+                  icon="error"
+                  class="q-ml-xs pipeline-error-btn"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  color="negative"
+                  :title="t('pipeline.lastError')"
+                  @click.stop
+                >
+                  <q-tooltip>
+                    Last error: {{ new Date(props.row.last_error.last_error_timestamp / 1000).toLocaleString() }}
+                  </q-tooltip>
+                </q-btn>
               </template>
             </q-td>
           </q-tr>
@@ -1062,5 +1081,13 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
   width: 100%;
   justify-content: space-between;
   align-items: center;
+}
+
+.pipeline-error-btn {
+  opacity: 0.9;
+
+  &:hover {
+    opacity: 1;
+  }
 }
 </style>
