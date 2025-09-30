@@ -82,8 +82,9 @@ pub async fn put_file_contents(
         ));
     };
 
-    // Create a temporary file in the same directory
-    let temp_file = format!("{path}.tmp");
+    // Create a unique temporary file in the same directory to avoid concurrency issues
+    let random_suffix = super::rand::generate_random_string(16);
+    let temp_file = format!("{path}_{random_suffix}.tmp");
 
     // Write to temporary file first
     let mut file_handle = File::create(&temp_file).await?;
