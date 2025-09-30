@@ -608,13 +608,40 @@ pub async fn run_datafusion(
         // Update scan stats to include aggregation cache ratio
         scan_stats.aggs_cache_ratio = aggs_cache_ratio;
         ret.map(|data| {
-            check_query_default_limit_exceeded(
-                data.iter().fold(0, |acc, batch| acc + batch.num_rows()),
+            let total_rows = data.iter().fold(0, |acc, batch| acc + batch.num_rows());
+            let is_exceeded = check_query_default_limit_exceeded(
+                total_rows,
                 &mut visit.partial_err,
                 &sql,
                 search_event_type,
             );
-            (data, visit.scan_stats, visit.partial_err)
+
+            if is_exceeded {
+                let limit = cfg.limit.query_default_limit as usize;
+                let mut remaining = limit;
+                let mut truncated_data = Vec::new();
+
+                for batch in data {
+                    if remaining == 0 {
+                        break;
+                    }
+
+                    let batch_rows = batch.num_rows();
+                    if batch_rows <= remaining {
+                        truncated_data.push(batch);
+                        remaining -= batch_rows;
+                    } else {
+                        // Need to slice this batch
+                        let sliced_batch = batch.slice(0, remaining);
+                        truncated_data.push(sliced_batch);
+                        remaining = 0;
+                    }
+                }
+
+                (truncated_data, scan_stats, visit.partial_err)
+            } else {
+                (data, scan_stats, visit.partial_err)
+            }
         })
         .map_err(|e| e.into())
     }

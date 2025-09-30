@@ -53,7 +53,6 @@ use crate::{
         search::{
             self as SearchService,
             cache::cacher::check_cache,
-            datafusion::optimizer::utils::QUERY_RESULT_BUFFER_SIZE,
             init_vrl_runtime,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         },
@@ -162,7 +161,7 @@ pub async fn search(
     let mut results = Vec::new();
     let mut work_group_set = Vec::new();
     let capped_query_limit = if in_req.search_type.as_ref() == Some(&SearchEventType::UI) {
-        cfg.limit.query_default_limit + QUERY_RESULT_BUFFER_SIZE as i64
+        cfg.limit.query_default_limit
     } else {
         c_resp.limit
     };
