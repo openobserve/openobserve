@@ -440,10 +440,7 @@ export const useSearchBar = () => {
       }
 
       // Use the appropriate method to fetch data
-      if (searchObj.communicationMethod === "streaming") {
-        getDataThroughStream(isPagination);
-        return;
-      }
+      getDataThroughStream(isPagination);
 
       // searchObjDebug["buildSearchStartTime"] = performance.now();
       // const queryReq: any = buildSearch();
