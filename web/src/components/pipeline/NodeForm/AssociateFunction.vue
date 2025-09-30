@@ -517,6 +517,7 @@ const filterFunctions = (val: any, update: any) => {
 .function-code-container {
   background-color: #fafbfc;
   border-radius: 0;
+  max-width: 584px;
   max-height: 250px;
   overflow-y: auto;
   position: relative;
