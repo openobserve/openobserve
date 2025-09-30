@@ -211,6 +211,7 @@ mod tests {
             is_aggregate: true,
             file_path: "test.json".to_string(),
             trace_id: "trace123".to_string(),
+            clear_cache: false,
         };
 
         assert!(response.has_cached_data);

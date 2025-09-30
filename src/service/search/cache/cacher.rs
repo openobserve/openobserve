@@ -758,7 +758,12 @@ pub async fn delete_cache(
             continue;
         }
 
-        match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
+        match disk::remove(
+            file.strip_prefix(&prefix)
+                .ok_or_else(|| std::io::Error::other(format!("Invalid file path: {}", file)))?,
+        )
+        .await
+        {
             Ok(_) => remove_files.push(file),
             Err(e) => {
                 log::error!("Error deleting cache: {e}");
