@@ -383,7 +383,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_get_file() {
-        let mut file_data = FileData::with_cache_strategy_and_max_size("lru", get_config().memory_cache.max_size);
+        let mut file_data =
+            FileData::with_cache_strategy_and_max_size("lru", get_config().memory_cache.max_size);
         let file_key = "files/default/logs/memory/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
@@ -427,7 +428,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_get_file() {
-        let mut file_data = FileData::with_cache_strategy_and_max_size("fifo", get_config().memory_cache.max_size);
+        let mut file_data =
+            FileData::with_cache_strategy_and_max_size("fifo", get_config().memory_cache.max_size);
         let file_key = "files/default/logs/memory/2022/10/03/10/6982652937134804993_5_1.parquet";
         let content = Bytes::from("Some text");
 
