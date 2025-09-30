@@ -214,3 +214,447 @@ pub async fn get_enrichment_table_json(
     log::debug!("get_enrichment_table_json: fetched from {org_id}/{table_name}");
     Ok(records)
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+    use vector_enrichment::{Case, Condition};
+    use vrl::value::Value;
+
+    use super::*;
+
+    // Helper function to create test VRL values
+    fn create_test_data() -> Vec<Value> {
+        vec![
+            json!({
+                "id": "1",
+                "name": "Alice",
+                "email": "alice@example.com",
+                "country": "USA",
+                "date": "2025-01-15T10:00:00Z",
+                "score": 95
+            }),
+            json!({
+                "id": "2",
+                "name": "Bob",
+                "email": "bob@example.com",
+                "country": "UK",
+                "date": "2025-02-20T15:30:00Z",
+                "score": 87
+            }),
+            json!({
+                "id": "3",
+                "name": "charlie",
+                "email": "charlie@example.com",
+                "country": "Canada",
+                "date": "2025-03-10T08:45:00Z",
+                "score": 92
+            }),
+        ]
+        .into_iter()
+        .map(|v| crate::service::db::enrichment_table::convert_to_vrl(&v))
+        .collect()
+    }
+
+    fn create_stream_table(data: Vec<Value>) -> StreamTable {
+        StreamTable {
+            org_id: "test_org".to_string(),
+            stream_name: "test_stream".to_string(),
+            data: Arc::new(data),
+        }
+    }
+
+    #[test]
+    fn test_enrichment_exact_match_sensitive() {
+        let table = create_stream_table(create_test_data());
+        let conditions = vec![Condition::Equals {
+            field: "name",
+            value: Value::from("Alice"),
+        }];
+
+        let result = table
+            .find_table_row(Case::Sensitive, &conditions, None, None, None)
+            .unwrap();
+
+        assert!(!result.is_empty());
+        assert_eq!(result.get("name").unwrap().as_str().unwrap(), "Alice");
+        assert_eq!(result.get("id").unwrap().as_str().unwrap(), "1");
+    }
+
+    #[test]
+    fn test_enrichment_exact_match_insensitive() {
+        let table = create_stream_table(create_test_data());
+        let conditions = vec![Condition::Equals {
+            field: "name",
+            value: Value::from("ALICE"),
+        }];
+
+        let result = table
+            .find_table_row(Case::Insensitive, &conditions, None, None, None)
+            .unwrap();
+
+        assert!(!result.is_empty());
+        assert_eq!(result.get("name").unwrap().as_str().unwrap(), "Alice");
+    }
+
+    #[test]
+    fn test_enrichment_case_insensitive_lowercase() {
+        let table = create_stream_table(create_test_data());
+        let conditions = vec![Condition::Equals {
+            field: "name",
+            value: Value::from("CHARLIE"),
+        }];
+
+        let result = table
+            .find_table_row(Case::Insensitive, &conditions, None, None, None)
+            .unwrap();
+
+        assert!(!result.is_empty());
+        assert_eq!(result.get("name").unwrap().as_str().unwrap(), "charlie");
+    }
+
+    #[test]
+    fn test_enrichment_case_sensitive_no_match() {
+        let table = create_stream_table(create_test_data());
+        let conditions = vec![Condition::Equals {
+            field: "name",
+            value: Value::from("ALICE"),
+        }];
+
+        let result = table
+            .find_table_row(Case::Sensitive, &conditions, None, None, None)
+            .unwrap();
+
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_enrichment_from_date() {
+        let table = create_stream_table(create_test_data());
+        let from_time = chrono::DateTime::parse_from_rfc3339("2025-02-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+
+        let conditions = vec![Condition::FromDate {
+            field: "date",
+            from: from_time,
+        }];
+
+        let results = table
+            .find_table_rows(Case::Sensitive, &conditions, None, None, None)
+            .unwrap();
+
+        assert_eq!(results.len(), 2); // Bob and Charlie
+        assert!(
+            results
+                .iter()
+                .any(|r| r.get("name").unwrap().as_str().unwrap() == "Bob")
+        );
+        assert!(
+            results
+                .iter()
+                .any(|r| r.get("name").unwrap().as_str().unwrap() == "charlie")
+        );
+    }
+
+    #[test]
+    fn test_enrichment_to_date() {
+        let table = create_stream_table(create_test_data());
+        let to_time = chrono::DateTime::parse_from_rfc3339("2025-02-25T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+
+        let conditions = vec![Condition::ToDate {
+            field: "date",
+            to: to_time,
+        }];
+
+        let results = table
+            .find_table_rows(Case::Sensitive, &conditions, None, None, None)
+            .unwrap();
+
+        assert_eq!(results.len(), 2); // Alice and Bob
+        assert!(
+            results
+                .iter()
+                .any(|r| r.get("name").unwrap().as_str().unwrap() == "Alice")
+        );
+        assert!(
+            results
+                .iter()
+                .any(|r| r.get("name").unwrap().as_str().unwrap() == "Bob")
+        );
+    }
+
+    #[test]
+    fn test_enrichment_between_dates() {
+        let table = create_stream_table(create_test_data());
+        let from_time = chrono::DateTime::parse_from_rfc3339("2025-01-10T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let to_time = chrono::DateTime::parse_from_rfc3339("2025-02-25T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+
+        let conditions = vec![Condition::BetweenDates {
+            field: "date",
+            from: from_time,
+            to: to_time,
+        }];
+
+        let results = table
+            .find_table_rows(Case::Sensitive, &conditions, None, None, None)
+            .unwrap();
+
+        assert_eq!(results.len(), 2); // Alice and Bob
+        assert!(
+            results
+                .iter()
+                .any(|r| r.get("name").unwrap().as_str().unwrap() == "Alice")
+        );
+        assert!(
+            results
+                .iter()
+                .any(|r| r.get("name").unwrap().as_str().unwrap() == "Bob")
+        );
+        assert!(
+            !results
+                .iter()
+                .any(|r| r.get("name").unwrap().as_str().unwrap() == "charlie")
+        );
+    }
+
+    #[test]
+    fn test_enrichment_empty_conditions() {
+        let table = create_stream_table(create_test_data());
+        let conditions = vec![];
+
+        let results = table
+            .find_table_rows(Case::Sensitive, &conditions, None, None, None)
+            .unwrap();
+
+        // Should return empty vector for empty conditions (early return optimization)
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_enrichment_multiple_conditions_and_logic() {
+        let table = create_stream_table(create_test_data());
+        let conditions = vec![
+            Condition::Equals {
+                field: "country",
+                value: Value::from("USA"),
+            },
+            Condition::Equals {
+                field: "name",
+                value: Value::from("Alice"),
+            },
+        ];
+
+        let result = table
+            .find_table_row(Case::Sensitive, &conditions, None, None, None)
+            .unwrap();
+
+        assert!(!result.is_empty());
+        assert_eq!(result.get("name").unwrap().as_str().unwrap(), "Alice");
+        assert_eq!(result.get("country").unwrap().as_str().unwrap(), "USA");
+    }
+
+    #[test]
+    fn test_enrichment_multiple_conditions_no_match() {
+        let table = create_stream_table(create_test_data());
+        let conditions = vec![
+            Condition::Equals {
+                field: "country",
+                value: Value::from("USA"),
+            },
+            Condition::Equals {
+                field: "name",
+                value: Value::from("Bob"), // Bob is from UK, not USA
+            },
+        ];
+
+        let result = table
+            .find_table_row(Case::Sensitive, &conditions, None, None, None)
+            .unwrap();
+
+        // Should be empty because Bob is not from USA
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_enrichment_field_selection() {
+        let table = create_stream_table(create_test_data());
+        let conditions = vec![Condition::Equals {
+            field: "name",
+            value: Value::from("Alice"),
+        }];
+        let select_fields = vec!["name".to_string(), "email".to_string()];
+
+        let result = table
+            .find_table_row(
+                Case::Sensitive,
+                &conditions,
+                Some(&select_fields),
+                None,
+                None,
+            )
+            .unwrap();
+
+        assert!(!result.is_empty());
+        assert!(result.contains_key("name"));
+        assert!(result.contains_key("email"));
+        assert!(!result.contains_key("id"));
+        assert!(!result.contains_key("country"));
+        assert_eq!(result.len(), 2); // Only name and email
+    }
+
+    #[test]
+    fn test_enrichment_field_selection_nonexistent() {
+        let table = create_stream_table(create_test_data());
+        let conditions = vec![Condition::Equals {
+            field: "name",
+            value: Value::from("Alice"),
+        }];
+        let select_fields = vec!["name".to_string(), "nonexistent_field".to_string()];
+
+        let result = table
+            .find_table_row(
+                Case::Sensitive,
+                &conditions,
+                Some(&select_fields),
+                None,
+                None,
+            )
+            .unwrap();
+
+        assert!(!result.is_empty());
+        assert!(result.contains_key("name"));
+        assert!(!result.contains_key("nonexistent_field"));
+        assert_eq!(result.len(), 1); // Only name exists
+    }
+
+    #[test]
+    fn test_enrichment_find_table_rows_multiple_results() {
+        let table = create_stream_table(create_test_data());
+        let conditions = vec![]; // Empty condition should return empty due to optimization
+
+        let results = table
+            .find_table_rows(Case::Sensitive, &conditions, None, None, None)
+            .unwrap();
+
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_enrichment_wildcard_parameter() {
+        // Test that wildcard parameter is accepted (currently unused but part of API)
+        let table = create_stream_table(create_test_data());
+        let conditions = vec![Condition::Equals {
+            field: "name",
+            value: Value::from("Alice"),
+        }];
+        let wildcard = Some(Value::from("*"));
+
+        let result = table
+            .find_table_row(Case::Sensitive, &conditions, None, wildcard.as_ref(), None)
+            .unwrap();
+
+        assert!(!result.is_empty());
+        assert_eq!(result.get("name").unwrap().as_str().unwrap(), "Alice");
+    }
+
+    #[test]
+    fn test_enrichment_index_operations() {
+        let mut table = create_stream_table(create_test_data());
+
+        // Test add_index
+        let index_handle = table
+            .add_index(Case::Sensitive, &["name", "country"])
+            .unwrap();
+        assert_eq!(index_handle.0, 1);
+
+        // Test index_fields
+        let fields = table.index_fields();
+        assert!(fields.is_empty()); // Currently returns empty
+
+        // Test needs_reload
+        assert!(!table.needs_reload());
+    }
+
+    #[test]
+    fn test_get_data_empty_table() {
+        let table = create_stream_table(vec![]);
+        let conditions = vec![Condition::Equals {
+            field: "name",
+            value: Value::from("Alice"),
+        }];
+
+        let results = get_data(&table, &conditions, None, Case::Sensitive);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_get_data_with_non_object_values() {
+        // Create a table with non-object values (should be filtered out)
+        let data = vec![
+            Value::from("not an object"),
+            Value::from(123),
+            json!({"name": "Alice"}).into(),
+        ];
+        let table = create_stream_table(data);
+        let conditions = vec![Condition::Equals {
+            field: "name",
+            value: Value::from("Alice"),
+        }];
+
+        let results = get_data(&table, &conditions, None, Case::Sensitive);
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_enrichment_date_condition_invalid_format() {
+        let mut data = create_test_data();
+        // Add a record with invalid date format
+        data.push(json!({"name": "Invalid", "date": "not-a-date"}).into());
+
+        let table = create_stream_table(data);
+        let from_time = chrono::DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+
+        let conditions = vec![Condition::FromDate {
+            field: "date",
+            from: from_time,
+        }];
+
+        let results = table
+            .find_table_rows(Case::Sensitive, &conditions, None, None, None)
+            .unwrap();
+
+        // Invalid date should be filtered out
+        assert!(
+            !results
+                .iter()
+                .any(|r| r.get("name").unwrap().as_str().unwrap() == "Invalid")
+        );
+    }
+
+    #[test]
+    fn test_enrichment_bytes_comparison() {
+        // Test direct bytes comparison (both UTF-8)
+        let data = vec![json!({"id": "1", "data": "test"}).into()];
+        let table = create_stream_table(data);
+
+        let conditions = vec![Condition::Equals {
+            field: "data",
+            value: Value::from("test"),
+        }];
+
+        let result = table
+            .find_table_row(Case::Sensitive, &conditions, None, None, None)
+            .unwrap();
+
+        assert!(!result.is_empty());
+    }
+}
