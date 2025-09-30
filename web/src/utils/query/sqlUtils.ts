@@ -726,6 +726,7 @@ export const buildSqlQuery = (
   // Return the constructed query
   return query;
 };
+
 export const changeHistogramInterval = async (
   query: any,
   histogramInterval: any,
@@ -801,6 +802,116 @@ export const convertQueryIntoSingleLine = async (query: any) => {
 };
 
 
+export const hasHistogramFunction = async (query: any) => {
+  try {
+    if (!query || query === "") {
+      return false;
+    }
+
+    if(typeof query === "string") await importSqlParser();
+    const ast: any = typeof query === "string" ? parser.astify(query) : query;
+
+    const MAX_RECURSION_DEPTH = 50;
+    const visitedNodes = new WeakSet();
+
+    const checkHistogramInNode = (node: any, depth: number = 0): boolean => {
+      if (!node || depth > MAX_RECURSION_DEPTH) {
+        if (depth > MAX_RECURSION_DEPTH) {
+          console.warn("Maximum recursion depth reached while checking for histogram function");
+        }
+        return false;
+      }
+
+      if (typeof node === 'object' && node !== null) {
+        if (visitedNodes.has(node)) {
+          return false;
+        }
+        visitedNodes.add(node);
+      }
+
+      // Check if current node is a histogram function
+      if (node.type === "function" && node?.name?.name?.[0]?.value === "histogram") {
+        return true;
+      }
+
+      // Check columns for histogram functions
+      if (node.columns && Array.isArray(node.columns)) {
+        for (const column of node.columns) {
+          if (column.expr && column.expr.type === "function" &&
+              column.expr?.name?.name?.[0]?.value === "histogram") {
+            return true;
+          }
+          // Check nested subqueries in columns
+          if (column.expr && column.expr.ast && checkHistogramInNode(column.expr.ast, depth + 1)) {
+            return true;
+          }
+        }
+      }
+
+      // Check FROM clause for subqueries
+      if (node.from && Array.isArray(node.from)) {
+        for (const fromClause of node.from) {
+          if (fromClause.expr && fromClause.expr.ast &&
+              checkHistogramInNode(fromClause.expr.ast, depth + 1)) {
+            return true;
+          }
+        }
+      }
+
+      // Check WHERE clause for subqueries
+      if (node.where) {
+        if (checkHistogramInWhere(node.where, depth + 1)) {
+          return true;
+        }
+      }
+
+      // Check WITH statements
+      if (node.with && Array.isArray(node.with)) {
+        for (const withClause of node.with) {
+          if (withClause.stmt && checkHistogramInNode(withClause.stmt, depth + 1)) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    };
+
+    const checkHistogramInWhere = (whereNode: any, depth: number = 0): boolean => {
+      if (!whereNode || depth > MAX_RECURSION_DEPTH) {
+        return false;
+      }
+
+      // Check if WHERE node itself is a histogram function
+      if (whereNode.type === "function" && whereNode?.name?.name?.[0]?.value === "histogram") {
+        return true;
+      }
+
+      // Check binary expressions (AND, OR, etc.)
+      if (whereNode.type === "binary_expr") {
+        if (whereNode.left && checkHistogramInWhere(whereNode.left, depth + 1)) {
+          return true;
+        }
+        if (whereNode.right && checkHistogramInWhere(whereNode.right, depth + 1)) {
+          return true;
+        }
+        // Check for subquery in right side
+        if (whereNode.right && whereNode.right.ast &&
+            checkHistogramInNode(whereNode.right.ast, depth + 1)) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
+    return checkHistogramInNode(ast);
+  } catch (error) {
+    console.error("Error checking for histogram function:", error);
+    return false;
+  }
+};
+
 export const getStreamNameFromQuery = async (query: any) => {
   let streamName = null;
   try {
@@ -814,7 +925,7 @@ export const getStreamNameFromQuery = async (query: any) => {
               // Recursively extract table names from the WITH statement with depth protection
               const MAX_RECURSION_DEPTH = 50; // Prevent stack overflow
               const visitedNodes = new WeakSet(); // Prevent circular references - more efficient for objects
-              
+
               const extractTablesFromNode = (node: any, depth: number = 0) => {
                 if (!node || depth > MAX_RECURSION_DEPTH) {
                   if (depth > MAX_RECURSION_DEPTH) {
@@ -822,7 +933,7 @@ export const getStreamNameFromQuery = async (query: any) => {
                   }
                   return;
                 }
-                
+
                 // Use WeakSet for efficient circular reference detection
                 if (typeof node === 'object' && node !== null) {
                   if (visitedNodes.has(node)) {
@@ -830,7 +941,7 @@ export const getStreamNameFromQuery = async (query: any) => {
                   }
                   visitedNodes.add(node);
                 }
-                
+
                 // Check if current node has a from clause
                 if (node.from && Array.isArray(node.from)) {
                   node.from.forEach((stream: any) => {
@@ -843,12 +954,12 @@ export const getStreamNameFromQuery = async (query: any) => {
                     }
                   });
                 }
-                
+
                 // Check for nested subqueries in WHERE clause
                 if (node.where && node.where.right && node.where.right.ast) {
                   extractTablesFromNode(node.where.right.ast, depth + 1);
                 }
-                
+
                 // Check for nested subqueries in SELECT expressions
                 if (node.columns && Array.isArray(node.columns)) {
                   node.columns.forEach((col: any) => {
@@ -858,7 +969,7 @@ export const getStreamNameFromQuery = async (query: any) => {
                   });
                 }
               };
-              
+
               // Start extraction from the WITH statement
               extractTablesFromNode(obj?.stmt);
             });
