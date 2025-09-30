@@ -542,7 +542,7 @@ mod tests {
         assert_eq!(neg_int_json, back_to_json);
 
         // Test float
-        let float_json = json::Value::Number(json::Number::from_f64(3.14).unwrap());
+        let float_json = json::Value::Number(json::Number::from_f64(1.23).unwrap());
         let vrl_value = convert_to_vrl(&float_json);
         let back_to_json = convert_from_vrl(&vrl_value);
         assert_eq!(float_json, back_to_json);
@@ -653,7 +653,7 @@ mod tests {
         assert_eq!(int_vrl, back_to_vrl);
 
         // Test float
-        let float_vrl = vrl::value::Value::Float(NotNan::new(3.14).unwrap());
+        let float_vrl = vrl::value::Value::Float(NotNan::new(1.23).unwrap());
         let json_value = convert_from_vrl(&float_vrl);
         let back_to_vrl = convert_to_vrl(&json_value);
         assert_eq!(float_vrl, back_to_vrl);
