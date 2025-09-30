@@ -464,6 +464,7 @@ pub async fn run_datafusion(
     };
 
     let context = tracing::Span::current().context();
+    let search_event_type = req.search_event_type.clone();
 
     // rewrite physical plan
     let mut rewrite = RemoteScanRewriter::new(
@@ -611,6 +612,7 @@ pub async fn run_datafusion(
                 data.iter().fold(0, |acc, batch| acc + batch.num_rows()),
                 &mut visit.partial_err,
                 &sql,
+                search_event_type,
             );
             (data, visit.scan_stats, visit.partial_err)
         })
