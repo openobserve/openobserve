@@ -184,7 +184,7 @@ export function useLogsHighlighter() {
             dataStr,
             currentColors.value.timestamp,
             queryString,
-            showQuotes,
+            false,
           );
         } else {
           return createStyledSpan(
@@ -438,7 +438,7 @@ export function useLogsHighlighter() {
             String(value),
             numType,
             queryString,
-            showQuotes,
+            numType !== "timestamp",
           ),
         );
       } else if (typeof value === "string") {
@@ -563,7 +563,7 @@ export function useLogsHighlighter() {
             dataStr,
             currentColors.timestamp,
             queryString,
-            showQuotes,
+            false,
           );
         } else {
           return createStyledSpan(
