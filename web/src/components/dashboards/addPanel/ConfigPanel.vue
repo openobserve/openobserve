@@ -244,15 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <q-toggle
-      v-if="
-        dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'heatmap' &&
-        dashboardPanelData.data.type != 'metric' &&
-        dashboardPanelData.data.type != 'gauge' &&
-        dashboardPanelData.data.type != 'geomap' &&
-        dashboardPanelData.data.type != 'sankey' &&
-        dashboardPanelData.data.type != 'maps'
-      "
+      v-if="showLegendsConditions"
       v-model="dashboardPanelData.data.config.show_legends"
       :label="t('dashboard.showLegendsLabel')"
       data-test="dashboard-config-show-legend"
@@ -289,16 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="o2-input">
       <q-select
-        v-if="
-          dashboardPanelData.data.type != 'table' &&
-          dashboardPanelData.data.type != 'heatmap' &&
-          dashboardPanelData.data.type != 'metric' &&
-          dashboardPanelData.data.type != 'gauge' &&
-          dashboardPanelData.data.type != 'geomap' &&
-          dashboardPanelData.data.config.show_legends &&
-          dashboardPanelData.data.type != 'sankey' &&
-          dashboardPanelData.data.type != 'maps'
-        "
+        v-if="showLegendPositionConditions"
         outlined
         v-model="dashboardPanelData.data.config.legends_position"
         :options="legendsPositionOptions"
@@ -317,16 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <q-select
-        v-if="
-          dashboardPanelData.data.type != 'table' &&
-          dashboardPanelData.data.type != 'heatmap' &&
-          dashboardPanelData.data.type != 'metric' &&
-          dashboardPanelData.data.type != 'gauge' &&
-          dashboardPanelData.data.type != 'geomap' &&
-          dashboardPanelData.data.config.show_legends &&
-          dashboardPanelData.data.type != 'sankey' &&
-          dashboardPanelData.data.type != 'maps'
-        "
+        v-if="showLegendTypeConditions"
         outlined
         v-model="dashboardPanelData.data.config.legends_type"
         :options="legendTypeOptions"
@@ -347,16 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="input-container">
         <!-- Legend Width Configuration (for right position) -->
         <q-input
-          v-if="
-            dashboardPanelData.data.type != 'table' &&
-            dashboardPanelData.data.type != 'heatmap' &&
-            dashboardPanelData.data.type != 'metric' &&
-            dashboardPanelData.data.type != 'gauge' &&
-            dashboardPanelData.data.type != 'geomap' &&
-            dashboardPanelData.data.config.show_legends &&
-            dashboardPanelData.data.config.legends_position == 'right' &&
-            dashboardPanelData.data.type != 'sankey'
-          "
+          v-if="showLegendWidthConditions"
           v-model.number="legendWidthValue"
           :label="t('common.legendWidth')"
           color="input-border"
@@ -374,23 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Legend Height Configuration (for auto/bottom position) -->
         <q-input
-          v-if="
-            dashboardPanelData.data.type != 'table' &&
-            dashboardPanelData.data.type != 'heatmap' &&
-            dashboardPanelData.data.type != 'metric' &&
-            dashboardPanelData.data.type != 'gauge' &&
-            dashboardPanelData.data.type != 'geomap' &&
-            dashboardPanelData.data.config.show_legends &&
-            (dashboardPanelData.data.config.legends_position == null ||
-              dashboardPanelData.data.config.legends_position == 'bottom') &&
-            dashboardPanelData.data.type != 'sankey' &&
-            !(
-              (dashboardPanelData.data.config.legends_position == null ||
-                dashboardPanelData.data.config.legends_position == 'bottom') &&
-              (dashboardPanelData.data.config.legends_type == null ||
-                dashboardPanelData.data.config.legends_type == 'scroll')
-            )
-          "
+          v-if="showLegendHeightConditions"
           v-model.number="legendHeightValue"
           label="Legend Height"
           color="input-border"
@@ -409,16 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Unit container for Legend Width (right position) -->
         <div
           class="unit-container"
-          v-if="
-            dashboardPanelData.data.type != 'table' &&
-            dashboardPanelData.data.type != 'heatmap' &&
-            dashboardPanelData.data.type != 'metric' &&
-            dashboardPanelData.data.type != 'gauge' &&
-            dashboardPanelData.data.type != 'geomap' &&
-            dashboardPanelData.data.config.show_legends &&
-            dashboardPanelData.data.config.legends_position == 'right' &&
-            dashboardPanelData.data.type != 'sankey'
-          "
+          v-if="showLegendWidthUnitContainerConditions"
         >
           <button
             @click="setUnit('px')"
@@ -456,23 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Unit container for Legend Height (auto/bottom position) -->
         <div
           class="unit-container"
-          v-if="
-            dashboardPanelData.data.type != 'table' &&
-            dashboardPanelData.data.type != 'heatmap' &&
-            dashboardPanelData.data.type != 'metric' &&
-            dashboardPanelData.data.type != 'gauge' &&
-            dashboardPanelData.data.type != 'geomap' &&
-            dashboardPanelData.data.config.show_legends &&
-            (dashboardPanelData.data.config.legends_position == null ||
-              dashboardPanelData.data.config.legends_position == 'bottom') &&
-            dashboardPanelData.data.type != 'sankey' &&
-            !(
-              (dashboardPanelData.data.config.legends_position == null ||
-                dashboardPanelData.data.config.legends_position == 'bottom') &&
-              (dashboardPanelData.data.config.legends_type == null ||
-                dashboardPanelData.data.config.legends_type == 'scroll')
-            )
-          "
+          v-if="showLegendHeightUnitContainerConditions"
         >
           <button
             @click="setHeightUnit('px')"
@@ -513,12 +437,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-select
         v-if="
           (dashboardPanelData.data.type === 'pie' ||
-          dashboardPanelData.data.type === 'donut') &&
+            dashboardPanelData.data.type === 'donut') &&
           dashboardPanelData.data.config.show_legends &&
           dashboardPanelData.data.config.legends_position === 'right' &&
           (dashboardPanelData.data.config.legends_type === 'plain' ||
-          dashboardPanelData.data.config.legends_type === 'scroll' ||
-          dashboardPanelData.data.config.legends_type === null)
+            dashboardPanelData.data.config.legends_type === 'scroll' ||
+            dashboardPanelData.data.config.legends_type === null) &&
+          !isTrellisEnabled
         "
         outlined
         v-model="dashboardPanelData.data.config.chart_align"
@@ -529,9 +454,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         stack-label
         emit-value
         :display-value="`${
-          dashboardPanelData.data.config.chart_align === null ? 'Auto' :
-          dashboardPanelData.data.config.chart_align === 'left' ? 'Left' :
-          dashboardPanelData.data.config.chart_align === 'center' ? 'Center' : 'Auto'
+          dashboardPanelData.data.config.chart_align === null
+            ? 'Auto'
+            : dashboardPanelData.data.config.chart_align === 'left'
+              ? 'Left'
+              : dashboardPanelData.data.config.chart_align === 'center'
+                ? 'Center'
+                : 'Auto'
         }`"
         data-test="dashboard-config-chart-align"
       >
@@ -1750,6 +1679,15 @@ import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
 import { useStore } from "vuex";
 
 import { markRaw, watchEffect } from "vue";
+import {
+  shouldShowLegendsToggle,
+  shouldShowLegendPosition,
+  shouldShowLegendType,
+  shouldShowLegendWidth,
+  shouldShowLegendHeight,
+  shouldShowLegendWidthUnitContainer,
+  shouldShowLegendHeightUnitContainer,
+} from "@/utils/dashboard/configUtils";
 
 export default defineComponent({
   components: {
@@ -1905,6 +1843,10 @@ export default defineComponent({
 
       if (!dashboardPanelData?.data?.config?.trellis?.group_by_y_axis) {
         dashboardPanelData.data.config.trellis.group_by_y_axis = false;
+      }
+
+      if (!dashboardPanelData.data.config.show_gridlines) {
+        dashboardPanelData.data.config.show_gridlines = true;
       }
     });
 
@@ -2365,25 +2307,66 @@ export default defineComponent({
       );
     });
 
-    // Clear legend width when switching to scroll type since scroll legends ignore custom width
+    const isTrellisEnabled = computed(() => {
+      return dashboardPanelData.data.config.trellis?.layout !== null;
+    });
+
+    // Computed properties for legend conditions
+    const showLegendsConditions = computed(() =>
+      shouldShowLegendsToggle(dashboardPanelData, isTrellisEnabled.value),
+    );
+
+    const showLegendPositionConditions = computed(() =>
+      shouldShowLegendPosition(dashboardPanelData, isTrellisEnabled.value),
+    );
+
+    const showLegendTypeConditions = computed(() =>
+      shouldShowLegendType(dashboardPanelData, isTrellisEnabled.value),
+    );
+
+    const showLegendWidthConditions = computed(() =>
+      shouldShowLegendWidth(dashboardPanelData, isTrellisEnabled.value),
+    );
+
+    const showLegendHeightConditions = computed(() =>
+      shouldShowLegendHeight(dashboardPanelData, isTrellisEnabled.value),
+    );
+
+    const showLegendWidthUnitContainerConditions = computed(() =>
+      shouldShowLegendWidthUnitContainer(
+        dashboardPanelData,
+        isTrellisEnabled.value,
+      ),
+    );
+
+    const showLegendHeightUnitContainerConditions = computed(() =>
+      shouldShowLegendHeightUnitContainer(
+        dashboardPanelData,
+        isTrellisEnabled.value,
+      ),
+    );
+
+    // Clear legend width when switching away from plain type or when position is not right
     watchEffect(() => {
-      if (dashboardPanelData.data.config.legends_type === "scroll") {
-        // Clear the legend width value when switching to scroll type
+      if (
+        dashboardPanelData.data.config.legends_type !== "plain" ||
+        dashboardPanelData.data.config.legends_position !== "right"
+      ) {
+        // Clear the legend width value when conditions no longer allow width customization
         if (dashboardPanelData.data.config.legend_width) {
           dashboardPanelData.data.config.legend_width.value = null;
         }
       }
     });
 
-    // Clear legend height when switching to scroll/auto type at bottom/auto position
+    // Clear legend height when switching away from plain type or when position is not bottom/auto
     watchEffect(() => {
       if (
-        (dashboardPanelData.data.config.legends_position === "bottom" ||
-          dashboardPanelData.data.config.legends_position === null) &&
-        (dashboardPanelData.data.config.legends_type === "scroll" ||
-          dashboardPanelData.data.config.legends_type === null)
+        dashboardPanelData.data.config.legends_type !== "plain" ||
+        (dashboardPanelData.data.config.legends_position !== null &&
+          dashboardPanelData.data.config.legends_position !== "bottom")
       ) {
-        // Clear the legend height value when conditions match
+        // Clear the legend height value when conditions no longer allow height customization
         if (dashboardPanelData.data.config.legend_height) {
           dashboardPanelData.data.config.legend_height.value = null;
         }
@@ -2420,7 +2403,15 @@ export default defineComponent({
       showTrellisConfig,
       isBreakdownFieldEmpty,
       hasTimeShifts,
+      isTrellisEnabled,
       dashboardPanelDataPageKey,
+      showLegendsConditions,
+      showLegendPositionConditions,
+      showLegendTypeConditions,
+      showLegendWidthConditions,
+      showLegendHeightConditions,
+      showLegendWidthUnitContainerConditions,
+      showLegendHeightUnitContainerConditions,
     };
   },
 });

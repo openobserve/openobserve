@@ -34,12 +34,10 @@ import {
   getUnitValue,
   isTimeSeries,
   isTimeStamp,
-  calculateBottomLegendHeight,
-  calculateRightLegendWidth,
   calculateChartDimensions,
-  generateChartAlignmentProperties,
   calculatePieChartRadius,
   shouldApplyChartAlignment,
+  generateChartAlignmentProperties,
 } from "./convertDataIntoUnitValue";
 import {
   calculateGridPositions,
@@ -58,8 +56,9 @@ import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 import {
   createBaseLegendConfig,
   applyLegendConfiguration,
-  applyPieDonutCenterAdjustment,
+  applyPieDonutChartAlignment,
   getChartDimensions,
+  applyPieDonutCenterAdjustment,
 } from "./legendConfiguration";
 
 /**
@@ -1723,6 +1722,14 @@ export const convertSQLData = async (
       break;
     }
     case "pie": {
+      // Add more padding for pie chart
+      options.grid = {
+        containLabel: true,
+        left: "15%",
+        right: "15%",
+        top: "15%",
+        bottom: "15%",
+      };
       options.tooltip = {
         trigger: "item",
         textStyle: {
@@ -1869,6 +1876,14 @@ export const convertSQLData = async (
       break;
     }
     case "donut": {
+      // Add more padding for donut chart
+      options.grid = {
+        containLabel: true,
+        left: "15%",
+        right: "15%",
+        top: "15%",
+        bottom: "15%",
+      };
       options.tooltip = {
         trigger: "item",
         textStyle: {
@@ -1948,135 +1963,13 @@ export const convertSQLData = async (
 
         options.series[0].radius = [`${innterRadius}%`, `${outerRadius}%`];
 
-        // Apply chart alignment - only when legend position is right and chart_align is explicitly set
-        const shouldApplyAlignment =
-          panelSchema.config?.show_legends &&
-          panelSchema.config?.legends_position === "right" &&
-          (panelSchema.config?.legends_type === "plain" ||
-            panelSchema.config?.legends_type === "scroll" ||
-            panelSchema.config?.legends_type === null) &&
-          panelSchema.config?.chart_align; // Only apply when chart_align is explicitly set
-        if (shouldApplyAlignment) {
-          // Apply chart alignment based on container properties
-          const containerProps = calculatePieChartContainer(
-            panelSchema,
-            chartWidth,
-            chartHeight,
-            options.series[0].data || [],
-          );
-
-          // Apply center positioning based on alignment requirements
-          if (containerProps.shouldUseGridAlignment) {
-            // Calculate center position for alignment within ONLY the chart area (excluding legend)
-            const chartAlign = panelSchema.config?.chart_align;
-            const chartAreaWidth = containerProps.availableWidth;
-
-            let centerX = 50; // Default center
-            let centerY = 50; // Default center
-
-            // For right legends, adjust horizontal positioning
-            const chartAreaRadius = Math.min(chartAreaWidth, chartHeight) * 0.4; // 40% of smaller dimension
-            const radiusAsPercentOfTotal = (chartAreaRadius / chartWidth) * 100;
-            const minSafeXInChartArea = radiusAsPercentOfTotal + 2; // 2% padding
-
-            switch (chartAlign) {
-              case "left": {
-                // Position chart to the left within ONLY the chart area
-                const leftPositionInChartArea = chartAreaWidth * 0.25; // 25% into chart area
-                centerX = Math.max(
-                  minSafeXInChartArea,
-                  (leftPositionInChartArea / chartWidth) * 100,
-                );
-                break;
-              }
-              case "center":
-              default: {
-                // Center within ONLY the chart area
-                const chartAreaCenter = chartAreaWidth / 2;
-                centerX = (chartAreaCenter / chartWidth) * 100;
-                break;
-              }
-            }
-
-            options.series[0].center = [`${centerX}%`, `${centerY}%`];
-          } else {
-            // Fallback to default center when grid alignment is not used
-            options.series[0].center = ["50%", "50%"];
-          }
-        } else {
-          // Default positioning for all other cases - don't interfere with existing functionality
-          // Adjust center position based on legend position for plain legends
-          if (
-            panelSchema.config?.show_legends &&
-            panelSchema.config?.legends_type === "plain"
-          ) {
-            if (panelSchema.config?.legends_position === "right") {
-              // Calculate legend width and move chart center to the left
-              const legendCount = options.series[0].data?.length || 0;
-              // Prefer explicit legend width if provided in config
-              let legendWidth;
-              if (
-                panelSchema.config.legend_width &&
-                !isNaN(parseFloat(panelSchema.config.legend_width.value))
-              ) {
-                legendWidth =
-                  panelSchema.config.legend_width.unit === "%"
-                    ? chartWidth * (panelSchema.config.legend_width.value / 100)
-                    : panelSchema.config.legend_width.value;
-              } else {
-                // Dynamically compute width to ensure legends do not overlap the chart
-                legendWidth = calculateRightLegendWidth(
-                  legendCount,
-                  chartWidth,
-                  chartHeight,
-                  options.series[0].data || [],
-                  false,
-                );
-              }
-
-              const availableWidth = chartWidth - legendWidth;
-              const centerX = (availableWidth / 2 / chartWidth) * 100; // Convert to percentage
-              options.series[0].center = [`${centerX}%`, "50%"];
-            } else if (
-              panelSchema.config?.legends_position === "bottom" ||
-              panelSchema.config?.legends_position === null
-            ) {
-              // Calculate legend height and move chart center up
-              const legendCount = options.series[0].data?.length || 0;
-
-              // Prefer explicit legend height if provided in config, but not for scroll legends when position is auto/bottom
-              let legendHeight;
-              if (
-                panelSchema.config.legend_height &&
-                !isNaN(parseFloat(panelSchema.config.legend_height.value)) &&
-                // Don't apply legend height config when legend type is auto/scroll and position is auto/bottom
-                !(
-                  (panelSchema.config?.legends_position === "bottom" ||
-                    panelSchema.config?.legends_position === null) &&
-                  (panelSchema.config?.legends_type === "scroll" ||
-                    panelSchema.config?.legends_type === null)
-                )
-              ) {
-                legendHeight =
-                  panelSchema.config.legend_height.unit === "%"
-                    ? chartHeight *
-                      (panelSchema.config.legend_height.value / 100)
-                    : panelSchema.config.legend_height.value;
-              } else {
-                // Dynamically compute height to ensure legends do not overlap the chart
-                legendHeight = calculateBottomLegendHeight(
-                  legendCount,
-                  chartWidth,
-                  options.series[0].data || [],
-                  chartHeight,
-                );
-              }
-              const availableHeight = chartHeight - legendHeight;
-              const centerY = (availableHeight / 2 / chartHeight) * 100; // Convert to percentage
-              options.series[0].center = ["50%", `${centerY}%`];
-            }
-          }
-        }
+        // Apply chart alignment and center positioning using centralized function
+        applyPieDonutChartAlignment(
+          panelSchema,
+          options,
+          chartWidth,
+          chartHeight,
+        );
       }
 
       options.xAxis = [];
@@ -3009,7 +2902,6 @@ export const convertSQLData = async (
       options.yAxis = options.yAxis;
     }
   }
-
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 
