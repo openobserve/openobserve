@@ -64,7 +64,7 @@ export const useSearchHistogramManager = () => {
       onError: (payload: any, error: any) => void;
       onComplete: (payload: any, response: any) => void;
       onReset: (data: any, traceId?: string) => void;
-    }
+    },
   ) => {
     const parsedSQL: any = fnParsedSQL();
 
@@ -157,7 +157,7 @@ export const useSearchHistogramManager = () => {
             queryReq,
             buildWebSocketPayload,
             initializeSearchConnection,
-            callbacks
+            callbacks,
           );
           searchObjDebug["pagecountEndTime"] = performance.now();
         }, 0);
@@ -186,7 +186,7 @@ export const useSearchHistogramManager = () => {
             queryReq,
             buildWebSocketPayload,
             initializeSearchConnection,
-            callbacks
+            callbacks,
           );
           searchObjDebug["pagecountEndTime"] = performance.now();
         }, 0);
@@ -201,7 +201,6 @@ export const useSearchHistogramManager = () => {
     meta?: any,
     refreshPagination?: Function,
   ) => {
-    console.log("histogram response", response);
     searchObjDebug["histogramProcessingStartTime"] = performance.now();
 
     searchObj.loading = false;
@@ -313,7 +312,7 @@ export const useSearchHistogramManager = () => {
       onError: (payload: any, error: any) => void;
       onComplete: (payload: any, response: any) => void;
       onReset: (data: any, traceId?: string) => void;
-    }
+    },
   ) => {
     if (
       searchObj.data.queryResults.total >
