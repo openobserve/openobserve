@@ -429,6 +429,16 @@ pub async fn check_ingestion_allowed(
         )));
     }
 
+    #[cfg(feature = "enterprise")]
+    {
+        // this is installation level limit for all orgs combined
+        if !o2_enterprise::enterprise::license::ingestion_allowed() {
+            return Err(Error::IngestionError(
+                "installation has exceeded its ingestion quota".to_string(),
+            ));
+        }
+    }
+
     #[cfg(feature = "cloud")]
     {
         if !super::organization::is_org_in_free_trial_period(org_id).await? {
