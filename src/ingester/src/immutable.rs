@@ -181,12 +181,14 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
 
     // update metrics
     metrics::INGEST_MEMTABLE_BYTES
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .sub(stat.json_size);
     metrics::INGEST_MEMTABLE_ARROW_BYTES
-        .with_label_values(&[])
+        .with_label_values::<&str>(&[])
         .sub(stat.arrow_size as i64);
-    metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
+    metrics::INGEST_MEMTABLE_FILES
+        .with_label_values::<&str>(&[])
+        .dec();
 
     Ok(())
 }
