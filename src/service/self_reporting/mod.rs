@@ -338,7 +338,7 @@ pub fn http_report_metrics(
     let uri = format!("/api/org/{uri}");
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            &uri,
+            uri.as_str(),
             code,
             org_id,
             stream_type.as_str(),
@@ -348,7 +348,7 @@ pub fn http_report_metrics(
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            &uri,
+            uri.as_str(),
             code,
             org_id,
             stream_type.as_str(),
