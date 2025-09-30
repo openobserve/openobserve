@@ -94,7 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mt-lg"
                 >
                   <h5 class="text-center">
-                    <q-icon name="warning" color="warning" size="10rem" /><br />
+                    <q-icon name="warning"
+color="warning" size="10rem" /><br />
                     <div
                       data-test="logs-search-filter-error-message"
                       v-html="searchObj.data.filterErrMsg"
@@ -174,7 +175,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-none"
                   >
-                    <q-icon name="info" color="primary" size="md" /> Select a
+                    <q-icon name="info"
+color="primary" size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -193,7 +195,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-error-message"
                     class="text-center q-ma-none col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
                     <q-btn
                       v-if="
@@ -220,7 +223,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-error-message"
                     class="text-center q-ma-none col-10"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary" size="md" />
                     {{ t("search.applySearch") }}
                   </h6>
                 </div>
@@ -595,8 +599,12 @@ export default defineComponent({
       updateUrlQueryParams,
       addTraceId,
     } = logsUtils();
-    const { buildWebSocketPayload, buildSearch, initializeSearchConnection } =
-      useSearchStream();
+    const {
+      getHistogramData,
+      buildWebSocketPayload,
+      buildSearch,
+      initializeSearchConnection,
+    } = useSearchStream();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const showSearchHistory = ref(false);
@@ -1367,7 +1375,6 @@ export default defineComponent({
       return parsedSQL;
     };
 
-
     const handleQuickModeChange = () => {
       if (searchObj.meta.quickMode == true) {
         let field_list: string = "*";
@@ -1801,15 +1808,15 @@ export default defineComponent({
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
           let logsPageQuery = "";
-          
+
           // handle sql mode
-          if(!searchObj.meta.sqlMode){
+          if (!searchObj.meta.sqlMode) {
             const queryBuild = buildSearch();
             logsPageQuery = queryBuild?.query?.sql ?? "";
           } else {
             logsPageQuery = searchObj.data.query;
           }
-          
+
           // Check if query is SELECT * which is not supported for visualization
           if (
             store.state.zoConfig.quick_mode_enabled === true &&
@@ -2344,6 +2351,7 @@ export default defineComponent({
       fnParsedSQL,
       isLimitQuery,
       buildWebSocketPayload,
+      getHistogramData,
       initializeSearchConnection,
       addTraceId,
       showJobScheduler,
@@ -2485,30 +2493,10 @@ export default defineComponent({
         ) {
           this.searchObj.meta.histogramDirtyFlag = false;
 
-          // this.handleRunQuery();
-          this.searchObj.loadingHistogram = true;
-
           // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
 
-          if (this.searchObj.communicationMethod === "streaming") {
-            const payload = this.buildWebSocketPayload(
-              this.searchObj.data.histogramQuery,
-              false,
-              "histogram",
-              {
-                isHistogramOnly: this.searchObj.meta.histogramDirtyFlag,
-                is_ui_histogram: true,
-              },
-            );
-            const requestId = this.initializeSearchConnection(payload);
-
-            if (requestId) {
-              this.addTraceId(payload.traceId);
-            }
-
-            return;
-          }
+          this.getHistogramData(this.searchObj.data.histogramQuery);
         }
       }
 

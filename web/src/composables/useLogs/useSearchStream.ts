@@ -86,6 +86,22 @@ export const useSearchStream = () => {
     }
   };
 
+  const getHistogramData = (queryReq: any) => {
+    const histogramCallbacks = {
+      onData: responseProcessor.handleSearchResponse,
+      onError: responseProcessor.handleSearchError,
+      onComplete: handleSearchComplete,
+      onReset: handleSearchReset,
+    };
+
+    histogramHandler.processHistogramRequest(
+      queryReq,
+      connectionManager.buildWebSocketPayload,
+      connectionManager.initializeSearchConnection,
+      histogramCallbacks,
+    );
+  };
+
   /**
    * Handle search completion
    * Orchestrates histogram processing if needed
@@ -97,22 +113,9 @@ export const useSearchStream = () => {
       !payload.isPagination &&
       searchObj.meta.refreshInterval == 0
     ) {
-      const histogramCallbacks = {
-        onData: responseProcessor.handleSearchResponse,
-        onError: responseProcessor.handleSearchError,
-        onComplete: handleSearchComplete,
-        onReset: handleSearchReset,
-      };
-
-      histogramHandler.processHistogramRequest(
-        payload.queryReq,
-        connectionManager.buildWebSocketPayload,
-        connectionManager.initializeSearchConnection,
-        histogramCallbacks,
-      );
+      getHistogramData(payload.queryReq);
     }
 
-    console.log("Search Complete", payload);
     // Update loading states
     if (payload.type === "search") {
       searchObj.loading = false;
@@ -211,6 +214,7 @@ export const useSearchStream = () => {
     responseProcessor,
     histogramHandler,
     paginationManager,
+    getHistogramData,
   };
 };
 

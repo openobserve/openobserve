@@ -92,7 +92,7 @@ export const useHistogram = () => {
       }
 
       if (
-        (searchObj.communicationMethod === "streaming") &&
+        searchObj.communicationMethod === "streaming" &&
         endCount < totalCount &&
         !searchObj.meta.showHistogram
       ) {
@@ -123,7 +123,7 @@ export const useHistogram = () => {
         ")";
       return title;
     } catch (e: any) {
-      console.log("Error while generating histogram title", e);
+      console.error("Error while generating histogram title", e);
       notificationMsg.value = "Error while generating histogram title.";
       return "";
     }
@@ -197,7 +197,7 @@ export const useHistogram = () => {
         errorDetail: "",
       };
     } catch (e: any) {
-      console.log("Error while generating histogram data", e);
+      console.error("Error while generating histogram data", e);
       notificationMsg.value = "Error while generating histogram data.";
     }
   };
