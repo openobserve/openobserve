@@ -441,9 +441,6 @@ pub async fn search(
     //     should_cache_results = should_cache_results && res.function_error.is_empty();
     // }
 
-    // if function error is not empty and it only contains query limit error then we need to cache
-    // the results in merge results check if evert type is ui and then pass the query limit
-
     // Update: Don't cache any partial results
     let should_cache_results = res.new_start_time.is_none()
         && res.new_end_time.is_none()
