@@ -77,7 +77,7 @@ pub async fn search(
     // this being to avoid performance impact of query fn being applied during query
     // execution
     let use_query_fn = query.uses_zo_fn;
-    let mut query_fn = query.query_fn.clone();
+    let query_fn = query.query_fn.clone();
     #[cfg(feature = "enterprise")]
     let action_id = query.action_id.clone();
 
@@ -137,9 +137,6 @@ pub async fn search(
             let input_fn = query_fn.trim();
 
             let apply_over_hits = super::super::RESULT_ARRAY.is_match(input_fn);
-            if apply_over_hits {
-                query_fn = super::super::RESULT_ARRAY.replace(input_fn, "").to_string();
-            }
             let mut runtime = crate::common::utils::functions::init_vrl_runtime();
             let program =
                 match crate::service::ingestion::compile_vrl_function(&query_fn, &sql.org_id) {
