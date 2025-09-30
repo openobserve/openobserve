@@ -142,7 +142,7 @@ describe("NoRegexPatterns", () => {
       const importButtonText = wrapper.find(".import-button-text");
       
       expect(importButtonText.exists()).toBe(true);
-      expect(importButtonText.text()).toBe("Import Regex Pattern");
+      expect(importButtonText.text()).toBe("Import Pattern");
     });
   });
 
@@ -268,7 +268,7 @@ describe("NoRegexPatterns", () => {
       expect(titleText.text()).toBeTruthy();
       expect(subtitleText.text()).toBeTruthy();
       expect(createNewText.text()).toBe("Create New");
-      expect(importButtonText.text()).toBe("Import Regex Pattern");
+      expect(importButtonText.text()).toBe("Import Pattern");
     });
 
     it("should have proper button structure for import action", () => {
