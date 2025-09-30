@@ -91,10 +91,10 @@ pub async fn batch_upsert(
     let txn = client.begin().await?;
 
     // Collect all pipeline_ids to check which exist
-    let pipeline_ids: Vec<String> = errors.iter().map(|(id, ..)| id.clone()).collect();
+    let pipeline_ids: Vec<&str> = errors.iter().map(|(id, ..)| id.as_str()).collect();
 
     let existing_records = PipelineLastErrors::find()
-        .filter(pipeline_last_errors::Column::PipelineId.is_in(pipeline_ids.clone()))
+        .filter(pipeline_last_errors::Column::PipelineId.is_in(pipeline_ids))
         .all(&txn)
         .await?;
 

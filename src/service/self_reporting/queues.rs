@@ -156,9 +156,10 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
                 ReportingData::Usage(usage) => usages.push(*usage),
                 ReportingData::Trigger(trigger) => triggers.push(json::to_value(*trigger).unwrap()),
                 ReportingData::Error(error) => {
+                    let error_data = *error;
                     // Keep raw error data for DB batching
-                    raw_errors.push(*error.clone());
-                    errors.push(json::to_value(*error).unwrap());
+                    errors.push(json::to_value(&error_data).unwrap());
+                    raw_errors.push(error_data);
                 }
             }
             (usages, triggers, errors, raw_errors)
