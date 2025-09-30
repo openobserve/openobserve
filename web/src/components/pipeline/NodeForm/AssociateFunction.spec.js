@@ -53,7 +53,21 @@ describe("AssociateFunction Component", () => {
         type: 'function'
       },
       userSelectedNode: {},
-      isEditNode: false
+      isEditNode: false,
+      functions: {
+        function1: {
+          function: 'console.log("test function 1");',
+          name: 'function1'
+        },
+        function2: {
+          function: 'console.log("test function 2");',
+          name: 'function2'
+        },
+        function3: {
+          function: 'console.log("test function 3");',
+          name: 'function3'
+        }
+      }
     };
 
     // Mock useDnD composable
@@ -214,6 +228,27 @@ describe("AssociateFunction Component", () => {
           after_flatten: false
         }
       };
+      mockPipelineObj.functions = {
+        function1: {
+          function: 'console.log("test function 1");',
+          name: 'function1'
+        },
+        function2: {
+          function: 'console.log("test function 2");',
+          name: 'function2'
+        },
+        function3: {
+          function: 'console.log("test function 3");',
+          name: 'function3'
+        }
+      };
+
+      // Mock useDnD composable for edit mode
+      vi.mocked(useDnD).mockImplementation(() => ({
+        pipelineObj: mockPipelineObj,
+        addNode: mockAddNode,
+        deletePipelineNode: vi.fn()
+      }));
 
       // Mount component with edit mode props
       wrapper = mount(AssociateFunction, {
@@ -232,6 +267,9 @@ describe("AssociateFunction Component", () => {
           associatedFunctions: ["function4"]
         }
       });
+
+      const notifyMock = vi.fn();
+      wrapper.vm.$q.notify = notifyMock;
 
       await flushPromises();
       await wrapper.vm.$nextTick();
