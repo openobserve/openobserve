@@ -6,7 +6,7 @@
       :class="store.state.theme == 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
     >
       <div class="q-table__title tw-font-[600]" data-test="regex-pattern-list-title">
-            {{ t("regex_patterns.header") }}
+            {{ t("regex_patterns.title") }}
           </div>
           <q-input
                 v-model="filterQuery"
@@ -128,7 +128,7 @@
         <template #bottom="scope">
           <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
             <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
-                  {{ resultTotal }} {{ t('regex_patterns.header') }}
+                  {{ resultTotal }} {{ t('regex_patterns.bottom_header') }}
                 </div>
           <QTablePagination
             :scope="scope"
