@@ -283,6 +283,7 @@ lettre = { version = "0.11", default-features = false, features = [
     "pool",
     "tokio1",
     "tokio1-rustls-tls",
+    "aws-lc-rs"
 ] }
 log = "0.4"
 md5 = "0.8.0"
