@@ -62,8 +62,9 @@ pub fn get_file_contents(file: &str, range: Option<Range<u64>>) -> Result<Vec<u8
 
 #[inline(always)]
 pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Error> {
-    // Create a temporary file in the same directory
-    let temp_file = format!("{file}.tmp");
+    // Create a unique temporary file in the same directory to avoid concurrency issues
+    let random_suffix = super::rand::generate_random_string(16);
+    let temp_file = format!("{file}_{random_suffix}.tmp");
 
     // Write to temporary file first
     let mut file_handle = File::create(&temp_file)?;
