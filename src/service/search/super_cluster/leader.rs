@@ -395,12 +395,23 @@ async fn run_datafusion(
         );
         visit.scan_stats.aggs_cache_ratio = aggs_cache_ratio;
         ret.map(|data| {
-            check_query_default_limit_exceeded(
-                data.iter().fold(0, |acc, batch| acc + batch.num_rows()),
+            let total_rows = data.iter().fold(0, |acc, batch| acc + batch.num_rows());
+            let is_exceeded = check_query_default_limit_exceeded(
+                total_rows,
                 &mut visit.partial_err,
                 &sql,
                 search_event_type,
             );
+
+            let data = if is_exceeded {
+                super::super::utils::truncate_record_batches(
+                    data,
+                    cfg.limit.query_default_limit as usize,
+                )
+            } else {
+                data
+            };
+
             (data, visit.scan_stats, visit.partial_err)
         })
         .map_err(|e| e.into())

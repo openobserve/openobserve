@@ -266,3 +266,30 @@ pub fn check_query_default_limit_exceeded(
 
     is_exceeded
 }
+
+pub fn truncate_record_batches(
+    data: Vec<arrow::array::RecordBatch>,
+    limit: usize,
+) -> Vec<arrow::array::RecordBatch> {
+    let mut remaining = limit;
+    let mut truncated_data = Vec::new();
+
+    for batch in data {
+        if remaining == 0 {
+            break;
+        }
+
+        let batch_rows = batch.num_rows();
+        if batch_rows <= remaining {
+            truncated_data.push(batch);
+            remaining -= batch_rows;
+        } else {
+            // Need to slice this batch
+            let sliced_batch = batch.slice(0, remaining);
+            truncated_data.push(sliced_batch);
+            remaining = 0;
+        }
+    }
+
+    truncated_data
+}

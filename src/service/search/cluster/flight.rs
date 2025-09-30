@@ -616,32 +616,16 @@ pub async fn run_datafusion(
                 search_event_type,
             );
 
-            if is_exceeded {
-                let limit = cfg.limit.query_default_limit as usize;
-                let mut remaining = limit;
-                let mut truncated_data = Vec::new();
-
-                for batch in data {
-                    if remaining == 0 {
-                        break;
-                    }
-
-                    let batch_rows = batch.num_rows();
-                    if batch_rows <= remaining {
-                        truncated_data.push(batch);
-                        remaining -= batch_rows;
-                    } else {
-                        // Need to slice this batch
-                        let sliced_batch = batch.slice(0, remaining);
-                        truncated_data.push(sliced_batch);
-                        remaining = 0;
-                    }
-                }
-
-                (truncated_data, scan_stats, visit.partial_err)
+            let data = if is_exceeded {
+                super::super::utils::truncate_record_batches(
+                    data,
+                    cfg.limit.query_default_limit as usize,
+                )
             } else {
-                (data, scan_stats, visit.partial_err)
-            }
+                data
+            };
+
+            (data, scan_stats, visit.partial_err)
         })
         .map_err(|e| e.into())
     }
