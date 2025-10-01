@@ -691,6 +691,11 @@ export const usePanelDataLoader = (
     // is streaming aggs
     const streaming_aggs = searchRes?.content?.streaming_aggs ?? false;
 
+    // Initialize data array if not exists
+    if (!state.data[payload?.meta?.currentQueryIndex]) {
+      state.data[payload?.meta?.currentQueryIndex] = [];
+    }
+
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
       state.data[payload?.meta?.currentQueryIndex] = [
@@ -711,10 +716,10 @@ export const usePanelDataLoader = (
       ];
     }
 
-    // update result metadata - for streaming, we replace instead of append
-    state.resultMetaData[payload?.meta?.currentQueryIndex] = [
+    // Push metadata for each partition
+    state.resultMetaData[payload?.meta?.currentQueryIndex].push(
       searchRes?.content?.results ?? {},
-    ];
+    );
 
     // If we have data and loading is complete, set isPartialData to false
     if (
@@ -726,13 +731,19 @@ export const usePanelDataLoader = (
   };
 
   const handleStreamingHistogramMetadata = (payload: any, searchRes: any) => {
-    // update result metadata - for streaming, we replace instead of append
-    state.resultMetaData[payload?.meta?.currentQueryIndex] = [
-      {
-        ...(searchRes?.content ?? {}),
-        ...(searchRes?.content?.results ?? {}),
-      },
-    ];
+    // Use currentQueryIndex from payload meta
+    const currentQueryIndex = payload?.meta?.currentQueryIndex;
+
+    // Initialize metadata array if not exists
+    if (!state.resultMetaData[currentQueryIndex]) {
+      state.resultMetaData[currentQueryIndex] = [];
+    }
+
+    // Push metadata for each partition
+    state.resultMetaData[currentQueryIndex].push({
+      ...(searchRes?.content ?? {}),
+      ...(searchRes?.content?.results ?? {}),
+    });
   };
 
   const handleStreamingHistogramHits = (payload: any, searchRes: any) => {
@@ -748,9 +759,14 @@ export const usePanelDataLoader = (
     );
     // is streaming aggs
     const streaming_aggs =
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex][
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
         lastPartitionIndex
       ]?.streaming_aggs ?? false;
+
+    // Initialize data array if not exists
+    if (!state.data[payload?.meta?.currentQueryIndex]) {
+      state.data[payload?.meta?.currentQueryIndex] = [];
+    }
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
