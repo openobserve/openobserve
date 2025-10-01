@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 9;
+pub const DB_SCHEMA_VERSION: u64 = 10;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -829,7 +829,7 @@ pub struct Common {
     pub feature_broadcast_join_left_side_max_size: usize, // MB
     #[env_config(
         name = "ZO_FEATURE_ENRICHMENT_BROADCAST_JOIN_ENABLED",
-        default = true,
+        default = false,
         help = "Enable enrichment table broadcast join"
     )]
     pub feature_enrichment_broadcast_join_enabled: bool,
@@ -1225,7 +1225,7 @@ pub struct Limit {
         help = "Maximum number of fields allowed in user-defined schema"
     )]
     pub user_defined_schema_max_fields: usize,
-    // MB, total data size in memory, default is 50% of system memory
+    // MB, total data size of memtable in memory
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
     pub mem_table_max_size: usize,
     #[env_config(

@@ -48,10 +48,16 @@ pub struct Pipeline {
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
     pub paused_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_error: Option<PipelineErrorInfo>,
 }
 
 impl Pipeline {
-    fn from(meta_pipeline: meta_pipeline, paused_at: Option<i64>) -> Self {
+    fn from(
+        meta_pipeline: meta_pipeline,
+        paused_at: Option<i64>,
+        last_error: Option<PipelineErrorInfo>,
+    ) -> Self {
         Self {
             id: meta_pipeline.id,
             version: meta_pipeline.version,
@@ -63,8 +69,16 @@ impl Pipeline {
             nodes: meta_pipeline.nodes,
             edges: meta_pipeline.edges,
             paused_at,
+            last_error,
         }
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
+pub struct PipelineErrorInfo {
+    pub last_error_timestamp: i64,
+    pub error_summary: Option<String>,
+    pub node_errors: Option<serde_json::Value>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -73,7 +87,11 @@ pub struct PipelineList {
 }
 
 impl PipelineList {
-    pub fn from(pipelines: Vec<meta_pipeline>, triggers: Vec<Trigger>) -> Self {
+    pub fn from(
+        pipelines: Vec<meta_pipeline>,
+        triggers: Vec<Trigger>,
+        errors: HashMap<String, PipelineErrorInfo>,
+    ) -> Self {
         let triggers_map = triggers
             .into_iter()
             .map(|trigger| (trigger.module_key.to_string(), trigger))
@@ -85,7 +103,8 @@ impl PipelineList {
                     .get(&derived_stream.get_scheduler_module_key(&pipeline.name, &pipeline.id))
                     .and_then(|trigger| trigger.end_time)
             });
-            list.push(Pipeline::from(pipeline, paused_at));
+            let last_error = errors.get(&pipeline.id).cloned();
+            list.push(Pipeline::from(pipeline, paused_at, last_error));
         }
 
         PipelineList { list }

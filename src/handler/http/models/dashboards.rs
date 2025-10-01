@@ -23,7 +23,8 @@ use serde_json::{Map, Value};
 use utoipa::ToSchema;
 
 /// HTTP request body for the `CreateDashboard`/`UpdateDashboard` endpoints.
-#[derive(Debug, ToSchema)]
+#[derive(Debug, ToSchema, Serialize)]
+#[serde(untagged)]
 pub enum DashboardRequestBody {
     V1(v1::Dashboard),
     V2(v2::Dashboard),

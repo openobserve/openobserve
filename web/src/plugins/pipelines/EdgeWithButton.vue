@@ -41,9 +41,14 @@ const props = defineProps({
   },
 })
 
-const { removeEdges } = useVueFlow()
+const { removeEdges, getSelectedEdges, addSelectedEdges, removeSelectedEdges } = useVueFlow()
 
 const path = computed(() => getBezierPath(props))
+
+let clickTimeout = null
+
+// Edge click handling moved to PipelineFlow.vue using VueFlow events
+// These handlers are no longer used but kept for backwards compatibility
 </script>
 
 <script>
@@ -54,39 +59,19 @@ export default {
 
 <template>
   <!-- You can use the `BaseEdge` component to create your own custom edge more easily -->
-  <BaseEdge :id="id" :style="style" :path="path[0]" :marker-end="markerEnd"  />
+  <BaseEdge 
+    :id="id" 
+    :style="{ ...style, cursor: 'pointer', strokeDasharray: 'none' }" 
+    :path="path[0]" 
+    :marker-end="markerEnd"
+  />
 
   <!-- Use the `EdgeLabelRenderer` to escape the SVG world of edges and render your own custom label in a `<div>` ctx -->
   <EdgeLabelRenderer>
-    <div
-      :style="{
-        pointerEvents: 'all',
-        position: 'absolute',
-        transform: `translate(-50%, -50%) translate(${path[1]}px,${path[2]}px)`,
-      }"
-      class="nodrag nopan"
-    >
-      <button class="edgebutton" @click="removeEdges(id)" >×</button>
-    </div>
+    <!-- Edge delete button removed - use keyboard delete instead -->
   </EdgeLabelRenderer>
 </template>
 
 <style scoped lang="scss">
-.edgebutton{
-    background-color: #f00;
-    color: #fff;
-    border: none;
-    border-radius: 50%;
-    width: 12px;
-    height: 12px;
-    font-size: 12px;
-    cursor: pointer;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 0;
-    margin: 0;
-    outline: none;
-    transition: background-color 0.2s ease;
-}
+/* Edge button styles removed - using keyboard deletion instead */
 </style>

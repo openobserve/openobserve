@@ -107,7 +107,7 @@
       </q-dialog>
 
       <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
-        <div class="messages-container " ref="messagesContainer">
+        <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
           <div v-if="chatMessages.length === 0" class="welcome-section ">
             <div class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full ">
               <img :src="o2AiTitleLogo" />
@@ -341,6 +341,7 @@ export default defineComponent({
     const currentChatTimestamp = ref<string | null>(null);
     const saveHistoryLoading = ref(false);
     const historySearchTerm = ref('');
+    const shouldAutoScroll = ref(true);
     
     const modelConfig: any = {
       openai: [
@@ -385,9 +386,22 @@ export default defineComponent({
       }
     };
 
+    const getScrollThreshold = () => {
+      return 50; // Fixed 50px threshold for all screens
+    };
+
+    const checkIfShouldAutoScroll = () => {
+      if (!messagesContainer.value) return;
+      
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
+      const threshold = getScrollThreshold();
+      
+      shouldAutoScroll.value = scrollTop + clientHeight >= scrollHeight - threshold;
+    };
+
     const scrollToBottom = async () => {
       await nextTick();
-      if (messagesContainer.value) {
+      if (messagesContainer.value && shouldAutoScroll.value) {
         messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
       }
     };
@@ -639,6 +653,7 @@ export default defineComponent({
       selectedModel.value = modelConfig.openai[0];
       showHistory.value = false;
       currentChatTimestamp.value = null;
+      shouldAutoScroll.value = true; // Reset auto-scroll for new chat
       store.dispatch('setCurrentChatTimestamp', null);
       store.dispatch('setChatUpdated', true);
     };
@@ -677,6 +692,7 @@ export default defineComponent({
             selectedModel.value = chat.model || modelConfig.openai[0];
             currentChatId.value = chatId;
             showHistory.value = false;
+            shouldAutoScroll.value = true; // Reset auto-scroll when loading chat
             
             if(chatId !== store.state.currentChatTimestamp) {
               store.dispatch('setCurrentChatTimestamp', chatId);
@@ -704,6 +720,7 @@ export default defineComponent({
         content: userMessage
       });
       inputMessage.value = '';
+      shouldAutoScroll.value = true; // Reset auto-scroll for new message
       await scrollToBottom();
       await saveToHistory(); // Save after user message
 
@@ -997,6 +1014,9 @@ export default defineComponent({
       saveHistoryLoading,
       historySearchTerm,
       filteredChatHistory,
+      shouldAutoScroll,
+      checkIfShouldAutoScroll,
+      getScrollThreshold,
     }
   }
 });

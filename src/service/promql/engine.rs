@@ -48,7 +48,8 @@ use super::{
     utils::{apply_label_selector, apply_matchers},
 };
 use crate::service::promql::{
-    DEFAULT_MAX_SERIES_PER_QUERY, aggregations, binaries, functions, micros, value::*,
+    DEFAULT_MAX_SERIES_PER_QUERY, aggregations, binaries, functions, micros,
+    rewrite::remove_filter_all, value::*,
 };
 
 pub struct Engine {
@@ -301,8 +302,10 @@ impl Engine {
             }
             PromExpr::NumberLiteral(NumberLiteral { val }) => Value::Float(*val),
             PromExpr::StringLiteral(StringLiteral { val }) => Value::String(val.clone()),
-            PromExpr::VectorSelector(v) => {
-                let data = self.eval_vector_selector(v).await?;
+            PromExpr::VectorSelector(vs) => {
+                let mut vs = vs.clone();
+                remove_filter_all(&mut vs);
+                let data = self.eval_vector_selector(&vs).await?;
                 if data.is_empty() {
                     Value::None
                 } else {
@@ -310,7 +313,9 @@ impl Engine {
                 }
             }
             PromExpr::MatrixSelector(MatrixSelector { vs, range }) => {
-                let data = self.eval_matrix_selector(vs, *range).await?;
+                let mut vs = vs.clone();
+                remove_filter_all(&mut vs);
+                let data = self.eval_matrix_selector(&vs, *range).await?;
                 if data.is_empty() {
                     Value::None
                 } else {

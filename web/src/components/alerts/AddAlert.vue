@@ -402,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
     </div>
-    <div class="flex justify-end items-center q-px-lg " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: fixed; bottom: 0; left: 0; right: 0; height: 70px !important; z-index: 100;">
+    <div class="flex justify-end items-center q-px-lg " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: fixed; bottom: 0; left: 0; height: 70px !important; z-index: 100;" :style="{ right: store.state.isAiChatEnabled ? '25%' : '0' }">
       <q-btn
         data-test="add-alert-cancel-btn"
         v-close-popup="true"
@@ -453,6 +453,7 @@ import {
   defineComponent,
   ref,
   onMounted,
+  onUnmounted,
   watch,
   type Ref,
   computed,
@@ -505,6 +506,7 @@ import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import AlertsContainer from "./AlertsContainer.vue";
 import JsonEditor from "../common/JsonEditor.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import {
   updateGroup as updateGroupUtil,
   removeConditionGroup as removeConditionGroupUtil,
@@ -671,9 +673,13 @@ export default defineComponent({
     const vrlFunctionError = ref("");
 
     const showTimezoneWarning = ref(false);
-    
+
     const showJsonEditorDialog = ref(false);
     const validationErrors = ref([]);
+
+    onMounted(async () => {
+      await loadPanelDataIfPresent();
+    });
 
     const { track } = useReo();
 
@@ -711,7 +717,18 @@ export default defineComponent({
     const suffixCode = ref("");
     const alertType = ref(router.currentRoute.value.query.alert_type || "all");
 
-    onMounted(async () => {});
+    onMounted(async () => {
+      // Set up alerts context provider
+      const alertsProvider = createAlertsContextProvider(formData, store, props.isUpdated);
+      contextRegistry.register('alerts', alertsProvider);
+      contextRegistry.setActive('alerts');
+    });
+
+    onUnmounted(() => {
+      // Clean up alerts-specific context provider
+      contextRegistry.unregister('alerts');
+      contextRegistry.setActive('');
+    });
 
     const updateEditorContent = async (stream_name: string) => {
       triggerCols.value = [];
@@ -1046,10 +1063,139 @@ export default defineComponent({
 
     const navigateToErrorField = (formRef: any) => {
       const errorField = formRef.$el.querySelector('.q-field--error');
-      if (errorField) { 
+      if (errorField) {
         errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
+
+    const loadPanelDataIfPresent = async () => {
+      const route = router.currentRoute.value;
+      if (route.query.fromPanel === "true" && route.query.panelData) {
+        try {
+          const panelData = JSON.parse(decodeURIComponent(route.query.panelData as string));
+
+          if (panelData.queries && panelData.queries.length > 0) {
+            const query = panelData.queries[0];
+
+            formData.value.name = `Alert from ${panelData.panelTitle}`;
+
+            // Show notification that query was imported
+            q.notify({
+              type: "positive",
+              message: t("alerts.importedFromPanel", { panelTitle: panelData.panelTitle }),
+              timeout: 3000,
+            });
+
+            if (query.fields?.stream_type) {
+              formData.value.stream_type = query.fields.stream_type;
+            }
+
+            if (query.fields?.stream) {
+              formData.value.stream_name = query.fields.stream;
+              await updateStreams(false);
+              await updateStreamFields(query.fields.stream);
+            }
+
+            if (panelData.queryType === "sql" && query.query) {
+              formData.value.query_condition.type = "sql";
+              formData.value.query_condition.sql = query.query;
+              isAggregationEnabled.value = false;
+            } else if (panelData.queryType === "promql" && query.query) {
+              formData.value.query_condition.type = "promql";
+              formData.value.query_condition.promql = query.query;
+            }
+
+            if (query.customQuery === false && query.fields) {
+              isAggregationEnabled.value = true;
+
+              if (query.fields.x && query.fields.x.length > 0) {
+                if (!formData.value.query_condition.aggregation) {
+                  formData.value.query_condition.aggregation = {
+                    group_by: [],
+                    function: "count",
+                    having: {
+                      column: "",
+                      operator: ">=",
+                      value: 1,
+                    },
+                  };
+                }
+                formData.value.query_condition.aggregation.group_by = query.fields.x.map((x: any) => x.alias || x.column);
+              }
+
+              if (query.fields.y && query.fields.y.length > 0) {
+                const yField = query.fields.y[0];
+                if (yField.aggregationFunction) {
+                  if (!formData.value.query_condition.aggregation) {
+                    formData.value.query_condition.aggregation = {
+                      group_by: [""],
+                      function: "count",
+                      having: {
+                        column: "",
+                        operator: ">=",
+                        value: 1,
+                      },
+                    };
+                  }
+                  formData.value.query_condition.aggregation.function = yField.aggregationFunction.toLowerCase();
+                }
+              }
+
+              if (query.fields.filter && query.fields.filter.length > 0) {
+                const conditions: any[] = [];
+                query.fields.filter.forEach((filter: any) => {
+                  if (filter.type === 'list' && filter.values && filter.values.length > 0) {
+                    conditions.push({
+                      column: filter.column,
+                      operator: "=",
+                      value: filter.values[0],
+                      ignore_case: false
+                    });
+                  }
+                });
+
+                if (conditions.length > 0) {
+                  formData.value.query_condition.conditions = {
+                    groupId: getUUID(),
+                    label: 'and',
+                    items: conditions
+                  };
+                }
+              }
+            }
+
+            if (query.vrlFunctionQuery) {
+              showVrlFunction.value = true;
+              formData.value.query_condition.vrl_function = query.vrlFunctionQuery;
+            }
+
+            if (panelData.timeRange?.value_type === "relative") {
+              const relativeValue = panelData.timeRange.relative_value || 15;
+              const relativePeriod = panelData.timeRange.relative_period || "Minutes";
+
+              let periodInMinutes = relativeValue;
+              if (relativePeriod === "Hours") {
+                periodInMinutes = relativeValue * 60;
+              } else if (relativePeriod === "Days") {
+                periodInMinutes = relativeValue * 60 * 24;
+              } else if (relativePeriod === "Weeks") {
+                periodInMinutes = relativeValue * 60 * 24 * 7;
+              }
+
+              formData.value.trigger_condition.period = periodInMinutes;
+            }
+          }
+        } catch (error) {
+          console.error("Error loading panel data:", error);
+          q.notify({
+            type: "negative",
+            message: "Failed to load panel data",
+            timeout: 2000
+          });
+        }
+      }
+    };
+
 
     const openJsonEditor = () => {
       showJsonEditorDialog.value = true;
@@ -1175,6 +1321,7 @@ export default defineComponent({
       originalStreamFields,
       generateSqlQuery: generateSqlQueryLocal,
       track,
+      loadPanelDataIfPresent,
     };
   },
 

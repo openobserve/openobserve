@@ -834,13 +834,13 @@ fn calculate_deltas_multi(
 mod tests {
     use std::sync::Arc;
 
-    use arrow_schema::Schema;
+    use arrow_schema::{Field, Schema};
     use config::meta::{
         search::{Query, Request, RequestEncoding, Response, ResponseTook, SearchEventType},
         sql::OrderBy,
     };
     use datafusion::common::TableReference;
-    use infra::schema::SchemaCache;
+    use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
 
     use super::*;
     use crate::{common::meta::search::CachedQueryResponse, service::search::Sql};
@@ -1068,6 +1068,20 @@ mod tests {
         let trace_id = "test_trace_123";
         let org_id = "test_org";
         let stream_type = StreamType::Logs;
+
+        // Add the stream to the STREAM_SCHEMA_LATEST cache
+        let schema = Schema::new(vec![
+            Field::new("_timestamp", arrow_schema::DataType::Int64, false),
+            Field::new("message", arrow_schema::DataType::Utf8, true),
+        ]);
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.insert(
+                format!("{org_id}/{stream_type}/logs"),
+                SchemaCache::new(schema),
+            );
+        } // Lock is dropped here before calling check_cache
+
         let mut req = Request {
             query: Query {
                 sql: "SELECT _timestamp, message FROM logs WHERE _timestamp >= 1640995200000000 AND _timestamp <= 1641081600000000 ORDER BY _timestamp DESC LIMIT 100".to_string(),
