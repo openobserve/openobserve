@@ -234,7 +234,7 @@ pub async fn start_metrics_collector() {
 
     #[cfg(not(tokio_unstable))]
     log::info!(
-        "Starting runtime metrics collector (basic mode - compile with --cfg tokio_unstable for detailed metrics)"
+        "Starting runtime metrics collector (basic mode - compile with --cfg tokio_unstable for detail)"
     );
 
     tokio::spawn(async {

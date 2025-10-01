@@ -22,7 +22,7 @@ import useStreams from "@/composables/useStreams";
 import savedviewsService from "@/services/saved_views";
 import searchService from "@/services/search";
 
-import { arraysMatch, isStreamingEnabled } from "@/utils/zincutils";
+import { arraysMatch } from "@/utils/zincutils";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
@@ -440,10 +440,7 @@ export const useSearchBar = () => {
       }
 
       // Use the appropriate method to fetch data
-      if (searchObj.communicationMethod === "streaming") {
-        getDataThroughStream(isPagination);
-        return;
-      }
+      getDataThroughStream(isPagination);
 
       // searchObjDebug["buildSearchStartTime"] = performance.now();
       // const queryReq: any = buildSearch();
@@ -867,17 +864,17 @@ export const useSearchBar = () => {
   };
 
   // const setCommunicationMethod = () => {
-    // const shouldUseStreaming = isStreamingEnabled(store.state);
+  // const shouldUseStreaming = isStreamingEnabled(store.state);
 
-    // const isMultiStreamSearch =
-    //   searchObj.data.stream.selectedStream.length > 1 &&
-    //   !searchObj.meta.sqlMode;
+  // const isMultiStreamSearch =
+  //   searchObj.data.stream.selectedStream.length > 1 &&
+  //   !searchObj.meta.sqlMode;
 
-    // if (shouldUseStreaming && !isMultiStreamSearch) {
-      // searchObj.communicationMethod = "streaming";
-    // } else {
-    //   searchObj.communicationMethod = "http";
-    // }
+  // if (shouldUseStreaming && !isMultiStreamSearch) {
+  // searchObj.communicationMethod = "streaming";
+  // } else {
+  //   searchObj.communicationMethod = "http";
+  // }
   // };
 
   // const getPageCount = async (queryReq: any) => {
