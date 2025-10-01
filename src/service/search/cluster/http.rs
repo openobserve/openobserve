@@ -127,8 +127,15 @@ pub async fn search(
     if !merge_batches.is_empty() {
         let schema = merge_batches[0].schema();
         let batches_query_ref: Vec<&RecordBatch> = merge_batches.iter().collect();
-        let json_rows = record_batches_to_json_rows(&batches_query_ref)
+        let mut json_rows = record_batches_to_json_rows(&batches_query_ref)
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+
+        // Check if query limit exceeded, if so truncate
+        let default_query_limit = config::get_config().limit.query_default_limit as usize;
+        if json_rows.len() > default_query_limit {
+            json_rows.truncate(default_query_limit);
+        }
+
         let mut sources: Vec<json::Value> = if query_fn.is_empty() {
             json_rows
                 .into_iter()
