@@ -39,10 +39,49 @@
         </div>
       </div>
 
-      <!-- 2nd section - Charts -->
+      <!-- 2nd section - functions and dashboards tiles + 2 charts -->
       <div class="charts-main-container row tw-gap-4 q-mt-md xl:tw-min-h-[330px]" style="display: flex; gap: 16px; height: calc(100% - 22px);">
-        <!-- First Chart -->
-        <div class="first-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[35%] tw-p-4"
+        <!-- Functions and Dashboards tiles -->
+        <div class="xl:tw-flex-col lg:tw-flex md:tw-flex-row tw-justify-evenly sm:tw-justify-start tw-gap-4 md:tw-w-full xl:tw-w-fit">
+          <!-- Functions tile -->
+          <div class="tw-w-full lg:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
+            <div class="dashboards-tile-content tw-h-[180px] q-pa-md rounded-borders column justify-between"
+                 :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+                 style="min-height: 150px; gap: 12px;">
+              <div class="column justify-between">
+                <div class="row justify-between items-center">
+                  <div class="skeleton-box" style="width: 100px; height: 16px; border-radius: 4px;"></div>
+                  <div class="skeleton-box" style="width: 32px; height: 32px; border-radius: 4px;"></div>
+                </div>
+              </div>
+              <div class="row items-end justify-between">
+                <div class="skeleton-box" style="width: 50px; height: 24px; border-radius: 4px;"></div>
+                <div class="skeleton-box" style="width: 60px; height: 32px; border-radius: 4px;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dashboards tile -->
+          <div class="tw-w-full lg:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
+            <div class="functions-tile-content tw-h-[180px] q-pa-md rounded-borders column justify-between"
+                 :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+                 style="min-height: 150px; gap: 12px;">
+              <div class="column justify-between">
+                <div class="row justify-between items-center">
+                  <div class="skeleton-box" style="width: 100px; height: 16px; border-radius: 4px;"></div>
+                  <div class="skeleton-box" style="width: 32px; height: 32px; border-radius: 4px;"></div>
+                </div>
+              </div>
+              <div class="row items-end justify-between">
+                <div class="skeleton-box" style="width: 50px; height: 24px; border-radius: 4px;"></div>
+                <div class="skeleton-box" style="width: 60px; height: 32px; border-radius: 4px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alerts Chart -->
+        <div class="first-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[31%] tw-p-4"
              style="display: flex; flex-direction: column;"
              :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'">
           <div class="details-container" style="margin-bottom: 16px;">
@@ -68,13 +107,13 @@
             </div>
           </div>
           <!-- Chart area -->
-          <div class="custom-first-chart xl:tw-min-h-[200px] tw-h-[calc(100vh-500px)] md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)] tw-w-full">
+          <div class="custom-first-chart tw-my-auto xl:tw-min-h-[200px] tw-h-[calc(100vh-500px)] md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)] tw-w-full">
             <div class="skeleton-box" style="width: 100%; height: 100%; border-radius: 8px;"></div>
           </div>
         </div>
 
-        <!-- Second Chart -->
-        <div class="second-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[calc(65%-16px)] tw-p-4"
+        <!-- Pipelines Chart -->
+        <div class="second-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[calc(49%+5px)] tw-p-4"
              style="display: flex; flex-direction: column;"
              :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'">
           <div class="details-container" style="margin-bottom: 16px;">
@@ -100,32 +139,8 @@
             </div>
           </div>
           <!-- Chart area -->
-          <div class="custom-second-chart xl:tw-min-h-[200px] tw-h-[calc(100vh-500px)] md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)]">
+          <div class="custom-second-chart tw-my-auto xl:tw-min-h-[200px] tw-h-[calc(100vh-500px)] md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)]">
             <div class="skeleton-box" style="width: 100%; height: 100%; border-radius: 8px;"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 3rd section - Functions and Dashboard tiles -->
-      <div class="tw-flex flex-col sm:tw-flex-row tw-justify-evenly sm:tw-justify-start tw-flex-wrap tw-gap-4 q-mt-md">
-        <div 
-          v-for="n in 2" 
-          :key="n" 
-          class="tw-w-full sm:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full"
-        >
-          <div class="tile-content q-pa-md rounded-borders column justify-between"
-               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               style="min-height: 150px; gap: 12px;">
-            <div class="column justify-between">
-              <div class="row justify-between items-center">
-                <div class="skeleton-box" style="width: 100px; height: 16px; border-radius: 4px;"></div>
-                <div class="skeleton-box" style="width: 32px; height: 32px; border-radius: 4px;"></div>
-              </div>
-            </div>
-            <div class="row items-end justify-between">
-              <div class="skeleton-box" style="width: 50px; height: 24px; border-radius: 4px;"></div>
-              <div class="skeleton-box" style="width: 60px; height: 32px; border-radius: 4px;"></div>
-            </div>
           </div>
         </div>
       </div>
