@@ -1,11 +1,11 @@
 /**
  * Logs Context Provider - Extracts context from the logs page
  * 
- * This provider extracts comprehensive context from the logs page including:
+ * This provider extracts context from the logs page including:
  * - Current search query and filters
  * - Time range selection
  * - Selected streams
- * - Search results and schema information
+ * - Search results and metadata
  * 
  * Example Usage:
  * ```typescript
@@ -18,34 +18,12 @@
  * 
  * // Get context
  * const context = await contextRegistry.getActiveContext();
- * // Returns: { pageType: 'logs', data: { query: '...', streams: [...], ... } }
+ * // Returns: { currentPage: 'logs', currentSQLQuery: '...', selectedStreams: [...], ... }
  * ```
  */
 
 import type { ContextProvider, PageContext } from './types';
 
-/**
- * Extracts field names from schema data for AI context
- * 
- * @param schemaData - The cached schema response data
- * @returns Array of field names and their types
- * 
- * Example:
- * ```typescript
- * const fields = extractFieldNames(schemaCache.response.data);
- * // Returns: [{ name: 'timestamp', type: 'datetime' }, { name: 'level', type: 'Utf8' }]
- * ```
- */
-const extractFieldNames = (schemaData: any): Array<{name: string, type: string}> => {
-  if (!schemaData || !Array.isArray(schemaData)) {
-    return [];
-  }
-  
-  return schemaData.map((field: any) => ({
-    name: field.name || '',
-    type: field.type || 'unknown'
-  })).filter((field: any) => field.name); // Filter out empty names
-};
 
 /**
  * Extracts interesting fields organized by stream name from the actual selectedInterestingStreamFields structure
@@ -147,18 +125,16 @@ const buildTimeRangeContext = (datetimeObj: any) => {
  * 
  * @param searchObj - The search object containing query, filters, and other search state
  * @param store - The Vuex store instance (passed from component)
- * @param getStreamFn - Function to get stream schema (passed from component)
  * @param dashboardPanelData - Dashboard panel data for visualize mode (optional)
  * 
  * Example:
  * ```typescript
- * const provider = createLogsContextProvider(searchObj, store, getStream, dashboardPanelData);
+ * const provider = createLogsContextProvider(searchObj, store, dashboardPanelData);
  * ```
  */
 export const createLogsContextProvider = (
   searchObj: any,
   store: any,
-  getStreamFn: any,
   dashboardPanelData?: any
 ): ContextProvider => {
   return {
@@ -180,98 +156,41 @@ export const createLogsContextProvider = (
                 dashboardPanelData.layout.currentQueryIndex
               ].fields.stream_type : null;
 
-        // Extract comprehensive schema information for each stream
-        const streamSchemas: any = {};
-        
-        if (streamType && streams?.length && getStreamFn) {
-          for (let i = 0; i < streams.length; i++) {
-            try {
-              const schema = await getStreamFn(streams[i], streamType, true);
-              let schemaData = JSON.parse(JSON.stringify(schema.uds_schema || schema.schema || [])); // Deep copy
-              let isUdsEnabled = schema.uds_schema?.length > 0;
-              
-              // Add timestamp and all fields columns if UDS is enabled
-              if (isUdsEnabled) {
-                const timestampColumn = store.state.zoConfig?.timestamp_column;
-                const allFieldsName = store.state.zoConfig?.all_fields_name;
-                
-                if (timestampColumn) {
-                  schemaData.push({
-                    name: timestampColumn,
-                    type: "Int64",
-                  });
-                }
-                
-                if (allFieldsName) {
-                  schemaData.push({
-                    name: allFieldsName,
-                    type: "Utf8",
-                  });
-                }
-              }
-              
-              streamSchemas[`stream_name_${i + 1}`] = streams[i];
-              streamSchemas[`schema_${i + 1}`] = schemaData;
-            } catch (error) {
-              console.error(`Error getting schema for stream ${streams[i]}:`, error);
-            }
-          }
-        }
 
         return {
-          pageType: 'logs',
-          data: {
-            // Query and search information
-            currentQuery: searchObj?.data?.query || '',
-            sqlMode: searchObj?.meta?.sqlMode || false,
-            
-            // Stream information
-            selectedStreams: streams || [],
-            streamType: streamType,
-            
-            // Comprehensive schema information (following legacy pattern)
-            streamSchemas,
-            
-            // Interesting fields organized by stream name (using actual structure)
-            interestingFields: extractInterestingFieldsByStream(
-              searchObj?.data?.stream?.selectedInterestingStreamFields || []
-            ),
-            
-            // Time range (conditional based on type)
-            timeRange: buildTimeRangeContext(searchObj.data.datetime),
-            
-            // Current organization
-            organization: store?.state?.selectedOrganization?.identifier || '',
-            
-            showHistogram: searchObj?.meta?.showHistogram,
-            showFields: searchObj?.meta?.showFields,
-            visualizeToggle: searchObj?.meta?.logsVisualizeToggle,
-            quickMode: searchObj?.meta?.quickMode || false,
-            
-            // Search metadata (lightweight, no actual results)
-            searchResultData: {
-              totalResultsLength: searchObj?.data?.queryResults?.hits?.length || 0,
-              totalTimeTook: searchObj?.data?.queryResults?.took || 0,
-              resultCacheRatio: searchObj?.data?.queryResults?.result_cache_ratio || 0,
-              partitionsTotal: searchObj?.data?.queryResults?.partitionDetail?.partitions?.length || 0,
-            },
-            
-            // Additional metadata
-            timestamp: new Date().toISOString()
-          }
+          currentPage: 'logs',
+          // Query and search information
+          currentSQLQuery: searchObj?.data?.query || '',
+          sqlMode: searchObj?.meta?.sqlMode || false,
+          currentVRLQuery: searchObj.data.vrl || '',
+
+          // Stream information
+          selectedStreams: streams || [],
+          streamType: streamType,
+          
+          // Interesting fields organized by stream name (using actual structure)
+          interestingFields: extractInterestingFieldsByStream(
+            searchObj?.data?.stream?.selectedInterestingStreamFields || []
+          ),
+          
+          // Time range (conditional based on type)
+          timeRange: buildTimeRangeContext(searchObj.data.datetime),
+          
+          // Current organization
+          organization_identifier: store?.state?.selectedOrganization?.identifier || '',
+          quickMode: searchObj?.meta?.quickMode || false,
+          
         };
       } catch (error) {
         console.error('Error generating logs context:', error);
         // Return basic context on error
         return {
-          pageType: 'logs',
-          data: {
-            currentQuery: searchObj?.data?.query || '',
-            selectedStreams: searchObj?.data?.stream?.selectedStream || [],
-            organization: store?.state?.selectedOrganization?.identifier || '',
-            timestamp: new Date().toISOString(),
-            error: 'Failed to extract full context'
-          }
+          currentPage: 'logs',
+          currentQuery: searchObj?.data?.query || '',
+          selectedStreams: searchObj?.data?.stream?.selectedStream || [],
+          organization: store?.state?.selectedOrganization?.identifier || '',
+          timestamp: new Date().toISOString(),
+          error: 'Failed to extract full context'
         };
       }
     }

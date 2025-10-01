@@ -31,3 +31,4 @@ export { contextRegistry, default as registry } from './registry';
 // Export context providers
 export { createLogsContextProvider } from './logsContextProvider';
 export { createDefaultContextProvider } from './defaultContextProvider';
+export { createPipelinesContextProvider } from './pipelinesContextProvider';

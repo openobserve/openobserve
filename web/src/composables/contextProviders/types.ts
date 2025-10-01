@@ -4,18 +4,15 @@
  * Example Usage:
  * ```typescript
  * const logsContext: PageContext = {
- *   pageType: 'logs',
- *   data: {
- *     currentQuery: 'level:error',
- *     timeRange: { from: '2024-01-01', to: '2024-01-02' }
- *   }
+ *   currentPage: 'logs',
+ *   currentQuery: 'level:error',
+ *   timeRange: { from: '2024-01-01', to: '2024-01-02' }
  * };
  * ```
  */
 
-export interface PageContext {
-  pageType: 'logs' | 'metrics' | 'dashboard';
-  data: Record<string, any>;
+export interface PageContext extends Record<string, any> {
+  currentPage: string;
 }
 
 /**
@@ -25,8 +22,9 @@ export interface PageContext {
  * ```typescript
  * const logsProvider: ContextProvider = {
  *   getContext: async () => ({
- *     pageType: 'logs',
- *     data: { query: searchObj.query, schema: await getStreamSchema() }
+ *     currentPage: 'logs',
+ *     query: searchObj.query,
+ *     schema: await getStreamSchema()
  *   })
  * };
  * ```

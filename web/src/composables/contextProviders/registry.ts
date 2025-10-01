@@ -87,7 +87,7 @@ class ContextRegistry {
    * ```typescript
    * const context = await getActiveContext();
    * if (context) {
-   *   console.log('Current page:', context.pageType);
+   *   console.log('Current page:', context.currentPage);
    * }
    * ```
    */

@@ -41,23 +41,18 @@ export const createDefaultContextProvider = (
       const currentRoute = router?.currentRoute?.value;
       
       return {
-        pageType: currentRoute?.meta?.title || 'unknown',
-        data: {
-          // Current route information
-          route: {
-            name: currentRoute?.name || 'unknown',
-            path: currentRoute?.path || '/',
-            fullPath: currentRoute?.fullPath || '/',
-            title: currentRoute?.meta?.title || '',
-            params: currentRoute?.params || {},
-            query: currentRoute?.query || {}
-          },
-          
-          // Organization context
-          organization: {
-            identifier: store?.state?.selectedOrganization?.identifier || ''
-          }
-        }
+        currentPage: currentRoute?.meta?.title || 'unknown',
+        
+        // Current route information
+        routeName: currentRoute?.name || 'unknown',
+        routePath: currentRoute?.path || '/',
+        routeFullPath: currentRoute?.fullPath || '/',
+        routeTitle: currentRoute?.meta?.title || '',
+        routeParams: currentRoute?.params || {},
+        routeQuery: currentRoute?.query || {},
+        
+        // Organization context
+        organizationIdentifier: store?.state?.selectedOrganization?.identifier || ''
       };
     }
   };
