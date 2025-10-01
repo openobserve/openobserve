@@ -402,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
     </div>
-    <div class="flex justify-end items-center q-px-lg " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: fixed; bottom: 0; left: 0; right: 0; height: 70px !important; z-index: 100;">
+    <div class="flex justify-end items-center q-px-lg " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: fixed; bottom: 0; left: 0; height: 70px !important; z-index: 100;" :style="{ right: store.state.isAiChatEnabled ? '25%' : '0' }">
       <q-btn
         data-test="add-alert-cancel-btn"
         v-close-popup="true"
