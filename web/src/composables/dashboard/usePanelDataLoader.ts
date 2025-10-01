@@ -637,6 +637,11 @@ export const usePanelDataLoader = (
     // is streaming aggs
     const streaming_aggs = searchRes?.content?.streaming_aggs ?? false;
 
+    // Initialize data array if not exists
+    if (!state.data[payload?.meta?.currentQueryIndex]) {
+      state.data[payload?.meta?.currentQueryIndex] = [];
+    }
+
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
       state.data[payload?.meta?.currentQueryIndex] = [
@@ -657,20 +662,26 @@ export const usePanelDataLoader = (
       ];
     }
 
-    // update result metadata - for streaming, we replace instead of append
-    state.resultMetaData[payload?.meta?.currentQueryIndex] = [
+    // Push metadata for each partition
+    state.resultMetaData[payload?.meta?.currentQueryIndex].push(
       searchRes?.content?.results ?? {},
-    ];
+    );
   };
 
   const handleStreamingHistogramMetadata = (payload: any, searchRes: any) => {
-    // update result metadata - for streaming, we replace instead of append
-    state.resultMetaData[payload?.meta?.currentQueryIndex] = [
-      {
-        ...(searchRes?.content ?? {}),
-        ...(searchRes?.content?.results ?? {}),
-      },
-    ];
+    // Use currentQueryIndex from payload meta
+    const currentQueryIndex = payload?.meta?.currentQueryIndex;
+
+    // Initialize metadata array if not exists
+    if (!state.resultMetaData[currentQueryIndex]) {
+      state.resultMetaData[currentQueryIndex] = [];
+    }
+
+    // Push metadata for each partition
+    state.resultMetaData[currentQueryIndex].push({
+      ...(searchRes?.content ?? {}),
+      ...(searchRes?.content?.results ?? {}),
+    });
   };
 
   const handleStreamingHistogramHits = (payload: any, searchRes: any) => {
@@ -680,12 +691,20 @@ export const usePanelDataLoader = (
       code: "",
     };
 
-    // Get the first partition's metadata (streaming typically has single partition)
-    const firstPartitionMetadata =
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[0];
-
+   const lastPartitionIndex = Math.max(
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.length - 1,
+      0,
+    );
     // is streaming aggs
-    const streaming_aggs = firstPartitionMetadata?.streaming_aggs ?? false;
+    const streaming_aggs =
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
+        lastPartitionIndex
+      ]?.streaming_aggs ?? false;
+
+    // Initialize data array if not exists
+    if (!state.data[payload?.meta?.currentQueryIndex]) {
+      state.data[payload?.meta?.currentQueryIndex] = [];
+    }
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
@@ -695,7 +714,9 @@ export const usePanelDataLoader = (
     }
     // if order by is desc, append new partition response at end
     else if (
-      firstPartitionMetadata?.order_by?.toLowerCase() === "asc"
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
+        lastPartitionIndex
+      ]?.order_by?.toLowerCase() === "asc"
     ) {
       // else append new partition response at start
       state.data[payload?.meta?.currentQueryIndex] = [

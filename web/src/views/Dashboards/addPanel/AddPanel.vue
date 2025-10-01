@@ -1349,6 +1349,8 @@ export default defineComponent({
         const errorList = errorData.errors ?? [];
         errorList.splice(0);
         errorList.push(errorMsg.message);
+      }else{
+        errorMessage.value = "";
       }
     };
 
