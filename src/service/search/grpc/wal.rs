@@ -26,7 +26,7 @@ use config::{
         stream::{FileKey, StreamParams, StreamPartition},
     },
     utils::{
-        async_file::{create_wal_dir_datetime_filter, scan_files_filtered},
+        async_file::{FilterResult, create_wal_dir_datetime_filter, scan_files_filtered},
         file::is_exists,
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
         record_batch_ext::concat_batches,
@@ -598,7 +598,7 @@ async fn get_file_list(
 
         scan_files_filtered(&pattern, filter, None).await?
     } else {
-        scan_files_filtered(&pattern, |_| Box::pin(async { true }), None).await?
+        scan_files_filtered(&pattern, |_| FilterResult::Static(true), None).await?
     };
 
     let files = files

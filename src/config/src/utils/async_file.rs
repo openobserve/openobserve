@@ -20,6 +20,7 @@ use std::{
     path::{Path, PathBuf},
     pin::Pin,
     sync::Arc,
+    task::{Context, Poll},
     time::SystemTime,
 };
 
@@ -30,6 +31,27 @@ use tokio::{
     fs::{File, metadata, read_dir, remove_dir},
     io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
 };
+
+/// A filter result that can be either a static boolean value or an async Future
+/// that resolves to a boolean. This allows for both synchronous and asynchronous
+/// filter predicates.
+pub enum FilterResult {
+    /// A static boolean result
+    Static(bool),
+    /// A future that will resolve to a boolean result
+    Future(Pin<Box<dyn Future<Output = bool> + Send>>),
+}
+
+impl Future for FilterResult {
+    type Output = bool;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match &mut *self {
+            FilterResult::Static(value) => Poll::Ready(*value),
+            FilterResult::Future(future) => future.as_mut().poll(cx),
+        }
+    }
+}
 
 #[inline(always)]
 pub async fn get_file_meta(path: impl AsRef<Path>) -> Result<Metadata, std::io::Error> {
@@ -179,69 +201,71 @@ pub fn create_wal_dir_datetime_filter(
     end_time: DateTime<Utc>,
     extension_pattern: String,
     skip_count: usize,
-) -> impl for<'a> Fn(&'a PathBuf) -> Pin<Box<dyn Future<Output = bool> + Send + 'a>> + Clone {
+) -> impl for<'a> Fn(&'a PathBuf) -> FilterResult + Clone {
     let extension_pattern = Arc::new(extension_pattern.to_lowercase());
     move |path: &PathBuf| {
         let extension_pattern = Arc::clone(&extension_pattern);
-        Box::pin(async move {
-            let mut components = path
-                .components()
-                .skip(skip_count)
-                .map(|c| c.as_os_str())
-                .filter_map(|osc| osc.to_str());
 
-            let year = match components.next().map(|c| c.parse::<i32>()) {
-                Some(Ok(y @ 1901..=9999)) => y, // A plausible year
-                Some(_) => return false,        // Parsed, but not a plausible year
-                None => return true,            /* Not present or failed to parse, could be a
-                                                  * skippable path */
-            };
+        // Most of the logic is synchronous, so we can do it immediately
+        let mut components = path
+            .components()
+            .skip(skip_count)
+            .map(|c| c.as_os_str())
+            .filter_map(|osc| osc.to_str());
 
-            let month = match components.next().map(|c| c.parse::<u32>()) {
-                Some(Ok(m @ 1..=12)) => m,
-                Some(_) => return false, // Parsed, but invalid month number
-                None => start_time.month(), // Not present or failed to parse
-            };
+        let year = match components.next().map(|c| c.parse::<i32>()) {
+            Some(Ok(y @ 1901..=9999)) => y,                // A plausible year
+            Some(_) => return FilterResult::Static(false), // Parsed, but not a plausible year
+            None => return FilterResult::Static(true),     /* Not present or failed to parse,
+                                                             * could be a
+                                                             * skippable path */
+        };
 
-            let month_days = [31u32, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-            let days = month_days[month as usize] + if month == 2 && year % 4 == 0 { 1 } else { 0 };
-            let day = match components.next().map(|c| c.parse::<u32>()) {
-                Some(Ok(day)) => {
-                    if 1 <= day && day <= days {
-                        day
-                    } else {
-                        return false;
-                    }
+        let month = match components.next().map(|c| c.parse::<u32>()) {
+            Some(Ok(m @ 1..=12)) => m,
+            Some(_) => return FilterResult::Static(false), // Parsed, but invalid month number
+            None => start_time.month(),                    // Not present or failed to parse
+        };
+
+        let month_days = [31u32, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        let days = month_days[month as usize] + if month == 2 && year % 4 == 0 { 1 } else { 0 };
+        let day = match components.next().map(|c| c.parse::<u32>()) {
+            Some(Ok(day)) => {
+                if 1 <= day && day <= days {
+                    day
+                } else {
+                    return FilterResult::Static(false);
                 }
-                Some(_) => return false,
-                None => start_time.day(),
-            };
+            }
+            Some(_) => return FilterResult::Static(false),
+            None => start_time.day(),
+        };
 
-            let hour = match components.next().map(|c| c.parse::<u32>()) {
-                Some(Ok(hour @ 0..24)) => hour,
-                Some(_) => return false,
-                None => start_time.hour(),
-            };
+        let hour = match components.next().map(|c| c.parse::<u32>()) {
+            Some(Ok(hour @ 0..24)) => hour,
+            Some(_) => return FilterResult::Static(false),
+            None => start_time.hour(),
+        };
 
-            let date_range_check = if let Some(datetime) =
-                Utc.with_ymd_and_hms(year, month, day, hour, 0, 0).single()
-            {
+        let date_range_check =
+            if let Some(datetime) = Utc.with_ymd_and_hms(year, month, day, hour, 0, 0).single() {
                 datetime >= start_time && datetime <= end_time
             } else {
                 false
             };
 
-            date_range_check
-                && (!path.is_file()
-                    || path
-                        .extension()
-                        .and_then(|extension| {
-                            extension
-                                .to_str()
-                                .map(|s| s.to_lowercase() == **extension_pattern)
-                        })
-                        .unwrap_or_default())
-        })
+        let result = date_range_check
+            && (!path.is_file()
+                || path
+                    .extension()
+                    .and_then(|extension| {
+                        extension
+                            .to_str()
+                            .map(|s| s.to_lowercase() == **extension_pattern)
+                    })
+                    .unwrap_or_default());
+
+        FilterResult::Static(result)
     }
 }
 
@@ -283,10 +307,7 @@ pub fn process_files_filtered<R, F, P, T>(
 ) -> Pin<Box<dyn Stream<Item = T> + Send>>
 where
     R: AsRef<Path>,
-    F: for<'a> Fn(&'a PathBuf) -> Pin<Box<dyn Future<Output = bool> + Send + 'a>>
-        + Send
-        + Clone
-        + 'static,
+    F: for<'a> Fn(&'a PathBuf) -> FilterResult + Send + Clone + 'static,
     P: Fn(PathBuf) -> Pin<Box<dyn Future<Output = T> + Send>> + Send + Clone + 'static,
     T: Send + 'static,
 {
@@ -360,10 +381,7 @@ pub async fn scan_files_filtered<P, F>(
 ) -> Result<Vec<String>, std::io::Error>
 where
     P: AsRef<Path>,
-    F: for<'a> Fn(&'a PathBuf) -> Pin<Box<dyn Future<Output = bool> + Send + 'a>>
-        + Send
-        + Clone
-        + 'static,
+    F: for<'a> Fn(&'a PathBuf) -> FilterResult + Send + Clone + 'static,
 {
     let stream = process_files_filtered(
         root,
@@ -394,16 +412,16 @@ pub async fn scan_files<P: AsRef<Path>>(
         root,
         move |f: &PathBuf| {
             let ext = Arc::clone(&ext);
-            Box::pin(async move {
-                if f.is_dir() {
-                    true
-                } else {
-                    f.extension()
-                        .and_then(|file_ext| file_ext.to_str())
-                        .map(|s| s.eq_ignore_ascii_case(&ext))
-                        .unwrap_or_default()
-                }
-            })
+            if f.is_dir() {
+                FilterResult::Static(true)
+            } else {
+                let result = f
+                    .extension()
+                    .and_then(|file_ext| file_ext.to_str())
+                    .map(|s| s.eq_ignore_ascii_case(&ext))
+                    .unwrap_or_default();
+                FilterResult::Static(result)
+            }
         },
         limit,
     )
