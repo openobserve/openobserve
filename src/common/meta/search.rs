@@ -35,7 +35,6 @@ pub struct CachedQueryResponse {
 pub struct QueryDelta {
     pub delta_start_time: i64,
     pub delta_end_time: i64,
-    pub delta_removed_hits: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
@@ -128,7 +127,6 @@ mod tests {
             deltas: vec![QueryDelta {
                 delta_start_time: 1000,
                 delta_end_time: 2000,
-                delta_removed_hits: false,
             }],
             has_cached_data: true,
             cache_query_response: true,
@@ -154,12 +152,10 @@ mod tests {
         let delta = QueryDelta {
             delta_start_time: 1000,
             delta_end_time: 2000,
-            delta_removed_hits: true,
         };
 
         assert_eq!(delta.delta_start_time, 1000);
         assert_eq!(delta.delta_end_time, 2000);
-        assert!(delta.delta_removed_hits);
     }
 
     #[test]
@@ -167,13 +163,11 @@ mod tests {
         let delta1 = QueryDelta {
             delta_start_time: 1000,
             delta_end_time: 2000,
-            delta_removed_hits: false,
         };
 
         let delta2 = QueryDelta {
             delta_start_time: 2000,
             delta_end_time: 3000,
-            delta_removed_hits: false,
         };
 
         assert!(delta1 < delta2);

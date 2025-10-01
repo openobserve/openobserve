@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="pipeline-json-edit-btn"
           @click="openJsonEditor"
         >
-              <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
+              <q-tooltip>Edit Pipeline Json</q-tooltip>
             </q-btn>
       <q-btn
         data-test="add-pipeline-cancel-btn"
@@ -88,12 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="nodes-drag-container q-pr-md">
       <div
         data-test="pipeline-editor-nodes-list-title"
-        class="text-bold q-mb-sm q-mx-sm"
+        class="nodes-header q-mb-sm q-mx-sm"
       >
         {{ t("pipeline.nodes") }}
       </div>
 
-      <q-separator class="q-mb-md" />
 
       <div class="flex q-mt-sm">
         <NodeSidebar
@@ -218,19 +217,20 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
 import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
-import { MarkerType } from "@vue-flow/core";
+import { MarkerType, useVueFlow } from "@vue-flow/core";
 import ExternalDestination from "./NodeForm/ExternalDestination.vue";
+import { contextRegistry, createPipelinesContextProvider } from "@/composables/contextProviders";
 import JsonEditor from "../common/JsonEditor.vue";
 import { validatePipeline as validatePipelineUtil, type ValidationResult } from '../../utils/validatePipeline';
 import { useReo } from "@/services/reodotdev_analytics";
 
-const functionImage = getImageURL("images/pipeline/function.svg");
-const streamImage = getImageURL("images/pipeline/stream.svg");
-const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
-const externalOutputImage = getImageURL("images/pipeline/externalOutput.svg");
+const functionImage = getImageURL("images/pipeline/transform_function.png");
+const streamImage = getImageURL("images/pipeline/input_stream.png");
+const streamOutputImage = getImageURL("images/pipeline/output_stream.png");
+const externalOutputImage = getImageURL("images/pipeline/output_remote.png");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
-const conditionImage = getImageURL("images/pipeline/condition.svg");
-const queryImage = getImageURL("images/pipeline/query.svg");
+const conditionImage = getImageURL("images/pipeline/transform_condition.png");
+const queryImage = getImageURL("images/pipeline/input_query.png");
 import useStreams from "@/composables/useStreams";
 import usePipelines from "@/composables/usePipelines";
 
@@ -513,8 +513,30 @@ onBeforeMount(() => {
   getFunctions();
 });
 
+// Initialize Vue Flow composables
+const { getSelectedEdges, removeEdges } = useVueFlow()
+
 onMounted(async () => {
   window.addEventListener("beforeunload", beforeUnloadHandler);
+  
+  // Add keyboard handler for edge deletion
+  const handleKeydown = (event) => {
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      const selectedEdges = getSelectedEdges.value
+      
+      if (selectedEdges.length > 0) {
+        event.preventDefault()
+        const edgeIds = selectedEdges.map(edge => edge.id)
+        removeEdges(edgeIds)
+      }
+    }
+  }
+  
+  window.addEventListener("keydown", handleKeydown);
+  
+  // Store handler reference for cleanup
+  (window as any).pipelineKeydownHandler = handleKeydown;
+  
   pipelineDestinationsList.value = await getPipelineDestinations();
   usedStreamsListResponse.value = await getUsedStreamsList();
   const { path, query } = router.currentRoute.value; 
@@ -526,10 +548,21 @@ onMounted(async () => {
         }
       })
     }
+    
+  // Setup pipelines context provider
+  setupPipelinesContextProvider();
   });
 
 onUnmounted(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);
+  
+  // Cleanup keyboard handler
+  if ((window as any).pipelineKeydownHandler) {
+    window.removeEventListener("keydown", (window as any).pipelineKeydownHandler);
+  }
+  
+  // Cleanup pipelines context provider
+  cleanupPipelinesContextProvider();
 });
 
 let forceSkipBeforeUnloadListener = false;
@@ -1077,6 +1110,36 @@ const savePipelineJson = async (json: string) => {
     validationErrors.value = ['Invalid JSON format'];
   }
 };
+
+// [START] Pipelines Context Provider Setup
+
+/**
+ * Setup the pipelines context provider for AI chat integration
+ * 
+ * Example: When user opens pipeline editor, this registers the context provider
+ * that will extract pipeline information for AI context
+ */
+const setupPipelinesContextProvider = () => {
+  const provider = createPipelinesContextProvider(pipelineObj, store);
+  
+  contextRegistry.register('pipelines', provider);
+  contextRegistry.setActive('pipelines');
+};
+
+/**
+ * Cleanup pipelines context provider when leaving pipeline editor
+ * 
+ * Example: When user navigates away from pipeline editor, this removes the provider
+ * but keeps the default provider available for fallback
+ */
+const cleanupPipelinesContextProvider = () => {
+  // Only unregister the pipelines provider, keep default provider
+  contextRegistry.unregister('pipelines');
+  // Reset to no active provider, so it falls back to default
+  contextRegistry.setActive('');
+};
+
+// [END] Pipelines Context Provider Setup
 </script>
 
 <style scoped lang="scss">
@@ -1089,7 +1152,7 @@ const savePipelineJson = async (json: string) => {
 }
 
 .pipeline-chart-container {
-  height: 84vh;
+  height: 82.6vh;
   border-radius: 12px;
   width: calc(100% - 200px);
 }
@@ -1098,12 +1161,58 @@ const savePipelineJson = async (json: string) => {
   width: 200px;
 }
 
+.nodes-header {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  padding: 0 4px 8px 4px;
+  text-align: center;
+  margin-bottom: 16px !important;
+  border-bottom: 2px solid #e5e7eb;
+  letter-spacing: 0.05em;
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: #8b5cf6;
+    border-radius: 1px;
+  }
+}
+
 .node-type-row {
   cursor: grab;
   padding: 5px;
   border: 1px solid #e4e4e4;
   border-radius: 8px;
   user-select: none;
+}
+
+// Global rule to eliminate ALL transitions during any Vue Flow drag operation
+.vue-flow.dragging,
+.vue-flow:has(.vue-flow__node:active) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+// Ensure dragging nodes have zero lag
+.vue-flow__node.dragging,
+.vue-flow__node:active {
+  transition: none !important;
+  transform: none !important;
+  animation: none !important;
+  
+  * {
+    transition: none !important;
+    transform: none !important; 
+    animation: none !important;
+  }
 }
 </style>
 
@@ -1116,29 +1225,165 @@ const savePipelineJson = async (json: string) => {
   width: auto;
 
   .vue-flow__node {
-    padding: 0px;
+    padding: 8px 16px;
     width: auto;
+    min-height: 44px;
+    transition: all 0.3s ease;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    
+    // Disable ALL transitions when dragging for zero lag
+    &:active,
+    &.dragging {
+      cursor: grabbing;
+      transition: none !important;
+      * {
+        transition: none !important;
+      }
+    }
   }
 
   .o2vf_node_input,
   .vue-flow__node-input {
-    background-color: #c8d6f5;
-    border-color: 1px solid #2c6b2f;
-    color: black;
+    border: 1px solid #60a5fa;
+    color: #1f2937;
+    border-radius: 12px;
+    background: rgba(239, 246, 255, 0.8);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+    transition: all 0.3s ease;
+    cursor: grab;
+    min-height: 36px;
+    padding: 8px 16px;
+    
+    // Disable transitions during drag for zero lag
+    &:active,
+    &.dragging {
+      cursor: grabbing;
+      transition: none !important;
+      * {
+        transition: none !important;
+      }
+    }
   }
 
-  .o2vf_node_output,
   .vue-flow__node-output {
-    background-color: #8fd4b8;
-    border-color: 1px solid #3b6f3f;
-    color: black;
+    cursor: grab;
+    min-height: 36px;
+    padding: 8px 16px;
+
+    border: 1px solid rgba(74, 222, 128, 0.4);
+    color: #181a1B;
+    border-radius: 8px;
+    background: rgba(240, 253, 244, 0.9);
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
+    transition: all 0.3s ease;
+
+    &:hover {
+      background: rgba(240, 253, 244, 1);
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+      border-color: rgba(74, 222, 128, 0.6);
+    }
+    // Disable transitions during drag for zero lag
+    &:active,
+    &.dragging {
+      cursor: grabbing;
+      transition: none !important;
+      * {
+        transition: none !important;
+      }
+    }
   }
+
 
   .o2vf_node_default,
   .vue-flow__node-default {
-    background-color: #efefef;
-    border-color: 1px solid #171e25;
-    color: black;
+    border: 1px solid #f59e0b;
+    color: #1f2937;
+    border-radius: 12px;
+    background: rgba(255, 251, 235, 0.8);
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.1);
+    transition: all 0.3s ease;
+    cursor: grab;
+    min-height: 36px;
+    padding: 8px 16px;
+    
+    &:hover {
+      border: 1px solid #f59e0b !important;
+      background: rgba(255, 251, 235, 0.95) !important;
+      box-shadow: 0 6px 16px rgba(217, 119, 6, 0.2) !important;
+    }
+    
+    // Disable transitions during drag for zero lag
+    &:active,
+    &.dragging {
+      cursor: grabbing;
+      transition: none !important;
+      * {
+        transition: none !important;
+      }
+    }
+  }
+
+}
+
+// Dark mode nodes header styling
+.body--dark {
+  .nodes-header {
+    color: rgba(255, 255, 255, 0.95) !important;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.2) !important;
+
+    &::after {
+      background: #a855f7 !important;
+    }
+  }
+
+  // Dark mode input nodes to match NodeSidebar
+  .vue-flow__node-input,
+  .o2vf_node_input {
+    background: rgba(30, 58, 138, 0.2) !important;
+    border: 1px solid rgba(96, 165, 250, 0.3) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1) !important;
+
+    &:hover {
+      background: rgba(30, 58, 138, 0.3) !important;
+      border-color: rgba(96, 165, 250, 0.5) !important;
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2) !important;
+    }
+  }
+
+  .vue-flow__node-output,
+  .o2vf_node_output {
+    background: rgba(20, 83, 45, 0.2) !important;
+    border: 1px solid rgba(74, 222, 128, 0.3) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+
+    &:hover {
+      background: rgba(20, 83, 45, 0.3) !important;
+      border-color: rgba(74, 222, 128, 0.5) !important;
+      box-shadow: 0 6px 16px rgba(34, 197, 94, 0.2) !important;
+    }
+  }
+
+  // Dark mode default nodes to match NodeSidebar
+  .vue-flow__node-default,
+  .o2vf_node_default {
+    background: rgba(120, 53, 15, 0.2) !important;
+    border: 1px solid rgba(251, 146, 60, 0.3) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1) !important;
+
+    &:hover {
+      background: rgba(120, 53, 15, 0.3) !important;
+      border-color: rgba(251, 146, 60, 0.5) !important;
+      box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2) !important;
+    }
   }
 }
+
 </style>

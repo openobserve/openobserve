@@ -143,7 +143,7 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
         // deleted successfully then update metrics
         let (org_id, stream_type, ..) = split_perfix(&file_key);
         metrics::INGEST_WAL_USED_BYTES
-            .with_label_values(&[&org_id, stream_type.as_str()])
+            .with_label_values(&[org_id.as_str(), stream_type.as_str()])
             .sub(file_size as i64);
     }
 
@@ -573,7 +573,7 @@ async fn move_files(
                         PROCESSING_FILES.remove_async(&file.key).await;
                         // deleted successfully then update metrics
                         metrics::INGEST_WAL_USED_BYTES
-                            .with_label_values(&[&org_id, stream_type.as_str()])
+                            .with_label_values(&[org_id.as_str(), stream_type.as_str()])
                             .sub(file.meta.compressed_size);
                     }
                 }
@@ -584,7 +584,7 @@ async fn move_files(
 
             // metrics
             metrics::INGEST_WAL_READ_BYTES
-                .with_label_values(&[&org_id, stream_type.as_str()])
+                .with_label_values(&[org_id.as_str(), stream_type.as_str()])
                 .inc_by(file.meta.compressed_size as u64);
         }
 
