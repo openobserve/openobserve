@@ -32,3 +32,4 @@ export { contextRegistry, default as registry } from './registry';
 export { createLogsContextProvider } from './logsContextProvider';
 export { createDefaultContextProvider } from './defaultContextProvider';
 export { createPipelinesContextProvider } from './pipelinesContextProvider';
+export { createAlertsContextProvider } from './alertsContextProvider';

@@ -453,6 +453,7 @@ import {
   defineComponent,
   ref,
   onMounted,
+  onUnmounted,
   watch,
   type Ref,
   computed,
@@ -505,6 +506,7 @@ import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import AlertsContainer from "./AlertsContainer.vue";
 import JsonEditor from "../common/JsonEditor.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import {
   updateGroup as updateGroupUtil,
   removeConditionGroup as removeConditionGroupUtil,
@@ -711,7 +713,18 @@ export default defineComponent({
     const suffixCode = ref("");
     const alertType = ref(router.currentRoute.value.query.alert_type || "all");
 
-    onMounted(async () => {});
+    onMounted(async () => {
+      // Set up alerts context provider
+      const alertsProvider = createAlertsContextProvider(formData, store, props.isUpdated);
+      contextRegistry.register('alerts', alertsProvider);
+      contextRegistry.setActive('alerts');
+    });
+
+    onUnmounted(() => {
+      // Clean up alerts-specific context provider
+      contextRegistry.unregister('alerts');
+      contextRegistry.setActive('');
+    });
 
     const updateEditorContent = async (stream_name: string) => {
       triggerCols.value = [];
