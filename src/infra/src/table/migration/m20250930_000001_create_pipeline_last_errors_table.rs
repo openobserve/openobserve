@@ -156,7 +156,7 @@ mod tests {
                 "pipeline_name" varchar(255) NOT NULL,
                 "last_error_timestamp" bigint NOT NULL,
                 "error_summary" text,
-                "node_errors" json,
+                "node_errors" json_text,
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL
             )"#

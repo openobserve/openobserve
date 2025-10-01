@@ -48,14 +48,21 @@ pub async fn upsert(
         .await?;
 
     if let Some(existing_model) = existing {
-        // Update existing record
-        let mut active_model: pipeline_last_errors::ActiveModel = existing_model.into();
-        active_model.last_error_timestamp = Set(timestamp);
-        active_model.error_summary = Set(error_data.error.clone());
-        active_model.node_errors = Set(node_errors_json);
-        active_model.updated_at = Set(now_micros());
+        // Check if error content has actually changed
+        let error_changed = existing_model.error_summary != error_data.error
+            || existing_model.node_errors != node_errors_json;
 
-        active_model.update(client).await?;
+        // Only update if error content changed
+        if error_changed {
+            let mut active_model: pipeline_last_errors::ActiveModel = existing_model.into();
+            active_model.last_error_timestamp = Set(timestamp);
+            active_model.error_summary = Set(error_data.error.clone());
+            active_model.node_errors = Set(node_errors_json);
+            active_model.updated_at = Set(now_micros());
+
+            active_model.update(client).await?;
+        }
+        // If error hasn't changed, skip the write to avoid unnecessary DB load
     } else {
         // Insert new record
         let now = now_micros();
@@ -98,10 +105,12 @@ pub async fn batch_upsert(
         .all(&txn)
         .await?;
 
-    let existing_ids: std::collections::HashSet<String> = existing_records
-        .into_iter()
-        .map(|r| r.pipeline_id)
-        .collect();
+    // Store existing records in a map for efficient lookup and comparison
+    let existing_map: std::collections::HashMap<String, pipeline_last_errors::Model> =
+        existing_records
+            .into_iter()
+            .map(|r| (r.pipeline_id.clone(), r))
+            .collect();
 
     let now = now_micros();
 
@@ -113,20 +122,22 @@ pub async fn batch_upsert(
             None
         };
 
-        if existing_ids.contains(&pipeline_id) {
-            // Update existing record
-            let existing = PipelineLastErrors::find_by_id(&pipeline_id)
-                .one(&txn)
-                .await?
-                .unwrap();
+        if let Some(existing) = existing_map.get(&pipeline_id) {
+            // Check if error content has actually changed
+            let error_changed = existing.error_summary != error_data.error
+                || existing.node_errors != node_errors_json;
 
-            let mut active_model: pipeline_last_errors::ActiveModel = existing.into();
-            active_model.last_error_timestamp = Set(timestamp);
-            active_model.error_summary = Set(error_data.error.clone());
-            active_model.node_errors = Set(node_errors_json);
-            active_model.updated_at = Set(now);
+            // Only update if error content changed
+            if error_changed {
+                let mut active_model: pipeline_last_errors::ActiveModel = existing.clone().into();
+                active_model.last_error_timestamp = Set(timestamp);
+                active_model.error_summary = Set(error_data.error.clone());
+                active_model.node_errors = Set(node_errors_json);
+                active_model.updated_at = Set(now);
 
-            active_model.update(&txn).await?;
+                active_model.update(&txn).await?;
+            }
+            // If error hasn't changed, skip the write to reduce DB load
         } else {
             // Insert new record
             let active_model = pipeline_last_errors::ActiveModel {
