@@ -520,6 +520,7 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -704,6 +705,11 @@ export default defineComponent({
       window.removeEventListener("beforeunload", beforeUnloadHandler);
 
       removeAiContextHandler();
+
+      // Clean up dashboard context provider
+      contextRegistry.unregister('dashboards');
+      contextRegistry.setActive('');
+
       // console.timeEnd("onUnmounted");
 
       // Clear all refs to prevent memory leaks
@@ -768,6 +774,17 @@ export default defineComponent({
       loadDashboard();
 
       registerAiContextHandler();
+
+      // Set up dashboard context provider
+      const dashboardProvider = createDashboardsContextProvider(
+        route, 
+        store, 
+        dashboardPanelData, 
+        editMode.value
+      );
+      contextRegistry.register('dashboards', dashboardProvider);
+      contextRegistry.setActive('dashboards');
+
       // console.timeEnd("add panel loadDashboard");
     });
 

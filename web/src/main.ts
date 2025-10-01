@@ -31,6 +31,7 @@ import configService from "./services/config";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
 import { useReo } from "./services/reodotdev_analytics";
+import { contextRegistry, createDefaultContextProvider } from "./composables/contextProviders";
 
 
 const app = createApp(App);
@@ -48,6 +49,10 @@ app
 
 // const router = createRouter(store);
 app.use(store).use(router);
+
+// Initialize default context provider globally
+const defaultProvider = createDefaultContextProvider(router, store);
+contextRegistry.register('default', defaultProvider);
 
 const { reoInit } = useReo();
 

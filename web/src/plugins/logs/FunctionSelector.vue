@@ -19,8 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="searchObj.meta.showTransformEditor"
     :icon="functionToggleIcon"
     title="Toggle Function Editor"
-    class="float-left"
-    size="32px"
+    class="float-left tw-cursor-pointer o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+    size="xs"
+    :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
   />
   <q-btn-group
     class="no-outline q-pa-none no-border float-left q-mr-xs"
@@ -108,9 +109,7 @@ const functionToggleIcon = computed(() => {
   return (
     "img:" +
     getImageURL(
-      searchObj.meta.showTransformEditor
-        ? "images/common/function_dark.svg"
-        : "images/common/function.svg",
+         "images/common/function.svg",
     )
   );
 });
