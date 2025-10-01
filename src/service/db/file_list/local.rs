@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use config::meta::stream::{FileKey, FileListDeleted};
 use hashbrown::HashSet;
@@ -139,8 +142,13 @@ impl FileDeletionManager {
     }
 }
 
-pub static FILE_DELETION_MANAGER: Lazy<FileDeletionManager> =
-    Lazy::new(|| FileDeletionManager::new(LOCAL_CACHE.clone()));
+impl Default for FileDeletionManager {
+    fn default() -> Self {
+        FileDeletionManager::new(LOCAL_CACHE.clone())
+    }
+}
+pub static FILE_DELETION_MANAGER: Lazy<Arc<FileDeletionManager>> =
+    Lazy::new(|| Arc::new(FileDeletionManager::new(LOCAL_CACHE.clone())));
 
 #[cfg(test)]
 mod tests {

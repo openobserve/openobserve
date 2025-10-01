@@ -13,7 +13,162 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::Path, sync::Arc, time::UNIX_EPOCH};
+//! # Parquet File Processing System - Operational Flow Documentation
+//!
+//! ## High-Level Architecture Overview
+//!
+//! This is a **batch-oriented file processing system** that moves WAL (Write-Ahead Log) parquet
+//! files from local disk to remote storage. The system uses a **nested channel architecture** with
+//! worker threads to handle file processing and merging operations.
+//!
+//! ## Core Components & Data Flow
+//!
+//! ### 1. Main Control Loop (`run()` function)
+//! ```
+//! [Main Loop] ---> [Pending Delete Scanner] ---> [WAL Files Scanner]
+//!      ^                                               |
+//!      |                                               v
+//! [Sleep Interval] <------------------------------- [Channel Send]
+//! ```
+//!
+//! **Purpose**: Orchestrates the entire process with periodic scanning
+//! **Critical Timing**: Sleeps for `file_push_interval` seconds between cycles
+//! **Why**: Prevents overwhelming the system while ensuring timely file processing
+//!
+//! ### 2. Worker Thread Pool Setup
+//! ```
+//! [Main] ---> [Create Channel(1)] ---> [Spawn N Workers]
+//!                |                         |
+//!                v                         v
+//!         [Single Receiver]         [Worker Pool listening]
+//! ```
+//!
+//! **Channel Buffer Size**: 1 (blocking backpressure mechanism)
+//! **Worker Count**: `cfg.limit.file_move_thread_num`
+//! **Critical Ordering**: Workers process batches sequentially per worker, but multiple workers run
+//! in parallel
+//!
+//! ### 3. File Discovery & Grouping Pipeline
+//! ```
+//! [scan_files_with_channel] ---> [Batch Channel] ---> [prepare_files]
+//!          |                           |                     |
+//!          v                           v                     v
+//!     [File System]              [Vec<String>]        [Partition Groups]
+//! ```
+//!
+//! **Batching**: Files are discovered in batches (limit: `file_push_limit`)
+//! **Grouping Logic**: Files are partitioned by prefix (org/stream/date path minus thread_id)
+//! **Why Grouping**: Related files are processed together for efficient merging
+//!
+//! ### 4. File Processing States & Lifecycle
+//! ```
+//! [Discovered] ---> [PROCESSING_FILES] ---> [Merged/Uploaded] ---> [Deleted/Pending Delete]
+//!                          ^                                              |
+//!                          |                                              v
+//!                   [Lock Check] <--------------------- [WAL Lock Files Check]
+//! ```
+//!
+//! **State Management**: `PROCESSING_FILES` global HashSet prevents duplicate processing
+//! **Lock Coordination**: WAL lock files indicate active usage, triggering pending delete instead
+//! of immediate deletion
+//!
+//! ## Critical Operational Sequences
+//!
+//! ### 1. File Merge Decision Logic (Order Matters!)
+//! ```
+//! 1. Sort files by min_ts (timestamp ordering)
+//! 2. Check total size vs max_file_size
+//! 3. Check field count vs file_move_fields_limit
+//! 4. Check file age vs max_file_retention_time
+//! 5. If all conditions pass → proceed with merge
+//! ```
+//!
+//! **Why This Order**: Timestamp sorting ensures temporal consistency; size/field limits prevent
+//! resource exhaustion; age check ensures timely processing
+//!
+//! ### 2. Merge Operation Sequence
+//! ```
+//! 1. Create DataFusion session with unique trace_id
+//! 2. Build table from file list
+//! 3. Execute merge_parquet_files()
+//! 4. Generate inverted index (if enabled)
+//! 5. Upload to remote storage
+//! 6. Update file_list metadata
+//! 7. Cleanup local files
+//! 8. Clear session data
+//! ```
+//!
+//! **Critical**: Session cleanup MUST happen after merge completion to prevent memory leaks
+//!
+//! ### 3. File Deletion Workflow
+//! ```
+//! [Check WAL Lock] ---> [Lock Exists?] ---> [Add to Pending Delete]
+//!         |                    |                      |
+//!         v                    v                      v
+//!    [No Lock]          [Lock Present]         [Queue for Later]
+//!         |                                           |
+//!         v                                           v
+//!   [Delete Immediately]                    [Process in Next Cycle]
+//! ```
+//!
+//! **Concurrency Safety**: WAL locks prevent deletion of actively used files
+//!
+//! ## Channel Usage Patterns & Threading
+//!
+//! ### 1. File Discovery Channel
+//! - **Type**: `tokio::sync::mpsc::channel::<Vec<String>>(1)`
+//! - **Flow**: Single producer (file scanner) → Single consumer (prepare_files)
+//! - **Backpressure**: Buffer size 1 creates natural flow control
+//!
+//! ### 2. Worker Distribution Channel
+//! - **Type**: `tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(1)`
+//! - **Flow**: Single producer (main loop) → Multiple consumers (worker pool)
+//! - **Load Balancing**: First-available worker gets next batch
+//!
+//! ### 3. Worker Coordination
+//! - **Shared Receiver**: `Arc<Mutex<Receiver>>` enables multiple workers to compete for work
+//! - **Partition Isolation**: Each worker processes different file partitions simultaneously
+//!
+//! ## Memory & Resource Management
+//!
+//! ### 1. Processing Files Tracking
+//! - **Global State**: `PROCESSING_FILES` prevents concurrent processing
+//! - **Cleanup Points**: Files removed from set after successful processing or error
+//!
+//! ### 2. Metadata Caching
+//! - **Cache**: `WAL_PARQUET_METADATA` stores file metadata to avoid repeated reads
+//! - **Lifecycle**: Metadata removed when files are deleted or processed
+//!
+//! ### 3. Session Management
+//! - **Trace IDs**: Unique identifiers prevent session collision
+//! - **Cleanup**: Explicit cleanup of DataFusion sessions prevents memory leaks
+//!
+//! ## Error Handling & Resilience
+//!
+//! ### 1. Non-Fatal Errors (Continue Processing)
+//! - File read failures → Skip file, log warning
+//! - Schema retrieval failures → Release files, continue with next batch
+//! - Individual file deletion failures → Add to pending delete
+//!
+//! ### 2. Fatal Errors (Stop Processing)
+//! - Storage upload failures → Abort entire merge operation
+//! - Critical system failures → Propagate error up the chain
+//!
+//! ## Key Transformation Points for Streaming Model
+//!
+//! 1. **Replace Batch Channels** with streaming iterators or async streams
+//! 2. **Eliminate File Grouping** in favor of individual file processing
+//! 3. **Convert Worker Pool** to stream processing pipeline
+//! 4. **Replace Periodic Scanning** with event-driven file watching
+//! 5. **Modify State Management** from global HashSets to stream-local state
+
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    pin::Pin,
+    sync::Arc,
+    time::UNIX_EPOCH,
+};
 
 use arrow_schema::Schema;
 use bytes::Bytes;
@@ -26,7 +181,7 @@ use config::{
     },
     metrics,
     utils::{
-        async_file::{get_file_meta, get_file_size},
+        async_file::{get_file_meta, get_file_size, process_files_filtered},
         file::scan_files_with_channel,
         parquet::{
             get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
@@ -34,6 +189,7 @@ use config::{
         schema_ext::SchemaExt,
     },
 };
+use futures::{Future, Stream, StreamExt};
 use hashbrown::HashSet;
 use infra::{
     schema::{
@@ -42,7 +198,8 @@ use infra::{
     },
     storage,
 };
-use ingester::WAL_PARQUET_METADATA;
+use ingester::{WAL_PARQUET_METADATA, WalParquetMetadataTable};
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use tokio::{
     fs::remove_file,
@@ -50,9 +207,12 @@ use tokio::{
 };
 
 use crate::{
-    common::infra::wal,
+    common::infra::wal::{self, SEARCHING_FILES, SearchingFileLocker},
     service::{
-        db::{self, file_list::local::FILE_DELETION_MANAGER},
+        db::{
+            self,
+            file_list::local::{FILE_DELETION_MANAGER, FileDeletionManager},
+        },
         schema::generate_schema_for_defined_schema_fields,
         search::datafusion::exec::{self, MergeParquetResult, TableBuilder},
         tantivy::create_tantivy_index,
@@ -60,6 +220,186 @@ use crate::{
 };
 
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
+
+pub struct ParquetFileManager {
+    processing_files: RwLock<HashSet<PathBuf>>,
+
+    file_deletion_manager: Arc<FileDeletionManager>,
+    wal_parquet_metadata: Arc<WalParquetMetadataTable>,
+    searching_files_lock: Arc<parking_lot::RwLock<SearchingFileLocker>>,
+    canonical_wal_dir: PathBuf,
+}
+
+impl ParquetFileManager {
+    pub async fn run(&self) -> Result<(), anyhow::Error> {
+        // start worker threads
+        let cfg = get_config();
+
+        // add the pending delete files to processing set
+        {
+            let mut processing_files = self.processing_files.write().await;
+            self.file_deletion_manager
+                .list_pending_delete()
+                .await
+                .into_iter()
+                .for_each(|file| {
+                    processing_files.insert(file);
+                });
+        }
+
+        let (tx, rx) = tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(1);
+        let rx = Arc::new(Mutex::new(rx));
+        for thread_id in 0..cfg.limit.file_move_thread_num {
+            let rx = rx.clone();
+            tokio::spawn(async move {
+                loop {
+                    let ret = rx.lock().await.recv().await;
+                    match ret {
+                        None => {
+                            log::debug!("[INGESTER:JOB] Receiving files channel is closed");
+                            break;
+                        }
+                        Some((prefix, files)) => {
+                            if let Err(e) = move_files(thread_id, &prefix, files).await {
+                                log::error!(
+                                    "[INGESTER:JOB] Error moving parquet files to remote: {e}"
+                                );
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // prepare files
+        loop {
+            if cluster::is_offline() {
+                break;
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(
+                get_config().limit.file_push_interval,
+            ))
+            .await;
+
+            // check pending delete files
+            if let Err(e) = self.scan_pending_delete_files().await {
+                log::error!("[INGESTER:JOB] Error scan pending delete files: {e}");
+            }
+
+            // scan wal files
+            if let Err(e) = scan_wal_files(tx.clone()).await {
+                log::error!("[INGESTER:JOB] Error prepare parquet files: {e}");
+            }
+        }
+
+        log::info!("[INGESTER:JOB] job::files::parquet is stopped");
+        Ok(())
+    }
+
+    // check if the file is still in pending delete
+    async fn scan_pending_delete_files(&self) -> Result<(), anyhow::Error> {
+        let start = std::time::Instant::now();
+        let cfg = get_config();
+
+        let wal_dir = tokio::fs::canonicalize(Path::new(&cfg.common.data_wal_dir)).await?;
+
+        let pending_delete_files = self.file_deletion_manager.list_pending_delete().await;
+        let files_num = pending_delete_files.len();
+        for (file_path, file_key) in pending_delete_files
+            .into_iter()
+            .filter_map(|f| Some(f.clone()).zip(f.to_str().map(String::from)))
+        {
+            // If this file has a lock file - we skip
+            if self.searching_files_lock.read().exist(&file_key) {
+                continue;
+            }
+
+            // If not, it is released and we can skip it
+            log::warn!("[INGESTER:JOB] the file was released, delete it: {file_key}");
+            #[cfg(not(test))]
+            let Ok(file_size) = tokio::fs::metadata(&file_path).await.map(|f| f.len()) else {
+                // File was present in the pending_delete list but doesn't exist
+                continue;
+            };
+
+            // delete metadata from cache and file from disk
+            // All these operations are independent and can be done without any causal ordering
+            let _ = tokio::join!(
+                // Delete the file
+                async {
+                    tokio::fs::remove_file(&file_path).await.inspect_err(|e| {
+                        log::error!("[INGESTER:JOB] Failed to remove parquet file: {file_key}, {e}")
+                    })
+                },
+                // Release the metadata locks
+                async { self.wal_parquet_metadata.write().await.remove(&file_key) },
+                // Release the processing locks
+                async { self.processing_files.write().await.remove(&file_path) },
+                // Release from the pending deletion list of locks
+                async {
+                    self
+                        .file_deletion_manager
+                        .dequeue_from_deletion(&file_key)
+                        .await
+                        .inspect_err(|e| {
+                            log::error!(
+                                "[INGESTER:JOB] Failed to remove pending delete file: {file_key}, {e}"
+                            );
+                        })
+                }
+            );
+
+            #[cfg(not(test))]
+            {
+                // deleted successfully then update metrics
+                // We need to account for wal_type/thread_id
+                let mut rel_path = file_path
+                    .components()
+                    .skip(wal_dir.components().count() + 2);
+
+                if let (Some(org_id), Some(stream_type)) = (rel_path.next(), rel_path.next())
+                    && let (Some(org_id), Some(stream_type)) = (
+                        org_id.as_os_str().to_str(),
+                        stream_type.as_os_str().to_str(),
+                    )
+                {
+                    metrics::INGEST_WAL_USED_BYTES
+                        .with_label_values(&[org_id, stream_type])
+                        .sub(file_size as i64);
+                } else {
+                    log::error!(
+                        r#"[INGESTER:JOB] Failed to generate metrics while completing scanning pending delete files.
+Path extraction failed."#
+                    )
+                }
+            }
+        }
+
+        if files_num > 0 {
+            log::debug!(
+                "[INGESTER:JOB] scan pending delete files total: {}, took: {} ms",
+                files_num,
+                start.elapsed().as_millis()
+            );
+        }
+        Ok(())
+    }
+}
+
+// TODO: Eventually this initialization will be moved into a global state manager
+pub static PARQUET_FILE_MANAGER: Lazy<Arc<ParquetFileManager>> = Lazy::new(|| {
+    Arc::new(ParquetFileManager {
+        processing_files: Default::default(),
+        file_deletion_manager: Default::default(),
+        wal_parquet_metadata: Default::default(),
+        searching_files_lock: SEARCHING_FILES.clone(),
+
+        canonical_wal_dir: PathBuf::from(&get_config().common.data_wal_dir)
+            .canonicalize()
+            .expect("Critical config detail: wal_dir"),
+    })
+});
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // add the pending delete files to processing set
@@ -230,6 +570,38 @@ async fn scan_wal_files(
     }
     Ok(())
 }
+
+/// # Streaming WAL Files Scanner
+///
+/// ## Execution Plan
+///
+/// This is a streaming variant of `scan_wal_files` that processes files individually through
+/// a continuous stream pipeline instead of batching them first.
+///
+/// ### Stream Processing Pipeline
+/// ```
+/// [Directory Walker] -> [Filter Parquet] -> [Process Individual] -> [Group by Prefix] -> [Send to Workers]
+///        |                     |                    |                     |                   |
+///   [WalkDir Stream]    [Extension Filter]   [prepare_single_file]  [Batch Accumulator]  [Worker Channel]
+/// ```
+///
+/// ### Key Design Decisions
+/// - **Filter Function**: Check for `.parquet` extension and exclude files already being processed
+/// - **Process Function**: Transform individual PathBuf to FileKey (extracted from prepare_files
+///   logic)
+/// - **Batching Strategy**: Accumulate files by prefix before sending to workers for compatibility
+/// - **Limit Handling**: Apply file limit at stream level using `take(limit)`
+/// - **Error Handling**: Continue processing on individual file errors, log and skip
+///
+/// ### Stream State Management
+/// - **Prefix Grouping**: Internal HashMap groups files by prefix as they stream through
+/// - **Batch Flushing**: Send accumulated batches when prefix changes or stream ends
+/// - **Backpressure**: Leverages existing channel backpressure mechanism
+///
+/// ### Integration Points
+/// - **Worker Channel**: Reuses existing `tokio::sync::mpsc::Sender<(String, Vec<FileKey>)>`
+/// - **Configuration**: Same config limits (`file_push_limit`, `data_wal_dir`)
+/// - **Metrics**: Maintains same logging and timing metrics as original function
 
 async fn prepare_files(
     files: Vec<String>,
