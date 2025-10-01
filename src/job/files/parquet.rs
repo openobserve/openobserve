@@ -163,9 +163,7 @@
 //! 5. **Modify State Management** from global HashSets to stream-local state
 
 use std::{
-    collections::HashMap,
     path::{Path, PathBuf},
-    pin::Pin,
     sync::Arc,
     time::UNIX_EPOCH,
 };
@@ -181,7 +179,7 @@ use config::{
     },
     metrics,
     utils::{
-        async_file::{get_file_meta, get_file_size, process_files_filtered},
+        async_file::{get_file_meta, get_file_size},
         file::scan_files_with_channel,
         parquet::{
             get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
@@ -189,7 +187,7 @@ use config::{
         schema_ext::SchemaExt,
     },
 };
-use futures::{Future, Stream, StreamExt};
+use futures::{Future, StreamExt};
 use hashbrown::HashSet;
 use infra::{
     schema::{

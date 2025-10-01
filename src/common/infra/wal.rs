@@ -30,6 +30,12 @@ pub struct SearchingFileLocker {
     inner: HashMap<String, usize>,
 }
 
+impl Default for SearchingFileLocker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SearchingFileLocker {
     pub fn new() -> Self {
         Self {
