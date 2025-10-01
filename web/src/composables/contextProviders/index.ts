@@ -33,3 +33,4 @@ export { createLogsContextProvider } from './logsContextProvider';
 export { createDefaultContextProvider } from './defaultContextProvider';
 export { createPipelinesContextProvider } from './pipelinesContextProvider';
 export { createAlertsContextProvider } from './alertsContextProvider';
+export { createDashboardsContextProvider } from './dashboardsContextProvider';
