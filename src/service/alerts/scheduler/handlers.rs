@@ -1031,48 +1031,72 @@ async fn handle_derived_stream_triggers(
     } else {
         ScheduledTriggerData::from_json_string(&trigger.data).unwrap()
     };
-    let Ok(pipeline) = db::pipeline::get_by_id(&pipeline_id).await else {
-        let err_msg = format!(
-            "Pipeline associated with trigger not found: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
+    // Try to get pipeline from cache first, fallback to database if not found
+    let pipeline = if let Some(cached_pipeline) =
+        db::pipeline::get_scheduled_pipeline(&pipeline_id).await
+    {
+        log::debug!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} found in cache"
         );
-        // Check after 5 mins if the pipeline is created
-        new_trigger.next_run_at += Duration::try_minutes(5)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
-        let trigger_data_stream = TriggerData {
-            _timestamp: now_micros(),
-            org: new_trigger.org.clone(),
-            module: TriggerDataType::DerivedStream,
-            key: new_trigger.module_key.clone(),
-            next_run_at: new_trigger.next_run_at,
-            is_realtime: new_trigger.is_realtime,
-            is_silenced: new_trigger.is_silenced,
-            status: TriggerDataStatus::Failed,
-            start_time: 0,
-            end_time: 0,
-            retries: new_trigger.retries,
-            error: Some(err_msg.clone()),
-            success_response: None,
-            is_partial: None,
-            delay_in_secs: None,
-            evaluation_took_in_secs: None,
-            source_node: Some(LOCAL_NODE.name.clone()),
-            query_took: None,
-            scheduler_trace_id: Some(scheduler_trace_id.clone()),
-            time_in_queue_ms: Some(time_in_queue),
-            skipped_alerts_count: None,
-        };
+        cached_pipeline
+    } else {
+        // Cache miss, try to fetch from database and cache it
+        log::debug!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} not in cache, fetching from database"
+        );
+        match db::pipeline::get_by_id(&pipeline_id).await {
+            Ok(pipeline) => {
+                // Cache the pipeline for future use
+                db::pipeline::cache_scheduled_pipeline(&pipeline).await;
+                log::debug!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} fetched from database and cached"
+                );
+                pipeline
+            }
+            Err(_) => {
+                let err_msg = format!(
+                    "Pipeline associated with trigger not found: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
+                );
+                // Check after 5 mins if the pipeline is created
+                new_trigger.next_run_at += Duration::try_minutes(5)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap();
+                let trigger_data_stream = TriggerData {
+                    _timestamp: now_micros(),
+                    org: new_trigger.org.clone(),
+                    module: TriggerDataType::DerivedStream,
+                    key: new_trigger.module_key.clone(),
+                    next_run_at: new_trigger.next_run_at,
+                    is_realtime: new_trigger.is_realtime,
+                    is_silenced: new_trigger.is_silenced,
+                    status: TriggerDataStatus::Failed,
+                    start_time: 0,
+                    end_time: 0,
+                    retries: new_trigger.retries,
+                    error: Some(err_msg.clone()),
+                    success_response: None,
+                    is_partial: None,
+                    delay_in_secs: None,
+                    evaluation_took_in_secs: None,
+                    source_node: Some(LOCAL_NODE.name.clone()),
+                    query_took: None,
+                    scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                    time_in_queue_ms: Some(time_in_queue),
+                    skipped_alerts_count: None,
+                };
 
-        log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
-        new_trigger_data.reset();
-        new_trigger.data = new_trigger_data.to_json_string();
-        db::scheduler::update_trigger(new_trigger).await?;
-        publish_triggers_usage(trigger_data_stream).await;
-        return Err(anyhow::anyhow!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] {}",
-            err_msg
-        ));
+                log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
+                new_trigger_data.reset();
+                new_trigger.data = new_trigger_data.to_json_string();
+                db::scheduler::update_trigger(new_trigger).await?;
+                publish_triggers_usage(trigger_data_stream).await;
+                return Err(anyhow::anyhow!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] {}",
+                    err_msg
+                ));
+            }
+        }
     };
 
     #[cfg(feature = "cloud")]
