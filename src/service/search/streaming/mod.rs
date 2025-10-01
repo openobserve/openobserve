@@ -636,7 +636,7 @@ pub async fn process_search_stream_request_multi(
                         "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Permission denied for stream {stream_name}"
                     );
                     let _ = sender_clone
-                        .send(Err(infra::errors::Error::Forbidden(
+                        .send(Err(infra::errors::Error::Message(
                             "Unauthorized Access".to_string()
                         )))
                         .await;
