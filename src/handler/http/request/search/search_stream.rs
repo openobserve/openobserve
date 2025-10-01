@@ -47,7 +47,10 @@ use crate::{
     handler::http::request::search::{
         build_search_request_per_field, error_utils::map_error_to_http_response,
     },
-    service::{search::search_stream::process_search_stream_request, setup_tracing_with_trace_id},
+    service::{
+        search::{search_stream::process_search_stream_request, utils::is_cachable_function_error},
+        setup_tracing_with_trace_id,
+    },
 };
 #[cfg(feature = "enterprise")]
 use crate::{
@@ -404,6 +407,8 @@ pub async fn search_http2_stream(
     #[cfg(not(feature = "enterprise"))]
     let audit_ctx = None;
 
+    let search_type = req.search_type;
+
     // Spawn the search task in a separate task
     actix_web::rt::spawn(process_search_stream_request(
         org_id.clone(),
@@ -426,6 +431,18 @@ pub async fn search_http2_stream(
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
         let chunks_iter = match result {
             Ok(mut v) => {
+                // Check if function error is only - querm limit default error and only `ui`
+                if let StreamResponses::SearchResponse {
+                    ref mut results, ..
+                } = v
+                {
+                    if search_type == Some(SearchEventType::UI)
+                        && is_cachable_function_error(&results.function_error)
+                    {
+                        results.function_error.clear();
+                    }
+                }
+
                 if is_ui_histogram
                     && let StreamResponses::SearchResponse {
                         ref mut results, ..
