@@ -33,6 +33,7 @@ impl MigrationTrait for Migration {
                     .table(PipelineLastErrors::Table)
                     .col(PipelineLastErrors::OrgId)
                     .col(PipelineLastErrors::LastErrorTimestamp)
+                    .if_not_exists()
                     .to_owned(),
             )
             .await?;
