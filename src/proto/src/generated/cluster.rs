@@ -2629,7 +2629,7 @@ pub mod query_cache_server {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PhysicalPlanNode {
-    #[prost(oneof = "physical_plan_node::Plan", tags = "1, 2, 3, 4")]
+    #[prost(oneof = "physical_plan_node::Plan", tags = "1, 2, 3, 4, 5")]
     pub plan: ::core::option::Option<physical_plan_node::Plan>,
 }
 /// Nested message and enum types in `PhysicalPlanNode`.
@@ -2645,6 +2645,8 @@ pub mod physical_plan_node {
         StreamingAggs(super::StreamingAggsExecNode),
         #[prost(message, tag = "4")]
         TmpExec(super::TmpExecNode),
+        #[prost(message, tag = "5")]
+        EnrichmentExec(super::EnrichmentExecNode),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2675,6 +2677,17 @@ pub struct TmpExecNode {
     #[prost(bytes = "vec", optional, tag = "4")]
     pub data: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
     #[prost(message, optional, tag = "5")]
+    pub schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EnrichmentExecNode {
+    #[prost(string, tag = "1")]
+    pub trace_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub org_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub stream_name: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "4")]
     pub schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

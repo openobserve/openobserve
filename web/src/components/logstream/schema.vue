@@ -420,6 +420,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-icon color="primary" size="12px" :name="outlinedPerson"></q-icon>
                           <q-icon color="primary" size="12px" :name="outlinedSchema"></q-icon>
                         </span>
+                        <span class="tw-pl-7" v-else-if="col.name === 'patterns'">
+                          {{ col.label }}
+                          <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
+                            {{ t('logStream.sdr') }}
+                          </q-tooltip>
+                        </span>
                         <span v-else>
                           {{ col.label }}
                         </span>

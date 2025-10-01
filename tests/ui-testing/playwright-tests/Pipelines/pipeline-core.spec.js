@@ -151,14 +151,35 @@ test.describe("Core Pipeline Tests", () => {
     await page.getByRole("option", { name: "e2e_automate3", exact: true }).click();
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(3000);
-    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    // Hover over the output stream node to show delete button, then click it
+    await page.locator('[data-test="pipeline-node-output-stream-node"]').first().hover();
+    await page.waitForTimeout(500);
+    await page.locator('[data-test="pipeline-node-output-delete-btn"]').first().click();
     await page.locator('[data-test="confirm-button"]').click();
-    await page.locator("button").filter({ hasText: "edit" }).hover();
-    await page.getByRole("img", { name: "Output Stream" }).click();
+    // Drag and drop output stream instead of hover-click
+    await pageManager.pipelinesPage.selectAndDragSecondStream();
     await page.getByLabel("Stream Name *").click();
     await page.getByLabel("Stream Name *").fill("destination-node");
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
+    
+    // Wait for dialog to close and ensure canvas is ready for interaction
+    await page.waitForTimeout(2000);
+    await page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' });
+    await page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
+    
+    // Ensure no dialogs are blocking the interaction
+    await page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {
+      // Ignore if no backdrop exists
+    });
+
+    // Connect the input node to the output node by dragging from output handle to input handle
+    await page.locator('[data-test="pipeline-node-input-output-handle"]').hover({ force: true });
+    await page.mouse.down();
+    await page.locator('[data-test="pipeline-node-output-input-handle"]').hover({ force: true });
+    await page.mouse.up();
+    await page.waitForTimeout(1000);
+
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pageManager.pipelinesPage.enterPipelineName(pipelineName);
     await pageManager.pipelinesPage.savePipeline();
@@ -189,10 +210,13 @@ test.describe("Core Pipeline Tests", () => {
     await page.getByRole("option", { name: "e2e_automate1", exact: true }).click();
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
-    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    // Hover over the output stream node to show delete button, then click it
+    await page.locator('[data-test="pipeline-node-output-stream-node"]').first().hover();
+    await page.waitForTimeout(500);
+    await page.locator('[data-test="pipeline-node-output-delete-btn"]').first().click();
     await page.locator('[data-test="confirm-button"]').click();
-    await page.locator("button").filter({ hasText: "edit" }).hover();
-    await page.getByRole("img", { name: "Function", exact: true }).click();
+    // Drag and drop function instead of hover-click
+    await pageManager.pipelinesPage.selectAndDragFunction();
     await pageManager.pipelinesPage.toggleCreateFunction();
     await pageManager.pipelinesPage.enterFunctionName(randomFunctionName);
     await page.locator('[data-test="logs-vrl-function-editor"]').locator('.monaco-editor').click();
@@ -206,12 +230,37 @@ test.describe("Core Pipeline Tests", () => {
     await page.waitForTimeout(3000);
     await pageManager.pipelinesPage.saveFunction();
     await page.waitForTimeout(3000);
-    await page.getByText(randomFunctionName).hover();
-    await page.getByRole("img", { name: "Output Stream" }).click();
+    // Drag and drop output stream instead of hover-click
+    await pageManager.pipelinesPage.selectAndDragSecondStream();
     await page.getByLabel("Stream Name *").click();
     await page.getByLabel("Stream Name *").fill("destination-node");
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
+    
+    // Wait for dialog to close and ensure canvas is ready for interaction
+    await page.waitForTimeout(2000);
+    await page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' });
+    await page.waitForSelector('[data-test="pipeline-node-default-input-handle"]', { state: 'visible' });
+    await page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
+    
+    // Ensure no dialogs are blocking the interaction
+    await page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {
+      // Ignore if no backdrop exists
+    });
+    
+    // Connect the input node to function to output node by creating edges
+    await page.locator('[data-test="pipeline-node-input-output-handle"]').hover({ force: true });
+    await page.mouse.down();
+    await page.locator('[data-test="pipeline-node-default-input-handle"]').hover({ force: true });
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    
+    await page.locator('[data-test="pipeline-node-default-output-handle"]').hover({ force: true });
+    await page.mouse.down();
+    await page.locator('[data-test="pipeline-node-output-input-handle"]').hover({ force: true });
+    await page.mouse.up();
+    await page.waitForTimeout(1000);
+    
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pageManager.pipelinesPage.enterPipelineName(pipelineName);
     await pageManager.pipelinesPage.savePipeline();
@@ -243,10 +292,13 @@ test.describe("Core Pipeline Tests", () => {
     await page.getByRole("option", { name: "e2e_automate2", exact: true }).click();
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
-    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    // Hover over the output stream node to show delete button, then click it
+    await page.locator('[data-test="pipeline-node-output-stream-node"]').first().hover();
+    await page.waitForTimeout(500);
+    await page.locator('[data-test="pipeline-node-output-delete-btn"]').first().click();
     await page.locator('[data-test="confirm-button"]').click();
-    await page.locator("button").filter({ hasText: "edit" }).hover();
-    await page.getByRole("img", { name: "Stream", exact: true }).click();
+    // Drag and drop condition instead of hover-click  
+    await pageManager.pipelinesPage.selectAndDragCondition();
     await page.getByPlaceholder("Column").click();
     await page.getByPlaceholder("Column").fill("container_name");
     await page.getByRole("option", { name: "kubernetes_container_name" }).click();
@@ -258,12 +310,37 @@ test.describe("Core Pipeline Tests", () => {
     await page.getByPlaceholder("Value").fill("prometheus");
     await pageManager.pipelinesPage.saveCondition();
     await page.waitForTimeout(2000);
-    await page.getByText('kubernetes_container_name').hover();
-    await page.getByRole("img", { name: "Output Stream" }).click();
+    // Drag and drop output stream instead of hover-click
+    await pageManager.pipelinesPage.selectAndDragSecondStream();
     await page.getByLabel("Stream Name *").click();
     await page.getByLabel("Stream Name *").fill("destination-node");
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
+    
+    // Wait for dialog to close and ensure canvas is ready for interaction
+    await page.waitForTimeout(2000);
+    await page.waitForSelector('[data-test="pipeline-node-input-output-handle"]', { state: 'visible' });
+    await page.waitForSelector('[data-test="pipeline-node-default-input-handle"]', { state: 'visible' });
+    await page.waitForSelector('[data-test="pipeline-node-output-input-handle"]', { state: 'visible' });
+    
+    // Ensure no dialogs are blocking the interaction
+    await page.waitForSelector('.q-dialog__backdrop', { state: 'hidden', timeout: 3000 }).catch(() => {
+      // Ignore if no backdrop exists
+    });
+    
+    // Connect the input node to condition to output node by creating edges
+    await page.locator('[data-test="pipeline-node-input-output-handle"]').hover({ force: true });
+    await page.mouse.down();
+    await page.locator('[data-test="pipeline-node-default-input-handle"]').hover({ force: true });
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    
+    await page.locator('[data-test="pipeline-node-default-output-handle"]').hover({ force: true });
+    await page.mouse.down();
+    await page.locator('[data-test="pipeline-node-output-input-handle"]').hover({ force: true });
+    await page.mouse.up();
+    await page.waitForTimeout(1000);
+    
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pageManager.pipelinesPage.enterPipelineName(pipelineName);
     await pageManager.pipelinesPage.savePipeline();
