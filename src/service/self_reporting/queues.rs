@@ -149,15 +149,20 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         buffered.len()
     );
 
-    let (usages, triggers, errors) = buffered.into_iter().fold(
-        (Vec::new(), Vec::new(), Vec::new()),
-        |(mut usages, mut triggers, mut errors), item| {
+    let (usages, triggers, errors, raw_errors) = buffered.into_iter().fold(
+        (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+        |(mut usages, mut triggers, mut errors, mut raw_errors), item| {
             match item {
                 ReportingData::Usage(usage) => usages.push(*usage),
                 ReportingData::Trigger(trigger) => triggers.push(json::to_value(*trigger).unwrap()),
-                ReportingData::Error(error) => errors.push(json::to_value(*error).unwrap()),
+                ReportingData::Error(error) => {
+                    let error_data = *error;
+                    // Keep raw error data for DB batching
+                    errors.push(json::to_value(&error_data).unwrap());
+                    raw_errors.push(error_data);
+                }
             }
-            (usages, triggers, errors)
+            (usages, triggers, errors, raw_errors)
         },
     );
 
@@ -209,6 +214,42 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         let error_stream = StreamParams::new(META_ORG_ID, ERROR_STREAM, StreamType::Logs);
         if let Err(e) = super::ingestion::ingest_reporting_data(errors, error_stream).await {
             log::error!("[SELF-REPORTING] Error in ingesting ErrorData: {e}");
+        }
+    }
+
+    // Batch upsert pipeline errors to DB
+    if !raw_errors.is_empty() {
+        let pipeline_errors: Vec<_> = raw_errors
+            .into_iter()
+            .filter_map(|error_data| {
+                // Only process pipeline errors
+                if let config::meta::self_reporting::error::ErrorSource::Pipeline(pipeline_error) =
+                    error_data.error_source
+                {
+                    Some((
+                        pipeline_error.pipeline_id.clone(),
+                        pipeline_error.pipeline_name.clone(),
+                        error_data.stream_params.org_id.to_string(),
+                        error_data._timestamp,
+                        pipeline_error,
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if !pipeline_errors.is_empty() {
+            log::debug!(
+                "[SELF-REPORTING] thread_{thread_id} batch upserting {} pipeline errors to DB",
+                pipeline_errors.len()
+            );
+            if let Err(e) = crate::service::db::pipeline_errors::batch_upsert(pipeline_errors).await
+            {
+                log::error!(
+                    "[SELF-REPORTING] thread_{thread_id} failed to batch upsert pipeline errors to DB: {e}"
+                );
+            }
         }
     }
 }

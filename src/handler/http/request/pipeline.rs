@@ -156,7 +156,32 @@ async fn list_pipelines(
         Err(e) => return Ok(e.into()),
     };
 
-    Ok(HttpResponse::Ok().json(PipelineList::from(pipelines, pipeline_triggers)))
+    // Fetch pipeline errors from DB
+    let pipeline_errors = match crate::service::db::pipeline_errors::list_by_org(&org_id).await {
+        Ok(errors) => errors
+            .into_iter()
+            .map(|error| {
+                (
+                    error.pipeline_id.clone(),
+                    crate::handler::http::models::pipelines::PipelineErrorInfo {
+                        last_error_timestamp: error.last_error_timestamp,
+                        error_summary: error.error_summary,
+                        node_errors: error.node_errors,
+                    },
+                )
+            })
+            .collect::<std::collections::HashMap<_, _>>(),
+        Err(e) => {
+            log::error!("[Pipeline] Failed to fetch pipeline errors: {}", e);
+            std::collections::HashMap::default() // Continue without errors if DB fetch fails
+        }
+    };
+
+    Ok(HttpResponse::Ok().json(PipelineList::from(
+        pipelines,
+        pipeline_triggers,
+        pipeline_errors,
+    )))
 }
 
 /// GetStreamsWithPipeline
