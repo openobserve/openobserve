@@ -625,12 +625,12 @@ pub async fn process_search_stream_request_multi(
             // Check permissions for each stream in this query
             #[cfg(feature = "enterprise")]
             for stream_name in stream_names.iter() {
-                if let Some(res) = check_stream_permissions(
+                if check_stream_permissions(
                     stream_name,
                     &org_id_clone,
                     &user_id_clone,
                     &stream_type,
-                ).await
+                ).await.is_some()
                 {
                     log::error!(
                         "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Permission denied for stream {stream_name}"
