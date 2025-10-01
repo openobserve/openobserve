@@ -65,6 +65,7 @@ mod m20250731_000001_create_compactor_manual_jobs;
 mod m20250801_000001_create_system_prompts_table;
 mod m20250822_093713_add_updated_at_for_file_list_table;
 mod m20250923_000001_update_enrichment_table_data_size;
+mod m20250930_000001_create_pipeline_last_errors_table;
 
 pub struct Migrator;
 
@@ -122,6 +123,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250801_000001_create_system_prompts_table::Migration),
             Box::new(m20250822_093713_add_updated_at_for_file_list_table::Migration),
             Box::new(m20250923_000001_update_enrichment_table_data_size::Migration),
+            Box::new(m20250930_000001_create_pipeline_last_errors_table::Migration),
         ]
     }
 }
