@@ -219,6 +219,7 @@ import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
 import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
 import { MarkerType, useVueFlow } from "@vue-flow/core";
 import ExternalDestination from "./NodeForm/ExternalDestination.vue";
+import { contextRegistry, createPipelinesContextProvider } from "@/composables/contextProviders";
 import JsonEditor from "../common/JsonEditor.vue";
 import { validatePipeline as validatePipelineUtil, type ValidationResult } from '../../utils/validatePipeline';
 import { useReo } from "@/services/reodotdev_analytics";
@@ -547,6 +548,9 @@ onMounted(async () => {
         }
       })
     }
+    
+  // Setup pipelines context provider
+  setupPipelinesContextProvider();
   });
 
 onUnmounted(() => {
@@ -556,6 +560,9 @@ onUnmounted(() => {
   if ((window as any).pipelineKeydownHandler) {
     window.removeEventListener("keydown", (window as any).pipelineKeydownHandler);
   }
+  
+  // Cleanup pipelines context provider
+  cleanupPipelinesContextProvider();
 });
 
 let forceSkipBeforeUnloadListener = false;
@@ -1103,6 +1110,36 @@ const savePipelineJson = async (json: string) => {
     validationErrors.value = ['Invalid JSON format'];
   }
 };
+
+// [START] Pipelines Context Provider Setup
+
+/**
+ * Setup the pipelines context provider for AI chat integration
+ * 
+ * Example: When user opens pipeline editor, this registers the context provider
+ * that will extract pipeline information for AI context
+ */
+const setupPipelinesContextProvider = () => {
+  const provider = createPipelinesContextProvider(pipelineObj, store);
+  
+  contextRegistry.register('pipelines', provider);
+  contextRegistry.setActive('pipelines');
+};
+
+/**
+ * Cleanup pipelines context provider when leaving pipeline editor
+ * 
+ * Example: When user navigates away from pipeline editor, this removes the provider
+ * but keeps the default provider available for fallback
+ */
+const cleanupPipelinesContextProvider = () => {
+  // Only unregister the pipelines provider, keep default provider
+  contextRegistry.unregister('pipelines');
+  // Reset to no active provider, so it falls back to default
+  contextRegistry.setActive('');
+};
+
+// [END] Pipelines Context Provider Setup
 </script>
 
 <style scoped lang="scss">

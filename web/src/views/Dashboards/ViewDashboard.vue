@@ -374,6 +374,7 @@ import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
+import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -626,6 +627,17 @@ export default defineComponent({
       if (!store.state.organizationData.folders.length) {
         await getFoldersList(store);
       }
+
+      // Set up dashboard context provider
+      const dashboardProvider = createDashboardsContextProvider(
+        route, 
+        store, 
+        undefined, 
+        false, 
+        currentDashboardData
+      );
+      contextRegistry.register('dashboards', dashboardProvider);
+      contextRegistry.setActive('dashboards');
     });
 
     const setTimeString = () => {
@@ -1114,6 +1126,10 @@ export default defineComponent({
 
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
+      
+      // Clean up dashboard context provider
+      contextRegistry.unregister('dashboards');
+      contextRegistry.setActive('');
       
       // Clear all refs
       cleanupRefs();
