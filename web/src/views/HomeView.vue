@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-h6 ">Streams</div>
               <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                >
+                <q-tooltip>View</q-tooltip>
                 <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
                 <router-link
                   exact
@@ -209,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div>
                       <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                     >
+                        <q-tooltip>View</q-tooltip>
                         <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
                       <router-link
                         exact
@@ -238,6 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ summary.dashboard_count }}
                 <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                     >
+                    <q-tooltip>View</q-tooltip>
                     <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
                       <router-link
                         exact
@@ -262,6 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("home.alertTitle") }}
                 </span>
                 <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
+                  <q-tooltip>View</q-tooltip>
                   <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
                   <router-link
                     exact
@@ -302,6 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("home.pipelineTitle") }}
                 </span>
                 <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
+                  <q-tooltip>View</q-tooltip>
                   <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
                   <router-link
                     exact
