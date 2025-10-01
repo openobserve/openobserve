@@ -194,21 +194,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="xl:tw-flex-col lg:tw-flex md:tw-flex-row tw-justify-evenly sm:tw-justify-start tw-gap-4 md:tw-w-full xl:tw-w-fit " >
 
           <div class="tw-w-full lg:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
-            <div class="dashboards-tile-content tw-h-[180px] q-pa-md rounded-borders text-center column justify-between"
+            <div class="functions-tile-content tw-h-[180px] q-pa-md rounded-borders text-center column justify-between"
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
               style="min-height: 150px; gap: 12px;">
               <div class="column justify-between">
-                <div class="row justify-between">
+                <div class="row justify-between tw-flex tw-items-center">
                   <div class="tile-title">{{ t("home.functionTitle") }}</div>
-                  <div>
-                    <img :src="functionsIcon" />
-                  </div>
-                </div>
-              </div>
-              <div class="data-to-display row items-end tw-flex tw-justify-between">
-                {{ summary.function_count }}
-                <div>
-                      <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+
+                    <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                     >
                         <q-tooltip>View</q-tooltip>
                         <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
@@ -220,25 +213,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-btn>
                 </div>
               </div>
+              <div class="data-to-display row items-end tw-flex tw-justify-between">
+                {{ summary.function_count }}
+                <div>
+                      <img :class="store.state.theme == 'dark' ? 'functions-icon-dark' : 'functions-icon-light'" :src="functionsIcon" />
+                </div>
+              </div>
             </div>
           </div>
 
           <!-- Tile 2 -->
           <div class="tw-w-full lg:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
-            <div class="functions-tile-content tw-h-[180px] q-pa-md rounded-borders text-center column justify-between"
+            <div class="dashboards-tile-content tw-h-[180px] q-pa-md rounded-borders text-center column justify-between"
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
               style="min-height: 150px; gap: 12px;">
               <div class="column justify-between">
-                <div class="row justify-between">
+                <div class="row justify-between tw-items-center">
                   <div class="tile-title">{{ t("home.dashboardTitle") }}</div>
                   <div>
-                    <img :src="dashboardsIcon" />
-                  </div>
-                </div>
-              </div>
-              <div class="data-to-display row items-end tw-flex tw-justify-between">
-                {{ summary.dashboard_count }}
-                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                    <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                     >
                     <q-tooltip>View</q-tooltip>
                     <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
@@ -248,6 +241,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="absolute full-width full-height"
                       ></router-link>
                   </q-btn>
+                  </div>
+                </div>
+              </div>
+              <div class="data-to-display row items-end tw-flex tw-justify-between">
+                {{ summary.dashboard_count }}
+                        <img :class="store.state.theme == 'dark' ? 'dashboards-icon-dark' : 'dashboards-icon-light'" :src="dashboardsIcon" />
+
               </div>
             </div>
           </div>
@@ -384,6 +384,7 @@ import pipelines from "@/services/pipelines";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
+import store from "@/test/unit/helpers/store";
 
 export default defineComponent({
   name: "PageHome",
@@ -636,12 +637,12 @@ export default defineComponent({
   });
 
   const functionsIcon = computed(() => {
-    const icon = store.state.theme === 'dark' ? 'images/home/function_dark.svg' : 'images/home/function.svg';
+    const icon = store.state.theme === 'dark' ? 'images/home/function_tile_icon_dark.svg' : 'images/home/function_tile_icon.svg';
     return getImageURL(icon);
   });
 
   const dashboardsIcon = computed(() => {
-    const icon = store.state.theme === 'dark' ? 'images/home/dashboard_dark.svg' : 'images/home/dashboard.svg';
+    const icon = store.state.theme === 'dark' ? 'images/home/dashboards_tile_icon.svg' : 'images/home/dashboards_tile_icon.svg';
     return getImageURL(icon);
   });
 
@@ -801,9 +802,25 @@ export default defineComponent({
   padding: 16px;
   border-radius: 8px;
 }
+.dashboards-tile-content.light-tile-content {
+  background: rgba(238, 95, 38, 0.2) !important;
+  border: 1px solid rgba(238, 95, 38, 0.2) !important;
+}
+.dashboards-tile-content.dark-tile-content {
+  background: rgba(238, 95, 38, 0.15) !important;
+  border: 1px solid rgba(255, 140, 100, 0.3) !important;
+}
 .functions-tile-content{
   padding: 16px;
   border-radius: 8px;
+}
+.functions-tile-content.light-tile-content {
+  background: rgba(111, 186, 253, 0.2) !important;
+  border: 1px solid rgba(57, 126, 246, 0.2) !important;
+}
+.functions-tile-content.dark-tile-content {
+  background: rgba(57, 126, 246, 0.15) !important;
+  border: 1px solid rgba(111, 186, 253, 0.3) !important;
 }
 .dark-tile-content {
   background: #2B2C2D;
@@ -892,5 +909,19 @@ export default defineComponent({
 
 .ai-enabled-home-view{
   height: calc(100vh - 120px);
+}
+
+.functions-icon-dark{
+  opacity: 0.4;
+}
+.functions-icon-light{
+  opacity: 0.2;
+}
+
+.dashboards-icon-dark{
+  opacity: 0.4;
+}
+.dashboards-icon-light{
+  opacity: 0.2;
 }
 </style>
