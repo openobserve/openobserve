@@ -40,7 +40,7 @@ use remove_index_fields::RemoveIndexFieldsRule;
 use rewrite_histogram::RewriteHistogram;
 use rewrite_match::RewriteMatch;
 
-use crate::service::search::{datafusion::optimizer::utils::QUERY_RESULT_BUFFER_SIZE, sql::Sql};
+use crate::service::search::sql::Sql;
 
 pub mod add_sort_and_limit;
 pub mod add_timestamp;
@@ -70,9 +70,8 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         if sql.limit > 0 {
             Some(sql.limit as usize)
         } else {
-            // Additional `QUERY_RESULT_BUFFER_SIZE` rows to check if there is data more than the
-            // specified default limit
-            Some(cfg.limit.query_default_limit as usize + QUERY_RESULT_BUFFER_SIZE)
+            // Additional 5 rows to check if there is data more than the specified default limit
+            Some(cfg.limit.query_default_limit as usize + 5)
         }
     } else {
         None
