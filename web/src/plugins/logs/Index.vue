@@ -2293,7 +2293,6 @@ export default defineComponent({
       const provider = createLogsContextProvider(
         searchObj, 
         store, 
-        getStream, 
         dashboardPanelData
       );
       

@@ -52,7 +52,7 @@ export const createDefaultContextProvider = (
         routeQuery: currentRoute?.query || {},
         
         // Organization context
-        organizationIdentifier: store?.state?.selectedOrganization?.identifier || ''
+        organization_identifier: store?.state?.selectedOrganization?.identifier || ''
       };
     }
   };

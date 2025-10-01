@@ -162,7 +162,7 @@ export const createLogsContextProvider = (
           // Query and search information
           currentSQLQuery: searchObj?.data?.query || '',
           sqlMode: searchObj?.meta?.sqlMode || false,
-          currentVRLQuery: searchObj.data.vrl || '',
+          currentVRLQuery: searchObj?.data?.tempFunctionContent || '',
 
           // Stream information
           selectedStreams: streams || [],
@@ -186,9 +186,9 @@ export const createLogsContextProvider = (
         // Return basic context on error
         return {
           currentPage: 'logs',
-          currentQuery: searchObj?.data?.query || '',
+          currentSQLQuery: searchObj?.data?.query || '',
           selectedStreams: searchObj?.data?.stream?.selectedStream || [],
-          organization: store?.state?.selectedOrganization?.identifier || '',
+          organization_identifier: store?.state?.selectedOrganization?.identifier || '',
           timestamp: new Date().toISOString(),
           error: 'Failed to extract full context'
         };
