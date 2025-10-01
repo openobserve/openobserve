@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :activeTab="activeTab"
           :added-users="addedUsers"
           :removed-users="removedUsers"
+          context="role"
         />
         <GroupServiceAccounts
           v-if="config.isCloud == 'false'"
