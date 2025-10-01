@@ -249,9 +249,9 @@ pub fn check_query_default_limit_exceeded(num_rows: usize, partial_err: &mut Str
 }
 
 pub fn is_default_query_limit_exceeded(num_rows: usize, sql: &Sql) -> bool {
-    let query_default_limit = config::get_config().limit.query_default_limit as usize;
+    let default_query_limit = config::get_config().limit.query_default_limit as usize;
     if sql.limit > config::QUERY_WITH_NO_LIMIT && sql.limit <= 0 {
-        num_rows > query_default_limit
+        num_rows > default_query_limit
     } else {
         false
     }

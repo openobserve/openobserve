@@ -435,12 +435,10 @@ pub async fn search_http2_stream(
                 if let StreamResponses::SearchResponse {
                     ref mut results, ..
                 } = v
+                    && search_type == Some(SearchEventType::UI)
+                    && is_cachable_function_error(&results.function_error)
                 {
-                    if search_type == Some(SearchEventType::UI)
-                        && is_cachable_function_error(&results.function_error)
-                    {
-                        results.function_error.clear();
-                    }
+                    results.function_error.clear();
                 }
 
                 if is_ui_histogram
