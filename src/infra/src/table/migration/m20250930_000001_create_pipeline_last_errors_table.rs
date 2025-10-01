@@ -74,12 +74,8 @@ fn create_pipeline_last_errors_table_statement() -> TableCreateStatement {
                 .big_integer()
                 .not_null(),
         )
-        .col(
-            ColumnDef::new(PipelineLastErrors::ErrorSummary)
-                .text()
-                .null(),
-        )
-        .col(ColumnDef::new(PipelineLastErrors::NodeErrors).json().null())
+        .col(ColumnDef::new(PipelineLastErrors::ErrorSummary).text())
+        .col(ColumnDef::new(PipelineLastErrors::NodeErrors).json())
         .col(
             ColumnDef::new(PipelineLastErrors::CreatedAt)
                 .big_integer()
