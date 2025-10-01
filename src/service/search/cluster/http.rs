@@ -39,7 +39,9 @@ use o2_enterprise::enterprise::actions::{
 use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
-use crate::service::search::{cluster::flight, request::Request, sql::Sql};
+use crate::service::search::{
+    cluster::flight, request::Request, sql::Sql, utils::is_default_query_limit_exceeded,
+};
 
 #[tracing::instrument(name = "service:search:cluster", skip_all)]
 pub async fn search(
@@ -130,9 +132,10 @@ pub async fn search(
         let mut json_rows = record_batches_to_json_rows(&batches_query_ref)
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
 
-        // Check if query limit exceeded, if so truncate
+        // Check if query limit exceeded, if so truncate and do not truncate if query is not a limit
+        // query
         let default_query_limit = config::get_config().limit.query_default_limit as usize;
-        if json_rows.len() > default_query_limit {
+        if is_default_query_limit_exceeded(json_rows.len(), &sql) {
             json_rows.truncate(default_query_limit);
         }
 

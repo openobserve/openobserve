@@ -234,17 +234,26 @@ pub async fn collect_scan_stats(
 }
 
 pub fn check_query_default_limit_exceeded(num_rows: usize, partial_err: &mut String, sql: &Sql) {
+    if is_default_query_limit_exceeded(num_rows, sql) {
+        let capped_err = format!(
+            "{CAPPED_RESULTS_MSG} limit: {}",
+            config::get_config().limit.query_default_limit
+        );
+        if !partial_err.is_empty() {
+            partial_err.push('\n');
+            partial_err.push_str(&capped_err);
+        } else {
+            *partial_err = capped_err;
+        }
+    }
+}
+
+pub fn is_default_query_limit_exceeded(num_rows: usize, sql: &Sql) -> bool {
     let query_default_limit = config::get_config().limit.query_default_limit as usize;
     if sql.limit > config::QUERY_WITH_NO_LIMIT && sql.limit <= 0 {
-        let capped_err = format!("{CAPPED_RESULTS_MSG} limit: {query_default_limit}");
-        if num_rows > query_default_limit {
-            if !partial_err.is_empty() {
-                partial_err.push('\n');
-                partial_err.push_str(&capped_err);
-            } else {
-                *partial_err = capped_err;
-            }
-        }
+        num_rows > query_default_limit
+    } else {
+        false
     }
 }
 
