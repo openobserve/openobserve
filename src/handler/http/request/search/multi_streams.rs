@@ -42,7 +42,6 @@ use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 #[cfg(feature = "enterprise")]
 use crate::{
     common::meta::search::AuditContext,
-    handler::http::request::search::utils::check_stream_permissions,
     service::self_reporting::audit,
 };
 
