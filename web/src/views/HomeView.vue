@@ -797,10 +797,12 @@ export default defineComponent({
   height: 140px !important; /* or any fixed height */
   padding: 16px;
   border-radius: 8px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 .dashboards-tile-content{
   padding: 16px;
   border-radius: 8px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 .dashboards-tile-content.light-tile-content {
   background: rgba(238, 95, 38, 0.2) !important;
@@ -813,6 +815,7 @@ export default defineComponent({
 .functions-tile-content{
   padding: 16px;
   border-radius: 8px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 .functions-tile-content.light-tile-content {
   background: rgba(111, 186, 253, 0.2) !important;
@@ -923,5 +926,26 @@ export default defineComponent({
 }
 .dashboards-icon-light{
   opacity: 0.2;
+}
+
+/* Tile hover effects for view buttons */
+.functions-tile-content:hover .view-arrow-icon-svg,
+.dashboards-tile-content:hover .view-arrow-icon-svg {
+  transform: translateX(20px);
+  opacity: 0;
+}
+.functions-tile-content:hover .view-button-light::after,
+.functions-tile-content:hover .view-button-dark::after,
+.dashboards-tile-content:hover .view-button-light::after,
+.dashboards-tile-content:hover .view-button-dark::after {
+  transform: translate(-50%, -50%) translateX(0);
+  opacity: 1;
+}
+
+/* Tile hover scale effects */
+.tile-content:hover,
+.functions-tile-content:hover,
+.dashboards-tile-content:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
 }
 </style>
