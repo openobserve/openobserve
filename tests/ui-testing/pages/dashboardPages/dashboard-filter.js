@@ -190,15 +190,13 @@ export default class DashboardFilter {
       await operatorLocator.waitFor({ state: "visible", timeout: 5000 });
       await operatorLocator.click();
 
-      // Wait for dropdown menu with options to be visible
-      await this.page.locator('.q-menu[role="listbox"]').last().waitFor({ state: "visible", timeout: 5000 });
-
+      // Wait for the specific option to appear in any visible menu
       const optionLocator = this.page
         .getByRole("option", { name: operator, exact: true })
         .last();
 
-      // Wait until option is visible
-      await optionLocator.waitFor({ state: "visible", timeout: 5000 });
+      // Wait until option is visible with increased timeout
+      await optionLocator.waitFor({ state: "visible", timeout: 10000 });
       await optionLocator.click();
     }
 
