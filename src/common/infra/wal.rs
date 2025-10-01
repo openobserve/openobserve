@@ -13,18 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 
 // SEARCHING_FILES for searching files, in use, should not move to s3
-static SEARCHING_FILES: Lazy<parking_lot::RwLock<SearchingFileLocker>> =
-    Lazy::new(|| parking_lot::RwLock::new(SearchingFileLocker::new()));
+pub static SEARCHING_FILES: Lazy<Arc<parking_lot::RwLock<SearchingFileLocker>>> =
+    Lazy::new(|| Arc::new(parking_lot::RwLock::new(SearchingFileLocker::new())));
 
 // SEARCHING_REQUESTS for searching requests, in use, should not move to s3
 static SEARCHING_REQUESTS: Lazy<parking_lot::RwLock<HashMap<String, Vec<String>>>> =
     Lazy::new(Default::default);
 
-struct SearchingFileLocker {
+pub struct SearchingFileLocker {
     inner: HashMap<String, usize>,
 }
 

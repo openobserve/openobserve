@@ -41,9 +41,8 @@ pub use writer::{
 use crate::errors::OpenDirSnafu;
 
 pub(crate) type ReadRecordBatchEntry = (Arc<Schema>, Vec<Arc<entry::RecordBatchEntry>>);
-
-pub static WAL_PARQUET_METADATA: Lazy<RwAHashMap<String, config::meta::stream::FileMeta>> =
-    Lazy::new(Default::default);
+pub type WalParquetMetadataTable = RwAHashMap<String, config::meta::stream::FileMeta>;
+pub static WAL_PARQUET_METADATA: Lazy<Arc<WalParquetMetadataTable>> = Lazy::new(Default::default);
 
 pub static WAL_DIR_DEFAULT_PREFIX: &str = "logs";
 
