@@ -197,6 +197,7 @@ export default defineComponent({
     "mouseover",
     "mousemove",
     "mouseout",
+    "contextmenu",
   ],
   props: {
     data: {
@@ -228,6 +229,7 @@ export default defineComponent({
       chart?.off("dataZoom");
       chart?.off("click");
       chart?.off("mouseover");
+      chart?.off("contextmenu");
 
       //dispose
       if (chart) {
@@ -346,6 +348,57 @@ export default defineComponent({
       });
     };
 
+    const handleContextMenu = (params: any) => {
+      // Get chart type from the first series
+      const chartType = chart?.getOption()?.series?.[0]?.type;
+
+      // Only handle contextmenu for bar and line charts
+      if (!chartType || !['bar', 'line'].includes(chartType)) {
+        return;
+      }
+
+      // Prevent default context menu
+      const event = params.event?.event;
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+
+      // Extract data point value
+      let dataPointValue = null;
+
+      // For bar and line charts, get the value from the data
+      if (params.value !== undefined && params.value !== null) {
+        // For array format [x, y], take y value
+        if (Array.isArray(params.value)) {
+          dataPointValue = params.value[1] !== undefined ? params.value[1] : params.value[0];
+        } else {
+          dataPointValue = params.value;
+        }
+      } else if (params.data !== undefined && params.data !== null) {
+        // Alternative data format
+        if (Array.isArray(params.data)) {
+          dataPointValue = params.data[1] !== undefined ? params.data[1] : params.data[0];
+        } else if (typeof params.data === 'object' && params.data.value !== undefined) {
+          dataPointValue = params.data.value;
+        } else {
+          dataPointValue = params.data;
+        }
+      }
+
+      // Only emit if we have a valid data point value
+      if (dataPointValue !== null && dataPointValue !== undefined && !isNaN(Number(dataPointValue))) {
+        emit("contextmenu", {
+          x: event?.clientX || 0,
+          y: event?.clientY || 0,
+          value: Number(dataPointValue),
+          seriesName: params.seriesName,
+          dataIndex: params.dataIndex,
+          seriesIndex: params.seriesIndex,
+        });
+      }
+    };
+
     const chartInitialSetUp = () => {
       chart?.on("mousemove", (params: any) => {
         emit("mousemove", params);
@@ -364,6 +417,7 @@ export default defineComponent({
       });
 
       chart?.on("legendselectchanged", legendSelectChangedFn);
+      chart?.on("contextmenu", handleContextMenu);
       chart?.on("highlight", (params: any) => {
         // reset hovered series name on downplay
         // hoveredSeriesState?.value?.setHoveredSeriesName("");
