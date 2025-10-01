@@ -132,7 +132,7 @@ pub async fn search(
         let mut json_rows = record_batches_to_json_rows(&batches_query_ref)
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
 
-        // Check if query limit exceeded, if so truncate and do not truncate if query is not a limit
+        // Check if query limit exceeded, if so truncate and do not truncate if query is a limit
         // query
         let default_query_limit = config::get_config().limit.query_default_limit as usize;
         if is_default_query_limit_exceeded(json_rows.len(), &sql) {
