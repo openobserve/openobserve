@@ -8,6 +8,7 @@ use std::io::{self, Write};
 use prometheus::{
     Encoder, Result,
     proto::{self, MetricFamily, MetricType},
+    proto_ext::MessageFieldExt,
 };
 use serde_json::{Map, Value, json};
 
@@ -52,12 +53,12 @@ impl JsonEncoder {
 
         for mf in metric_families {
             // Add entry for the metric
-            let name: &str = mf.get_name();
+            let name: &str = mf.name();
 
             let mut mf_map = Map::new();
 
             // Add Help
-            let help: &str = mf.get_help();
+            let help: &str = mf.help();
             mf_map.insert("help".to_string(), json! {help});
             mf_map.insert("__name__".to_string(), json! {name});
 
@@ -70,12 +71,12 @@ impl JsonEncoder {
                 // Metric
                 match metric_type {
                     MetricType::COUNTER => {
-                        mf_map.insert("value".to_string(), json!(m.get_counter().get_value()));
+                        mf_map.insert("value".to_string(), json!(m.get_counter().value()));
                         extra_info(&mut mf_map, m);
                         // f64
                     }
                     MetricType::GAUGE => {
-                        mf_map.insert("value".to_string(), json!(m.get_gauge().get_value()));
+                        mf_map.insert("value".to_string(), json!(m.get_gauge().value()));
                         extra_info(&mut mf_map, m);
                         // f64
                     }
@@ -89,8 +90,8 @@ impl JsonEncoder {
                         let mut inf_seen = false;
 
                         for b in h.get_bucket() {
-                            let upper_bound = b.get_upper_bound(); // f64
-                            let cumulative_count = b.get_cumulative_count(); // f64
+                            let upper_bound = b.upper_bound(); // f64
+                            let cumulative_count = b.cumulative_count(); // f64
 
                             upper_bounds.push(json!(upper_bound));
                             cumulative_counts.push(json!(cumulative_count));
@@ -144,8 +145,8 @@ impl JsonEncoder {
                         let mut values = vec![];
 
                         for q in s.get_quantile() {
-                            quantiles.push(json!(q.get_quantile()));
-                            values.push(q.get_value());
+                            quantiles.push(json!(q.quantile()));
+                            values.push(q.value());
                         }
 
                         // individual buckets
@@ -163,7 +164,7 @@ impl JsonEncoder {
 
                         let names = ["sum".to_string(), "count".to_string()];
 
-                        let values = [json!(s.get_sample_sum()), json!(s.get_sample_count())];
+                        let values = [json!(s.sample_sum()), json!(s.sample_count())];
                         for (key, value) in names.into_iter().zip(values.into_iter()) {
                             let mut row = Map::new();
                             row.insert("_timestamp".to_string(), json!(timestamp));
@@ -210,13 +211,13 @@ impl Encoder for JsonEncoder {
 // Adds into a map m.timestamp and m.LabelPair.
 // names and values must be of the same length
 fn extra_info(map: &mut Map<String, Value>, mc: &proto::Metric) {
-    let timestamp = mc.get_timestamp_ms();
+    let timestamp = mc.timestamp_ms();
     if timestamp != 0 {
         map.insert("_timestamp".to_string(), json!(timestamp));
     }
 
     for lp in mc.get_label() {
-        map.insert(lp.get_name().to_string(), json!(lp.get_value()));
+        map.insert(lp.name().to_string(), json!(lp.value()));
     }
 }
 
