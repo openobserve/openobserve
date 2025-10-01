@@ -148,7 +148,7 @@ export default class DashboardFilter {
       `[data-test="dashboard-add-condition-label-${idx}-${textContent}"]`
     );
     await fieldLabelLocator.click();
-    
+
     // Step 3: Open the condition selector
     if (operator || value) {
       // Target the most recent (last) visible portal to avoid strict mode violation
@@ -170,8 +170,9 @@ export default class DashboardFilter {
               .locator('[data-test="dashboard-add-condition-operator"]')
               .last();
 
-      // Wait until operator dropdown is visible
+      // Wait until operator dropdown is visible and stable
       await operatorLocator.waitFor({ state: "visible", timeout: 5000 });
+      await this.page.waitForTimeout(500); // Wait for any animations to complete
       await operatorLocator.click();
 
       // Wait for the specific option to appear in any visible menu
