@@ -1102,13 +1102,20 @@ export default defineComponent({
             }
           
           //here we are filtering the alerts by the activeTab
-          //why we are passing the refreshResults flag as false because we dont need to show the alerts in the table 
+          //why we are passing the refreshResults flag as false because we dont need to show the alerts in the table
           filterAlertsByTab(refreshResults);
           if (router.currentRoute.value.query.action == "import") {
             showImportAlertDialog.value = true;
           }
           if (router.currentRoute.value.query.action == "add") {
-            showAddUpdateFn({ row: undefined });
+            // If coming from panel with data, directly show dialog without extra navigation
+            if (router.currentRoute.value.query.fromPanel === "true") {
+              isUpdated.value = false;
+              formData.value = undefined;
+              showAddAlertDialog.value = true;
+            } else {
+              showAddUpdateFn({ row: undefined });
+            }
           }
           if (router.currentRoute.value.query.action == "update") {
             const alertId = router.currentRoute.value.query.alert_id as string;
@@ -1188,7 +1195,11 @@ export default defineComponent({
         folderIdToBeCloned.value = newVal;
         selectedAlerts.value = [];
         allSelectedAlerts.value = false;
-        if(newVal == router.currentRoute.value.query.folder){
+
+        // Don't return early if coming from panel - need to fetch alerts to show dialog
+        const isFromPanel = router.currentRoute.value.query.fromPanel === "true";
+
+        if(newVal == router.currentRoute.value.query.folder && !isFromPanel){
           return;
         }
         if (searchAcrossFolders.value) {
@@ -1201,6 +1212,7 @@ export default defineComponent({
           router.push({
             name: "alertList",
             query: {
+              ...router.currentRoute.value.query,
               org_identifier: store.state.selectedOrganization.identifier,
               folder: activeFolderId.value,
             },
@@ -1428,6 +1440,7 @@ export default defineComponent({
         await router.push({
           name: "alertList",
           query: {
+            ...router.currentRoute.value.query,
             action: "add",
             org_identifier: store.state.selectedOrganization.identifier,
             folder: activeFolderId.value,
@@ -1440,6 +1453,7 @@ export default defineComponent({
         await router.push({
           name: "alertList",
           query: {
+            ...router.currentRoute.value.query,
             alert_id: props.row.id,
             action: "update",
             name: props.row.name,
