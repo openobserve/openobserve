@@ -130,7 +130,6 @@ pub async fn process_search_stream_request(
 
     let started_at = chrono::Utc::now().timestamp_micros();
     let mut start = Instant::now();
-    let cfg = config::get_config();
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
     let use_cache = req.use_cache;
     let start_time = req.query.start_time;
@@ -170,11 +169,6 @@ pub async fn process_search_stream_request(
 
     if req.query.from == 0 && !req.query.track_total_hits && req.query.streaming_id.is_none() {
         // check cache for the first page
-        req.query.size = if req.query.size == -1 {
-            cfg.limit.query_default_limit
-        } else {
-            req.query.size
-        };
         let force_clear_cache = if !use_cache { Some(true) } else { None };
         let (c_resp, _should_exec_query) = match cache::prepare_cache_response(
             &trace_id,
@@ -278,11 +272,7 @@ pub async fn process_search_stream_request(
                 max_query_range
             }; // hours
 
-            let size = if req.query.size == -1 {
-                cfg.limit.query_default_limit
-            } else {
-                req.query.size
-            };
+            let size = req.query.size;
             // Step 1(a): handle cache responses & query the deltas
             if let Err(e) = handle_cache_responses_and_deltas(
                 &mut req,
@@ -366,11 +356,7 @@ pub async fn process_search_stream_request(
                 "[HTTP2_STREAM trace_id {trace_id}] No cache found, processing search request",
             );
 
-            let size = if req.query.size == -1 {
-                cfg.limit.query_default_limit
-            } else {
-                req.query.size
-            };
+            let size = req.query.size;
             if let Err(e) = do_partitioned_search(
                 &mut req,
                 &trace_id,
@@ -503,11 +489,7 @@ pub async fn process_search_stream_request(
         }
     } else {
         // Step 4: Search without cache for req with from > 0
-        let size = if req.query.size == -1 {
-            cfg.limit.query_default_limit
-        } else {
-            req.query.size
-        };
+        let size = req.query.size;
         if let Err(e) = do_partitioned_search(
             &mut req,
             &trace_id,
