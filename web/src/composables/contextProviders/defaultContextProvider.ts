@@ -47,7 +47,6 @@ export const createDefaultContextProvider = (
         routeName: currentRoute?.name || 'unknown',
         routePath: currentRoute?.path || '/',
         routeFullPath: currentRoute?.fullPath || '/',
-        routeTitle: currentRoute?.meta?.title || '',
         routeParams: currentRoute?.params || {},
         routeQuery: currentRoute?.query || {},
         

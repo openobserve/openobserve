@@ -60,7 +60,7 @@ const useAiChat = () => {
             body = model.length > 0 
                 ? JSON.stringify({ model, messages: _messages, context: structuredContext }) 
                 : JSON.stringify({ messages: _messages, context: structuredContext });
-        } else if (legacyContext) {
+        } else if (legacyContext && _messages.length > 0) {
             // Fallback to legacy approach - inject context into message content
             const currentMessage = _messages[_messages.length - 1];
             currentMessage.content = getFormattedContext(currentMessage, legacyContext);
