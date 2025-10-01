@@ -33,10 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : '100%',
       }"
     >
-      <thead
-        class="tw-sticky tw-top-0 tw-z-10"
-        style="max-height: 44px; height: 22px"
-      >
+      <thead class="tw-sticky tw-top-0 tw-z-10 tw-max-h-11 tw-h-6">
         <vue-draggable
           v-model="columnOrder"
           v-for="headerGroup in table.getHeaderGroups()"
@@ -45,9 +42,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :animation="200"
           :sort="!isResizingHeader || !defaultColumns"
           handle=".table-head"
-          :class="{
-            'tw-cursor-move': table.getState().columnOrder.length > 1,
-          }"
+          :class="[
+            table.getState().columnOrder.length > 1 && 'tw-cursor-move',
+            'tw-min-w-full',
+            store.state.theme === 'dark' ? 'tw-bg-zinc-600' : 'tw-bg-gray-100',
+          ]"
           :style="{
             width:
               defaultColumns && wrap
@@ -55,11 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : defaultColumns
                   ? tableRowSize + 'px'
                   : table.getTotalSize() + 'px',
-            minWidth: '100%',
-            background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
           }"
           tag="tr"
-          @start="(event) => handleDragStart(event)"
+          @start="(event: any) => handleDragStart(event)"
           @end="() => handleDragEnd()"
           class="tw-flex items-center"
         >
@@ -85,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw-bg-zinc-300',
                 header.column.getIsResizing() ? 'isResizing' : '',
               ]"
-              :style="{}"
               class="tw-right-0"
             />
 
@@ -141,10 +137,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <td
             :colspan="columnOrder.length"
             class="text-bold"
-            :style="{
-              background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
-              opacity: 0.7,
-            }"
+            :class="[
+              'tw-opacity-70',
+              store.state.theme === 'dark'
+                ? 'tw-bg-gray-600'
+                : 'tw-bg-gray-100',
+            ]"
           >
             <div
               class="text-subtitle2 text-weight-bold tw-flex tw-items-center"
@@ -155,11 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </td>
         </tr>
         <tr v-if="!loading && errMsg != ''" class="tw-w-full">
-          <td
-            :colspan="columnOrder.length"
-            class="text-bold"
-            style="opacity: 0.7"
-          >
+          <td :colspan="columnOrder.length" class="text-bold tw-opacity-70">
             <div class="text-subtitle2 text-weight-bold bg-warning">
               <q-icon size="xs" name="warning"
 class="q-mr-xs" />
@@ -171,11 +165,7 @@ class="q-mr-xs" />
           data-test="log-search-result-function-error"
           v-if="functionErrorMsg != ''"
         >
-          <td
-            :colspan="columnOrder.length"
-            class="text-bold"
-            style="opacity: 0.6"
-          >
+          <td :colspan="columnOrder.length" class="text-bold tw-opacity-60">
             <div
               class="text-subtitle2 text-weight-bold q-pl-sm"
               :class="
@@ -203,8 +193,7 @@ class="q-mr-xs" />
         <tr v-if="functionErrorMsg != '' && isFunctionErrorOpen">
           <td
             :colspan="columnOrder.length"
-            style="opacity: 0.7"
-            class="q-px-sm"
+            class="q-px-sm tw-opacity-70"
             :class="
               store.state.theme === 'dark'
                 ? 'tw-bg-yellow-600'
@@ -229,11 +218,17 @@ class="q-mr-xs" />
             }`"
             :style="{
               transform: `translateY(${virtualRow.start + (isFirefox ? baseOffset : 0)}px)`,
-              minWidth: '100%',
             }"
             :data-index="virtualRow.index"
-            :ref="(node: any) => rowVirtualizer.measureElement(node)"
-            class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b tw-cursor-pointer"
+            :ref="
+              (node: any) =>
+                rowVirtualizer.measureElement(
+                  node,
+                  (formattedRows[virtualRow.index]?.original as any)
+                    ?.isExpandedRow,
+                )
+            "
+            class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b tw-cursor-pointer tw-min-w-full"
             :class="[
               store.state.theme === 'dark'
                 ? 'w-border-gray-800  hover:tw-bg-zinc-800'
@@ -265,9 +260,6 @@ class="q-mr-xs" />
                   ?.isExpandedRow
               "
               class="tw-absolute tw-left-0 tw-inset-y-0 tw-w-1 tw-z-10"
-              :style="{
-                backgroundColor: getRowStatusColor(tableRows[virtualRow.index]),
-              }"
             ></div>
             <td
               v-if="
@@ -401,7 +393,6 @@ import {
   onBeforeUnmount,
 } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
-import HighLight from "@/components/HighLight.vue";
 import {
   FlexRender,
   type ColumnDef,
@@ -473,7 +464,7 @@ const props = defineProps({
     required: false,
   },
   selectedStreamFtsKeys: {
-    type: Array,
+    type: Array as () => string[],
     default: () => [],
   },
 });
@@ -697,20 +688,30 @@ watch(
 
 const parentRef = ref<HTMLElement | null>(null);
 
-// const isFirefox = computed(() => {
-//   return (
-//     typeof document !== "undefined" && CSS.supports("-moz-appearance", "none")
-//   );
-// });
+const isFirefox = computed(() => {
+  return (
+    typeof document !== "undefined" && CSS.supports("-moz-appearance", "none")
+  );
+});
 
-// const baseOffset = isFirefox.value ? 20 : 0;
+const baseOffset = isFirefox.value ? 20 : 0;
 
 const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
     getScrollElement: () => parentRef.value,
-    estimateSize: () => 22,
+    estimateSize: () => 20,
     overscan: 20,
+    measureElement:
+      typeof window !== "undefined" && !isFirefox.value
+        ? (element: any, isExpanded: boolean) => {
+            // Only measure expanded rows (check if it's actually an expanded row)
+            if (isExpanded) {
+              return element.getBoundingClientRect().height;
+            }
+            return 20; // Fixed height for collapsed rows
+          }
+        : undefined,
   };
 });
 
