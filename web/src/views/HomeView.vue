@@ -27,7 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="row justify-between items-center q-mb-md">
             <div class="text-h6 ">Streams</div>
               <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-               >View
+               >
+                <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
                 <router-link
                   exact
                   :to="{ name: 'logstreams' }"
@@ -207,7 +208,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ summary.function_count }}
                 <div>
                       <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                    >View
+                    >
+                        <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
                       <router-link
                         exact
                         :to="{ name: 'functionList' }"
@@ -235,7 +237,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="data-to-display row items-end tw-flex tw-justify-between">
                 {{ summary.dashboard_count }}
                 <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                    >View
+                    >
+                    <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
                       <router-link
                         exact
                         :to="{ name: 'dashboards' }"
@@ -258,7 +261,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   {{ t("home.alertTitle") }}
                 </span>
-                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
+                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
+                  <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
                   <router-link
                     exact
                     :to="{ name: 'alertList' }"
@@ -297,7 +301,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   {{ t("home.pipelineTitle") }}
                 </span>
-                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">View
+                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
+                  <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
                   <router-link
                     exact
                     :to="{ name: 'pipelines' }"
@@ -644,6 +649,11 @@ export default defineComponent({
     return getImageURL('images/home/pipeline.svg');
   });
 
+  const getForwardIcon = computed(() => {
+    const icon = store.state.theme === 'dark' ? 'images/home/forward_dark.svg' : 'images/home/forward_light.svg';
+    return getImageURL(icon);
+  });
+
   const formatEventCount = (num: number): string => {
   if (num < 100000) return num.toString();
 
@@ -682,6 +692,7 @@ export default defineComponent({
       isLoadingSummary,
       pipelinesIcon,
       alertsIcon,
+      getForwardIcon,
       formatEventCount
     };
   },
@@ -722,14 +733,54 @@ export default defineComponent({
 }
 .view-button-light {
   cursor: pointer;
-  color: #5960B2;
   padding: 0px
 }
 .view-button-dark {
   cursor: pointer;
-  color: #929BFF;
   padding: 0px;
   margin: 0px;
+}
+.view-button-light,
+.view-button-dark {
+  position: relative;
+  overflow: hidden;
+}
+.view-arrow-icon-svg {
+  width: 28px;
+  height: 14px;
+  transition: transform 0.4s ease-in-out, opacity 0.4s ease-in-out;
+  display: inline-block;
+}
+.view-button-light:hover .view-arrow-icon-svg,
+.view-button-dark:hover .view-arrow-icon-svg {
+  transform: translateX(20px);
+  opacity: 0;
+}
+.view-button-light::after,
+.view-button-dark::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) translateX(-20px);
+  opacity: 0;
+  transition: transform 0.4s ease-in-out, opacity 0.4s ease-in-out;
+  width: 28px;
+  height: 14px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+.view-button-light::after {
+  background-image: url('/src/assets/images/home/forward_light.svg');
+}
+.view-button-dark::after {
+  background-image: url('/src/assets/images/home/forward_dark.svg');
+}
+.view-button-light:hover::after,
+.view-button-dark:hover::after {
+  transform: translate(-50%, -50%) translateX(0);
+  opacity: 1;
 }
 .tile {
   flex: 1 1 240px; /* grow, shrink, basis */
