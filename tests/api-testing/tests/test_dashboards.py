@@ -88,7 +88,6 @@ def test_dashboard_search_stream_query(create_session, base_url):
     # Make POST request - note: NO stream=True for this test, we'll parse the SSE response
     resp = session.post(url, params=params, json=payload)
 
-    # Validate response status
     assert resp.status_code == 200, f"Search stream query failed: {resp.status_code} {resp.text}"
 
     # Parse SSE (Server-Sent Events) response
@@ -401,4 +400,5 @@ def test_list_dashboards_pagination(create_session, base_url):
     # Clean up
     for dashboard_id in created_ids:
         session.delete(f"{base_url}api/{ORG_ID}/dashboards/{dashboard_id}")
+
 
