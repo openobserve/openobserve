@@ -684,8 +684,6 @@ export default defineComponent({
     const { track } = useReo();
 
     const activeFolderId = ref(router.currentRoute.value.query.folder || "default");
-    const importedFromPanel = ref(false);
-    const importedPanelTitle = ref("");
 
     const updateActiveFolderId = (folderId: any) => {
       activeFolderId.value = folderId.value;
@@ -1079,9 +1077,6 @@ export default defineComponent({
           if (panelData.queries && panelData.queries.length > 0) {
             const query = panelData.queries[0];
 
-            importedFromPanel.value = true;
-            importedPanelTitle.value = panelData.panelTitle;
-
             formData.value.name = `Alert from ${panelData.panelTitle}`;
 
             // Show notification that query was imported
@@ -1201,17 +1196,6 @@ export default defineComponent({
       }
     };
 
-    const clearImportedData = () => {
-      importedFromPanel.value = false;
-      importedPanelTitle.value = "";
-      formData.value = { ...defaultValue() };
-      formData.value.is_real_time = formData.value.is_real_time.toString();
-      q.notify({
-        type: "info",
-        message: "Imported data cleared",
-        timeout: 2000
-      });
-    };
 
     const openJsonEditor = () => {
       showJsonEditorDialog.value = true;
@@ -1338,9 +1322,6 @@ export default defineComponent({
       generateSqlQuery: generateSqlQueryLocal,
       track,
       loadPanelDataIfPresent,
-      importedFromPanel,
-      importedPanelTitle,
-      clearImportedData,
     };
   },
 

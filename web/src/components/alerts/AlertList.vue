@@ -1108,14 +1108,7 @@ export default defineComponent({
             showImportAlertDialog.value = true;
           }
           if (router.currentRoute.value.query.action == "add") {
-            // If coming from panel with data, directly show dialog without extra navigation
-            if (router.currentRoute.value.query.fromPanel === "true") {
-              isUpdated.value = false;
-              formData.value = undefined;
-              showAddAlertDialog.value = true;
-            } else {
-              showAddUpdateFn({ row: undefined });
-            }
+            showAddUpdateFn({ row: undefined });
           }
           if (router.currentRoute.value.query.action == "update") {
             const alertId = router.currentRoute.value.query.alert_id as string;
@@ -1196,10 +1189,7 @@ export default defineComponent({
         selectedAlerts.value = [];
         allSelectedAlerts.value = false;
 
-        // Don't return early if coming from panel - need to fetch alerts to show dialog
-        const isFromPanel = router.currentRoute.value.query.fromPanel === "true";
-
-        if(newVal == router.currentRoute.value.query.folder && !isFromPanel){
+        if(newVal == router.currentRoute.value.query.folder){
           return;
         }
         if (searchAcrossFolders.value) {
