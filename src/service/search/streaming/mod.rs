@@ -47,7 +47,10 @@ use crate::{
 };
 #[cfg(feature = "enterprise")]
 use crate::{
-    handler::http::request::search::error_utils::map_error_to_http_response,
+    handler::http::request::search::{
+        error_utils::map_error_to_http_response,
+        utils::check_stream_permissions,
+    },
     service::self_reporting::audit,
 };
 
