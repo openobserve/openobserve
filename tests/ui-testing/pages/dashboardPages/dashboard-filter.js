@@ -148,23 +148,7 @@ export default class DashboardFilter {
       `[data-test="dashboard-add-condition-label-${idx}-${textContent}"]`
     );
     await fieldLabelLocator.click();
-
-    // await this.page
-    //   .getByRole("option", { name: newFieldName, exact: true })
-    //   .first()
-    //   .click();
-
-    // const option = this.page
-    //   .getByRole("option", { name: newFieldName, exact: true })
-    //   .first();
-    // await option.waitFor({ state: "visible", timeout: 10000 });
-    // await option.click();
-
-    // await this.page
-    //   .locator('div.q-menu[role="listbox"] div.q-item')
-    //   .first()
-    //   .click();
-
+    
     // Step 3: Open the condition selector
     if (operator || value) {
       // Target the most recent (last) visible portal to avoid strict mode violation
