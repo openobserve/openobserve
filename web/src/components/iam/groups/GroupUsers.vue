@@ -406,21 +406,21 @@ const toggleUserSelection = (user: any) => {
 };
 
 const shouldShowWarning = (user: any) => {
-  // Only show warning for roles, not for groups
-  if (props.context !== "role") return false;
-
-  // Only show warning if user is external
-  if (!user.is_external) return false;
-
-  // Only show warning if user is currently selected (checked)
-  if (!user.isInGroup) return false;
-
-  // Only show warning if user is being NEWLY added (not already in the role)
-  // groupUsersMap contains the original list of users in the role
-  // If user was already in the role, don't show warning (they might be from AD groups)
-  if (groupUsersMap.value.has(user.email)) return false;
-
-  return true;
+  // Show warning icon for external users being newly added to roles
+  // Warning conditions:
+  // 1. context === "role" - Only show for roles, not for groups
+  // 2. user.is_external - User is marked as external (e.g., from AD/LDAP)
+  // 3. user.isInGroup - User is currently selected/checked in the UI
+  // 4. !groupUsersMap.has(email) - User was NOT already in the role (newly added)
+  //
+  // Note: We don't warn for users already in the role as they might have
+  // been added through AD groups and we don't want to show false warnings
+  return (
+    props.context === "role" &&
+    user.is_external &&
+    user.isInGroup &&
+    !groupUsersMap.value.has(user.email)
+  );
 };
 
 const filterUsers = (rows: any[], term: string) => {
