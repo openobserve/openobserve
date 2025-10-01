@@ -235,7 +235,7 @@ pub async fn collect_scan_stats(
 
 pub fn check_query_default_limit_exceeded(num_rows: usize, partial_err: &mut String, sql: &Sql) {
     if is_default_query_limit_exceeded(num_rows, sql) {
-        let capped_err = format!("{CAPPED_RESULTS_MSG}",);
+        let capped_err = CAPPED_RESULTS_MSG.to_string();
         if !partial_err.is_empty() {
             partial_err.push('\n');
             partial_err.push_str(&capped_err);
