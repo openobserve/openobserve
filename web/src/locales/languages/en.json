@@ -378,7 +378,9 @@
     "serviceAccounts": "Service Accounts",
     "serviceAccountsName": "Service Accounts Name",
     "basicUsers": "Users",
-    "quota": "Quotas"
+    "quota": "Quotas",
+    "externalUserWarningTitle": "External user warning",
+    "externalUserWarningMessage": "Adding external users directly to roles won't grant permissions. Add them to User Groups instead."
   },
   "ticket": {
     "header": "Support Tickets",
