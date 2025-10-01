@@ -15,7 +15,12 @@
 
 use std::{any::Any, sync::Arc};
 
-use arrow::array::RecordBatch;
+use arrow::{
+    array::{ArrayRef, RecordBatch},
+    compute::cast,
+    datatypes::DataType,
+};
+use bytes::Bytes;
 use config::{PARQUET_BATCH_SIZE, utils::record_batch_ext::convert_vrl_to_record_batch};
 use datafusion::{
     arrow::datatypes::SchemaRef,
@@ -32,6 +37,7 @@ use datafusion::{
     },
 };
 use futures::TryStreamExt;
+use parquet::arrow::{ProjectionMask, arrow_reader::ParquetRecordBatchReaderBuilder};
 use rayon::prelude::*;
 
 use crate::common::infra::config::ENRICHMENT_TABLES;
@@ -97,6 +103,8 @@ impl DisplayAs for EnrichmentExec {
 pub struct EnrichmentMetrics {
     /// Time in nanos to get enrichment data from in-memory store
     pub fetch_data_time: metrics::Time,
+    /// Time in nanos to read enrichment data from disk
+    pub read_disk_time: metrics::Time,
     /// Time in nanos to convert VRL directly to RecordBatch
     pub vrl_to_record_batch_time: metrics::Time,
     /// output rows
@@ -109,6 +117,10 @@ impl EnrichmentMetrics {
         let fetch_data_time =
             MetricBuilder::new(metrics).subset_time("fetch_data_time", input_partition);
 
+        // Time in nanos to read enrichment data from disk
+        let read_disk_time =
+            MetricBuilder::new(metrics).subset_time("read_disk_time", input_partition);
+
         // Time in nanos to convert VRL directly to RecordBatch
         let vrl_to_record_batch_time =
             MetricBuilder::new(metrics).subset_time("vrl_to_record_batch_time", input_partition);
@@ -118,6 +130,7 @@ impl EnrichmentMetrics {
 
         Self {
             fetch_data_time,
+            read_disk_time,
             vrl_to_record_batch_time,
             output_rows,
         }
@@ -199,6 +212,46 @@ async fn fetch_data(
 ) -> Result<SendableRecordBatchStream> {
     let key = format!("{org_id}/enrichment_tables/{stream_name}");
 
+    // First, try to read from disk if available
+    let read_disk_timer = metrics.read_disk_time.timer();
+    let disk_result = read_from_disk(&org_id, &stream_name, &schema).await;
+    read_disk_timer.done();
+
+    if let Ok(batches) = disk_result {
+        let total_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+        log::info!(
+            "[trace_id {trace_id}] Read enrichment data from disk in {} ms, {} batches with {total_rows} total rows",
+            std::time::Duration::from_nanos(metrics.read_disk_time.value() as u64).as_millis(),
+            batches.len()
+        );
+        metrics.record_output(total_rows);
+        return Ok(Box::pin(MemoryStream::try_new(
+            batches,
+            Arc::clone(&schema),
+            None,
+        )?));
+    } else if let DataFusionError::Execution(err_msg) = disk_result.err().unwrap() {
+        log::warn!(
+            "[trace_id {trace_id}] EnrichmentExec failed to read from disk for key: {key}, error: {err_msg}"
+        );
+    }
+
+    log::info!(
+        "[trace_id {trace_id}] No disk data found or error reading from disk, falling back to in-memory cache"
+    );
+
+    // Fall back to in-memory cache
+    fetch_from_memory_cache(trace_id, key, schema, target_partition, metrics).await
+}
+
+/// Fetch enrichment data from in-memory cache and convert to RecordBatch
+async fn fetch_from_memory_cache(
+    trace_id: String,
+    key: String,
+    schema: SchemaRef,
+    target_partition: usize,
+    metrics: EnrichmentMetrics,
+) -> Result<SendableRecordBatchStream> {
     let fetch_data_timer = metrics.fetch_data_time.timer();
     let enrichment_data = match ENRICHMENT_TABLES.get(&key) {
         Some(stream_table) => {
@@ -294,4 +347,134 @@ async fn fetch_data(
         Arc::clone(&schema),
         None,
     )?))
+}
+
+/// Read enrichment table data directly from disk (parquet files)
+async fn read_from_disk(
+    org_id: &str,
+    table_name: &str,
+    schema: &SchemaRef,
+) -> Result<Vec<RecordBatch>> {
+    use config::utils::enrichment_local_cache::{get_key, get_table_dir};
+
+    let key = get_key(org_id, table_name);
+    let file_dir = get_table_dir(&key);
+
+    // Check if directory exists
+    if !file_dir.exists() {
+        return Err(DataFusionError::Execution(format!(
+            "Enrichment table directory not found: {file_dir:?}"
+        )));
+    }
+
+    // Read all parquet files in the directory
+    let mut files = Vec::new();
+    let mut entries = tokio::fs::read_dir(&file_dir).await.map_err(|e| {
+        DataFusionError::Execution(format!("Failed to read enrichment table directory: {e}"))
+    })?;
+
+    while let Some(entry) = entries
+        .next_entry()
+        .await
+        .map_err(|e| DataFusionError::Execution(format!("Failed to read directory entry: {e}")))?
+    {
+        let file_path = entry.path();
+        if file_path.is_file() && file_path.extension().unwrap_or_default() == "parquet" {
+            files.push(file_path);
+        }
+    }
+
+    if files.is_empty() {
+        return Err(DataFusionError::Execution(
+            "No parquet files found in enrichment table directory".to_string(),
+        ));
+    }
+
+    // Sort files by created time
+    files.sort_by_key(|f| f.metadata().unwrap().created().unwrap());
+
+    // Read all parquet files and collect batches
+    let mut all_batches = Vec::new();
+    for file in files {
+        let file_content = tokio::fs::read(&file)
+            .await
+            .map_err(|e| DataFusionError::Execution(format!("Failed to read parquet file: {e}")))?;
+
+        // Parse parquet file
+        let builder =
+            ParquetRecordBatchReaderBuilder::try_new(Bytes::from(file_content)).map_err(|e| {
+                DataFusionError::Execution(format!("Failed to create parquet reader: {e}"))
+            })?;
+
+        let parquet_schema = builder.schema();
+        let parquet_file_metadata = builder.metadata();
+
+        // Build projection mask to read columns in the order they appear in the expected schema
+        let projection_indices: Vec<usize> = schema
+            .fields()
+            .iter()
+            .filter_map(|field| {
+                parquet_schema
+                    .fields()
+                    .iter()
+                    .position(|f| f.name() == field.name())
+            })
+            .collect();
+
+        let projection_mask = ProjectionMask::roots(
+            parquet_file_metadata.file_metadata().schema_descr(),
+            projection_indices,
+        );
+
+        let reader = builder
+            .with_projection(projection_mask)
+            .build()
+            .map_err(|e| {
+                DataFusionError::Execution(format!("Failed to build parquet reader: {e}"))
+            })?;
+
+        for batch_result in reader {
+            let batch = batch_result.map_err(|e| {
+                DataFusionError::Execution(format!("Failed to read record batch: {e}"))
+            })?;
+
+            // Convert UTF8 columns to Utf8View
+            let converted_batch = convert_utf8_to_utf8view(batch, schema)?;
+            all_batches.push(converted_batch);
+        }
+    }
+
+    Ok(all_batches)
+}
+
+/// Convert UTF8 columns to Utf8View in a RecordBatch
+fn convert_utf8_to_utf8view(
+    batch: RecordBatch,
+    expected_schema: &SchemaRef,
+) -> Result<RecordBatch> {
+    let columns: Vec<ArrayRef> = batch
+        .columns()
+        .iter()
+        .enumerate()
+        .map(|(i, col)| {
+            let expected_field = expected_schema.field(i);
+
+            // If the expected type is Utf8View and the actual type is Utf8, convert it
+            if matches!(expected_field.data_type(), DataType::Utf8View)
+                && matches!(col.data_type(), DataType::Utf8)
+            {
+                cast(col, &DataType::Utf8View).map_err(|e| {
+                    DataFusionError::Execution(format!("Failed to cast UTF8 to Utf8View: {e}"))
+                })
+            } else {
+                Ok(Arc::clone(col))
+            }
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    RecordBatch::try_new(Arc::clone(expected_schema), columns).map_err(|e| {
+        DataFusionError::Execution(format!(
+            "Failed to create record batch after conversion: {e}"
+        ))
+    })
 }

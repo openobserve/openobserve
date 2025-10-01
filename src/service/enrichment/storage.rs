@@ -153,6 +153,7 @@ pub mod remote {
             .await
             .map_err(|e| anyhow!("Failed to get schema from cache: {}", e))?;
 
+        // Question: this convert only used for calculate original_size and compressed_size?
         let buf = Bytes::from(serde_json::to_string(&data).unwrap());
         let mut file_meta = FileMeta {
             min_ts: created_at,
@@ -226,6 +227,17 @@ pub mod remote {
 }
 
 pub mod local {
+    use std::sync::Arc;
+
+    use arrow_json;
+    use config::{
+        meta::stream::{FileMeta, StreamType},
+        utils::{
+            parquet::write_recordbatch_to_parquet, record_batch_ext::convert_json_to_record_batch,
+        },
+    };
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+
     use super::*;
 
     pub async fn store(
@@ -244,10 +256,27 @@ pub mod local {
             tokio::fs::create_dir_all(parent).await?;
         }
 
-        // Serialize and write data
-        let json_data = serde_json::to_string_pretty(data)
-            .map_err(|e| anyhow!("Failed to serialize enrichment table data: {}", e))?;
-        tokio::fs::write(&file_path, json_data)
+        // Get schema from cache
+        let schema = infra::schema::get_cache(org_id, table_name, StreamType::EnrichmentTables)
+            .await
+            .map_err(|e| anyhow!("Failed to get schema from cache: {e}"))?
+            .schema()
+            .clone();
+
+        let file_meta = FileMeta {
+            min_ts: updated_at,
+            max_ts: updated_at,
+            records: data.len() as i64,
+            ..Default::default()
+        };
+
+        let data_refs: Vec<_> = data.iter().map(|row| Arc::new(row.clone())).collect();
+        let record_batch = convert_json_to_record_batch(&schema, &data_refs)?;
+        let parquet_data =
+            write_recordbatch_to_parquet(schema.clone(), &[record_batch], &[], &file_meta).await?;
+
+        // Write parquet data to file
+        tokio::fs::write(&file_path, parquet_data)
             .await
             .map_err(|e| anyhow!("Failed to write enrichment table file: {}", e))?;
 
@@ -279,7 +308,7 @@ pub mod local {
         let mut entries = tokio::fs::read_dir(&file_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
             let file_path = entry.path();
-            if file_path.is_file() && file_path.extension().unwrap_or_default() == "json" {
+            if file_path.is_file() && file_path.extension().unwrap_or_default() == "parquet" {
                 files.push(file_path);
             }
         }
@@ -294,12 +323,34 @@ pub mod local {
         // read the files in order
         let mut records = Vec::new();
         for file in files {
-            let data = tokio::fs::read_to_string(&file)
+            let file_content = tokio::fs::read(&file)
                 .await
                 .map_err(|e| anyhow!("Failed to read enrichment table file: {}", e))?;
-            let table_data: Vec<Value> = serde_json::from_str(&data)
-                .map_err(|e| anyhow!("Failed to parse enrichment table JSON: {}", e))?;
-            records.extend(table_data);
+
+            // Parse parquet file
+            let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(file_content))
+                .map_err(|e| anyhow!("Failed to create parquet reader: {}", e))?
+                .build()
+                .map_err(|e| anyhow!("Failed to build parquet reader: {}", e))?;
+
+            for batch in reader {
+                let batch = batch.map_err(|e| anyhow!("Failed to read record batch: {}", e))?;
+                // Convert record batch to JSON
+                let mut buf = Vec::new();
+                let mut writer = arrow_json::ArrayWriter::new(&mut buf);
+                writer
+                    .write(&batch)
+                    .map_err(|e| anyhow!("Failed to write batch as JSON: {}", e))?;
+                writer
+                    .finish()
+                    .map_err(|e| anyhow!("Failed to finish JSON writer: {}", e))?;
+
+                let json_str = String::from_utf8(buf)
+                    .map_err(|e| anyhow!("Failed to convert JSON bytes to string: {}", e))?;
+                let table_data: Vec<Value> = serde_json::from_str(&json_str)
+                    .map_err(|e| anyhow!("Failed to parse enrichment table JSON: {}", e))?;
+                records.extend(table_data);
+            }
         }
         Ok(records)
     }
@@ -348,11 +399,11 @@ pub mod local {
             )
         })? {
             if let Ok(file_name) = entry.file_name().into_string()
-                && file_name.ends_with(".json")
+                && file_name.ends_with(".parquet")
                 && file_name.starts_with(&prefix.replace("/", "_"))
             {
                 let key = file_name
-                    .strip_suffix(".json")
+                    .strip_suffix(".parquet")
                     .unwrap_or(&file_name)
                     .replace("_", "/");
                 keys.push(key);
@@ -371,7 +422,7 @@ pub mod local {
     pub async fn store_data_if_needed(
         org_id: &str,
         table_name: &str,
-        data: &[Value],
+        data: Arc<Vec<Value>>,
         updated_at: i64,
     ) -> Result<()> {
         let key = get_key(org_id, table_name);
@@ -379,7 +430,7 @@ pub mod local {
         let last_updated_at = metadata_content.get(&key).cloned().unwrap_or_default();
         if last_updated_at < updated_at || last_updated_at == 0 {
             delete(org_id, table_name).await?;
-            store(org_id, table_name, data, updated_at).await?;
+            store(org_id, table_name, data.as_ref(), updated_at).await?;
         }
         Ok(())
     }
@@ -387,14 +438,14 @@ pub mod local {
     pub async fn store_data_if_needed_background(
         org_id: &str,
         table_name: &str,
-        data: &[Value],
+        data: Arc<Vec<Value>>,
         updated_at: i64,
     ) -> Result<()> {
         let org_id = org_id.to_string();
         let table_name = table_name.to_string();
-        let data = data.to_owned();
+        let data = data.clone();
         tokio::task::spawn(async move {
-            store_data_if_needed(&org_id, &table_name, &data, updated_at).await
+            store_data_if_needed(&org_id, &table_name, data, updated_at).await
         });
         Ok(())
     }

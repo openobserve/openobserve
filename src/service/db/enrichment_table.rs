@@ -45,7 +45,7 @@ pub async fn get_enrichment_table_data(
         sql: format!("SELECT * FROM \"{name}\""),
         start_time,
         end_time,
-        size: -1, // -1 means no limit, enrichment table should not be limited
+        size: 100_000_000, // we have `ZO_QUERY_DEFAULT_LIMIT`, so -1 not work
         ..Default::default()
     };
 
