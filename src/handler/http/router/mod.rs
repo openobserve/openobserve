@@ -558,6 +558,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(pipeline::enable_pipeline)
         .service(pipeline::enable_pipeline_bulk)
         .service(search::multi_streams::search_multi)
+        .service(search::multi_streams::search_multi_stream)
         .service(search::multi_streams::_search_partition_multi)
         .service(search::multi_streams::around_multi)
         .service(stream::delete_stream_cache)
