@@ -966,7 +966,6 @@ fn parse_simple_multi_stream_request(
     struct SimpleMultiStreamWrapper {
         query: SimpleMultiStreamQuery,
     }
-
     #[derive(serde::Deserialize)]
     struct SimpleMultiStreamQuery {
         sql: Vec<String>,
