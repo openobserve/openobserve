@@ -90,6 +90,7 @@ datafusion-functions-aggregate-common.workspace = true
 datafusion-functions-json.workspace = true
 arrow.workspace = true
 arrow-flight.workspace = true
+arrow-json.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true

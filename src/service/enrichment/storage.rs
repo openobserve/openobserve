@@ -13,18 +13,160 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use anyhow::{Result, anyhow};
+use arrow::array::{Array, Int64Array, RecordBatch};
+use arrow_schema::SchemaRef;
 use bytes::Bytes;
 use config::{
-    spawn_pausable_job,
+    PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME, spawn_pausable_job,
     utils::{
         enrichment_local_cache::{
             get_key, get_metadata_content, get_metadata_path, get_table_dir, get_table_path,
         },
         json::Value,
+        record_batch_ext::{convert_json_to_record_batch, convert_vrl_to_record_batch},
     },
 };
+use rayon::prelude::*;
 use tokio::task::JoinHandle;
+
+#[derive(Debug, Clone)]
+pub enum Values {
+    Json(Arc<Vec<serde_json::Value>>),
+    Vrl(Arc<Vec<vrl::value::Value>>),
+    RecordBatch(Vec<RecordBatch>),
+}
+
+impl Values {
+    pub fn len(&self) -> usize {
+        match self {
+            Values::Json(data) => data.len(),
+            Values::Vrl(data) => data.len(),
+            Values::RecordBatch(batches) => batches.iter().map(|b| b.num_rows()).sum(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Values::Json(data) => data.is_empty(),
+            Values::Vrl(data) => data.is_empty(),
+            Values::RecordBatch(batches) => batches.iter().all(|b| b.num_rows() == 0),
+        }
+    }
+
+    pub fn last_updated_at(&self) -> i64 {
+        match self {
+            Values::RecordBatch(batches) => {
+                let mut max_ts = 0;
+                for batch in batches {
+                    if let Some(column) = batch.column_by_name(TIMESTAMP_COL_NAME)
+                        && let Some(array) = column.as_any().downcast_ref::<Int64Array>()
+                    {
+                        for v in array.values() {
+                            if *v > max_ts {
+                                max_ts = *v;
+                            }
+                        }
+                    }
+                }
+                max_ts
+            }
+            Values::Json(data) => data
+                .iter()
+                .map(|r| r.get(TIMESTAMP_COL_NAME).unwrap().as_i64().unwrap())
+                .max()
+                .unwrap(),
+            _ => unimplemented!("last_updated_at is not implement for vrl"),
+        }
+    }
+
+    /// Convert to JSON format if not already in that format
+    pub fn to_json(&self) -> Result<Arc<Vec<serde_json::Value>>> {
+        match self {
+            Values::Json(data) => Ok(Arc::clone(data)),
+            Values::Vrl(data) => {
+                let pool = rayon::ThreadPoolBuilder::new()
+                    .num_threads(config::get_config().limit.cpu_num)
+                    .build()?;
+                let json_data = pool.install(|| {
+                    data.par_iter()
+                        .map(crate::service::db::enrichment_table::convert_from_vrl)
+                        .collect()
+                });
+                Ok(Arc::new(json_data))
+            }
+            Values::RecordBatch(batches) => {
+                let mut records = Vec::new();
+                for batch in batches {
+                    let mut buf = Vec::new();
+                    let mut writer = arrow_json::ArrayWriter::new(&mut buf);
+                    writer
+                        .write(batch)
+                        .map_err(|e| anyhow!("Failed to write batch as JSON: {e}"))?;
+                    writer
+                        .finish()
+                        .map_err(|e| anyhow!("Failed to finish JSON writer: {e}"))?;
+
+                    let json_str = String::from_utf8(buf)
+                        .map_err(|e| anyhow!("Failed to convert JSON bytes to string: {e}"))?;
+                    let batch_data: Vec<Value> = serde_json::from_str(&json_str)
+                        .map_err(|e| anyhow!("Failed to parse JSON: {e}"))?;
+                    records.extend(batch_data);
+                }
+                Ok(Arc::new(records))
+            }
+        }
+    }
+
+    /// Convert to VRL format if not already in that format
+    pub fn to_vrl(&self) -> Result<Arc<Vec<vrl::value::Value>>> {
+        match self {
+            Values::Vrl(data) => Ok(Arc::clone(data)),
+            Values::Json(data) => {
+                let pool = rayon::ThreadPoolBuilder::new()
+                    .num_threads(config::get_config().limit.cpu_num)
+                    .build()?;
+                let vrl_data = pool.install(|| {
+                    data.par_iter()
+                        .map(crate::service::db::enrichment_table::convert_to_vrl)
+                        .collect()
+                });
+                Ok(Arc::new(vrl_data))
+            }
+            Values::RecordBatch(batches) => {
+                // Convert RecordBatch directly to VRL without intermediate JSON
+                let vrl_data =
+                    crate::service::db::enrichment_table::convert_recordbatch_to_vrl(batches)?;
+                Ok(Arc::new(vrl_data))
+            }
+        }
+    }
+
+    /// Convert to RecordBatch format if not already in that format
+    pub fn to_record_batch(&self, schema: &SchemaRef) -> Result<Vec<RecordBatch>> {
+        match self {
+            Values::RecordBatch(batches) => Ok(batches.clone()),
+            Values::Vrl(data) => {
+                let chunks: Vec<&[vrl::value::Value]> =
+                    data.as_ref().chunks(PARQUET_BATCH_SIZE).collect();
+
+                chunks
+                    .iter()
+                    .map(|chunk| convert_vrl_to_record_batch(schema, chunk))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| anyhow!("Failed to convert VRL to RecordBatch: {}", e))
+            }
+            Values::Json(data) => {
+                let data_refs: Vec<_> = data.iter().map(|row| Arc::new(row.clone())).collect();
+                convert_json_to_record_batch(schema, &data_refs)
+                    .map(|batch| vec![batch])
+                    .map_err(|e| anyhow!("Failed to convert JSON to RecordBatch: {}", e))
+            }
+        }
+    }
+}
 
 pub mod remote {
     use std::sync::Arc;
@@ -227,14 +369,9 @@ pub mod remote {
 }
 
 pub mod local {
-    use std::sync::Arc;
-
-    use arrow_json;
     use config::{
         meta::stream::{FileMeta, StreamType},
-        utils::{
-            parquet::write_recordbatch_to_parquet, record_batch_ext::convert_json_to_record_batch,
-        },
+        utils::parquet::write_recordbatch_to_parquet,
     };
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
@@ -243,7 +380,7 @@ pub mod local {
     pub async fn store(
         org_id: &str,
         table_name: &str,
-        data: &[Value],
+        data: Values,
         updated_at: i64,
     ) -> Result<()> {
         let key = get_key(org_id, table_name);
@@ -263,17 +400,16 @@ pub mod local {
             .schema()
             .clone();
 
+        let data = data.to_record_batch(&schema)?;
         let file_meta = FileMeta {
             min_ts: updated_at,
             max_ts: updated_at,
-            records: data.len() as i64,
+            records: data.iter().map(|b| b.num_rows()).sum::<usize>() as i64,
             ..Default::default()
         };
 
-        let data_refs: Vec<_> = data.iter().map(|row| Arc::new(row.clone())).collect();
-        let record_batch = convert_json_to_record_batch(&schema, &data_refs)?;
         let parquet_data =
-            write_recordbatch_to_parquet(schema.clone(), &[record_batch], &[], &file_meta).await?;
+            write_recordbatch_to_parquet(schema.clone(), &data, &[], &file_meta).await?;
 
         // Write parquet data to file
         tokio::fs::write(&file_path, parquet_data)
@@ -301,7 +437,10 @@ pub mod local {
         Ok(())
     }
 
-    pub async fn retrieve(org_id: &str, table_name: &str) -> Result<Vec<Value>> {
+    /// Retrieve enrichment table data as Values (optimized version)
+    /// This returns data in RecordBatch format directly from parquet files,
+    /// avoiding unnecessary conversions
+    pub async fn retrieve(org_id: &str, table_name: &str) -> Result<Values> {
         let key = get_key(org_id, table_name);
         let file_dir = get_table_dir(&key);
         let mut files = Vec::new();
@@ -314,14 +453,14 @@ pub mod local {
         }
 
         if files.is_empty() {
-            return Ok(vec![]);
+            return Ok(Values::RecordBatch(vec![]));
         }
 
         // sort the files by created_at
         files.sort_by_key(|f| f.metadata().unwrap().created().unwrap());
 
-        // read the files in order
-        let mut records = Vec::new();
+        // read the files in order and keep as RecordBatch
+        let mut batches = Vec::new();
         for file in files {
             let file_content = tokio::fs::read(&file)
                 .await
@@ -335,24 +474,10 @@ pub mod local {
 
             for batch in reader {
                 let batch = batch.map_err(|e| anyhow!("Failed to read record batch: {}", e))?;
-                // Convert record batch to JSON
-                let mut buf = Vec::new();
-                let mut writer = arrow_json::ArrayWriter::new(&mut buf);
-                writer
-                    .write(&batch)
-                    .map_err(|e| anyhow!("Failed to write batch as JSON: {}", e))?;
-                writer
-                    .finish()
-                    .map_err(|e| anyhow!("Failed to finish JSON writer: {}", e))?;
-
-                let json_str = String::from_utf8(buf)
-                    .map_err(|e| anyhow!("Failed to convert JSON bytes to string: {}", e))?;
-                let table_data: Vec<Value> = serde_json::from_str(&json_str)
-                    .map_err(|e| anyhow!("Failed to parse enrichment table JSON: {}", e))?;
-                records.extend(table_data);
+                batches.push(batch);
             }
         }
-        Ok(records)
+        Ok(Values::RecordBatch(batches))
     }
 
     pub async fn delete(org_id: &str, table_name: &str) -> Result<()> {
@@ -422,7 +547,7 @@ pub mod local {
     pub async fn store_data_if_needed(
         org_id: &str,
         table_name: &str,
-        data: Arc<Vec<Value>>,
+        data: Values,
         updated_at: i64,
     ) -> Result<()> {
         let key = get_key(org_id, table_name);
@@ -430,7 +555,7 @@ pub mod local {
         let last_updated_at = metadata_content.get(&key).cloned().unwrap_or_default();
         if last_updated_at < updated_at || last_updated_at == 0 {
             delete(org_id, table_name).await?;
-            store(org_id, table_name, data.as_ref(), updated_at).await?;
+            store(org_id, table_name, data, updated_at).await?;
         }
         Ok(())
     }
@@ -438,16 +563,143 @@ pub mod local {
     pub async fn store_data_if_needed_background(
         org_id: &str,
         table_name: &str,
-        data: Arc<Vec<Value>>,
+        data: Values,
         updated_at: i64,
     ) -> Result<()> {
         let org_id = org_id.to_string();
         let table_name = table_name.to_string();
-        let data = data.clone();
         tokio::task::spawn(async move {
             store_data_if_needed(&org_id, &table_name, data, updated_at).await
         });
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::{
+        array::RecordBatch,
+        datatypes::{DataType, Field, Schema},
+    };
+
+    use crate::service::enrichment::storage::Values;
+
+    #[test]
+    fn test_values_conversions() {
+        // Test JSON -> JSON (no conversion)
+        let json_data = Arc::new(vec![
+            serde_json::json!({"name": "Alice", "age": 30}),
+            serde_json::json!({"name": "Bob", "age": 25}),
+        ]);
+        let value_type = Values::Json(Arc::clone(&json_data));
+        let result = value_type.to_json().unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0]["name"], "Alice");
+
+        // Test JSON -> VRL
+        let vrl_data = value_type.to_vrl().unwrap();
+        assert_eq!(vrl_data.len(), 2);
+
+        // Test VRL -> VRL (no conversion)
+        let value_type_vrl = Values::Vrl(Arc::clone(&vrl_data));
+        let result_vrl = value_type_vrl.to_vrl().unwrap();
+        assert_eq!(result_vrl.len(), 2);
+
+        // Test VRL -> JSON
+        let json_from_vrl = value_type_vrl.to_json().unwrap();
+        assert_eq!(json_from_vrl.len(), 2);
+    }
+
+    #[test]
+    fn test_values_record_batch_conversion() {
+        use arrow::array::{Int64Array, StringArray};
+
+        // Create a simple RecordBatch
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("age", DataType::Int64, false),
+        ]));
+
+        let name_array = StringArray::from(vec!["Alice", "Bob"]);
+        let age_array = Int64Array::from(vec![30, 25]);
+
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(name_array), Arc::new(age_array)],
+        )
+        .unwrap();
+
+        let value_type = Values::RecordBatch(vec![batch]);
+
+        // Test RecordBatch -> JSON
+        let json_data = value_type.to_json().unwrap();
+        assert_eq!(json_data.len(), 2);
+        assert_eq!(json_data[0]["name"], "Alice");
+        assert_eq!(json_data[0]["age"], 30);
+
+        // Test RecordBatch -> RecordBatch (no conversion)
+        let result_batch = value_type.to_record_batch(&schema).unwrap();
+        assert_eq!(result_batch.len(), 1);
+        assert_eq!(result_batch[0].num_rows(), 2);
+    }
+
+    #[test]
+    fn test_last_updated_at() {
+        use arrow::array::{Int64Array, StringArray};
+
+        // Create a schema with _timestamp column
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("_timestamp", DataType::Int64, false),
+        ]));
+
+        // Create first batch with timestamps
+        let name_array1 = StringArray::from(vec!["Alice", "Bob"]);
+        let timestamp_array1 = Int64Array::from(vec![1000, 2000]);
+
+        let batch1 = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(name_array1), Arc::new(timestamp_array1)],
+        )
+        .unwrap();
+
+        // Create second batch with timestamps
+        let name_array2 = StringArray::from(vec!["Charlie", "David"]);
+        let timestamp_array2 = Int64Array::from(vec![1500, 3000]);
+
+        let batch2 = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(name_array2), Arc::new(timestamp_array2)],
+        )
+        .unwrap();
+
+        // Test with multiple batches
+        let value_type = Values::RecordBatch(vec![batch1, batch2]);
+        let max_ts = value_type.last_updated_at();
+        assert_eq!(max_ts, 3000);
+
+        // Test with empty batches
+        let empty_value_type = Values::RecordBatch(vec![]);
+        let max_ts_empty = empty_value_type.last_updated_at();
+        assert_eq!(max_ts_empty, 0);
+
+        // Test with batch without _timestamp column
+        let schema_no_ts = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("age", DataType::Int64, false),
+        ]));
+        let name_array3 = StringArray::from(vec!["Eve"]);
+        let age_array3 = Int64Array::from(vec![25]);
+        let batch3 = RecordBatch::try_new(
+            schema_no_ts,
+            vec![Arc::new(name_array3), Arc::new(age_array3)],
+        )
+        .unwrap();
+        let value_type_no_ts = Values::RecordBatch(vec![batch3]);
+        let max_ts_no_ts = value_type_no_ts.last_updated_at();
+        assert_eq!(max_ts_no_ts, 0);
     }
 }
 
@@ -469,22 +721,6 @@ pub mod database {
 
         log::debug!("Stored enrichment table {table_name} to database");
         Ok(())
-    }
-
-    pub async fn retrieve(org_id: &str, table_name: &str) -> Result<Vec<Value>> {
-        match crate::service::db::enrichment_table::get_enrichment_data_from_db(org_id, table_name)
-            .await
-        {
-            Ok(data) => Ok(data.0),
-            Err(e) => {
-                log::error!("Failed to retrieve enrichment table {table_name} from database: {e}");
-                Err(anyhow::anyhow!(
-                    "Failed to retrieve enrichment table {}: {}",
-                    table_name,
-                    e
-                ))
-            }
-        }
     }
 
     pub async fn delete(org_id: &str, table_name: &str) -> Result<()> {

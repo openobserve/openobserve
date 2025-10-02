@@ -44,10 +44,9 @@ use crate::{
     handler::http::router::ERROR_HEADER,
     service::{
         db,
+        enrichment::storage::Values,
         format_stream_name,
-        // ingestion::write_file,
-        schema::{check_for_schema, stream_schema_exists},
-        // self_reporting::report_request_usage_stats,
+        schema::{check_for_schema, stream_schema_exists}, /* self_reporting::report_request_usage_stats, */
     },
 };
 
@@ -259,9 +258,13 @@ pub async fn save_enrichment_data(
     }
 
     // write data to local cache
-    if let Err(e) =
-        crate::service::enrichment::storage::local::store(org_id, stream_name, &records, timestamp)
-            .await
+    if let Err(e) = crate::service::enrichment::storage::local::store(
+        org_id,
+        stream_name,
+        Values::Json(std::sync::Arc::new(records)),
+        timestamp,
+    )
+    .await
     {
         log::error!("Error writing enrichment table to local cache: {e}");
     }

@@ -15,19 +15,23 @@
 
 use std::sync::Arc;
 
+use arrow::array::RecordBatch;
 use config::{
-    meta::stream::{EnrichmentTableMetaStreamStats, StreamType},
+    meta::stream::{EnrichmentTableMetaStreamStats, PartitionTimeLevel, StreamType},
     utils::{
         json,
+        record_batch_ext::convert_json_to_record_batch,
         time::{BASE_TIME, now_micros},
     },
 };
-use infra::{cache::stats, db as infra_db};
+use infra::{cache::stats, db as infra_db, storage};
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use rayon::prelude::*;
 use vrl::prelude::NotNan;
 
 use crate::{
     common::infra::config::ENRICHMENT_TABLES,
-    service::{db as db_service, enrichment::StreamTable, search as SearchService},
+    service::{db as db_service, enrichment::StreamTable},
 };
 
 /// Will no longer be used as we are using the meta stream stats to store start, end time and size
@@ -37,84 +41,98 @@ pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta
 pub async fn get_enrichment_table_data(
     org_id: &str,
     name: &str,
-) -> Result<Vec<serde_json::Value>, anyhow::Error> {
+) -> Result<Vec<RecordBatch>, anyhow::Error> {
     let start_time = get_start_time(org_id, name).await;
     let end_time = now_micros();
+    log::debug!("get enrichment table {org_id}/{name} data req start time: {start_time}");
 
-    let query = config::meta::search::Query {
-        sql: format!("SELECT * FROM \"{name}\""),
-        start_time,
-        end_time,
-        size: 100_000_000, // we have `ZO_QUERY_DEFAULT_LIMIT`, so -1 not work
-        ..Default::default()
-    };
+    let mut all_batches = Vec::new();
 
-    let req = config::meta::search::Request {
-        query,
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: None,
-        search_event_context: None,
-        use_cache: false,
-        local_mode: Some(true),
-    };
-    log::info!("get enrichment table {org_id}/{name} data req start time: {start_time}");
-    // do search
-    match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
-        Ok(res) => {
-            if !res.hits.is_empty() {
-                Ok(res.hits)
-            } else {
-                Ok(vec![])
-            }
-        }
-        Err(err) => {
-            log::error!("get enrichment table {org_id}/{name} data error: {err:?}");
-            Ok(vec![])
+    // Get schema for converting database data
+    let schema = infra::schema::get_cache(org_id, name, StreamType::EnrichmentTables)
+        .await?
+        .schema()
+        .clone();
+
+    // 1. Get data from database first (recent data) and convert to RecordBatch
+    if let Ok((db_data, ..)) = get_enrichment_data_from_db(org_id, name).await
+        && !db_data.is_empty()
+    {
+        log::debug!(
+            "get enrichment table {org_id}/{name} found {} records from database",
+            db_data.len()
+        );
+        // Convert JSON to RecordBatch
+        let data_refs: Vec<_> = db_data.iter().map(|row| Arc::new(row.clone())).collect();
+        match convert_json_to_record_batch(&schema, &data_refs) {
+            Ok(batch) => all_batches.push(batch),
+            Err(e) => log::error!("Failed to convert database data to RecordBatch: {e}"),
         }
     }
+
+    // 2. Get file list and read from S3 (with disk cache)
+    let files = match crate::service::file_list::query(
+        "",
+        org_id,
+        name,
+        StreamType::EnrichmentTables,
+        PartitionTimeLevel::Unset,
+        start_time,
+        end_time,
+    )
+    .await
+    {
+        Ok(files) => files,
+        Err(err) => {
+            log::error!("get enrichment table {org_id}/{name} file list error: {err:?}");
+            return Ok(all_batches);
+        }
+    };
+
+    if files.is_empty() {
+        log::debug!(
+            "get enrichment table {org_id}/{name} total batches: {}",
+            all_batches.iter().map(|b| b.num_rows()).sum::<usize>()
+        );
+        return Ok(all_batches);
+    }
+
+    log::debug!(
+        "get enrichment table {org_id}/{name} found {} files from S3",
+        files.len()
+    );
+
+    // 3. Read each file directly from S3 (with disk cache) as RecordBatch
+    for file in files.iter() {
+        match read_parquet_file_from_s3(&file.key).await {
+            Ok(batches) => all_batches.extend(batches),
+            Err(e) => log::error!(
+                "Failed to read file {org_id}/{name} from S3 {}: {e}",
+                file.key
+            ),
+        }
+    }
+
+    log::info!(
+        "get enrichment table {org_id}/{name} total rows: {}",
+        all_batches.iter().map(|b| b.num_rows()).sum::<usize>()
+    );
+    Ok(all_batches)
 }
 
-pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-    let start_time = get_start_time(org_id, name).await;
-    let end_time = now_micros();
+/// Helper function to read and parse a parquet file from S3
+async fn read_parquet_file_from_s3(file_key: &str) -> Result<Vec<RecordBatch>, anyhow::Error> {
+    let path = object_store::path::Path::from(file_key);
+    let account = storage::get_account(file_key).unwrap_or_default();
 
-    let query = config::meta::search::Query {
-        sql: format!("SELECT * FROM \"{name}\""),
-        start_time,
-        end_time,
-        size: -1, // -1 means no limit, enrichment table should not be limited
-        ..Default::default()
-    };
+    // Read file from S3 (with disk cache)
+    let result = infra::cache::storage::get(&account, &path).await?;
+    let bytes = result.bytes().await?;
 
-    let req = config::meta::search::Request {
-        query,
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: None,
-        search_event_context: None,
-        use_cache: false,
-        local_mode: Some(true),
-    };
-    log::debug!("get enrichment table {name} data req start time: {start_time}");
-    // do search
-    match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
-        Ok(res) => {
-            if !res.hits.is_empty() {
-                Ok(res.hits.iter().map(convert_to_vrl).collect())
-            } else {
-                Ok(vec![])
-            }
-        }
-        Err(err) => {
-            log::error!("get enrichment table data error: {err:?}");
-            Ok(vec![])
-        }
-    }
+    // Parse parquet file and collect all batches
+    let reader = ParquetRecordBatchReaderBuilder::try_new(bytes)?.build()?;
+    let batches: Result<Vec<_>, _> = reader.collect();
+    Ok(batches?)
 }
 
 pub fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
@@ -164,6 +182,110 @@ pub fn convert_from_vrl(value: &vrl::value::Value) -> json::Value {
         )),
         vrl::value::Value::Regex(_) => json::Value::String("regex".to_string()),
     }
+}
+
+/// Convert RecordBatch directly to VRL values without intermediate JSON
+/// Only handles data types supported by convert_json_to_record_batch:
+/// Utf8, Utf8View, LargeUtf8, Int64, UInt64, Float64, Boolean, Binary, Null
+pub fn convert_recordbatch_to_vrl(
+    batches: &[arrow::array::RecordBatch],
+) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
+    use arrow::{array::*, datatypes::DataType};
+
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(config::get_config().limit.cpu_num)
+        .build()?;
+
+    // Process batches in parallel, collecting rows from each batch
+    let vrl_records: Result<Vec<_>, _> = pool.install(|| {
+        batches
+            .par_iter()
+            .map(|batch| {
+                let schema = batch.schema();
+                let num_rows = batch.num_rows();
+
+                // Process rows within a batch in parallel
+                (0..num_rows)
+                    .into_par_iter()
+                    .map(|row_idx| {
+                        let mut record_map = vrl::value::ObjectMap::new();
+
+                        for (col_idx, field) in schema.fields().iter().enumerate() {
+                            let column = batch.column(col_idx);
+                            let field_name = field.name();
+
+                            if column.is_null(row_idx) {
+                                record_map.insert(field_name.clone().into(), vrl::value::Value::Null);
+                                continue;
+                            }
+
+                            let vrl_value = match field.data_type() {
+                                DataType::Boolean => {
+                                    let array =
+                                        column.as_any().downcast_ref::<BooleanArray>().unwrap();
+                                    vrl::value::Value::Boolean(array.value(row_idx))
+                                }
+                                DataType::Int64 => {
+                                    let array =
+                                        column.as_any().downcast_ref::<Int64Array>().unwrap();
+                                    vrl::value::Value::Integer(array.value(row_idx))
+                                }
+                                DataType::UInt64 => {
+                                    let array =
+                                        column.as_any().downcast_ref::<UInt64Array>().unwrap();
+                                    vrl::value::Value::Integer(array.value(row_idx) as i64)
+                                }
+                                DataType::Float64 => {
+                                    let array =
+                                        column.as_any().downcast_ref::<Float64Array>().unwrap();
+                                    vrl::value::Value::Float(
+                                        NotNan::new(array.value(row_idx))
+                                            .unwrap_or(NotNan::new(0.0).unwrap()),
+                                    )
+                                }
+                                DataType::Utf8 => {
+                                    let array =
+                                        column.as_any().downcast_ref::<StringArray>().unwrap();
+                                    vrl::value::Value::from(array.value(row_idx))
+                                }
+                                DataType::Utf8View => {
+                                    let array =
+                                        column.as_any().downcast_ref::<StringViewArray>().unwrap();
+                                    vrl::value::Value::from(array.value(row_idx))
+                                }
+                                DataType::LargeUtf8 => {
+                                    let array = column
+                                        .as_any()
+                                        .downcast_ref::<LargeStringArray>()
+                                        .unwrap();
+                                    vrl::value::Value::from(array.value(row_idx))
+                                }
+                                DataType::Binary => {
+                                    let array =
+                                        column.as_any().downcast_ref::<BinaryArray>().unwrap();
+                                    vrl::value::Value::Bytes(array.value(row_idx).to_vec().into())
+                                }
+                                DataType::Null => vrl::value::Value::Null,
+                                _ => {
+                                    return Err(anyhow::anyhow!(
+                                        "Unsupported data type for RecordBatch to VRL conversion: {:?}",
+                                        field.data_type()
+                                    ));
+                                }
+                            };
+
+                            record_map.insert(field_name.clone().into(), vrl_value);
+                        }
+
+                        Ok(vrl::value::Value::Object(record_map))
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .collect()
+    });
+
+    // Flatten the nested Vec<Vec<Value>> into Vec<Value>
+    vrl_records.map(|batches| batches.into_iter().flatten().collect())
 }
 
 pub async fn save_enrichment_data_to_db(
@@ -352,7 +474,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     Ok(data) => data,
                     Err(e) => {
                         log::error!("[ENRICHMENT::TABLE watch] get enrichment table error: {e}");
-                        vec![]
+                        Arc::new(vec![])
                     }
                 };
                 log::info!(
@@ -364,7 +486,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     StreamTable {
                         org_id: org_id.to_string(),
                         stream_name: stream_name.to_string(),
-                        data: data.into(),
+                        data,
                     },
                 );
             }
@@ -384,6 +506,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
+        // Use the optimized get_enrichment_table_data and convert to VRL
+        let batches = get_enrichment_table_data(org_id, name).await?;
+        convert_recordbatch_to_vrl(&batches)
+    }
 
     #[test]
     fn test_convert_to_vrl_string() {
@@ -698,6 +826,69 @@ mod tests {
         let expected_microseconds = timestamp.timestamp_nanos_opt().unwrap_or(0) / 1000;
         let expected_vrl = vrl::value::Value::Integer(expected_microseconds);
         assert_eq!(expected_vrl, back_to_vrl);
+    }
+
+    #[test]
+    fn test_convert_recordbatch_to_vrl() {
+        use arrow::{
+            array::{BooleanArray, Float64Array, Int64Array, StringArray},
+            datatypes::{DataType, Field, Schema},
+        };
+
+        // Create a simple RecordBatch
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("age", DataType::Int64, false),
+            Field::new("score", DataType::Float64, false),
+            Field::new("active", DataType::Boolean, false),
+        ]));
+
+        let name_array = StringArray::from(vec!["Alice", "Bob"]);
+        let age_array = Int64Array::from(vec![30, 25]);
+        let score_array = Float64Array::from(vec![95.5, 88.3]);
+        let active_array = BooleanArray::from(vec![true, false]);
+
+        let batch = arrow::array::RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![
+                Arc::new(name_array),
+                Arc::new(age_array),
+                Arc::new(score_array),
+                Arc::new(active_array),
+            ],
+        )
+        .unwrap();
+
+        // Test RecordBatch -> VRL direct conversion
+        let vrl_data = convert_recordbatch_to_vrl(&[batch]).unwrap();
+        assert_eq!(vrl_data.len(), 2);
+
+        // Verify first record
+        match &vrl_data[0] {
+            vrl::value::Value::Object(obj) => {
+                assert_eq!(obj.get("name"), Some(&vrl::value::Value::from("Alice")));
+                assert_eq!(obj.get("age"), Some(&vrl::value::Value::Integer(30)));
+                assert_eq!(obj.get("active"), Some(&vrl::value::Value::Boolean(true)));
+                // Check score is a float
+                match obj.get("score") {
+                    Some(vrl::value::Value::Float(f)) => {
+                        assert!((f.into_inner() - 95.5).abs() < 0.001);
+                    }
+                    _ => panic!("Expected float value for score"),
+                }
+            }
+            _ => panic!("Expected object value"),
+        }
+
+        // Verify second record
+        match &vrl_data[1] {
+            vrl::value::Value::Object(obj) => {
+                assert_eq!(obj.get("name"), Some(&vrl::value::Value::from("Bob")));
+                assert_eq!(obj.get("age"), Some(&vrl::value::Value::Integer(25)));
+                assert_eq!(obj.get("active"), Some(&vrl::value::Value::Boolean(false)));
+            }
+            _ => panic!("Expected object value"),
+        }
     }
 
     #[test]
