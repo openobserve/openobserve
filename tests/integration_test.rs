@@ -3205,14 +3205,11 @@ mod tests {
         // Create the pipeline
         let req = test::TestRequest::post()
             .uri("/api/e2e/pipelines")
-            .append_header(auth.clone())
+            .append_header(auth)
             .set_json(&pipeline_data)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        println!(
-            "test derived stream invalid timerange with cron frequency resp: {:?}",
-            resp
-        );
+        println!("test derived stream invalid timerange with cron frequency resp: {resp:?}");
         assert!(resp.status().is_success());
 
         let pipeline = get_pipeline_from_api(pipeline_data.name.as_str()).await;
@@ -3410,7 +3407,7 @@ mod tests {
         )
         .await;
 
-        println!("schema_exists: {:?}", schema_exists);
+        println!("schema_exists: {schema_exists:?}");
 
         assert!(schema_exists.has_fields);
 
@@ -3449,7 +3446,7 @@ mod tests {
         assert!(data.is_ok());
         let data = data.unwrap();
         assert!(data.len() == 2);
-        println!("save enrichment data new tabledata: {:?}", data);
+        println!("save enrichment data new tabledata: {data:?}");
         println!(
             "save enrichment data new table data[0]: {:?}",
             data[0].get("name").unwrap().to_string()
@@ -3472,19 +3469,13 @@ mod tests {
 
         // Check the ENRICHMENT_TABLES cache to check if the table is created
         let enrichment_tables = ENRICHMENT_TABLES.clone();
-        println!(
-            "save enrichment data new table enrichment_tables: {:?}",
-            enrichment_tables
-        );
+        println!("save enrichment data new table enrichment_tables: {enrichment_tables:?}");
         assert!(enrichment_tables.contains_key(&schema_key));
         assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 2);
 
         drop(enrichment_tables);
 
-        println!(
-            "save enrichment data new table meta_table_stats: {:?}",
-            meta_table_stats
-        );
+        println!("save enrichment data new table meta_table_stats: {meta_table_stats:?}");
         // Also, it should store the cache in the disk
         check_enrichment_table_local_disk_cache(org_id, table_name, meta_table_stats.end_time)
             .await;
@@ -3528,10 +3519,7 @@ mod tests {
 
         // Check the ENRICHMENT_TABLES cache to check if the table is deleted
         let enrichment_tables = ENRICHMENT_TABLES.clone();
-        println!(
-            "enrichment data cleanup enrichment_tables: {:?}",
-            enrichment_tables
-        );
+        println!("enrichment data cleanup enrichment_tables: {enrichment_tables:?}");
         assert!(!enrichment_tables.contains_key(&schema_key));
         drop(enrichment_tables);
 

@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use o2_enterprise::enterprise::ai::meta::AiMessage;
+use o2_enterprise::enterprise::ai::meta::{AiMessage, Role};
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use utoipa::ToSchema;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -25,11 +26,13 @@ pub struct PromptRequest {
     pub model: String,
     #[serde(default)]
     pub provider: String,
+    #[serde(default)]
+    pub context: Map<String, Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct PromptResponse {
-    pub role: String,
+    pub role: Role,
     pub content: String,
 }
 

@@ -17,8 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup>
 import { Handle } from "@vue-flow/core";
 import useDragAndDrop from "./useDnD";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { getImageURL } from "@/utils/zincutils";
 import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
@@ -47,10 +49,150 @@ const props = defineProps({
 const emit = defineEmits(["delete:node"]);
 const { pipelineObj, deletePipelineNode,onDragStart,onDrop, checkIfDefaultDestinationNode } = useDragAndDrop();
 const menu = ref(false)
+const showButtons = ref(false)
+const showDeleteTooltip = ref(false)
+let hideButtonsTimeout = null
 
-const hanldeMouseOver = () => {
-  console.log("mouse over")
-}
+// Check if current node has errors
+const hasNodeError = computed(() => {
+  const lastError = pipelineObj.currentSelectedPipeline?.last_error;
+  if (!lastError || !lastError.node_errors) return false;
+
+  // node_errors is a JSON object with node IDs as keys
+  const nodeErrors = lastError.node_errors;
+  return nodeErrors && nodeErrors[props.id];
+});
+
+// Get error info for current node
+const getNodeErrorInfo = computed(() => {
+  const lastError = pipelineObj.currentSelectedPipeline?.last_error;
+  if (!lastError || !lastError.node_errors) return null;
+
+  const nodeError = lastError.node_errors[props.id];
+  if (!nodeError) return null;
+
+  // node_errors is an object with structure: { node_id: { errors: [...], error_count: N, ... } }
+  if (nodeError.errors && Array.isArray(nodeError.errors) && nodeError.errors.length > 0) {
+    const errorText = nodeError.errors.join('\n\n');
+    if (nodeError.error_count > nodeError.errors.length) {
+      return `${errorText}\n\n... and ${nodeError.error_count - nodeError.errors.length} more errors`;
+    }
+    return errorText;
+  }
+
+  return null;
+});
+
+// Edge color mapping for different node types
+const getNodeColor = (ioType) => {
+  const colorMap = {
+    input: '#3b82f6',      // Blue
+    output: '#22c55e',     // Green  
+    default: '#f59e0b'     // Orange/Amber
+  };
+  return colorMap[ioType] || '#6b7280';
+};
+
+// Function to update edge colors on node hover
+const updateEdgeColors = (nodeId, color, reset = false) => {
+  if (pipelineObj.currentSelectedPipeline?.edges) {
+    pipelineObj.currentSelectedPipeline.edges.forEach(edge => {
+      if (edge.source === nodeId) {
+        if (reset) {
+          // Reset to default color
+          edge.style = { 
+            ...edge.style, 
+            stroke: '#6b7280', 
+            strokeWidth: 2 
+          };
+          edge.markerEnd = {
+            ...edge.markerEnd,
+            color: '#6b7280'
+          };
+        } else {
+          // Apply node color to both edge and arrow
+          edge.style = { 
+            ...edge.style, 
+            stroke: color, 
+            strokeWidth: 2 
+          };
+          edge.markerEnd = {
+            ...edge.markerEnd,
+            color: color
+          };
+        }
+      }
+    });
+  }
+};
+
+// Node hover handlers
+const handleNodeHover = (nodeId, ioType) => {
+  const color = getNodeColor(ioType);
+  updateEdgeColors(nodeId, color, false);
+  
+  // Clear any existing timeout
+  if (hideButtonsTimeout) {
+    window.clearTimeout(hideButtonsTimeout);
+    hideButtonsTimeout = null;
+  }
+  
+  showButtons.value = true;
+};
+
+const handleNodeLeave = (nodeId) => {
+  updateEdgeColors(nodeId, null, true);
+  
+  // Add delay before hiding buttons
+  hideButtonsTimeout = window.setTimeout(() => {
+    showButtons.value = false;
+  }, 200);
+};
+
+// Handle mouse enter on action buttons to prevent hiding
+const handleActionButtonsEnter = () => {
+  if (hideButtonsTimeout) {
+    window.clearTimeout(hideButtonsTimeout);
+    hideButtonsTimeout = null;
+  }
+};
+
+// Handle mouse leave on action buttons to hide after delay
+const handleActionButtonsLeave = () => {
+  hideButtonsTimeout = window.setTimeout(() => {
+    showButtons.value = false;
+  }, 200);
+};
+
+// Handle delete tooltip show/hide
+const handleDeleteTooltipEnter = () => {
+  showDeleteTooltip.value = true;
+};
+
+const handleDeleteTooltipLeave = () => {
+  showDeleteTooltip.value = false;
+};
+
+// Navigate to function page to fix the error
+const navigateToFunction = (functionName) => {
+  const errorInfo = getNodeErrorInfo.value;
+  const query = {
+    action: "update",
+    name: functionName,
+    org_identifier: store.state.selectedOrganization.identifier,
+  };
+
+  // Add error message to query if available
+  if (errorInfo) {
+    query.error = errorInfo;
+  }
+
+  router.push({
+    name: "functionList",
+    query,
+  });
+};
+
 
 
 const onFunctionClick = (data,event,id) =>{
@@ -135,6 +277,8 @@ const onExternalDestinationClick = (data,event,id) =>{
 }
 
 const { t } = useI18n();
+const router = useRouter();
+const store = useStore();
 
 
 const editNode = (id) => {
@@ -156,6 +300,14 @@ const  functionInfo = (data) =>  {
 
       return pipelineObj.functions[data.name] || null;
   }
+
+const getTruncatedConditions = (conditions) => {
+  const allConditionsText = conditions.map(condition => 
+    `${condition.column} ${condition.operator} ${condition.value}`
+  ).join(', ');
+  
+  return allConditionsText.length > 30 ? allConditionsText.substring(0, 30) + '...' : allConditionsText;
+}
 
 const confirmDialogMeta = ref({
   show: false,
@@ -200,87 +352,41 @@ function getIcon(data, ioType) {
 
 <template>
   <!-- Input Handle (Target) -->
-  <div class="o2vf_node">
+  <div class="">
     <Handle
       v-if="io_type == 'output' || io_type === 'default'"
       id="input"
       type="target"
       :position="'top'"
-      class="node_handle_custom"
-     
+      :class="`node_handle_custom handle_${io_type}`"
+      :data-test="`pipeline-node-${io_type}-input-handle`"
     />
 
     <div
       v-if="data.node_type == 'function'"
-      :class="`o2vf_node_${io_type}`"
-      class="custom-btn q-pa-none btn-fixed-width"
+      class="q-pa-none btn-fixed-width"
+      :data-test="`pipeline-node-${io_type}-function-node`"
+      data-node-type="function"
       style="
-      padding: 5px 2px;
+      padding: 5px 0px;
         width: fit-content;
         display: flex;
         align-items: center;
         border: none;
         cursor: pointer;
       "
-      @mouseover="menu = true"
-      @mouseleave="menu = false"
+      @mouseenter="handleNodeHover(id, io_type)"
+      @mouseleave="handleNodeLeave(id)"
+      @click="editNode(id)"
     >
-      <q-menu      @mouseover="menu = true" @mouseleave="menu = false"  v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
-    <q-list >
-    
-      <q-item clickable @click="(event) => onFunctionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
-          <q-tooltip  anchor="top middle" self="bottom right">Function</q-tooltip>
 
-        </q-item-section>
-
-      </q-item>
-      <q-item clickable @click="(event) => onConditionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Condition</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item clickable @click="(event) => onStreamOutputClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-          <q-item
-              v-if="config.isEnterprise == 'true'"
-            clickable
-            @click="(event) => onExternalDestinationClick(data, event, id)"
-          >
-        <q-item-section avatar>
-          <img :src="externalOutputImage" alt="Remote Destination" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <!-- Add more items similarly for other images -->
-    </q-list>
-  </q-menu>
-
-    <q-tooltip :style="{ maxWidth: '300px', whiteSpace: 'pre-wrap' }">
-  <div>
-    <strong>Name:</strong> {{ functionInfo(data).name }}<br />
-    <strong>Definition:</strong><br />
-    <div style="border: 1px solid lightgray; padding: 4px; border-radius: 1px ;">
-      {{ functionInfo(data).function }}
-    </div>
-  </div>
-</q-tooltip>
 
       <div class="icon-container " style="display: flex; align-items: center">
         <!-- Icon -->
         <q-icon
           :name="getIcon(data, io_type)"
-          size="1em"
-          class="q-ma-sm"
+          size="1.5em"
+          class="q-my-sm q-mr-sm"
         />
       </div>
 
@@ -290,7 +396,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="row"
+          class="row node-label-text"
           align="left"
           style="
             text-align: left;
@@ -299,101 +405,80 @@ function getIcon(data, ioType) {
             text-overflow: ellipsis;
           "
         >
-          {{ data.name }}
-        </div>
-        <div class="row">
-          <div style="text-transform: capitalize">
-            Run
-            {{
-              data.after_flatten ? "After Flattening" : "Before Flattening"
-            }}
-          </div>
+          {{ data.name }} - <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
         </div>
       </div>
-      <div class="float-right tw-pl-2">
-        <q-btn
-          flat
-          round
-          dense
-          icon="edit"
-          size="0.8em"
-          @click="editNode(id)"
-        />
+
+      <!-- Error Badge for Function Nodes -->
+      <div
+        v-if="hasNodeError"
+        class="error-badge"
+        @click.stop="navigateToFunction(data.name)"
+      >
+        <q-icon name="error" size="sm" />
+        <span v-if="pipelineObj.currentSelectedPipeline?.last_error?.node_errors?.[id]?.error_count" class="error-count">
+          {{ pipelineObj.currentSelectedPipeline.last_error.node_errors[id].error_count }}
+        </span>
+        <q-tooltip
+          anchor="top middle"
+          self="bottom middle"
+          :offset="[0, 10]"
+          max-width="600px"
+          class="pipeline-error-tooltip"
+        >
+          <div style="max-height: 300px; overflow-y: auto;">
+            {{ getNodeErrorInfo || 'Error occurred' }}
+          </div>
+        </q-tooltip>
+      </div>
+
+      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
+
         <q-btn
           flat
           round
           dense
           icon="delete"
-          size="0.8em"
-          @click="deleteNode(id)"
+          size="0.6em"
+          @click.stop="deleteNode(id)"
+          class="node-action-btn delete-btn"
+          :data-test="`pipeline-node-${io_type}-delete-btn`"
+          @mouseenter="handleDeleteTooltipEnter"
+          @mouseleave="handleDeleteTooltipLeave"
         />
+        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
+          Delete Node
+          <div class="tooltip-arrow delete-arrow"></div>
+        </div>
       </div>
     </div>
 
     <div
       v-if="data.node_type == 'stream'"
-      :class="`o2vf_node_${io_type}`"
-      class="custom-btn q-pa-none btn-fixed-width"
+      class=" q-pa-none btn-fixed-width"
+      :data-test="`pipeline-node-${io_type}-stream-node`"
+      data-node-type="stream"
       style="
         width: fit-content;
         display: flex;
         align-items: center;
         border: none;
         cursor: pointer;
-        padding: 5px 2px;
+        padding: 5px 0px;
 
       "
-       @mouseover="menu = true"
-      @mouseleave="menu = false"
-    >
-
-       <q-menu v-if="io_type == 'input'" @mouseover="menu = true" @mouseleave="menu = false"   v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
-    <q-list >
-      <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
-          <q-tooltip  anchor="top middle" self="bottom right">Function</q-tooltip>
-        </q-item-section>
-      
-
-      </q-item>
-      <q-item clickable @click="(event) => onConditionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Condition</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item clickable  @click="(event) => onStreamOutputClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item
-            v-if="config.isEnterprise == 'true'"
-            clickable
-            @click="(event) => onExternalDestinationClick(data, event, id)"
-          >
-        <q-item-section avatar>
-          <img :src="externalOutputImage" alt="Remote Destination" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <!-- Add more items similarly for other images -->
-    </q-list>
-  </q-menu>
-
+      @mouseenter="handleNodeHover(id, io_type)"
+      @mouseleave="handleNodeLeave(id)"
+      @click="editNode(id)"
+     >
   
 
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <q-icon
           :name="getIcon(data, io_type)"
-          size="1em"
-          class="q-ma-sm"
+           size="1.5em"
+          class="q-my-sm q-mr-sm"
         />
       </div>
 
@@ -404,7 +489,7 @@ function getIcon(data, ioType) {
       <div class="container">
         <div
         v-if=" data.stream_name &&  data.stream_name.hasOwnProperty('label')"
-          class="row"
+          class="row node-label-text"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -416,7 +501,7 @@ function getIcon(data, ioType) {
         </div>
         <div
         v-else
-          class="row"
+          class="row node-label-text"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -427,89 +512,52 @@ function getIcon(data, ioType) {
           {{ data.stream_type }} - {{    data.stream_name }}
         </div>
       </div>
-      <div class="float-right tw-pl-2">
-        <q-btn
-          flat
-          round
-          dense
-          icon="edit"
-          size="0.8em"
-          @click="editNode(id)"
-        />
+      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
+        
         <q-btn
           flat
           round
           dense
           icon="delete"
-          size="0.8em"
-          @click="deleteNode(id)"
+          size="0.6em"
+          @click.stop="deleteNode(id)"
+          class="node-action-btn delete-btn"
+          :data-test="`pipeline-node-${io_type}-delete-btn`"
+          @mouseenter="handleDeleteTooltipEnter"
+          @mouseleave="handleDeleteTooltipLeave"
         />
+        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
+          Delete Node
+          <div class="tooltip-arrow delete-arrow"></div>
+        </div>
       </div>
     </div>
     <div
       v-if="data.node_type == 'remote_stream'"
-      :class="`o2vf_node_${io_type}`"
-      class="custom-btn q-pa-none btn-fixed-width"
+      class=" q-pa-none btn-fixed-width"
+      :data-test="`pipeline-node-${io_type}-remote-stream-node`"
+      data-node-type="remote_stream"
       style="
         width: fit-content;
         display: flex;
         align-items: center;
         border: none;
         cursor: pointer;
-        padding: 5px 2px;
+        padding: 5px 0px;
 
       "
-       @mouseover="menu = true"
-      @mouseleave="menu = false"
-    >
+      @mouseenter="handleNodeHover(id, io_type)"
+      @mouseleave="handleNodeLeave(id)"
+      @click="editNode(id)"
+     >
 
-       <q-menu v-if="io_type == 'input'" @mouseover="menu = true" @mouseleave="menu = false"   v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
-    <q-list >
-      <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
-          <q-tooltip  anchor="top middle" self="bottom right">Function</q-tooltip>
-        </q-item-section>
-      
-
-      </q-item>
-      <q-item clickable @click="(event) => onConditionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Condition</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item clickable  @click="(event) => onStreamOutputClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item
-            v-if="config.isEnterprise == 'true'"
-            clickable
-            @click="(event) => onExternalDestinationClick(data, event, id)"
-          >
-        <q-item-section avatar>
-          <img :src="externalOutputImage" alt="Remote Destination" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <!-- Add more items similarly for other images -->
-    </q-list>
-  </q-menu>
-
-  
 
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <q-icon
           :name="getIcon(data, io_type)"
-          size="1em"
-          class="q-ma-sm"
+          size="1.5em"
+          class="q-my-sm q-mr-sm"
         />
       </div>
 
@@ -519,7 +567,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="row"
+          class="row node-label-text"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -530,99 +578,52 @@ function getIcon(data, ioType) {
           {{ data.destination_name }}
         </div>
       </div>
-      <div class="float-right tw-pl-2">
-        <q-btn
-          flat
-          round
-          dense
-          icon="edit"
-          size="0.8em"
-          @click="editNode(id)"
-        />
+      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
+        
         <q-btn
           flat
           round
           dense
           icon="delete"
-          size="0.8em"
-          @click="deleteNode(id)"
+          size="0.6em"
+          @click.stop="deleteNode(id)"
+          class="node-action-btn delete-btn"
+          :data-test="`pipeline-node-${io_type}-delete-btn`"
+          @mouseenter="handleDeleteTooltipEnter"
+          @mouseleave="handleDeleteTooltipLeave"
         />
+        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
+          Delete Node
+          <div class="tooltip-arrow delete-arrow"></div>
+        </div>
       </div>
     </div>
 
     <div
       v-if="data.node_type == 'query'"
-      :class="`o2vf_node_${io_type}`"
-      class="custom-btn q-pa-none btn-fixed-width"
+      class=" q-pa-none btn-fixed-width"
+      :data-test="`pipeline-node-${io_type}-query-node`"
+      data-node-type="query"
       style="
         width: fit-content;
         display: flex;
         align-items: center;
         border: none;
         cursor: pointer;
-        padding: 5px 2px;
+        padding: 5px 0px;
 
       "
-       @mouseover="menu = true"
-      @mouseleave="menu = false"
-    >
-    <q-menu  v-model="menu" @mouseover="menu = true" @mouseleave="menu = false"  name="myMenu" class="menu-list" anchor="top right" self="top left">
-    <q-list >
-      <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
-          <q-tooltip  anchor="top middle" self="bottom right">Function</q-tooltip>
-
-        </q-item-section>
-
-      </q-item>
-      <q-item clickable @click="(event) => onConditionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Condition</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item clickable  @click="(event) => onStreamOutputClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item 
-            v-if="config.isEnterprise == 'true'"
-            clickable
-            @click="(event) => onExternalDestinationClick(data, event, id)"
-          >
-        <q-item-section avatar>
-          <img :src="externalOutputImage" alt="Remote Destination" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <!-- Add more items similarly for other images -->
-    </q-list>
-  </q-menu>
-
-    <q-tooltip :style="{ maxWidth: '300px', whiteSpace: 'pre-wrap' }">
-  <div>
-    <strong>{{  data.query_condition.type == 'sql' ? 'SQL' : 'PromQL' }}:</strong> <pre style="max-width: 200px ; text-wrap: wrap;">{{  data.query_condition.type == 'sql' ? data.query_condition.sql : data.query_condition.promql }}</pre><br />
-    <strong>Period:</strong> {{ data.trigger_condition.period }}<br />
-    <strong>Frequency:</strong> {{ data.trigger_condition.frequency }} {{ data.trigger_condition.frequency_type }}<br />
-    <strong>Operator:</strong> {{ data.trigger_condition.operator }}<br />
-    <strong>Threshold:</strong> {{ data.trigger_condition.threshold }}<br />
-    <strong>Cron:</strong> {{ data.trigger_condition.cron || 'None' }}<br />
-    <strong>Silence:</strong> {{ data.trigger_condition.silence }}
-  </div>
-</q-tooltip>
+      @mouseenter="handleNodeHover(id, io_type)"
+      @mouseleave="handleNodeLeave(id)"
+      @click="editNode(id)"
+     >
 
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <q-icon
           :name="getIcon(data, io_type)"
-          size="1em"
-          class="q-ma-sm"
+          size="1.5em"
+          class="q-my-sm q-mr-sm"
         />
       </div>
 
@@ -632,7 +633,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="row"
+          class="row node-label-text"
           style="
             text-align: left;
             text-wrap: wrap;
@@ -644,31 +645,32 @@ function getIcon(data, ioType) {
         </div>
       </div>
 
-      <div class="float-right">
-        <q-btn
-          flat
-          round
-          dense
-          icon="edit"
-          size="0.8em"
-          @click="editNode(id)"
-          style="margin-right: 5px"
-        />
+      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
+        
         <q-btn
           flat
           round
           dense
           icon="delete"
-          size="0.8em"
-          @click="deleteNode(id)"
+          size="0.6em"
+          @click.stop="deleteNode(id)"
+          class="node-action-btn delete-btn"
+          :data-test="`pipeline-node-${io_type}-delete-btn`"
+          @mouseenter="handleDeleteTooltipEnter"
+          @mouseleave="handleDeleteTooltipLeave"
         />
+        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
+          Delete Node
+          <div class="tooltip-arrow delete-arrow"></div>
+        </div>
       </div>
     </div>
 
     <div
       v-if="data.node_type == 'condition'"
-      :class="`o2vf_node_${io_type}`"
-      class="custom-btn q-pa-none btn-fixed-width"
+      class=" q-pa-none btn-fixed-width"
+      :data-test="`pipeline-node-${io_type}-condition-node`"
+      data-node-type="condition"
       style="
         width: fit-content;
         display: flex;
@@ -676,53 +678,17 @@ function getIcon(data, ioType) {
         border: none;
         cursor: pointer;
       "
-       @mouseover="menu = true"
-      @mouseleave="menu = false"
-    >
-    <q-menu   v-model="menu" @mouseover="menu = true" @mouseleave="menu = false"  name="myMenu" class="menu-list" anchor="top right" self="top left">
-    <q-list >
-
-      <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
-          <q-tooltip  anchor="top middle" self="bottom right">Function</q-tooltip>
-        </q-item-section>
-      </q-item>
-      <q-item clickable @click="(event) => onConditionClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Condition</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item class="q-item-output" clickable  @click="(event) => onStreamOutputClick(data, event,id)">
-        <q-item-section avatar>
-          <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <q-item 
-            v-if="config.isEnterprise == 'true'"
-            clickable
-            @click="(event) => onExternalDestinationClick(data, event, id)"
-          >
-        <q-item-section avatar>
-          <img :src="externalOutputImage" alt="Remote Destination" style="width: 30px; height: 30px;">
-          <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
-
-        </q-item-section>
-      </q-item>
-      <!-- Add more items similarly for other images -->
-    </q-list>
-  </q-menu>
+      @mouseenter="handleNodeHover(id, io_type)"
+      @mouseleave="handleNodeLeave(id)"
+      @click="editNode(id)"
+     >
 
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <q-icon
           :name="getIcon(data, io_type)"
-          size="1em"
-          class="q-ma-sm"
+          size="1.5em"
+          class="q-my-sm q-mr-sm"
         />
       </div>
 
@@ -732,6 +698,7 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
+    class="node-label-text"
     style="
       text-align: left;
       text-wrap: wrap;
@@ -739,30 +706,28 @@ function getIcon(data, ioType) {
       text-overflow: ellipsis;
     "
   >
-    <div class="column" v-for="(condition, index) in data.conditions" :key="index" style="margin-bottom: 1px;">
-      {{ condition.column }} {{ condition.operator }} {{ condition.value }}
-    </div>
+    {{ getTruncatedConditions(data.conditions) }}
   </div>
       </div>
 
-      <div class="float-right">
-        <q-btn
-          flat
-          round
-          dense
-          icon="edit"
-          size="0.8em"
-          @click="editNode(id)"
-          style="margin-right: 5px"
-        />
+      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
+        
         <q-btn
           flat
           round
           dense
           icon="delete"
-          size="0.8em"
-          @click="deleteNode(id)"
+          size="0.6em"
+          @click.stop="deleteNode(id)"
+          class="node-action-btn delete-btn"
+          :data-test="`pipeline-node-${io_type}-delete-btn`"
+          @mouseenter="handleDeleteTooltipEnter"
+          @mouseleave="handleDeleteTooltipLeave"
         />
+        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
+          Delete Node
+          <div class="tooltip-arrow delete-arrow"></div>
+        </div>
       </div>
     </div>
     <Handle
@@ -770,8 +735,8 @@ function getIcon(data, ioType) {
       id="output"
       type="source"
       :position="'bottom'"
-      class="node_handle_custom"
-      
+      :class="`node_handle_custom handle_${io_type}`"
+      :data-test="`pipeline-node-${io_type}-output-handle`"
     />
   </div>
 
@@ -786,12 +751,59 @@ function getIcon(data, ioType) {
 </template>
 
 <style lang="scss">
-.node_handle_custom{
-  background-color:#9a9698;
-    height:10px;
-    width:30px;
-    border-radius:4px;
-  filter: invert(100%);
+.node_handle_custom {
+  width: 16px !important;
+  height: 16px !important;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50% !important;
+  background: #6b7280;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #374151;
+    transition: all 0.3s ease;
+  }
+
+}
+
+// Input nodes - Blue theme
+.handle_input {
+  background: #dbeafe !important;
+  
+  &::before {
+    background: #3b82f6 !important;
+  }
+  
+}
+
+// Output nodes - Green theme  
+.handle_output {
+  background: #dcfce7 !important;
+  
+  &::before {
+    background: #22c55e !important;
+  }
+  
+}
+
+// Transform nodes (default) - Orange theme
+.handle_default {
+  background: #fef3c7 !important;
+  
+  &::before {
+    background: #f59e0b !important;
+  }
+  
 }
 .vue-flow__node-custom {
   padding: 10px;
@@ -805,9 +817,558 @@ function getIcon(data, ioType) {
   background-color: var(--vf-node-bg);
   border-color: var(--vf-node-color);
 }
+
+// Remove only transform effects but keep visual styling
+.o2vf_node_input,
+.o2vf_node_output,
+.o2vf_node_default,
+.custom-btn {
+  &:hover {
+    transform: none !important;
+  }
+}
+
 .menu-list{
   margin: 0px 10px;
   background-color: white;
+}
+
+// Node action buttons - hover to show with matching colors
+.node-action-buttons {
+  position: absolute;
+  top: -30px;
+  right: 0px;
+  display: flex;
+  gap: 6px;
+  transition: all 0.3s ease;
+  z-index: 10;
+  padding: 5px 5px 10px 5px;
+}
+
+.node-action-btn {
+  min-width: 20px !important;
+  width: 20px !important;
+  height: 20px !important;
+  padding: 0 !important;
+  border-radius: 4px !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid var(--node-color) !important;
+  color: var(--node-color) !important;
+  transition: all 0.2s ease !important;
+  
+  .q-icon {
+    font-size: 1.3em !important;
+  }
+  
+  &:hover {
+    background: var(--node-color) !important;
+    color: white !important;
+    transform: scale(1.1) !important;
+  }
+}
+
+
+.delete-btn:hover {
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3) !important;
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
+}
+
+// Custom tooltips with arrow pointers
+.custom-tooltip {
+  position: fixed;
+  background: #dc2626;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+
+.delete-tooltip {
+  background: #dc2626;
+}
+
+.tooltip-arrow {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid;
+}
+
+.delete-arrow {
+  border-top-color: #dc2626;
+}
+
+// Pipeline error tooltip styling
+.pipeline-error-tooltip {
+  background: #ef4444 !important;
+  color: white !important;
+  font-size: 12px !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  line-height: 1.5 !important;
+  padding: 10px 14px !important;
+
+  div {
+    max-height: 300px;
+    overflow-y: auto;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 3px;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.5);
+      }
+    }
+  }
+}
+
+// Error badge styling
+.error-badge {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  width: 20px;
+  height: 20px;
+  background: #ef4444;
+  border: 2px solid white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 15;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.5);
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: scale(1.2);
+    box-shadow: 0 3px 10px rgba(239, 68, 68, 0.7);
+    z-index: 20;
+  }
+
+  .q-icon {
+    font-size: 0.9em !important;
+    color: white !important;
+  }
+
+  .error-count {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #dc2626;
+    color: white;
+    font-size: 9px;
+    font-weight: bold;
+    min-width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+    border: 1.5px solid white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+}
+
+// Node label text styling
+.node-label-text {
+  font-size: 15px !important;
+  font-weight: 900 !important;
+  line-height: 1.4 !important;
+}
+
+// Function Details Dialog Styles
+.function-details-dialog {
+  .q-dialog__inner {
+    padding: 0;
+  }
+}
+
+// Condition Details Dialog Styles
+.condition-details-dialog {
+  .q-dialog__inner {
+    padding: 0;
+  }
+}
+
+// Query Details Dialog Styles
+.query-details-dialog {
+  .q-dialog__inner {
+    padding: 0;
+  }
+}
+
+.function-details-card {
+  border-radius: 0;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.function-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.function-name-section,
+.function-timing-section,
+.function-definition-section {
+  .text-subtitle1 {
+    color: #1976d2;
+    margin-bottom: 8px;
+    display: block;
+  }
+}
+
+.function-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  padding: 8px 12px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  border-left: 4px solid #1976d2;
+}
+
+.function-timing {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  border-left: 4px solid #28a745;
+}
+
+.function-definition {
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
+}
+
+.function-code {
+  color: #333;
+  background-color: transparent;
+  margin: 0;
+  padding: 12px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+}
+
+// Dark mode support
+.body--dark {
+  .function-details-card {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    
+    .q-card-section {
+      background-color: #1e1e1e;
+    }
+  }
+  
+  .function-name {
+    background-color: #2d2d2d;
+    color: #ffffff;
+    border-left-color: #64b5f6;
+  }
+  
+  .function-timing {
+    background-color: #2d2d2d;
+    color: #ffffff;
+    border-left-color: #4caf50;
+  }
+  
+  .function-definition {
+    background-color: #2d2d2d;
+    border-color: #444;
+  }
+  
+  .function-code {
+    color: #ffffff;
+  }
+  
+  .function-definition-section .text-subtitle1,
+  .function-name-section .text-subtitle1,
+  .function-timing-section .text-subtitle1 {
+    color: #64b5f6;
+  }
+}
+
+// Condition Details Styles
+.condition-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.conditions-list-section {
+  .text-subtitle1 {
+    color: #1976d2;
+    margin-bottom: 12px;
+    display: block;
+  }
+}
+
+.conditions-container {
+  background-color: #f5f5f5;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  padding: 16px;
+}
+
+.condition-item {
+  margin-bottom: 12px;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.condition-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background-color: #ffffff;
+  border-radius: 4px;
+  border-left: 4px solid #1976d2;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.condition-field {
+  font-weight: 600;
+  color: #1976d2;
+  min-width: 80px;
+}
+
+.condition-operator {
+  font-weight: 500;
+  color: #666;
+  background-color: #e3f2fd;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.condition-value {
+  font-weight: 500;
+  color: #333;
+  background-color: #f0f0f0;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+}
+
+.and-operator {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0;
+}
+
+.and-text {
+  background-color: #28a745;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 12px;
+  text-align: center;
+  min-width: 40px;
+}
+
+// Dark mode support for conditions
+.body--dark {
+  .conditions-container {
+    background-color: #2d2d2d;
+    border-color: #444;
+  }
+  
+  .condition-row {
+    background-color: #3a3a3a;
+    border-left-color: #64b5f6;
+  }
+  
+  .condition-field {
+    color: #64b5f6;
+  }
+  
+  .condition-operator {
+    background-color: #1e3a8a;
+    color: #bfdbfe;
+  }
+  
+  .condition-value {
+    background-color: #4a4a4a;
+    color: #ffffff;
+  }
+  
+  .conditions-list-section .text-subtitle1 {
+    color: #64b5f6;
+  }
+}
+
+// Query Details Styles
+.query-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.query-type-section,
+.query-content-section,
+.trigger-details-section {
+  .text-subtitle1 {
+    color: #1976d2;
+    margin-bottom: 12px;
+    display: block;
+  }
+}
+
+.query-type {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  padding: 8px 12px;
+  background-color: #e3f2fd;
+  border-radius: 4px;
+  border-left: 4px solid #1976d2;
+  text-align: center;
+  max-width: 100px;
+}
+
+.query-content {
+  background-color: #f5f5f5;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.query-code {
+  color: #333;
+  background-color: transparent;
+  margin: 0;
+  padding: 16px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+  min-height: 80px;
+  border: none;
+  resize: none;
+}
+
+.trigger-details {
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trigger-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #e9ecef;
+  
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.trigger-label {
+  font-weight: 600;
+  color: #495057;
+  min-width: 80px;
+}
+
+.trigger-value {
+  font-weight: 500;
+  color: #333;
+  background-color: #ffffff;
+  padding: 4px 8px;
+  border-radius: 3px;
+  border: 1px solid #dee2e6;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+}
+
+// Dark mode support for query dialog
+.body--dark {
+  .query-type {
+    background-color: #1e3a8a;
+    color: #bfdbfe;
+    border-left-color: #64b5f6;
+  }
+  
+  .query-content {
+    background-color: #2d2d2d;
+    border-color: #444;
+  }
+  
+  .query-code {
+    color: #ffffff;
+    background-color: #2d2d2d;
+  }
+  
+  .trigger-details {
+    background-color: #2d2d2d;
+    border-color: #444;
+  }
+  
+  .trigger-row {
+    border-bottom-color: #444;
+  }
+  
+  .trigger-label {
+    color: #e9ecef;
+  }
+  
+  .trigger-value {
+    background-color: #3a3a3a;
+    border-color: #555;
+    color: #ffffff;
+  }
+  
+  .query-type-section .text-subtitle1,
+  .query-content-section .text-subtitle1,
+  .trigger-details-section .text-subtitle1 {
+    color: #64b5f6;
+  }
 }
 
 </style>

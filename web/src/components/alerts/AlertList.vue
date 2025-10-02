@@ -1102,7 +1102,7 @@ export default defineComponent({
             }
           
           //here we are filtering the alerts by the activeTab
-          //why we are passing the refreshResults flag as false because we dont need to show the alerts in the table 
+          //why we are passing the refreshResults flag as false because we dont need to show the alerts in the table
           filterAlertsByTab(refreshResults);
           if (router.currentRoute.value.query.action == "import") {
             showImportAlertDialog.value = true;
@@ -1188,6 +1188,7 @@ export default defineComponent({
         folderIdToBeCloned.value = newVal;
         selectedAlerts.value = [];
         allSelectedAlerts.value = false;
+
         if(newVal == router.currentRoute.value.query.folder){
           return;
         }
@@ -1201,6 +1202,7 @@ export default defineComponent({
           router.push({
             name: "alertList",
             query: {
+              ...router.currentRoute.value.query,
               org_identifier: store.state.selectedOrganization.identifier,
               folder: activeFolderId.value,
             },
@@ -1428,6 +1430,7 @@ export default defineComponent({
         await router.push({
           name: "alertList",
           query: {
+            ...router.currentRoute.value.query,
             action: "add",
             org_identifier: store.state.selectedOrganization.identifier,
             folder: activeFolderId.value,
@@ -1440,6 +1443,7 @@ export default defineComponent({
         await router.push({
           name: "alertList",
           query: {
+            ...router.currentRoute.value.query,
             alert_id: props.row.id,
             action: "update",
             name: props.row.name,
