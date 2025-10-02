@@ -737,24 +737,22 @@ pub async fn do_partitioned_search(
             total_hits
         };
 
-        if !is_streaming_aggs {
-            if req_size > 0 && remaining_limit <= 0 {
-                // Already reached the limit, skip this partition
-                search_res.hits.clear();
-                search_res.total = 0;
-            } else if req_size > 0 && total_hits > remaining_limit {
-                log::info!(
-                    "[HTTP2_STREAM trace_id {}] Truncating results to stay within limit: remaining={}, total_hits={}",
-                    trace_id,
-                    remaining_limit,
-                    total_hits
-                );
-                search_res.hits.truncate(remaining_limit as usize);
-                curr_res_size += remaining_limit;
-                search_res.total = search_res.hits.len();
-            } else {
-                curr_res_size += total_hits;
-            }
+        if req_size > 0 && remaining_limit <= 0 && !is_streaming_aggs {
+            // Already reached the limit, skip this partition
+            search_res.hits.clear();
+            search_res.total = 0;
+        } else if req_size > 0 && total_hits > remaining_limit && !is_streaming_aggs {
+            log::info!(
+                "[HTTP2_STREAM trace_id {}] Truncating results to stay within limit: remaining={}, total_hits={}",
+                trace_id,
+                remaining_limit,
+                total_hits
+            );
+            search_res.hits.truncate(remaining_limit as usize);
+            curr_res_size += remaining_limit;
+            search_res.total = search_res.hits.len();
+        } else {
+            curr_res_size += total_hits;
         }
 
         search_res = order_search_results(search_res, fallback_order_by_col.clone());
