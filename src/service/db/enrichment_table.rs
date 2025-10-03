@@ -84,46 +84,6 @@ pub async fn get_enrichment_table_data(
     }
 }
 
-pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-    let start_time = get_start_time(org_id, name).await;
-    let end_time = now_micros();
-
-    let query = config::meta::search::Query {
-        sql: format!("SELECT * FROM \"{name}\""),
-        start_time,
-        end_time,
-        size: -1, // -1 means no limit, enrichment table should not be limited
-        ..Default::default()
-    };
-
-    let req = config::meta::search::Request {
-        query,
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: None,
-        search_event_context: None,
-        use_cache: false,
-        local_mode: Some(true),
-    };
-    log::debug!("get enrichment table {name} data req start time: {start_time}");
-    // do search
-    match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
-        Ok(res) => {
-            if !res.hits.is_empty() {
-                Ok(res.hits.iter().map(convert_to_vrl).collect())
-            } else {
-                Ok(vec![])
-            }
-        }
-        Err(err) => {
-            log::error!("get enrichment table data error: {err:?}");
-            Ok(vec![])
-        }
-    }
-}
-
 pub fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
     match value {
         json::Value::Null => vrl::value::Value::Null,
@@ -498,17 +458,7 @@ mod tests {
         // This will fail in test environment due to missing dependencies,
         // but tests the function structure
         let result = get_enrichment_table_data("test_org", "test_table").await;
-        assert!(result.is_ok());
-        let data = result.unwrap();
-        assert_eq!(data.len(), 0); // Should return empty vec due to search service failure
-    }
-
-    #[tokio::test]
-    async fn test_get() {
-        let result = get("test_org", "test_table").await;
-        assert!(result.is_ok());
-        let data = result.unwrap();
-        assert_eq!(data.len(), 0); // Should return empty vec due to search service failure
+        assert!(result.is_err());
     }
 
     #[tokio::test]
