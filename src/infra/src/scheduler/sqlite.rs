@@ -14,8 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use chrono::Duration;
-use config::utils::{json, time::now_micros};
+use config::{
+    metrics::DB_QUERY_NUMS,
+    utils::{json, time::now_micros},
+};
 use sqlx::{Pool, Row, Sqlite};
 
 use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_max_retries};
@@ -309,6 +313,165 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 .put(&key, json::to_vec(&trigger).unwrap().into(), true, None)
                 .await?;
         }
+        Ok(())
+    }
+
+    async fn bulk_update_triggers(&self, triggers: Vec<Trigger>) -> Result<()> {
+        if triggers.is_empty() {
+            return Ok(());
+        }
+
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        DB_QUERY_NUMS
+            .with_label_values(&["bulk_update", "scheduled_jobs"])
+            .inc();
+
+        // Use transaction for SQLite bulk operations
+        let mut transaction = client.begin().await?;
+
+        for trigger in &triggers {
+            let query = sqlx::query(
+                r#"UPDATE scheduled_jobs
+    SET status = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?, data = ?
+    WHERE org = ? AND module_key = ? AND module = ?;"#,
+            )
+            .bind(&trigger.status)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(&trigger.org)
+            .bind(&trigger.module_key)
+            .bind(&trigger.module);
+
+            if let Err(e) = query.execute(&mut *transaction).await {
+                log::warn!(
+                    "Error updating trigger {}/{}/{}: {}",
+                    trigger.org,
+                    trigger.module,
+                    trigger.module_key,
+                    e
+                );
+                transaction.rollback().await?;
+                // Fallback to individual updates
+                for trigger in triggers {
+                    self.update_trigger(trigger, false).await?;
+                }
+                return Ok(());
+            }
+        }
+
+        if let Err(e) = transaction.commit().await {
+            log::warn!("Bulk update transaction failed: {}", e);
+            // Fallback to individual updates
+            for trigger in triggers {
+                self.update_trigger(trigger, false).await?;
+            }
+            return Ok(());
+        }
+
+        // Handle cluster coordinator for realtime alerts
+        for trigger in &triggers {
+            if trigger.module == TriggerModule::Alert && trigger.is_realtime {
+                let key = format!(
+                    "{TRIGGERS_KEY}{}/{}/{}",
+                    trigger.module, &trigger.org, &trigger.module_key
+                );
+                let cluster_coordinator = db::get_coordinator().await;
+                if let Err(e) = cluster_coordinator
+                    .put(&key, Bytes::from(""), true, None)
+                    .await
+                {
+                    log::error!(
+                        "Error updating cluster coordinator for trigger {}: {}",
+                        key,
+                        e
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn bulk_update_status(
+        &self,
+        updates: Vec<(
+            String,
+            TriggerModule,
+            String,
+            TriggerStatus,
+            i32,
+            Option<String>,
+        )>,
+    ) -> Result<()> {
+        if updates.is_empty() {
+            return Ok(());
+        }
+
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        DB_QUERY_NUMS
+            .with_label_values(&["bulk_update_status", "scheduled_jobs"])
+            .inc();
+
+        // Use transaction for SQLite bulk operations
+        let mut transaction = client.begin().await?;
+
+        for (org, module, module_key, status, retries, data) in &updates {
+            let query = match data {
+                Some(data) => {
+                    sqlx::query(
+                        r#"UPDATE scheduled_jobs SET status = ?, retries = ?, data = ? WHERE org = ? AND module_key = ? AND module = ?;"#,
+                    )
+                    .bind(status)
+                    .bind(*retries)
+                    .bind(data)
+                    .bind(org)
+                    .bind(module_key)
+                    .bind(module)
+                }
+                None => {
+                    sqlx::query(
+                        r#"UPDATE scheduled_jobs SET status = ?, retries = ? WHERE org = ? AND module_key = ? AND module = ?;"#,
+                    )
+                    .bind(status)
+                    .bind(*retries)
+                    .bind(org)
+                    .bind(module_key)
+                    .bind(module)
+                }
+            };
+
+            if let Err(e) = query.execute(&mut *transaction).await {
+                log::warn!(
+                    "Error updating status for trigger {}/{}/{}: {}",
+                    org,
+                    module,
+                    module_key,
+                    e
+                );
+                transaction.rollback().await?;
+                // Fallback to individual updates
+                for (org, module, module_key, status, retries, data) in updates {
+                    self.update_status(&org, module, &module_key, status, retries, data.as_deref())
+                        .await?;
+                }
+                return Ok(());
+            }
+        }
+
+        if let Err(e) = transaction.commit().await {
+            log::warn!("Bulk status update transaction failed: {}", e);
+            // Fallback to individual updates
+            for (org, module, module_key, status, retries, data) in updates {
+                self.update_status(&org, module, &module_key, status, retries, data.as_deref())
+                    .await?;
+            }
+        }
+
         Ok(())
     }
 
