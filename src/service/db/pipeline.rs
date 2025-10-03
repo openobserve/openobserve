@@ -117,7 +117,7 @@ pub async fn get_by_id(pipeline_id: &str) -> Result<Pipeline, PipelineError> {
 }
 
 /// Returns the cached scheduled pipeline by id, or fetches from DB if not cached.
-pub async fn get_scheduled_pipeline(pipeline_id: &str) -> Option<Pipeline> {
+pub async fn get_scheduled_pipeline_from_cache(pipeline_id: &str) -> Option<Pipeline> {
     SCHEDULED_PIPELINES.read().await.get(pipeline_id).cloned()
 }
 
@@ -135,7 +135,7 @@ pub async fn cache_scheduled_pipeline(pipeline: &Pipeline) {
 }
 
 /// Removes a scheduled pipeline from the cache.
-pub async fn remove_scheduled_pipeline(pipeline_id: &str) {
+pub async fn remove_scheduled_pipeline_from_cache(pipeline_id: &str) {
     SCHEDULED_PIPELINES.write().await.remove(pipeline_id);
 }
 
@@ -447,15 +447,15 @@ mod tests {
         cache_scheduled_pipeline(&pipeline).await;
 
         // Retrieve from cache
-        let cached_pipeline = get_scheduled_pipeline(test_id).await;
+        let cached_pipeline = get_scheduled_pipeline_from_cache(test_id).await;
         assert!(cached_pipeline.is_some());
         assert_eq!(cached_pipeline.unwrap().id, test_id);
 
         // Remove from cache
-        remove_scheduled_pipeline(test_id).await;
+        remove_scheduled_pipeline_from_cache(test_id).await;
 
         // Verify it's not in cache anymore
-        let cached_pipeline = get_scheduled_pipeline(test_id).await;
+        let cached_pipeline = get_scheduled_pipeline_from_cache(test_id).await;
         assert!(cached_pipeline.is_none());
     }
 
@@ -485,7 +485,7 @@ mod tests {
         cache_scheduled_pipeline(&realtime_pipeline).await;
 
         // Verify realtime pipeline was not cached
-        let cached_realtime = get_scheduled_pipeline(realtime_id).await;
+        let cached_realtime = get_scheduled_pipeline_from_cache(realtime_id).await;
         assert!(cached_realtime.is_none());
 
         // Create a scheduled pipeline
@@ -505,10 +505,10 @@ mod tests {
         cache_scheduled_pipeline(&scheduled_pipeline).await;
 
         // Verify only the scheduled pipeline is cached
-        let cached = get_scheduled_pipeline(scheduled_id).await;
+        let cached = get_scheduled_pipeline_from_cache(scheduled_id).await;
         assert!(cached.is_some());
 
         // Clean up
-        remove_scheduled_pipeline(scheduled_id).await;
+        remove_scheduled_pipeline_from_cache(scheduled_id).await;
     }
 }
