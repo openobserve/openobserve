@@ -28,8 +28,7 @@ use proto::cluster_rpc;
 use {
     crate::service::search::datafusion::distributed_plan::enrichment_exec::EnrichmentExec,
     o2_enterprise::enterprise::search::datafusion::distributed_plan::{
-        aggregate_topk_exec::AggregateTopkExec, streaming_aggs_exec::StreamingAggsExec,
-        tmp_exec::TmpExec,
+        agg_topk_exec::AggregateTopkExec, streaming_aggs_exec::StreamingAggsExec, tmp_exec::TmpExec,
     },
 };
 
