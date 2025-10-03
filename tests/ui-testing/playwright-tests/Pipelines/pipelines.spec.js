@@ -393,7 +393,7 @@ test.describe("Pipeline testcases", () => {
     await page.locator('[data-test="confirm-button"]').click();
     
     // Navigate back from pipeline editing and confirm
-    await page.locator('[data-test="add-pipeline-back-btn"]').click();
+    await page.locator('[data-test="add-pipeline-cancel-btn"]').click();
   });
 
   test.skip("should add source, function,destination and then delete pipeline", async ({
