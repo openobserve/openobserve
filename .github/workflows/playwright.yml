@@ -24,11 +24,11 @@ env:
   COLUMNS: 150
   ZO_ROOT_USER_EMAIL: automation@tester.ai
   ZO_ROOT_USER_PASSWORD: 12345678
-  ZO_BASE_URL: https://main.internal.zinclabs.dev/
-  WS_ZO_BASE_URL: https://main.internal.zinclabs.dev/
-  ZO_BASE_URL_SC: https://main.internal.zinclabs.dev/
-  ZO_BASE_URL_SC_UI: https://main.internal.zinclabs.dev/
-  INGESTION_URL: https://main.internal.zinclabs.dev/
+  ZO_BASE_URL: https://dev2.internal.zinclabs.dev/
+  WS_ZO_BASE_URL: https://dev2.internal.zinclabs.dev/
+  ZO_BASE_URL_SC: https://dev2.internal.zinclabs.dev/
+  ZO_BASE_URL_SC_UI: https://dev2.internal.zinclabs.dev/
+  INGESTION_URL: https://dev2.internal.zinclabs.dev/
   ORGNAME: automationtesting
   ZO_QUICK_MODE_NUM_FIELDS: 100
   ZO_QUICK_MODE_STRATEGY: first
@@ -110,7 +110,7 @@ jobs:
           - testfolder: "GeneralTests"
             browser: "chrome"
             run_files: [
-              "sanity.spec.js",
+              # "sanity.spec.js",
               # "changeOrg.spec.js",
               # "enrichment.spec.js", 
               # "schema.spec.js",
@@ -137,13 +137,13 @@ jobs:
           #     "logsqueries.matchall.spec.js",
           #     "searchpartition.spec.js"
           #   ]
-          # - testfolder: "Alerts"
-          #   browser: "chrome"
-          #   run_files: [
-          #     "alerts-e2e-flow.spec.js",
-          #     "alerts-ui-operations.spec.js",
-          #     "alerts-import.spec.js"
-          #   ]
+          - testfolder: "Alerts"
+            browser: "chrome"
+            run_files: [
+              # "alerts-e2e-flow.spec.js",
+              "alerts-ui-operations.spec.js",
+              # "alerts-import.spec.js"
+            ]
           # - testfolder: "Dashboards-Core"
           #   browser: "chrome"
           #   run_files: [

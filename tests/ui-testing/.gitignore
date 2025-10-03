@@ -13,3 +13,4 @@ node_modules
 /playwright/.cache/
 coverage/
 .nyc_output/
+LoginAuth.json
