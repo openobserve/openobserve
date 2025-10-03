@@ -362,6 +362,7 @@ describe("GroupUsers Component", () => {
         isInGroup: true,
         org: "TestOrg1, TestOrg2",
         role: "user",
+        is_external: false,
       });
       expect(wrapper.vm.users[1]).toEqual({
         "#": 2,
@@ -369,6 +370,7 @@ describe("GroupUsers Component", () => {
         isInGroup: true,
         org: "TestOrg1",
         role: "admin",
+        is_external: false,
       });
       expect(wrapper.vm.users[2]).toEqual({
         "#": 3,
@@ -376,6 +378,7 @@ describe("GroupUsers Component", () => {
         isInGroup: false,
         org: "",
         role: "root",
+        is_external: false,
       });
     });
 
@@ -408,6 +411,7 @@ describe("GroupUsers Component", () => {
         isInGroup: true,
         org: "TestOrg1, TestOrg2",
         role: "user",
+        is_external: false,
       });
     });
   });
