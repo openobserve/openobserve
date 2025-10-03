@@ -47,6 +47,7 @@ export const logsUtils = () => {
   const q = useQuasar();
   const router = useRouter();
   const store = useStore();
+  const timestampColumnName = store.state.zoConfig.timestamp_column;
 
   const DEFAULT_PARSED_RESULT: ParsedSQLResult = {
     columns: [],
@@ -709,6 +710,40 @@ export const logsUtils = () => {
     return false;
   }
 
+  // validate if timestamp column alias is used for any field
+  const checkTimestampAlias = (query: string): boolean => {
+    const parsedSQL = fnParsedSQL(query);
+
+    const columns = parsedSQL?.columns;
+    if (Array.isArray(columns)) {
+      const invalid = columns.some(
+        (field: any) => field.as === timestampColumnName,
+      );
+      if (invalid) {
+        return false;
+      }
+    }
+
+    // Escape special regex characters in timestamp column name
+    const escapedTimestamp = timestampColumnName.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      "\\$&",
+    );
+
+    // Patterns for alias check
+    const patterns = [
+      new RegExp(`\\bas\\s*'${escapedTimestamp}'`, "i"), // AS '_timestamp'
+      new RegExp(`\\bas\\s*"${escapedTimestamp}"`, "i"), // AS "_timestamp"
+      new RegExp(`\\bas\\s+${escapedTimestamp}\\b`, "i"), // AS _timestamp (unquoted)
+    ];
+
+    if (patterns.some((p) => p.test(query))) {
+      return false;
+    }
+
+    return true;
+  };
+
   return {
     fnParsedSQL,
     fnUnparsedSQL,
@@ -729,6 +764,7 @@ export const logsUtils = () => {
     isNonAggregatedSQLMode,
     updatedLocalLogFilterField,
     isTimestampASC,
+    checkTimestampAlias,
   };
 };
 

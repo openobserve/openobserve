@@ -72,6 +72,7 @@ vi.mock("@/utils/zincutils", () => ({
   isWebSocketEnabled: vi.fn(() => false),
   isStreamingEnabled: vi.fn(() => false),
   escapeSingleQuotes: vi.fn((str) => str.replace(/\\/g, "\\\\").replace(/'/g, "\\'")),
+  useLocalWrapContent: vi.fn(() => null),
 }));
 
 // Enhanced Panel Cache mocking
