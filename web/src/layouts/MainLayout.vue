@@ -630,6 +630,7 @@ import {
   outlinedManageAccounts,
   outlinedDescription,
   outlinedCode,
+  outlinedDevices,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -807,7 +808,7 @@ export default defineComponent({
       },
       {
         title: t("menu.rum"),
-        icon: "devices",
+        icon: outlinedDevices,
         link: "/rum",
         name: "rum",
       },
