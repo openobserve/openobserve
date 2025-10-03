@@ -106,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @updated:data-zoom="onDataZoom"
           @error="errorDetail = $event"
           @click="onChartClick"
+          @contextmenu="onChartContextMenu"
         />
       </div>
       <div
@@ -265,6 +266,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close="closeAddAnnotation"
         :panelsList="panelsList"
       />
+      <!-- Alert Context Menu -->
+      <AlertContextMenu
+        :visible="contextMenuVisible"
+        :x="contextMenuPosition.x"
+        :y="contextMenuPosition.y"
+        :value="contextMenuValue"
+        @select="handleCreateAlert"
+        @close="hideContextMenu"
+      />
     </div>
   </div>
 </template>
@@ -333,10 +343,15 @@ const CustomChartRenderer = defineAsyncComponent(() => {
   return import("./panels/CustomChartRenderer.vue");
 });
 
+const AlertContextMenu = defineAsyncComponent(() => {
+  return import("./AlertContextMenu.vue");
+});
+
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
     ChartRenderer,
+    AlertContextMenu,
     TableRenderer,
     GeoMapRenderer,
     MapsRenderer,
@@ -527,6 +542,61 @@ export default defineComponent({
 
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef: any = ref(null);
+
+    // Context menu state for alert creation
+    const contextMenuVisible = ref(false);
+    const contextMenuPosition = ref({ x: 0, y: 0 });
+    const contextMenuValue = ref(0);
+    const contextMenuData = ref<any>(null);
+
+    const onChartContextMenu = (event: any) => {
+      contextMenuVisible.value = true;
+      contextMenuPosition.value = { x: event.x, y: event.y };
+      contextMenuValue.value = event.value;
+      contextMenuData.value = event;
+    };
+
+    const hideContextMenu = () => {
+      contextMenuVisible.value = false;
+    };
+
+    const handleCreateAlert = (selection: { condition: string; threshold: number }) => {
+      hideContextMenu();
+
+      // Prepare panel data to pass to alert creation
+      const query = panelSchema.value.queries?.[0];
+      if (!query) {
+        console.error('No query found in panel');
+        return;
+      }
+
+      // Determine query type based on panel configuration
+      // Only care about SQL vs PromQL distinction
+      let queryType = 'sql'; // Default to SQL
+      if (panelSchema.value.queryType === 'promql') {
+        queryType = 'promql';
+      }
+
+      const panelDataToPass = {
+        panelTitle: panelSchema.value.title || 'Unnamed Panel',
+        panelId: panelSchema.value.id,
+        queries: panelSchema.value.queries,
+        queryType: queryType,
+        timeRange: selectedTimeObj.value,
+        threshold: selection.threshold,
+        condition: selection.condition,
+      };
+
+      // Navigate to alert creation page
+      router.push({
+        name: 'addAlert',
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          fromPanel: 'true',
+          panelData: encodeURIComponent(JSON.stringify(panelDataToPass)),
+        },
+      });
+    };
 
     // hovered series state
     // used to show tooltip axis for all charts
@@ -2000,6 +2070,12 @@ export default defineComponent({
       downloadDataAsJSON,
       loadingProgressPercentage,
       isPartialData,
+      contextMenuVisible,
+      contextMenuPosition,
+      contextMenuValue,
+      onChartContextMenu,
+      hideContextMenu,
+      handleCreateAlert,
     };
   },
 });

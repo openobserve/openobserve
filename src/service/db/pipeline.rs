@@ -17,10 +17,7 @@ use std::sync::Arc;
 
 use config::{
     cluster::LOCAL_NODE,
-    meta::{
-        pipeline::{Pipeline, components::PipelineSource},
-        stream::StreamParams,
-    },
+    meta::{pipeline::Pipeline, stream::StreamParams},
 };
 use infra::{
     coordinator::pipelines::PIPELINES_WATCH_PREFIX,
@@ -30,7 +27,9 @@ use infra::{
 use once_cell::sync::Lazy;
 
 use crate::{
-    common::infra::config::{PIPELINE_STREAM_MAPPING, STREAM_EXECUTABLE_PIPELINES},
+    common::infra::config::{
+        PIPELINE_STREAM_MAPPING, SCHEDULED_PIPELINES, STREAM_EXECUTABLE_PIPELINES,
+    },
     service::pipeline::batch_execution::ExecutablePipeline,
 };
 
@@ -117,6 +116,47 @@ pub async fn get_by_id(pipeline_id: &str) -> Result<Pipeline, PipelineError> {
     Ok(infra_pipeline::get_by_id(pipeline_id).await?)
 }
 
+/// Returns the cached scheduled pipeline by id, or fetches from DB if not cached.
+pub async fn get_scheduled_pipeline_from_cache(pipeline_id: &str) -> Option<Pipeline> {
+    SCHEDULED_PIPELINES.read().await.get(pipeline_id).cloned()
+}
+
+/// Adds or updates a scheduled pipeline in the cache.
+pub async fn cache_scheduled_pipeline(pipeline: &Pipeline) {
+    if matches!(
+        pipeline.source,
+        config::meta::pipeline::components::PipelineSource::Scheduled(_)
+    ) {
+        SCHEDULED_PIPELINES
+            .write()
+            .await
+            .insert(pipeline.id.clone(), pipeline.clone());
+    }
+}
+
+/// Removes a scheduled pipeline from the cache.
+pub async fn remove_scheduled_pipeline_from_cache(pipeline_id: &str) {
+    SCHEDULED_PIPELINES.write().await.remove(pipeline_id);
+}
+
+/// Returns the number of scheduled pipelines in the cache.
+pub async fn get_scheduled_pipelines_cache_size() -> usize {
+    SCHEDULED_PIPELINES.read().await.len()
+}
+
+/// Returns cache statistics for monitoring.
+pub async fn get_cache_stats() -> (usize, usize) {
+    let realtime_count = STREAM_EXECUTABLE_PIPELINES.read().await.len();
+    let scheduled_count = SCHEDULED_PIPELINES.read().await.len();
+    (realtime_count, scheduled_count)
+}
+
+/// Clears the scheduled pipelines cache. Used for maintenance.
+pub async fn clear_scheduled_pipelines_cache() {
+    SCHEDULED_PIPELINES.write().await.clear();
+    log::info!("[Pipeline] Scheduled pipelines cache cleared");
+}
+
 /// Finds the pipeline with the same source
 ///
 /// Used to validate if a duplicate pipeline exists.
@@ -163,32 +203,44 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     }
     let mut pipeline_stream_mapping_cache = PIPELINE_STREAM_MAPPING.write().await;
     let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
+    let mut scheduled_pipelines_cache = SCHEDULED_PIPELINES.write().await;
     // clear the cache first in case of a refresh
     pipeline_stream_mapping_cache.clear();
     stream_exec_pl.clear();
+    scheduled_pipelines_cache.clear();
 
     for pipeline in pipelines.into_iter() {
-        if pipeline.enabled
-            && let PipelineSource::Realtime(stream_params) = &pipeline.source
-        {
-            match ExecutablePipeline::new(&pipeline).await {
-                Err(e) => {
-                    log::error!(
-                        "[Pipeline] error initializing ExecutablePipeline from pipeline {}/{}. {}. Not cached",
-                        pipeline.org,
-                        pipeline.id,
-                        e
-                    )
+        if pipeline.enabled {
+            match &pipeline.source {
+                config::meta::pipeline::components::PipelineSource::Realtime(stream_params) => {
+                    match ExecutablePipeline::new(&pipeline).await {
+                        Err(e) => {
+                            log::error!(
+                                "[Pipeline] error initializing ExecutablePipeline from pipeline {}/{}. {}. Not cached",
+                                pipeline.org,
+                                pipeline.id,
+                                e
+                            )
+                        }
+                        Ok(exec_pl) => {
+                            pipeline_stream_mapping_cache
+                                .insert(pipeline.id.clone(), stream_params.clone());
+                            stream_exec_pl.insert(stream_params.clone(), exec_pl);
+                        }
+                    };
                 }
-                Ok(exec_pl) => {
-                    pipeline_stream_mapping_cache.insert(pipeline.id, stream_params.clone());
-                    stream_exec_pl.insert(stream_params.clone(), exec_pl);
+                config::meta::pipeline::components::PipelineSource::Scheduled(_) => {
+                    scheduled_pipelines_cache.insert(pipeline.id.clone(), pipeline);
                 }
-            };
+            }
         }
     }
 
-    log::info!("[Pipeline] Cached with len: {}", stream_exec_pl.len());
+    log::info!(
+        "[Pipeline] Cached realtime pipelines: {}, scheduled pipelines: {}",
+        stream_exec_pl.len(),
+        scheduled_pipelines_cache.len()
+    );
     Ok(())
 }
 
@@ -272,62 +324,83 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     log::error!("[Pipeline::watch] error getting pipeline by id from db");
                     continue;
                 };
-                // Only realtime & enabled pipeline should be added cache
-                if let PipelineSource::Realtime(stream_params) = &pipeline.source {
-                    let mut pipeline_stream_mapping_cache = PIPELINE_STREAM_MAPPING.write().await;
-                    let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
-                    if pipeline.enabled {
-                        match ExecutablePipeline::new(&pipeline).await {
-                            Err(e) => {
-                                log::error!(
-                                    "[Pipeline::watch] {}/{}/{}: Error initializing pipeline into ExecutablePipeline when updating cache: {}",
-                                    pipeline.org,
-                                    pipeline.name,
-                                    pipeline.id,
-                                    e
-                                );
-                            }
-                            Ok(exec_pl) => {
-                                pipeline_stream_mapping_cache
-                                    .insert(pipeline_id.to_string(), stream_params.clone());
-                                stream_exec_pl.insert(stream_params.clone(), exec_pl);
-                                log::info!(
-                                    "[Pipeline::watch]: pipeline {} added to cache.",
-                                    &pipeline.id
-                                );
-                            }
-                        };
-                    } else {
-                        // remove pipeline from cache if the update is to disable
-                        if let Some(removed) = pipeline_stream_mapping_cache.remove(pipeline_id) {
-                            if stream_exec_pl.remove(&removed).is_some() {
-                                log::info!(
-                                    "[Pipeline]: pipeline {pipeline_id} disabled and removed from cache."
-                                );
-                            }
-                        } else {
-                            log::error!(
-                                "[Pipeline]: pipeline {pipeline_id} not found in cache to remove."
+                match &pipeline.source {
+                    config::meta::pipeline::components::PipelineSource::Realtime(stream_params) => {
+                        let mut pipeline_stream_mapping_cache =
+                            PIPELINE_STREAM_MAPPING.write().await;
+                        let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
+                        if pipeline.enabled {
+                            match ExecutablePipeline::new(&pipeline).await {
+                                Err(e) => {
+                                    log::error!(
+                                        "[Pipeline::watch] {}/{}/{}: Error initializing pipeline into ExecutablePipeline when updating cache: {}",
+                                        pipeline.org,
+                                        pipeline.name,
+                                        pipeline.id,
+                                        e
+                                    );
+                                }
+                                Ok(exec_pl) => {
+                                    pipeline_stream_mapping_cache
+                                        .insert(pipeline_id.to_string(), stream_params.clone());
+                                    stream_exec_pl.insert(stream_params.clone(), exec_pl);
+                                    log::info!(
+                                        "[Pipeline::watch]: realtime pipeline {} added to cache.",
+                                        &pipeline.id
+                                    );
+                                }
+                            };
+                        } else if let Some(removed) =
+                            pipeline_stream_mapping_cache.remove(pipeline_id)
+                            && stream_exec_pl.remove(&removed).is_some()
+                        {
+                            // remove pipeline from cache if the update is to disable
+                            log::info!(
+                                "[Pipeline]: realtime pipeline {pipeline_id} disabled and removed from cache."
                             );
+                        }
+                    }
+                    config::meta::pipeline::components::PipelineSource::Scheduled(_) => {
+                        let mut scheduled_pipelines_cache = SCHEDULED_PIPELINES.write().await;
+                        if pipeline.enabled {
+                            scheduled_pipelines_cache.insert(pipeline_id.to_string(), pipeline);
+                            log::info!(
+                                "[Pipeline::watch]: scheduled pipeline {pipeline_id} added to cache."
+                            );
+                        } else {
+                            // remove pipeline from cache if the update is to disable
+                            if scheduled_pipelines_cache.remove(pipeline_id).is_some() {
+                                log::info!(
+                                    "[Pipeline]: scheduled pipeline {pipeline_id} disabled and removed from cache."
+                                );
+                            }
                         }
                     }
                 }
             }
             db::Event::Delete(ev) => {
                 let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
-                if let Some(removed) = PIPELINE_STREAM_MAPPING.write().await.remove(pipeline_id) {
-                    if STREAM_EXECUTABLE_PIPELINES
+                if let Some(removed) = PIPELINE_STREAM_MAPPING.write().await.remove(pipeline_id)
+                    && STREAM_EXECUTABLE_PIPELINES
                         .write()
                         .await
                         .remove(&removed)
                         .is_some()
-                    {
-                        log::info!(
-                            "[Pipeline]: pipeline {pipeline_id} deleted and removed from cache."
-                        );
-                    };
-                } else {
-                    log::error!("[Pipeline]: pipeline {pipeline_id} not found in cache to remove.");
+                {
+                    log::info!(
+                        "[Pipeline]: realtime pipeline {pipeline_id} deleted and removed from cache."
+                    );
+                }
+                // Also remove from scheduled pipelines cache
+                if SCHEDULED_PIPELINES
+                    .write()
+                    .await
+                    .remove(pipeline_id)
+                    .is_some()
+                {
+                    log::info!(
+                        "[Pipeline]: scheduled pipeline {pipeline_id} deleted and removed from cache."
+                    );
                 }
             }
             db::Event::Empty => {}
@@ -342,4 +415,100 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 enum PipelineTableEvent<'a> {
     Add(&'a Pipeline),
     Remove(&'a str),
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::{
+        pipeline::components::{DerivedStream, PipelineSource},
+        stream::{StreamParams, StreamType},
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_scheduled_pipeline_cache_operations() {
+        let test_id = "test_pipeline_cache_ops_456";
+
+        // Create a test scheduled pipeline
+        let pipeline = Pipeline {
+            id: test_id.to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "Test pipeline".to_string(),
+            source: PipelineSource::Scheduled(DerivedStream::default()),
+            nodes: vec![],
+            edges: vec![],
+        };
+
+        // Cache the pipeline
+        cache_scheduled_pipeline(&pipeline).await;
+
+        // Retrieve from cache
+        let cached_pipeline = get_scheduled_pipeline_from_cache(test_id).await;
+        assert!(cached_pipeline.is_some());
+        assert_eq!(cached_pipeline.unwrap().id, test_id);
+
+        // Remove from cache
+        remove_scheduled_pipeline_from_cache(test_id).await;
+
+        // Verify it's not in cache anymore
+        let cached_pipeline = get_scheduled_pipeline_from_cache(test_id).await;
+        assert!(cached_pipeline.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_cache_only_scheduled_pipelines() {
+        let realtime_id = "realtime_pipeline_789";
+        let scheduled_id = "scheduled_pipeline_789";
+
+        // Create a realtime pipeline
+        let realtime_pipeline = Pipeline {
+            id: realtime_id.to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "realtime_pipeline".to_string(),
+            description: "Realtime pipeline".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![],
+            edges: vec![],
+        };
+
+        // Try to cache the realtime pipeline (should be ignored)
+        cache_scheduled_pipeline(&realtime_pipeline).await;
+
+        // Verify realtime pipeline was not cached
+        let cached_realtime = get_scheduled_pipeline_from_cache(realtime_id).await;
+        assert!(cached_realtime.is_none());
+
+        // Create a scheduled pipeline
+        let scheduled_pipeline = Pipeline {
+            id: scheduled_id.to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "scheduled_pipeline".to_string(),
+            description: "Scheduled pipeline".to_string(),
+            source: PipelineSource::Scheduled(DerivedStream::default()),
+            nodes: vec![],
+            edges: vec![],
+        };
+
+        // Cache the scheduled pipeline
+        cache_scheduled_pipeline(&scheduled_pipeline).await;
+
+        // Verify only the scheduled pipeline is cached
+        let cached = get_scheduled_pipeline_from_cache(scheduled_id).await;
+        assert!(cached.is_some());
+
+        // Clean up
+        remove_scheduled_pipeline_from_cache(scheduled_id).await;
+    }
 }
