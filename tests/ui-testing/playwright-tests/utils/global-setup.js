@@ -108,7 +108,8 @@ async function performGlobalIngestion(page) {
   };
 
   const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+    const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+    const fetchResponse = await fetch(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
       method: 'POST',
       headers: headers,
       body: JSON.stringify(logsdata)

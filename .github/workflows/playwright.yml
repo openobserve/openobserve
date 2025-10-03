@@ -217,14 +217,17 @@ jobs:
           echo "Testing ingestion endpoint with authentication:"
           echo "INGESTION_URL: ${INGESTION_URL}"
           echo "ORGNAME: ${ORGNAME}"
-          echo "Attempting POST to: ${INGESTION_URL}/api/${ORGNAME}/e2e_automate/_json"
+
+          # Remove trailing slash from INGESTION_URL if present
+          BASE_URL=${INGESTION_URL%/}
+          echo "Attempting POST to: ${BASE_URL}/api/${ORGNAME}/e2e_automate/_json"
 
           # Test with basic auth and sample data
           curl -v -X POST \
             -H "Authorization: Basic $(echo -n "${ZO_ROOT_USER_EMAIL}:${ZO_ROOT_USER_PASSWORD}" | base64)" \
             -H "Content-Type: application/json" \
             -d '{"test": "data"}' \
-            "${INGESTION_URL}/api/${ORGNAME}/e2e_automate/_json" || echo "Ingestion API call failed"
+            "${BASE_URL}/api/${ORGNAME}/e2e_automate/_json" || echo "Ingestion API call failed"
 
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
