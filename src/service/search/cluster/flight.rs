@@ -520,7 +520,7 @@ pub async fn run_datafusion(
 
         let (plan, is_complete_cache_hit, is_complete_cache_hit_with_no_data) =
             o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_streaming_agg_plan(
-                streaming_id,
+                streaming_id.clone(),
                 start_time,
                 end_time,
                 streaming_aggregation_enabled,
@@ -531,6 +531,9 @@ pub async fn run_datafusion(
         physical_plan = plan;
         // Check for aggs cache hit
         if is_complete_cache_hit {
+            log::info!(
+                "[trace_id {trace_id}] [streaming_id {streaming_id}] streaming aggs complete cache hit for duration, start={start_time}, end={end_time}"
+            );
             aggs_cache_ratio = 100;
             // skip empty exec visitor for streaming aggregation query
             // since the new plan after rewrite will have a `EmptyExec` for a complete cache
