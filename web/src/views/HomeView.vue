@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          >
           <div class="row justify-between items-center q-mb-md">
             <div class="section-header">Streams</div>
-              <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+              <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                >
                 <q-tooltip>View</q-tooltip>
-                <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
+                <q-icon name="arrow_forward" class="view-arrow-icon" />
                 <router-link
                   exact
                   :to="{ name: 'logstreams' }"
@@ -198,24 +198,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'">
               <div class="column justify-between">
                 <div class="row justify-between tw-items-center">
-                  <div class="tile-title">{{ t("home.functionTitle") }}</div>
-                  <div class="tile-icon icon-bg-orange">
-                    <img :src="functionsIcon" />
+                  <div class="row tw-items-center tw-gap-2">
+                    <div class="tile-icon icon-bg-orange">
+                      <img :src="functionsIcon" />
+                    </div>
+                    <div class="tile-title">{{ t("home.functionTitle") }}</div>
                   </div>
+                  <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                  >
+                      <q-tooltip>View</q-tooltip>
+                      <q-icon name="arrow_forward" class="view-arrow-icon" />
+                    <router-link
+                      exact
+                      :to="{ name: 'functionList' }"
+                      class="absolute full-width full-height"
+                    ></router-link>
+                </q-btn>
                 </div>
               </div>
-              <div class="data-to-display row items-end tw-justify-between">
+              <div class="data-to-display row items-end">
                 {{ summary.function_count }}
-                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                >
-                    <q-tooltip>View</q-tooltip>
-                    <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
-                  <router-link
-                    exact
-                    :to="{ name: 'functionList' }"
-                    class="absolute full-width full-height"
-                  ></router-link>
-              </q-btn>
               </div>
             </div>
           </div>
@@ -226,24 +228,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'">
               <div class="column justify-between">
                 <div class="row justify-between tw-items-center">
-                  <div class="tile-title">{{ t("home.dashboardTitle") }}</div>
-                  <div class="tile-icon icon-bg-orange">
-                    <img :src="dashboardsIcon" />
+                  <div class="row tw-items-center tw-gap-2">
+                    <div class="tile-icon icon-bg-orange">
+                      <img :src="dashboardsIcon" />
+                    </div>
+                    <div class="tile-title">{{ t("home.dashboardTitle") }}</div>
                   </div>
+                  <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                  >
+                  <q-tooltip>View</q-tooltip>
+                  <q-icon name="arrow_forward" class="view-arrow-icon" />
+                    <router-link
+                      exact
+                      :to="{ name: 'dashboards' }"
+                      class="absolute full-width full-height"
+                    ></router-link>
+                </q-btn>
                 </div>
               </div>
-              <div class="data-to-display row items-end tw-justify-between">
+              <div class="data-to-display row items-end">
                 {{ summary.dashboard_count }}
-                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                >
-                <q-tooltip>View</q-tooltip>
-                <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
-                  <router-link
-                    exact
-                    :to="{ name: 'dashboards' }"
-                    class="absolute full-width full-height"
-                  ></router-link>
-              </q-btn>
               </div>
             </div>
           </div>
@@ -260,9 +264,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   {{ t("home.alertTitle") }}
                 </span>
-                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
+                <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
                   <q-tooltip>View</q-tooltip>
-                  <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
+                  <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
                     :to="{ name: 'alertList' }"
@@ -301,9 +305,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   {{ t("home.pipelineTitle") }}
                 </span>
-                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
+                <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
                   <q-tooltip>View</q-tooltip>
-                  <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
+                  <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
                     :to="{ name: 'pipelines' }"
@@ -746,39 +750,48 @@ export default defineComponent({
 .view-button-dark {
   position: relative;
   overflow: hidden;
+  transition: all 0.3s ease;
+
+  .router-link-active,
+  a {
+    z-index: 10;
+    pointer-events: all;
+  }
 }
-.view-arrow-icon-svg {
-  width: 28px;
-  height: 14px;
+
+.view-arrow-icon {
+  font-size: 18px;
   transition: transform 0.4s ease-in-out, opacity 0.4s ease-in-out;
-  display: inline-block;
+  pointer-events: none;
+  position: relative;
+  z-index: 1;
 }
-.view-button-light:hover .view-arrow-icon-svg,
-.view-button-dark:hover .view-arrow-icon-svg {
+
+// Slide out current arrow on hover
+.view-button-light:hover .view-arrow-icon,
+.view-button-dark:hover .view-arrow-icon {
   transform: translateX(20px);
   opacity: 0;
 }
+
+// Create second arrow that slides in using Material Icons font
 .view-button-light::after,
 .view-button-dark::after {
-  content: '';
+  content: 'arrow_forward';
+  font-family: 'Material Icons';
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%) translateX(-20px);
   opacity: 0;
   transition: transform 0.4s ease-in-out, opacity 0.4s ease-in-out;
-  width: 28px;
-  height: 14px;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
+  font-size: 18px;
+  pointer-events: none;
+  z-index: 1;
+  line-height: 1;
+  font-feature-settings: 'liga';
 }
-.view-button-light::after {
-  background-image: url('/src/assets/images/home/forward_light.svg');
-}
-.view-button-dark::after {
-  background-image: url('/src/assets/images/home/forward_dark.svg');
-}
+
 .view-button-light:hover::after,
 .view-button-dark:hover::after {
   transform: translate(-50%, -50%) translateX(0);
@@ -920,6 +933,11 @@ export default defineComponent({
   img {
     height: 24px;
   }
+}
+
+.functions-tile-content .tile-icon img,
+.dashboards-tile-content .tile-icon img {
+  height: 20px;
 }
 
 // Dark mode icon visibility enhancement
