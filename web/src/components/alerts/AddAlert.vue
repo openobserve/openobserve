@@ -245,6 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div v-else class="q-pa-none q-ma-none q-pr-sm  ">
               <scheduled-alert
+                v-if="!isLoadingPanelData"
                 ref="scheduledAlertRef"
                 :columns="filteredColumns"
                 :conditions="formData.query_condition?.conditions || {}"
@@ -677,9 +678,7 @@ export default defineComponent({
     const showJsonEditorDialog = ref(false);
     const validationErrors = ref([]);
 
-    onMounted(async () => {
-      await loadPanelDataIfPresent();
-    });
+    const isLoadingPanelData = ref(false);
 
     const { track } = useReo();
 
@@ -1070,7 +1069,9 @@ export default defineComponent({
 
     const loadPanelDataIfPresent = async () => {
       const route = router.currentRoute.value;
+
       if (route.query.fromPanel === "true" && route.query.panelData) {
+        isLoadingPanelData.value = true;
         try {
           const panelData = JSON.parse(decodeURIComponent(route.query.panelData as string));
 
@@ -1097,6 +1098,7 @@ export default defineComponent({
             }
 
             // Set query type based on panel (SQL or PromQL)
+            // Always set a specific type - never leave it as empty string to avoid defaulting to quick mode
             if (panelData.queryType === "sql") {
               formData.value.query_condition.type = "sql";
               // If the panel has a generated query, populate it
@@ -1108,6 +1110,10 @@ export default defineComponent({
               if (query.query) {
                 formData.value.query_condition.promql = query.query;
               }
+            } else {
+              // Default to SQL mode if queryType is not specified
+              // This prevents falling back to quick mode
+              formData.value.query_condition.type = "sql";
             }
 
             // Handle query builder fields for SQL panels
@@ -1225,6 +1231,8 @@ export default defineComponent({
             message: "Failed to load panel data",
             timeout: 2000
           });
+        } finally {
+          isLoadingPanelData.value = false;
         }
       }
     };
@@ -1355,10 +1363,11 @@ export default defineComponent({
       generateSqlQuery: generateSqlQueryLocal,
       track,
       loadPanelDataIfPresent,
+      isLoadingPanelData,
     };
   },
 
-  created() {
+  async created() {
     // TODO OK: Refactor this code
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...cloneDeep(this.modelValue) };
@@ -1372,10 +1381,11 @@ export default defineComponent({
     }
       this.formData.is_real_time = this.formData.is_real_time.toString();
 
-    // If from panel, we'll set the query type in loadPanelDataIfPresent
-    // So remove the default 'custom' type to avoid it showing Quick Mode initially
+    // If from panel, load panel data BEFORE initializing child components
+    // This ensures the correct query type is set before ScheduledAlert initializes
     if (isFromPanel) {
-      this.formData.query_condition.type = ""; // Will be set by loadPanelDataIfPresent
+      this.formData.query_condition.type = ""; // Temporarily set to empty
+      await this.loadPanelDataIfPresent(); // Load panel data and set correct type
     }
 
     // Set default frequency to min_auto_refresh_interval
