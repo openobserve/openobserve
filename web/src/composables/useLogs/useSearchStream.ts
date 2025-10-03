@@ -826,17 +826,27 @@ export const useSearchStream = () => {
       payload.type === "search" &&
       response?.type === "search_response_hits"
     ) {
-      const isStreamingAggs = response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs;
-      const shouldAppendStreamingResults = isStreamingAggs ? !response.content?.results?.hits?.length : true;
-      searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition]++;
+      const isStreamingAggs =
+        response.content?.streaming_aggs ||
+        searchObj.data.queryResults.streaming_aggs;
+      const shouldAppendStreamingResults = isStreamingAggs
+        ? !response.content?.results?.hits?.length
+        : true;
+      searchPartitionMap[payload.traceId].chunks[
+        searchPartitionMap[payload.traceId].partition
+      ]++;
       // If single partition has more than 1 chunk, then we need to append the results
-      const isChunkedHits = searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition] > 1;
+      const isChunkedHits =
+        searchPartitionMap[payload.traceId].chunks[
+          searchPartitionMap[payload.traceId].partition
+        ] > 1;
 
       handleStreamingHits(
         payload,
         response,
         payload.isPagination,
-        (shouldAppendStreamingResults && (searchPartitionMap[payload.traceId].partition > 1 || isChunkedHits)),
+        shouldAppendStreamingResults &&
+          (searchPartitionMap[payload.traceId].partition > 1 || isChunkedHits),
       );
       return;
     }
@@ -848,21 +858,26 @@ export const useSearchStream = () => {
       searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
         ? searchPartitionMap[payload.traceId]
         : {
-          partition: 0,
-          chunks: {},
-        };
+            partition: 0,
+            chunks: {},
+          };
 
       const isStreamingAggs = response.content?.streaming_aggs;
-      const shouldAppendStreamingResults = isStreamingAggs ? !response.content?.results?.hits?.length : true;
+      const shouldAppendStreamingResults = isStreamingAggs
+        ? !response.content?.results?.hits?.length
+        : true;
 
       searchPartitionMap[payload.traceId].partition++;
-      searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition] = 0;
-      
+      searchPartitionMap[payload.traceId].chunks[
+        searchPartitionMap[payload.traceId].partition
+      ] = 0;
+
       handleStreamingMetadata(
         payload,
         response,
         payload.isPagination,
-        (shouldAppendStreamingResults && searchPartitionMap[payload.traceId].partition > 1),
+        shouldAppendStreamingResults &&
+          searchPartitionMap[payload.traceId].partition > 1,
       );
       return;
     }
@@ -903,13 +918,15 @@ export const useSearchStream = () => {
       searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
         ? searchPartitionMap[payload.traceId]
         : {
-          partition: 0,
-          chunks: {},
-        };
-                      
+            partition: 0,
+            chunks: {},
+          };
+
       searchPartitionMap[payload.traceId].partition++;
       const isStreamingAggs = response.content?.streaming_aggs;
-      const shouldAppendStreamingResults = isStreamingAggs ? !response.content?.results?.hits?.length : true;
+      const shouldAppendStreamingResults = isStreamingAggs
+        ? !response.content?.results?.hits?.length
+        : true;
 
       if (payload.type === "search") {
         handleLogsResponse(
@@ -917,7 +934,8 @@ export const useSearchStream = () => {
           payload.isPagination,
           payload.traceId,
           response,
-          (shouldAppendStreamingResults && searchPartitionMap[payload.traceId].partition > 1),
+          shouldAppendStreamingResults &&
+            searchPartitionMap[payload.traceId].partition > 1,
         );
       }
 
@@ -996,7 +1014,10 @@ export const useSearchStream = () => {
         searchAggData.hasAggregation = true;
         searchObj.meta.resultGrid.showPagination = false;
 
-        if (response.content?.streaming_aggs) {
+        if (
+          response.content?.streaming_aggs &&
+          response.content?.results?.total
+        ) {
           searchAggData.total = response.content?.results?.total;
         } else {
           searchAggData.total =
