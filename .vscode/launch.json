@@ -1,60 +1,73 @@
 {
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug OpenObserve",
-      "program": "${workspaceFolder}/target/debug/openobserve",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "environment": [
-        {
-          "name": "RUST_LOG",
-          "value": "debug"
-        },
-        {
-          "name": "RUST_BACKTRACE",
-          "value": "1"
+      "name": "Debug executable 'openobserve' (server)",
+      "cargo": {
+        "args": ["build", "--bin=openobserve", "--package=openobserve"],
+        "filter": {
+          "name": "openobserve",
+          "kind": "bin"
         }
-      ],
-      "console": "integratedTerminal",
-      "stopOnEntry": false,
-      "sourceLanguages": ["rust"],
-      "preLaunchTask": "rust: cargo build (debug)"
+      },
+      "env": {
+        "ZO_ROOT_USER_EMAIL": "root@example.com",
+        "ZO_ROOT_USER_PASSWORD": "Complexpass#123",
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
     },
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug OpenObserve (Cargo)",
+      "name": "Debug unit tests in library 'openobserve'",
       "cargo": {
-        "args": ["build", "--bin=openobserve"],
+        "args": ["test", "--no-run", "--lib", "--package=openobserve"],
+        "filter": {
+          "name": "openobserve",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'openobserve' (bin)",
+      "cargo": {
+        "args": ["build", "--bin=openobserve", "--package=openobserve"],
         "filter": {
           "name": "openobserve",
           "kind": "bin"
         }
       },
       "args": [],
-      "cwd": "${workspaceFolder}",
-      "environment": [
-        {
-          "name": "RUST_LOG",
-          "value": "debug"
-        },
-        {
-          "name": "RUST_BACKTRACE",
-          "value": "1"
-        }
-      ],
-      "console": "integratedTerminal",
-      "sourceLanguages": ["rust"]
+      "cwd": "${workspaceFolder}"
     },
     {
       "type": "lldb",
-      "request": "attach",
-      "name": "Attach to Process",
-      "pid": "${command:pickProcess}",
-      "sourceLanguages": ["rust"]
+      "request": "launch",
+      "name": "Debug unit tests in executable 'openobserve'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=openobserve",
+          "--package=openobserve"
+        ],
+        "filter": {
+          "name": "openobserve",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
     }
   ]
 }

@@ -111,11 +111,9 @@ pub async fn process_search_stream_request(
     dashboard_info: Option<DashboardInfo>,
 ) {
     log::info!(
-        "[HTTP2_STREAM trace_id {}] Received HTTP/2 stream request for org_id: {}, start_time={}, end_time={}",
+        "[HTTP2_STREAM trace_id {}] Received test HTTP/2 stream request for org_id: {}",
         trace_id,
-        org_id,
-        req.query.start_time,
-        req.query.end_time
+        org_id
     );
 
     // Send a progress: 0 event as an indiciator of search initiation
