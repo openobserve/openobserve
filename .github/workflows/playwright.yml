@@ -212,7 +212,7 @@ jobs:
       - name: Ensure we are getting a reply from the server
         run: curl ${ZO_BASE_URL}/login
 
-      - name: Debug ingestion API endpoint
+      - name: Health Check ingestion API endpoint
         run: |
           echo "Testing ingestion endpoint with authentication:"
           echo "INGESTION_URL: ${INGESTION_URL}"
