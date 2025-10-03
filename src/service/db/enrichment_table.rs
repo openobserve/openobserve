@@ -344,7 +344,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     Ok(data) => data,
                     Err(e) => {
                         log::error!(
-                            "[ENRICHMENT::TABLE watch] get enrichment table error, trying again: {e}"
+                            "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error, trying again: {e}"
                         );
                         match super::super::enrichment::get_enrichment_table(org_id, stream_name)
                             .await
@@ -352,7 +352,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                             Ok(data) => data,
                             Err(e) => {
                                 log::error!(
-                                    "[ENRICHMENT::TABLE watch] get enrichment table error, giving up: {e}"
+                                    "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error, giving up: {e}"
                                 );
                                 Vec::new()
                             }
