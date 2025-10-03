@@ -737,11 +737,11 @@ pub async fn do_partitioned_search(
             total_hits
         };
 
-        if req_size > 0 && remaining_limit <= 0 {
+        if req_size > 0 && remaining_limit <= 0 && !is_streaming_aggs {
             // Already reached the limit, skip this partition
             search_res.hits.clear();
             search_res.total = 0;
-        } else if req_size > 0 && total_hits > remaining_limit {
+        } else if req_size > 0 && total_hits > remaining_limit && !is_streaming_aggs {
             log::info!(
                 "[HTTP2_STREAM trace_id {}] Truncating results to stay within limit: remaining={}, total_hits={}",
                 trace_id,
