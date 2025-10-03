@@ -17,7 +17,6 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use chrono::Utc;
-use config::get_config;
 use tokio::{
     sync::{Mutex, RwLock, mpsc},
     time::{Instant, interval},
@@ -25,11 +24,10 @@ use tokio::{
 #[cfg(feature = "enterprise")]
 use {
     config::meta::triggers::TriggerModule as MetaTriggerModule,
-    infra::errors::Error,
     o2_enterprise::enterprise::{common::config::get_config as get_o2_config, super_cluster},
 };
 
-use crate::service::db::scheduler::{Trigger, TriggerModule, TriggerStatus};
+use super::{Trigger, TriggerModule, TriggerStatus};
 
 /// Maximum number of triggers to batch together for bulk operations
 const MAX_BATCH_SIZE: usize = 100;
@@ -150,7 +148,7 @@ impl TriggerBatchUpdater {
         let (tx, rx) = mpsc::unbounded_channel();
 
         // Spawn the batch processor
-        let processor = BatchProcessor::new(rx);
+        let mut processor = BatchProcessor::new(rx);
         tokio::spawn(async move {
             if let Err(e) = processor.run().await {
                 log::error!("[BATCH_UPDATER] Error in batch processor: {}", e);
@@ -412,7 +410,9 @@ impl FlushProcessor {
     }
 
     async fn bulk_update_triggers(&self, triggers: Vec<Trigger>) -> Result<()> {
-        infra::scheduler::bulk_update_triggers(triggers).await
+        infra::scheduler::bulk_update_triggers(triggers)
+            .await
+            .map_err(|e| anyhow::anyhow!("Bulk update triggers failed: {}", e))
     }
 
     async fn bulk_update_status(
@@ -442,7 +442,9 @@ impl FlushProcessor {
             })
             .collect();
 
-        infra::scheduler::bulk_update_status(infra_updates).await
+        infra::scheduler::bulk_update_status(infra_updates)
+            .await
+            .map_err(|e| anyhow::anyhow!("Bulk update status failed: {}", e))
     }
 
     async fn send_super_cluster_events(
@@ -659,16 +661,19 @@ mod tests {
 
         // Should not panic when sending updates
         assert!(updater.update_trigger(trigger.clone()).await.is_ok());
+
+        // Create a separate trigger instance for status update to avoid borrow issues
+        let trigger2 = trigger.clone();
         assert!(
             updater
                 .update_status(
-                    &trigger.org,
-                    trigger.module,
-                    &trigger.module_key,
+                    &trigger2.org,
+                    trigger2.module,
+                    &trigger2.module_key,
                     TriggerStatus::Processing,
                     1,
                     Some("{}"),
-                    trigger
+                    trigger2,
                 )
                 .await
                 .is_ok()

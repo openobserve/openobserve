@@ -15,7 +15,6 @@
 
 use config::get_config;
 
-pub mod batch_updater;
 pub mod handlers;
 pub mod worker;
 

@@ -334,7 +334,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             .inc();
 
         // Build bulk update query using UNNEST
-        let mut query_builder = String::from(
+        let query_builder = String::from(
             r#"UPDATE scheduled_jobs SET
                 status = bulk_data.status,
                 retries = bulk_data.retries,
@@ -364,7 +364,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             modules.push(trigger.module.to_string());
             orgs.push(trigger.org.clone());
             module_keys.push(trigger.module_key.clone());
-            statuses.push(trigger.status);
+            statuses.push(trigger.status.clone());
             retries_vec.push(trigger.retries);
             next_run_ats.push(trigger.next_run_at);
             is_realtimes.push(trigger.is_realtime);
@@ -466,7 +466,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 orgs.push(org.clone());
                 modules.push(module.to_string());
                 module_keys.push(module_key.clone());
-                statuses.push(*status);
+                statuses.push(status.clone());
                 retries_vec.push(*retries);
                 datas.push(data.as_ref().unwrap().clone());
             }
@@ -513,7 +513,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 orgs.push(org.clone());
                 modules.push(module.to_string());
                 module_keys.push(module_key.clone());
-                statuses.push(*status);
+                statuses.push(status.clone());
                 retries_vec.push(*retries);
             }
 
