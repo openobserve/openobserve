@@ -47,7 +47,7 @@
   <script>
   import { getImageURL } from "@/utils/zincutils";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
-  import { defineComponent, computed } from 'vue';
+  import { defineComponent, computed, watch } from 'vue';
   import { VueFlow } from "@vue-flow/core";
   import { ref, onMounted } from "vue";
 import CustomNode from '@/plugins/pipelines/CustomNode.vue';
@@ -87,11 +87,10 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
   
 
       onMounted(async () => {
-
       if (vueFlowRef.value) {
         vueFlowRef.value.fitView({ padding: 0.1});
       }
-        
+
         pipelineObj.nodeTypes = [
   {
     label: "Source",
@@ -157,7 +156,6 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
     isSectionHeader: false,
   },
 ];
-        pipelineObj.currentSelectedPipeline = props.pipeline;
 
         setTimeout(() => {
           if(vueFlowRef.value)
@@ -165,7 +163,14 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
         }, 100);
 
       })
-  
+
+      // Watch for pipeline prop changes to update error information
+      watch(() => props.pipeline, (newPipeline) => {
+        if (newPipeline) {
+          pipelineObj.currentSelectedPipeline = newPipeline;
+        }
+      }, { immediate: true });
+
       // Return the computed properties
       return {
         lockedNodes,
