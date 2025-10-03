@@ -245,6 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div v-else class="q-pa-none q-ma-none q-pr-sm  ">
               <scheduled-alert
+                v-if="!isLoadingPanelData"
                 ref="scheduledAlertRef"
                 :columns="filteredColumns"
                 :conditions="formData.query_condition?.conditions || {}"
@@ -677,9 +678,7 @@ export default defineComponent({
     const showJsonEditorDialog = ref(false);
     const validationErrors = ref([]);
 
-    onMounted(async () => {
-      await loadPanelDataIfPresent();
-    });
+    const isLoadingPanelData = ref(false);
 
     const { track } = useReo();
 
@@ -1070,7 +1069,9 @@ export default defineComponent({
 
     const loadPanelDataIfPresent = async () => {
       const route = router.currentRoute.value;
+
       if (route.query.fromPanel === "true" && route.query.panelData) {
+        isLoadingPanelData.value = true;
         try {
           const panelData = JSON.parse(decodeURIComponent(route.query.panelData as string));
 
@@ -1096,16 +1097,28 @@ export default defineComponent({
               await updateStreamFields(query.fields.stream);
             }
 
-            if (panelData.queryType === "sql" && query.query) {
+            // Set query type based on panel (SQL or PromQL)
+            // Always set a specific type - never leave it as empty string to avoid defaulting to quick mode
+            if (panelData.queryType === "sql") {
               formData.value.query_condition.type = "sql";
-              formData.value.query_condition.sql = query.query;
-              isAggregationEnabled.value = false;
-            } else if (panelData.queryType === "promql" && query.query) {
+              // If the panel has a generated query, populate it
+              if (query.query) {
+                formData.value.query_condition.sql = query.query;
+              }
+            } else if (panelData.queryType === "promql") {
               formData.value.query_condition.type = "promql";
-              formData.value.query_condition.promql = query.query;
+              if (query.query) {
+                formData.value.query_condition.promql = query.query;
+              }
+            } else {
+              // Default to SQL mode if queryType is not specified
+              // This prevents falling back to quick mode
+              formData.value.query_condition.type = "sql";
             }
 
-            if (query.customQuery === false && query.fields) {
+            // Handle query builder fields for SQL panels
+            if (panelData.queryType === "sql" && query.customQuery === false && query.fields) {
+              // Enable aggregation for query builder generated SQL
               isAggregationEnabled.value = true;
 
               if (query.fields.x && query.fields.x.length > 0) {
@@ -1184,6 +1197,32 @@ export default defineComponent({
 
               formData.value.trigger_condition.period = periodInMinutes;
             }
+
+            // Handle threshold and condition from context menu
+            if (panelData.threshold !== undefined && panelData.condition) {
+              formData.value.trigger_condition.threshold = panelData.threshold;
+
+              // Set the operator based on condition
+              if (panelData.condition === 'above') {
+                formData.value.trigger_condition.operator = '>=';
+              } else if (panelData.condition === 'below') {
+                formData.value.trigger_condition.operator = '<=';
+              }
+
+              // If aggregation is enabled, also set the having clause
+              if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
+                if (!formData.value.query_condition.aggregation.having) {
+                  formData.value.query_condition.aggregation.having = {
+                    column: "",
+                    operator: ">=",
+                    value: 1,
+                  };
+                }
+                formData.value.query_condition.aggregation.having.value = panelData.threshold;
+                formData.value.query_condition.aggregation.having.operator =
+                  panelData.condition === 'above' ? '>=' : '<=';
+              }
+            }
           }
         } catch (error) {
           console.error("Error loading panel data:", error);
@@ -1192,6 +1231,8 @@ export default defineComponent({
             message: "Failed to load panel data",
             timeout: 2000
           });
+        } finally {
+          isLoadingPanelData.value = false;
         }
       }
     };
@@ -1322,17 +1363,30 @@ export default defineComponent({
       generateSqlQuery: generateSqlQueryLocal,
       track,
       loadPanelDataIfPresent,
+      isLoadingPanelData,
     };
   },
 
-  created() {
+  async created() {
     // TODO OK: Refactor this code
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...cloneDeep(this.modelValue) };
+
+    // Check if this is from a dashboard panel - if so, don't set default query type
+    const route = this.router.currentRoute.value;
+    const isFromPanel = route.query.fromPanel === "true" && route.query.panelData;
+
     if(!this.isUpdated){
       this.formData.is_real_time = this.alertType === 'realTime'? true : false;
     }
       this.formData.is_real_time = this.formData.is_real_time.toString();
+
+    // If from panel, load panel data BEFORE initializing child components
+    // This ensures the correct query type is set before ScheduledAlert initializes
+    if (isFromPanel) {
+      this.formData.query_condition.type = ""; // Temporarily set to empty
+      await this.loadPanelDataIfPresent(); // Load panel data and set correct type
+    }
 
     // Set default frequency to min_auto_refresh_interval
     if (this.store.state?.zoConfig?.min_auto_refresh_interval)
