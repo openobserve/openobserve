@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Bottom Section (40%) -->
             <div class="data-to-display row items-end ">
-              {{ summary.streams_count }} 
+              {{ animatedStreamsCount || summary.streams_count }}
             </div>
             </div>
             </div>
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Bottom Section (40%) -->
             <div class="data-to-display row items-end ">
-              {{ summary.doc_count }}
+              {{ formattedAnimatedEventsCount }}
             </div>
             </div>
             </div>
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Bottom Section (40%) -->
             <div class="data-to-display row items-end ">
-              {{ summary.compressed_data }}
+              {{ formattedAnimatedCompressedSize }}
             </div>
             </div>
             </div>
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Bottom Section (40%) -->
             <div class="data-to-display row items-end ">
-              {{ summary.ingested_data }}
+              {{ formattedAnimatedIngestedSize }}
             </div>
             </div>
             </div>
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Bottom Section (40%) -->
             <div class="data-to-display row items-end ">
-              {{ summary.index_size }}
+              {{ formattedAnimatedIndexSize }}
             </div>
             </div>
             </div>
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="data-to-display row items-end">
-                {{ summary.function_count }}
+                {{ animatedFunctionCount || summary.function_count }}
               </div>
             </div>
           </div>
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="data-to-display row items-end">
-                {{ summary.dashboard_count }}
+                {{ animatedDashboardCount || summary.dashboard_count }}
               </div>
             </div>
           </div>
@@ -277,12 +277,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="row q-pt-sm" style="gap: 16px;">
                 <div class="column">
                   <span class="text-subtitle">{{ t("home.scheduledAlert") }}</span>
-                  <span class="results-count">{{ summary.scheduled_alerts }}</span>
+                  <span class="results-count">{{ animatedScheduledAlerts || summary.scheduled_alerts }}</span>
                 </div>
                 <q-separator vertical />
                 <div class="column">
                   <span class="text-subtitle">{{ t("home.rtAlert") }}</span>
-                  <span class="results-count">{{ summary.rt_alerts }}</span>
+                  <span class="results-count">{{ animatedRtAlerts || summary.rt_alerts }}</span>
                 </div>
               </div>
             </div>
@@ -318,12 +318,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="row q-pt-sm" style="gap: 16px;">
                 <div class="column">
                   <span class="text-subtitle"> {{ t("home.schedulePipelineTitle") }}</span>
-                  <span class="results-count">{{ summary.scheduled_pipelines }}</span>
+                  <span class="results-count">{{ animatedScheduledPipelines || summary.scheduled_pipelines }}</span>
                 </div>
                 <q-separator vertical />
                 <div class="column">
                   <span class="text-subtitle">{{ t("home.rtPipelineTitle") }}</span>
-                  <span class="results-count">{{ summary.rt_pipelines }}</span>
+                  <span class="results-count">{{ animatedRtPipelines || summary.rt_pipelines }}</span>
                 </div>
               </div>
             </div>
@@ -373,7 +373,7 @@ bordered class="my-card q-py-md">
 
 <script lang="ts">
 import { useQuasar } from "quasar";
-import { computed, defineComponent, ref, watch } from "vue";
+import { computed, defineComponent, ref, watch, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import orgService from "../services/organizations";
@@ -401,6 +401,38 @@ export default defineComponent({
     const pipelinesPanelDataKey = ref(0);
     const isLoadingSummary = ref(false);
 
+    // Animated counters for numbers
+    const animatedStreamsCount = ref(0);
+    const animatedEventsCount = ref(0);
+    const animatedCompressedSize = ref(0);
+    const animatedIngestedSize = ref(0);
+    const animatedIndexSize = ref(0);
+    const animatedFunctionCount = ref(0);
+    const animatedDashboardCount = ref(0);
+    const animatedScheduledAlerts = ref(0);
+    const animatedRtAlerts = ref(0);
+    const animatedScheduledPipelines = ref(0);
+    const animatedRtPipelines = ref(0);
+
+    // Count-up animation function
+    const animateValue = (ref: any, start: number, end: number, duration: number) => {
+      if (start === end) {
+        ref.value = end;
+        return;
+      }
+      const range = end - start;
+      const increment = range / (duration / 16); // 60fps
+      let current = start;
+
+      const timer = setInterval(() => {
+        current += increment;
+        if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+          current = end;
+          clearInterval(timer);
+        }
+        ref.value = Math.floor(current);
+      }, 16);
+    };
 
     const getSummary = (org_id: any) => {
       isLoadingSummary.value = true;
@@ -426,18 +458,21 @@ export default defineComponent({
             return;
           }
 
+          const rawDocCount = res.data.streams?.total_records ?? 0;
+          const rawCompressedSize = res.data.streams?.total_compressed_size ?? 0;
+          const rawIngestedSize = res.data.streams?.total_storage_size ?? 0;
+          const rawIndexSize = res.data.streams?.total_index_size ?? 0;
+
           summary.value = {
             streams_count: res.data.streams?.num_streams ?? 0,
-            ingested_data: formatSizeFromMB(
-              res.data.streams?.total_storage_size,
-            ),
-            compressed_data: formatSizeFromMB(
-              res.data.streams?.total_compressed_size,
-            ),
-            doc_count: formatEventCount(res.data.streams?.total_records ?? 0),
-            index_size: formatSizeFromMB(
-              res.data.streams?.total_index_size ?? 0,
-            ),
+            ingested_data: formatSizeFromMB(rawIngestedSize),
+            compressed_data: formatSizeFromMB(rawCompressedSize),
+            doc_count: formatEventCount(rawDocCount),
+            doc_count_raw: rawDocCount,
+            compressed_size_raw: rawCompressedSize,
+            ingested_size_raw: rawIngestedSize,
+            index_size: formatSizeFromMB(rawIndexSize),
+            index_size_raw: rawIndexSize,
             scheduled_pipelines: res.data.pipelines?.num_scheduled ?? 0,
             rt_pipelines: res.data.pipelines?.num_realtime ?? 0,
             rt_alerts: res.data.alerts?.num_realtime ?? 0,
@@ -451,6 +486,20 @@ export default defineComponent({
             healthy_alerts: res.data.alerts?.trigger_status.healthy ?? 0,
             warning_alerts: res.data.alerts?.trigger_status.warning ?? 0,
           };
+
+          // Animate counters
+          animateValue(animatedStreamsCount, 0, summary.value.streams_count, 500);
+          animateValue(animatedEventsCount, 0, summary.value.doc_count_raw, 500);
+          animateValue(animatedCompressedSize, 0, summary.value.compressed_size_raw, 500);
+          animateValue(animatedIngestedSize, 0, summary.value.ingested_size_raw, 500);
+          animateValue(animatedIndexSize, 0, summary.value.index_size_raw, 500);
+          animateValue(animatedFunctionCount, 0, summary.value.function_count, 500);
+          animateValue(animatedDashboardCount, 0, summary.value.dashboard_count, 500);
+          animateValue(animatedScheduledAlerts, 0, summary.value.scheduled_alerts, 500);
+          animateValue(animatedRtAlerts, 0, summary.value.rt_alerts, 500);
+          animateValue(animatedScheduledPipelines, 0, summary.value.scheduled_pipelines, 500);
+          animateValue(animatedRtPipelines, 0, summary.value.rt_pipelines, 500);
+
           no_data_ingest.value = false;
           dismiss();
         })
@@ -673,6 +722,32 @@ export default defineComponent({
   return scaled.toFixed(1).replace(/\.0$/, "") + units[tier];
 };
 
+  // Computed property for formatted animated events count
+  const formattedAnimatedEventsCount = computed(() => {
+    return animatedEventsCount.value > 0
+      ? formatEventCount(animatedEventsCount.value)
+      : summary.value.doc_count;
+  });
+
+  // Computed properties for formatted animated sizes
+  const formattedAnimatedCompressedSize = computed(() => {
+    return animatedCompressedSize.value > 0
+      ? formatSizeFromMB(animatedCompressedSize.value)
+      : summary.value.compressed_data;
+  });
+
+  const formattedAnimatedIngestedSize = computed(() => {
+    return animatedIngestedSize.value > 0
+      ? formatSizeFromMB(animatedIngestedSize.value)
+      : summary.value.ingested_data;
+  });
+
+  const formattedAnimatedIndexSize = computed(() => {
+    return animatedIndexSize.value > 0
+      ? formatSizeFromMB(animatedIndexSize.value)
+      : summary.value.index_size;
+  });
+
 
 
 
@@ -699,7 +774,22 @@ export default defineComponent({
       pipelinesIcon,
       alertsIcon,
       getForwardIcon,
-      formatEventCount
+      formatEventCount,
+      animatedStreamsCount,
+      animatedEventsCount,
+      formattedAnimatedEventsCount,
+      animatedCompressedSize,
+      animatedIngestedSize,
+      animatedIndexSize,
+      formattedAnimatedCompressedSize,
+      formattedAnimatedIngestedSize,
+      formattedAnimatedIndexSize,
+      animatedFunctionCount,
+      animatedDashboardCount,
+      animatedScheduledAlerts,
+      animatedRtAlerts,
+      animatedScheduledPipelines,
+      animatedRtPipelines
     };
   },
   computed: {
@@ -728,6 +818,8 @@ export default defineComponent({
   border-radius: 8px;
   box-sizing: border-box;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border-left: 3px solid #397EF6;
+  animation: fadeInUp 0.5s ease-out backwards;
 }
 .dark-stream-container {
   background: #2B2C2D;
@@ -800,6 +892,25 @@ export default defineComponent({
 .tile {
   flex: 1 1 240px; /* grow, shrink, basis */
   max-width: 100%; /* prevents overflow */
+  animation: fadeInUp 0.5s ease-out backwards;
+}
+
+// Stagger animation for tiles
+.tile:nth-child(1) { animation-delay: 0ms; }
+.tile:nth-child(2) { animation-delay: 50ms; }
+.tile:nth-child(3) { animation-delay: 100ms; }
+.tile:nth-child(4) { animation-delay: 150ms; }
+.tile:nth-child(5) { animation-delay: 200ms; }
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .tile-content {
@@ -814,6 +925,15 @@ export default defineComponent({
   padding: 16px;
   border-radius: 8px;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
+  animation: fadeInUp 0.5s ease-out backwards;
+}
+
+.functions-tile-content {
+  animation-delay: 250ms;
+}
+
+.dashboards-tile-content {
+  animation-delay: 300ms;
 }
 .dark-tile-content {
   background: #2B2C2D;
@@ -876,6 +996,17 @@ export default defineComponent({
   flex-direction: column;
   border-radius: 8px;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
+  animation: fadeInUp 0.5s ease-out backwards;
+}
+
+.first-chart-container {
+  border-left: 3px solid #EE5F26;
+  animation-delay: 350ms;
+}
+
+.second-chart-container {
+  border-left: 3px solid #9333EA;
+  animation-delay: 400ms;
 }
 
 .chart-container-light{
@@ -974,6 +1105,7 @@ export default defineComponent({
 .chart-container:hover,
 .streams-container:hover {
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
 }
 
 .dark-tile-content:hover,
@@ -982,5 +1114,46 @@ export default defineComponent({
 .chart-container-dark:hover,
 .dark-stream-container:hover {
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+  transform: translateY(-2px);
+}
+
+/* Focus visible states for keyboard navigation */
+.view-button-light:focus-visible,
+.view-button-dark:focus-visible {
+  outline: 2px solid #397EF6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid #397EF6;
+  outline-offset: 2px;
+}
+
+// Remove default focus outline (only show on keyboard navigation)
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Reduced motion support for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  // Keep hover lift but remove animation
+  .tile-content:hover,
+  .functions-tile-content:hover,
+  .dashboards-tile-content:hover,
+  .chart-container:hover,
+  .streams-container:hover {
+    transform: none;
+  }
 }
 </style>
