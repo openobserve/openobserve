@@ -81,7 +81,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="field-function-menu-popup"
                 :data-test="`dashboard-name-item-${nameLabel}-menu`"
               >
-                <div style="padding: 3px 16px 16px 16px; width: 771px">
+                <div
+                  style="padding: 3px 16px 16px 16px"
+                  :style="{
+                    width: dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery
+                      ? 'auto'
+                      : '771px',
+                  }"
+                >
                   <div>
                     <div class="q-mr-xs q-mb-sm">
                       <DynamicFunctionPopUp
@@ -192,7 +201,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="field-function-menu-popup"
                 :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
               >
-                <div style="padding: 3px 16px 16px 16px; width: 771px">
+                <div
+                  style="padding: 3px 16px 16px 16px"
+                  :style="{
+                    width: dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery
+                      ? 'auto'
+                      : '771px',
+                  }"
+                >
                   <div>
                     <div class="q-mr-xs q-mb-sm">
                       <DynamicFunctionPopUp

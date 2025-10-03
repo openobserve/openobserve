@@ -81,7 +81,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="field-function-menu-popup"
                 :data-test="`dashboard-latitude-item-${latitudeLabel}-menu`"
               >
-                <div style="padding: 3px 16px 16px 16px; width: 771px">
+                <div
+                  style="padding: 3px 16px 16px 16px"
+                  :style="{
+                    width: dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery
+                      ? 'auto'
+                      : '771px',
+                  }"
+                >
                   <DynamicFunctionPopUp
                     v-model="
                       dashboardPanelData.data.queries[
@@ -187,7 +196,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="field-function-menu-popup"
                 :data-test="`dashboard-longitude-item-${longitudeLabel}-menu`"
               >
-                <div style="padding: 3px 16px 16px 16px; width: 771px">
+                <div
+                  style="padding: 3px 16px 16px 16px"
+                  :style="{
+                    width: dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery
+                      ? 'auto'
+                      : '771px',
+                  }"
+                >
                   <DynamicFunctionPopUp
                     v-model="
                       dashboardPanelData.data.queries[
@@ -293,7 +311,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="field-function-menu-popup"
                 :data-test="`dashboard-weight-item-${weightLabel}-menu`"
               >
-                <div style="padding: 3px 16px 16px 16px; width: 771px">
+                <div
+                  style="padding: 3px 16px 16px 16px"
+                  :style="{
+                    width: dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery
+                      ? 'auto'
+                      : '771px',
+                  }"
+                >
                   <DynamicFunctionPopUp
                     v-model="
                       dashboardPanelData.data.queries[
