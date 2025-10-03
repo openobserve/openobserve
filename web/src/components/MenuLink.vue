@@ -134,9 +134,11 @@ export default defineComponent({
     };
 
     // Phase 5: Accessibility - compute active state
-    const isActive = computed(() => {
-      return router.currentRoute.value.path.indexOf(props.link) === 0 && props.link !== '/';
-    });
+    // Use the computed isActive property instead of duplicating logic
+    :class="{
+      'q-router-link--active': isActive,
+      'q-link-function': title == 'Functions',
+    }"
 
     // Phase 5: Accessibility - compute ARIA label with fallback
     const ariaLabel = computed(() => {
