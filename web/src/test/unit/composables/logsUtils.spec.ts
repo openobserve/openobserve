@@ -130,21 +130,21 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
       expect(result).toBe(true);
     });
 
-    it("should return true when timestamp field is aliased as itself", () => {
+    it("should return false when timestamp field is aliased as itself with AS keyword", () => {
       const query = "SELECT _timestamp AS _timestamp FROM logs";
       mockSearchObj.data.query = query;
 
       const result = logsUtilsInstance.checkTimestampAlias(query);
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
 
-    it("should debug the exact query from user", () => {
+    it("should return false when timestamp is aliased with double quotes", () => {
       const query = 'SELECT _timestamp AS _timestamp FROM "default"';
       mockSearchObj.data.query = query;
 
       const result = logsUtilsInstance.checkTimestampAlias(query);
-      
-      expect(result).toBe(true);
+
+      expect(result).toBe(false);
     });
   });
 
@@ -491,18 +491,20 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
     it("should work with different timestamp column names", () => {
       // Change the timestamp column name
       mockStore.state.zoConfig.timestamp_column = "event_time";
+      // Recreate instance to pick up new timestamp column name
+      const customInstance = logsUtils();
 
       const validQuery = "SELECT event_time FROM logs";
       const invalidQuery = "SELECT created_at AS event_time FROM logs";
 
       // Test valid case
       mockSearchObj.data.query = validQuery;
-      let result = logsUtilsInstance.checkTimestampAlias(validQuery);
+      let result = customInstance.checkTimestampAlias(validQuery);
       expect(result).toBe(true);
 
       // Test invalid case
       mockSearchObj.data.query = invalidQuery;
-      result = logsUtilsInstance.checkTimestampAlias(invalidQuery);
+      result = customInstance.checkTimestampAlias(invalidQuery);
       expect(result).toBe(false);
 
       // Reset for other tests
@@ -512,6 +514,8 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
     it("should handle custom timestamp column in complex queries", () => {
       // Change the timestamp column name
       mockStore.state.zoConfig.timestamp_column = "log_timestamp";
+      // Recreate instance to pick up new timestamp column name
+      const customInstance = logsUtils();
 
       const query = `
         WITH recent AS (
@@ -522,7 +526,7 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
       `;
       mockSearchObj.data.query = query;
 
-      const result = logsUtilsInstance.checkTimestampAlias(query);
+      const result = customInstance.checkTimestampAlias(query);
       expect(result).toBe(false);
 
       // Reset for other tests
@@ -606,6 +610,386 @@ describe("logsUtils - checkTimestampAlias (Fixed Implementation)", () => {
 
       const result = logsUtilsInstance.checkTimestampAlias(query);
       expect(result).toBe(true);
+    });
+  });
+
+  describe("Quote format variations - Double quotes, Single quotes, No quotes", () => {
+    describe("Simple field aliases with different quote formats", () => {
+      it("should return false when field uses double-quoted timestamp alias", () => {
+        const query = 'SELECT created_at AS "_timestamp" FROM logs';
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false when field uses single-quoted timestamp alias", () => {
+        const query = "SELECT created_at AS '_timestamp' FROM logs";
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false when field uses unquoted timestamp alias", () => {
+        const query = "SELECT created_at AS _timestamp FROM logs";
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false when timestamp field uses double-quoted alias to itself", () => {
+        const query = 'SELECT _timestamp AS "_timestamp" FROM logs';
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false when timestamp field uses single-quoted alias to itself", () => {
+        const query = "SELECT _timestamp AS '_timestamp' FROM logs";
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+    });
+
+    describe("Histogram function with different quote formats", () => {
+      it("should return false for histogram with double-quoted timestamp alias", () => {
+        const query = 'SELECT histogram(_timestamp) as "_timestamp", count(kubernetes_namespace_name) as "y_axis_1", kubernetes_namespace_name as "breakdown_1" FROM "ks" GROUP BY _timestamp, breakdown_1 ORDER BY _timestamp ASC';
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for histogram with single-quoted timestamp alias", () => {
+        const query = "SELECT histogram(_timestamp) as '_timestamp', count(kubernetes_namespace_name) as \"y_axis_1\", kubernetes_namespace_name as \"breakdown_1\" FROM \"ks\" GROUP BY _timestamp, breakdown_1 ORDER BY _timestamp ASC";
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for histogram with unquoted timestamp alias", () => {
+        const query = 'SELECT histogram(_timestamp) as _timestamp, count(kubernetes_namespace_name) as "y_axis_1", kubernetes_namespace_name as "breakdown_1" FROM "ks" GROUP BY _timestamp, breakdown_1 ORDER BY _timestamp ASC';
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return true for valid histogram query without timestamp alias", () => {
+        const query = 'SELECT histogram(_timestamp) as "time_bucket", count(kubernetes_namespace_name) as "y_axis_1", kubernetes_namespace_name as "breakdown_1" FROM "ks" GROUP BY time_bucket, breakdown_1 ORDER BY time_bucket ASC';
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(true);
+      });
+    });
+
+    describe("Aggregation functions with different quote formats", () => {
+      it("should return false for MAX function with double-quoted timestamp alias", () => {
+        const query = 'SELECT MAX(created_at) AS "_timestamp", user_id FROM logs GROUP BY user_id';
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for MAX function with single-quoted timestamp alias", () => {
+        const query = "SELECT MAX(created_at) AS '_timestamp', user_id FROM logs GROUP BY user_id";
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for MIN function with unquoted timestamp alias", () => {
+        const query = "SELECT MIN(event_time) AS _timestamp FROM events";
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for DATE_TRUNC with double-quoted timestamp alias", () => {
+        const query = 'SELECT DATE_TRUNC(\'hour\', log_time) AS "_timestamp", COUNT(*) FROM logs GROUP BY DATE_TRUNC(\'hour\', log_time)';
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for DATE_TRUNC with single-quoted timestamp alias", () => {
+        const query = "SELECT DATE_TRUNC('hour', log_time) AS '_timestamp', COUNT(*) FROM logs GROUP BY DATE_TRUNC('hour', log_time)";
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+    });
+
+    describe("Complex queries with mixed quote formats", () => {
+      it("should return false for query with multiple aliased columns including single-quoted timestamp", () => {
+        const query = `
+          SELECT
+            user_id as "user",
+            event_date AS '_timestamp',
+            action as "action_type"
+          FROM events
+        `;
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for query with multiple aliased columns including double-quoted timestamp", () => {
+        const query = `
+          SELECT
+            user_id as 'user',
+            event_date AS "_timestamp",
+            action as 'action_type'
+          FROM events
+        `;
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for CTE with single-quoted timestamp alias", () => {
+        const query = `
+          WITH recent_logs AS (
+            SELECT event_time AS '_timestamp', user_id
+            FROM events
+            WHERE event_time > '2023-01-01'
+          )
+          SELECT '_timestamp', user_id FROM recent_logs
+        `;
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for JOIN query with double-quoted timestamp alias", () => {
+        const query = `
+          SELECT l.log_time AS "_timestamp", l.message, u.username
+          FROM logs l
+          JOIN users u ON l.user_id = u.id
+        `;
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for subquery with single-quoted timestamp alias", () => {
+        const query = `
+          SELECT message, (
+            SELECT MAX(created_at) AS '_timestamp'
+            FROM events
+            WHERE user_id = logs.user_id
+          ) AS latest_event
+          FROM logs
+        `;
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+    });
+
+    describe("Complicated real-world dashboard queries with all quote formats", () => {
+      it("should return false for dashboard panel query with double-quoted histogram alias", () => {
+        const query = `
+          SELECT
+            histogram(_timestamp, '5m') as "_timestamp",
+            COUNT(*) as "total_requests",
+            AVG(response_time) as "avg_response",
+            service_name as "service"
+          FROM api_logs
+          WHERE _timestamp >= NOW() - INTERVAL '1 hour'
+          GROUP BY histogram(_timestamp, '5m'), service_name
+          ORDER BY histogram(_timestamp, '5m') ASC
+        `;
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for dashboard panel query with single-quoted histogram alias", () => {
+        const query = `
+          SELECT
+            histogram(_timestamp, '1h') as '_timestamp',
+            COUNT(DISTINCT user_id) as 'unique_users',
+            SUM(bytes_sent) as 'total_bytes',
+            status_code as 'status'
+          FROM access_logs
+          WHERE _timestamp >= NOW() - INTERVAL '24 hours'
+          GROUP BY histogram(_timestamp, '1h'), status_code
+          ORDER BY histogram(_timestamp, '1h') ASC
+        `;
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for multi-breakdown dashboard query with mixed quotes", () => {
+        const query = `
+          SELECT
+            DATE_TRUNC('minute', event_time) AS "_timestamp",
+            COUNT(*) as "count",
+            environment as 'env',
+            region as "region",
+            pod_name as 'pod'
+          FROM kubernetes_events
+          WHERE event_time >= NOW() - INTERVAL '30 minutes'
+          GROUP BY DATE_TRUNC('minute', event_time), environment, region, pod_name
+          ORDER BY DATE_TRUNC('minute', event_time) DESC
+        `;
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for percentile calculation with single-quoted alias", () => {
+        const query = `
+          SELECT
+            FLOOR(log_timestamp / 60000) * 60000 AS '_timestamp',
+            PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY duration) as 'p50',
+            PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY duration) as 'p95',
+            PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY duration) as 'p99'
+          FROM request_logs
+          WHERE log_timestamp >= UNIX_TIMESTAMP() - 3600
+          GROUP BY FLOOR(log_timestamp / 60000)
+        `;
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return true for valid complex dashboard query without timestamp alias", () => {
+        const query = `
+          SELECT
+            histogram(_timestamp, '5m') as "time_bucket",
+            COUNT(*) as "total_requests",
+            AVG(response_time) as "avg_response",
+            service_name as "service"
+          FROM api_logs
+          WHERE _timestamp >= NOW() - INTERVAL '1 hour'
+          GROUP BY histogram(_timestamp, '5m'), service_name
+          ORDER BY histogram(_timestamp, '5m') ASC
+        `;
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(true);
+      });
+    });
+
+    describe("Edge cases with quote handling", () => {
+      it("should handle query with escaped quotes in string literals", () => {
+        const query = `
+          SELECT
+            _timestamp,
+            message,
+            'It\\'s a test' as description
+          FROM logs
+          WHERE message LIKE '%\\"test\\"%'
+        `;
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(true);
+      });
+
+      it("should return false when timestamp alias appears in WHERE clause with double quotes", () => {
+        const query = 'SELECT log_date AS "_timestamp" FROM logs WHERE log_date > NOW()';
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false when timestamp alias appears with extra whitespace and single quotes", () => {
+        const query = "SELECT   created_at   AS   '_timestamp'   FROM   logs";
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for CAST function with double-quoted timestamp alias", () => {
+        const query = 'SELECT CAST(event_date AS TIMESTAMP) AS "_timestamp" FROM events';
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for COALESCE with single-quoted timestamp alias", () => {
+        const query = "SELECT COALESCE(updated_at, created_at) AS '_timestamp' FROM records";
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should handle quoted table and column names without false positives", () => {
+        const query = `
+          SELECT
+            "_timestamp" as time_column,
+            "user"."name" as username
+          FROM "logs"."_timestamp"
+        `;
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(true);
+      });
+
+      it("should return false for nested function with all quote variations", () => {
+        const query = 'SELECT EXTRACT(EPOCH FROM log_time) AS "_timestamp" FROM logs';
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+    });
+
+    describe("Case sensitivity with different quote formats", () => {
+      it("should return false for uppercase AS with double-quoted timestamp", () => {
+        const query = 'SELECT created_at AS "_timestamp" FROM logs';
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for lowercase as with single-quoted timestamp", () => {
+        const query = "SELECT created_at as '_timestamp' FROM logs";
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
+
+      it("should return false for mixed case As with unquoted timestamp", () => {
+        const query = "SELECT created_at As _timestamp FROM logs";
+        mockSearchObj.data.query = query;
+
+        const result = logsUtilsInstance.checkTimestampAlias(query);
+        expect(result).toBe(false);
+      });
     });
   });
 });
