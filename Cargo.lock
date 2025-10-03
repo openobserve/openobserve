@@ -6758,6 +6758,7 @@ dependencies = [
  "rust-embed-for-web",
  "rustls 0.23.20",
  "rustls-pemfile 2.2.0",
+ "scc",
  "sea-orm",
  "segment",
  "serde",
@@ -8959,6 +8960,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 
 [[package]]
+name = "saa"
+version = "4.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d568b02a433a98d20e7dc1a8b3077163629fe1e86c89fb95e31798324137a925"
+
+[[package]]
 name = "salsa20"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8974,6 +8981,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "scc"
+version = "3.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b502f85d09e86afa08920ba0e320d9919e0edfb57aa6d7f7947d9961f789cdd7"
+dependencies = [
+ "equivalent",
+ "saa",
+ "sdd",
 ]
 
 [[package]]
@@ -9000,6 +9018,12 @@ dependencies = [
  "ring",
  "untrusted",
 ]
+
+[[package]]
+name = "sdd"
+version = "4.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "289309f6b5c6a090488f188a75e98d96007e763b892018de92b5889eb09a03f4"
 
 [[package]]
 name = "sea-bae"

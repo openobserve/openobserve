@@ -20,6 +20,8 @@ use config::{
     meta::stream::StreamType,
 };
 
+use crate::service::db::file_list::local::FILE_DELETION_MANAGER;
+
 pub mod broadcast;
 pub mod parquet;
 
@@ -29,7 +31,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     // load pending delete files to memory cache
-    crate::service::db::file_list::local::load_pending_delete().await?;
+    FILE_DELETION_MANAGER.reload_pending_from_local().await?;
 
     tokio::task::spawn(parquet::run());
     tokio::task::spawn(broadcast::run());

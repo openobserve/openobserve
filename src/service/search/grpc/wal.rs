@@ -26,7 +26,7 @@ use config::{
         stream::{FileKey, StreamParams, StreamPartition},
     },
     utils::{
-        async_file::{create_wal_dir_datetime_filter, scan_files_filtered},
+        async_file::{FilterResult, create_wal_dir_datetime_filter, scan_files_filtered},
         file::is_exists,
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
         record_batch_ext::concat_batches,
@@ -47,7 +47,8 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use crate::{
     common::infra::wal,
     service::{
-        db, file_list,
+        db::{self, file_list::local::FILE_DELETION_MANAGER},
+        file_list,
         search::{
             datafusion::{exec::TableBuilder, table_provider::memtable::NewMemTable},
             generate_filter_from_equal_items, generate_search_schema_diff,
@@ -597,7 +598,7 @@ async fn get_file_list(
 
         scan_files_filtered(&pattern, filter, None).await?
     } else {
-        scan_files_filtered(&pattern, |_| true, None).await?
+        scan_files_filtered(&pattern, |_| FilterResult::Static(true), None).await?
     };
 
     let files = files
@@ -634,7 +635,7 @@ async fn get_file_list(
     }
 
     // filter by pending delete
-    let mut files = crate::service::db::file_list::local::filter_by_pending_delete(files).await;
+    let mut files = FILE_DELETION_MANAGER.filter_for_active(files).await;
     if files.is_empty() {
         return Ok(vec![]);
     }
