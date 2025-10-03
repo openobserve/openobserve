@@ -28,6 +28,7 @@ import {
 } from "@/ts/interfaces/query";
 import { logsErrorMessage } from "@/utils/common";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
+import { useI18n } from "vue-i18n";
 
 export const useSearchResponseHandler = () => {
   const { showErrorNotification, showCancelSearchNotification } =
@@ -41,6 +42,8 @@ export const useSearchResponseHandler = () => {
   const { refreshPagination } = useSearchPagination();
 
   const store = useStore();
+  const { t } = useI18n();
+
   const {
     searchObj,
     searchObjDebug,
@@ -539,6 +542,11 @@ export const useSearchResponseHandler = () => {
       searchObj.data.countErrorMsg = "Error while retrieving total events: ";
       if (trace_id) searchObj.data.countErrorMsg += " TraceID: " + trace_id;
       notificationMsg.value = searchObj.data.countErrorMsg;
+    } else if (request.type === "histogram") {
+      searchObj.data.histogram.errorMsg = errorMsg;
+      searchObj.data.histogram.errorCode = code || 0;
+      searchObj.data.histogram.errorDetail = error_detail || "";
+      notificationMsg.value = errorMsg;
     } else {
       searchObj.data.errorDetail = error_detail || "";
       searchObj.data.errorMsg = errorMsg;
@@ -561,7 +569,7 @@ export const useSearchResponseHandler = () => {
 
     const customMessage = logsErrorMessage(code || 0);
     if (customMessage) {
-      errorMsg = customMessage;
+      errorMsg = t(customMessage);
     }
 
     if (trace_id) {
