@@ -206,14 +206,14 @@ pub async fn get_enrichment_table_json(
         .unwrap_or_default();
 
     if (db_stats.end_time > local_stats_last_updated) || local_stats_last_updated == 0 {
-        log::debug!("get_enrichment_table_json: fetching from remote: {org_id}/{table_name}");
+        log::info!("get_enrichment_table_json: fetching from remote: {org_id}/{table_name}");
         let data =
             crate::service::db::enrichment_table::get_enrichment_table_data(org_id, table_name)
                 .await?;
         records.extend(data);
     } else {
         // fetch from local cache and put into records
-        log::debug!("get_enrichment_table_json: fetching from local: {org_id}/{table_name}");
+        log::info!("get_enrichment_table_json: fetching from local: {org_id}/{table_name}");
         let data = storage::local::retrieve(org_id, table_name).await?;
         records.extend(data);
     }
