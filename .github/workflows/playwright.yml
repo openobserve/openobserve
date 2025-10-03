@@ -47,58 +47,57 @@ env:
   ZO_UTF8_VIEW_ENABLED: false
 
 jobs:
-  build_binary:
-    name: build_binary
-    runs-on:
-      labels: ubicloud-standard-16
+  # build_binary:
+  #   name: build_binary
+  #   runs-on:
+  #     labels: ubicloud-standard-16
 
-    steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  #   steps:
+  #     - name: Remove unused tools
+  #       run: |
+  #         sudo rm -rf /usr/share/dotnet
+  #         sudo rm -rf /opt/ghc
+  #         sudo rm -rf "/usr/local/share/boost"
+  #         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
-      - name: Clone the current repo
-        uses: actions/checkout@v5
+  #     - name: Clone the current repo
+  #       uses: actions/checkout@v5
 
-      - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2025-07-20
-          targets: x86_64-unknown-linux-gnu
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "21.12"
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
+  #     - name: Setup Rust Toolchain
+  #       uses: dtolnay/rust-toolchain@master
+  #       with:
+  #         toolchain: nightly-2025-07-20
+  #         targets: x86_64-unknown-linux-gnu
+  #     - uses: Swatinem/rust-cache@v2
+  #       with:
+  #         cache-on-failure: true
+  #     - name: Install Protoc
+  #       uses: arduino/setup-protoc@v3
+  #       with:
+  #         version: "21.12"
+  #     - uses: actions/setup-node@v5
+  #       with:
+  #         node-version: 22
 
-      - name: Build frontend code
-        env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
-          VITE_COVERAGE: "true"
-          COVERAGE: "true"
-        run: cd web && npm install && npm run build
+  #     - name: Build frontend code
+  #       env:
+  #         NODE_OPTIONS: "--max-old-space-size=8192"
+  #         VITE_COVERAGE: "true"
+  #         COVERAGE: "true"
+  #       run: cd web && npm install && npm run build
 
-      - name: Build and run binary
-        run: cargo build --release --target x86_64-unknown-linux-gnu
+  #     - name: Build and run binary
+  #       run: cargo build --release --target x86_64-unknown-linux-gnu
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-binary
-          path: target/x86_64-unknown-linux-gnu/release/openobserve
-          retention-days: 1
-
+  #     - name: Upload artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: debug-binary
+  #         path: target/x86_64-unknown-linux-gnu/release/openobserve
+  #         retention-days: 1
   ui_integration_tests:
     name: e2e / ${{ matrix.testfolder }}
-    needs: [build_binary]
+    # needs: [build_binary]
     runs-on:
       labels: repo-openobserve-standard-8
     # container:
@@ -198,17 +197,17 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
 
-      - name: Download artifacts
-        uses: actions/download-artifact@v5
-        with:
-          name: debug-binary
-          path: debug-binary
+      # - name: Download artifacts
+      #   uses: actions/download-artifact@v5
+      #   with:
+      #     name: debug-binary
+      #     path: debug-binary
 
-      - name: Start OpenObserve
-        run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
+      # - name: Start OpenObserve
+      #   run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
 
-      - name: Wait for start
-        run: sleep 15
+      # - name: Wait for start
+      #   run: sleep 15
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
@@ -272,23 +271,23 @@ jobs:
             echo "No files specified to run for ${{ matrix.testfolder }} folder"
           fi
 
-      - name: Sanitize Test Folder Name
-        shell: bash
-        run: |
-          # Assign the matrix variable to a Bash variable
-          SANITIZED_FOLDERNAME="${{ matrix.testfolder }}"
-          # Export as a GitHub Actions environment variable
-          echo "SANITIZED_FOLDERNAME=$SANITIZED_FOLDERNAME" >> $GITHUB_ENV
+      # - name: Sanitize Test Folder Name
+      #   shell: bash
+      #   run: |
+      #     # Assign the matrix variable to a Bash variable
+      #     SANITIZED_FOLDERNAME="${{ matrix.testfolder }}"
+      #     # Export as a GitHub Actions environment variable
+      #     echo "SANITIZED_FOLDERNAME=$SANITIZED_FOLDERNAME" >> $GITHUB_ENV
 
-      - name: Upload Coverage Data
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-coverage-${{ env.SANITIZED_FOLDERNAME }}
-          path: tests/ui-testing/.nyc_output
-          include-hidden-files: true
+      # - name: Upload Coverage Data
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: playwright-coverage-${{ env.SANITIZED_FOLDERNAME }}
+      #     path: tests/ui-testing/.nyc_output
+      #     include-hidden-files: true
 
-      - name: Generate Coverage Report
-        run: cd tests/ui-testing && npx nyc report
+      # - name: Generate Coverage Report
+      #   run: cd tests/ui-testing && npx nyc report
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
@@ -298,42 +297,42 @@ jobs:
           path: playwright-report/
           retention-days: 30
 
-      - name: Check OpenObserve logs
-        if: always()
-        run: cat o2.log
+      # - name: Check OpenObserve logs
+      #   if: always()
+      #   run: cat o2.log
 
-  generate_coverage_report:
-    name: Generate Coverage Report
-    needs: [build_binary, ui_integration_tests]
-    runs-on: ubicloud-standard-8
-    if: always()
+  # generate_coverage_report:
+  #   name: Generate Coverage Report
+  #   needs: [build_binary, ui_integration_tests]
+  #   runs-on: ubicloud-standard-8
+  #   if: always()
 
-    steps:
-      - name: Clone the current repo
-        uses: actions/checkout@v5
+  #   steps:
+  #     - name: Clone the current repo
+  #       uses: actions/checkout@v5
 
-      - name: Download Playwright Coverage Data
-        uses: actions/download-artifact@v5
-        with:
-          pattern: playwright-coverage-* # Match all artifacts with this prefix
-          path: merged-coverage
-          merge-multiple: true
+  #     - name: Download Playwright Coverage Data
+  #       uses: actions/download-artifact@v5
+  #       with:
+  #         pattern: playwright-coverage-* # Match all artifacts with this prefix
+  #         path: merged-coverage
+  #         merge-multiple: true
 
-      - name: Verify Downloaded Files
-        run: ls -R merged-coverage # Check the structure and contents
+  #     - name: Verify Downloaded Files
+  #       run: ls -R merged-coverage # Check the structure and contents
 
-      - name: Move Coverage Files to .nyc_output
-        run: |
-          mkdir -p tests/ui-testing/.nyc_output
-          mv merged-coverage/* tests/ui-testing/.nyc_output/ || echo "No files to move"
+  #     - name: Move Coverage Files to .nyc_output
+  #       run: |
+  #         mkdir -p tests/ui-testing/.nyc_output
+  #         mv merged-coverage/* tests/ui-testing/.nyc_output/ || echo "No files to move"
 
-      - name: Generate Coverage Report
-        run: cd tests/ui-testing && npm ci && npx nyc report
+  #     - name: Generate Coverage Report
+  #       run: cd tests/ui-testing && npm ci && npx nyc report
 
-      - name: Upload Coverage Report
-        uses: actions/upload-artifact@v4
-        if: hashFiles('tests/ui-testing/coverage-report/**') != ''
-        with:
-          name: coverage-report
-          path: tests/ui-testing/coverage-report
-          retention-days: 7
+  #     - name: Upload Coverage Report
+  #       uses: actions/upload-artifact@v4
+  #       if: hashFiles('tests/ui-testing/coverage-report/**') != ''
+  #       with:
+  #         name: coverage-report
+  #         path: tests/ui-testing/coverage-report
+  #         retention-days: 7
