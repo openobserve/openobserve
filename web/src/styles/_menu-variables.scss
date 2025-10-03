@@ -1,0 +1,127 @@
+// Menu Modernization Variables
+// Phase 1: Foundation & Structure
+
+// ============================================
+// Dark Mode Colors
+// ============================================
+
+// Background
+$menu-bg-dark: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+$menu-border-dark: rgba(71, 85, 105, 0.5);
+
+// Active State
+$active-bg-dark: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.2) 100%);
+$active-border-dark: rgba(168, 85, 247, 0.3);
+$active-icon-dark: #a855f7; // purple-400
+$active-text-dark: #ffffff;
+$active-glow-dark: 0 0 8px rgba(168, 85, 247, 0.5);
+
+// Hover State
+$hover-bg-dark: rgba(30, 41, 59, 1); // slate-800
+$hover-icon-dark: #cbd5e1; // slate-300
+$hover-text-dark: #cbd5e1;
+
+// Default State
+$default-icon-dark: #94a3b8; // slate-400
+$default-text-dark: #64748b; // slate-500
+
+// Badge
+$badge-bg: linear-gradient(135deg, #ef4444 0%, #ec4899 100%);
+$badge-shadow: 0 4px 8px rgba(239, 68, 68, 0.5);
+$badge-ring: 2px solid #0f172a;
+
+// ============================================
+// Light Mode Colors
+// ============================================
+
+// Background
+$menu-bg-light: rgba(255, 255, 255, 0.8);
+$menu-border-light: rgba(226, 232, 240, 0.5);
+
+// Active State
+$active-bg-light: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%);
+$active-border-light: rgba(59, 130, 246, 0.4);
+$active-icon-light: #2563eb; // blue-600
+$active-text-light: #1e40af; // blue-700
+$active-glow-light: 0 0 8px rgba(37, 99, 235, 0.4);
+$active-shadow-light: 0 4px 8px rgba(59, 130, 246, 0.2);
+
+// Hover State
+$hover-bg-light: rgba(241, 245, 249, 0.6); // gray-100/60
+$hover-icon-light: #374151; // gray-700
+$hover-text-light: #374151;
+
+// Default State
+$default-icon-light: #6b7280; // gray-500
+$default-text-light: #9ca3af; // gray-600
+
+// Badge Light
+$badge-bg-light: linear-gradient(135deg, #ef4444 0%, #ec4899 100%);
+$badge-shadow-light: 0 4px 8px rgba(239, 68, 68, 0.3);
+$badge-ring-light: 2px solid #ffffff;
+
+// ============================================
+// Typography
+// ============================================
+
+$label-font-size: 11px;
+$label-font-weight-default: 500;
+$label-font-weight-active: 600;
+$label-line-height: 1.2;
+$label-letter-spacing: 0.02em;
+
+// ============================================
+// Spacing & Sizing
+// ============================================
+
+// Container
+$menu-width: 96px;
+$menu-padding-y: 24px;
+$menu-border-radius: 16px;
+
+// Menu Items
+$item-height: 64px;
+$item-padding-y: 16px;
+$item-margin-bottom: 4px;
+$item-border-radius: 12px;
+
+// Icons
+$icon-size: 22px;
+$icon-stroke-width-default: 2px;
+$icon-stroke-width-active: 2.5px;
+$icon-margin-bottom: 8px;
+
+// Icon Container
+$icon-container-padding: 10px;
+$icon-container-border-radius: 12px;
+
+// Badge
+$badge-size: 16px;
+$badge-font-size: 9px;
+$badge-offset-top: -4px;
+$badge-offset-right: -8px;
+
+// Active Indicator (Left Border)
+$indicator-width: 4px;
+$indicator-height: 48px;
+$indicator-border-radius: 0 2px 2px 0;
+
+// ============================================
+// Effects & Animations
+// ============================================
+
+// Transitions
+$transition-standard: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+$transition-slow: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+// Transforms
+$scale-active: 1.05;
+$scale-hover: 1.02;
+
+// Backdrop Filter
+$backdrop-blur: blur(12px);
+
+// Shadows
+$shadow-container: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+$shadow-active-dark: 0 8px 16px rgba(168, 85, 247, 0.4);
+$shadow-active-light: 0 4px 12px rgba(59, 130, 246, 0.2);
