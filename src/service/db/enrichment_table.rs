@@ -64,16 +64,11 @@ pub async fn get_enrichment_table_data(
     // do search
     match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
         Ok(res) => {
-            if !res.hits.is_empty() {
-                log::info!(
-                    "get enrichment table {org_id}/{name} data success with hits: {}",
-                    res.hits.len()
-                );
-                Ok(res.hits)
-            } else {
-                log::info!("get enrichment table {org_id}/{name} data success with no hits",);
-                Ok(vec![])
-            }
+            log::info!(
+                "get enrichment table {org_id}/{name} data success with hits: {}",
+                res.hits.len()
+            );
+            Ok(res.hits)
         }
         Err(err) => {
             log::error!("get enrichment table {org_id}/{name} data error: {err}",);
