@@ -128,6 +128,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="toggleUserSelection(slotProps.column.row)"
             />
           </template>
+          <template v-slot:email="slotProps: any">
+            <div class="flex items-center">
+              <span>{{ slotProps.column.row.email }}</span>
+              <q-icon
+                v-if="shouldShowWarning(slotProps.column.row)"
+                name="info"
+                color="warning"
+                size="16px"
+                class="q-ml-xs cursor-pointer"
+                :data-test="`iam-external-user-warning-icon-${slotProps.column.row.email}`"
+              >
+                <q-tooltip
+                  anchor="center right"
+                  self="center left"
+                  :offset="[10, 0]"
+                  max-width="300px"
+                >
+                  <div style="font-size: 12px; line-height: 1.5;">
+                    <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
+                    <div class="q-mt-xs">{{ t("iam.externalUserWarningMessage") }}</div>
+                  </div>
+                </q-tooltip>
+              </q-icon>
+            </div>
+          </template>
         </app-table>
       </template>
       <div
@@ -168,6 +193,10 @@ const props = defineProps({
   removedUsers: {
     type: Set,
     default: () => new Set(),
+  },
+  context: {
+    type: String,
+    default: "group", // "group" or "role"
   },
 });
 
@@ -230,6 +259,8 @@ const columns = computed(() => {
       label: t("iam.userName"),
       align: "left",
       sortable: true,
+      slot: true,
+      slotName: "email",
     },
   ];
 
@@ -330,13 +361,14 @@ const getchOrgUsers = async () => {
     );
 
     usersState.users = cloneDeep(
-      data.map((user: any, index: number) => {  
+      data.map((user: any, index: number) => {
         return {
           email: user.email,
           "#": index + 1,
           isInGroup: groupUsersMap.value.has(user.email),
           org: user.orgs?.length > 0 ? user.orgs.map((org:{ org_name: string }) => org.org_name).join(", ") : "", // Set default "N/A" for users with no orgs
-          role:user.role
+          role: user.role,
+          is_external: user.is_external || false
         };
       })
     );
@@ -348,7 +380,8 @@ const getchOrgUsers = async () => {
           email: user.email,
           isInGroup: groupUsersMap.value.has(user.email),
           org: user.org,
-          role:user.role
+          role: user.role,
+          is_external: user.is_external || false
         };
       }
     );
@@ -370,6 +403,24 @@ const toggleUserSelection = (user: any) => {
   if (!user.isInGroup && props.addedUsers.has(user.email)) {
     props.removedUsers.delete(user.email);
   }
+};
+
+const shouldShowWarning = (user: any) => {
+  // Show warning icon for external users being newly added to roles
+  // Warning conditions:
+  // 1. context === "role" - Only show for roles, not for groups
+  // 2. user.is_external - User is marked as external (e.g., from AD/LDAP)
+  // 3. user.isInGroup - User is currently selected/checked in the UI
+  // 4. !groupUsersMap.has(email) - User was NOT already in the role (newly added)
+  //
+  // Note: We don't warn for users already in the role as they might have
+  // been added through AD groups and we don't want to show false warnings
+  return (
+    props.context === "role" &&
+    user.is_external &&
+    user.isInGroup &&
+    !groupUsersMap.value.has(user.email)
+  );
 };
 
 const filterUsers = (rows: any[], term: string) => {
