@@ -27,7 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         aria-label="Streams overview section"
          >
           <div class="row justify-between items-center streams-header">
-            <div class="section-header">Streams</div>
+            <div class="row tw-items-center tw-gap-2">
+              <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                <q-icon :name="outlinedWindow" size="1.5rem" />
+              </div>
+              <div class="section-header">Streams</div>
+            </div>
               <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                aria-label="View all streams"
                >
@@ -198,11 +203,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
       <!-- 2nd section -->
-        <div class="charts-main-container row tw-gap-4 q-mt-md" style="display: flex; gap: 16px;">
+        <div class="charts-main-container">
           <!-- functions and dashboards tiles + 2 charts -->
-        <div class="xl:tw-flex-col lg:tw-flex md:tw-flex-row tw-justify-evenly sm:tw-justify-start tw-gap-4 md:tw-w-full xl:tw-w-fit " >
+        <div class="functions-dashboards-column">
 
-          <div class="tw-w-full lg:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
+          <div class="tile-wrapper">
             <div class="functions-tile-content rounded-borders text-center column justify-between"
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
               role="article"
@@ -236,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Tile 2 -->
-          <div class="tw-w-full lg:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
+          <div class="tile-wrapper">
             <div class="dashboards-tile-content rounded-borders text-center column justify-between"
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
               role="article"
@@ -270,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
                   <!-- Chart 1 -->
-          <div class="chart-container first-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[31%] tw-p-4"
+          <div class="chart-container first-chart-container rounded-borders tw-p-4"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
           role="region"
           aria-label="Alerts overview section"
@@ -315,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class="chart-container second-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[calc(100%-240px-31%-2rem)] tw-p-4"
+          <div class="chart-container second-chart-container rounded-borders tw-p-4"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
           role="region"
           aria-label="Pipelines overview section"
@@ -410,6 +415,7 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import store from "@/test/unit/helpers/store";
+import { outlinedWindow } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "PageHome",
@@ -823,7 +829,8 @@ export default defineComponent({
       animatedScheduledAlerts,
       animatedRtAlerts,
       animatedScheduledPipelines,
-      animatedRtPipelines
+      animatedRtPipelines,
+      outlinedWindow
     };
   },
   computed: {
@@ -894,17 +901,17 @@ export default defineComponent({
 
 // Mixin for common tile styles
 @mixin tile-base {
-  height: 160px;
-  padding: 16px;
-  border-radius: 8px;
+  height: 100%;
+  padding: 1rem;
+  border-radius: 0.5rem;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   contain: layout style paint;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 // Mixin for container base styles
 @mixin container-base {
-  border-radius: 8px;
+  border-radius: 0.5rem;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   animation: fadeInUp 0.5s ease-out backwards;
 }
@@ -1119,6 +1126,56 @@ export default defineComponent({
   contain: layout style;
 }
 
+// Layout for charts section
+.charts-main-container {
+  display: grid;
+  grid-template-columns: minmax(min-content, max-content) 1fr 2fr;
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: stretch;
+
+  // Responsive: stack on smaller screens
+  @media (max-width: 1280px) {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+}
+
+.functions-dashboards-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+
+  // On smaller screens, display as a row
+  @media (max-width: 1280px) {
+    flex-direction: row;
+  }
+
+  // On mobile, stack vertically again
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
+}
+
+.tile-wrapper {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+
+.functions-tile-content,
+.dashboards-tile-content {
+  width: 100%;
+  flex: 1;
+  min-width: 0;
+
+  // Only apply to the outer row (title + button), not the inner row (icon + title text)
+  > .column > .row.justify-between {
+    flex-wrap: nowrap;
+  }
+}
+
 .first-chart-container {
   border-left: 3px solid var(--accent-orange);
   animation-delay: 350ms;
@@ -1264,8 +1321,7 @@ export default defineComponent({
 .chart-container,
 .streams-container {
   &:hover {
-    box-shadow: 0 8px 25px var(--hover-shadow);
-    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--hover-shadow);
   }
 }
 
