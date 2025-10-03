@@ -16,17 +16,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-px-md" style="overflow-y: auto;" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
-    <div v-if="!no_data_ingest && !isLoadingSummary" class="column q-pt-md" style="height: auto; overflow-y: auto; ">
+    <div v-if="!no_data_ingest && !isLoadingSummary" class="q-pt-md" style="display: flex; flex-direction: column; gap: 16px;">
         <!-- 1st section -->
          <div>
           <TrialPeriod></TrialPeriod>
          </div>
-        <div class="streams-container q-pa-md"
+        <div class="streams-container"
         :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
+        role="region"
+        aria-label="Streams overview section"
          >
-          <div class="row justify-between items-center q-mb-md">
+          <div class="row justify-between items-center streams-header">
             <div class="section-header">Streams</div>
               <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+               aria-label="View all streams"
                >
                 <q-tooltip>View</q-tooltip>
                 <q-icon name="arrow_forward" class="view-arrow-icon" />
@@ -34,24 +37,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   exact
                   :to="{ name: 'logstreams' }"
                   class="absolute full-width full-height"
+                  aria-label="Navigate to streams page"
                 ></router-link>
             </q-btn>
           </div>
 
 
           <!-- Tiles -->
-          <div class="row wrap justify-evenly q-gutter-md ">
-            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+          <div class="tiles-grid">
+            <div class="tile">
+              <div class="tile-content rounded-borders text-center column justify-between "
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               style="height: 100%; gap: 12px">
+               role="article"
+               aria-label="Streams count statistics">
               <!-- Top Section (60%) -->
               <div class="column justify-between">
                 <!-- Title row -->
                 <div class="row justify-between">
-                  <div class="tile-title">   {{ t("home.streams") }}</div>
-                  <div class="tile-icon icon-bg-blue">
-                    <img :src="streamsIcon" />
+                  <div class="tile-title">{{ t("home.streams") }}</div>
+                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                    <img :src="streamsIcon" alt="" />
                   </div>
                 </div>
 
@@ -64,23 +69,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end ">
+            <div class="data-to-display row items-end " aria-live="polite">
               {{ animatedStreamsCount || summary.streams_count }}
             </div>
             </div>
             </div>
 
-            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+            <div class="tile">
+              <div class="tile-content rounded-borders text-center column justify-between "
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               style="height: 100%; gap: 12px">
+               role="article"
+               aria-label="Events count statistics">
               <!-- Top Section (60%) -->
               <div class="column justify-between" >
                 <!-- Title row -->
                 <div class="row justify-between">
-                  <div class="tile-title">   {{ t("home.docsCountLbl") }}</div>
-                  <div class="tile-icon icon-bg-blue">
-                    <img :src="recordsIcon" />
+                  <div class="tile-title">{{ t("home.docsCountLbl") }}</div>
+                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                    <img :src="recordsIcon" alt="" />
                   </div>
                 </div>
 
@@ -93,22 +99,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end ">
+            <div class="data-to-display row items-end " aria-live="polite">
               {{ formattedAnimatedEventsCount }}
             </div>
             </div>
             </div>
-            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+            <div class="tile">
+              <div class="tile-content rounded-borders text-center column justify-between "
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               style="height: 100%; gap: 12px">
+               role="article"
+               aria-label="Compressed data size statistics">
               <!-- Top Section (60%) -->
               <div class="column justify-between">
                 <!-- Title row -->
                 <div class="row justify-between">
-                  <div class="tile-title"> {{ t("home.totalDataCompressed") }}</div>
-                  <div class="tile-icon icon-bg-blue">
-                    <img :src="compressedSizeIcon" />
+                  <div class="tile-title">{{ t("home.totalDataCompressed") }}</div>
+                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                    <img :src="compressedSizeIcon" alt="" />
                   </div>
                 </div>
 
@@ -121,23 +128,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end ">
+            <div class="data-to-display row items-end " aria-live="polite">
               {{ formattedAnimatedCompressedSize }}
             </div>
             </div>
             </div>
 
-            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+            <div class="tile">
+              <div class="tile-content rounded-borders text-center column justify-between "
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               style="height: 100%; gap: 12px">
+               role="article"
+               aria-label="Ingested data size statistics">
               <!-- Top Section (60%) -->
               <div class="column justify-between" >
                 <!-- Title row -->
                 <div class="row justify-between">
-                  <div class="tile-title"> {{ t("home.totalDataIngested") }}</div>
-                  <div class="tile-icon icon-bg-blue">
-                    <img :src="ingestedSizeIcon" />
+                  <div class="tile-title">{{ t("home.totalDataIngested") }}</div>
+                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                    <img :src="ingestedSizeIcon" alt="" />
                   </div>
                 </div>
 
@@ -150,23 +158,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end ">
+            <div class="data-to-display row items-end " aria-live="polite">
               {{ formattedAnimatedIngestedSize }}
             </div>
             </div>
             </div>
 
-            <div class="tile" style="min-width: 240px; flex-grow: 1; max-width: 100%;">
-              <div class="tile-content q-pa-md rounded-borders text-center column justify-between "
+            <div class="tile">
+              <div class="tile-content rounded-borders text-center column justify-between "
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               style="height: 100%; gap: 12px">
+               role="article"
+               aria-label="Index size statistics">
               <!-- Top Section (60%) -->
               <div class="column justify-between">
                 <!-- Title row -->
                 <div class="row justify-between">
-                  <div class="tile-title">  {{ t("home.indexSizeLbl") }}</div>
-                  <div class="tile-icon icon-bg-blue">
-                    <img :src="indexSizeIcon" />
+                  <div class="tile-title">{{ t("home.indexSizeLbl") }}</div>
+                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                    <img :src="indexSizeIcon" alt="" />
                   </div>
                 </div>
 
@@ -179,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end ">
+            <div class="data-to-display row items-end " aria-live="polite">
               {{ formattedAnimatedIndexSize }}
             </div>
             </div>
@@ -189,22 +198,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
       <!-- 2nd section -->
-        <div class="charts-main-container row tw-gap-4 q-mt-md xl:tw-min-h-[330px] " style="display: flex; gap: 16px; height: calc(100% - 22px);  ">
+        <div class="charts-main-container row tw-gap-4 q-mt-md" style="display: flex; gap: 16px;">
           <!-- functions and dashboards tiles + 2 charts -->
         <div class="xl:tw-flex-col lg:tw-flex md:tw-flex-row tw-justify-evenly sm:tw-justify-start tw-gap-4 md:tw-w-full xl:tw-w-fit " >
 
           <div class="tw-w-full lg:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
-            <div class="functions-tile-content q-pa-md rounded-borders text-center column justify-between"
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'">
+            <div class="functions-tile-content rounded-borders text-center column justify-between"
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+              role="article"
+              aria-label="Functions count statistics">
               <div class="column justify-between">
                 <div class="row justify-between tw-items-center">
                   <div class="row tw-items-center tw-gap-2">
-                    <div class="tile-icon icon-bg-orange">
-                      <img :src="functionsIcon" />
+                    <div class="tile-icon icon-bg-orange" aria-hidden="true">
+                      <img :src="functionsIcon" alt="" />
                     </div>
                     <div class="tile-title">{{ t("home.functionTitle") }}</div>
                   </div>
                   <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                  aria-label="View all functions"
                   >
                       <q-tooltip>View</q-tooltip>
                       <q-icon name="arrow_forward" class="view-arrow-icon" />
@@ -212,11 +224,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       exact
                       :to="{ name: 'functionList' }"
                       class="absolute full-width full-height"
+                      aria-label="Navigate to functions page"
                     ></router-link>
                 </q-btn>
                 </div>
               </div>
-              <div class="data-to-display row items-end">
+              <div class="data-to-display row items-end" aria-live="polite">
                 {{ animatedFunctionCount || summary.function_count }}
               </div>
             </div>
@@ -224,17 +237,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Tile 2 -->
           <div class="tw-w-full lg:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
-            <div class="dashboards-tile-content q-pa-md rounded-borders text-center column justify-between"
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'">
+            <div class="dashboards-tile-content rounded-borders text-center column justify-between"
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+              role="article"
+              aria-label="Dashboards count statistics">
               <div class="column justify-between">
                 <div class="row justify-between tw-items-center">
                   <div class="row tw-items-center tw-gap-2">
-                    <div class="tile-icon icon-bg-orange">
-                      <img :src="dashboardsIcon" />
+                    <div class="tile-icon icon-bg-orange" aria-hidden="true">
+                      <img :src="dashboardsIcon" alt="" />
                     </div>
                     <div class="tile-title">{{ t("home.dashboardTitle") }}</div>
                   </div>
                   <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                  aria-label="View all dashboards"
                   >
                   <q-tooltip>View</q-tooltip>
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
@@ -242,47 +258,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       exact
                       :to="{ name: 'dashboards' }"
                       class="absolute full-width full-height"
+                      aria-label="Navigate to dashboards page"
                     ></router-link>
                 </q-btn>
                 </div>
               </div>
-              <div class="data-to-display row items-end">
+              <div class="data-to-display row items-end" aria-live="polite">
                 {{ animatedDashboardCount || summary.dashboard_count }}
               </div>
             </div>
           </div>
         </div>
-                  <!-- Chart 1 --> 
+                  <!-- Chart 1 -->
           <div class="chart-container first-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[31%] tw-p-4"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
+          role="region"
+          aria-label="Alerts overview section"
           >
             <div class="details-container">
               <div class="row justify-between items-center">
                 <span class="text-title tw-flex tw-items-center tw-gap-2">
-                  <div class="tile-icon icon-bg-blue">
-                      <img :src="alertsIcon" />
+                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                      <img :src="alertsIcon" alt="" />
                   </div>
                   {{ t("home.alertTitle") }}
                 </span>
-                <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
+                <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                aria-label="View all alerts">
                   <q-tooltip>View</q-tooltip>
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
                     :to="{ name: 'alertList' }"
                     class="absolute full-width full-height"
+                    aria-label="Navigate to alerts page"
                   ></router-link>
               </q-btn>
               </div>
               <div class="row q-pt-sm" style="gap: 16px;">
                 <div class="column">
                   <span class="text-subtitle">{{ t("home.scheduledAlert") }}</span>
-                  <span class="results-count">{{ animatedScheduledAlerts || summary.scheduled_alerts }}</span>
+                  <span class="results-count" aria-live="polite">{{ animatedScheduledAlerts || summary.scheduled_alerts }}</span>
                 </div>
                 <q-separator vertical />
                 <div class="column">
                   <span class="text-subtitle">{{ t("home.rtAlert") }}</span>
-                  <span class="results-count">{{ animatedRtAlerts || summary.rt_alerts }}</span>
+                  <span class="results-count" aria-live="polite">{{ animatedRtAlerts || summary.rt_alerts }}</span>
                 </div>
               </div>
             </div>
@@ -296,34 +317,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="chart-container second-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[calc(100%-240px-31%-2rem)] tw-p-4"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
+          role="region"
+          aria-label="Pipelines overview section"
           >
             <div class="details-container">
               <div class="row justify-between items-center">
                 <span class="text-title tw-flex tw-items-center tw-gap-2">
-                  <div class="tile-icon icon-bg-blue">
-                      <img :src="pipelinesIcon" />
+                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                      <img :src="pipelinesIcon" alt="" />
                   </div>
                   {{ t("home.pipelineTitle") }}
                 </span>
-                <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
+                <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                aria-label="View all pipelines">
                   <q-tooltip>View</q-tooltip>
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
                     :to="{ name: 'pipelines' }"
                     class="absolute full-width full-height"
+                    aria-label="Navigate to pipelines page"
                   ></router-link>
               </q-btn>
               </div>
               <div class="row q-pt-sm" style="gap: 16px;">
                 <div class="column">
                   <span class="text-subtitle"> {{ t("home.schedulePipelineTitle") }}</span>
-                  <span class="results-count">{{ animatedScheduledPipelines || summary.scheduled_pipelines }}</span>
+                  <span class="results-count" aria-live="polite">{{ animatedScheduledPipelines || summary.scheduled_pipelines }}</span>
                 </div>
                 <q-separator vertical />
                 <div class="column">
                   <span class="text-subtitle">{{ t("home.rtPipelineTitle") }}</span>
-                  <span class="results-count">{{ animatedRtPipelines || summary.rt_pipelines }}</span>
+                  <span class="results-count" aria-live="polite">{{ animatedRtPipelines || summary.rt_pipelines }}</span>
                 </div>
               </div>
             </div>
@@ -814,20 +839,110 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.streams-container {
+/*
+ * HomeView Styles - Refactored for consistency and maintainability
+ *
+ * Structure:
+ * 1. CSS Variables & Theme Mixins - Centralized theming system
+ * 2. Global Transitions - Smooth theme switching
+ * 3. Layout Components - Containers, grids, tiles
+ * 4. Interactive States - Hover, focus, animations
+ * 5. Responsive Design - Media queries and accessibility
+ */
+
+/* ===== 1. CSS Variables & Theme Mixins ===== */
+:root {
+  // Accent colors (theme-independent)
+  --accent-blue: #397EF6;
+  --accent-orange: #EE5F26;
+  --accent-purple: #9333EA;
+
+  // Light theme colors (default)
+  --tile-bg: #ffffff;
+  --tile-border: #E7EAEE;
+  --text-primary: #2E3133;
+  --text-secondary: #72777B;
+  --hover-shadow: rgba(0, 0, 0, 0.3);
+}
+
+// Mixin for dark theme variables
+@mixin dark-theme-vars {
+  --tile-bg: #2B2C2D;
+  --tile-border: #444444;
+  --text-primary: #CCCFD1;
+  --text-secondary: #B7B7B7;
+  --hover-shadow: rgba(0, 0, 0, 0.6);
+}
+
+// Mixin for light theme variables
+@mixin light-theme-vars {
+  --tile-bg: #ffffff;
+  --tile-border: #E7EAEE;
+  --text-primary: #2E3133;
+  --text-secondary: #72777B;
+  --hover-shadow: rgba(0, 0, 0, 0.3);
+}
+
+// Mixin for common tile styles
+@mixin tile-base {
+  height: 160px;
+  padding: 16px;
   border-radius: 8px;
-  box-sizing: border-box;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
-  border-left: 3px solid #397EF6;
+  contain: layout style paint;
+  gap: 8px;
+}
+
+// Mixin for container base styles
+@mixin container-base {
+  border-radius: 8px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
   animation: fadeInUp 0.5s ease-out backwards;
 }
-.dark-stream-container {
-  background: #2B2C2D;
-  border: 1px solid #444444;
+
+// Apply dark theme to all dark containers
+.dark-stream-container,
+.dark-tile-content,
+.chart-container-dark {
+  @include dark-theme-vars;
 }
+
+// Apply light theme to all light containers
+.light-stream-container,
+.light-tile-content,
+.chart-container-light {
+  @include light-theme-vars;
+}
+
+/* ===== 2. Global Transitions ===== */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+// Disable transitions for animations
+*[class*="animation"],
+*[style*="animation"] {
+  transition: none;
+}
+
+/* ===== 3. Layout Components ===== */
+
+// Streams container
+.streams-container {
+  @include container-base;
+  box-sizing: border-box;
+  border-left: 3px solid var(--accent-blue);
+  contain: layout style;
+  padding: 16px;
+}
+
+.streams-header {
+  margin-bottom: 16px;
+}
+.dark-stream-container,
 .light-stream-container {
-  background: #ffffff;
-  border: 1px solid #E7EAEE;
+  background: var(--tile-bg);
+  border: 1px solid var(--tile-border);
 }
 .view-button-light {
   cursor: pointer;
@@ -889,10 +1004,17 @@ export default defineComponent({
   transform: translate(-50%, -50%) translateX(0);
   opacity: 1;
 }
+
+// Modern CSS Grid for responsive tiles
+.tiles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
 .tile {
-  flex: 1 1 240px; /* grow, shrink, basis */
-  max-width: 100%; /* prevents overflow */
   animation: fadeInUp 0.5s ease-out backwards;
+  contain: layout style paint;
 }
 
 // Stagger animation for tiles
@@ -914,17 +1036,12 @@ export default defineComponent({
 }
 
 .tile-content {
-  height: 160px !important;
-  padding: 16px;
-  border-radius: 8px;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  @include tile-base;
 }
+
 .dashboards-tile-content,
 .functions-tile-content {
-  height: 160px !important;
-  padding: 16px;
-  border-radius: 8px;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  @include tile-base;
   animation: fadeInUp 0.5s ease-out backwards;
 }
 
@@ -935,16 +1052,11 @@ export default defineComponent({
 .dashboards-tile-content {
   animation-delay: 300ms;
 }
-.dark-tile-content {
-  background: #2B2C2D;
-  border: 1px solid #444444;
-  color: #D2D2D2;
-}
-
+.dark-tile-content,
 .light-tile-content {
-  background: #ffffff;
-  border: 1px solid #E7EAEE;
-  color: #2D2D2D;
+  background: var(--tile-bg);
+  border: 1px solid var(--tile-border);
+  color: var(--text-primary);
 }
 .section-header {
   font-size: 20px;
@@ -992,30 +1104,66 @@ export default defineComponent({
   line-height: 32px;
 }
 .chart-container {
+  @include container-base;
   display: flex;
   flex-direction: column;
-  border-radius: 8px;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  animation: fadeInUp 0.5s ease-out backwards;
+  contain: layout style;
 }
 
 .first-chart-container {
-  border-left: 3px solid #EE5F26;
+  border-left: 3px solid var(--accent-orange);
   animation-delay: 350ms;
 }
 
 .second-chart-container {
-  border-left: 3px solid #9333EA;
+  border-left: 3px solid var(--accent-purple);
   animation-delay: 400ms;
 }
 
-.chart-container-light{
-  border: 1px solid #E7EAEE;
-  background: #ffffff;
+.chart-container-light,
+.chart-container-dark {
+  border: 1px solid var(--tile-border);
+  background: var(--tile-bg);
+  position: relative;
 }
-.chart-container-dark{
-  border: 1px solid #444444;
-  background: #2B2C2D;
+
+// Chart loading shimmer animation
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.chart-container.loading::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.chart-container-dark.loading::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    transparent 100%
+  );
+  background-size: 1000px 100%;
 }
 .text-title{
   font-size: 18px;
@@ -1098,36 +1246,31 @@ export default defineComponent({
   border: 1px solid rgba(242, 220, 245, 0.45);
 }
 
-/* Tile hover effects */
-.tile-content:hover,
-.functions-tile-content:hover,
-.dashboards-tile-content:hover,
-.chart-container:hover,
-.streams-container:hover {
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-  transform: translateY(-2px);
-}
+/* ===== 4. Interactive States ===== */
 
-.dark-tile-content:hover,
-.functions-tile-content.dark-tile-content:hover,
-.dashboards-tile-content.dark-tile-content:hover,
-.chart-container-dark:hover,
-.dark-stream-container:hover {
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
-  transform: translateY(-2px);
+// Hover effects - unified for all containers
+.tile-content,
+.functions-tile-content,
+.dashboards-tile-content,
+.chart-container,
+.streams-container {
+  &:hover {
+    box-shadow: 0 8px 25px var(--hover-shadow);
+    transform: translateY(-2px);
+  }
 }
 
 /* Focus visible states for keyboard navigation */
 .view-button-light:focus-visible,
 .view-button-dark:focus-visible {
-  outline: 2px solid #397EF6;
+  outline: 2px solid var(--accent-blue);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
 a:focus-visible,
 button:focus-visible {
-  outline: 2px solid #397EF6;
+  outline: 2px solid var(--accent-blue);
   outline-offset: 2px;
 }
 
@@ -1136,7 +1279,31 @@ button:focus-visible {
   outline: none;
 }
 
-/* Reduced motion support for accessibility */
+// Empty state for charts with no data
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  opacity: 0.6;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  opacity: 0.5;
+}
+
+.empty-state-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: inherit;
+}
+
+/* ===== 5. Responsive Design & Accessibility ===== */
+
+// Reduced motion support
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
