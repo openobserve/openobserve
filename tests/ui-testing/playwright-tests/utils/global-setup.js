@@ -108,12 +108,12 @@ async function performGlobalIngestion(page) {
   };
 
   // Debug logging
-  console.log('=== INGESTION DEBUG INFO ===');
-  console.log('INGESTION_URL:', process.env.INGESTION_URL);
-  console.log('ORGNAME:', orgId);
-  console.log('Stream Name:', streamName);
-  console.log('Headers:', JSON.stringify(headers, null, 2));
-  console.log('============================');
+  testLogger.debug('Ingestion configuration', {
+    ingestionUrl: process.env.INGESTION_URL,
+    orgName: orgId,
+    streamName: streamName,
+    headers: headers
+  });
 
   const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
     const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
