@@ -46,6 +46,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import { useAnnotations } from "./useAnnotations";
 import useHttpStreamingSearch from "../useStreamingSearch";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import logsUtils from "@/composables/useLogs/logsUtils";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -72,8 +73,8 @@ export const usePanelDataLoader = (
   runId?: any,
   tabId?: any,
   tabName?: any,
-  searchResponse: any,
-  is_ui_histogram: any,
+  searchResponse?: any,
+  is_ui_histogram?: any,
   dashboardName?: any,
   folderName?: any,
 ) => {
@@ -173,6 +174,9 @@ export const usePanelDataLoader = (
     loadingProgressPercentage: 0,
     isPartialData: false,
   });
+
+  // Initialize logs utils to reuse common SQL validations
+  const { checkTimestampAlias } = logsUtils();
 
   // observer for checking if panel is visible on the screen
   let observer: any = null;
@@ -1385,6 +1389,17 @@ export const usePanelDataLoader = (
                     panelSchema.value.queryType,
                   );
                 const query = query2;
+
+                // Validate that timestamp column is not used as an alias for other fields
+                if (!checkTimestampAlias(query)) {
+                  state.errorDetail = {
+                    message: `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
+                    code: "400",
+                  };
+                  state.loading = false;
+                  // Skip this iteration and continue with next query/time shift
+                  continue;
+                }
                 const metadata: any = {
                   originalQuery: it.query,
                   query: query,
@@ -1569,6 +1584,17 @@ export const usePanelDataLoader = (
                 );
 
               const query = query2;
+
+              // Validate that timestamp column is not used as an alias for other fields
+              if (!checkTimestampAlias(query)) {
+                state.errorDetail = {
+                  message: `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
+                  code: "400",
+                };
+                state.loading = false;
+                // Skip executing this query and move to next
+                continue;
+              }
 
               const metadata: any = {
                 originalQuery: it.query,

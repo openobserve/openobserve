@@ -47,6 +47,7 @@ export const logsUtils = () => {
   const q = useQuasar();
   const router = useRouter();
   const store = useStore();
+  const timestampColumnName = store.state.zoConfig.timestamp_column;
 
   const DEFAULT_PARSED_RESULT: ParsedSQLResult = {
     columns: [],
@@ -709,61 +710,35 @@ export const logsUtils = () => {
     return false;
   }
 
-  // validate if timestamp_column should not be used as alias for any other field except timestamp_column field
-  const checkTimestampAlias = (query: string) => {
+  // validate if timestamp column alias is used for any field
+  const checkTimestampAlias = (query: string): boolean => {
     const parsedSQL = fnParsedSQL(query);
-    const timestampColumnName = store.state.zoConfig.timestamp_column;
 
-    // Handle case where parsedSQL is null/undefined or has no columns
     const columns = parsedSQL?.columns;
-    if (!columns || !Array.isArray(columns)) {
-      return true; // No columns to validate
+    if (Array.isArray(columns)) {
+      const invalid = columns.some(
+        (field: any) => field.as === timestampColumnName,
+      );
+      if (invalid) {
+        return false;
+      }
     }
 
-    // Find columns that are aliased as timestamp_column
-    const timestampAliasFields = columns.filter(
-      (field) => field.as === timestampColumnName
+    // Escape special regex characters in timestamp column name
+    const escapedTimestamp = timestampColumnName.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      "\\$&",
     );
 
-    // Check if any non-timestamp field uses timestamp_column as alias
-    for (const field of timestampAliasFields) {
-      let actualFieldName = null;
+    // Patterns for alias check
+    const patterns = [
+      new RegExp(`\\bas\\s*'${escapedTimestamp}'`, "i"), // AS '_timestamp'
+      new RegExp(`\\bas\\s*"${escapedTimestamp}"`, "i"), // AS "_timestamp"
+      new RegExp(`\\bas\\s+${escapedTimestamp}\\b`, "i"), // AS _timestamp (unquoted)
+    ];
 
-      // Handle different expression types
-      if (field.expr?.type === "column_ref") {
-        // Simple column reference: field.expr.column.expr.value
-        actualFieldName = field.expr.column?.expr?.value;
-      } else if (field.expr?.type === "aggr_func") {
-        // Aggregate function: field.expr.args.expr.column.expr.value  
-        actualFieldName = field.expr.args?.expr?.column?.expr?.value;
-      }
-      // Add more expression types as needed
-      
-      if (actualFieldName && actualFieldName !== timestampColumnName) {
-        return false; // Invalid: non-timestamp field using timestamp alias
-      }
-    }
-
-    // String-based detection as fallback for complex nested cases that AST parsing might miss
-    // Only use this as fallback if AST parsing didn't find any timestamp aliases
-    if (timestampAliasFields.length === 0) {
-      // Check for potential timestamp aliases using string matching
-      const timestampAliasPattern = new RegExp(
-        `\\b\\w+\\s+as\\s+${timestampColumnName}\\b`,
-        "i",
-      );
-      const selfAliasPattern = new RegExp(
-        `\\b${timestampColumnName}\\s+as\\s+${timestampColumnName}\\b`,
-        "i",
-      );
-
-      if (timestampAliasPattern.test(query)) {
-        // Found potential timestamp alias, but check if it's self-alias
-        if (selfAliasPattern.test(query)) {
-          return true; // _timestamp AS _timestamp is valid
-        }
-        return false; // Some other field aliased as timestamp
-      }
+    if (patterns.some((p) => p.test(query))) {
+      return false;
     }
 
     return true;
