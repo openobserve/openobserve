@@ -189,14 +189,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
       <!-- 2nd section -->
-        <div class="charts-main-container row tw-gap-4 q-mt-md xl:tw-min-h-[330px] " style="display: flex; gap: 16px; height: calc(100% - 22px);  ">
-          <!-- functions and dashboards tiles + 2 charts -->
-        <div class="xl:tw-flex-col lg:tw-flex md:tw-flex-row tw-justify-evenly sm:tw-justify-start tw-gap-4 md:tw-w-full xl:tw-w-fit " >
+        <div class="charts-main-container row tw-gap-4 q-mt-md xl:tw-min-h-[330px] " style="display: flex; gap: 16px; height: calc(100% - 22px); width: 100%;">
+          <!-- Part 1 (tiles) + Part 2 (alerts chart) = 50% -->
+        <div class="left-section" style="display: flex; width: calc(50% - 8px); gap: 16px;">
+          <!-- Part 1: Functions and Dashboards tiles -->
+        <div class="tiles-section xl:tw-flex-col lg:tw-flex md:tw-flex-row tw-justify-evenly sm:tw-justify-start tw-gap-4" style="display: flex; flex-direction: column; width: 240px;">
 
-          <div class="tw-w-full lg:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
-            <div class="functions-tile-content tw-h-[180px] q-pa-md rounded-borders text-center column justify-between"
+          <div class="tw-w-full" style="flex: 1;">
+            <div class="functions-tile-content q-pa-md rounded-borders text-center column justify-between"
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-              style="min-height: 150px; gap: 12px;">
+              style="height: 100%; gap: 12px;">
               <div class="column justify-between">
                 <div class="row justify-between tw-flex tw-items-center">
                   <div class="tile-title">{{ t("home.functionTitle") }}</div>
@@ -223,10 +225,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Tile 2 -->
-          <div class="tw-w-full lg:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
-            <div class="dashboards-tile-content tw-h-[180px] q-pa-md rounded-borders text-center column justify-between"
+          <div class="tw-w-full" style="flex: 1;">
+            <div class="dashboards-tile-content q-pa-md rounded-borders text-center column justify-between"
               :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-              style="min-height: 150px; gap: 12px;">
+              style="height: 100%; gap: 12px;">
               <div class="column justify-between">
                 <div class="row justify-between tw-items-center">
                   <div class="tile-title">{{ t("home.dashboardTitle") }}</div>
@@ -252,8 +254,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-                  <!-- Chart 1 --> 
-          <div class=" first-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[31%]  tw-p-4" style= " display: flex; flex-direction: column;"
+          <!-- Part 2: Alerts Chart -->
+          <div class="first-chart-container rounded-borders tw-p-4" style="display: flex; flex-direction: column; flex: 1;"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
           >
             <div class="details-container" style="margin-bottom: 16px;">
@@ -294,7 +296,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class=" second-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[calc(49%+5px)] tw-p-4 " style=" display: flex; flex-direction: column;"
+        </div>
+          <!-- Part 3: Pipeline Chart = 50% -->
+          <div class="second-chart-container rounded-borders tw-p-4" style="display: flex; flex-direction: column; width: calc(50% - 8px);"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
           >
             <div class="details-container" style="margin-bottom: 16px;">
