@@ -39,7 +39,12 @@
           :key="argIndex + '-' + arg.type"
           class="tw-w-full tw-flex tw-flex-col"
         >
-          <div class="tw-flex">
+          <div
+            class="tw-flex"
+            :style="{
+              marginLeft: isChild ? '-60px' : '0px',
+            }"
+          >
             <!-- <div class="tw-mr-2 tw-relative">
               <SubTaskArrow class="tw-absolute" />
               <div
@@ -61,7 +66,7 @@
               ></div>
 
               <!-- SubTask Arrow -->
-              <div class="tw-absolute" style="top: 30px; left: -1px;">
+              <div class="tw-absolute" style="top: 30px; left: -1px">
                 <SubTaskArrow />
               </div>
             </div>
@@ -160,6 +165,7 @@
                   v-if="fields.args[argIndex]?.type === 'function'"
                   v-model="fields.args[argIndex].value"
                   :allowAggregation="allowAggregation"
+                  :isChild="true"
                   :data-test="`dashboard-function-dropdown-arg-function-input-${argIndex}`"
                 />
 
@@ -238,6 +244,11 @@ export default {
       required: false,
       default: false,
     },
+    isChild: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
   },
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
@@ -312,7 +323,9 @@ export default {
 
     const getValidationForFunction = (functionName: string) => {
       return (
-        functionValidation.find((v) => v.functionName === (functionName ?? null)) ?? {}
+        functionValidation.find(
+          (v) => v.functionName === (functionName ?? null),
+        ) ?? {}
       );
     };
 
