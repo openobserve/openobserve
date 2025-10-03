@@ -210,7 +210,7 @@ jobs:
       #   run: sleep 15
 
       - name: Ensure we are getting a reply from the server
-        run: curl http://localhost:5080/web/login
+        run: curl ${ZO_BASE_URL}/login
 
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
