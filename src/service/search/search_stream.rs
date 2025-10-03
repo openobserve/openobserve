@@ -111,9 +111,11 @@ pub async fn process_search_stream_request(
     dashboard_info: Option<DashboardInfo>,
 ) {
     log::info!(
-        "[HTTP2_STREAM trace_id {}] Received test HTTP/2 stream request for org_id: {}",
+        "[HTTP2_STREAM trace_id {}] Received HTTP/2 stream request for org_id: {}, start_time={}, end_time={}",
         trace_id,
-        org_id
+        org_id,
+        req.query.start_time,
+        req.query.end_time
     );
 
     // Send a progress: 0 event as an indiciator of search initiation
@@ -1035,7 +1037,7 @@ pub async fn handle_cache_responses_and_deltas(
     let cached_search_duration = cache_duration + (max_query_range * 3600 * 1_000_000); // microseconds
 
     log::info!(
-        "[HTTP2_STREAM trace_id {}] Handling cache response and deltas, curr_res_size: {}, cached_search_duration: {}, remaining_query_duration: {}, deltas_len: {}, cache_start_time: {}, cache_end_time: {}",
+        "[HTTP2_STREAM trace_id {}] Handling cache response and deltas, curr_res_size: {}, cached_search_duration: {}, remaining_query_duration: {}, deltas_len: {}, cache_start_time: {}, cache_end_time: {}, query_start={}, query_end={}",
         trace_id,
         curr_res_size,
         cached_search_duration,
@@ -1043,6 +1045,8 @@ pub async fn handle_cache_responses_and_deltas(
         deltas.len(),
         cache_start_time,
         cache_end_time,
+        req.query.start_time,
+        req.query.end_time
     );
 
     // Process cached responses and deltas in sorted order

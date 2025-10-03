@@ -361,7 +361,7 @@ test.describe("Pipeline testcases", () => {
     await page.locator('[data-test="scheduled-pipeline-sql-editor"] .monaco-editor').click();
     // Click on the editor to type the query
     // await page.locator(".cm-lines").first().click();
-    const sqlQuery = 'select * from "default"';
+    const sqlQuery = 'select * from "e2e_automate"';
 
     // Locate the editor and type the SQL query if it's not already typed
     await page.click('[data-test="scheduled-pipeline-sql-editor"]');

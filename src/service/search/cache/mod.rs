@@ -216,10 +216,22 @@ pub async fn search(
                     .build()
             )
         );
+        let cache_start_time = c_resp
+            .cached_response
+            .first()
+            .map(|c| c.response_start_time)
+            .unwrap_or_default();
+        let cache_end_time = c_resp
+            .cached_response
+            .last()
+            .map(|c| c.response_end_time)
+            .unwrap_or_default();
         log::info!(
-            "[trace_id {trace_id}] Query original start time: {}, end time : {}",
+            "[trace_id {trace_id}] Query original start time: {}, end time : {}, cache_start_time: {}, cache_end_time: {}",
             req.query.start_time,
-            req.query.end_time
+            req.query.end_time,
+            cache_start_time,
+            cache_end_time
         );
 
         let mut tasks = Vec::new();
