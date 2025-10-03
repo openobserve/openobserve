@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- 2nd section -->
         <div class="charts-main-container row tw-gap-4 q-mt-md xl:tw-min-h-[330px] " style="display: flex; gap: 16px; height: calc(100% - 22px); width: 100%;">
           <!-- Part 1 (tiles) + Part 2 (alerts chart) = 50% -->
-        <div class="left-section md:tw-w-[calc(100%-8px)] lg:tw-w-[calc(50%-8px)]" style="display: flex; gap: 16px;">
+        <div class="left-section sm:tw-w-[calc(100%-8px)] md:tw-w-[calc(100%-8px)] lg:tw-w-[calc(50%-8px)]" style="display: flex; gap: 16px;">
           <!-- Part 1: Functions and Dashboards tiles -->
         <div class="tiles-section  xl:tw-flex-col lg:tw-flex md:tw-flex tw-justify-evenly sm:tw-justify-start tw-gap-4" style="display: flex; flex-direction: column; width: 240px;">
 
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
           <!-- Part 3: Pipeline Chart = 50% -->
-          <div class="second-chart-container lg:tw-w-[calc(50%-8px)] md:tw-w-full rounded-borders tw-p-4" style="display: flex; flex-direction: column;"
+          <div class="second-chart-container lg:tw-w-[calc(50%-8px)] sm:tw-w-full rounded-borders tw-p-4" style="display: flex; flex-direction: column;"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
           >
             <div class="details-container" style="margin-bottom: 16px;">
