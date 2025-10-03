@@ -37,9 +37,10 @@ export default class DashboardFilter {
 
     // Step 3: Open the condition selector
     if (operator || value) {
-      const conditionLocator = this.page.locator(
-        `[data-test="dashboard-add-condition-condition-${idx}"]`
-      );
+      // Target the most recent (last) visible portal to avoid strict mode violation
+      const conditionLocator = this.page
+        .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
+        .last();
       await conditionLocator.waitFor({ state: "visible" });
       await conditionLocator.click(); // double click for stability
     }
@@ -148,6 +149,69 @@ export default class DashboardFilter {
     );
     await fieldLabelLocator.click();
 
+    // Step 3: Open the condition selector
+    if (operator || value) {
+      // Target the most recent (last) visible portal to avoid strict mode violation
+      const conditionLocator = this.page
+        .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
+        .last();
+      await conditionLocator.waitFor({ state: "visible" });
+      await conditionLocator.click(); // double click for stability
+    }
+
+    // Step 4: Operator dropdown
+    if (operator) {
+      const operatorLocator =
+        index === 0
+          ? this.page
+              .locator('[data-test="dashboard-add-condition-operator"]')
+              .first()
+          : this.page
+              .locator('[data-test="dashboard-add-condition-operator"]')
+              .last();
+
+      // Wait until operator dropdown is visible and stable
+      await operatorLocator.waitFor({ state: "visible", timeout: 5000 });
+      await this.page.waitForTimeout(500); // Wait for any animations to complete
+      await operatorLocator.click();
+
+      // Wait for the specific option to appear in any visible menu
+      const optionLocator = this.page
+        .getByRole("option", { name: operator, exact: true })
+        .last();
+
+      // Wait until option is visible with increased timeout
+      await optionLocator.waitFor({ state: "visible", timeout: 10000 });
+      await optionLocator.click();
+    }
+
+    // Step 5: Fill value field
+    if (value) {
+      const valueInput =
+        index === 0
+          ? this.page.locator('[data-test="common-auto-complete"]').first()
+          : this.page.locator('[data-test="common-auto-complete"]').last();
+
+      // Wait until input is visible
+      await valueInput.waitFor({ state: "visible", timeout: 5000 });
+      await valueInput.click();
+      await valueInput.fill(value);
+
+      const suggestion = this.page
+        .locator('[data-test="common-auto-complete-option"]')
+        .first();
+
+      // Wait until suggestion is visible
+      await suggestion.waitFor({ state: "visible", timeout: 5000 });
+      await suggestion.click();
+    } else if (operator && newFieldName) {
+      const expectedError = `Filter: ${newFieldName}: Condition value required`;
+      const errorMessage = this.page
+        .locator("div")
+        .filter({ hasText: expectedError });
+      // Optional: Assert here if needed
+    }
+
     // Step 2: Handle multiple matching elements for column dropdown
     const allColumnLocators = this.page.locator(
       `[data-test="dashboard-add-condition-column-${idx}\\}"]`
@@ -164,78 +228,11 @@ export default class DashboardFilter {
     await columnLocator.click();
     await columnLocator.fill(newFieldName);
 
+    // Wait for dropdown to appear after filling the value
     // await this.page
-    //   .getByRole("option", { name: newFieldName, exact: true })
-    //   .first()
-    //   .click();
-
-    // const option = this.page
-    //   .getByRole("option", { name: newFieldName, exact: true })
-    //   .first();
-    // await option.waitFor({ state: "visible", timeout: 10000 });
-    // await option.click();
-
-    // await this.page
-    //   .locator('div.q-menu[role="listbox"] div.q-item')
-    //   .first()
-    //   .click();
-
-    // Wait for the suggestion list to appear and select the first suggestion
-    const suggestion = await this.page.locator(
-      'div.q-menu[role="listbox"] div.q-item'
-    );
-    await suggestion.waitFor({ state: "visible", timeout: 10000 });
-    const firstSuggestion = suggestion.first();
-    await firstSuggestion.waitFor({ state: "visible", timeout: 10000 });
-    await firstSuggestion.click();
-
-    // Step 3: Condition dropdown
-    if (operator || value) {
-      const conditionLocator = this.page.locator(
-        `[data-test="dashboard-add-condition-condition-${idx}"]`
-      );
-      await conditionLocator.click();
-      await conditionLocator.click(); // safety click
-    }
-
-    // Step 4: Operator dropdown
-    if (operator) {
-      const operatorLocator =
-        index === 0
-          ? this.page
-              .locator('[data-test="dashboard-add-condition-operator"]')
-              .first()
-          : this.page
-              .locator('[data-test="dashboard-add-condition-operator"]')
-              .last();
-
-      await operatorLocator.click();
-      await this.page
-        .getByRole("option", { name: operator, exact: true })
-        .first()
-        .click();
-    }
-
-    // Step 5: Fill value field
-    if (value) {
-      const valueInput =
-        index === 0
-          ? this.page.locator('[data-test="common-auto-complete"]').first()
-          : this.page.locator('[data-test="common-auto-complete"]').last();
-
-      await valueInput.click();
-      await valueInput.fill(value);
-
-      const suggestion = this.page
-        .locator('[data-test="common-auto-complete-option"]')
-        .first();
-      await suggestion.click();
-    } else if (operator && newFieldName) {
-      const expectedError = `Filter: ${newFieldName}: Condition value required`;
-      const errorMessage = this.page
-        .locator("div")
-        .filter({ hasText: expectedError });
-      // Optional: Assert here if needed
-    }
+    //   .locator('div.q-menu[role="listbox"]')
+    //   .waitFor({ state: "visible", timeout: 5000 });
+    await columnLocator.press("ArrowDown");
+    await columnLocator.press("Enter");
   }
 }

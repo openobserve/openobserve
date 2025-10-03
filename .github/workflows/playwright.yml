@@ -117,7 +117,7 @@ jobs:
                 "schema.spec.js",
                 "schemaload.spec.js",
                 "serviceAccount.spec.js",
-                "usersOrg.spec.js",
+                "usersOrg.spec.js", 
                 "org.spec.js",
               ]
           - testfolder: "Logs-Core"
@@ -192,7 +192,7 @@ jobs:
                 "pipelines.spec.js",
                 "pipeline-dynamic.spec.js",
                 "pipeline-core.spec.js",
-                # "remotepipeline.spec.js"
+                "remotepipeline.spec.js"
               ]
           - testfolder: "Reports"
             browser: "chrome"
