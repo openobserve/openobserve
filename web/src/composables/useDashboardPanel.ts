@@ -2600,6 +2600,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     query += array?.join("");
 
+    // If no valid fields in SELECT clause, return empty query
+    if (array.length === 0) {
+      return "";
+    }
+
     // 2. Stream, Join query
     // now add from stream name
     query += ` FROM "${
@@ -2634,19 +2639,61 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const xAxisAlias = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.x
-      .filter((it: any) => !it?.isDerived)
+      .filter((it: any) => {
+        if (it?.isDerived) return false;
+        // Validate field has valid expression
+        const fieldExpression = buildSQLQueryFromInput(
+          it,
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.joins?.length
+            ? dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.stream
+            : "",
+        );
+        return !!fieldExpression;
+      })
       .map((it: any) => it?.alias);
 
     const yAxisAlias = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.y
-      .filter((it: any) => !it?.isDerived)
+      .filter((it: any) => {
+        if (it?.isDerived) return false;
+        // Validate field has valid expression
+        const fieldExpression = buildSQLQueryFromInput(
+          it,
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.joins?.length
+            ? dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.stream
+            : "",
+        );
+        return !!fieldExpression;
+      })
       .map((it: any) => it?.alias);
 
     const bAxisAlias = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields?.breakdown
-      ?.filter((it: any) => !it?.isDerived)
+      ?.filter((it: any) => {
+        if (it?.isDerived) return false;
+        // Validate field has valid expression
+        const fieldExpression = buildSQLQueryFromInput(
+          it,
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.joins?.length
+            ? dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.stream
+            : "",
+        );
+        return !!fieldExpression;
+      })
       ?.map((it: any) => it?.alias);
 
     const tableTypeWithXFieldOnly =
@@ -2694,7 +2741,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     if (dashboardPanelData.data.type !== "heatmap") {
       // Process y-axis having conditions
       yAxisFields.forEach((field: any) => {
+        // Validate field has valid expression before adding to HAVING clause
+        const fieldExpression = buildSQLQueryFromInput(
+          field,
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.joins?.length
+            ? dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.stream
+            : "",
+        );
+
         if (
+          fieldExpression &&
           field?.havingConditions?.[0]?.operator &&
           field?.havingConditions?.[0]?.value !== undefined &&
           field?.havingConditions?.[0]?.value !== null &&
@@ -2710,7 +2770,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     // Process z-axis having conditions
     zAxisFields.forEach((field: any) => {
+      // Validate field has valid expression before adding to HAVING clause
+      const fieldExpression = buildSQLQueryFromInput(
+        field,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.joins?.length
+          ? dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields?.stream
+          : "",
+      );
+
       if (
+        fieldExpression &&
         field?.havingConditions?.[0]?.operator &&
         field?.havingConditions?.[0]?.value !== undefined &&
         field?.havingConditions?.[0]?.value !== null &&
@@ -2733,7 +2806,21 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     fields.forEach((it: any) => {
       // ignore if None is selected or sortBy is not there
       if (it?.sortBy) {
-        orderByArr.push(`${it?.alias} ${it?.sortBy}`);
+        // Validate field has valid expression before adding to ORDER BY clause
+        const fieldExpression = buildSQLQueryFromInput(
+          it,
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.joins?.length
+            ? dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields?.stream
+            : "",
+        );
+
+        if (fieldExpression) {
+          orderByArr.push(`${it?.alias} ${it?.sortBy}`);
+        }
       }
     });
 
