@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :target="target"
     :aria-current="isActive ? 'page' : undefined"
     :aria-label="ariaLabel"
-    @click="external ? openWebPage(link) : ''"
+    v-on="external ? { click: () => openWebPage(link) } : {}"
   >
     <q-item-section v-if="icon" avatar>
       <div class="icon-wrapper">
@@ -46,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
+          aria-live="polite"
           :aria-label="`${badge} notifications`"
-          role="status"
         >
           {{ badge > 99 ? '99+' : badge }}
         </div>
@@ -60,8 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
+          aria-live="polite"
           :aria-label="`${badge} notifications`"
-          role="status"
         >
           {{ badge > 99 ? '99+' : badge }}
         </div>
@@ -138,9 +138,9 @@ export default defineComponent({
       return router.currentRoute.value.path.indexOf(props.link) === 0 && props.link !== '/';
     });
 
-    // Phase 5: Accessibility - compute ARIA label
+    // Phase 5: Accessibility - compute ARIA label with fallback
     const ariaLabel = computed(() => {
-      let label = props.title;
+      let label = props.title || 'Navigation link';
       if (props.badge && props.badge > 0) {
         label += ` (${props.badge} notifications)`;
       }

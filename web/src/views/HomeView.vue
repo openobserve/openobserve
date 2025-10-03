@@ -439,24 +439,33 @@ export default defineComponent({
     const animatedScheduledPipelines = ref(0);
     const animatedRtPipelines = ref(0);
 
-    // Count-up animation function
+    // Count-up animation function using requestAnimationFrame
     const animateValue = (ref: any, start: number, end: number, duration: number) => {
       if (start === end) {
         ref.value = end;
         return;
       }
       const range = end - start;
-      const increment = range / (duration / 16); // 60fps
-      let current = start;
+      const startTime = performance.now();
+      let animationId: number;
 
-      const timer = setInterval(() => {
-        current += increment;
-        if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
-          current = end;
-          clearInterval(timer);
+      const animate = (currentTime: number) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        ref.value = Math.floor(start + range * progress);
+
+        if (progress < 1) {
+          animationId = requestAnimationFrame(animate);
+        } else {
+          ref.value = end;
         }
-        ref.value = Math.floor(current);
-      }, 16);
+      };
+
+      animationId = requestAnimationFrame(animate);
+
+      // Return cleanup function
+      return () => cancelAnimationFrame(animationId);
     };
 
     const getSummary = (org_id: any) => {
@@ -532,7 +541,7 @@ export default defineComponent({
           console.log(err);
           dismiss();
           $q.notify({
-            type: "negative-increase",
+            type: "negative",
             message: "Error while pulling summary.",
             timeout: 2000,
           });
