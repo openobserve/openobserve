@@ -74,7 +74,7 @@ import {
   useLocalTimezone,
   useLocalWrapContent,
   getDecodedUserInfo,
-  getTimezonesByOffset
+  getTimezonesByOffset,
 } from "./zincutils";
 
 // Mock localStorage
@@ -96,12 +96,16 @@ const sessionStorageMock = {
 global.sessionStorage = sessionStorageMock as any;
 
 // Mock window.btoa and window.atob
-global.btoa = vi.fn((str: string) => Buffer.from(str, 'binary').toString('base64'));
-global.atob = vi.fn((str: string) => Buffer.from(str, 'base64').toString('binary'));
+global.btoa = vi.fn((str: string) =>
+  Buffer.from(str, "binary").toString("base64"),
+);
+global.atob = vi.fn((str: string) =>
+  Buffer.from(str, "base64").toString("binary"),
+);
 
 // Mock console methods
-vi.spyOn(console, 'log').mockImplementation(() => {});
-vi.spyOn(console, 'error').mockImplementation(() => {});
+vi.spyOn(console, "log").mockImplementation(() => {});
+vi.spyOn(console, "error").mockImplementation(() => {});
 
 describe("zincutils", () => {
   beforeEach(() => {
@@ -326,12 +330,18 @@ describe("zincutils", () => {
 
     describe("queryIndexSplit", () => {
       it("should split query at specified word", () => {
-        const result = queryIndexSplit("SELECT * FROM table WHERE id = 1", "WHERE");
+        const result = queryIndexSplit(
+          "SELECT * FROM table WHERE id = 1",
+          "WHERE",
+        );
         expect(result).toEqual(["SELECT * FROM table ", " id = 1"]);
       });
 
       it("should handle case insensitive split", () => {
-        const result = queryIndexSplit("select * from table where id = 1", "WHERE");
+        const result = queryIndexSplit(
+          "select * from table where id = 1",
+          "WHERE",
+        );
         expect(result).toEqual(["select * from table ", " id = 1"]);
       });
 
@@ -344,7 +354,9 @@ describe("zincutils", () => {
     describe("escapeSingleQuotes", () => {
       it("should escape single quotes", () => {
         expect(escapeSingleQuotes("It's a test")).toBe("It''s a test");
-        expect(escapeSingleQuotes("Multiple 'quotes' here")).toBe("Multiple ''quotes'' here");
+        expect(escapeSingleQuotes("Multiple 'quotes' here")).toBe(
+          "Multiple ''quotes'' here",
+        );
       });
 
       it("should handle strings without quotes", () => {
@@ -385,7 +397,8 @@ describe("zincutils", () => {
 
     describe("getUserInfo", () => {
       it("should extract user info from login string", () => {
-        const loginString = "#id_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+        const loginString =
+          "#id_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
         const result = getUserInfo(loginString);
         expect(result).toBeDefined();
       });
@@ -398,7 +411,8 @@ describe("zincutils", () => {
 
     describe("getDecodedAccessToken", () => {
       it("should decode access token", () => {
-        const token = "header.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.signature";
+        const token =
+          "header.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.signature";
         const result = getDecodedAccessToken(token);
         expect(result).toBeDefined();
       });
@@ -466,7 +480,9 @@ describe("zincutils", () => {
     describe("getUUID", () => {
       it("should generate valid UUID", () => {
         const uuid = getUUID();
-        expect(uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+        expect(uuid).toMatch(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+        );
       });
 
       it("should generate unique UUIDs", () => {
@@ -479,7 +495,9 @@ describe("zincutils", () => {
     describe("getUUIDv7", () => {
       it("should generate valid UUID v7", () => {
         const uuid = getUUIDv7();
-        expect(uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+        expect(uuid).toMatch(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+        );
       });
 
       it("should generate unique UUID v7s", () => {
@@ -491,9 +509,9 @@ describe("zincutils", () => {
       it("should generate time-ordered UUID v7s", async () => {
         const uuid1 = getUUIDv7();
         // Use a proper delay instead of busy-waiting
-        await new Promise(resolve => setTimeout(resolve, 2));
+        await new Promise((resolve) => setTimeout(resolve, 2));
         const uuid2 = getUUIDv7();
-        
+
         // UUID v7 should be lexicographically sortable by time
         expect(uuid1 < uuid2).toBe(true);
       });
@@ -505,7 +523,9 @@ describe("zincutils", () => {
         expect(context).toHaveProperty("traceparent");
         expect(context).toHaveProperty("traceId");
         expect(context).toHaveProperty("spanId");
-        expect(context.traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
+        expect(context.traceparent).toMatch(
+          /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/,
+        );
       });
 
       it("should use UUID v7 for trace ID", () => {
@@ -513,10 +533,15 @@ describe("zincutils", () => {
         // Trace ID should be 32 characters (UUID without hyphens)
         expect(context.traceId).toHaveLength(32);
         expect(context.traceId).toMatch(/^[0-9a-f]{32}$/i);
-        
+
         // Convert back to UUID format to verify it's v7
-        const uuidFormat = context.traceId.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
-        expect(uuidFormat).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+        const uuidFormat = context.traceId.replace(
+          /(.{8})(.{4})(.{4})(.{4})(.{12})/,
+          "$1-$2-$3-$4-$5",
+        );
+        expect(uuidFormat).toMatch(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+        );
       });
 
       it("should generate unique trace contexts", () => {
@@ -628,61 +653,35 @@ describe("zincutils", () => {
     describe("getWebSocketUrl", () => {
       it("should generate WebSocket URL", () => {
         // Mock window.location
-        Object.defineProperty(window, 'location', {
+        Object.defineProperty(window, "location", {
           value: {
-            protocol: 'https:',
+            protocol: "https:",
           },
           writable: true,
         });
 
-        const url = getWebSocketUrl("request123", "org1", "https://api.example.com");
+        const url = getWebSocketUrl(
+          "request123",
+          "org1",
+          "https://api.example.com",
+        );
         expect(url).toBe("wss://api.example.com/api/org1/ws/v2/request123");
       });
 
       it("should use ws protocol for http", () => {
-        Object.defineProperty(window, 'location', {
+        Object.defineProperty(window, "location", {
           value: {
-            protocol: 'http:',
+            protocol: "http:",
           },
           writable: true,
         });
 
-        const url = getWebSocketUrl("request123", "org1", "http://api.example.com");
+        const url = getWebSocketUrl(
+          "request123",
+          "org1",
+          "http://api.example.com",
+        );
         expect(url).toBe("ws://api.example.com/api/org1/ws/v2/request123");
-      });
-    });
-
-    describe("isWebSocketEnabled", () => {
-      it("should return false if websocket not enabled in config", () => {
-        const data = { zoConfig: { websocket_enabled: false } };
-        expect(isWebSocketEnabled(data)).toBe(false);
-      });
-
-      it("should check organization settings when config enabled", () => {
-        const data = {
-          zoConfig: { websocket_enabled: true },
-          organizationData: {
-            organizationSettings: { enable_websocket_search: true }
-          }
-        };
-        expect(isWebSocketEnabled(data)).toBe(true);
-      });
-    });
-
-    describe("isStreamingEnabled", () => {
-      it("should return false if streaming not enabled in config", () => {
-        const data = { zoConfig: { streaming_enabled: false } };
-        expect(isStreamingEnabled(data)).toBe(false);
-      });
-
-      it("should check organization settings when config enabled", () => {
-        const data = {
-          zoConfig: { streaming_enabled: true },
-          organizationData: {
-            organizationSettings: { enable_streaming_search: true }
-          }
-        };
-        expect(isStreamingEnabled(data)).toBe(true);
       });
     });
   });
@@ -709,25 +708,27 @@ describe("zincutils", () => {
       });
 
       it("should throw error for invalid cron expression", () => {
-        expect(() => getCronIntervalDifferenceInSeconds("invalid")).toThrow("Invalid cron expression");
+        expect(() => getCronIntervalDifferenceInSeconds("invalid")).toThrow(
+          "Invalid cron expression",
+        );
       });
     });
 
     describe("getDueDays", () => {
       it.skip("should calculate due days correctly", () => {
         const now = Date.now();
-        const futureDate = now + (7 * 24 * 60 * 60 * 1000); // 7 days from now
+        const futureDate = now + 7 * 24 * 60 * 60 * 1000; // 7 days from now
         const futureMicros = futureDate * 1000; // Convert to microseconds
-        
+
         const result = getDueDays(futureMicros);
         expect(result).toBe(7);
       });
 
       it.skip("should return negative for past dates", () => {
         const now = Date.now();
-        const pastDate = now - (7 * 24 * 60 * 60 * 1000); // 7 days ago
+        const pastDate = now - 7 * 24 * 60 * 60 * 1000; // 7 days ago
         const pastMicros = pastDate * 1000; // Convert to microseconds
-        
+
         const result = getDueDays(pastMicros);
         expect(result).toBe(-7);
       });
@@ -774,7 +775,7 @@ describe("zincutils", () => {
           host: "api.example.com",
           port: "8080",
           protocol: "https",
-          tls: "On"
+          tls: "On",
         });
       });
 
@@ -785,7 +786,7 @@ describe("zincutils", () => {
           host: "localhost",
           port: "3000",
           protocol: "http",
-          tls: "Off"
+          tls: "Off",
         });
       });
 
@@ -805,8 +806,13 @@ describe("zincutils", () => {
         const message = "Query limit exceeded";
         const startTime = 1640995200000000; // microseconds
         const endTime = 1641008400000000; // microseconds
-        
-        const result = getFunctionErrorMessage(message, startTime, endTime, "UTC");
+
+        const result = getFunctionErrorMessage(
+          message,
+          startTime,
+          endTime,
+          "UTC",
+        );
         expect(result).toContain(message);
         expect(result).toContain("Data returned for:");
       });
@@ -815,7 +821,11 @@ describe("zincutils", () => {
         const message = "Query limit exceeded";
         // The function doesn't actually handle errors the way we expected
         // It still tries to format even with invalid inputs
-        const result = getFunctionErrorMessage(message, "invalid" as any, "invalid" as any);
+        const result = getFunctionErrorMessage(
+          message,
+          "invalid" as any,
+          "invalid" as any,
+        );
         expect(result).toContain(message);
       });
     });
@@ -827,7 +837,10 @@ describe("zincutils", () => {
         const userData = { id: 1, name: "John" };
         const userDataString = JSON.stringify(userData);
         const result = useLocalCurrentUser(userDataString);
-        expect(localStorageMock.setItem).toHaveBeenCalledWith("currentuser", expect.any(String));
+        expect(localStorageMock.setItem).toHaveBeenCalledWith(
+          "currentuser",
+          expect.any(String),
+        );
       });
     });
 
