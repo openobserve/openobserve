@@ -21,11 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          <div>
           <TrialPeriod></TrialPeriod>
          </div>
-        <div class="streams-container q-px-lg q-py-md "
+        <div class="streams-container q-pa-md"
         :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
          >
           <div class="row justify-between items-center q-mb-md">
-            <div class="text-h6 ">Streams</div>
+            <div class="section-header">Streams</div>
               <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                >
                 <q-tooltip>View</q-tooltip>
@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Title row -->
                 <div class="row justify-between">
                   <div class="tile-title">   {{ t("home.streams") }}</div>
-                  <div>
-                    <img height="32px" :src="streamsIcon" />
+                  <div class="tile-icon icon-bg-blue">
+                    <img :src="streamsIcon" />
                   </div>
                 </div>
 
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Title row -->
                 <div class="row justify-between">
                   <div class="tile-title">   {{ t("home.docsCountLbl") }}</div>
-                  <div>
+                  <div class="tile-icon icon-bg-blue">
                     <img :src="recordsIcon" />
                   </div>
                 </div>
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Title row -->
                 <div class="row justify-between">
                   <div class="tile-title"> {{ t("home.totalDataCompressed") }}</div>
-                  <div style="opacity: 0.8;">
+                  <div class="tile-icon icon-bg-blue">
                     <img :src="compressedSizeIcon" />
                   </div>
                 </div>
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Title row -->
                 <div class="row justify-between">
                   <div class="tile-title"> {{ t("home.totalDataIngested") }}</div>
-                  <div>
+                  <div class="tile-icon icon-bg-blue">
                     <img :src="ingestedSizeIcon" />
                   </div>
                 </div>
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Title row -->
                 <div class="row justify-between">
                   <div class="tile-title">  {{ t("home.indexSizeLbl") }}</div>
-                  <div>
+                  <div class="tile-icon icon-bg-blue">
                     <img :src="indexSizeIcon" />
                   </div>
                 </div>
@@ -189,80 +189,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
       <!-- 2nd section -->
-        <div class="charts-main-container row tw-gap-4 q-mt-md xl:tw-min-h-[330px] " style="display: flex; gap: 16px; height: calc(100% - 22px); width: 100%;">
-          <!-- Part 1 (tiles) + Part 2 (alerts chart) = 50% -->
-        <div class="left-section sm:tw-w-[calc(100%-8px)] md:tw-w-[calc(100%-8px)] lg:tw-w-[calc(50%-8px)]" style="display: flex; gap: 16px;">
-          <!-- Part 1: Functions and Dashboards tiles -->
-        <div class="tiles-section  xl:tw-flex-col lg:tw-flex md:tw-flex tw-justify-evenly sm:tw-justify-start tw-gap-4" style="display: flex; flex-direction: column; width: 240px;">
+        <div class="charts-main-container row tw-gap-4 q-mt-md xl:tw-min-h-[330px] " style="display: flex; gap: 16px; height: calc(100% - 22px);  ">
+          <!-- functions and dashboards tiles + 2 charts -->
+        <div class="xl:tw-flex-col lg:tw-flex md:tw-flex-row tw-justify-evenly sm:tw-justify-start tw-gap-4 md:tw-w-full xl:tw-w-fit " >
 
-          <div class="tw-w-full" style="flex: 1;">
+          <div class="tw-w-full lg:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
             <div class="functions-tile-content q-pa-md rounded-borders text-center column justify-between"
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-              style="height: 100%; gap: 12px;">
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'">
               <div class="column justify-between">
-                <div class="row justify-between tw-flex tw-items-center">
+                <div class="row justify-between tw-items-center">
                   <div class="tile-title">{{ t("home.functionTitle") }}</div>
-
-                    <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                    >
-                        <q-tooltip>View</q-tooltip>
-                        <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
-                      <router-link
-                        exact
-                        :to="{ name: 'functionList' }"
-                        class="absolute full-width full-height"
-                      ></router-link>
-                  </q-btn>
+                  <div class="tile-icon icon-bg-orange">
+                    <img :src="functionsIcon" />
+                  </div>
                 </div>
               </div>
-              <div class="data-to-display row items-end tw-flex tw-justify-between">
+              <div class="data-to-display row items-end tw-justify-between">
                 {{ summary.function_count }}
-                <div>
-                      <img :class="store.state.theme == 'dark' ? 'functions-icon-dark' : 'functions-icon-light'" :src="functionsIcon" />
-                </div>
+                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                >
+                    <q-tooltip>View</q-tooltip>
+                    <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
+                  <router-link
+                    exact
+                    :to="{ name: 'functionList' }"
+                    class="absolute full-width full-height"
+                  ></router-link>
+              </q-btn>
               </div>
             </div>
           </div>
 
           <!-- Tile 2 -->
-          <div class="tw-w-full" style="flex: 1;">
+          <div class="tw-w-full lg:tw-w-[calc(50%-0.5rem)] xl:tw-w-[240px] tw-max-w-full">
             <div class="dashboards-tile-content q-pa-md rounded-borders text-center column justify-between"
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-              style="height: 100%; gap: 12px;">
+              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'">
               <div class="column justify-between">
                 <div class="row justify-between tw-items-center">
                   <div class="tile-title">{{ t("home.dashboardTitle") }}</div>
-                  <div>
-                    <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                    >
-                    <q-tooltip>View</q-tooltip>
-                    <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
-                      <router-link
-                        exact
-                        :to="{ name: 'dashboards' }"
-                        class="absolute full-width full-height"
-                      ></router-link>
-                  </q-btn>
+                  <div class="tile-icon icon-bg-orange">
+                    <img :src="dashboardsIcon" />
                   </div>
                 </div>
               </div>
-              <div class="data-to-display row items-end tw-flex tw-justify-between">
+              <div class="data-to-display row items-end tw-justify-between">
                 {{ summary.dashboard_count }}
-                        <img :class="store.state.theme == 'dark' ? 'dashboards-icon-dark' : 'dashboards-icon-light'" :src="dashboardsIcon" />
-
+                <q-btn no-caps flat :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                >
+                <q-tooltip>View</q-tooltip>
+                <img :src="getForwardIcon" class="view-arrow-icon-svg" alt="forward" />
+                  <router-link
+                    exact
+                    :to="{ name: 'dashboards' }"
+                    class="absolute full-width full-height"
+                  ></router-link>
+              </q-btn>
               </div>
             </div>
           </div>
         </div>
-          <!-- Part 2: Alerts Chart -->
-          <div class="first-chart-container rounded-borders tw-p-4" style="display: flex; flex-direction: column; flex: 1;"
+                  <!-- Chart 1 --> 
+          <div class="chart-container first-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[31%] tw-p-4"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
           >
-            <div class="details-container" style="margin-bottom: 16px;">
+            <div class="details-container">
               <div class="row justify-between items-center">
                 <span class="text-title tw-flex tw-items-center tw-gap-2">
-                  <div style="opacity: 0.8;" class="tw-bg-[#F5EB93] tw-flex tw-items-center tw-justify-center tw-rounded-[9px] tw-h-[33px] tw-w-[33px]">
-                      <img :src="alertsIcon" class="tw-h-[18px] tw-w-[18px] tw-mx-[7px] tw-my-[7px] tw-text-[#ea580b]" />
+                  <div class="tile-icon icon-bg-blue">
+                      <img :src="alertsIcon" />
                   </div>
                   {{ t("home.alertTitle") }}
                 </span>
@@ -296,16 +290,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-        </div>
-          <!-- Part 3: Pipeline Chart = 50% -->
-          <div class="second-chart-container lg:tw-w-[calc(50%-8px)] sm:tw-w-full rounded-borders tw-p-4" style="display: flex; flex-direction: column;"
+          <div class="chart-container second-chart-container rounded-borders tw-w-full tw-max-w-full xl:tw-w-[calc(100%-240px-31%-2rem)] tw-p-4"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
           >
-            <div class="details-container" style="margin-bottom: 16px;">
+            <div class="details-container">
               <div class="row justify-between items-center">
                 <span class="text-title tw-flex tw-items-center tw-gap-2">
-                  <div style="opacity: 0.8;" class="tw-bg-[#F2DCF5] tw-flex tw-items-center tw-justify-center tw-rounded-[9px] tw-h-[33px] tw-w-[33px]">
-                      <img :src="pipelinesIcon" class="tw-h-[18px] tw-w-[18px] tw-mx-[7px] tw-my-[7px]" />
+                  <div class="tile-icon icon-bg-blue">
+                      <img :src="pipelinesIcon" />
                   </div>
                   {{ t("home.pipelineTitle") }}
                 </span>
@@ -729,16 +721,16 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .streams-container {
-  background: linear-gradient(to bottom, #fdfdfe, #f3f3f9);
   border-radius: 8px;
   box-sizing: border-box;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 .dark-stream-container {
-  background: #222526;
+  background: #2B2C2D;
   border: 1px solid #444444;
 }
 .light-stream-container {
-  background: linear-gradient(to bottom, #fdfdfe, #f3f3f9);
+  background: #ffffff;
   border: 1px solid #E7EAEE;
 }
 .view-button-light {
@@ -798,36 +790,17 @@ export default defineComponent({
 }
 
 .tile-content {
-  height: 140px !important; /* or any fixed height */
+  height: 160px !important;
   padding: 16px;
   border-radius: 8px;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
-.dashboards-tile-content{
+.dashboards-tile-content,
+.functions-tile-content {
+  height: 160px !important;
   padding: 16px;
   border-radius: 8px;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-.dashboards-tile-content.light-tile-content {
-  background: rgba(238, 95, 38, 0.2) !important;
-  border: 1px solid rgba(238, 95, 38, 0.2) !important;
-}
-.dashboards-tile-content.dark-tile-content {
-  background: rgba(238, 95, 38, 0.15) !important;
-  border: 1px solid rgba(255, 140, 100, 0.3) !important;
-}
-.functions-tile-content{
-  padding: 16px;
-  border-radius: 8px;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-.functions-tile-content.light-tile-content {
-  background: rgba(111, 186, 253, 0.2) !important;
-  border: 1px solid rgba(57, 126, 246, 0.2) !important;
-}
-.functions-tile-content.dark-tile-content {
-  background: rgba(57, 126, 246, 0.15) !important;
-  border: 1px solid rgba(111, 186, 253, 0.3) !important;
 }
 .dark-tile-content {
   background: #2B2C2D;
@@ -840,6 +813,12 @@ export default defineComponent({
   border: 1px solid #E7EAEE;
   color: #2D2D2D;
 }
+.section-header {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
 .tile-title {
   font-size: 16px;
   font-weight: 500;
@@ -875,11 +854,20 @@ export default defineComponent({
   color: #FFD6D6;
 }
 .data-to-display{
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 600;
+  line-height: 32px;
 }
+.chart-container {
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
 .chart-container-light{
   border: 1px solid #E7EAEE;
+  background: #ffffff;
 }
 .chart-container-dark{
   border: 1px solid #444444;
@@ -900,9 +888,11 @@ export default defineComponent({
 .results-count{
   font-size: 20px;
   font-weight: 600;
+  line-height: 24px;
 }
 .details-container{
   gap: 12px;
+  margin-bottom: 16px;
 }
 .charts-main-container{
   gap: 12px;
@@ -918,38 +908,61 @@ export default defineComponent({
   height: calc(100vh - 120px);
 }
 
-.functions-icon-dark{
-  opacity: 0.4;
-}
-.functions-icon-light{
-  opacity: 0.2;
+.tile-icon {
+  opacity: 0.8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+
+  img {
+    height: 24px;
+  }
 }
 
-.dashboards-icon-dark{
-  opacity: 0.4;
-}
-.dashboards-icon-light{
-  opacity: 0.2;
-}
-
-/* Tile hover effects for view buttons */
-.functions-tile-content:hover .view-arrow-icon-svg,
-.dashboards-tile-content:hover .view-arrow-icon-svg {
-  transform: translateX(20px);
-  opacity: 0;
-}
-.functions-tile-content:hover .view-button-light::after,
-.functions-tile-content:hover .view-button-dark::after,
-.dashboards-tile-content:hover .view-button-light::after,
-.dashboards-tile-content:hover .view-button-dark::after {
-  transform: translate(-50%, -50%) translateX(0);
-  opacity: 1;
+// Dark mode icon visibility enhancement
+.dark-tile-content .tile-icon img,
+.dark-stream-container .tile-icon img,
+.chart-container-dark .tile-icon img {
+  filter: brightness(1.5);
 }
 
-/* Tile hover scale effects */
+.tile-icon.icon-bg-blue {
+  background: rgba(57, 126, 246, 0.2);
+  border: 1px solid rgba(57, 126, 246, 0.35);
+}
+
+.tile-icon.icon-bg-orange {
+  background: rgba(238, 95, 38, 0.2);
+  border: 1px solid rgba(238, 95, 38, 0.35);
+}
+
+.tile-icon.icon-bg-yellow {
+  background: rgba(245, 235, 147, 0.25);
+  border: 1px solid rgba(245, 235, 147, 0.45);
+}
+
+.tile-icon.icon-bg-purple {
+  background: rgba(242, 220, 245, 0.25);
+  border: 1px solid rgba(242, 220, 245, 0.45);
+}
+
+/* Tile hover effects */
 .tile-content:hover,
 .functions-tile-content:hover,
-.dashboards-tile-content:hover {
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+.dashboards-tile-content:hover,
+.chart-container:hover,
+.streams-container:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.dark-tile-content:hover,
+.functions-tile-content.dark-tile-content:hover,
+.dashboards-tile-content.dark-tile-content:hover,
+.chart-container-dark:hover,
+.dark-stream-container:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
 }
 </style>
