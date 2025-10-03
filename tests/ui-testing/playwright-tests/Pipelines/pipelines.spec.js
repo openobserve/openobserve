@@ -117,7 +117,7 @@ async function exploreStreamAndInteractWithLogDetails(page, streamName) {
 
 async function deletePipeline(page, randomPipelineName) {
   // Click the back button
-  await page.locator('[data-test="add-pipeline-back-btn"]').click();
+  await page.locator('[data-test="add-pipeline-cancel-btn"]').click();
   await page.locator('[data-test="confirm-button"]').click();
   await page.waitForTimeout(2000);
 
