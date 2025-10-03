@@ -46,7 +46,7 @@ import useSearchResponseHandler from "@/composables/useLogs/useSearchResponseHan
 import useSearchHistogramManager from "@/composables/useLogs/useSearchHistogramManager";
 import useSearchPagination from "@/composables/useLogs/useSearchPagination";
 
-export const useSearchStream = () => {
+export const useSearchStreamRefactored = () => {
   const { showErrorNotification } = useNotifications();
   const { addTraceId } = logsUtils();
 
@@ -86,22 +86,6 @@ export const useSearchStream = () => {
     }
   };
 
-  const getHistogramData = (queryReq: any) => {
-    const histogramCallbacks = {
-      onData: responseProcessor.handleSearchResponse,
-      onError: responseProcessor.handleSearchError,
-      onComplete: handleSearchComplete,
-      onReset: handleSearchReset,
-    };
-
-    histogramHandler.processHistogramRequest(
-      queryReq,
-      connectionManager.buildWebSocketPayload,
-      connectionManager.initializeSearchConnection,
-      histogramCallbacks,
-    );
-  };
-
   /**
    * Handle search completion
    * Orchestrates histogram processing if needed
@@ -113,7 +97,11 @@ export const useSearchStream = () => {
       !payload.isPagination &&
       searchObj.meta.refreshInterval == 0
     ) {
-      getHistogramData(payload.queryReq);
+      histogramHandler.processHistogramRequest(
+        payload.queryReq,
+        connectionManager.buildWebSocketPayload,
+        connectionManager.initializeSearchConnection,
+      );
     }
 
     // Update loading states
@@ -214,7 +202,6 @@ export const useSearchStream = () => {
     responseProcessor,
     histogramHandler,
     paginationManager,
-    getHistogramData,
   };
 };
 
@@ -241,4 +228,4 @@ export const useSearchStream = () => {
  * - Add comprehensive tests for each split composable
  */
 
-export default useSearchStream;
+export default useSearchStreamRefactored;

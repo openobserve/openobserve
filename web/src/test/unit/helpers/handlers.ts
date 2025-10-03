@@ -296,7 +296,6 @@ export const restHandlers = [
   // Config Service handler
   http.get(`${store.state.API_ENDPOINT}/config`, () => {
     return HttpResponse.json({
-      websocket_enabled: true,
       streaming_enabled: true,
       custom_logo_text: "Test Logo Text",
       custom_logo_img: "base64imagedata",
