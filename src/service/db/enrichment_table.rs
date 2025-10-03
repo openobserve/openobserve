@@ -70,19 +70,21 @@ pub async fn get_enrichment_table_data(
     match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
         Ok(res) => {
             if !res.hits.is_empty() {
+                log::info!(
+                    "get enrichment table {org_id}/{name} data success with hits: {}",
+                    res.hits.len()
+                );
                 Ok(res.hits)
             } else {
+                log::info!("get enrichment table {org_id}/{name} data success with no hits",);
                 Ok(vec![])
             }
         }
         Err(err) => {
-            log::error!(
-                "get enrichment table {}/{} data error: {:?}",
-                org_id,
-                name,
-                err
-            );
-            Ok(vec![])
+            log::error!("get enrichment table {org_id}/{name} data error: {err}",);
+            Err(anyhow::anyhow!(
+                "get enrichment table {org_id}/{name} error: {err}"
+            ))
         }
     }
 }
@@ -341,8 +343,20 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 {
                     Ok(data) => data,
                     Err(e) => {
-                        log::error!("[ENRICHMENT::TABLE watch] get enrichment table error: {e}");
-                        vec![]
+                        log::error!(
+                            "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error, trying again: {e}"
+                        );
+                        match super::super::enrichment::get_enrichment_table(org_id, stream_name)
+                            .await
+                        {
+                            Ok(data) => data,
+                            Err(e) => {
+                                log::error!(
+                                    "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error, giving up: {e}"
+                                );
+                                Vec::new()
+                            }
+                        }
                     }
                 };
                 log::info!(
