@@ -350,16 +350,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                     );
                                 }
                             };
-                        } else {
+                        } else if let Some(removed) =
+                            pipeline_stream_mapping_cache.remove(pipeline_id)
+                            && stream_exec_pl.remove(&removed).is_some()
+                        {
                             // remove pipeline from cache if the update is to disable
-                            if let Some(removed) = pipeline_stream_mapping_cache.remove(pipeline_id)
-                            {
-                                if stream_exec_pl.remove(&removed).is_some() {
-                                    log::info!(
-                                        "[Pipeline]: realtime pipeline {pipeline_id} disabled and removed from cache."
-                                    );
-                                }
-                            }
+                            log::info!(
+                                "[Pipeline]: realtime pipeline {pipeline_id} disabled and removed from cache."
+                            );
                         }
                     }
                     config::meta::pipeline::components::PipelineSource::Scheduled(_) => {
@@ -382,17 +380,16 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
             db::Event::Delete(ev) => {
                 let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
-                if let Some(removed) = PIPELINE_STREAM_MAPPING.write().await.remove(pipeline_id) {
-                    if STREAM_EXECUTABLE_PIPELINES
+                if let Some(removed) = PIPELINE_STREAM_MAPPING.write().await.remove(pipeline_id)
+                    && STREAM_EXECUTABLE_PIPELINES
                         .write()
                         .await
                         .remove(&removed)
                         .is_some()
-                    {
-                        log::info!(
-                            "[Pipeline]: realtime pipeline {pipeline_id} deleted and removed from cache."
-                        );
-                    };
+                {
+                    log::info!(
+                        "[Pipeline]: realtime pipeline {pipeline_id} deleted and removed from cache."
+                    );
                 }
                 // Also remove from scheduled pipelines cache
                 if SCHEDULED_PIPELINES
