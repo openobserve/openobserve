@@ -107,6 +107,14 @@ async function performGlobalIngestion(page) {
     "Content-Type": "application/json",
   };
 
+  // Debug logging
+  console.log('=== INGESTION DEBUG INFO ===');
+  console.log('INGESTION_URL:', process.env.INGESTION_URL);
+  console.log('ORGNAME:', orgId);
+  console.log('Stream Name:', streamName);
+  console.log('Headers:', JSON.stringify(headers, null, 2));
+  console.log('============================');
+
   const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
     const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
     const fetchResponse = await fetch(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
@@ -114,9 +122,20 @@ async function performGlobalIngestion(page) {
       headers: headers,
       body: JSON.stringify(logsdata)
     });
+
+    const responseText = await fetchResponse.text();
+    let data = null;
+
+    try {
+      data = responseText ? JSON.parse(responseText) : null;
+    } catch (e) {
+      data = { error: 'Invalid JSON response', responseText };
+    }
+
     return {
       status: fetchResponse.status,
-      data: await fetchResponse.json()
+      data: data,
+      responseText: responseText
     };
   }, {
     url: process.env.INGESTION_URL,
@@ -126,18 +145,20 @@ async function performGlobalIngestion(page) {
     logsdata: logsdata
   });
   
-  testLogger.debug('Data ingestion API response received', { 
-    status: response.status, 
-    orgId, 
-    streamName 
+  testLogger.debug('Data ingestion API response received', {
+    status: response.status,
+    orgId,
+    streamName,
+    responseText: response.responseText
   });
-  
+
   if (response.status !== 200) {
-    testLogger.error('Data ingestion failed', { 
-      status: response.status, 
-      response: response.data 
+    testLogger.error('Data ingestion failed', {
+      status: response.status,
+      response: response.data,
+      responseText: response.responseText
     });
-    throw new Error(`Data ingestion failed with status: ${response.status}`);
+    throw new Error(`Data ingestion failed with status: ${response.status}, response: ${response.responseText}`);
   }
   
   testLogger.info('Global data ingestion successful', { 
