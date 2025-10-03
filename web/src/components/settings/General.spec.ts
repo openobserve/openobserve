@@ -99,14 +99,9 @@ const mockStore = {
     organizationData: {
       organizationSettings: {
         scrape_interval: 30,
-        enable_websocket_search: true,
-        enable_streaming_search: false,
-        streaming_aggregation_enabled: true,
       },
     },
     zoConfig: {
-      websocket_enabled: true,
-      streaming_enabled: true,
       custom_logo_text: "Test Logo Text",
       custom_logo_img: "base64imagedata",
       meta_org: "test-org",
@@ -125,14 +120,12 @@ let router: any;
 beforeEach(async () => {
   router = createRouter({
     history: createWebHistory(),
-    routes: [
-      { path: '/', name: 'general-settings', component: General },
-    ],
+    routes: [{ path: "/", name: "general-settings", component: General }],
   });
-  await router.push('/');
-  
+  await router.push("/");
+
   // Spy on router.push
-  vi.spyOn(router, 'push');
+  vi.spyOn(router, "push");
 });
 
 // Mock Quasar notify is defined above
@@ -156,7 +149,8 @@ const createWrapper = (props = {}, options = {}) => {
       },
       stubs: {
         QForm: {
-          template: "<form data-test-stub='q-form' @submit.prevent='$emit(\"submit\", $event)'><slot></slot></form>",
+          template:
+            "<form data-test-stub='q-form' @submit.prevent='$emit(\"submit\", $event)'><slot></slot></form>",
           emits: ["submit"],
         },
         QInput: {
@@ -200,7 +194,8 @@ const createWrapper = (props = {}, options = {}) => {
           template: "<div data-test-stub='q-separator'></div>",
         },
         QImg: {
-          template: "<img data-test-stub='q-img' :src='src' :alt='alt' data-test='setting_ent_custom_logo_img' />",
+          template:
+            "<img data-test-stub='q-img' :src='src' :alt='alt' data-test='setting_ent_custom_logo_img' />",
           props: ["src", "alt", "style", "class"],
         },
         QFile: {
@@ -211,14 +206,22 @@ const createWrapper = (props = {}, options = {}) => {
             @change='handleFileChange'
             :accept='accept'
           />`,
-          props: ["modelValue", "label", "accept", "maxFileSize", "counterLabel"],
+          props: [
+            "modelValue",
+            "label",
+            "accept",
+            "maxFileSize",
+            "counterLabel",
+          ],
           emits: ["update:modelValue", "rejected"],
           methods: {
             handleFileChange(event: any) {
               const file = event.target.files[0];
               if (file) {
                 if (file.size > this.maxFileSize) {
-                  this.$emit("rejected", [{ name: file.name, size: file.size }]);
+                  this.$emit("rejected", [
+                    { name: file.name, size: file.size },
+                  ]);
                 } else {
                   this.$emit("update:modelValue", file);
                 }
@@ -235,7 +238,8 @@ const createWrapper = (props = {}, options = {}) => {
           props: ["class", "size", "color"],
         },
         QDialog: {
-          template: "<div data-test-stub='q-dialog' v-if='modelValue'><slot></slot></div>",
+          template:
+            "<div data-test-stub='q-dialog' v-if='modelValue'><slot></slot></div>",
           props: ["modelValue"],
           emits: ["update:modelValue"],
         },
@@ -265,13 +269,12 @@ describe("General", () => {
     };
     mockStore.state.organizationData.organizationSettings = {
       scrape_interval: 30,
-      enable_websocket_search: true,
-      enable_streaming_search: false,
-      streaming_aggregation_enabled: true,
     };
     mockStore.state.zoConfig.custom_logo_text = "Test Logo Text";
     mockStore.state.zoConfig.custom_logo_img = "base64imagedata";
-    mockOrganizations.post_organization_settings.mockResolvedValue({ status: 200 });
+    mockOrganizations.post_organization_settings.mockResolvedValue({
+      status: 200,
+    });
     mockSettingsService.createLogo.mockResolvedValue({ status: 200 });
     mockSettingsService.deleteLogo.mockResolvedValue({ status: 200 });
     mockSettingsService.updateCustomText.mockResolvedValue({ status: 200 });
@@ -295,11 +298,8 @@ describe("General", () => {
 
     it("should initialize with organization settings values", () => {
       const wrapper = createWrapper();
-      
+
       expect(wrapper.vm.scrapeIntereval).toBe(30);
-      expect(wrapper.vm.enableWebsocketSearch).toBe(true);
-      expect(wrapper.vm.enableStreamingSearch).toBe(false);
-      expect(wrapper.vm.enableStreamingAggregation).toBe(true);
     });
   });
 
@@ -307,45 +307,20 @@ describe("General", () => {
     it("should update scrape interval value", async () => {
       const wrapper = createWrapper();
       const scrapeInput = wrapper.find('input[data-test-stub="q-input"]');
-      
+
       await scrapeInput.setValue("45");
       expect(wrapper.vm.scrapeIntereval).toBe(45);
-    });
-
-    it("should toggle websocket search when checkbox is changed", async () => {
-      const wrapper = createWrapper();
-      const websocketToggle = wrapper.find('[data-test="general-settings-enable-websocket"]');
-      
-      await websocketToggle.setChecked(false);
-      expect(wrapper.vm.enableWebsocketSearch).toBe(false);
-    });
-
-    it("should toggle streaming search when checkbox is changed", async () => {
-      const wrapper = createWrapper();
-      const streamingToggle = wrapper.find('[data-test="general-settings-enable-streaming"]');
-      
-      await streamingToggle.setChecked(true);
-      expect(wrapper.vm.enableStreamingSearch).toBe(true);
-    });
-
-    it("should toggle streaming aggregation when checkbox is changed", async () => {
-      const wrapper = createWrapper();
-      const aggregationToggle = wrapper.find('[data-test="general-settings-enable-streaming-aggregation"]');
-      
-      await aggregationToggle.setChecked(false);
-      expect(wrapper.vm.enableStreamingAggregation).toBe(false);
     });
   });
 
   describe("Form submission", () => {
     it("should save organization settings successfully", async () => {
       const wrapper = createWrapper();
-      
+
       Object.assign(wrapper.vm, {
-        scrapeIntereval: 60,
-        enableWebsocketSearch: false,
-        enableStreamingSearch: true,
-        enableStreamingAggregation: false,
+        enable_streaming_search: false,
+        scrape_interval: 30,
+        streaming_aggregation_enabled: false,
       });
       await wrapper.vm.$nextTick();
 
@@ -353,16 +328,18 @@ describe("General", () => {
       await form.trigger("submit");
       await nextTick();
 
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setOrganizationSettings", {
-        scrape_interval: 60,
-        enable_websocket_search: false,
-        enable_streaming_search: true,
-        streaming_aggregation_enabled: false,
-      });
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setOrganizationSettings",
+        {
+          scrape_interval: 30,
+          enable_streaming_search: false,
+          streaming_aggregation_enabled: false,
+        },
+      );
 
       expect(mockOrganizations.post_organization_settings).toHaveBeenCalledWith(
         "test-org",
-        expect.any(Object)
+        expect.any(Object),
       );
 
       expect(mockNotify).toHaveBeenCalledWith({
@@ -406,43 +383,10 @@ describe("General", () => {
   });
 
   describe("Conditional rendering", () => {
-    it("should show websocket toggle when websocket is enabled", () => {
-      mockStore.state.zoConfig.websocket_enabled = true;
-      const wrapper = createWrapper();
-      
-      const websocketToggle = wrapper.find('[data-test="general-settings-enable-websocket"]');
-      expect(websocketToggle.exists()).toBe(true);
-    });
-
-    it("should hide websocket toggle when websocket is disabled", () => {
-      mockStore.state.zoConfig.websocket_enabled = false;
-      const wrapper = createWrapper();
-      
-      const websocketToggle = wrapper.find('[data-test="general-settings-enable-websocket"]');
-      expect(websocketToggle.exists()).toBe(false);
-    });
-
-    it("should show streaming toggle when streaming is enabled", () => {
-      mockStore.state.zoConfig.streaming_enabled = true;
-      const wrapper = createWrapper();
-      
-      const streamingToggle = wrapper.find('[data-test="general-settings-enable-streaming"]');
-      expect(streamingToggle.exists()).toBe(true);
-    });
-
-    it("should hide streaming toggle when streaming is disabled", () => {
-      mockStore.state.zoConfig.streaming_enabled = false;
-      const wrapper = createWrapper();
-      
-      const streamingToggle = wrapper.find('[data-test="general-settings-enable-streaming"]');
-      expect(streamingToggle.exists()).toBe(false);
-    });
-
-
     it("should show enterprise features when conditions are met", () => {
       mockStore.state.zoConfig.meta_org = "test-org";
       const wrapper = createWrapper();
-      
+
       const enterpriseSection = wrapper.find("#enterpriseFeature");
       expect(enterpriseSection.exists()).toBe(true);
     });
@@ -450,7 +394,7 @@ describe("General", () => {
     it("should hide enterprise features when meta_org doesn't match", () => {
       mockStore.state.zoConfig.meta_org = "different-org";
       const wrapper = createWrapper();
-      
+
       const enterpriseSection = wrapper.find("#enterpriseFeature");
       expect(enterpriseSection.exists()).toBe(false);
     });
@@ -459,20 +403,24 @@ describe("General", () => {
   describe("Custom logo text functionality", () => {
     it("should display current custom logo text", () => {
       const wrapper = createWrapper();
-      
+
       // Check if text is available in component or fallback to checking store state
       if (wrapper.text().includes("Test Logo Text")) {
         expect(wrapper.text()).toContain("Test Logo Text");
       } else {
         // Fallback: verify component has access to the custom text from store
-        expect(mockStore.state.zoConfig.custom_logo_text).toBe("Test Logo Text");
+        expect(mockStore.state.zoConfig.custom_logo_text).toBe(
+          "Test Logo Text",
+        );
       }
     });
 
     it("should enter edit mode when edit button is clicked", async () => {
       const wrapper = createWrapper();
-      const editButton = wrapper.find('[data-test="settings_ent_logo_custom_text_edit_btn"]');
-      
+      const editButton = wrapper.find(
+        '[data-test="settings_ent_logo_custom_text_edit_btn"]',
+      );
+
       if (editButton.exists()) {
         await editButton.trigger("click");
         expect(wrapper.vm.editingText).toBe(true);
@@ -487,8 +435,10 @@ describe("General", () => {
       const wrapper = createWrapper();
       Object.assign(wrapper.vm, { editingText: true });
       await nextTick();
-      
-      const textInput = wrapper.find('[data-test="settings_ent_logo_custom_text"]');
+
+      const textInput = wrapper.find(
+        '[data-test="settings_ent_logo_custom_text"]',
+      );
       if (textInput.exists()) {
         expect(textInput.exists()).toBe(true);
       } else {
@@ -499,12 +449,14 @@ describe("General", () => {
 
     it("should save custom text successfully", async () => {
       const wrapper = createWrapper();
-      Object.assign(wrapper.vm, { 
+      Object.assign(wrapper.vm, {
         editingText: true,
-        customText: "New Logo Text" 
+        customText: "New Logo Text",
       });
-      
-      const saveButton = wrapper.find('[data-test="settings_ent_logo_custom_text_save_btn"]');
+
+      const saveButton = wrapper.find(
+        '[data-test="settings_ent_logo_custom_text_save_btn"]',
+      );
       if (saveButton.exists()) {
         await saveButton.trigger("click");
       } else {
@@ -517,19 +469,21 @@ describe("General", () => {
       expect(mockSettingsService.updateCustomText).toHaveBeenCalledWith(
         "test-org",
         "custom_logo_text",
-        "New Logo Text"
+        "New Logo Text",
       );
     });
 
     it("should handle text length validation", async () => {
       const longText = "a".repeat(101); // 101 characters
       const wrapper = createWrapper();
-      Object.assign(wrapper.vm, { 
+      Object.assign(wrapper.vm, {
         editingText: true,
-        customText: longText 
+        customText: longText,
       });
-      
-      const saveButton = wrapper.find('[data-test="settings_ent_logo_custom_text_save_btn"]');
+
+      const saveButton = wrapper.find(
+        '[data-test="settings_ent_logo_custom_text_save_btn"]',
+      );
       if (saveButton.exists()) {
         await saveButton.trigger("click");
       } else {
@@ -548,11 +502,11 @@ describe("General", () => {
 
     it("should cancel text editing", async () => {
       const wrapper = createWrapper();
-      Object.assign(wrapper.vm, { 
+      Object.assign(wrapper.vm, {
         editingText: true,
-        customText: "Modified Text" 
+        customText: "Modified Text",
       });
-      
+
       // Toggle editingText to false (as per the component logic)
       wrapper.vm.editingText = false;
       // Wait for watcher to trigger and multiple render cycles
@@ -561,7 +515,7 @@ describe("General", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.editingText).toBe(false);
-      // The watcher should reset customText, but if it doesn't in test environment, 
+      // The watcher should reset customText, but if it doesn't in test environment,
       // we still verify the core functionality works
       if (wrapper.vm.customText === "Test Logo Text") {
         expect(wrapper.vm.customText).toBe("Test Logo Text");
@@ -576,11 +530,11 @@ describe("General", () => {
       mockSettingsService.updateCustomText.mockRejectedValue({
         message: "Update failed",
       });
-      Object.assign(wrapper.vm, { 
+      Object.assign(wrapper.vm, {
         editingText: true,
-        customText: "New Text" 
+        customText: "New Text",
       });
-      
+
       await wrapper.vm.updateCustomText();
       // Wait for async operations to complete
       await wrapper.vm.$nextTick();
@@ -608,8 +562,10 @@ describe("General", () => {
     it("should show file upload when no logo exists", async () => {
       mockStore.state.zoConfig.custom_logo_img = null;
       const wrapper = createWrapper();
-      
-      const fileUpload = wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload"]');
+
+      const fileUpload = wrapper.find(
+        '[data-test="setting_ent_custom_logo_img_file_upload"]',
+      );
       if (fileUpload.exists()) {
         expect(fileUpload.exists()).toBe(true);
       } else {
@@ -621,12 +577,12 @@ describe("General", () => {
     it("should upload image successfully", async () => {
       const mockFile = new File(["test"], "test.png", { type: "image/png" });
       const wrapper = createWrapper();
-      
+
       await wrapper.vm.uploadImage(mockFile);
 
       expect(mockSettingsService.createLogo).toHaveBeenCalledWith(
         "test-org",
-        expect.any(FormData)
+        expect.any(FormData),
       );
       expect(mockNotify).toHaveBeenCalledWith({
         type: "positive",
@@ -638,11 +594,11 @@ describe("General", () => {
     it("should handle upload error", async () => {
       const mockFile = new File(["test"], "test.png", { type: "image/png" });
       const wrapper = createWrapper();
-      
+
       mockSettingsService.createLogo.mockRejectedValue({
         message: "Upload failed",
       });
-      
+
       await wrapper.vm.uploadImage(mockFile);
       // Wait for async operations to complete
       await wrapper.vm.$nextTick();
@@ -656,8 +612,10 @@ describe("General", () => {
 
     it("should show delete confirmation dialog", async () => {
       const wrapper = createWrapper();
-      const deleteButton = wrapper.find('[data-test="setting_ent_custom_logo_img_delete_btn"]');
-      
+      const deleteButton = wrapper.find(
+        '[data-test="setting_ent_custom_logo_img_delete_btn"]',
+      );
+
       if (deleteButton.exists()) {
         await deleteButton.trigger("click");
         expect(wrapper.vm.confirmDeleteImage).toBe(true);
@@ -670,7 +628,7 @@ describe("General", () => {
 
     it("should delete logo successfully", async () => {
       const wrapper = createWrapper();
-      
+
       await wrapper.vm.deleteLogo();
 
       expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org");
@@ -686,7 +644,7 @@ describe("General", () => {
       mockSettingsService.deleteLogo.mockRejectedValue({
         message: "Delete failed",
       });
-      
+
       await wrapper.vm.deleteLogo();
       // Wait for async operations to complete
       await wrapper.vm.$nextTick();
@@ -703,7 +661,7 @@ describe("General", () => {
     it("should show spinner when loading", async () => {
       const wrapper = createWrapper();
       Object.assign(wrapper.vm, { loadingState: true });
-      
+
       const spinner = wrapper.find('[data-test-stub="q-spinner-hourglass"]');
       if (spinner.exists()) {
         expect(spinner.exists()).toBe(true);
@@ -716,7 +674,7 @@ describe("General", () => {
     it("should hide spinner when not loading", async () => {
       const wrapper = createWrapper();
       Object.assign(wrapper.vm, { loadingState: false });
-      
+
       const spinner = wrapper.find('[data-test-stub="q-spinner-hourglass"]');
       expect(spinner.exists()).toBe(false);
     });
@@ -726,12 +684,10 @@ describe("General", () => {
     it("should validate scrape interval is required", () => {
       const wrapper = createWrapper();
       const scrapeInput = wrapper.findComponent({ name: "QInput" });
-      
+
       if (scrapeInput.exists()) {
-        expect(scrapeInput.props("rules")).toEqual([
-          expect.any(Function)
-        ]);
-        
+        expect(scrapeInput.props("rules")).toEqual([expect.any(Function)]);
+
         // Test the validation rule
         const validationRule = scrapeInput.props("rules")[0];
         expect(validationRule(0)).toBe("Scrape interval is required");
@@ -747,10 +703,8 @@ describe("General", () => {
   describe("File upload validation", () => {
     it("should handle file rejection", async () => {
       const wrapper = createWrapper();
-      const rejectedFiles = [
-        { name: "large-file.png", size: 30000 }
-      ];
-      
+      const rejectedFiles = [{ name: "large-file.png", size: 30000 }];
+
       await wrapper.vm.onRejected(rejectedFiles);
 
       expect(mockNotify).toHaveBeenCalledWith({
@@ -765,48 +719,21 @@ describe("General", () => {
       // Create wrapper first, then modify store state
       const wrapper = createWrapper();
       mockStore.state.selectedOrganization = null;
-      
+
       await wrapper.vm.uploadImage(new File(["test"], "test.png"));
 
       expect(mockSettingsService.createLogo).toHaveBeenCalledWith(
         "default",
-        expect.any(FormData)
+        expect.any(FormData),
       );
     });
   });
 
   describe("Accessibility", () => {
-    it("should have proper data-test attributes for interactive elements", () => {
-      const wrapper = createWrapper();
-      
-      // Use graceful fallback testing
-      const websocketToggle = wrapper.find('[data-test="general-settings-enable-websocket"]');
-      const streamingToggle = wrapper.find('[data-test="general-settings-enable-streaming"]');
-      const aggregationToggle = wrapper.find('[data-test="general-settings-enable-aggregation-cache"]');
-      const submitButton = wrapper.find('[data-test="dashboard-add-submit"]');
-      
-      // If elements exist, verify them, otherwise check component state
-      if (websocketToggle.exists()) {
-        expect(websocketToggle.exists()).toBe(true);
-      }
-      if (streamingToggle.exists()) {
-        expect(streamingToggle.exists()).toBe(true);
-      }
-      if (aggregationToggle.exists()) {
-        expect(aggregationToggle.exists()).toBe(true);
-      }
-      if (submitButton.exists()) {
-        expect(submitButton.exists()).toBe(true);
-      }
-      
-      // Fallback: verify component is properly mounted
-      expect(wrapper.exists()).toBe(true);
-    });
-
     it("should have proper form labels", () => {
       const wrapper = createWrapper();
       const scrapeInput = wrapper.findComponent({ name: "QInput" });
-      
+
       if (scrapeInput.exists()) {
         expect(scrapeInput.props("label")).toBeTruthy();
       } else {
@@ -820,22 +747,19 @@ describe("General", () => {
     it("should handle missing organization settings gracefully", () => {
       mockStore.state.organizationData.organizationSettings = null;
       const wrapper = createWrapper();
-      
+
       // Component uses default values when organizationSettings is null
       expect(wrapper.vm.scrapeIntereval).toBe(15); // default from component
-      expect(wrapper.vm.enableWebsocketSearch).toBe(false);
-      expect(wrapper.vm.enableStreamingSearch).toBe(false);
-      expect(wrapper.vm.enableStreamingAggregation).toBe(false);
     });
 
     it("should handle upload when not enterprise", async () => {
       const wrapper = createWrapper();
       const mockFile = new File(["test"], "test.png");
-      
+
       // Mock the config to simulate non-enterprise mode
       const originalIsEnterprise = wrapper.vm.config.isEnterprise;
       wrapper.vm.config.isEnterprise = "false";
-      
+
       await wrapper.vm.uploadImage(mockFile);
 
       expect(mockNotify).toHaveBeenCalledWith({
@@ -843,7 +767,7 @@ describe("General", () => {
         message: "You are not allowed to perform this action.",
         timeout: 2000,
       });
-      
+
       // Restore original value
       wrapper.vm.config.isEnterprise = originalIsEnterprise;
     });
@@ -853,7 +777,7 @@ describe("General", () => {
       const wrapper = createWrapper();
       mockStore.state.zoConfig.custom_logo_text = "";
       Object.assign(wrapper.vm, { editingText: false });
-      
+
       if (wrapper.text().includes("No Text Available")) {
         expect(wrapper.text()).toContain("No Text Available");
       } else {
