@@ -71,34 +71,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="span.hasChildSpans"
-              :style="{
-                width: spanDimensions.collapseWidth + 'px',
-                height: spanDimensions.collapseHeight + 'px',
-              }"
-              class="q-pt-xs flex items-center collapse-container cursor-pointer"
-              @click.stop="toggleSpanCollapse(span.spanId)"
-              :data-test="`trace-tree-span-collapse-btn-${span.spanId}`"
-            >
-              <q-icon
-                dense
-                round
-                flat
-                name="expand_more"
-                class="collapse-btn"
-                :style="{
-                  rotate: collapseMapping[span.spanId] ? '0deg' : '270deg',
-                  marginLeft: '-0.125rem',
-                }"
-              />
-            </div>
-            <div
-              v-if="span.hasChildSpans"
-              class="span-count-box"
+              class="span-count-box cursor-pointer"
               :ref="el => setBadgeRef(span.spanId, el)"
               :style="{
                 borderColor: span.style.color,
                 color: span.style.color,
               }"
+              @click.stop="toggleSpanCollapse(span.spanId)"
+              :data-test="`trace-tree-span-badge-collapse-btn-${span.spanId}`"
+              :title="`Click to ${collapseMapping[span.spanId] ? 'collapse' : 'expand'}`"
             >
               {{ getChildCount(span) }}
             </div>
@@ -576,12 +557,6 @@ export default defineComponent({
   position: relative;
 }
 
-.collapse-btn {
-  width: 0.875rem;
-  height: auto;
-  opacity: 0.6;
-}
-
 .span-count-box {
   min-width: 1.5rem;
   height: 1.25rem;
@@ -594,6 +569,15 @@ export default defineComponent({
   font-size: 0.75rem;
   font-weight: 600;
   margin-right: 0.25rem;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+}
+
+.bg-dark .span-count-box:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .span-leaf-dot {
