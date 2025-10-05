@@ -548,7 +548,7 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .view-logs-container {
-  top: 0.4375rem;
+  top: 0.25rem;
   right: 0;
 }
 .spans-container {
@@ -593,6 +593,7 @@ export default defineComponent({
 
 .operation-name-container {
   height: 1.875rem;
+  overflow: visible;
 
   .view-logs-container {
     visibility: hidden;

@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     :style="{
-      height: '30px',
+      height: '1.875rem',
       border:
         store.state.theme === 'dark'
-          ? '1px solid #3c3c3c'
-          : '1px solid #ececec',
+          ? '0.0625rem solid #3c3c3c'
+          : '0.0625rem solid #ececec',
     }"
-    style="top: 0; z-index: 1999; position: sticky"
+    style="top: 0; z-index: 1999; position: sticky; border-radius: 0.5rem 0.5rem 0 0;"
     class="flex justify-start items-center header-bg bg-grey-2"
     :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
     data-test="trace-header"

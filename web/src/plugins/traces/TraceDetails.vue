@@ -311,49 +311,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ]"
         ref="parentContainer"
       >
-        <trace-header
-          data-test="trace-details-header"
-          :baseTracePosition="baseTracePosition"
-          :splitterWidth="leftWidth"
-          @resize-start="startResize"
-        />
-        <div class="relative-position full-height">
-          <div
-            class="trace-tree-container"
-            :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-            data-test="trace-details-tree-container"
-          >
-            <div class="position-relative">
-              <div
-                :style="{
-                  width: '1px',
-                  left: `${leftWidth}px`,
-                  backgroundColor:
-                    store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
-                  zIndex: 999,
-                  top: '-28px',
-                  height: `${parentHeight}px`,
-                  cursor: 'col-resize',
-                }"
-                class="absolute resize"
-                @mousedown="startResize"
-              />
-              <trace-tree
-                data-test="trace-details-tree"
-                :collapseMapping="collapseMapping"
-                :spans="spanPositionList"
-                :baseTracePosition="baseTracePosition"
-                :spanDimensions="spanDimensions"
-                :spanMap="spanMap"
-                :leftWidth="leftWidth"
-                ref="traceTreeRef"
-                :search-query="searchQuery"
-                :spanList="spanList"
-                @toggle-collapse="toggleSpanCollapse"
-                @select-span="updateSelectedSpan"
-                @update-current-index="handleIndexUpdate"
-                @search-result="handleSearchResult"
-              />
+        <div
+          class="trace-tree-wrapper"
+          :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        >
+          <trace-header
+            data-test="trace-details-header"
+            :baseTracePosition="baseTracePosition"
+            :splitterWidth="leftWidth"
+            @resize-start="startResize"
+          />
+          <div class="relative-position full-height">
+            <div
+              class="trace-tree-container"
+              data-test="trace-details-tree-container"
+            >
+              <div class="position-relative">
+                <div
+                  :style="{
+                    width: '1px',
+                    left: `${leftWidth}px`,
+                    backgroundColor:
+                      store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
+                    zIndex: 999,
+                    top: '-28px',
+                    height: `${parentHeight}px`,
+                    cursor: 'col-resize',
+                  }"
+                  class="absolute resize"
+                  @mousedown="startResize"
+                />
+                <trace-tree
+                  data-test="trace-details-tree"
+                  :collapseMapping="collapseMapping"
+                  :spans="spanPositionList"
+                  :baseTracePosition="baseTracePosition"
+                  :spanDimensions="spanDimensions"
+                  :spanMap="spanMap"
+                  :leftWidth="leftWidth"
+                  ref="traceTreeRef"
+                  :search-query="searchQuery"
+                  :spanList="spanList"
+                  @toggle-collapse="toggleSpanCollapse"
+                  @select-span="updateSelectedSpan"
+                  @update-current-index="handleIndexUpdate"
+                  @search-result="handleSearchResult"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -1437,8 +1441,22 @@ $traceChartCollapseHeight: 42px;
   }
 }
 
+.trace-tree-wrapper {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(0.625rem);
+  border-radius: 0.5rem;
+  border: 0.0625rem solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.trace-tree-wrapper.bg-white {
+  background: rgba(240, 240, 245, 0.8);
+  backdrop-filter: blur(0.625rem);
+  border: 0.125rem solid rgba(100, 100, 120, 0.3);
+}
+
 .trace-tree-container {
-  overflow: auto;
+  padding-top: 0;
 }
 
 .trace-chart-btn {
