@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               @click.stop="toggleSpanCollapse(span.spanId)"
               :data-test="`trace-tree-span-badge-collapse-btn-${span.spanId}`"
-              :title="`Click to ${collapseMapping[span.spanId] ? 'collapse' : 'expand'}`"
+              :title="`Click to ${collapseMapping[span.spanId] ? 'expand' : 'collapse'}`"
             >
               {{ getChildCount(span) }}
             </div>
