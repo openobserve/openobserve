@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-bind="$attrs">
+  <div v-bind="$attrs" style="overflow-x: hidden;" ref="rootContainer">
     <template v-for="(span, index) in spans as any[]" :key="span.spanId">
       <div
         :style="{
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 width: spanDimensions.collapseWidth + 'px',
                 height: spanDimensions.collapseHeight + 'px',
               }"
-              class="q-pt-xs flex justify-center items-center collapse-container cursor-pointer"
+              class="q-pt-xs flex items-center collapse-container cursor-pointer"
               @click.stop="toggleSpanCollapse(span.spanId)"
               :data-test="`trace-tree-span-collapse-btn-${span.spanId}`"
             >
@@ -87,12 +87,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="collapse-btn"
                 :style="{
                   rotate: collapseMapping[span.spanId] ? '0deg' : '270deg',
+                  marginLeft: '-0.125rem',
                 }"
               />
             </div>
             <div
               v-if="span.hasChildSpans"
               class="span-count-box"
+              :ref="el => setBadgeRef(span.spanId, el)"
               :style="{
                 borderColor: span.style.color,
                 color: span.style.color,
@@ -100,6 +102,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ getChildCount(span) }}
             </div>
+
+            <div
+              v-else
+              class="span-leaf-dot"
+              :ref="el => setBadgeRef(span.spanId, el)"
+              :style="{
+                backgroundColor: span.style.color,
+              }"
+            ></div>
+
             <div
               class="ellipsis q-pl-xs cursor-pointer span-name-section"
               @click="selectSpan(span.spanId)"
@@ -137,15 +149,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
+            class="span-background-wrapper"
             :style="{
               backgroundColor: span.style.backgroundColor,
               height: `calc(100% - 1.875rem)`,
               borderLeft: `0.1875rem solid ${span.style.color}`,
               marginLeft: span.hasChildSpans ? '0.875rem' : '0',
               width: '100%',
+              position: 'relative',
             }"
             :data-test="`trace-tree-span-background-${span.spanId}`"
-          ></div>
+          >
+          </div>
         </div>
       </div>
       <span-block
@@ -171,11 +186,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       </div>
     </template>
+
+    <!-- SVG overlay for connectors -->
+    <svg
+      v-if="Object.keys(connectorPaths).length > 0"
+      class="connector-overlay"
+      :style="{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+        zIndex: 1000,
+        overflow: 'visible',
+      }"
+    >
+      <template v-for="(connector, key) in connectorPaths" :key="key">
+        <!-- Vertical line -->
+        <line
+          :x1="connector.x1"
+          :y1="connector.y1"
+          :x2="connector.x1"
+          :y2="connector.y2"
+          :stroke="connector.color"
+          stroke-width="1.5"
+          opacity="0.6"
+        />
+        <!-- Horizontal lines to children -->
+        <template v-for="(child, idx) in connector.children" :key="idx">
+          <line
+            :x1="connector.x1"
+            :y1="child.y"
+            :x2="child.x"
+            :y2="child.y"
+            :stroke="connector.color"
+            stroke-width="1.5"
+            opacity="0.6"
+          />
+        </template>
+      </template>
+    </svg>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, ref, watch, computed } from "vue";
+import { defineComponent, nextTick, ref, watch, computed, onMounted } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
@@ -244,6 +300,16 @@ export default defineComponent({
 
     const router = useRouter();
 
+    const badgeRefs = ref<Record<string, HTMLElement>>({});
+    const connectorPaths = ref<Record<string, any>>({});
+    const rootContainer = ref<HTMLElement | null>(null);
+
+    const setBadgeRef = (spanId: string, el: any) => {
+      if (el) {
+        badgeRefs.value[spanId] = el;
+      }
+    };
+
     function toggleSpanCollapse(spanId: number | string) {
       emit("toggleCollapse", spanId);
     }
@@ -268,7 +334,9 @@ export default defineComponent({
     };
 
     const getChildrenHeight = (span: any): number => {
-      if (!span.spans || !Array.isArray(span.spans) || !props.collapseMapping[span.spanId]) return 0;
+      if (!span.spans || !Array.isArray(span.spans) || !props.collapseMapping[span.spanId]) {
+        return 0;
+      }
 
       const countVisibleChildren = (children: any[]): number => {
         let count = 0;
@@ -282,6 +350,59 @@ export default defineComponent({
       };
 
       return countVisibleChildren(span.spans);
+    };
+
+    const calculateConnectors = () => {
+      if (!rootContainer.value) return;
+
+      const newConnectorPaths: Record<string, any> = {};
+      const containerRect = rootContainer.value.getBoundingClientRect();
+      if (props.spans && Array.isArray(props.spans)) {
+        props.spans.forEach((span: any) => {
+          if (span.hasChildSpans && props.collapseMapping[span.spanId]) {
+            const parentBadge = badgeRefs.value[span.spanId];
+            if (!parentBadge) return;
+
+            const parentRect = parentBadge.getBoundingClientRect();
+            const parentX = parentRect.left - containerRect.left + parentRect.width / 2;
+            const parentY = parentRect.bottom - containerRect.top;
+
+            const children = getDirectChildren(span);
+            const childPositions: any[] = [];
+            let lastChildY = parentY;
+
+            children.forEach((child: any) => {
+              const childBadge = badgeRefs.value[child.spanId];
+              if (childBadge) {
+                const childRect = childBadge.getBoundingClientRect();
+                const childX = childRect.left - containerRect.left;
+                const childY = childRect.top - containerRect.top + childRect.height / 2;
+
+                childPositions.push({
+                  x: childX,
+                  y: childY,
+                  isLeaf: !child.hasChildSpans,
+                });
+
+                lastChildY = childY;
+              }
+            });
+
+            if (childPositions.length > 0) {
+              newConnectorPaths[span.spanId] = {
+                x1: parentX,
+                y1: parentY,
+                x2: parentX,
+                y2: lastChildY,
+                color: span.style.color,
+                children: childPositions,
+              };
+            }
+          }
+        });
+      }
+
+      connectorPaths.value = newConnectorPaths;
     };
 
     const searchResults = ref<any[]>([]);
@@ -393,6 +514,29 @@ export default defineComponent({
       emit("search-result", newValue.length);
     });
 
+    // Watch for changes that require recalculating connectors
+    watch(
+      () => [props.spans, props.collapseMapping],
+      () => {
+        nextTick(() => {
+          // Use setTimeout to ensure all refs are set after DOM updates
+          setTimeout(() => {
+            calculateConnectors();
+          }, 0);
+        });
+      },
+      { deep: true }
+    );
+
+    onMounted(() => {
+      nextTick(() => {
+        // Use setTimeout to ensure all refs are set after DOM updates
+        setTimeout(() => {
+          calculateConnectors();
+        }, 0);
+      });
+    });
+
     return {
       toggleSpanCollapse,
       getImageURL,
@@ -413,6 +557,10 @@ export default defineComponent({
       getChildCount,
       getDirectChildren,
       getChildrenHeight,
+      setBadgeRef,
+      connectorPaths,
+      calculateConnectors,
+      rootContainer,
     };
   },
   components: { SpanBlock },
@@ -448,10 +596,18 @@ export default defineComponent({
   margin-right: 0.25rem;
 }
 
+.span-leaf-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  margin-right: 0.25rem;
+  flex-shrink: 0;
+  align-self: center;
+}
+
 .span-name-section {
   padding-left: 0.25rem;
 }
-
 
 .operation-name-container {
   height: 1.875rem;
