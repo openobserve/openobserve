@@ -15,13 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-bind="$attrs" style="overflow-x: hidden;" ref="rootContainer">
+  <div v-bind="$attrs" ref="rootContainer">
     <template v-for="(span, index) in spans as any[]" :key="span.spanId">
       <div
         :style="{
           position: 'relative',
           width: '100%',
-          overflow: 'visible',
           flexWrap: 'nowrap',
         }"
         class="flex span-row"
@@ -144,27 +143,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <span-block
-        :span="span"
-        :depth="depth"
-        :baseTracePosition="baseTracePosition"
-        :styleObj="{
-          position: 'absolute',
-          top: span.style.top,
-          left: span.style.left,
-          height: '3.75rem',
-        }"
-        :style="{
-          width: `calc(100% - ${leftWidth}px)`,
-        }"
-        :spanDimensions="spanDimensions"
-        :isCollapsed="collapseMapping[span.spanId]"
-        :spanData="spanMap[span.spanId]"
-        :class="spanHoveredIndex === index ? 'span-block-highlight' : ''"
-        @toggle-collapse="toggleSpanCollapse"
-        @select-span="selectSpan"
-        @view-logs="viewSpanLogs(span)"
-      />
+      <div :style="{ width: `calc(100% - ${leftWidth}px)` }">
+        <span-block
+          :span="span"
+          :depth="depth"
+          :baseTracePosition="baseTracePosition"
+          :styleObj="{
+            position: 'absolute',
+            top: span.style.top,
+            left: span.style.left,
+            height: '3.75rem',
+          }"
+          :spanDimensions="spanDimensions"
+          :isCollapsed="collapseMapping[span.spanId]"
+          :spanData="spanMap[span.spanId]"
+          :class="spanHoveredIndex === index ? 'span-block-highlight' : ''"
+          @toggle-collapse="toggleSpanCollapse"
+          @select-span="selectSpan"
+          @view-logs="viewSpanLogs(span)"
+        />
+      </div>
       </div>
     </template>
 
@@ -613,8 +611,8 @@ export default defineComponent({
     &::before {
       content: '';
       position: absolute;
-      left: -9999px;
-      right: -9999px;
+      left: 0;
+      right: 0;
       top: 0;
       height: 1.875rem;
       background-color: rgba(0, 123, 255, 0.2);
