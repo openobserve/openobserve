@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           :style="{
             height: '100%',
-            margin: `0 0px 0 ${
+            margin: `0 0 0 ${
               span.hasChildSpans
                 ? span.style.left
                 : parseInt(span.style.left) +
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 class="q-mx-xs view-span-logs"
                 :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-                size="10px"
+                size="0.625rem"
                 icon="search"
                 dense
                 no-caps
@@ -139,9 +139,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             :style="{
               backgroundColor: span.style.backgroundColor,
-              height: `calc(100% - 30px)`,
-              borderLeft: `3px solid ${span.style.color}`,
-              marginLeft: span.hasChildSpans ? '14px' : '0',
+              height: `calc(100% - 1.875rem)`,
+              borderLeft: `0.1875rem solid ${span.style.color}`,
+              marginLeft: span.hasChildSpans ? '0.875rem' : '0',
               width: '100%',
             }"
             :data-test="`trace-tree-span-background-${span.spanId}`"
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           position: 'absolute',
           top: span.style.top,
           left: span.style.left,
-          height: '60px',
+          height: '3.75rem',
         }"
         :style="{
           width: `calc(100% - ${leftWidth}px)`,
@@ -260,6 +260,28 @@ export default defineComponent({
     const getChildCount = (span: any): number => {
       if (!span.spans || !Array.isArray(span.spans)) return 0;
       return span.spans.length;
+    };
+
+    const getDirectChildren = (span: any) => {
+      if (!span.spans || !Array.isArray(span.spans)) return [];
+      return span.spans;
+    };
+
+    const getChildrenHeight = (span: any): number => {
+      if (!span.spans || !Array.isArray(span.spans) || !props.collapseMapping[span.spanId]) return 0;
+
+      const countVisibleChildren = (children: any[]): number => {
+        let count = 0;
+        children.forEach((child: any) => {
+          count++;
+          if (child.spans && child.spans.length > 0 && props.collapseMapping[child.spanId]) {
+            count += countVisibleChildren(child.spans);
+          }
+        });
+        return count;
+      };
+
+      return countVisibleChildren(span.spans);
     };
 
     const searchResults = ref<any[]>([]);
@@ -389,6 +411,8 @@ export default defineComponent({
       scrollToMatch,
       findMatches,
       getChildCount,
+      getDirectChildren,
+      getChildrenHeight,
     };
   },
   components: { SpanBlock },
@@ -397,7 +421,7 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .view-logs-container {
-  top: 7px;
+  top: 0.4375rem;
   right: 0;
 }
 .spans-container {
@@ -405,7 +429,7 @@ export default defineComponent({
 }
 
 .collapse-btn {
-  width: 14px;
+  width: 0.875rem;
   height: auto;
   opacity: 0.6;
 }
@@ -415,7 +439,7 @@ export default defineComponent({
   height: 1.25rem;
   padding: 0 0.25rem;
   border-radius: 0.25rem;
-  border: 1px solid;
+  border: 0.0625rem solid;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -428,8 +452,9 @@ export default defineComponent({
   padding-left: 0.25rem;
 }
 
+
 .operation-name-container {
-  height: 30px;
+  height: 1.875rem;
 
   .view-logs-container {
     visibility: hidden;
@@ -451,7 +476,7 @@ export default defineComponent({
       left: -9999px;
       right: -9999px;
       top: 0;
-      height: 30px;
+      height: 1.875rem;
       background-color: rgba(0, 123, 255, 0.2);
       pointer-events: none;
       z-index: 999;
@@ -476,7 +501,7 @@ export default defineComponent({
   background-color: inherit;
   .view-logs-btn-text {
     visibility: hidden;
-    width: 0px;
+    width: 0;
     transition: width 0.3s ease-in;
   }
   &:hover .view-logs-btn-text {
@@ -485,7 +510,7 @@ export default defineComponent({
   }
 }
 .border-right {
-  border-right: 1px solid rgb(236, 236, 236);
+  border-right: 0.0625rem solid rgb(236, 236, 236);
 }
 .highlighted {
   background-color: yellow;
