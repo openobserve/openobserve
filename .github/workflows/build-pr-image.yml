@@ -13,13 +13,13 @@ env:
   AWS_REGION: us-east-1
 
 jobs:
-  build_pr_image:
-    name: build_pr_image
+  build_pr_image_amd64:
+    name: build_pr_image_amd64
     permissions:
       id-token: write
       contents: read
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
-    runs-on: ${{ github.event.pull_request.head.repo.fork == true && 'ubuntu-2204-8-cores' || 'ubicloud-standard-8' }}
+    runs-on: ubicloud-standard-8
     steps:
       - name: Remove unused tools
         run: |
@@ -44,6 +44,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          prefix-key: amd64
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
         with:
@@ -77,9 +78,6 @@ jobs:
         with:
           registry-type: public
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -91,17 +89,17 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          file: deploy/build/Dockerfile.pr.amd64
+          file: deploy/build/Dockerfile.pr
           context: .
           tags: |
             public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
           push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=amd64
+          cache-to: type=gha,mode=max,scope=amd64
           platforms: linux/amd64
 
-  build_pr_image_arm:
-    name: build_pr_image_arm
+  build_pr_image_arm64:
+    name: build_pr_image_arm64
     permissions:
       id-token: write
       contents: read
@@ -123,13 +121,6 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Check if UI code has changes and skip if none
-        run: |
-          if ! git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^web/"; then
-            echo "UI code hasn't changed, skipping build"
-            exit 0
-          fi
-
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -138,6 +129,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          prefix-key: arm64
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
         with:
@@ -182,17 +174,18 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          file: deploy/build/Dockerfile.pr.amd64
+          file: deploy/build/Dockerfile.pr
           context: .
           tags: |
             public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64
           push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=arm64
+          cache-to: type=gha,mode=max,scope=arm64
           platforms: linux/arm64
 
   build:
-    needs: [build_pr_image, build_pr_image_arm]
+    needs: [build_pr_image_amd64, build_pr_image_arm64]
+    if: ${{ success() && needs.build_pr_image_amd64.result == 'success' && needs.build_pr_image_arm64.result == 'success' }}
     runs-on: ubicloud-standard-16-arm
     permissions:
       id-token: write
