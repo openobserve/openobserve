@@ -234,75 +234,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <q-separator style="width: 100%" />
-      <div class="col-12 flex justify-between items-end q-pr-sm q-pt-sm">
-        <div
-          data-test="trace-details-toggle-timeline-btn"
-          class="trace-chart-btn flex items-center no-wrap cursor-pointer q-mb-sm"
-          @click="toggleTimeline"
-        >
-          <q-icon
-            name="expand_more"
-            :class="!isTimelineExpanded ? 'rotate-270' : ''"
-            size="22px"
-            class="cursor-pointer text-grey-10"
-          />
+      <div class="col-12 timeline-header-wrapper" :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
+        <div class="flex justify-between items-end q-pr-sm q-pt-sm q-pb-sm">
           <div
-            data-test="trace-details-visual-title"
-            class="text-subtitle2 text-bold"
+            data-test="trace-details-toggle-timeline-btn"
+            class="trace-chart-btn flex items-center no-wrap cursor-pointer"
+            @click="toggleTimeline"
           >
-            {{
-              activeVisual === "timeline"
-                ? "Trace Timeline"
-                : "Trace Service Map"
-            }}
+            <q-icon
+              name="expand_more"
+              :class="!isTimelineExpanded ? 'rotate-270' : ''"
+              size="22px"
+              class="cursor-pointer text-grey-10"
+            />
+            <div
+              data-test="trace-details-visual-title"
+              class="text-subtitle2 text-bold"
+            >
+              {{
+                activeVisual === "timeline"
+                  ? "Trace Timeline"
+                  : "Trace Service Map"
+              }}
+            </div>
+          </div>
+
+          <div
+            v-if="isTimelineExpanded"
+            class="rounded-borders visual-selector-container"
+            :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+          >
+            <template v-for="visual in traceVisuals" :key="visual.value">
+              <q-btn
+                :data-test="`trace-details-visual-${visual.value}-btn`"
+                :color="visual.value === activeVisual ? 'primary' : ''"
+                :flat="visual.value === activeVisual ? false : true"
+                dense
+                no-caps
+                size="11px"
+                class="q-px-sm visual-selection-btn"
+                @click="activeVisual = visual.value"
+              >
+                <q-icon><component :is="visual.icon" /></q-icon>
+                {{ visual.label }}</q-btn
+              >
+            </template>
           </div>
         </div>
-
         <div
-          v-if="isTimelineExpanded"
-          class="rounded-borders"
-          style="border: 1px solid #cacaca; padding: 2px"
+          v-show="isTimelineExpanded"
+          class="chart-container-inner q-px-sm q-pb-sm"
+          :key="isTimelineExpanded.toString()"
         >
-          <template v-for="visual in traceVisuals" :key="visual.value">
-            <q-btn
-              :data-test="`trace-details-visual-${visual.value}-btn`"
-              :color="visual.value === activeVisual ? 'primary' : ''"
-              :flat="visual.value === activeVisual ? false : true"
-              dense
-              no-caps
-              size="11px"
-              class="q-px-sm visual-selection-btn"
-              @click="activeVisual = visual.value"
-            >
-              <q-icon><component :is="visual.icon" /></q-icon>
-              {{ visual.label }}</q-btn
-            >
-          </template>
+          <ChartRenderer
+            data-test="trace-details-timeline-chart"
+            v-if="activeVisual === 'timeline'"
+            class="trace-details-chart"
+            id="trace_details_gantt_chart"
+            :data="ChartData"
+            @updated:chart="updateChart"
+            style="height: 200px"
+          />
+          <ChartRenderer
+            data-test="trace-details-service-map-chart"
+            v-else
+            :data="traceServiceMap"
+            style="height: 200px"
+          />
         </div>
       </div>
-      <div
-        v-show="isTimelineExpanded"
-        class="col-12"
-        :key="isTimelineExpanded.toString()"
-      >
-        <ChartRenderer
-          data-test="trace-details-timeline-chart"
-          v-if="activeVisual === 'timeline'"
-          class="trace-details-chart"
-          id="trace_details_gantt_chart"
-          :data="ChartData"
-          @updated:chart="updateChart"
-          style="height: 200px"
-        />
-        <ChartRenderer
-          data-test="trace-details-service-map-chart"
-          v-else
-          :data="traceServiceMap"
-          style="height: 200px"
-        />
-      </div>
-      <q-separator style="width: 100%" class="q-mb-sm" />
       <div
         class="histogram-spans-container"
         :class="[
@@ -1432,9 +1432,7 @@ $traceChartCollapseHeight: 42px;
   height: calc(
     100vh - $toolbarHeight - $traceChartHeight - 44px - $appNavbarHeight
   );
-  overflow-y: auto;
   position: relative;
-  overflow-x: hidden;
 
   &.full {
     height: calc(100vh - $toolbarHeight - 8px - 44px - $appNavbarHeight);
@@ -1446,7 +1444,10 @@ $traceChartCollapseHeight: 42px;
   backdrop-filter: blur(0.625rem);
   border-radius: 0.5rem;
   border: 0.0625rem solid rgba(255, 255, 255, 0.1);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  height: 100%;
 }
 
 .trace-tree-wrapper.bg-white {
@@ -1519,6 +1520,32 @@ $traceChartCollapseHeight: 42px;
       padding-right: 5px;
       font-size: 15px;
     }
+  }
+
+  .visual-selector-container {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(0.625rem);
+    border-radius: 0.5rem;
+    border: 0.0625rem solid rgba(255, 255, 255, 0.1);
+    padding: 0.125rem;
+  }
+
+  .visual-selector-container.bg-white {
+    background: rgba(240, 240, 245, 0.8);
+    border: 0.125rem solid rgba(100, 100, 120, 0.3);
+  }
+
+  .timeline-header-wrapper {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(0.625rem);
+    border-radius: 0.5rem;
+    border: 0.0625rem solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 0.5rem;
+  }
+
+  .timeline-header-wrapper.bg-white {
+    background: rgba(240, 240, 245, 0.8);
+    border: 0.125rem solid rgba(100, 100, 120, 0.3);
   }
 }
 
