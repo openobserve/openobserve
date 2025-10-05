@@ -607,6 +607,7 @@ export default defineComponent({
 
 .span-row {
   position: relative;
+  min-height: 1.875rem;
 
   &.span-row-highlight {
     &::before {
