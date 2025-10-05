@@ -15,20 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <template v-for="(span, index) in spans as any[]" :key="span.spanId">
-    <div
-      :style="{
-        position: 'relative',
-        width: '100%',
-        overflow: 'visible',
-        flexWrap: 'nowrap',
-      }"
-      class="flex span-row"
-      :class="spanHoveredIndex === index ? 'span-row-highlight' : ''"
-      :data-test="`trace-tree-span-container-${span.spanId}`"
-      @mouseover="() => (spanHoveredIndex = index)"
-      @mouseout="() => (spanHoveredIndex = -1)"
-    >
+  <div v-bind="$attrs">
+    <template v-for="(span, index) in spans as any[]" :key="span.spanId">
+      <div
+        :style="{
+          position: 'relative',
+          width: '100%',
+          overflow: 'visible',
+          flexWrap: 'nowrap',
+        }"
+        class="flex span-row"
+        :class="spanHoveredIndex === index ? 'span-row-highlight' : ''"
+        :data-test="`trace-tree-span-container-${span.spanId}`"
+        @mouseover="() => (spanHoveredIndex = index)"
+        @mouseout="() => (spanHoveredIndex = -1)"
+      >
       <div :style="{ width: leftWidth + 'px' }">
         <div
           :style="{
@@ -70,10 +71,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="span.hasChildSpans"
-              class="collapse-container cursor-pointer"
+              :style="{
+                width: spanDimensions.collapseWidth + 'px',
+                height: spanDimensions.collapseHeight + 'px',
+              }"
+              class="q-pt-xs flex justify-center items-center collapse-container cursor-pointer"
               @click.stop="toggleSpanCollapse(span.spanId)"
               :data-test="`trace-tree-span-collapse-btn-${span.spanId}`"
-              :title="`${getChildCount(span)} child span${getChildCount(span) !== 1 ? 's' : ''}`"
             >
               <q-icon
                 dense
@@ -81,16 +85,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 name="expand_more"
                 class="collapse-btn"
-                :class="collapseMapping[span.spanId] ? 'expanded' : 'collapsed'"
+                :style="{
+                  rotate: collapseMapping[span.spanId] ? '0deg' : '270deg',
+                }"
               />
-              <span class="child-count-badge">{{ getChildCount(span) }}</span>
             </div>
             <div
-              class="ellipsis q-pl-xs cursor-pointer"
+              v-if="span.hasChildSpans"
+              class="span-count-box"
               :style="{
-                paddingLeft: '4px',
-                borderLeft: `3px solid ${span.style.color}`,
+                borderColor: span.style.color,
+                color: span.style.color,
               }"
+            >
+              {{ getChildCount(span) }}
+            </div>
+            <div
+              class="ellipsis q-pl-xs cursor-pointer span-name-section"
               @click="selectSpan(span.spanId)"
               :data-test="`trace-tree-span-select-btn-${span.spanId}`"
             >
@@ -126,11 +137,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="span-vertical-line"
-            :class="{ 'has-children': span.hasChildSpans }"
             :style="{
               backgroundColor: span.style.backgroundColor,
-              borderLeftColor: span.style.color,
+              height: `calc(100% - 30px)`,
+              borderLeft: `3px solid ${span.style.color}`,
+              marginLeft: span.hasChildSpans ? '14px' : '0',
+              width: '100%',
             }"
             :data-test="`trace-tree-span-background-${span.spanId}`"
           ></div>
@@ -157,8 +169,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @select-span="selectSpan"
         @view-logs="viewSpanLogs(span)"
       />
-    </div>
-  </template>
+      </div>
+    </template>
+  </div>
 </template>
 
 <script lang="ts">
@@ -172,6 +185,7 @@ import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "TraceTree",
+  inheritAttrs: false,
   props: {
     spans: {
       type: Array,
@@ -390,59 +404,28 @@ export default defineComponent({
   position: relative;
 }
 
-.span-vertical-line {
-  height: calc(100% - 1.875rem);
-  border-left: 0.1875rem solid;
-  width: 100%;
-
-  &.has-children {
-    margin-left: 0.875rem;
-    margin-top: 1rem;
-  }
-}
-
-.collapse-container {
-  position: relative;
-  width: 0.875rem;
-  height: 0.875rem;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding-top: 0.125rem;
-  flex-shrink: 0;
-}
-
 .collapse-btn {
-  width: 0.875rem;
+  width: 14px;
   height: auto;
   opacity: 0.6;
-
-  &.expanded {
-    rotate: 0deg;
-  }
-
-  &.collapsed {
-    rotate: 270deg;
-  }
 }
 
-.child-count-badge {
-  position: absolute;
-  bottom: -0.125rem;
-  right: -0.125rem;
-  min-width: 1rem;
-  height: 1rem;
-  border-radius: 0.1875rem;
-  border: 0.09375rem solid #1976d2;
-  background-color: white;
-  color: #1976d2;
-  font-size: 0.625rem;
-  font-weight: bold;
+.span-count-box {
+  min-width: 1.5rem;
+  height: 1.25rem;
+  padding: 0 0.25rem;
+  border-radius: 0.25rem;
+  border: 1px solid;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 0.125rem;
-  line-height: 1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-right: 0.25rem;
+}
+
+.span-name-section {
+  padding-left: 0.25rem;
 }
 
 .operation-name-container {
