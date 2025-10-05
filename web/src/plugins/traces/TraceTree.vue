@@ -23,8 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         overflow: 'visible',
         flexWrap: 'nowrap',
       }"
-      class="flex"
+      class="flex span-row"
+      :class="spanHoveredIndex === index ? 'span-row-highlight' : ''"
       :data-test="`trace-tree-span-container-${span.spanId}`"
+      @mouseover="() => (spanHoveredIndex = index)"
+      @mouseout="() => (spanHoveredIndex = -1)"
     >
       <div :style="{ width: leftWidth + 'px' }">
         <div
@@ -44,9 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="flex no-wrap q-pt-sm full-width relative-position operation-name-container"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-            :style="{ height: '30px' }"
-            @mouseover="() => (spanHoveredIndex = index)"
-            @mouseout="() => (spanHoveredIndex = -1)"
             :data-test="`trace-tree-span-operation-name-container-${span.spanId}`"
           >
             <div
@@ -70,13 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="span.hasChildSpans"
-              :style="{
-                width: spanDimensions.collapseWidth + 'px',
-                height: spanDimensions.collapseHeight + 'px',
-              }"
-              class="q-pt-xs flex justify-center items-center collapse-container cursor-pointer"
+              class="collapse-container cursor-pointer"
               @click.stop="toggleSpanCollapse(span.spanId)"
               :data-test="`trace-tree-span-collapse-btn-${span.spanId}`"
+              :title="`${getChildCount(span)} child span${getChildCount(span) !== 1 ? 's' : ''}`"
             >
               <q-icon
                 dense
@@ -84,10 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 name="expand_more"
                 class="collapse-btn"
-                :style="{
-                  rotate: collapseMapping[span.spanId] ? '0deg' : '270deg',
-                }"
+                :class="collapseMapping[span.spanId] ? 'expanded' : 'collapsed'"
               />
+              <span class="child-count-badge">{{ getChildCount(span) }}</span>
             </div>
             <div
               class="ellipsis q-pl-xs cursor-pointer"
@@ -130,12 +126,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
+            class="span-vertical-line"
+            :class="{ 'has-children': span.hasChildSpans }"
             :style="{
               backgroundColor: span.style.backgroundColor,
-              height: `calc(100% - 30px)`,
-              borderLeft: `3px solid ${span.style.color}`,
-              marginLeft: span.hasChildSpans ? '14px' : '0',
-              width: '100%',
+              borderLeftColor: span.style.color,
             }"
             :data-test="`trace-tree-span-background-${span.spanId}`"
           ></div>
@@ -157,10 +152,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :spanDimensions="spanDimensions"
         :isCollapsed="collapseMapping[span.spanId]"
         :spanData="spanMap[span.spanId]"
+        :class="spanHoveredIndex === index ? 'span-block-highlight' : ''"
         @toggle-collapse="toggleSpanCollapse"
         @select-span="selectSpan"
-        @mouseover="() => (spanHoveredIndex = index)"
-        @mouseout="() => (spanHoveredIndex = -1)"
         @view-logs="viewSpanLogs(span)"
       />
     </div>
@@ -248,6 +242,12 @@ export default defineComponent({
       const queryDetails = buildQueryDetails(span);
       navigateToLogs(queryDetails);
     };
+
+    const getChildCount = (span: any): number => {
+      if (!span.spans || !Array.isArray(span.spans)) return 0;
+      return span.spans.length;
+    };
+
     const searchResults = ref<any[]>([]);
     const currentIndex = ref<number | null>(null);
     const currentSelectedValue = computed(() => {
@@ -374,6 +374,7 @@ export default defineComponent({
       currentSelectedValue,
       scrollToMatch,
       findMatches,
+      getChildCount,
     };
   },
   components: { SpanBlock },
@@ -389,13 +390,64 @@ export default defineComponent({
   position: relative;
 }
 
+.span-vertical-line {
+  height: calc(100% - 1.875rem);
+  border-left: 0.1875rem solid;
+  width: 100%;
+
+  &.has-children {
+    margin-left: 0.875rem;
+    margin-top: 1rem;
+  }
+}
+
+.collapse-container {
+  position: relative;
+  width: 0.875rem;
+  height: 0.875rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-top: 0.125rem;
+  flex-shrink: 0;
+}
+
 .collapse-btn {
-  width: 14px;
+  width: 0.875rem;
   height: auto;
   opacity: 0.6;
+
+  &.expanded {
+    rotate: 0deg;
+  }
+
+  &.collapsed {
+    rotate: 270deg;
+  }
+}
+
+.child-count-badge {
+  position: absolute;
+  bottom: -0.125rem;
+  right: -0.125rem;
+  min-width: 1rem;
+  height: 1rem;
+  border-radius: 0.1875rem;
+  border: 0.09375rem solid #1976d2;
+  background-color: white;
+  color: #1976d2;
+  font-size: 0.625rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.125rem;
+  line-height: 1;
 }
 
 .operation-name-container {
+  height: 30px;
+
   .view-logs-container {
     visibility: hidden;
   }
@@ -403,6 +455,33 @@ export default defineComponent({
     &.show {
       visibility: visible !important;
     }
+  }
+}
+
+.span-row {
+  position: relative;
+
+  &.span-row-highlight {
+    &::before {
+      content: '';
+      position: absolute;
+      left: -9999px;
+      right: -9999px;
+      top: 0;
+      height: 30px;
+      background-color: rgba(0, 123, 255, 0.2);
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    .operation-name-container {
+      background-color: transparent !important;
+    }
+  }
+
+  > * {
+    position: relative;
+    z-index: 2;
   }
 }
 </style>
@@ -433,5 +512,12 @@ export default defineComponent({
   background-color: yellow;
   color: red;
   font-weight: bold;
+}
+
+.span-block-highlight {
+  .bg-dark,
+  .bg-white {
+    background-color: transparent !important;
+  }
 }
 </style>
