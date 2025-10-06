@@ -215,18 +215,32 @@
               </template>
             </q-select>
 
-          <q-btn
-            color="primary"
-            :disable="isLoading || !inputMessage.trim()"
-            @click="sendMessage"
-            class="tw-px-2 tw-rounded-md no-border"
-            no-caps
+          <!-- Debug info - remove this later -->
+          <!-- <div class="tw-text-xs tw-text-gray-500">Loading: {{ isLoading }}, Input: {{ inputMessage.length }}</div> -->
 
+          <!-- Send button - shown when not loading -->
+          <q-btn
+            v-if="!isLoading"
+            :disable="!inputMessage.trim()"
+            @click="sendMessage"
+            color="positive"
+            round
+            dense
+            class="tw-ml-1"
           >
-            <div class="tw-flex tw-items-center tw-gap-2">
-              <img :src="getGenerateAiIcon" class="tw-w-4 tw-h-4" />
-              <span class="tw-text-[12px]">Generate</span>
-            </div>
+            <q-icon name="send" size="16px" color="white" />
+          </q-btn>
+          
+          <!-- Stop button - shown when loading/streaming -->
+          <q-btn
+            v-if="isLoading"
+            color="negative"
+            @click="cancelCurrentRequest"
+            round
+            dense
+            class="tw-ml-1"
+          >
+            <q-icon name="stop" size="16px" color="white" />
           </q-btn>
         </div>
       </div>
@@ -343,6 +357,9 @@ export default defineComponent({
     const historySearchTerm = ref('');
     const shouldAutoScroll = ref(true);
     
+    // AbortController for managing request cancellation - allows users to stop ongoing AI requests
+    const currentAbortController = ref<AbortController | null>(null);
+    
     const modelConfig: any = {
       openai: [
         'gpt-4.1'
@@ -412,6 +429,55 @@ export default defineComponent({
       const loadingElement = document.getElementById('loading-indicator');
       if (loadingElement) {
         loadingElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    };
+
+    /**
+     * Cancels the currently ongoing AI chat request if one exists
+     * This will stop the streaming response and clean up the request state
+     * Shows a user-friendly notification about the cancellation
+     * 
+     * Called when user clicks the "Stop" button during message generation
+     */
+    const cancelCurrentRequest = async () => {
+      if (currentAbortController.value) {
+        currentAbortController.value.abort();
+        currentAbortController.value = null;
+        
+        // Show user notification about successful cancellation
+        $q.notify({
+          message: 'Response generation stopped',
+          color: 'secondary',
+          position: 'bottom',
+          timeout: 2000,
+          icon: 'stop'
+        });
+        
+        // Update UI state to reflect cancellation
+        isLoading.value = false;
+        
+        // Handle partial message cleanup
+        if (chatMessages.value.length > 0) {
+          const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+          if (lastMessage.role === 'assistant') {
+            if (!lastMessage.content) {
+              // Remove empty assistant message that was added for streaming
+              chatMessages.value.pop();
+            } else if (currentStreamingMessage.value) {
+              // Keep partial content but indicate it was cancelled
+              lastMessage.content += '\n\n_[Response stopped by user]_';
+            }
+          }
+        }
+        
+        // Reset streaming state
+        currentStreamingMessage.value = '';
+        
+        // Save the current state including cancellation
+        await saveToHistory();
+        
+        // Scroll to show the final state
+        await scrollToBottom();
       }
     };
 
@@ -539,7 +605,14 @@ export default defineComponent({
           await saveToHistory();
         }
       } catch (error) {
-        console.error('Error reading stream:', error);
+        // Handle different types of errors appropriately
+        if (error instanceof Error && error.name === 'AbortError') {
+          // Request was cancelled by user - this is expected behavior, not an error
+          return; // Exit gracefully without logging as error
+        } else {
+          // Genuine error occurred during stream processing
+          console.error('Error reading stream:', error);
+        }
       }
     };
 
@@ -720,6 +793,11 @@ export default defineComponent({
       }
     };
 
+    /**
+     * Sends a message to the AI chat service with streaming response handling
+     * Creates a new AbortController for each request to enable cancellation
+     * Manages the complete request lifecycle from user input to streaming response
+     */
     const sendMessage = async () => {
       if (!inputMessage.value.trim() || isLoading.value) return;
 
@@ -736,17 +814,32 @@ export default defineComponent({
       isLoading.value = true;
       currentStreamingMessage.value = '';
       
+      // Create new AbortController for this request - enables cancellation via Stop button
+      currentAbortController.value = new AbortController();
+      
       try {
         chatMessages.value.push({
           role: 'assistant',
           content: ''
         });
         await scrollToLoadingIndicator(); // Scroll directly to loading indicator
+        
         let response: any;
         try { 
-          response = await fetchAiChat(chatMessages.value.slice(0, -1),"",store.state.selectedOrganization.identifier);
+          // Pass abort signal to enable request cancellation
+          response = await fetchAiChat(
+            chatMessages.value.slice(0, -1),
+            "",
+            store.state.selectedOrganization.identifier,
+            currentAbortController.value.signal
+          );
         } catch (error) {
           console.error('Error fetching AI chat:', error);
+          return;
+        }
+
+        // Check if request was cancelled before processing response
+        if (response && response.cancelled) {
           return;
         }
 
@@ -789,6 +882,10 @@ export default defineComponent({
       }
 
       isLoading.value = false;
+      
+      // Clean up AbortController after request completion (success or error)
+      currentAbortController.value = null;
+      
       await scrollToBottom();
     };
 
@@ -824,6 +921,12 @@ export default defineComponent({
     });
 
     onUnmounted(()=>{
+      // Cancel any ongoing requests when component is unmounted to prevent memory leaks
+      if (currentAbortController.value) {
+        currentAbortController.value.abort();
+        currentAbortController.value = null;
+      }
+      
       //this step is added because we are using seperate instances of o2 ai chat component to make sync between them
       //whenever a new chat is created or a new message is sent, the currentChatTimestamp is set to the chatId
       //so we need to make sure that the currentChatTimestamp is set to the correct chatId
@@ -1028,6 +1131,8 @@ export default defineComponent({
       checkIfShouldAutoScroll,
       getScrollThreshold,
       scrollToLoadingIndicator,
+      cancelCurrentRequest,
+      currentAbortController,
     }
   }
 });

@@ -44,7 +44,25 @@ const useAiChat = () => {
         }
     }
 
-    const fetchAiChat = async (messages: any[],model: string,org_id: string) => {
+    /**
+     * Fetches AI chat response with streaming support and optional request cancellation
+     * 
+     * @param messages - Array of chat messages to send to the AI
+     * @param model - AI model to use (optional, defaults to server-side config)
+     * @param org_id - Organization identifier for API routing
+     * @param abortSignal - Optional AbortController signal for request cancellation
+     * @returns Promise<Response> - Fetch response object with streaming capabilities
+     * 
+     * Example usage:
+     * ```typescript
+     * const abortController = new AbortController();
+     * const response = await fetchAiChat(messages, 'gpt-4', 'org123', abortController.signal);
+     * 
+     * // To cancel the request:
+     * abortController.abort();
+     * ```
+     */
+    const fetchAiChat = async (messages: any[], model: string, org_id: string, abortSignal?: AbortSignal) => {
         let url  = `${store.state.API_ENDPOINT}/api/${org_id}/ai/chat_stream`;
         
         // Try structured context first, fallback to legacy context
@@ -75,18 +93,29 @@ const useAiChat = () => {
         }
 
         try {
-            const response = await fetch(url, {
+            // Configure fetch options with abort signal for request cancellation
+            const fetchOptions: RequestInit = {
                 method: 'POST',
                 body: body,
-            credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        });
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                // Add abort signal if provided to enable request cancellation
+                ...(abortSignal && { signal: abortSignal })
+            };
+            
+            const response = await fetch(url, fetchOptions);
         return response;
         } catch (error) {
-            console.error('Error fetching AI chat:', error);
-            return null;
+            // Handle different types of errors appropriately
+            if (error instanceof Error && error.name === 'AbortError') {
+                // Return a special response to indicate cancellation
+                return { cancelled: true, error };
+            } else {
+                console.error('Error fetching AI chat:', error);
+                return null;
+            }
         }
     }
 
