@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="trace-details full-width" :style="backgroundStyle">
+  <div class="trace-details" :style="backgroundStyle">
     <div
-      class="row q-px-sm"
+      class="trace-details-content"
       v-if="
         traceTree.length &&
         spanList.length &&
@@ -27,17 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         )
       "
     >
-      <div class="full-width flex items-center toolbar flex justify-between">
-        <div class="flex items-center">
+      <div class="trace-combined-header-wrapper" :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
+        <div class="full-width flex items-center toolbar flex justify-between q-pb-sm">
+          <div class="flex items-center">
           <div
             data-test="trace-details-back-btn"
-            class="flex justify-center items-center q-mr-sm cursor-pointer"
-            style="
-              border: 1.5px solid;
-              border-radius: 50%;
-              width: 22px;
-              height: 22px;
-            "
+            class="flex justify-center items-center q-mr-sm cursor-pointer trace-back-btn"
             title="Traces List"
             @click="routeToTracesList"
           >
@@ -162,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex items-center">
           <div
-            class="flex justify-center items-center tw-border tw-pl-2 tw-rounded-sm tw-border-gray-300"
+            class="flex justify-center items-center tw-border tw-pl-2 tw-border-gray-300 trace-search-container"
           >
             <q-input
               data-test="trace-details-search-input"
@@ -232,77 +227,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="routeToTracesList"
           />
         </div>
-      </div>
+        </div>
 
-      <q-separator style="width: 100%" />
-      <div class="col-12 flex justify-between items-end q-pr-sm q-pt-sm">
-        <div
-          data-test="trace-details-toggle-timeline-btn"
-          class="trace-chart-btn flex items-center no-wrap cursor-pointer q-mb-sm"
-          @click="toggleTimeline"
-        >
-          <q-icon
-            name="expand_more"
-            :class="!isTimelineExpanded ? 'rotate-270' : ''"
-            size="22px"
-            class="cursor-pointer text-grey-10"
-          />
+        <q-separator class="q-my-sm" />
+
+        <div class="flex justify-between items-end q-pr-sm q-pb-sm">
           <div
-            data-test="trace-details-visual-title"
-            class="text-subtitle2 text-bold"
+            data-test="trace-details-toggle-timeline-btn"
+            class="trace-chart-btn flex items-center no-wrap cursor-pointer"
+            @click="toggleTimeline"
           >
-            {{
-              activeVisual === "timeline"
-                ? "Trace Timeline"
-                : "Trace Service Map"
-            }}
+            <q-icon
+              name="expand_more"
+              :class="!isTimelineExpanded ? 'rotate-270' : ''"
+              size="22px"
+              class="cursor-pointer text-grey-10"
+            />
+            <div
+              data-test="trace-details-visual-title"
+              class="text-subtitle2 text-bold"
+            >
+              {{
+                activeVisual === "timeline"
+                  ? "Trace Timeline"
+                  : "Trace Service Map"
+              }}
+            </div>
+          </div>
+
+          <div
+            v-if="isTimelineExpanded"
+            class="rounded-borders visual-selector-container"
+            :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+          >
+            <template v-for="visual in traceVisuals" :key="visual.value">
+              <q-btn
+                :data-test="`trace-details-visual-${visual.value}-btn`"
+                :color="visual.value === activeVisual ? 'primary' : ''"
+                :flat="visual.value === activeVisual ? false : true"
+                dense
+                no-caps
+                size="11px"
+                class="q-px-sm visual-selection-btn"
+                @click="activeVisual = visual.value"
+              >
+                <q-icon><component :is="visual.icon" /></q-icon>
+                {{ visual.label }}</q-btn
+              >
+            </template>
           </div>
         </div>
-
         <div
-          v-if="isTimelineExpanded"
-          class="rounded-borders"
-          style="border: 1px solid #cacaca; padding: 2px"
+          v-show="isTimelineExpanded"
+          class="chart-container-inner q-px-sm q-pb-sm"
+          :key="isTimelineExpanded.toString()"
         >
-          <template v-for="visual in traceVisuals" :key="visual.value">
-            <q-btn
-              :data-test="`trace-details-visual-${visual.value}-btn`"
-              :color="visual.value === activeVisual ? 'primary' : ''"
-              :flat="visual.value === activeVisual ? false : true"
-              dense
-              no-caps
-              size="11px"
-              class="q-px-sm visual-selection-btn"
-              @click="activeVisual = visual.value"
-            >
-              <q-icon><component :is="visual.icon" /></q-icon>
-              {{ visual.label }}</q-btn
-            >
-          </template>
+          <ChartRenderer
+            data-test="trace-details-timeline-chart"
+            v-if="activeVisual === 'timeline'"
+            class="trace-details-chart trace-chart-height"
+            id="trace_details_gantt_chart"
+            :data="ChartData"
+            @updated:chart="updateChart"
+          />
+          <ChartRenderer
+            data-test="trace-details-service-map-chart"
+            v-else
+            :data="traceServiceMap"
+            class="trace-chart-height"
+          />
         </div>
       </div>
-      <div
-        v-show="isTimelineExpanded"
-        class="col-12"
-        :key="isTimelineExpanded.toString()"
-      >
-        <ChartRenderer
-          data-test="trace-details-timeline-chart"
-          v-if="activeVisual === 'timeline'"
-          class="trace-details-chart"
-          id="trace_details_gantt_chart"
-          :data="ChartData"
-          @updated:chart="updateChart"
-          style="height: 200px"
-        />
-        <ChartRenderer
-          data-test="trace-details-service-map-chart"
-          v-else
-          :data="traceServiceMap"
-          style="height: 200px"
-        />
-      </div>
-      <q-separator style="width: 100%" class="q-mb-sm" />
+      <div style="display: flex; flex: 1; min-height: 0;">
       <div
         class="histogram-spans-container"
         :class="[
@@ -311,68 +307,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ]"
         ref="parentContainer"
       >
-        <trace-header
-          data-test="trace-details-header"
-          :baseTracePosition="baseTracePosition"
-          :splitterWidth="leftWidth"
-          @resize-start="startResize"
-        />
-        <div class="relative-position full-height">
-          <div
-            class="trace-tree-container"
-            :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-            data-test="trace-details-tree-container"
-          >
-            <div class="position-relative">
+        <div
+          class="trace-tree-wrapper"
+          :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        >
+          <trace-header
+            data-test="trace-details-header"
+            :baseTracePosition="baseTracePosition"
+            :splitterWidth="leftWidth"
+            @resize-start="startResize"
+          />
+          <div style="display: flex; flex: 1; min-height: 0;">
+            <div class="relative-position trace-content-scroll">
               <div
-                :style="{
-                  width: '1px',
-                  left: `${leftWidth}px`,
-                  backgroundColor:
-                    store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
-                  zIndex: 999,
-                  top: '-28px',
-                  height: `${parentHeight}px`,
-                  cursor: 'col-resize',
-                }"
-                class="absolute resize"
-                @mousedown="startResize"
-              />
-              <trace-tree
-                data-test="trace-details-tree"
-                :collapseMapping="collapseMapping"
-                :spans="spanPositionList"
+                class="trace-tree-container"
+                data-test="trace-details-tree-container"
+              >
+                <div class="position-relative">
+                  <div
+                    :style="{
+                      width: '1px',
+                      left: `${leftWidth}px`,
+                      backgroundColor:
+                        store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
+                      zIndex: 999,
+                      top: '-28px',
+                      height: `${spanPositionList.length * spanDimensions.height + 28}px`,
+                      cursor: 'col-resize',
+                    }"
+                    class="absolute resize"
+                    @mousedown="startResize"
+                  />
+                  <trace-tree
+                    data-test="trace-details-tree"
+                    :collapseMapping="collapseMapping"
+                    :spans="spanPositionList"
+                    :baseTracePosition="baseTracePosition"
+                    :spanDimensions="spanDimensions"
+                    :spanMap="spanMap"
+                    :leftWidth="leftWidth"
+                    ref="traceTreeRef"
+                    :search-query="searchQuery"
+                    :spanList="spanList"
+                    @toggle-collapse="toggleSpanCollapse"
+                    @select-span="updateSelectedSpan"
+                    @update-current-index="handleIndexUpdate"
+                    @search-result="handleSearchResult"
+                  />
+                </div>
+              </div>
+            </div>
+            <q-separator v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)" vertical />
+            <div
+              v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
+              class="histogram-sidebar-inner"
+              :class="isTimelineExpanded ? '' : 'full'"
+            >
+              <trace-details-sidebar
+                data-test="trace-details-sidebar"
+                :span="spanMap[selectedSpanId as string]"
                 :baseTracePosition="baseTracePosition"
-                :spanDimensions="spanDimensions"
-                :spanMap="spanMap"
-                :leftWidth="leftWidth"
-                ref="traceTreeRef"
                 :search-query="searchQuery"
-                :spanList="spanList"
-                @toggle-collapse="toggleSpanCollapse"
-                @select-span="updateSelectedSpan"
-                @update-current-index="handleIndexUpdate"
-                @search-result="handleSearchResult"
+                @view-logs="redirectToLogs"
+                @close="closeSidebar"
+                @open-trace="openTraceLink"
               />
             </div>
           </div>
         </div>
       </div>
-      <q-separator vertical />
-      <div
-        v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-        class="histogram-sidebar"
-        :class="isTimelineExpanded ? '' : 'full'"
-      >
-        <trace-details-sidebar
-          data-test="trace-details-sidebar"
-          :span="spanMap[selectedSpanId as string]"
-          :baseTracePosition="baseTracePosition"
-          :search-query="searchQuery"
-          @view-logs="redirectToLogs"
-          @close="closeSidebar"
-          @open-trace="openTraceLink"
-        />
       </div>
     </div>
     <div
@@ -1402,7 +1405,22 @@ $traceChartCollapseHeight: 42px;
   height: $toolbarHeight;
 }
 .trace-details {
-  overflow: auto;
+  overflow: hidden;
+  height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.trace-details-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 0.75rem;
+  box-sizing: border-box;
 }
 .histogram-container-full {
   width: 100%;
@@ -1411,34 +1429,46 @@ $traceChartCollapseHeight: 42px;
   width: calc(100% - $sidebarWidth - $separatorWidth);
 }
 
-.histogram-sidebar {
+.histogram-sidebar-inner {
   width: $sidebarWidth;
-  height: calc(
-    100vh - $toolbarHeight - $traceChartHeight - 44px - $appNavbarHeight
-  );
+  flex-shrink: 0;
   overflow-y: auto;
   overflow-x: hidden;
-
-  &.full {
-    height: calc(100vh - $toolbarHeight - 8px - 44px - $appNavbarHeight);
-  }
+  flex: 1;
+  min-height: 0;
 }
 
 .histogram-spans-container {
-  height: calc(
-    100vh - $toolbarHeight - $traceChartHeight - 44px - $appNavbarHeight
-  );
-  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
   position: relative;
-  overflow-x: hidden;
+  padding-bottom: 0.5rem;
+}
 
-  &.full {
-    height: calc(100vh - $toolbarHeight - 8px - 44px - $appNavbarHeight);
-  }
+.trace-tree-wrapper {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(0.625rem);
+  border-radius: 0.5rem;
+  border: 0.1875rem solid rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+  height: calc(100% - 2.5rem);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 2.5rem;
+}
+
+.trace-tree-wrapper.bg-white {
+  background: rgba(240, 240, 245, 0.8);
+  backdrop-filter: blur(0.625rem);
+  border: 0.1875rem solid rgba(100, 100, 120, 0.5);
 }
 
 .trace-tree-container {
-  overflow: auto;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
+  min-height: 100%;
 }
 
 .trace-chart-btn {
@@ -1475,6 +1505,20 @@ $traceChartCollapseHeight: 42px;
 }
 </style>
 <style lang="scss">
+// Prevent parent containers from adding scrollbars
+body:has(.trace-details),
+html:has(.trace-details) {
+  overflow: hidden !important;
+}
+
+.trace-content-scroll {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  min-height: 0 !important;
+  scrollbar-gutter: stable !important;
+}
+
 .trace-details {
   .q-splitter__before,
   .q-splitter__after {
@@ -1488,11 +1532,30 @@ $traceChartCollapseHeight: 42px;
   .trace-details-chart {
     .rangeslider-slidebox {
       fill: #7076be !important;
+      opacity: 0.3 !important;
     }
     .rangeslider-mask-max,
     .rangeslider-mask-min {
       fill: #d2d2d2 !important;
-      fill-opacity: 1 !important;
+      fill-opacity: 0.15 !important;
+    }
+    .rangeslider-grabber {
+      fill: #7076be !important;
+      stroke: #ffffff !important;
+      stroke-width: 2 !important;
+      opacity: 1 !important;
+    }
+    .rangeslider-grabber:hover {
+      fill: #5a5fa0 !important;
+      cursor: ew-resize !important;
+    }
+    // Enhance the line graph (trace duration) visibility
+    .trace {
+      stroke-width: 2 !important;
+      opacity: 0.8 !important;
+    }
+    .scatterlayer .trace {
+      opacity: 1 !important;
     }
   }
 
@@ -1501,6 +1564,44 @@ $traceChartCollapseHeight: 42px;
       padding-right: 5px;
       font-size: 15px;
     }
+  }
+
+  .visual-selector-container {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(0.625rem);
+    border-radius: 0.5rem;
+    border: 0.0625rem solid rgba(255, 255, 255, 0.1);
+    padding: 0.125rem;
+  }
+
+  .visual-selector-container.bg-white {
+    background: rgba(240, 240, 245, 0.8);
+    border: 0.125rem solid rgba(100, 100, 120, 0.3);
+  }
+
+  .trace-combined-header-wrapper {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(0.625rem);
+    border-radius: 0.5rem;
+    border: 0.0625rem solid rgba(255, 255, 255, 0.1);
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .trace-combined-header-wrapper.bg-white {
+    background: rgba(240, 240, 245, 0.8);
+    border: 0.125rem solid rgba(100, 100, 120, 0.3);
+  }
+
+  .chart-container-inner {
+    min-height: 12.5rem;
+    overflow: hidden;
+  }
+
+  .trace-chart-height {
+    height: 12.5rem !important;
+    min-height: 12.5rem !important;
   }
 }
 
@@ -1521,6 +1622,8 @@ $traceChartCollapseHeight: 42px;
 
 .trace-logs-selector {
   .q-field {
+    border-radius: 0.5rem 0 0 0.5rem;
+
     span {
       display: inline-block;
       width: 180px;
@@ -1529,20 +1632,37 @@ $traceChartCollapseHeight: 42px;
       text-overflow: ellipsis;
       text-align: left;
     }
+
+    .q-field__control {
+      border-radius: 0.5rem 0 0 0.5rem;
+    }
+
+    .q-field__control:before,
+    .q-field__control:after {
+      border: none !important;
+    }
   }
 }
 
 .log-stream-search-input {
   .q-field .q-field__control {
     padding: 0px 4px;
+    border-radius: 0.5rem;
+  }
+
+  .q-field .q-field__control:before,
+  .q-field .q-field__control:after {
+    border: none !important;
   }
 }
 
 .traces-view-logs-btn {
   height: 36px;
   margin-left: -1px;
-  border-top-left-radius: 0px;
-  border-bottom-left-radius: 0px;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-top-right-radius: 0.5rem !important;
+  border-bottom-right-radius: 0.5rem !important;
 
   .q-btn__content {
     span {
@@ -1552,6 +1672,34 @@ $traceChartCollapseHeight: 42px;
 }
 .custom-height {
   height: 34px;
+}
+
+.trace-search-container {
+  border-radius: 0.5rem;
+}
+
+.q-menu .q-item.q-item--active {
+  background-color: rgba(25, 118, 210, 0.2) !important;
+  font-weight: 600 !important;
+}
+
+.q-dark .q-menu .q-item.q-item--active {
+  background-color: rgba(144, 202, 249, 0.2) !important;
+}
+
+.q-menu .q-item.q-manual-focusable--focused {
+  background-color: rgba(25, 118, 210, 0.1) !important;
+}
+
+.q-dark .q-menu .q-item.q-manual-focusable--focused {
+  background-color: rgba(144, 202, 249, 0.1) !important;
+}
+
+.trace-back-btn {
+  border: 0.09375rem solid;
+  border-radius: 50%;
+  width: 1.375rem;
+  height: 1.375rem;
 }
 
 .custom-height .q-field__control,
