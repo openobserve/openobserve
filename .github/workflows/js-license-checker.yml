@@ -23,34 +23,49 @@ jobs:
     steps:
       - name: Checkout latest code
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
-      - name: Check if UI code has changes and skip if none
+      - name: Check if UI code has changes
+        id: check_changes
         run: |
-          if ! git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^web/"; then
-            echo "UI code hasn't changed, skipping license check"
-            exit 0
+          if [ -n "${{ github.event.before }}" ]; then
+            if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^web/"; then
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+            else
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            # For new branches or when before is unavailable, check against base branch
+            if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -q "^web/"; then
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+            else
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Check if package files changed
+        id: check_package_changes
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          results=$(git show --name-only HEAD | grep "package.*.json" || true)
+          if [ -z "$results" ]; then
+            echo "has_package_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_package_changes=true" >> $GITHUB_OUTPUT
           fi
 
       - uses: actions/setup-node@v5
+        if: steps.check_changes.outputs.has_changes == 'true' && steps.check_package_changes.outputs.has_package_changes == 'true'
         with:
-          node-version: 20
-      - name: Build frontend code
-        run: |
-          results=$(git show --name-only HEAD | grep "package.*.json")
-          if [ -z "$result" ]; then
-            echo "No package.json or package-lock.json files changed. Skipping license check."
-            exit 0
-          fi
-          cd web && npm install && npm run build
+          node-version: 22
+
+      - name: Install dependencies
+        if: steps.check_changes.outputs.has_changes == 'true' && steps.check_package_changes.outputs.has_package_changes == 'true'
+        run: cd web && npm install
+
       - name: Check licenses
+        if: steps.check_changes.outputs.has_changes == 'true' && steps.check_package_changes.outputs.has_package_changes == 'true'
         run: |
-          results=$(git show --name-only HEAD | grep "package.*.json")
-          if [ -z "$result" ]; then
-            echo "No package.json or package-lock.json files changed. Skipping license check."
-            exit 0
-          fi
           npm install -g license-checker
-          cd web && npx -q --yes license-checker --production --json --onlyAllow="MIT;ISC;Apache-2.0;BSD;MPL-2.0;Unlicense;CC-BY-4.0;Artistic-2.0;UNLICENSED"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_CONTEXT: ${{ toJson(github) }}
+          cd web && license-checker --production --json --onlyAllow="MIT;ISC;Apache-2.0;BSD;MPL-2.0;Unlicense;CC-BY-4.0;Artistic-2.0;UNLICENSED"
