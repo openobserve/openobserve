@@ -115,9 +115,9 @@ class PageManager {
     this.logsQueryPage = new LogsQueryPage(page);
     this.unflattenedPage = new UnflattenedPage(page);
 
-    // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
-    this.regexPatternsPage = new RegexPatternsPage(page);
-    this.streamAssociationPage = new StreamAssociationPage(page);
+    // // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
+    // this.regexPatternsPage = new RegexPatternsPage(page);
+    // this.streamAssociationPage = new StreamAssociationPage(page);
   }
 }
 
