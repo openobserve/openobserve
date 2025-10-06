@@ -180,6 +180,25 @@
             <span>Generating response...</span>
           </div>
         </div>
+        
+        <!-- Scroll to bottom button -->
+        <div 
+          v-show="showScrollToBottom" 
+          class="scroll-to-bottom-container"
+        >
+          <q-btn
+            round
+            flat
+            icon="arrow_downward"
+            class="scroll-to-bottom-btn"
+            @click="scrollToBottomSmooth"
+            size="sm"
+          >
+            <q-tooltip anchor="top middle" self="bottom middle">
+              Scroll to bottom
+            </q-tooltip>
+          </q-btn>
+        </div>
       </div>
       <div class="chat-input-wrapper tw-flex tw-flex-col q-ma-md" @click="focusInput">
         <q-input
@@ -359,6 +378,7 @@ export default defineComponent({
     const saveHistoryLoading = ref(false);
     const historySearchTerm = ref('');
     const shouldAutoScroll = ref(true);
+    const showScrollToBottom = ref(false);
     
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
@@ -421,14 +441,36 @@ export default defineComponent({
       
       const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
       const threshold = getScrollThreshold();
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - threshold;
       
-      shouldAutoScroll.value = scrollTop + clientHeight >= scrollHeight - threshold;
+      shouldAutoScroll.value = isAtBottom;
+      
+      // Show scroll to bottom button when user scrolls up significantly
+      // Only show if there's enough content to scroll and user is not at bottom
+      const hasScrollableContent = scrollHeight > clientHeight + 100; // At least 100px more content
+      const isScrolledUp = scrollTop + clientHeight < scrollHeight - 100; // 100px from bottom
+      
+      showScrollToBottom.value = hasScrollableContent && isScrolledUp;
     };
 
     const scrollToBottom = async () => {
       await nextTick();
       if (messagesContainer.value && shouldAutoScroll.value) {
         messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+      }
+    };
+
+    const scrollToBottomSmooth = async () => {
+      await nextTick();
+      if (messagesContainer.value) {
+        messagesContainer.value.scrollTo({
+          top: messagesContainer.value.scrollHeight,
+          behavior: 'smooth'
+        });
+        // Hide the button immediately when user clicks it
+        showScrollToBottom.value = false;
+        // Reset auto-scroll when user manually scrolls to bottom
+        shouldAutoScroll.value = true;
       }
     };
 
@@ -1257,6 +1299,8 @@ export default defineComponent({
       checkIfShouldAutoScroll,
       getScrollThreshold,
       scrollToLoadingIndicator,
+      scrollToBottomSmooth,
+      showScrollToBottom,
       cancelCurrentRequest,
       currentAbortController,
     }
@@ -1362,6 +1406,7 @@ export default defineComponent({
     display: flex;
     flex-direction: column;
     background: transparent;
+    position: relative;
   }
 
   .messages-container {
@@ -1747,6 +1792,89 @@ export default defineComponent({
 .history-list-container {
   flex: 1;
   overflow-y: auto;
+}
+
+// Scroll to bottom button styling
+.scroll-to-bottom-container {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+.scroll-to-bottom-btn {
+  transition: all 0.3s ease;
+  animation: fadeInUp 0.3s ease;
+  pointer-events: auto;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  
+  body.body--light & {
+    border: 2px solid #2563eb !important;
+    color: #2563eb !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+  }
+  
+  body.body--dark & {
+    border: 2px solid #667eea !important;
+    color: #667eea !important;
+    background: rgba(30, 30, 30, 0.9) !important;
+  }
+  
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    
+    body.body--light & {
+      border: 2px solid #1d4ed8 !important;
+      color: #1d4ed8 !important;
+      background: rgba(255, 255, 255, 1) !important;
+    }
+    
+    body.body--dark & {
+      border: 2px solid #5a6fd8 !important;
+      color: #5a6fd8 !important;
+      background: rgba(40, 40, 40, 0.95) !important;
+    }
+  }
+  
+  &:active {
+    transform: scale(1);
+  }
+  
+  .q-icon {
+    font-size: 18px;
+    animation: bounce 2s infinite;
+    font-weight: bold;
+  }
+}
+
+// Bounce animation for the arrow icon
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-3px);
+  }
+  60% {
+    transform: translateY(-2px);
+  }
+}
+
+// Fade in up animation for button appearance
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 // Subtle gradient animation
