@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="float-right select-pagination"
             size="sm"
             dense
+            borderless
             @update:model-value="getPageData('recordsPerPage')"
           ></q-select>
         </div>
