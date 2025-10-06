@@ -223,10 +223,11 @@
             v-if="!isLoading"
             :disable="!inputMessage.trim()"
             @click="sendMessage"
-            color="positive"
             round
             dense
+            flat
             class="tw-ml-1"
+            :style="{ backgroundColor: '#575FC5' }"
           >
             <q-icon name="send" size="16px" color="white" />
           </q-btn>
@@ -1400,7 +1401,9 @@ export default defineComponent({
   .model-selector{
     background-color: #262626;
     border: 1px solid #3b3b3b;
-    padding: 0px 6px;
+    padding: 0px 4px;
+    border-radius: 4px;
+    padding-left: 4px;
   }
 
 }
@@ -1408,8 +1411,10 @@ export default defineComponent({
 .light-mode-bottom-bar{
   .model-selector{
     background-color: #ffffff;
-    border: 1px solid #f3f3f3;
+    border: 1px solid #bdbbbb;
     padding: 0px 4px;
+    border-radius: 4px;
+    padding-left: 4px;
   }
 }
   .o2-ai-beta-text {
