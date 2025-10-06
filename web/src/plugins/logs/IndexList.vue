@@ -93,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         hide-header
         :wrap-cells="searchObj.meta.resultGrid.wrapCells"
         class="field-table full-height"
+        :class="{ 'loading-fields': searchObj.loadingStream }"
         id="fieldList"
         :rows-per-page-options="[]"
       >
@@ -303,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="float-right">
                         <q-icon
                           :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                          v-if="searchObj.meta.quickMode"
+                          v-show="searchObj.meta.quickMode"
                           :name="
                             props.row.isInterestingField
                               ? 'info'
@@ -360,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <q-icon
                         :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                        v-if="searchObj.meta.quickMode"
+                        v-show="searchObj.meta.quickMode"
                         :name="
                           props.row.isInterestingField ? 'info' : 'info_outline'
                         "
@@ -579,7 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template
                 v-slot:interesting_fields_slot
-                v-if="searchObj.meta.quickMode"
+                v-show="searchObj.meta.quickMode"
               >
                 <div data-test="logs-interesting-fields-btn">
                   <q-icon name="info" />
@@ -632,7 +633,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template
                 v-slot:interesting_fields_slot
-                v-if="searchObj.meta.quickMode"
+                v-show="searchObj.meta.quickMode"
               >
                 <div data-test="logs-interesting-fields-btn">
                   <q-icon name="info" />
@@ -761,6 +762,7 @@ import {
   computed,
   onBeforeMount,
   onBeforeUnmount,
+  nextTick,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -955,13 +957,16 @@ export default defineComponent({
 
     const resetFields = async () => {
       searchObj.loadingStream = true;
-      streamSchemaFieldsIndexMapping.value = {};
 
-      // Selected streams has usd
-      setTimeout(async () => {
-        await extractFields();
-        searchObj.loadingStream = false;
-      }, 0);
+      // Wait for next tick to ensure loading state is rendered
+      await nextTick();
+
+      streamSchemaFieldsIndexMapping.value = {};
+      await extractFields();
+
+      // Wait for next tick before removing loading state
+      await nextTick();
+      searchObj.loadingStream = false;
     };
 
     watch(
@@ -999,13 +1004,13 @@ export default defineComponent({
       },
     );
 
-    watch(
-      () => searchObj.meta.quickMode,
-      () => {
-        // if quick mode is called, reset fields
-        resetFields();
-      },
-    );
+    // Removed resetFields() call on quick mode toggle to prevent flicker
+    // watch(
+    //   () => searchObj.meta.quickMode,
+    //   () => {
+    //     resetFields();
+    //   },
+    // );
 
     watch(
       () => [
@@ -1672,10 +1677,16 @@ export default defineComponent({
         showOnlyInterestingFields.value = false;
       }
 
+      // Reset pagination to page 1 before resetting fields
+      pagination.value.page = 1;
+
       await resetFields();
     };
 
     const toggleInterestingFields = () => {
+      // Reset pagination to page 1 before resetting fields
+      pagination.value.page = 1;
+
       resetFields();
     };
 
@@ -2375,10 +2386,34 @@ $streamSelectorHeight: 44px;
   .field-table {
     .q-table__bottom {
       padding: 5px !important;
+      transition: all 0.2s ease-in-out;
+
+      .q-btn {
+        transition: all 0.15s ease-in-out;
+
+        &:hover {
+          transform: scale(1.05);
+        }
+
+        &:active {
+          transform: scale(0.95);
+        }
+      }
     }
 
-    .schema-field-toggle .q-btn {
-      padding: 5px !important;
+    .schema-field-toggle {
+      .q-btn {
+        padding: 5px !important;
+        transition: all 0.15s ease-in-out;
+
+        &:hover {
+          transform: scale(1.05);
+        }
+
+        &:active {
+          transform: scale(0.95);
+        }
+      }
     }
   }
 }

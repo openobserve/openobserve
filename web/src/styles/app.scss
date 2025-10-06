@@ -1,5 +1,10 @@
 @import 'variables';
 
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
 
 .q-w-sm {
   width: 360px;
