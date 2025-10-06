@@ -106,12 +106,11 @@ export function useLogsHighlighter() {
       // Yield to browser between chunks to keep UI responsive
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
-    console.log("Return ----");
     return processedResults.value;
   }
 
   const clearCache = () => {
-    // processedResults.value = {};
+    processedResults.value = {};
   };
 
   /**
@@ -456,11 +455,13 @@ export function useLogsHighlighter() {
           parts.push(showQuotes ? `"${processedLine}"` : processedLine);
         } else {
           // Regular string processing with semantic detection
-          processTextWithHighlights(
-            value,
-            queryString,
-            currentColors,
-            showQuotes,
+          parts.push(
+            processTextWithHighlights(
+              value,
+              queryString,
+              currentColors,
+              showQuotes,
+            ),
           );
         }
       } else if (typeof value === "object") {
