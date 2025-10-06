@@ -325,6 +325,7 @@ impl QueryConditionExt for QueryCondition {
                     }
                     sqls
                 },
+                streams: vec![],
                 encoding: config::meta::search::RequestEncoding::Empty,
                 regions: vec![],
                 clusters: vec![],
