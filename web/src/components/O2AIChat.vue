@@ -548,11 +548,20 @@ export default defineComponent({
                     content = content.replace(/([^`])\s*```/g, '$1\n```');
                     
                     currentStreamingMessage.value += content;
-                    if (chatMessages.value.length > 0) {
-                      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    
+                    // Check if we need to create the assistant message for the first time
+                    const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (!lastMessage || lastMessage.role !== 'assistant') {
+                      // First content chunk - create assistant message
+                      chatMessages.value.push({
+                        role: 'assistant',
+                        content: currentStreamingMessage.value
+                      });
+                    } else {
+                      // Update existing assistant message
                       lastMessage.content = currentStreamingMessage.value;
-                      messageComplete = true;
                     }
+                    messageComplete = true;
                     await scrollToBottom();
                   }
                 } catch (jsonError) {
@@ -588,11 +597,20 @@ export default defineComponent({
                   content = content.replace(/([^`])\s*```/g, '$1\n```');
                   
                   currentStreamingMessage.value += content;
-                  if (chatMessages.value.length > 0) {
-                    const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  
+                  // Check if we need to create the assistant message for the first time
+                  const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  if (!lastMessage || lastMessage.role !== 'assistant') {
+                    // First content chunk - create assistant message
+                    chatMessages.value.push({
+                      role: 'assistant',
+                      content: currentStreamingMessage.value
+                    });
+                  } else {
+                    // Update existing assistant message
                     lastMessage.content = currentStreamingMessage.value;
-                    messageComplete = true;
                   }
+                  messageComplete = true;
                   await scrollToBottom();
                 }
               } catch (e) {
@@ -821,17 +839,14 @@ export default defineComponent({
       currentAbortController.value = new AbortController();
       
       try {
-        chatMessages.value.push({
-          role: 'assistant',
-          content: ''
-        });
+        // Don't add empty assistant message here - wait for actual content
         await scrollToLoadingIndicator(); // Scroll directly to loading indicator
         
         let response: any;
         try { 
           // Pass abort signal to enable request cancellation
           response = await fetchAiChat(
-            chatMessages.value.slice(0, -1),
+            chatMessages.value,
             "",
             store.state.selectedOrganization.identifier,
             currentAbortController.value.signal
@@ -873,9 +888,8 @@ export default defineComponent({
             role: 'assistant',
             content: 'Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.'
           });
-        } else if (chatMessages.value.length > 0 && chatMessages.value[chatMessages.value.length - 1].role === 'assistant') {
-          chatMessages.value[chatMessages.value.length - 1].content = errorMessage;
         } else {
+          // Always create a new assistant message with error since we don't pre-create empty ones
           chatMessages.value.push({
             role: 'assistant',
             content: errorMessage
@@ -1160,17 +1174,75 @@ export default defineComponent({
 .chat-container {
   width: 100%;
   height: 100vh;
-  background: var(--q-page-background);
   color: var(--q-primary-text);
   display: flex;
   flex-direction: column;
-  
   overflow: hidden;
+  
+  // Light mode gradient - more sophisticated
+  &.light-mode {
+    background: linear-gradient(
+      135deg, 
+      rgba(255, 255, 255, 0.95) 0%, 
+      rgba(248, 250, 255, 0.98) 20%,
+      rgba(243, 247, 255, 1) 40%,
+      rgba(250, 252, 255, 0.99) 60%,
+      rgba(245, 248, 255, 1) 80%,
+      rgba(255, 255, 255, 0.96) 100%
+    );
+    background-size: 400% 400%;
+    animation: subtleShift 20s ease-in-out infinite;
+  }
+  
+  // Dark mode gradient - more sophisticated
+  &.dark-mode {
+    background: linear-gradient(
+      135deg,
+      rgba(18, 18, 24, 0.95) 0%,
+      rgba(22, 22, 35, 0.98) 20%,
+      rgba(16, 16, 30, 1) 40%,
+      rgba(20, 20, 32, 0.99) 60%,
+      rgba(14, 14, 28, 1) 80%,
+      rgba(19, 19, 26, 0.96) 100%
+    );
+    background-size: 400% 400%;
+    animation: subtleShift 25s ease-in-out infinite;
+  }
 
   .chat-content-wrapper {
     display: flex;
     flex-direction: column;
     height: 100%;
+    
+    // Light mode gradient - more sophisticated
+    &.light-mode {
+      background: linear-gradient(
+        135deg, 
+        rgba(255, 255, 255, 0.95) 0%, 
+        rgba(248, 250, 255, 0.98) 20%,
+        rgba(243, 247, 255, 1) 40%,
+        rgba(250, 252, 255, 0.99) 60%,
+        rgba(245, 248, 255, 1) 80%,
+        rgba(255, 255, 255, 0.96) 100%
+      );
+      background-size: 400% 400%;
+      animation: subtleShift 20s ease-in-out infinite;
+    }
+    
+    // Dark mode gradient - more sophisticated
+    &.dark-mode {
+      background: linear-gradient(
+        135deg,
+        rgba(18, 18, 24, 0.95) 0%,
+        rgba(22, 22, 35, 0.98) 20%,
+        rgba(16, 16, 30, 1) 40%,
+        rgba(20, 20, 32, 0.99) 60%,
+        rgba(14, 14, 28, 1) 80%,
+        rgba(19, 19, 26, 0.96) 100%
+      );
+      background-size: 400% 400%;
+      animation: subtleShift 25s ease-in-out infinite;
+    }
   }
 
 
@@ -1195,6 +1267,7 @@ export default defineComponent({
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    background: transparent;
   }
 
   .messages-container {
@@ -1204,6 +1277,7 @@ export default defineComponent({
     display: flex;
     flex-direction: column;
     gap: 16px;
+    background: transparent;
     max-width: 900px;
     margin: 0 auto;
     width: 100%;
@@ -1579,5 +1653,24 @@ export default defineComponent({
 .history-list-container {
   flex: 1;
   overflow-y: auto;
+}
+
+// Subtle gradient animation
+@keyframes subtleShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  25% {
+    background-position: 100% 50%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+  75% {
+    background-position: 0% 100%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 </style> 
