@@ -24,6 +24,8 @@ jobs:
   backend_unit_tests:
     runs-on:
       labels: ubicloud-standard-8
+    permissions:
+      contents: read
 
     # Note: Services always start regardless of conditional logic in steps.
     # GitHub Actions does not support conditional services.
@@ -145,6 +147,8 @@ jobs:
   ui_unit_tests:
     runs-on:
       labels: ubicloud-standard-8
+    permissions:
+      contents: read
 
     steps:
       - name: Clone the current repo
