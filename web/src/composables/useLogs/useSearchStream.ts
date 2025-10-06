@@ -47,11 +47,8 @@ import {
   addSpacesToOperators,
 } from "@/utils/zincutils";
 
-import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
-
 export const useSearchStream = () => {
   const { showErrorNotification } = useNotifications();
-  const { processHitsInChunks, clearCache } = useLogsHighlighter();
   const {
     fnParsedSQL,
     hasAggregation,
@@ -341,7 +338,6 @@ export const useSearchStream = () => {
   const initializeSearchConnection = (
     payload: any,
   ): string | Promise<void> | null => {
-    clearCache();
     // Use the appropriate method to fetch data
     if (searchObj.communicationMethod === "ws") {
       return fetchQueryDataWithWebSocket(payload, {
