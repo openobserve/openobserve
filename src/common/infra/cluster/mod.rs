@@ -204,7 +204,7 @@ pub async fn register_and_keep_alive() -> Result<()> {
         _ => etcd::register_and_keep_alive().await?,
     };
 
-    // check node heatbeat
+    // check node heartbeat
     tokio::task::spawn(async move {
         let client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(true)
@@ -403,6 +403,7 @@ async fn handle_node_list_put(
     // check if the same node is already in the cluster
     if let Some(node) = get_cached_node_by_name(&item_value.name).await {
         if node.uuid.ne(&item_value.uuid) {
+            log::info!("[CLUSTER] removing exisiting entry {node:?}, overwriting..");
             NODES.write().await.remove(&node.uuid);
         }
     }
@@ -420,6 +421,10 @@ async fn handle_node_list_put(
         add_node_to_consistent_hash(&item_value, &Role::FlattenCompactor, None).await;
     }
     NODES.write().await.insert(item_key.to_string(), item_value);
+    NODES_HEALTH_CHECK
+        .write()
+        .await
+        .insert(item_key.to_string(), 0);
     Ok(())
 }
 
@@ -450,6 +455,7 @@ async fn handle_node_list_delete(event_key: &str) -> std::result::Result<(), any
         remove_node_from_consistent_hash(&item_value, &Role::FlattenCompactor, None).await;
     }
     NODES.write().await.remove(item_key);
+    NODES_HEALTH_CHECK.write().await.remove(item_key);
     Ok(())
 }
 
@@ -477,9 +483,16 @@ async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
             );
             let mut w = NODES_HEALTH_CHECK.write().await;
             let Some(entry) = w.get_mut(&node.uuid) else {
-                // node haven't been added to the cluster yet, when the health check first succeed,
-                // it will be added to the check map
-                continue;
+                // when the node comes online we populate the health check map
+                // its expected that when node is marked online, it should be able to respond
+                // to health checks. A node is marked online after GRPC init which marks complete
+                // setup of the node.
+                log::warn!(
+                    "[CLUSTER] node {node:?} is marked as online but not present in health check map"
+                );
+                return Err(infra::errors::Error::Message(format!(
+                    "{node:?} node state not in health check map"
+                )));
             };
             *entry += 1;
             let times = *entry;
