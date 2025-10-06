@@ -170,6 +170,9 @@ export default defineComponent({
   margin: 0px;
   border-radius: 6px;
 
+  /* Always have a border to prevent layout shift when active */
+  border: 1px solid transparent;
+
   /* Minimal height to prevent scrollbar */
   min-height: 24px;
 
@@ -188,7 +191,7 @@ export default defineComponent({
 
   // Phase 2: Enhanced hover state
   &:hover:not(.q-router-link--active) {
-    transform: scale(1.02) translateZ(0);
+    transform: translateZ(0);
     background-color: rgba(30, 41, 59, 0.6);
 
     .q-icon {
@@ -202,7 +205,7 @@ export default defineComponent({
 
   // Phase 2 & 3: Enhanced active state with modern UX
   &.q-router-link--active {
-    transform: scale(1.05) translateZ(0) !important;
+    transform: translateZ(0) !important;
     // Rich, vibrant multi-layer gradient background
     background:
       linear-gradient(135deg, rgba(168, 85, 247, 0.4) 0%, rgba(236, 72, 153, 0.35) 100%),
