@@ -2,14 +2,30 @@
  * Logs Page Styles
  * Phase 2: CSS Architecture - Extract Inline Styles Only
  * NO SIZE CHANGES - Keep all original measurements
+ * Using rem units (1rem = 16px)
  */
 
 /* ============================================================================
    LAYOUT HELPERS
    ============================================================================ */
 
+.logPage {
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
 .full-width {
   width: 100%;
+}
+
+.full-height {
+  height: 100% !important;
+  max-height: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
 }
 
 /* ============================================================================
@@ -17,12 +33,17 @@
    ============================================================================ */
 
 .field-list-collapse-btn {
+  border-radius: 50%;
+  z-index: 100 !important;
+  position: absolute !important;
+
   &--visible {
-    right: -20px;
+    right: -0.75rem !important; // -12px (adjusted to not be cut off)
   }
 
   &--hidden {
-    right: -24px;
+    left: 0.25rem !important; // 4px (when collapsed, show on left side)
+    right: auto !important;
   }
 }
 
@@ -32,7 +53,8 @@
 
 .visualize-container {
   // Dynamic height - will use CSS variable
-  height: calc(100vh - var(--splitter-height, 10vh) - 40px);
+  height: calc(100vh - var(--splitter-height, 10vh) - 2.5rem); // 40px
+  border-radius: 0.5rem;
 }
 
 /* ============================================================================
@@ -40,14 +62,16 @@
    ============================================================================ */
 
 .search-history-empty {
-  height: 200px;
+  height: 12.5rem; // 200px
+  border-radius: 0.5rem;
 
   &__content {
     height: 80vh;
+    border-radius: 0.5rem;
   }
 
   &__icon {
-    font-size: 100px;
+    font-size: 6.25rem; // 100px
     opacity: 0.1;
   }
 
@@ -59,7 +83,7 @@
     opacity: 0.8;
 
     .q-icon {
-      font-size: 20px;
+      font-size: 1.25rem; // 20px
       opacity: 0.5;
     }
   }
@@ -70,8 +94,10 @@
    ============================================================================ */
 
 .error-display {
+  border-radius: 0.5rem;
+
   &__message {
-    font-size: 14px;
+    font-size: 0.875rem; // 14px
     margin: 0;
   }
 }

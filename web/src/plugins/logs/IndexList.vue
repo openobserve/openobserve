@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="float-right">
                         <q-icon
                           :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                          v-if="searchObj.meta.quickMode"
+                          v-show="searchObj.meta.quickMode"
                           :name="
                             props.row.isInterestingField
                               ? 'info'
@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <q-icon
                         :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                        v-if="searchObj.meta.quickMode"
+                        v-show="searchObj.meta.quickMode"
                         :name="
                           props.row.isInterestingField ? 'info' : 'info_outline'
                         "
@@ -580,7 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template
                 v-slot:interesting_fields_slot
-                v-if="searchObj.meta.quickMode"
+                v-show="searchObj.meta.quickMode"
               >
                 <div data-test="logs-interesting-fields-btn">
                   <q-icon name="info" />
@@ -633,7 +633,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template
                 v-slot:interesting_fields_slot
-                v-if="searchObj.meta.quickMode"
+                v-show="searchObj.meta.quickMode"
               >
                 <div data-test="logs-interesting-fields-btn">
                   <q-icon name="info" />
@@ -1688,6 +1688,9 @@ export default defineComponent({
       } else {
         showOnlyInterestingFields.value = false;
       }
+
+      // Reset pagination to page 1 before resetting fields
+      pagination.value.page = 1;
 
       await resetFields();
     };
