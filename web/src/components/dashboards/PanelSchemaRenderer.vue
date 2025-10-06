@@ -767,7 +767,7 @@ export default defineComponent({
     );
 
     watch(
-      [data, store?.state],
+      [data, store?.state, annotations],
       async () => {
         // emit vrl function field list
         if (data.value?.length && data.value[0] && data.value[0].length) {
