@@ -43,6 +43,7 @@ Usage Examples:
 
 <script setup lang="ts">
 import { computed, withDefaults } from "vue";
+import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 
 /**
  * Component Props Interface
@@ -55,6 +56,8 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   column: {},
 });
+
+const { processedResults } = useLogsHighlighter();
 
 defineExpose({
   processedResults,
