@@ -45,16 +45,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection"
-            style="width: 100%"
+            class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection full-width"
             v-show="searchObj.meta.logsVisualizeToggle == 'logs'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
-              style="width: 100%"
-              class="full-height"
+              class="full-height full-width"
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
@@ -82,11 +80,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense
                     size="20px"
                     round
-                    class="q-mr-xs field-list-collapse-btn"
+                    :class="[
+                      'q-mr-xs',
+                      'field-list-collapse-btn',
+                      searchObj.meta.showFields ? 'field-list-collapse-btn--visible' : 'field-list-collapse-btn--hidden'
+                    ]"
                     color="primary"
-                    :style="{
-                      right: searchObj.meta.showFields ? '-20px' : '-24px',
-                    }"
                     @click="collapseFieldList"
                   ></q-btn>
                 </div>
@@ -250,13 +249,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span v-if="disableMoreErrorDetails">
                       <SanitizedHtmlRenderer
                         data-test="logs-search-detail-error-message"
-                        :htmlContent="
-                          searchObj?.data?.errorMsg +
-                          '<h6 style=\'font-size: 14px; margin: 0;\'>' +
-                          searchObj?.data?.errorDetail +
-                          '</h6>'
-                        "
+                        :htmlContent="searchObj?.data?.errorMsg"
                       />
+                      <div class="error-display__message">
+                        {{ searchObj?.data?.errorDetail }}
+                      </div>
                       <SanitizedHtmlRenderer
                         data-test="logs-search-detail-function-error-message"
                         :htmlContent="searchObj?.data?.functionError"
@@ -269,7 +266,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
-            :style="`height: calc(100vh - ${splitterModel}vh - 40px);`"
+            class="visualize-container"
+            :style="{ '--splitter-height': `${splitterModel}vh` }"
           >
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
@@ -290,31 +288,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div
         v-else-if="showSearchHistory && !store.state.zoConfig.usage_enabled"
-        style="height: 200px"
+        class="search-history-empty"
       >
-        <div style="height: 80vh" class="text-center q-pa-md flex flex-center">
+        <div class="search-history-empty__content text-center q-pa-md flex flex-center">
           <div>
             <div>
               <q-icon
                 name="history"
                 size="100px"
                 color="gray"
-                class="q-mb-md"
-                style="opacity: 0.1"
+                class="q-mb-md search-history-empty__icon"
               />
             </div>
-            <div class="text-h4" style="opacity: 0.8">
+            <div class="text-h4 search-history-empty__title">
               Search history is not enabled.
             </div>
             <div
-              style="opacity: 0.8"
-              class="q-mt-sm flex items-center justify-center"
+              class="search-history-empty__info q-mt-sm flex items-center justify-center"
             >
               <q-icon
                 name="info"
                 class="q-mr-xs"
                 size="20px"
-                style="opacity: 0.5"
               />
               <span class="text-h6 text-center">
                 Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
@@ -2725,4 +2720,8 @@ export default defineComponent({
     width: 100%;
   }
 }
+</style>
+
+<style lang="scss">
+@import '@/styles/logs-page.scss';
 </style>

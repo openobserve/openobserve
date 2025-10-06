@@ -1,0 +1,107 @@
+/**
+ * Index List (Field List) Styles
+ * Phase 2: CSS Architecture - Extract Inline Styles Only
+ * NO SIZE CHANGES - Keep all original measurements
+ */
+
+/* ============================================================================
+   FIELD GROUP HEADER
+   ============================================================================ */
+
+.field-group-header {
+  line-height: 28px;
+  padding-left: 10px;
+}
+
+/* ============================================================================
+   FIELD NAME & VALUE STYLES
+   ============================================================================ */
+
+.field-name {
+  max-width: 90% !important;
+  display: inline-block;
+}
+
+.field-icon-spacing {
+  margin-right: 0.375rem;
+}
+
+/* ============================================================================
+   FIELD VALUE CONTAINER - DYNAMIC WIDTH
+   ============================================================================ */
+
+.field-value-container {
+  &--multi-stream {
+    width: calc(100% - 50px);
+  }
+
+  &--single-stream {
+    width: 100%;
+  }
+}
+
+.field-value-key {
+  width: calc(100% - 50px);
+}
+
+.field-value-count {
+  display: contents;
+
+  &--with-actions {
+    width: 50px;
+  }
+}
+
+/* ============================================================================
+   LOADING STATE
+   ============================================================================ */
+
+.field-loading {
+  height: 60px;
+}
+
+.field-loading-label {
+  font-size: 1.1em;
+}
+
+/* ============================================================================
+   EXPANDED FIELD DETAILS
+   ============================================================================ */
+
+.expanded-field-row {
+  opacity: 0.7;
+}
+
+/* ============================================================================
+   STREAM OPTION ITEM
+   ============================================================================ */
+
+.stream-option-item {
+  cursor: pointer;
+}
+
+/* ============================================================================
+   FIELD VALUE WIDTH CALCULATIONS
+   ============================================================================ */
+
+.field-value-container {
+  &--multi-stream {
+    width: calc(100% - 42px);
+  }
+
+  &--single-stream {
+    width: calc(100% - 0px);
+  }
+}
+
+.field-value-key {
+  width: calc(100% - 50px);
+}
+
+.field-value-count {
+  display: contents;
+
+  &--with-actions {
+    width: 50px;
+  }
+}
