@@ -64,55 +64,17 @@ pub async fn get_enrichment_table_data(
     // do search
     match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
         Ok(res) => {
-            if !res.hits.is_empty() {
-                Ok(res.hits)
-            } else {
-                Ok(vec![])
-            }
+            log::info!(
+                "get enrichment table {org_id}/{name} data success with hits: {}",
+                res.hits.len()
+            );
+            Ok(res.hits)
         }
         Err(err) => {
-            log::error!("get enrichment table {org_id}/{name} data error: {err:?}");
-            Ok(vec![])
-        }
-    }
-}
-
-pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-    let start_time = get_start_time(org_id, name).await;
-    let end_time = now_micros();
-
-    let query = config::meta::search::Query {
-        sql: format!("SELECT * FROM \"{name}\""),
-        start_time,
-        end_time,
-        size: -1, // -1 means no limit, enrichment table should not be limited
-        ..Default::default()
-    };
-
-    let req = config::meta::search::Request {
-        query,
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: None,
-        search_event_context: None,
-        use_cache: false,
-        local_mode: Some(true),
-    };
-    log::debug!("get enrichment table {name} data req start time: {start_time}");
-    // do search
-    match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
-        Ok(res) => {
-            if !res.hits.is_empty() {
-                Ok(res.hits.iter().map(convert_to_vrl).collect())
-            } else {
-                Ok(vec![])
-            }
-        }
-        Err(err) => {
-            log::error!("get enrichment table data error: {err:?}");
-            Ok(vec![])
+            log::error!("get enrichment table {org_id}/{name} data error: {err}",);
+            Err(anyhow::anyhow!(
+                "get enrichment table {org_id}/{name} error: {err}"
+            ))
         }
     }
 }
@@ -351,8 +313,20 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 {
                     Ok(data) => data,
                     Err(e) => {
-                        log::error!("[ENRICHMENT::TABLE watch] get enrichment table error: {e}");
-                        vec![]
+                        log::error!(
+                            "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error, trying again: {e}"
+                        );
+                        match super::super::enrichment::get_enrichment_table(org_id, stream_name)
+                            .await
+                        {
+                            Ok(data) => data,
+                            Err(e) => {
+                                log::error!(
+                                    "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error, giving up: {e}"
+                                );
+                                Vec::new()
+                            }
+                        }
                     }
                 };
                 log::info!(
@@ -479,17 +453,7 @@ mod tests {
         // This will fail in test environment due to missing dependencies,
         // but tests the function structure
         let result = get_enrichment_table_data("test_org", "test_table").await;
-        assert!(result.is_ok());
-        let data = result.unwrap();
-        assert_eq!(data.len(), 0); // Should return empty vec due to search service failure
-    }
-
-    #[tokio::test]
-    async fn test_get() {
-        let result = get("test_org", "test_table").await;
-        assert!(result.is_ok());
-        let data = result.unwrap();
-        assert_eq!(data.len(), 0); // Should return empty vec due to search service failure
+        assert!(result.is_err());
     }
 
     #[tokio::test]
