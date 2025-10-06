@@ -5,159 +5,159 @@
   font-size: 12px;
   word-break: break-word;
   display: inline;
-  content-visibility: auto;
+
 }
 
 /* Syntax highlighting classes */
 .log-key {
   color: #b71c1c;
-  content-visibility: auto;
+
 }
 .log-string {
   color: #2e7d32;
-  content-visibility: auto;
+
 }
 .log-number {
   color: #2563eb;
-  content-visibility: auto;
+
 }
 .log-boolean {
   color: #6d28d9;
-  content-visibility: auto;
+
 }
 .log-null {
   color: #6b7280;
-  content-visibility: auto;
+
 }
 .log-separator {
   color: #9ca3af;
-  content-visibility: auto;
+
 }
 .log-object-brace {
   color: #9ca3af;
-  content-visibility: auto;
+
 }
 
 /* Semantic type classes */
 .log-ip {
   color: #1976d2;
-  content-visibility: auto;
+
 }
 .log-url {
   color: #00796b;
-  content-visibility: auto;
+
 }
 .log-email {
   color: #7b1fa2;
-  content-visibility: auto;
+
 }
 .log-timestamp {
   color: #e65100;
-  content-visibility: auto;
+
 }
 .log-http-method {
   color: #388e3c;
-  content-visibility: auto;
+
 }
 .log-status-code {
   color: #f57c00;
-  content-visibility: auto;
+
 }
 .log-path {
   color: #5d4037;
-  content-visibility: auto;
+
 }
 .log-uuid {
   color: #455a64;
-  content-visibility: auto;
+
 }
 .log-file-size {
   color: #2563eb;
-  content-visibility: auto;
+
 }
 .log-object-value {
   color: #4b5563;
-  content-visibility: auto;
+
 }
 
 /* Dark theme variants */
 .dark .log-key {
   color: #f44336;
-  content-visibility: auto;
+
 }
 .dark .log-string {
   color: #4caf50;
-  content-visibility: auto;
+
 }
 .dark .log-number {
   color: #2196f3;
-  content-visibility: auto;
+
 }
 .dark .log-boolean {
   color: #9c27b0;
-  content-visibility: auto;
+
 }
 .dark .log-null {
   color: #9e9e9e;
-  content-visibility: auto;
+
 }
 .dark .log-ip {
   color: #42a5f5;
-  content-visibility: auto;
+
 }
 .dark .log-url {
   color: #26a69a;
-  content-visibility: auto;
+
 }
 .dark .log-email {
   color: #ab47bc;
-  content-visibility: auto;
+
 }
 .dark .log-timestamp {
   color: #ff9800;
-  content-visibility: auto;
+
 }
 .dark .log-http-method {
   color: #66bb6a;
-  content-visibility: auto;
+
 }
 .dark .log-status-code {
   color: #ffb74d;
-  content-visibility: auto;
+
 }
 .dark .log-path {
   color: #8d6e63;
-  content-visibility: auto;
+
 }
 .dark .log-uuid {
   color: #78909c;
-  content-visibility: auto;
+
 }
 
 /* Highlighting class */
 .log-highlighted {
   background-color: rgb(255, 213, 0);
-  color: black !important;
-  content-visibility: auto;
+  color: black;
+
 }
 
 /* Combined utility classes */
 .log-quote::before,
 .log-quote::after {
   content: '"';
-  content-visibility: auto;
+
 }
 
 /* Default fallback class */
 .log-default {
   color: inherit;
-  content-visibility: auto;
+
 }
 
 /* Whitespace class */
 .log-whitespace {
   color: transparent;
-  content-visibility: auto;
+
 }
 
 /* Special classes for performance optimization */
@@ -165,5 +165,5 @@
   font-family: monospace;
   font-size: 12px;
   word-break: break-word;
-  content-visibility: auto;
+
 }
