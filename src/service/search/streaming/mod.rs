@@ -47,10 +47,7 @@ use crate::{
 };
 #[cfg(feature = "enterprise")]
 use crate::{
-    handler::http::request::search::{
-        error_utils::map_error_to_http_response,
-        utils::check_stream_permissions,
-    },
+    handler::http::request::search::error_utils::map_error_to_http_response,
     service::self_reporting::audit,
 };
 
@@ -621,28 +618,6 @@ pub async fn process_search_stream_request_multi(
                     return;
                 }
             };
-
-            // Check permissions for each stream in this query
-            #[cfg(feature = "enterprise")]
-            for stream_name in stream_names.iter() {
-                if check_stream_permissions(
-                    stream_name,
-                    &org_id_clone,
-                    &user_id_clone,
-                    &stream_type,
-                ).await.is_some()
-                {
-                    log::error!(
-                        "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Permission denied for stream {stream_name}"
-                    );
-                    let _ = sender_clone
-                        .send(Err(infra::errors::Error::Message(
-                            "Unauthorized Access".to_string()
-                        )))
-                        .await;
-                    return;
-                }
-            }
 
             // Set query metadata
             req.search_type = query_search_type;
