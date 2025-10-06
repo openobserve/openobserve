@@ -149,14 +149,6 @@ pub async fn search_http2_stream(
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => {
-            // Check if this is a multi-stream request that was sent to the wrong endpoint
-            let error_msg = e.to_string();
-            if error_msg.contains("invalid type: sequence, expected a string") {
-                return MetaHttpResponse::bad_request(
-                    "Multi-stream search request detected. Please use /_search_stream_multi endpoint instead of /_search_stream for requests with multiple SQL queries."
-                );
-            }
-
             #[cfg(feature = "enterprise")]
             let error_message = e.to_string();
 
