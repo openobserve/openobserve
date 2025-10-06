@@ -226,8 +226,7 @@
             round
             dense
             flat
-            class="tw-ml-1"
-            :style="{ backgroundColor: '#575FC5' }"
+            class="tw-ml-1 send-button"
           >
             <q-icon name="send" size="16px" color="white" />
           </q-btn>
@@ -235,11 +234,11 @@
           <!-- Stop button - shown when loading/streaming -->
           <q-btn
             v-if="isLoading"
-            color="negative"
             @click="cancelCurrentRequest"
             round
             dense
-            class="tw-ml-1"
+            flat
+            class="tw-ml-1 stop-button"
           >
             <q-icon name="stop" size="16px" color="white" />
           </q-btn>
@@ -1445,6 +1444,43 @@ export default defineComponent({
 .dark-user-avatar {
   background: linear-gradient(135deg, #4c63d2 0%, #5a67d8 100%) !important;
   color: white;
+}
+
+// Send button gradient styling
+.send-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 4px 15px 0 rgba(102, 126, 234, 0.3) !important;
+  
+  &:hover:not(.disabled):not([disabled]):not(:disabled) {
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
+    box-shadow: 0 6px 20px 0 rgba(102, 126, 234, 0.4) !important;
+    transform: translateY(-1px) !important;
+  }
+  
+  &:active:not(.disabled):not([disabled]):not(:disabled) {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 10px 0 rgba(102, 126, 234, 0.3) !important;
+  }
+
+}
+
+// Stop button gradient styling
+.stop-button {
+  background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%) !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 4px 15px 0 rgba(245, 101, 101, 0.3) !important;
+  
+  &:hover {
+    background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%) !important;
+    box-shadow: 0 6px 20px 0 rgba(245, 101, 101, 0.4) !important;
+    transform: translateY(-1px) !important;
+  }
+  
+  &:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 10px 0 rgba(245, 101, 101, 0.3) !important;
+  }
 }
 
 .dark-mode .code-block-header{
