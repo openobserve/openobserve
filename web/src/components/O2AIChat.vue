@@ -175,7 +175,7 @@
               </div>
             </div>
           </div>
-          <div v-if="isLoading" class="">
+          <div v-if="isLoading" id="loading-indicator" class="">
             <q-spinner-dots color="primary" size="2em" />
             <span>Generating response...</span>
           </div>
@@ -403,6 +403,15 @@ export default defineComponent({
       await nextTick();
       if (messagesContainer.value && shouldAutoScroll.value) {
         messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+      }
+    };
+
+
+    const scrollToLoadingIndicator = async () => {
+      await nextTick();
+      const loadingElement = document.getElementById('loading-indicator');
+      if (loadingElement) {
+        loadingElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }
     };
 
@@ -721,7 +730,7 @@ export default defineComponent({
       });
       inputMessage.value = '';
       shouldAutoScroll.value = true; // Reset auto-scroll for new message
-      await scrollToBottom();
+      await scrollToBottom(); // Scroll after user message
       await saveToHistory(); // Save after user message
 
       isLoading.value = true;
@@ -732,6 +741,7 @@ export default defineComponent({
           role: 'assistant',
           content: ''
         });
+        await scrollToLoadingIndicator(); // Scroll directly to loading indicator
         let response: any;
         try { 
           response = await fetchAiChat(chatMessages.value.slice(0, -1),"",store.state.selectedOrganization.identifier);
@@ -1017,6 +1027,7 @@ export default defineComponent({
       shouldAutoScroll,
       checkIfShouldAutoScroll,
       getScrollThreshold,
+      scrollToLoadingIndicator,
     }
   }
 });
