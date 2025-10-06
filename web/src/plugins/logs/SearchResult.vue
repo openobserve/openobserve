@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="col column overflow-hidden full-height">
+  <div class="col column full-height" style="overflow: hidden !important; padding: 0 !important; margin: 0 !important; height: 100%;">
     <div
       class="search-list full-height full-width"
       ref="searchListContainer"
     >
-      <div class="row tw-min-h-[44px]">
+      <div class="row tw-min-h-[32px]">
         <div
-          class="col-7 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders"
+          class="col-7 text-left q-pl-lg bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="col-7 text-left q-pl-lg q-mt-xs warning flex items-center"
+          class="col-7 text-left q-pl-lg warning flex items-center"
         >
           {{ noOfRecordsTitle }}
           <span v-if="searchObj.loadingCounter" class="q-ml-md">
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="col-5 text-right q-pr-md q-gutter-xs pagination-block">
+        <div class="col-5 text-right q-pr-sm q-gutter-xs pagination-block">
           <q-pagination
             v-if="searchObj.meta.resultGrid.showPagination"
             :disable="searchObj.loading == true"
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="q-pb-lg histogram-loader"
+          class="q-pb-sm histogram-loader"
           v-if="histogramLoader"
         >
           <q-spinner-hourglass
@@ -850,6 +850,11 @@ export default defineComponent({
 
 .search-list {
   width: 100%;
+  height: 100%;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
 
   .chart {
     width: 100%;
@@ -899,9 +904,11 @@ export default defineComponent({
   }
 
   .q-table__bottom {
-    min-height: 40px;
-    padding-top: 0;
-    padding-bottom: 0;
+    min-height: 32px;
+    max-height: 32px;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
   }
 
   .q-td {
@@ -997,7 +1004,7 @@ export default defineComponent({
 .field_list,
 .table-head-chip {
   padding: 0px;
-  margin-bottom: 0.125rem;
+  margin-bottom: 0;
   position: relative;
   overflow: visible;
   cursor: default;
@@ -1057,6 +1064,11 @@ export default defineComponent({
 
 <style lang="scss">
 .search-list {
+  padding: 0 !important;
+  margin: 0 !important;
+  height: 100%;
+  overflow: hidden !important;
+
   .copy-log-btn {
     .q-icon {
       font-size: 12px !important;
