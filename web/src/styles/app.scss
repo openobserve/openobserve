@@ -5,6 +5,84 @@ html, body {
   padding: 0 !important;
 }
 
+/* ============================================================================
+   MODERN LEAN SCROLLBAR STYLES
+   Thin, minimal design with primary color scheme
+   ============================================================================ */
+
+::-webkit-scrollbar {
+  width: 0.5rem; // 8px - thinner for modern look
+  height: 0.5rem; // 8px
+}
+
+::-webkit-scrollbar-track {
+  background: transparent; // Clean, minimal track
+  border-radius: 0.25rem; // 4px - subtle rounding
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(87, 95, 197, 0.4); // Light primary color
+  border-radius: 0.25rem; // 4px - subtle rounding
+  transition: background 0.2s ease;
+  cursor: pointer; // Hand pointer
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(87, 95, 197, 0.6); // Slightly darker on hover
+  cursor: pointer; // Hand pointer
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: rgba(87, 95, 197, 0.8); // More visible when dragging
+  cursor: grabbing; // Grabbing hand when dragging
+}
+
+// Dark theme scrollbar
+.theme-dark {
+  ::-webkit-scrollbar-track {
+    background: transparent; // Clean, minimal track
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(161, 175, 255, 0.4); // Light dark-mode primary color
+    transition: background 0.2s ease;
+    cursor: pointer; // Hand pointer
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(161, 175, 255, 0.6);
+    cursor: pointer; // Hand pointer
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: rgba(161, 175, 255, 0.8);
+    cursor: grabbing; // Grabbing hand when dragging
+  }
+}
+
+// Light theme scrollbar
+.theme-light {
+  ::-webkit-scrollbar-track {
+    background: transparent; // Clean, minimal track
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(87, 95, 197, 0.4); // Light primary color
+    transition: background 0.2s ease;
+    cursor: pointer; // Hand pointer
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(87, 95, 197, 0.6);
+    cursor: pointer; // Hand pointer
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: rgba(87, 95, 197, 0.8);
+    cursor: grabbing; // Grabbing hand when dragging
+  }
+}
+
 
 .q-w-sm {
   width: 360px;
