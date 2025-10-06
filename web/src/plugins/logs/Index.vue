@@ -2725,6 +2725,12 @@ export default defineComponent({
       box-sizing: border-box !important;
       overflow: hidden !important;
     }
+    .q-splitter__after {
+      padding: 0 !important;
+      margin: 0 !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+    }
   }
 
   .thirdlevel {
@@ -2750,6 +2756,14 @@ export default defineComponent({
     // When hovering over the splitter area, slide out the collapsed button
     &:hover .splitter-section-collapse-btn--hidden {
       transform: translateY(-50%) translateX(10px) !important;
+    }
+  }
+
+  .logs-splitter-smooth {
+    .q-splitter__before,
+    .q-splitter__after,
+    .q-splitter__separator {
+      transition: all 0.3s ease-in-out !important;
     }
   }
 
