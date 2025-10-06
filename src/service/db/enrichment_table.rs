@@ -15,7 +15,10 @@
 
 use std::sync::Arc;
 
-use arrow::array::RecordBatch;
+use arrow::{
+    array::{RecordBatch, *},
+    datatypes::DataType,
+};
 use config::{
     meta::stream::{EnrichmentTableMetaStreamStats, PartitionTimeLevel, StreamType},
     utils::{
@@ -188,10 +191,8 @@ pub fn convert_from_vrl(value: &vrl::value::Value) -> json::Value {
 /// Only handles data types supported by convert_json_to_record_batch:
 /// Utf8, Utf8View, LargeUtf8, Int64, UInt64, Float64, Boolean, Binary, Null
 pub fn convert_recordbatch_to_vrl(
-    batches: &[arrow::array::RecordBatch],
+    batches: &[RecordBatch],
 ) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-    use arrow::{array::*, datatypes::DataType};
-
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(config::get_config().limit.cpu_num)
         .build()?;

@@ -175,7 +175,8 @@ pub mod remote {
     use config::{
         meta::stream::{FileMeta, StreamType},
         utils::{
-            parquet::write_recordbatch_to_parquet, record_batch_ext::convert_json_to_record_batch,
+            json::estimate_json_bytes, parquet::write_recordbatch_to_parquet,
+            record_batch_ext::convert_json_to_record_batch,
         },
     };
 
@@ -246,13 +247,13 @@ pub mod remote {
             return Ok(());
         }
 
-        let buf = Bytes::from(serde_json::to_string(&data).unwrap());
+        let original_size = data.iter().map(estimate_json_bytes).sum::<usize>() as i64;
         let mut file_meta = FileMeta {
             min_ts,
             max_ts,
             records: data.len() as i64,
-            original_size: buf.len() as i64,
-            compressed_size: buf.len() as i64,
+            original_size,
+            compressed_size: original_size,
             ..Default::default()
         };
 
@@ -285,7 +286,7 @@ pub mod remote {
     pub async fn store(
         org_id: &str,
         table_name: &str,
-        data: &Vec<Value>,
+        data: &[Value],
         created_at: i64,
     ) -> Result<()> {
         if data.is_empty() {
@@ -295,14 +296,13 @@ pub mod remote {
             .await
             .map_err(|e| anyhow!("Failed to get schema from cache: {}", e))?;
 
-        // Question: this convert only used for calculate original_size and compressed_size?
-        let buf = Bytes::from(serde_json::to_string(&data).unwrap());
+        let original_size = data.iter().map(estimate_json_bytes).sum::<usize>() as i64;
         let mut file_meta = FileMeta {
             min_ts: created_at,
             max_ts: created_at,
             records: data.len() as i64,
-            original_size: buf.len() as i64,
-            compressed_size: buf.len() as i64,
+            original_size,
+            compressed_size: original_size,
             ..Default::default()
         };
 
@@ -464,16 +464,16 @@ pub mod local {
         for file in files {
             let file_content = tokio::fs::read(&file)
                 .await
-                .map_err(|e| anyhow!("Failed to read enrichment table file: {}", e))?;
+                .map_err(|e| anyhow!("Failed to read enrichment table file: {e}"))?;
 
             // Parse parquet file
             let reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(file_content))
-                .map_err(|e| anyhow!("Failed to create parquet reader: {}", e))?
+                .map_err(|e| anyhow!("Failed to create parquet reader: {e}"))?
                 .build()
-                .map_err(|e| anyhow!("Failed to build parquet reader: {}", e))?;
+                .map_err(|e| anyhow!("Failed to build parquet reader: {e}"))?;
 
             for batch in reader {
-                let batch = batch.map_err(|e| anyhow!("Failed to read record batch: {}", e))?;
+                let batch = batch.map_err(|e| anyhow!("Failed to read record batch: {e}"))?;
                 batches.push(batch);
             }
         }
