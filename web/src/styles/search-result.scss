@@ -33,20 +33,29 @@
 }
 
 .select-pagination {
-  line-height: 1.5rem !important; // 24px - match pagination buttons
+  line-height: 1.75rem !important; // 28px - slightly taller to prevent clipping
   border-radius: 0.5rem !important;
-  padding: 0 0.375rem !important; // Compact padding
+  padding: 0.125rem 0.5rem !important; // Add vertical padding
   background: rgba(255, 255, 255, 0.1) !important; // Glassmorphic
   backdrop-filter: blur(10px) !important;
-  min-height: 1.5rem !important;
-  max-height: 1.5rem !important;
-  height: 1.5rem !important;
+  min-height: 1.75rem !important;
+  height: 1.75rem !important;
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  display: flex !important;
+  align-items: center !important;
+  overflow: visible !important;
+
+  .q-field__control-container {
+    padding-top: 0 !important;
+  }
 
   .q-field__control {
-    height: 1.5rem !important;
-    min-height: 1.5rem !important;
+    height: 1.75rem !important;
+    min-height: 1.75rem !important;
     padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    overflow: visible !important;
 
     &:before,
     &:after {
@@ -56,17 +65,40 @@
 
   .q-field__native {
     padding: 0 0.25rem !important;
-    min-height: 1.5rem !important;
+    min-height: 1.75rem !important;
+    line-height: 1.75rem !important;
     font-size: 0.75rem !important;
+    overflow: visible !important;
+
+    input,
+    span {
+      line-height: 1.75rem !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+  }
+
+  .q-field__input {
+    padding: 0 !important;
+    line-height: 1.75rem !important;
   }
 
   .q-field__append {
     padding: 0 !important;
-    height: 1.5rem !important;
+    padding-left: 0.25rem !important;
+    height: 1.75rem !important;
+    display: flex !important;
+    align-items: center !important;
   }
 
   .q-icon {
     font-size: 1rem !important;
+  }
+
+  // Selected value display
+  input[readonly] {
+    line-height: 1.75rem !important;
+    padding: 0 !important;
   }
 }
 
