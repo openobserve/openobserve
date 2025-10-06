@@ -86,13 +86,13 @@ jobs:
         run: cd web && npm install && npm run build
 
       - name: Build and run binary
-        run: cargo build --target x86_64-unknown-linux-gnu
+        run: cargo build --release --target x86_64-unknown-linux-gnu
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: debug-binary
-          path: target/x86_64-unknown-linux-gnu/debug/openobserve
+          name: release-binary
+          path: target/x86_64-unknown-linux-gnu/release/openobserve
           retention-days: 1
 
   ui_integration_tests:
@@ -213,11 +213,11 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v5
         with:
-          name: debug-binary
-          path: debug-binary
+          name: release-binary
+          path: release-binary
 
       - name: Start OpenObserve
-        run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
+        run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
         run: sleep 15
