@@ -21,8 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     dense
     flat
     class="q-ml-xs q-pa-xs"
-    :class="[sqlmode ? 'sql-mode' : 'normal-mode',
-      !store.state.isAiChatEnabled ? 'syntax-guide-button' : ''
+    :class="[
+      sqlmode ? 'sql-mode' : 'normal-mode',
+      !store.state.isAiChatEnabled ? 'syntax-guide-button' : '',
+      store.state.theme == 'dark' && !sqlmode ? 'syntax-guide-button-dark' : ''
     ]"
     icon="help"
   >
@@ -256,6 +258,10 @@ export default defineComponent({
   height: 32px;
   font-weight: bold;
   border: 1px solid rgba(89, 96, 178, 0.3);
+}
+
+.syntax-guide-button-dark {
+  border: 1px solid #ffffff !important;
 }
 
 .sql-mode {
