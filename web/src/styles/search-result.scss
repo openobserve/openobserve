@@ -1,0 +1,107 @@
+/**
+ * Search Result Styles
+ * Phase 2: CSS Architecture - Extract Inline Styles Only
+ * NO SIZE CHANGES - Keep all original measurements
+ */
+
+/* ============================================================================
+   LAYOUT HELPERS
+   ============================================================================ */
+
+.full-width {
+  width: 100%;
+}
+
+/* ============================================================================
+   PAGINATION BLOCK
+   ============================================================================ */
+
+.paginator-section {
+  line-height: 30px;
+  max-height: 30px;
+}
+
+.select-pagination {
+  line-height: 20px;
+}
+
+/* ============================================================================
+   HISTOGRAM CONTAINER
+   ============================================================================ */
+
+.histogram-container {
+  // Dynamic height controlled by CSS classes
+  &--visible {
+    height: 100px;
+    opacity: 1;
+    transition: all 0.3s ease-in-out;
+  }
+
+  &--hidden {
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: all 0.3s ease-in-out;
+  }
+}
+
+.histogram-chart {
+  max-height: 100px;
+}
+
+.histogram-empty {
+  height: 100px;
+
+  &__message {
+    min-height: 50px;
+  }
+}
+
+.histogram-loader {
+  top: 50px;
+  position: absolute;
+  left: 50%;
+}
+
+.histogram-error {
+  margin: 30px 0;
+
+  &__message {
+    min-height: 50px;
+  }
+}
+
+/* ============================================================================
+   TABLE HEIGHT CALCULATIONS
+   ============================================================================ */
+
+.table-container {
+  &--with-histogram {
+    height: calc(100% - 140px); // 100px histogram + 40px padding
+  }
+
+  &--without-histogram {
+    height: calc(100% - 40px);
+  }
+}
+
+/* ============================================================================
+   LOADING & SPINNER STYLES
+   ============================================================================ */
+
+.search-spinner {
+  margin: 0 auto;
+  display: block;
+}
+
+.search-loading-text {
+  font-size: 14px;
+}
+
+/* ============================================================================
+   DETAIL TABLE DIALOG
+   ============================================================================ */
+
+.detail-table-dialog {
+  margin-bottom: 15px;
+}

@@ -19,9 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col column overflow-hidden full-height">
     <div
-      class="search-list full-height"
+      class="search-list full-height full-width"
       ref="searchListContainer"
-      style="width: 100%"
     >
       <div class="row tw-min-h-[44px]">
         <div
@@ -42,14 +41,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-spinner-hourglass
               color="primary"
               size="25px"
-              style="margin: 0 auto; display: block"
+              class="search-spinner"
             />
             <q-tooltip
               anchor="center right"
               self="center left"
               max-width="300px"
             >
-              <span style="font-size: 14px">Fetching the search events</span>
+              <span class="search-loading-text">Fetching the search events</span>
             </q-tooltip>
           </span>
           <div
@@ -108,7 +107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             rowsPerPageLabel="Rows per page"
             :rows-per-page-options="rowsPerPageOptions"
             :rows-per-page="searchObj.meta.resultGrid.rowsPerPage"
-            style="line-height: 30px; max-height: 30px"
             data-test="logs-search-result-pagination"
           />
           <q-select
@@ -120,14 +118,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             dense
             @update:model-value="getPageData('recordsPerPage')"
-            style="line-height: 20px"
           ></q-select>
         </div>
       </div>
       <div
-        :style="{
-          height: searchObj.meta.showHistogram ? '100px' : '0px',
-        }"
+        :class="[
+          'histogram-container',
+          searchObj.meta.showHistogram ? 'histogram-container--visible' : 'histogram-container--hidden'
+        ]"
         v-if="
           searchObj.data?.histogram?.errorMsg == '' &&
           searchObj.data.histogram.errorCode != -1
@@ -141,12 +139,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           data-test="logs-search-result-bar-chart"
           :data="plotChart"
-          style="max-height: 100px"
+          class="histogram-chart"
           @updated:dataZoom="onChartUpdate"
         />
 
         <div
-          style="height: 100px"
+          class="histogram-empty"
           v-else-if="
             searchObj.meta.showHistogram &&
             !searchObj.loadingHistogram &&
@@ -154,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <h3 class="text-center">
-            <span style="min-height: 50px">
+            <span class="histogram-empty__message">
               <q-icon name="warning" color="warning" size="xs"></q-icon> No data
               found for histogram.</span
             >
@@ -162,25 +160,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          style="height: 100px"
+          class="histogram-empty"
           v-else-if="
             searchObj.meta.showHistogram && Object.keys(plotChart)?.length === 0
           "
         >
           <h3 class="text-center">
-            <span style="min-height: 50px; color: transparent">.</span>
+            <span class="histogram-empty__message" style="color: transparent">.</span>
           </h3>
         </div>
 
         <div
-          class="q-pb-lg"
-          style="top: 50px; position: absolute; left: 50%"
+          class="q-pb-lg histogram-loader"
           v-if="histogramLoader"
         >
           <q-spinner-hourglass
             color="primary"
             size="25px"
-            style="margin: 0 auto; display: block"
+            class="search-spinner"
           />
         </div>
       </div>
@@ -192,8 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <h6
-          class="text-center"
-          style="margin: 30px 0px"
+          class="text-center histogram-error"
           v-if="
             searchObj.data.histogram.errorCode != 0 &&
             searchObj.data.histogram.errorCode != -1
@@ -243,14 +239,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :default-columns="!searchObj.data.stream.selectedFields.length"
         class="col-12"
-        :style="{
-          height:
-            !searchObj.meta.showHistogram ||
-            (searchObj.meta.showHistogram &&
-              searchObj.data.histogram.errorCode == -1)
-              ? 'calc(100% - 40px)'
-              : 'calc(100% - 140px)',
-        }"
+        :class="[
+          !searchObj.meta.showHistogram ||
+          (searchObj.meta.showHistogram &&
+            searchObj.data.histogram.errorCode == -1)
+            ? 'table-container--without-histogram'
+            : 'table-container--with-histogram'
+        ]"
         @update:columnSizes="handleColumnSizesUpdate"
         @update:columnOrder="handleColumnOrderUpdate"
         @copy="copyLogToClipboard"
@@ -284,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]
           "
           :stream-type="searchObj.data.stream.streamType"
-          style="margin-bottom: 15px"
+          class="detail-table-dialog"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
           :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
           :highlight-query="
@@ -1087,4 +1082,8 @@ export default defineComponent({
 .histogram-unavailable-text-light {
   color: #ff8800;
 }
+</style>
+
+<style lang="scss">
+@import '@/styles/search-result.scss';
 </style>

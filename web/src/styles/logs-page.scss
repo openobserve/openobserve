@@ -1,0 +1,77 @@
+/**
+ * Logs Page Styles
+ * Phase 2: CSS Architecture - Extract Inline Styles Only
+ * NO SIZE CHANGES - Keep all original measurements
+ */
+
+/* ============================================================================
+   LAYOUT HELPERS
+   ============================================================================ */
+
+.full-width {
+  width: 100%;
+}
+
+/* ============================================================================
+   FIELD LIST COLLAPSE BUTTON
+   ============================================================================ */
+
+.field-list-collapse-btn {
+  &--visible {
+    right: -20px;
+  }
+
+  &--hidden {
+    right: -24px;
+  }
+}
+
+/* ============================================================================
+   VISUALIZE CONTAINER
+   ============================================================================ */
+
+.visualize-container {
+  // Dynamic height - will use CSS variable
+  height: calc(100vh - var(--splitter-height, 10vh) - 40px);
+}
+
+/* ============================================================================
+   SEARCH HISTORY EMPTY STATE
+   ============================================================================ */
+
+.search-history-empty {
+  height: 200px;
+
+  &__content {
+    height: 80vh;
+  }
+
+  &__icon {
+    font-size: 100px;
+    opacity: 0.1;
+  }
+
+  &__title {
+    opacity: 0.8;
+  }
+
+  &__info {
+    opacity: 0.8;
+
+    .q-icon {
+      font-size: 20px;
+      opacity: 0.5;
+    }
+  }
+}
+
+/* ============================================================================
+   ERROR MESSAGE STYLING
+   ============================================================================ */
+
+.error-display {
+  &__message {
+    font-size: 14px;
+    margin: 0;
+  }
+}
