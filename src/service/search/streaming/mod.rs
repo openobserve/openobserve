@@ -47,10 +47,7 @@ use crate::{
 };
 #[cfg(feature = "enterprise")]
 use crate::{
-    handler::http::request::search::{
-        error_utils::map_error_to_http_response,
-        utils::check_stream_permissions,
-    },
+    handler::http::request::search::error_utils::map_error_to_http_response,
     service::self_reporting::audit,
 };
 
@@ -86,6 +83,9 @@ pub async fn process_search_stream_request(
     log::debug!(
         "[HTTP2_STREAM trace_id {trace_id}] Received HTTP/2 stream request for org_id: {org_id}",
     );
+
+    #[cfg(feature = "enterprise")]
+    let audit_enabled = get_o2_config().common.audit_enabled && _audit_ctx.is_some();
 
     // Send a progress: 0 event as an indicator of search initiation
     if sender
@@ -160,7 +160,7 @@ pub async fn process_search_stream_request(
                 #[cfg(feature = "enterprise")]
                 {
                     let resp = map_error_to_http_response(&e, None).status().into();
-                    if get_o2_config().common.audit_enabled {
+                    if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
                             user_email: user_id,
@@ -266,7 +266,7 @@ pub async fn process_search_stream_request(
                 #[cfg(feature = "enterprise")]
                 {
                     let resp = map_error_to_http_response(&e, None).status().into();
-                    if get_o2_config().common.audit_enabled {
+                    if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
                             user_email: user_id,
@@ -345,7 +345,7 @@ pub async fn process_search_stream_request(
                 #[cfg(feature = "enterprise")]
                 {
                     let resp = map_error_to_http_response(&e, None).status().into();
-                    if get_o2_config().common.audit_enabled {
+                    if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
                             user_email: user_id,
@@ -412,7 +412,7 @@ pub async fn process_search_stream_request(
             #[cfg(feature = "enterprise")]
             {
                 let resp = map_error_to_http_response(&e, None).status().into();
-                if get_o2_config().common.audit_enabled {
+                if audit_enabled {
                     // Using spawn to handle the async call
                     audit(AuditMessage {
                         user_email: user_id,
@@ -474,7 +474,7 @@ pub async fn process_search_stream_request(
             #[cfg(feature = "enterprise")]
             {
                 let resp = map_error_to_http_response(&e, None).status().into();
-                if get_o2_config().common.audit_enabled {
+                if audit_enabled {
                     // Using spawn to handle the async call
                     audit(AuditMessage {
                         user_email: user_id,
@@ -516,7 +516,7 @@ pub async fn process_search_stream_request(
 
     #[cfg(feature = "enterprise")]
     {
-        if get_o2_config().common.audit_enabled {
+        if audit_enabled {
             // Using spawn to handle the async call
             audit(AuditMessage {
                 user_email: user_id,
@@ -538,11 +538,7 @@ pub async fn process_search_stream_request(
     }
 
     // Send a completion signal
-    if sender
-        .send(Ok(StreamResponses::Done))
-        .await
-        .is_err()
-    {
+    if sender.send(Ok(StreamResponses::Done)).await.is_err() {
         log::warn!(
             "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stop sending completion message to client",
         );
@@ -586,21 +582,21 @@ pub async fn process_search_stream_request_multi(
     let total_queries = queries.len() as f32;
     let mut completed_queries = 0;
     let _started_at = chrono::Utc::now().timestamp_micros();
-    
+
     // Process each query independently
     let mut query_tasks = Vec::new();
-    
+
     for (query_index, mut req) in queries.into_iter().enumerate() {
         let query_trace_id = format!("{trace_id}-q{query_index}");
         let org_id_clone = org_id.clone();
         let user_id_clone = user_id.clone();
         let sender_clone = sender.clone();
         let search_span_clone = search_span.clone();
-        
+
         // Clone search context for each query
         let query_search_type = search_type;
         let query_search_event_context = search_event_context.clone();
-        
+
         let task = tokio::spawn(async move {
             log::debug!(
                 "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Starting query {query_index}: {}",
@@ -608,48 +604,26 @@ pub async fn process_search_stream_request_multi(
             );
 
             // Get stream names for this specific query
+            // Note: Permissions are now checked at the handler level using the streams field
             let stream_names = match config::meta::sql::resolve_stream_names(&req.query.sql) {
                 Ok(v) => v,
                 Err(e) => {
                     log::error!(
                         "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Failed to resolve stream names: {e}"
                     );
-                    let _ = sender_clone
-                        .send(Err(e.into()))
-                        .await;
+                    let _ = sender_clone.send(Err(e.into())).await;
                     return;
                 }
             };
-
-            // Check permissions for each stream in this query
-            #[cfg(feature = "enterprise")]
-            for stream_name in stream_names.iter() {
-                if check_stream_permissions(
-                    stream_name,
-                    &org_id_clone,
-                    &user_id_clone,
-                    &stream_type,
-                ).await.is_some()
-                {
-                    log::error!(
-                        "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Permission denied for stream {stream_name}"
-                    );
-                    let _ = sender_clone
-                        .send(Err(infra::errors::Error::Message(
-                            "Unauthorized Access".to_string()
-                        )))
-                        .await;
-                    return;
-                }
-            }
 
             // Set query metadata
             req.search_type = query_search_type;
             req.search_event_context = query_search_event_context;
 
             // Create a nested sender for this specific query results
-            let (query_sender, mut query_receiver) = mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(100);
-            
+            let (query_sender, mut query_receiver) =
+                mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(100);
+
             // Launch the individual search stream request
             let search_task = process_search_stream_request(
                 org_id_clone.clone(),
@@ -661,12 +635,12 @@ pub async fn process_search_stream_request_multi(
                 OrderBy::default(),
                 search_span_clone.clone(),
                 query_sender,
-                None, // no values context for multi-stream
-                None, // no fallback order by col
-                None, // no audit context for individual queries
+                None,  // no values context for multi-stream
+                None,  // no fallback order by col
+                None,  // no audit context for individual queries
                 false, // not multi stream search at individual level
             );
-            
+
             tokio::spawn(search_task);
 
             // Forward results from this query to the main sender, prefixed with query info
@@ -675,19 +649,34 @@ pub async fn process_search_stream_request_multi(
                     Ok(response) => {
                         // Add query index to the response
                         let prefixed_response = match response {
-                            StreamResponses::SearchResponse { mut results, streaming_aggs, streaming_id, time_offset } => {
+                            StreamResponses::SearchResponse {
+                                mut results,
+                                streaming_aggs,
+                                streaming_id,
+                                time_offset,
+                            } => {
                                 // Add query index to metadata
                                 results.query_index = Some(query_index);
-                                StreamResponses::SearchResponse { results, streaming_aggs, streaming_id, time_offset }
+                                StreamResponses::SearchResponse {
+                                    results,
+                                    streaming_aggs,
+                                    streaming_id,
+                                    time_offset,
+                                }
                             }
                             StreamResponses::Progress { percent } => {
                                 // Scale progress per query
-                                let global_percent = ((query_index as f32 + (percent as f32 / 100.0)) / total_queries * 100.0) as usize;
-                                StreamResponses::Progress { percent: global_percent }
+                                let global_percent =
+                                    ((query_index as f32 + (percent as f32 / 100.0))
+                                        / total_queries
+                                        * 100.0) as usize;
+                                StreamResponses::Progress {
+                                    percent: global_percent,
+                                }
                             }
                             other => other, // Forward other responses as-is
                         };
-                        
+
                         if sender_clone.send(Ok(prefixed_response)).await.is_err() {
                             log::warn!(
                                 "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Main sender is closed"
@@ -710,21 +699,19 @@ pub async fn process_search_stream_request_multi(
                 "[HTTP2_STREAM_MULTI trace_id {query_trace_id}] Query {query_index} completed"
             );
         });
-        
+
         query_tasks.push(task);
     }
 
     // Wait for all queries to complete
     for task in query_tasks {
         if let Err(e) = task.await {
-            log::error!(
-                "[HTTP2_STREAM_MULTI trace_id {trace_id}] Task join error: {e}"
-            );
+            log::error!("[HTTP2_STREAM_MULTI trace_id {trace_id}] Task join error: {e}");
         }
-        
+
         completed_queries += 1;
         let progress = (completed_queries as f32 / total_queries * 100.0) as usize;
-        
+
         // Send progress update
         if sender
             .send(Ok(StreamResponses::Progress { percent: progress }))
@@ -744,33 +731,29 @@ pub async fn process_search_stream_request_multi(
     );
 
     #[cfg(feature = "enterprise")]
-    if let Some(audit_ctx) = _audit_ctx {
-        if get_o2_config().common.audit_enabled {
-            audit(AuditMessage {
-                user_email: user_id,
-                org_id,
-                _timestamp: chrono::Utc::now().timestamp(),
-                protocol: Protocol::Http,
-                response_meta: ResponseMeta {
-                    http_method: audit_ctx.method.to_string(),
-                    http_path: audit_ctx.path.to_string(),
-                    http_query_params: audit_ctx.query_params.to_string(),
-                    http_body: audit_ctx.body.to_string(),
-                    http_response_code: 200,
-                    error_msg: None,
-                    trace_id: Some(trace_id.to_string()),
-                },
-            })
-            .await;
-        }
+    if let Some(audit_ctx) = _audit_ctx
+        && get_o2_config().common.audit_enabled
+    {
+        audit(AuditMessage {
+            user_email: user_id,
+            org_id,
+            _timestamp: chrono::Utc::now().timestamp(),
+            protocol: Protocol::Http,
+            response_meta: ResponseMeta {
+                http_method: audit_ctx.method.to_string(),
+                http_path: audit_ctx.path.to_string(),
+                http_query_params: audit_ctx.query_params.to_string(),
+                http_body: audit_ctx.body.to_string(),
+                http_response_code: 200,
+                error_msg: None,
+                trace_id: Some(trace_id.to_string()),
+            },
+        })
+        .await;
     }
 
     // Send completion signal
-    if sender
-        .send(Ok(StreamResponses::Done))
-        .await
-        .is_err()
-    {
+    if sender.send(Ok(StreamResponses::Done)).await.is_err() {
         log::warn!(
             "[HTTP2_STREAM_MULTI trace_id {trace_id}] Sender is closed, stop sending completion message to client"
         );

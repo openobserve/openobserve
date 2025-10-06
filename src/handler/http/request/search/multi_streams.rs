@@ -40,11 +40,7 @@ use {crate::service::organization::is_org_in_free_trial_period, actix_web::http:
 #[cfg(feature = "enterprise")]
 use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 #[cfg(feature = "enterprise")]
-use crate::{
-    common::meta::search::AuditContext,
-    service::self_reporting::audit,
-};
-
+use crate::{common::meta::search::AuditContext, service::self_reporting::audit};
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
@@ -53,8 +49,8 @@ use crate::{
             functions,
             http::{
                 get_dashboard_info_from_request, get_enable_align_histogram_from_request,
-                get_fallback_order_by_col_from_request, get_or_create_trace_id, 
-                get_search_event_context_from_request, get_search_type_from_request, 
+                get_fallback_order_by_col_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
                 get_stream_type_from_request,
             },
             stream::get_settings_max_query_range,
@@ -62,10 +58,8 @@ use crate::{
     },
     handler::http::request::search::error_utils::map_error_to_http_response,
     service::{
-        search as SearchService, 
-        search::streaming::process_search_stream_request_multi,
-        self_reporting::report_request_usage_stats,
-        setup_tracing_with_trace_id,
+        search as SearchService, search::streaming::process_search_stream_request_multi,
+        self_reporting::report_request_usage_stats, setup_tracing_with_trace_id,
     },
 };
 
@@ -965,12 +959,14 @@ pub async fn around_multi(
 }
 
 /// Parse simple multi-stream request format and convert to MultiStreamRequest
-fn parse_simple_multi_stream_request(body: &[u8]) -> Result<search::MultiStreamRequest, infra::errors::Error> {
+fn parse_simple_multi_stream_request(
+    body: &[u8],
+) -> Result<search::MultiStreamRequest, infra::errors::Error> {
     #[derive(serde::Deserialize)]
     struct SimpleMultiStreamWrapper {
         query: SimpleMultiStreamQuery,
     }
-    
+
     #[derive(serde::Deserialize)]
     struct SimpleMultiStreamQuery {
         sql: Vec<String>,
@@ -988,22 +984,26 @@ fn parse_simple_multi_stream_request(body: &[u8]) -> Result<search::MultiStreamR
         quick_mode: bool,
     }
 
-    let simple_req: SimpleMultiStreamWrapper = json::from_slice(body)
-        .map_err(|e| infra::errors::Error::SerdeJsonError(e))?;
+    let simple_req: SimpleMultiStreamWrapper =
+        json::from_slice(body).map_err(infra::errors::Error::SerdeJsonError)?;
 
     // Convert to MultiStreamRequest format
-    let sql_queries = simple_req.query.sql.into_iter().map(|sql| {
-        search::SqlQuery {
+    let sql_queries = simple_req
+        .query
+        .sql
+        .into_iter()
+        .map(|sql| search::SqlQuery {
             sql,
             start_time: Some(simple_req.query.start_time),
             end_time: Some(simple_req.query.end_time),
             query_fn: simple_req.query.query_fn.clone(),
             is_old_format: false,
-        }
-    }).collect();
+        })
+        .collect();
 
     Ok(search::MultiStreamRequest {
         sql: sql_queries,
+        streams: vec![],
         encoding: search::RequestEncoding::Empty,
         timeout: 0,
         from: simple_req.query.from,
@@ -1026,7 +1026,9 @@ fn parse_simple_multi_stream_request(body: &[u8]) -> Result<search::MultiStreamR
     })
 }
 
-fn default_size() -> i64 { 10 }
+fn default_size() -> i64 {
+    10
+}
 
 /// SearchStreamMulti HTTP2 streaming endpoint
 #[utoipa::path(
@@ -1074,7 +1076,10 @@ pub async fn search_multi_stream(
 
     // Create a tracing span
     let http_span = if cfg.common.tracing_search_enabled {
-        tracing::info_span!("/api/{org_id}/_search_stream_multi", org_id = org_id.clone())
+        tracing::info_span!(
+            "/api/{org_id}/_search_stream_multi",
+            org_id = org_id.clone()
+        )
     } else {
         Span::none()
     };
@@ -1157,7 +1162,7 @@ pub async fn search_multi_stream(
                     #[cfg(feature = "enterprise")]
                     let error_message = e.to_string();
 
-                    let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
+                    let http_response = map_error_to_http_response(&e, Some(trace_id.clone()));
 
                     #[cfg(feature = "enterprise")]
                     {
@@ -1197,6 +1202,63 @@ pub async fn search_multi_stream(
         }
     }
 
+    // Check permissions for all streams upfront before processing queries
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_openfga::meta::mapping::OFGA_MODELS;
+
+        use crate::{
+            common::utils::auth::{AuthExtractor, is_root_user},
+            service::users::get_user,
+        };
+
+        if !is_root_user(&user_id) {
+            let user: config::meta::user::User = get_user(Some(&org_id), &user_id).await.unwrap();
+            let stream_type_str = stream_type.as_str();
+            let user_role = user.role.clone();
+            let user_is_external = user.is_external;
+
+            for stream_name in multi_req.streams.iter() {
+                if !crate::handler::http::auth::validator::check_permissions(
+                    &user_id,
+                    AuthExtractor {
+                        auth: "".to_string(),
+                        method: "GET".to_string(),
+                        o2_type: format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get(stream_type_str)
+                                .map_or(stream_type_str, |model| model.key),
+                            stream_name
+                        ),
+                        org_id: org_id.clone(),
+                        bypass_check: false,
+                        parent_id: "".to_string(),
+                    },
+                    user_role.clone(),
+                    user_is_external,
+                )
+                .await
+                {
+                    #[cfg(feature = "enterprise")]
+                    {
+                        report_to_audit(
+                            user_id.clone(),
+                            org_id.clone(),
+                            trace_id.clone(),
+                            403,
+                            Some(format!("Unauthorized Access to stream: {stream_name}")),
+                            &in_req,
+                            body_bytes.clone(),
+                        )
+                        .await;
+                    }
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                }
+            }
+        }
+    }
+
     let mut queries = multi_req.to_query_req();
 
     // Before making any requests, first check the sql expressions can be decoded correctly
@@ -1210,13 +1272,13 @@ pub async fn search_multi_stream(
             #[cfg(feature = "enterprise")]
             {
                 report_to_audit(
-                    user_id,
-                    org_id,
-                    trace_id,
+                    user_id.clone(),
+                    org_id.clone(),
+                    trace_id.clone(),
                     http_response.status().into(),
                     Some(error_message),
                     &in_req,
-                    body_bytes,
+                    body_bytes.clone(),
                 )
                 .await;
             }
@@ -1264,7 +1326,9 @@ pub async fn search_multi_stream(
         let chunks_iter = match result {
             Ok(v) => v.to_chunks(),
             Err(err) => {
-                log::error!("[HTTP2_STREAM_MULTI trace_id {trace_id}] Error in multi-stream search: {err}");
+                log::error!(
+                    "[HTTP2_STREAM_MULTI trace_id {trace_id}] Error in multi-stream search: {err}"
+                );
                 let err_res = match err {
                     infra::errors::Error::ErrorCode(ref code) => {
                         // if err code is cancelled return cancelled response
@@ -1356,6 +1420,7 @@ mod tests {
                 query_fn: None,
                 is_old_format: false,
             }],
+            streams: vec!["logs".to_string()],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1380,6 +1445,8 @@ mod tests {
         assert!(!request.sql.is_empty());
         assert_eq!(request.size, 10);
         assert_eq!(request.from, 0);
+        assert_eq!(request.streams.len(), 1);
+        assert_eq!(request.streams[0], "logs");
     }
 
     #[test]
@@ -1410,6 +1477,7 @@ mod tests {
                 query_fn: None,
                 is_old_format: false,
             }],
+            streams: vec![],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1439,6 +1507,7 @@ mod tests {
     fn test_search_multi_empty_queries() {
         let request = MultiStreamRequest {
             sql: vec![],
+            streams: vec![],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1473,6 +1542,7 @@ mod tests {
                 query_fn: Some("base64_encoded_vrl_function".to_string()),
                 is_old_format: false,
             }],
+            streams: vec![],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1508,6 +1578,7 @@ mod tests {
                 query_fn: None,
                 is_old_format: false,
             }],
+            streams: vec![],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1551,6 +1622,7 @@ mod tests {
                     is_old_format: false,
                 },
             ],
+            streams: vec!["logs".to_string(), "metrics".to_string()],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1575,6 +1647,9 @@ mod tests {
         assert_eq!(request.sql.len(), 2);
         assert_eq!(request.sql[0].sql, "SELECT * FROM logs");
         assert_eq!(request.sql[1].sql, "SELECT * FROM metrics");
+        assert_eq!(request.streams.len(), 2);
+        assert_eq!(request.streams[0], "logs");
+        assert_eq!(request.streams[1], "metrics");
     }
 
     #[test]
@@ -1587,6 +1662,7 @@ mod tests {
                 query_fn: None,
                 is_old_format: false,
             }],
+            streams: vec![],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
