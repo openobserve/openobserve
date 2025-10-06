@@ -18,14 +18,56 @@
    ============================================================================ */
 
 .paginator-section {
-  line-height: 1.875rem; // 30px
-  max-height: 1.875rem; // 30px
+  line-height: 1.5rem; // 24px - more compact
+  max-height: 1.5rem; // 24px
   border-radius: 0.5rem;
+  padding: 0.125rem 0.25rem; // Compact padding
+  background: rgba(255, 255, 255, 0.1); // Glassmorphic
+  backdrop-filter: blur(10px);
+
+  .q-btn {
+    padding: 0.125rem 0.25rem;
+    min-height: 1.5rem;
+    font-size: 0.75rem;
+  }
 }
 
 .select-pagination {
-  line-height: 1.25rem; // 20px
-  border-radius: 0.5rem;
+  line-height: 1.5rem !important; // 24px - match pagination buttons
+  border-radius: 0.5rem !important;
+  padding: 0 0.375rem !important; // Compact padding
+  background: rgba(255, 255, 255, 0.1) !important; // Glassmorphic
+  backdrop-filter: blur(10px) !important;
+  min-height: 1.5rem !important;
+  max-height: 1.5rem !important;
+  height: 1.5rem !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+
+  .q-field__control {
+    height: 1.5rem !important;
+    min-height: 1.5rem !important;
+    padding: 0 !important;
+
+    &:before,
+    &:after {
+      border: none !important;
+    }
+  }
+
+  .q-field__native {
+    padding: 0 0.25rem !important;
+    min-height: 1.5rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  .q-field__append {
+    padding: 0 !important;
+    height: 1.5rem !important;
+  }
+
+  .q-icon {
+    font-size: 1rem !important;
+  }
 }
 
 /* ============================================================================
