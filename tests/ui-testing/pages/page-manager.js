@@ -50,9 +50,9 @@ const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
 import UnflattenedPage from "./logsPages/unflattened.js";
 
-// ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
-import { RegexPatternsPage } from "./generalPages/regexPatternsPage.js";
-import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
+// // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
+// import { RegexPatternsPage } from "./generalPages/regexPatternsPage.js";
+// import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
 
 class PageManager {
   /**
