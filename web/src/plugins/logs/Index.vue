@@ -2668,23 +2668,24 @@ export default defineComponent({
     /* text-transform: capitalize; */
   }
 
-  .index-table :hover::-webkit-scrollbar,
-  #searchGridComponent:hover::-webkit-scrollbar {
-    height: 13px;
-    width: 13px;
-  }
+  // Removed - using global glassmorphic scrollbar from app.scss
+  // .index-table :hover::-webkit-scrollbar,
+  // #searchGridComponent:hover::-webkit-scrollbar {
+  //   height: 13px;
+  //   width: 13px;
+  // }
 
-  .index-table ::-webkit-scrollbar-track,
-  #searchGridComponent::-webkit-scrollbar-track {
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-    border-radius: 10px;
-  }
+  // .index-table ::-webkit-scrollbar-track,
+  // #searchGridComponent::-webkit-scrollbar-track {
+  //   -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+  //   border-radius: 10px;
+  // }
 
-  .index-table ::-webkit-scrollbar-thumb,
-  #searchGridComponent::-webkit-scrollbar-thumb {
-    border-radius: 10px;
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-  }
+  // .index-table ::-webkit-scrollbar-thumb,
+  // #searchGridComponent::-webkit-scrollbar-thumb {
+  //   border-radius: 10px;
+  //   -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+  // }
 
   .q-table__top {
     padding: 0px !important;
@@ -2713,7 +2714,14 @@ export default defineComponent({
       box-sizing: border-box !important;
     }
     .q-splitter__before {
-      overflow: visible !important;
+      overflow: hidden !important; // Prevent content from overflowing over scrollbar
+
+      // IndexList container - full width, scrollbar inside
+      > .relative-position {
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
     }
     .q-splitter__after {
       padding: 0 !important;
@@ -2740,9 +2748,14 @@ export default defineComponent({
 
   .logs-splitter-smooth {
     .q-splitter__before,
-    .q-splitter__after,
+    .q-splitter__after {
+      transition: none !important;
+    }
+
     .q-splitter__separator {
-      transition: all 0.3s ease-in-out !important;
+      transition: none !important;
+      z-index: 1 !important; // Lower z-index so scrollbar overlaps it
+      // Separator IS draggable, but scrollbar will be on top where they overlap
     }
   }
 
