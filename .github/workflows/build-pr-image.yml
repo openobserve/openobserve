@@ -185,7 +185,7 @@ jobs:
 
   build:
     needs: [build_pr_image_amd64, build_pr_image_arm64]
-    if: ${{ success() && needs.build_pr_image_amd64.result == 'success' && needs.build_pr_image_arm64.result == 'success' }}
+    if: ${{ needs.build_pr_image_amd64.result == 'success' && needs.build_pr_image_arm64.result == 'success' }}
     runs-on: ubicloud-standard-16-arm
     permissions:
       id-token: write
