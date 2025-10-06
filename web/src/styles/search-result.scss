@@ -2,6 +2,7 @@
  * Search Result Styles
  * Phase 2: CSS Architecture - Extract Inline Styles Only
  * NO SIZE CHANGES - Keep all original measurements
+ * Using rem units (1rem = 16px)
  */
 
 /* ============================================================================
@@ -17,12 +18,14 @@
    ============================================================================ */
 
 .paginator-section {
-  line-height: 30px;
-  max-height: 30px;
+  line-height: 1.875rem; // 30px
+  max-height: 1.875rem; // 30px
+  border-radius: 0.5rem;
 }
 
 .select-pagination {
-  line-height: 20px;
+  line-height: 1.25rem; // 20px
+  border-radius: 0.5rem;
 }
 
 /* ============================================================================
@@ -30,9 +33,11 @@
    ============================================================================ */
 
 .histogram-container {
+  border-radius: 0.5rem;
+
   // Dynamic height controlled by CSS classes
   &--visible {
-    height: 100px;
+    height: 6.25rem; // 100px
     opacity: 1;
     transition: all 0.3s ease-in-out;
   }
@@ -46,28 +51,31 @@
 }
 
 .histogram-chart {
-  max-height: 100px;
+  max-height: 6.25rem; // 100px
+  border-radius: 0.5rem;
 }
 
 .histogram-empty {
-  height: 100px;
+  height: 6.25rem; // 100px
+  border-radius: 0.5rem;
 
   &__message {
-    min-height: 50px;
+    min-height: 2rem; // 32px (reduced from 50px)
   }
 }
 
 .histogram-loader {
-  top: 50px;
+  top: 3.125rem; // 50px
   position: absolute;
   left: 50%;
 }
 
 .histogram-error {
-  margin: 30px 0;
+  margin: 0.5rem 0; // 8px (reduced from 30px)
+  border-radius: 0.5rem;
 
   &__message {
-    min-height: 50px;
+    min-height: 2rem; // 32px (reduced from 50px)
   }
 }
 
@@ -76,12 +84,17 @@
    ============================================================================ */
 
 .table-container {
+  border-radius: 0.5rem;
+  overflow: auto !important;
+
   &--with-histogram {
-    height: calc(100% - 140px); // 100px histogram + 40px padding
+    height: calc(100% - 8.75rem) !important; // 140px (100px histogram + 32px header + 8px spacing)
+    max-height: calc(100% - 8.75rem) !important;
   }
 
   &--without-histogram {
-    height: calc(100% - 40px);
+    height: calc(100% - 2.5rem) !important; // 40px (32px pagination header + 8px spacing)
+    max-height: calc(100% - 2.5rem) !important;
   }
 }
 
@@ -95,7 +108,7 @@
 }
 
 .search-loading-text {
-  font-size: 14px;
+  font-size: 0.875rem; // 14px
 }
 
 /* ============================================================================
@@ -103,5 +116,6 @@
    ============================================================================ */
 
 .detail-table-dialog {
-  margin-bottom: 15px;
+  margin-bottom: 0.5rem; // 8px (reduced from 15px)
+  border-radius: 0.5rem;
 }
