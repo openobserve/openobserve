@@ -363,6 +363,12 @@ export default defineComponent({
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
     
+    // Query history functionality
+    const queryHistory = ref<string[]>([]);
+    const historyIndex = ref(-1);
+    const HISTORY_KEY = 'ai-chat-query-history';
+    const MAX_HISTORY_SIZE = 10;
+    
     const modelConfig: any = {
       openai: [
         'gpt-4.1'
@@ -823,6 +829,10 @@ export default defineComponent({
       if (!inputMessage.value.trim() || isLoading.value) return;
 
       const userMessage = inputMessage.value;
+      
+      // Add to query history before clearing input
+      addToHistory(userMessage);
+      
       chatMessages.value.push({
         role: 'user',
         content: userMessage
@@ -915,6 +925,43 @@ export default defineComponent({
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault(); // Prevent the default enter behavior
         sendMessage();
+      } else if (e.key === 'ArrowUp' && isOnFirstLine(e.target as HTMLTextAreaElement)) {
+        e.preventDefault();
+        navigateHistory('up');
+      } else if (e.key === 'ArrowDown' && historyIndex.value > -1) {
+        e.preventDefault();
+        navigateHistory('down');
+      }
+    };
+
+    // Check if cursor is on the first line of textarea
+    const isOnFirstLine = (textarea: HTMLTextAreaElement) => {
+      if (!textarea) return false;
+      
+      const cursorPosition = textarea.selectionStart;
+      const textBeforeCursor = textarea.value.substring(0, cursorPosition);
+      
+      // Check if there are any newlines before cursor position
+      return !textBeforeCursor.includes('\n');
+    };
+
+    // Navigate through query history
+    const navigateHistory = (direction: 'up' | 'down') => {
+      if (queryHistory.value.length === 0) return;
+      
+      if (direction === 'up') {
+        if (historyIndex.value < queryHistory.value.length - 1) {
+          historyIndex.value++;
+          inputMessage.value = queryHistory.value[historyIndex.value];
+        }
+      } else if (direction === 'down') {
+        if (historyIndex.value > 0) {
+          historyIndex.value--;
+          inputMessage.value = queryHistory.value[historyIndex.value];
+        } else if (historyIndex.value === 0) {
+          historyIndex.value = -1;
+          inputMessage.value = '';
+        }
       }
     };
 
@@ -928,6 +975,51 @@ export default defineComponent({
           textarea.focus();
         }
       }
+    };
+
+    // Load query history from localStorage
+    const loadQueryHistory = () => {
+      try {
+        const stored = localStorage.getItem(HISTORY_KEY);
+        if (stored) {
+          queryHistory.value = JSON.parse(stored);
+        }
+      } catch (error) {
+        console.error('Error loading query history:', error);
+        queryHistory.value = [];
+      }
+    };
+
+    // Save query history to localStorage
+    const saveQueryHistory = () => {
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(queryHistory.value));
+      } catch (error) {
+        console.error('Error saving query history:', error);
+      }
+    };
+
+    // Add query to history
+    const addToHistory = (query: string) => {
+      const trimmedQuery = query.trim();
+      if (!trimmedQuery) return;
+      
+      // Remove if already exists to avoid duplicates
+      const existingIndex = queryHistory.value.indexOf(trimmedQuery);
+      if (existingIndex > -1) {
+        queryHistory.value.splice(existingIndex, 1);
+      }
+      
+      // Add to beginning of array
+      queryHistory.value.unshift(trimmedQuery);
+      
+      // Keep only last MAX_HISTORY_SIZE entries
+      if (queryHistory.value.length > MAX_HISTORY_SIZE) {
+        queryHistory.value = queryHistory.value.slice(0, MAX_HISTORY_SIZE);
+      }
+      
+      saveQueryHistory();
+      historyIndex.value = -1; // Reset index
     };
 
     // Watch for isOpen changes to fetch initial message when opened
@@ -947,7 +1039,9 @@ export default defineComponent({
         loadHistory(); // Load history on mount if chat is open
         loadChat(store.state.currentChatTimestamp);
       }
-    
+      
+      // Load query history from localStorage
+      loadQueryHistory();
     });
 
     onUnmounted(()=>{
