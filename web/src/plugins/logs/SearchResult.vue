@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="search-list full-height full-width"
       ref="searchListContainer"
     >
-      <div class="row tw-min-h-[32px]">
+      <div class="row tw-min-h-[28px]">
         <div
           class="col-7 text-left q-pl-lg bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
