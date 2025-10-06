@@ -1863,14 +1863,14 @@ body.ai-chat-open {
 }
 
 .ai-btn-active {
-  background-color: #5960b2 !important;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
 }
 .ai-hover-btn {
-  transition: background-color 1s ease;
+  transition: background 0.3s ease;
 }
 
 .ai-hover-btn:hover {
-  background-color: #5960b2;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
 }
 
 .ai-icon {
@@ -1878,7 +1878,7 @@ body.ai-chat-open {
 }
 
 .ai-hover-btn:hover .ai-icon {
-  transform: rotate(-180deg);
+  transform: rotate(180deg);
 }
 
 .organization-menu-o2 {
