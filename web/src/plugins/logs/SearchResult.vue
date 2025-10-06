@@ -835,3 +835,7 @@ export default defineComponent({
 <style lang="scss" scoped>
 @import '@/styles/logs/search-result.scss';
 </style>
+
+<style lang="scss">
+@import '@/styles/search-result.scss';
+</style>

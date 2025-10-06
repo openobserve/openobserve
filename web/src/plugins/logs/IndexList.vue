@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item>
         </template>
         <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-          <q-item style="cursor: pointer">
+          <q-item class="stream-option-item">
             <q-item-section @click="handleSingleStreamSelect(opt)">
               <q-item-label v-html="opt.label" />
             </q-item-section>
@@ -180,8 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`logs-field-list-item-${props.row.name}`"
                 >
                   <div
-                    class="ellipsis"
-                    style="max-width: 90% !important; display: inline-block"
+                    class="ellipsis field-name"
                   >
                     {{ props.row.name }}
                   </div>
@@ -195,10 +194,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="
                         props.row.isInterestingField ? 'info' : 'info_outline'
                       "
-                      :class="
+                      :class="[
+                        'field-icon-spacing',
                         store.state.theme === 'dark' ? '' : 'light-dimmed'
-                      "
-                      style="margin-right: 0.375rem"
+                      ]"
                       size="1.1rem"
                       :title="
                         props.row.isInterestingField
@@ -216,9 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :icon="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                    style="margin-right: 0.375rem"
-                    size="0.4rem"
-                    class="q-mr-sm"
+                    class="field-icon-spacing q-mr-sm"
                     @click.stop="addToFilter(`${props.row.name}=''`)"
                     round
                   />
@@ -230,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ) && props.row.name !== store.state.zoConfig.timestamp_column
                     "
                     :name="outlinedVisibility"
-                    style="margin-right: 0.375rem"
+                    class="field-icon-spacing"
                     size="1.1rem"
                     title="Add field to table"
                     @click.stop="clickFieldFn(props.row, props.pageIndex)"
@@ -243,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                     :name="outlinedVisibilityOff"
-                    style="margin-right: 0.375rem"
+                    class="field-icon-spacing"
                     size="1.1rem"
                     title="Remove field from table"
                     @click.stop="clickFieldFn(props.row, props.pageIndex)"
@@ -300,8 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`logs-field-list-item-${props.row.name}`"
                     >
                       <div
-                        class="ellipsis"
-                        style="max-width: 90% !important; display: inline-block"
+                        class="ellipsis field-name"
                       >
                         {{ props.row.name }}
                       </div>
@@ -317,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :class="
                             store.state.theme === 'dark' ? '' : 'light-dimmed'
                           "
-                          style="margin-right: 0.375rem"
+                          class="field-icon-spacing"
                           size="1.1rem"
                           :title="
                             props.row.isInterestingField
@@ -332,9 +328,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="props.row.isSchemaField"
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         :icon="outlinedAdd"
-                        style="margin-right: 0.375rem"
+                        class="field-icon-spacing q-mr-sm"
                         size="0.4rem"
-                        class="q-mr-sm"
                         @click.stop="addToFilter(`${props.row.name}=''`)"
                         round
                       />
@@ -346,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           )
                         "
                         :name="outlinedVisibility"
-                        style="margin-right: 0.375rem"
+                        class="field-icon-spacing"
                         size="1.1rem"
                         title="Add field to table"
                         @click.stop="clickFieldFn(props.row, props.pageIndex)"
@@ -359,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           )
                         "
                         :name="outlinedVisibilityOff"
-                        style="margin-right: 0.375rem"
+                        class="field-icon-spacing"
                         title="Remove field from table"
                         size="1.1rem"
                         @click.stop="clickFieldFn(props.row, props.pageIndex)"
@@ -391,14 +386,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="filter-values-container">
                       <div
                         v-show="fieldValues[props.row.name]?.isLoading"
-                        class="q-pl-md q-py-xs"
-                        style="height: 60px"
+                        class="q-pl-md q-py-xs field-loading"
                       >
                         <q-inner-loading
                           size="xs"
                           :showing="fieldValues[props.row.name]?.isLoading"
                           label="Fetching values..."
-                          label-style="font-size: 1.1em"
+                          label-class="field-loading-label"
                         />
                       </div>
                       <div
@@ -425,31 +419,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :data-test="`logs-search-subfield-add-${props.row.name}-${value.key}`"
                           >
                             <div
-                              class="flex row wrap justify-between"
-                              :style="
-                                searchObj.data.stream.selectedStream.length ==
-                                props.row.streams.length
-                                  ? 'width: calc(100% - 42px)'
-                                  : 'width: calc(100% - 0px)'
-                              "
+                              :class="[
+                                'flex row wrap justify-between',
+                                searchObj.data.stream.selectedStream.length == props.row.streams.length
+                                  ? 'field-value-container--multi-stream'
+                                  : 'field-value-container--single-stream'
+                              ]"
                             >
                               <div
                                 :title="value.key"
-                                class="ellipsis q-pr-xs"
-                                style="width: calc(100% - 50px)"
+                                class="ellipsis q-pr-xs field-value-key"
                               >
                                 {{ value.key }}
                               </div>
                               <div
                                 :title="value.count.toString()"
-                                class="ellipsis text-right q-pr-sm"
-                                style="display: contents"
-                                :style="
-                                  searchObj.data.stream.selectedStream.length ==
-                                  props.row.streams.length
-                                    ? 'width: 50px'
+                                :class="[
+                                  'ellipsis text-right q-pr-sm',
+                                  'field-value-count',
+                                  searchObj.data.stream.selectedStream.length == props.row.streams.length
+                                    ? 'field-value-count--with-actions'
                                     : ''
-                                "
+                                ]"
                               >
                                 {{ formatLargeNumber(value.count) }}
                               </div>
@@ -529,7 +520,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
           <q-tr v-if="searchObj.loadingStream == true">
-            <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
+            <q-td colspan="100%" class="text-bold expanded-field-row">
               <div class="text-subtitle2 text-weight-bold">
                 <q-spinner-hourglass size="20px" />
                 {{ t("confirmDialog.loading") }}
