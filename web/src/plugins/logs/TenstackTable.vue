@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="parentRef" class="container tw-overflow-x-auto tw-relative">
+  <div ref="parentRef" class="container tw-overflow-x-auto tw-relative table-container">
     <table
       v-if="table"
       data-test="logs-search-result-logs-table"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? tableRowSize + 'px'
                   : table.getTotalSize() + 'px',
             minWidth: '100%',
-            background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
+            background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
           }"
           tag="tr"
           @start="(event) => handleDragStart(event)"
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :colspan="columnOrder.length"
             class="text-bold"
             :style="{
-              background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
+              background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
               opacity: 0.7,
             }"
           >
@@ -936,6 +936,7 @@ defineExpose({
 .container {
   height: calc(100vh - 294px);
   overflow: auto;
+  border-radius: 0.5rem;
 }
 
 .cursor-pointer {
@@ -957,7 +958,6 @@ table {
 }
 
 thead {
-  background: lightgray;
   font-family: "Nunito Sans", sans-serif;
   font-size: 14px !important;
 }
@@ -985,7 +985,7 @@ td {
   position: sticky;
   opacity: 1;
   z-index: 1;
-  background: #f5f5f5;
+  background: #E0E0E0;
 }
 
 .q-table--dark .thead-sticky tr > *,
