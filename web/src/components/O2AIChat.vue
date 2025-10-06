@@ -181,8 +181,9 @@
           </div>
         </div>
       </div>
-      <div class="chat-input-wrapper tw-flex tw-flex-col q-ma-md" >
+      <div class="chat-input-wrapper tw-flex tw-flex-col q-ma-md" @click="focusInput">
         <q-input
+          ref="chatInput"
           v-model="inputMessage"
           placeholder="Write your prompt"
           dense
@@ -194,6 +195,7 @@
           :borderless="true"
           style="max-height: 250px; overflow-y: auto; font-size: 16px;"
           class="chat-input"
+          flat
         >
         </q-input>
         <div class="tw-flex tw-items-center tw-justify-end tw-mt-2 tw-gap-2" :class="store.state.theme == 'dark' ? 'dark-mode-bottom-bar' : 'light-mode-bottom-bar'">
@@ -343,6 +345,7 @@ export default defineComponent({
     const chatMessages = ref<ChatMessage[]>([]);
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
+    const chatInput = ref<HTMLElement | null>(null);
     const currentStreamingMessage = ref('');
     const selectedProvider = ref<string>('openai');
     const selectedModel = ref<any>('gpt-4.1');
@@ -901,6 +904,18 @@ export default defineComponent({
       }
     };
 
+    const focusInput = () => {
+      if (chatInput.value) {
+        // For Quasar components, we need to call the focus method on the component
+        chatInput.value.focus();
+        // Alternative: directly focus the native textarea element
+        const textarea = chatInput.value.$el?.querySelector('textarea');
+        if (textarea) {
+          textarea.focus();
+        }
+      }
+    };
+
     // Watch for isOpen changes to fetch initial message when opened
     watch(() => props.isOpen, (newValue) => {
       if (newValue) {
@@ -918,6 +933,7 @@ export default defineComponent({
         loadHistory(); // Load history on mount if chat is open
         loadChat(store.state.currentChatTimestamp);
       }
+    
     });
 
     onUnmounted(()=>{
@@ -1097,7 +1113,9 @@ export default defineComponent({
       isLoading,
       sendMessage,
       handleKeyDown,
+      focusInput,
       messagesContainer,
+      chatInput,
       formatMessage,
       capabilities,
       selectCapability,
@@ -1207,19 +1225,31 @@ export default defineComponent({
     flex-shrink: 0;
     display: flex;
     justify-content: center;
+    transition: all 0.2s ease;
 
     :deep(.q-field) {
       max-width: 900px;
       width: 100%;
     }
+  
   }
   .light-mode .chat-input-wrapper{
     background:#ffffff;
     border: 1px solid #e4e7ec;
+    border-radius: 12px;
+    &:focus-within {
+      border: 1px solid transparent;
+      box-shadow: 0 0 0 2px #667eea
+    }
   }
   .dark-mode .chat-input-wrapper{
     background:#191919;
     border: 1px solid #323232;
+    border-radius: 12px;
+     &:focus-within {
+      border: 1px solid transparent;
+      box-shadow: 0 0 0 2px #5a6ec3
+    }
   }
 
 
