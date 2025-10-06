@@ -425,6 +425,7 @@ export const useSearchQuery = () => {
 
     const preSQLQuery = req.query.sql;
     req.query.sql = [];
+    req.query.streams = [];
 
     streams
       .join(",")
@@ -458,6 +459,7 @@ export const useSearchQuery = () => {
         );
 
         req.query.sql.push(finalQuery);
+        req.query.streams.push(item);
       });
 
     return req;
