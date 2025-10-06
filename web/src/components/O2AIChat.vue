@@ -122,8 +122,8 @@
               { 'error-message': message.content.startsWith('Error:') }
             ]">
             <div class="message-content" >
-              <q-avatar v-if="message.role === 'user'" size="24px" class="q-mr-sm">
-                <q-icon size="16px" color="primary" name="person" />
+              <q-avatar v-if="message.role === 'user'" size="24px" :class="store.state.theme == 'dark' ? 'dark-user-avatar' : 'light-user-avatar'">
+                <q-icon size="16px" name="person" :color="store.state.theme == 'dark' ? 'white' : '#4a5568'" />
               </q-avatar>
               <div class="message-blocks" style="background-color: transparent;" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
                 <template v-for="(block, blockIndex) in message.blocks" :key="blockIndex">
@@ -1240,7 +1240,7 @@ export default defineComponent({
     .message-content {
       display: flex;
       align-items: flex-start;
-      gap: 12px;
+      gap: 6px;
       width: 100%;
     }
 
@@ -1250,11 +1250,16 @@ export default defineComponent({
       flex-direction: column;
       gap: 0;
       min-width: 0;
+      max-width: 100%;
+      overflow-x: auto;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
 
     .text-block {
       width: 100%;
       overflow-wrap: break-word;
+      max-width: 100%;
       &:not(:last-child) {
         margin-bottom: 4px;
       }
@@ -1267,12 +1272,43 @@ export default defineComponent({
         padding: 0;
         line-height: 1.4;
         display: block;
+        max-width: 100%;
+        overflow-x: auto;
         
         code {
           padding: 8px;
           margin: 0;
           display: block;
+          max-width: 100%;
         }
+      }
+
+      // Table styling to prevent horizontal overflow
+      :deep(table) {
+        max-width: 100%;
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
+        overflow-x: auto;
+        display: block;
+        white-space: nowrap;
+      }
+
+      :deep(table th), :deep(table td) {
+        padding: 8px 12px;
+        border: 1px solid #e2e8f0;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        text-overflow: ellipsis;
+        overflow: hidden;
+      }
+
+      // Force break long words and URLs
+      :deep(p), :deep(div), :deep(span) {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        word-break: break-word;
+        max-width: 100%;
       }
     }
 
@@ -1347,24 +1383,40 @@ export default defineComponent({
   }
   .light-mode .message{
     &.user {
-      background: white;
-      color: black;
+      background: linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
+      border: 1px solid #e0e6ff;
+      border-radius: 12px;
+      color: #2c3e50;
+      margin-left: 40px;
+      width: calc(100% - 40px);
     }
 
     &.assistant {
-      background: #fafafa;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
       color: var(--q-primary-text);
+      margin-left: 0;
+      width: 100%;
     }
   }
   .dark-mode .message{
     &.user {
-      background: #181a1b;
-      color: #e2e2e2;
+      background: linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
+      border: 1px solid #3a3d5c;
+      border-radius: 12px;
+      color: #e2e8f0;
+      margin-left: 40px;
+      width: calc(100% - 40px);
     }
 
     &.assistant {
-      background: #181a1b;
+      background: #1a1a1a;
+      border: 1px solid #333333;
+      border-radius: 12px;
       color: #e2e2e2;
+      margin-left: 0;
+      width: 100%;
     }
   }
 
@@ -1382,6 +1434,17 @@ export default defineComponent({
       }
     }
   }
+}
+
+// Avatar styling for user messages
+.light-user-avatar {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white;
+}
+
+.dark-user-avatar {
+  background: linear-gradient(135deg, #4c63d2 0%, #5a67d8 100%) !important;
+  color: white;
 }
 
 .dark-mode .code-block-header{
