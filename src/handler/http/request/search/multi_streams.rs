@@ -1002,6 +1002,7 @@ fn parse_simple_multi_stream_request(
 
     Ok(search::MultiStreamRequest {
         sql: sql_queries,
+        streams: vec![],
         encoding: search::RequestEncoding::Empty,
         timeout: 0,
         from: simple_req.query.from,
@@ -1454,6 +1455,7 @@ mod tests {
                 query_fn: None,
                 is_old_format: false,
             }],
+            streams: vec!["logs".to_string()],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1478,6 +1480,8 @@ mod tests {
         assert!(!request.sql.is_empty());
         assert_eq!(request.size, 10);
         assert_eq!(request.from, 0);
+        assert_eq!(request.streams.len(), 1);
+        assert_eq!(request.streams[0], "logs");
     }
 
     #[test]
@@ -1508,6 +1512,7 @@ mod tests {
                 query_fn: None,
                 is_old_format: false,
             }],
+            streams: vec![],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1537,6 +1542,7 @@ mod tests {
     fn test_search_multi_empty_queries() {
         let request = MultiStreamRequest {
             sql: vec![],
+            streams: vec![],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1571,6 +1577,7 @@ mod tests {
                 query_fn: Some("base64_encoded_vrl_function".to_string()),
                 is_old_format: false,
             }],
+            streams: vec![],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1606,6 +1613,7 @@ mod tests {
                 query_fn: None,
                 is_old_format: false,
             }],
+            streams: vec![],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1649,6 +1657,7 @@ mod tests {
                     is_old_format: false,
                 },
             ],
+            streams: vec!["logs".to_string(), "metrics".to_string()],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
@@ -1673,6 +1682,9 @@ mod tests {
         assert_eq!(request.sql.len(), 2);
         assert_eq!(request.sql[0].sql, "SELECT * FROM logs");
         assert_eq!(request.sql[1].sql, "SELECT * FROM metrics");
+        assert_eq!(request.streams.len(), 2);
+        assert_eq!(request.streams[0], "logs");
+        assert_eq!(request.streams[1], "metrics");
     }
 
     #[test]
@@ -1685,6 +1697,7 @@ mod tests {
                 query_fn: None,
                 is_old_format: false,
             }],
+            streams: vec![],
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
             from: 0,
