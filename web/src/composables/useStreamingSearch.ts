@@ -189,7 +189,7 @@ const useHttpStreaming = () => {
       : true;
 
     // Check if this is a multi-stream request (similar to search.ts logic)
-    const isMultiStream = typeof queryReq.query.sql !== "string";
+    const isMultiStream = typeof queryReq.query?.sql !== "string";
 
     //TODO OK: Create method to get the url based on the type
     if (type === "search" || type === "histogram" || type === "pageCount") {
