@@ -127,4 +127,13 @@
     opacity: 0.5;
     pointer-events: none;
   }
+
+  // Ensure consistent scrollbar styling
+  .q-table__middle {
+    overflow-y: auto !important;
+    position: relative;
+    // Add padding to prevent content from covering the scrollbar
+    padding-right: 0.5rem; // 8px for scrollbar
+    box-sizing: border-box;
+  }
 }
