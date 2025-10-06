@@ -225,6 +225,7 @@ jobs:
 
   build_pr_image_summary:
     runs-on: ubuntu-latest
+    permissions: {}
     needs: [build_pr_image_amd64, build_pr_image_arm64, build]
     if: always()
     steps:

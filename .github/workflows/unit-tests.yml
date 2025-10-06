@@ -194,6 +194,7 @@ jobs:
 
   unit_tests_summary:
     runs-on: ubuntu-latest
+    permissions: {}
     needs: [backend_unit_tests, ui_unit_tests]
     if: always()
     steps:
