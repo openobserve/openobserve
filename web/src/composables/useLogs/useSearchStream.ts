@@ -432,13 +432,6 @@ export const useSearchStream = () => {
       searchObj.data.queryResults.hits.push(...response.content.results.hits);
     }
 
-    processHitsInChunks(
-      searchObj.data.queryResults.hits,
-      searchObj.data.resultGrid?.columns,
-      !(isPagination && searchPartitionMap[payload.traceId].partition === 1) ||
-        !appendResult,
-    );
-
     if (searchObj.meta.refreshInterval == 0) {
       updatePageCountTotal(
         payload.queryReq,

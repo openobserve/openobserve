@@ -44,6 +44,7 @@ export function useLogsHighlighter() {
     clearCache: boolean,
     queryString: string = "",
     chunkSize: number = 50,
+    selectedStreamFtsKeys: string[] = [],
   ): Promise<{ [key: string]: string }> {
     if (clearCache) {
       processedResults.value = {};
@@ -90,7 +91,7 @@ export function useLogsHighlighter() {
                 columns[columnIndex].id === "source"
                   ? hit
                   : hit[columns[columnIndex].id],
-                store?.state?.zoConfig?.default_fts_keys || [],
+                selectedStreamFtsKeys,
               )
             ),
             showBraces: columns[columnIndex].id === "source",
@@ -446,25 +447,20 @@ export function useLogsHighlighter() {
         if (isLogLineWithMixedContent(value)) {
           // Mixed content processing (HTTP logs with IPs, URLs, etc.)
           // For now, use simplified processing to reduce complexity
-          const semanticType = detectSemanticType(value);
-          parts.push(
-            createStyledSpanWithClasses(
-              value,
-              semanticType,
-              queryString,
-              showQuotes,
-            ),
+          const processedLine = processTextWithHighlights(
+            value,
+            queryString,
+            currentColors,
+            false,
           );
+          parts.push(showQuotes ? `"${processedLine}"` : processedLine);
         } else {
           // Regular string processing with semantic detection
-          const semanticType = detectSemanticType(value);
-          parts.push(
-            createStyledSpanWithClasses(
-              value,
-              semanticType,
-              queryString,
-              showQuotes,
-            ),
+          processTextWithHighlights(
+            value,
+            queryString,
+            currentColors,
+            showQuotes,
           );
         }
       } else if (typeof value === "object") {

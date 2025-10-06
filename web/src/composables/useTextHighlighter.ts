@@ -445,8 +445,34 @@ export function useTextHighlighter() {
   }
 
   /**
+   * Gets semantic CSS class for a text value
+   * Maps semantic types to CSS class names for consistent styling
+   *
+   * @param semanticType - The detected semantic type
+   * @returns CSS class name for the semantic type
+   */
+  function getSemanticCSSClass(semanticType: string): string {
+    const classMap: { [key: string]: string } = {
+      ip: "log-ip",
+      url: "log-url",
+      email: "log-email",
+      timestamp: "log-timestamp",
+      http_method: "log-http-method",
+      status_code: "log-status-code",
+      file_size: "log-number",
+      uuid: "log-uuid",
+      path: "log-path",
+      whitespace: "log-whitespace",
+      default: "log-string",
+    };
+
+    return classMap[semanticType] || "log-string";
+  }
+
+  /**
    * Gets semantic color for a single text value
    * Convenience function that detects semantic type and returns appropriate color
+   * @deprecated Use getSemanticCSSClass instead for better performance
    *
    * @param value - Text value to analyze and colorize
    * @param colors - Color theme object containing color definitions
@@ -482,8 +508,129 @@ export function useTextHighlighter() {
   }
 
   /**
+   * Splits text into semantic segments (IPs, emails, URLs, etc.)
+   * @param text - Text to split into semantic parts
+   * @returns Array of text parts with their positions
+   */
+  function splitTextBySemantic(
+    text: string,
+  ): Array<{ text: string; start: number; end: number; type: string }> {
+    if (!text || typeof text !== "string") {
+      return [
+        {
+          text: text || "",
+          start: 0,
+          end: (text || "").length,
+          type: "default",
+        },
+      ];
+    }
+
+    const semanticPatterns = [
+      { pattern: /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, type: "ip" },
+      { pattern: /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/g, type: "email" },
+      { pattern: /\bhttps?:\/\/[^\s]+\b/g, type: "url" },
+      {
+        pattern: /\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b/g,
+        type: "http_method",
+      },
+      { pattern: /\b[1-5]\d{2}\b/g, type: "status_code" },
+      {
+        pattern:
+          /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/g,
+        type: "uuid",
+      },
+      { pattern: /\b\d{13,}\b/g, type: "timestamp" },
+      {
+        pattern: /\b\d+(\.\d+)?\s*(KB|MB|GB|TB|bytes?)\b/gi,
+        type: "file_size",
+      },
+      { pattern: /\/[^\s]*(?:\?[^\s]*)?(?:#[^\s]*)?\b/g, type: "path" },
+    ];
+
+    const matches: Array<{
+      text: string;
+      start: number;
+      end: number;
+      type: string;
+    }> = [];
+
+    // Find all semantic matches
+    semanticPatterns.forEach(({ pattern, type }) => {
+      // Reset regex lastIndex to ensure proper matching
+      pattern.lastIndex = 0;
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        matches.push({
+          text: match[0],
+          start: match.index,
+          end: match.index + match[0].length,
+          type,
+        });
+      }
+    });
+
+    // Sort by position
+    matches.sort((a, b) => a.start - b.start);
+
+    // Remove overlapping matches (prioritize by pattern order - first wins)
+    const filteredMatches = [];
+    for (const match of matches) {
+      const hasOverlap = filteredMatches.some(
+        (existing) =>
+          (match.start >= existing.start && match.start < existing.end) ||
+          (match.end > existing.start && match.end <= existing.end) ||
+          (existing.start >= match.start && existing.start < match.end),
+      );
+      if (!hasOverlap) {
+        filteredMatches.push(match);
+      }
+    }
+
+    // Create segments with semantic and non-semantic parts
+    const segments = [];
+    let lastEnd = 0;
+
+    for (const match of filteredMatches) {
+      // Add text before this match (only if non-empty)
+      if (match.start > lastEnd) {
+        const beforeText = text.slice(lastEnd, match.start);
+        if (beforeText.trim()) {
+          segments.push({
+            text: beforeText,
+            start: lastEnd,
+            end: match.start,
+            type: "default",
+          });
+        }
+      }
+
+      // Add the semantic match
+      segments.push(match);
+      lastEnd = match.end;
+    }
+
+    // Add remaining text (only if non-empty)
+    if (lastEnd < text.length) {
+      const remainingText = text.slice(lastEnd);
+      if (remainingText.trim()) {
+        segments.push({
+          text: remainingText,
+          start: lastEnd,
+          end: text.length,
+          type: "default",
+        });
+      }
+    }
+
+    return segments.length > 0
+      ? segments
+      : [{ text, start: 0, end: text.length, type: "default" }];
+  }
+
+  /**
    * Processes text segments with both semantic coloring and keyword highlighting
-   * Quotes are always shown when requested, but background highlighting only applies to content
+   * Now handles multiple semantic types within a single FTS string
    *
    * @param segments - Array of text segments to process
    * @param keywords - Keywords to highlight
@@ -499,20 +646,31 @@ export function useTextHighlighter() {
   ): string {
     // Always reconstruct the full text to handle merged consecutive quotes properly
     const fullText = segments.map((s) => s.content).join("");
-    const fullTextParts = splitTextByKeywords(fullText, keywords);
 
-    // Process the full text as a single unit
-    return fullTextParts
-      .map((part) => {
-        const content = escapeHtml(part.text);
-        if (part.isHighlighted) {
-          return `<span style="background-color: rgb(255, 213, 0); color: black;">${content}</span>`;
-        } else {
-          const semanticType = detectSemanticType(part.text);
-          const semanticColor =
-            getColorForType(semanticType, colors) || colors.stringValue;
-          return `<span style="color: ${semanticColor};">${content}</span>`;
-        }
+    // First split by semantic patterns to get multiple semantic types
+    const semanticSegments = splitTextBySemantic(fullText);
+
+    // Then apply keyword highlighting to each semantic segment
+    return semanticSegments
+      .map((segment) => {
+        const keywordParts = splitTextByKeywords(segment.text, keywords);
+
+        return keywordParts
+          .map((part) => {
+            const content = escapeHtml(part.text);
+            if (part.isHighlighted) {
+              return `<span class="log-highlighted">${content}</span>`;
+            } else {
+              // Use the detected semantic type from the segment, or detect it
+              const semanticType =
+                segment.type !== "default"
+                  ? segment.type
+                  : detectSemanticType(part.text);
+              const cssClass = getSemanticCSSClass(semanticType);
+              return `<span class="${cssClass}">${content}</span>`;
+            }
+          })
+          .join("");
       })
       .join("");
   }
@@ -549,6 +707,7 @@ export function useTextHighlighter() {
     extractKeywords,
     splitTextByKeywords,
     getSingleSemanticColor,
+    getSemanticCSSClass,
     escapeHtml,
     isFTSColumn,
   };
