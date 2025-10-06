@@ -230,7 +230,7 @@ const useHttpStreaming = () => {
           'Content-Type': 'application/json',
           'traceparent': traceparent,
         },
-        body: JSON.stringify(isMultiStream ? queryReq.query : queryReq),
+        body: JSON.stringify((isMultiStream && type != "values") ? queryReq.query : queryReq),
         signal: abortController.signal,
       });
 
