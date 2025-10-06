@@ -265,11 +265,10 @@ export default class DashboardFilter {
         .last();
 
       await operatorLocator.waitFor({ state: "visible", timeout: 5000 });
-      await this.page.waitForTimeout(500); // Stability wait
+      await operatorLocator.waitFor({ state: "attached", timeout: 5000 });
       await operatorLocator.click();
 
       // Wait for operator option to be available and click it
-      await this.page.waitForTimeout(300); // Wait for menu to render
       const operatorOption = this.page
         .getByRole("option", { name: operator, exact: true })
         .last();
@@ -308,7 +307,9 @@ export default class DashboardFilter {
     await columnLocator.waitFor({ state: "visible", timeout: 5000 });
     await columnLocator.click();
     await columnLocator.fill(fieldName);
-    await this.page.waitForTimeout(300); // Wait for dropdown to appear
+
+    // Wait for dropdown options to be available
+    await this.page.locator('.q-menu[role="listbox"]').last().waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
     await columnLocator.press("ArrowDown");
     await columnLocator.press("Enter");
   }
