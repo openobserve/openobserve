@@ -154,6 +154,12 @@
   content-visibility: auto;
 }
 
+/* Whitespace class */
+.log-whitespace {
+  color: transparent;
+  content-visibility: auto;
+}
+
 /* Special classes for performance optimization */
 .log-simple-text {
   font-family: monospace;
