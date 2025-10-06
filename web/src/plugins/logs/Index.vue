@@ -2785,9 +2785,14 @@ export default defineComponent({
 
   .logs-splitter-smooth {
     .q-splitter__before,
-    .q-splitter__after,
+    .q-splitter__after {
+      transition: none !important;
+    }
+
     .q-splitter__separator {
-      transition: all 0.3s ease-in-out !important;
+      transition: none !important;
+      z-index: 1 !important; // Lower z-index so scrollbar overlaps it
+      // Separator IS draggable, but scrollbar will be on top where they overlap
     }
   }
 
