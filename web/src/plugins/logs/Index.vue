@@ -45,16 +45,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection"
-            style="width: 100%"
+            class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection full-width"
             v-show="searchObj.meta.logsVisualizeToggle == 'logs'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
-              style="width: 100%"
-              class="full-height"
+              class="full-height full-width"
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
@@ -82,11 +80,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense
                     size="20px"
                     round
-                    class="q-mr-xs field-list-collapse-btn"
+                    :class="[
+                      'q-mr-xs',
+                      'field-list-collapse-btn',
+                      searchObj.meta.showFields ? 'field-list-collapse-btn--visible' : 'field-list-collapse-btn--hidden'
+                    ]"
                     color="primary"
-                    :style="{
-                      right: searchObj.meta.showFields ? '-20px' : '-24px',
-                    }"
                     @click="collapseFieldList"
                   ></q-btn>
                 </div>
@@ -250,13 +249,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span v-if="disableMoreErrorDetails">
                       <SanitizedHtmlRenderer
                         data-test="logs-search-detail-error-message"
-                        :htmlContent="
-                          searchObj?.data?.errorMsg +
-                          '<h6 style=\'font-size: 14px; margin: 0;\'>' +
-                          searchObj?.data?.errorDetail +
-                          '</h6>'
-                        "
+                        :htmlContent="searchObj?.data?.errorMsg"
                       />
+                      <div class="error-display__message">
+                        {{ searchObj?.data?.errorDetail }}
+                      </div>
                       <SanitizedHtmlRenderer
                         data-test="logs-search-detail-function-error-message"
                         :htmlContent="searchObj?.data?.functionError"
@@ -269,7 +266,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
-            :style="`height: calc(100vh - ${splitterModel}vh - 40px);`"
+            class="visualize-container"
+            :style="{ '--splitter-height': `${splitterModel}vh` }"
           >
             <VisualizeLogsQuery
               :visualizeChartData="visualizeChartData"
@@ -290,31 +288,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div
         v-else-if="showSearchHistory && !store.state.zoConfig.usage_enabled"
-        style="height: 200px"
+        class="search-history-empty"
       >
-        <div style="height: 80vh" class="text-center q-pa-md flex flex-center">
+        <div class="search-history-empty__content text-center q-pa-md flex flex-center">
           <div>
             <div>
               <q-icon
                 name="history"
                 size="100px"
                 color="gray"
-                class="q-mb-md"
-                style="opacity: 0.1"
+                class="q-mb-md search-history-empty__icon"
               />
             </div>
-            <div class="text-h4" style="opacity: 0.8">
+            <div class="text-h4 search-history-empty__title">
               Search history is not enabled.
             </div>
-            <div
-              style="opacity: 0.8"
-              class="q-mt-sm flex items-center justify-center"
-            >
+            <div class="q-mt-sm flex items-center justify-center search-history-empty__info">
               <q-icon
                 name="info"
                 class="q-mr-xs"
                 size="20px"
-                style="opacity: 0.5"
               />
               <span class="text-h6 text-center">
                 Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
@@ -2652,77 +2645,13 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
-.logPage {
-  height: calc(100vh - $navbarHeight);
-  min-height: calc(100vh - $navbarHeight) !important;
+/**
+ * Logs Page Styles - Phase 2 Refactored
+ * All inline styles removed, px converted to rem
+ * Importing centralized logs-page.scss module
+ */
+@import '@/styles/logs-page.scss';
 
-  .index-menu .field_list .field_overlay .field_label,
-  .q-field__native,
-  .q-field__input,
-  .q-table tbody td {
-    font-size: 12px !important;
-  }
-
-  .q-splitter__after {
-    overflow: hidden;
-  }
-
-  .q-item__label span {
-    /* text-transform: capitalize; */
-  }
-
-  .index-table :hover::-webkit-scrollbar,
-  #searchGridComponent:hover::-webkit-scrollbar {
-    height: 13px;
-    width: 13px;
-  }
-
-  .index-table ::-webkit-scrollbar-track,
-  #searchGridComponent::-webkit-scrollbar-track {
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-    border-radius: 10px;
-  }
-
-  .index-table ::-webkit-scrollbar-thumb,
-  #searchGridComponent::-webkit-scrollbar-thumb {
-    border-radius: 10px;
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-  }
-
-  .q-table__top {
-    padding: 0px !important;
-  }
-
-  .q-table__control {
-    width: 100%;
-  }
-
-  .logsPageMainSection > .q-field__control-container {
-    padding-top: 0px !important;
-  }
-
-  .logs-horizontal-splitter {
-    border: 1px solid var(--q-color-grey-3);
-    .q-splitter__panel {
-      z-index: auto !important;
-    }
-    .q-splitter__before {
-      overflow: visible !important;
-    }
-  }
-
-  .thirdlevel {
-    .field-list-collapse-btn {
-      z-index: 11;
-      position: absolute;
-      top: 5px;
-      font-size: 12px !important;
-    }
-  }
-
-  .search-result-container {
-    position: relative;
-    width: 100%;
-  }
-}
+// Component-specific overrides if needed
+// (Keep minimal - most styles are in logs-page.scss)
 </style>

@@ -1,0 +1,432 @@
+/**
+ * Search Result Styles
+ * Phase 2: CSS Architecture Refactoring
+ *
+ * This module contains all styles for SearchResult.vue
+ * with rem-based measurements and glassmorphic design.
+ */
+
+@import './design-system.scss';
+
+/* ============================================================================
+   1. SEARCH LIST CONTAINER
+   ============================================================================ */
+
+.search-list {
+  width: 100%;
+
+  &__container {
+    width: 100%;
+  }
+
+  .chart {
+    width: 100%;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  }
+}
+
+/* ============================================================================
+   2. PAGINATION BLOCK
+   ============================================================================ */
+
+.pagination-block {
+  .q-field--dense .q-field__control,
+  .q-field--dense .q-field__marginal {
+    height: 1.875rem !important; // 30px
+  }
+
+  .select-pagination {
+    position: relative;
+    top: -0.3125rem; // -5px
+  }
+}
+
+.paginator-section {
+  line-height: 1.875rem; // 30px
+  max-height: 1.875rem; // 30px
+}
+
+.select-pagination {
+  line-height: 1.25rem; // 20px
+}
+
+/* ============================================================================
+   3. HISTOGRAM CONTAINER
+   ============================================================================ */
+
+.histogram-container {
+  // Dynamic height controlled by CSS classes
+  &--visible {
+    height: 6.25rem; // 100px
+    opacity: 1;
+    transition: all $transition-base $ease-in-out;
+  }
+
+  &--hidden {
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: all $transition-base $ease-in-out;
+  }
+}
+
+.histogram-chart {
+  max-height: 6.25rem; // 100px
+}
+
+.histogram-empty {
+  height: 6.25rem; // 100px
+
+  &__message {
+    min-height: 3.125rem; // 50px
+  }
+}
+
+.histogram-loader {
+  top: 3.125rem; // 50px
+  position: absolute;
+  left: 50%;
+}
+
+.histogram-error {
+  margin: 1.875rem 0; // 30px 0
+
+  &__message {
+    min-height: 3.125rem; // 50px
+  }
+}
+
+.histogram-unavailable-text {
+  color: #f5a623;
+}
+
+.histogram-unavailable-text-light {
+  color: #ff8800;
+}
+
+/* ============================================================================
+   4. TABLE HEIGHT CALCULATIONS
+   ============================================================================ */
+
+.table-container {
+  &--with-histogram {
+    height: calc(100% - 8.75rem); // 140px = 100px histogram + 40px padding
+  }
+
+  &--without-histogram {
+    height: calc(100% - 2.5rem); // 40px padding
+  }
+}
+
+/* ============================================================================
+   5. TABLE STYLES
+   ============================================================================ */
+
+.search-list {
+  .my-sticky-header-table {
+    .q-table__top,
+    .q-table__bottom,
+    thead tr:first-child th {
+      background-color: white;
+    }
+
+    thead tr th {
+      position: sticky;
+      z-index: 1;
+    }
+
+    thead tr:first-child th {
+      top: 0;
+    }
+
+    &.q-table--loading thead tr:last-child th {
+      top: 3rem; // 48px
+    }
+  }
+
+  .q-table__top {
+    padding-left: 0;
+    padding-top: 0;
+  }
+
+  .q-table thead tr,
+  .q-table tbody td,
+  .q-table th,
+  .q-table td {
+    height: 1.5625rem; // 25px
+    padding: 0 $spacing-sm; // 0 8px
+    font-size: $font-size-xs; // 0.75rem (12px)
+  }
+
+  .q-table__bottom {
+    width: 100%;
+    min-height: 2.5rem; // 40px
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .q-td {
+    overflow: hidden;
+    min-width: 6.25rem; // 100px
+
+    .expanded {
+      margin: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      word-break: break-all;
+    }
+  }
+
+  .highlight {
+    background-color: rgb(255, 213, 0);
+  }
+}
+
+/* ============================================================================
+   6. TABLE HEADER
+   ============================================================================ */
+
+.table-header {
+  .table-head-chip {
+    background-color: #f5f5f5;
+    padding: 0;
+
+    .header-col-title {
+      margin-right: $spacing-sm; // 0.5rem
+      font-size: $font-size-sm; // 0.875rem (14px)
+      color: $dark;
+    }
+
+    .close-icon {
+      &:hover {
+        opacity: 0.7;
+      }
+    }
+
+    .q-table th.sortable {
+      cursor: pointer;
+      text-transform: capitalize;
+      font-weight: bold;
+    }
+  }
+
+  &.isClosable {
+    padding-right: 1.875rem; // 30px
+    position: relative;
+
+    .q-table-col-close {
+      transform: translateX(1.625rem); // 26px
+      position: absolute;
+      margin-top: 0.125rem; // 2px
+      color: #808080;
+    }
+  }
+
+  .q-table th.sortable {
+    cursor: pointer;
+    text-transform: capitalize;
+    font-weight: bold;
+  }
+}
+
+/* ============================================================================
+   7. STICKY HEADERS & FOOTERS
+   ============================================================================ */
+
+.thead-sticky tr > *,
+.tfoot-sticky tr > * {
+  position: sticky;
+  opacity: 1;
+  z-index: 1;
+  background: #f5f5f5;
+}
+
+.q-table--dark .thead-sticky tr > *,
+.q-table--dark .tfoot-sticky tr > * {
+  background: #565656;
+}
+
+.q-table--dark .table-header {
+  .table-head-chip {
+    background-color: #565656;
+  }
+}
+
+.thead-sticky tr:last-child > * {
+  top: 0;
+}
+
+.tfoot-sticky tr:first-child > * {
+  bottom: 0;
+}
+
+/* ============================================================================
+   8. FIELD LIST & CHIPS
+   ============================================================================ */
+
+.field_list,
+.table-head-chip {
+  padding: 0;
+  margin-bottom: $spacing-xs; // 0.125rem
+  position: relative;
+  overflow: visible;
+  cursor: default;
+  font-size: $font-size-xs; // 0.75rem (12px)
+  font-family: monospace;
+
+  .field_overlay {
+    width: fit-content;
+    position: absolute;
+    height: 100%;
+    right: 0;
+    top: 0;
+    background-color: #ffffff;
+    border-radius: $radius-md; // 0.375rem (6px)
+    padding: 0 $radius-md; // 0 6px
+    visibility: hidden;
+    display: flex;
+    align-items: center;
+    transition: all $transition-base linear;
+
+    &.field_overlay_dark {
+      background-color: #181a1b;
+    }
+
+    .q-icon,
+    .q-toggle__inner {
+      cursor: pointer;
+      opacity: 0;
+      transition: all $transition-base linear;
+      margin: 0 0.0625rem; // 0 1px
+    }
+  }
+
+  &:hover {
+    .field_overlay {
+      visibility: visible;
+
+      .q-icon,
+      .q-toggle__inner {
+        opacity: 1;
+      }
+    }
+  }
+}
+
+.table-head-chip {
+  font-family: "Nunito Sans", sans-serif;
+
+  .field_overlay {
+    background-color: #f5f5f5;
+
+    &.field_overlay_dark {
+      background-color: #565656;
+    }
+  }
+}
+
+/* ============================================================================
+   9. ACTION BUTTONS
+   ============================================================================ */
+
+.search-list {
+  .copy-log-btn {
+    .q-icon {
+      font-size: $font-size-xs !important; // 0.75rem (12px)
+    }
+  }
+
+  .view-trace-btn {
+    .q-icon {
+      font-size: 0.8125rem !important; // 13px
+    }
+  }
+}
+
+/* ============================================================================
+   10. PAGINATION INPUT
+   ============================================================================ */
+
+.search-list {
+  .q-pagination__content input {
+    border: 1px solid lightgrey;
+    top: 0.4375rem; // 7px
+    position: relative;
+    height: 1.875rem; // 30px
+  }
+}
+
+/* ============================================================================
+   11. MAX RESULT WIDTH
+   ============================================================================ */
+
+.max-result {
+  width: 10.625rem; // 170px
+}
+
+/* ============================================================================
+   12. DETAIL TABLE DIALOG
+   ============================================================================ */
+
+.detail-table-dialog {
+  margin-bottom: 0.9375rem; // 15px
+}
+
+/* ============================================================================
+   13. RESPONSIVE ADJUSTMENTS
+   ============================================================================ */
+
+@include responsive('sm') {
+  .search-list {
+    .q-table thead tr,
+    .q-table tbody td,
+    .q-table th,
+    .q-table td {
+      font-size: $font-size-sm; // Slightly larger on small screens
+    }
+  }
+}
+
+@include responsive('lg') {
+  .pagination-block {
+    .select-pagination {
+      // Better spacing on large screens
+      margin-left: $spacing-sm;
+    }
+  }
+}
+
+/* ============================================================================
+   14. GLASSMORPHIC ENHANCEMENTS (Optional)
+   ============================================================================ */
+
+.search-result--glass {
+  .search-list {
+    @include glass-panel-secondary;
+  }
+
+  .histogram-container--visible {
+    @include glass-card;
+  }
+
+  .table-header .table-head-chip {
+    @include glass-interactive;
+  }
+}
+
+/* ============================================================================
+   15. LOADING & SPINNER STYLES
+   ============================================================================ */
+
+.search-spinner {
+  margin: 0 auto;
+  display: block;
+}
+
+.tooltip-text {
+  font-size: $font-size-sm; // 0.875rem (14px)
+}
+
+/* ============================================================================
+   END OF SEARCH RESULT STYLES
+   ============================================================================ */

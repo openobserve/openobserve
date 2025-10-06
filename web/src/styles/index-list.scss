@@ -1,0 +1,436 @@
+/**
+ * Index List (Field List) Styles
+ * Phase 2: CSS Architecture Refactoring
+ *
+ * This module contains all styles for IndexList.vue
+ * with rem-based measurements and glassmorphic design.
+ */
+
+@import './design-system.scss';
+
+/* ============================================================================
+   1. VARIABLES
+   ============================================================================ */
+
+$stream-selector-height: 2.75rem; // 44px
+
+/* ============================================================================
+   2. LOGS INDEX MENU CONTAINER
+   ============================================================================ */
+
+.logs-index-menu {
+  width: 100%;
+
+  .q-menu {
+    box-shadow: 0 0.1875rem 0.9375rem rgba(0, 0, 0, 0.1); // 0 3px 15px
+    transform: translateY(0.5rem);
+    border-radius: 0;
+
+    .q-virtual-scroll__content {
+      padding: $spacing-sm; // 0.5rem
+    }
+  }
+
+  .q-field {
+    &__control {
+      height: 2.1875rem; // 35px
+      padding: 0 $spacing-sm; // 0 8px
+      min-height: auto !important;
+
+      &-container {
+        padding-top: 0 !important;
+      }
+    }
+  }
+}
+
+/* ============================================================================
+   3. INDEX TABLE
+   ============================================================================ */
+
+.index-table {
+  width: 100%;
+  height: calc(100% - $stream-selector-height);
+
+  .q-table {
+    display: table;
+    table-layout: fixed !important;
+  }
+
+  tr {
+    margin-bottom: 0.0625rem; // 1px
+  }
+
+  tbody,
+  tr,
+  td {
+    width: 100%;
+    display: block;
+    height: fit-content;
+    overflow: hidden;
+  }
+
+  .q-table__control,
+  label.q-field {
+    width: 100%;
+  }
+
+  .q-table thead tr,
+  .q-table tbody td {
+    height: auto;
+  }
+
+  .q-table__top {
+    padding: 0 !important;
+    border-bottom: unset;
+  }
+}
+
+/* ============================================================================
+   4. FIELD TABLE
+   ============================================================================ */
+
+.field-table {
+  width: 100%;
+
+  > .q-table__bottom {
+    padding: 0 !important;
+  }
+}
+
+/* ============================================================================
+   5. FIELD LIST ITEMS
+   ============================================================================ */
+
+.field_list {
+  padding: 0;
+  margin-bottom: $spacing-xs; // 0.125rem
+  position: relative;
+  overflow: visible;
+  cursor: default;
+
+  .field_label {
+    pointer-events: none;
+    font-size: 0.825rem;
+    position: relative;
+    display: inline;
+    z-index: 2;
+    left: 0;
+    height: 1.25rem; // 20px
+  }
+
+  .field-container {
+    height: 1.5625rem; // 25px
+  }
+
+  .field_overlay {
+    position: absolute;
+    height: 100%;
+    right: 0;
+    top: 0;
+    z-index: 5;
+    padding: 0 $radius-md; // 0 6px
+    visibility: hidden;
+    display: flex;
+    align-items: center;
+    transition: all $transition-base linear;
+
+    .q-icon {
+      cursor: pointer;
+      opacity: 0;
+      transition: all $transition-base linear;
+      margin: 0 0.0625rem; // 0 1px
+    }
+  }
+
+  &:hover {
+    .field_overlay {
+      visibility: visible;
+
+      .q-icon {
+        opacity: 1;
+      }
+    }
+  }
+}
+
+/* ============================================================================
+   6. FIELD GROUP HEADER
+   ============================================================================ */
+
+.field-group-header {
+  line-height: 1.75rem; // 28px
+  padding-left: 0.625rem; // 10px
+}
+
+/* ============================================================================
+   7. FIELD NAME & VALUE STYLES
+   ============================================================================ */
+
+.field-name {
+  max-width: 90% !important;
+  display: inline-block;
+}
+
+.field-icon-spacing {
+  margin-right: 0.375rem;
+}
+
+/* ============================================================================
+   8. FIELD VALUE CONTAINER - DYNAMIC WIDTH
+   ============================================================================ */
+
+.field-value-container {
+  &--multi-stream {
+    width: calc(100% - 2.625rem); // 42px for action buttons
+  }
+
+  &--single-stream {
+    width: 100%;
+  }
+}
+
+.field-value-key {
+  width: calc(100% - 3.125rem); // 50px for count display
+}
+
+.field-value-count {
+  display: contents;
+
+  &--with-actions {
+    width: 3.125rem; // 50px
+  }
+}
+
+/* ============================================================================
+   9. STREAM OPTION ITEM
+   ============================================================================ */
+
+.stream-option-item {
+  cursor: pointer;
+}
+
+/* ============================================================================
+   10. LOADING STATE
+   ============================================================================ */
+
+.field-loading {
+  height: 3.75rem; // 60px
+}
+
+.field-loading-label {
+  font-size: 1.1em;
+}
+
+/* ============================================================================
+   11. EXPANDED FIELD DETAILS
+   ============================================================================ */
+
+.expanded-field-row {
+  opacity: 0.7;
+}
+
+/* ============================================================================
+   12. FIELD OVERLAY THEMING
+   ============================================================================ */
+
+.logs-index-menu {
+  .field_overlay {
+    width: 3.125rem; // 50px
+    height: 100%;
+    background-color: white;
+
+    &.field_overlay_dark {
+      background-color: #181a1b;
+    }
+  }
+
+  .index-table {
+    tr {
+      &:not(:first-child) {
+        border-top: 1px solid rgba(0, 0, 0, 0.05);
+      }
+    }
+  }
+}
+
+/* ============================================================================
+   13. LOADING SPINNER
+   ============================================================================ */
+
+.loading-field-container {
+  .q-circular-progress {
+    color: primary;
+  }
+}
+
+/* ============================================================================
+   14. INTERESTING FIELDS TOGGLE
+   ============================================================================ */
+
+.interesting-fields-toggle {
+  min-height: 1.3rem; // ~21px
+  padding: 0.3125rem 0.625rem; // 5px 10px
+
+  .field_label {
+    font-size: $font-size-xs; // 0.75rem (12px)
+  }
+}
+
+/* ============================================================================
+   15. STREAM STATS
+   ============================================================================ */
+
+.stream-stats {
+  padding: 0;
+  top: 0.3125rem; // 5px
+
+  &__text {
+    height: 2.125rem; // 34px
+  }
+}
+
+/* ============================================================================
+   16. FIELD ACTIONS
+   ============================================================================ */
+
+.field-actions {
+  padding: 0;
+  height: 1.5625rem !important; // 25px
+  min-height: 1.5625rem !important;
+
+  .q-icon {
+    min-width: 0.75rem; // 12px
+    max-width: 0.75rem;
+    margin-right: 0.5rem; // 8px
+  }
+
+  .q-btn__content {
+    padding-left: 0.25rem; // 4px
+  }
+}
+
+/* ============================================================================
+   17. FIELD EXPAND ICON
+   ============================================================================ */
+
+.field-expand-icon {
+  width: 0.75rem; // 12px
+  height: 0.75rem;
+  font-size: 1.125rem; // 18px
+}
+
+/* ============================================================================
+   18. CUSTOM SCROLLBAR (LOGS THEME)
+   ============================================================================ */
+
+.logs-index-menu {
+  .index-table {
+    @include glass-scrollbar;
+  }
+}
+
+/* ============================================================================
+   19. FILTER INPUT
+   ============================================================================ */
+
+.field-filter-input {
+  .q-field__control {
+    padding: 0 0.3125rem; // 0 5px
+  }
+}
+
+/* ============================================================================
+   20. FIELD BADGE/CHIP
+   ============================================================================ */
+
+.field-badge {
+  border: 1px solid lightgrey;
+  border-radius: 0.3125rem; // 5px
+  line-height: 0.625rem; // 10px
+  padding: 0 !important;
+
+  .field-badge-text {
+    line-height: 2rem; // 32px
+    font-weight: 700;
+    font-size: 0.8125rem; // 13px
+  }
+}
+
+/* ============================================================================
+   21. RESPONSIVE ADJUSTMENTS
+   ============================================================================ */
+
+@include responsive('sm') {
+  .logs-index-menu {
+    .field_list .field_label {
+      font-size: $font-size-sm;
+    }
+  }
+}
+
+@include responsive('lg') {
+  .logs-index-menu {
+    .q-field__control {
+      height: 2.5rem; // Slightly larger on big screens
+    }
+  }
+}
+
+/* ============================================================================
+   22. GLASSMORPHIC ENHANCEMENTS (Optional)
+   ============================================================================ */
+
+.logs-index-menu--glass {
+  @include glass-panel-secondary;
+
+  .field_list {
+    .field_overlay {
+      @include glass-interactive;
+    }
+  }
+
+  .q-field__control {
+    @include glass-card;
+  }
+}
+
+/* ============================================================================
+   23. DARK THEME SPECIFIC
+   ============================================================================ */
+
+.theme-dark {
+  .logs-index-menu {
+    .field_overlay {
+      background-color: #181a1b;
+    }
+
+    .index-table tr:not(:first-child) {
+      border-top-color: rgba(255, 255, 255, 0.05);
+    }
+  }
+}
+
+.theme-light {
+  .logs-index-menu {
+    .field_overlay {
+      background-color: white;
+    }
+  }
+}
+
+/* ============================================================================
+   24. UTILITY CLASSES FOR INDEX LIST
+   ============================================================================ */
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.field-width-full {
+  width: calc(100% - 3.125rem); // Full width minus padding
+}
+
+/* ============================================================================
+   END OF INDEX LIST STYLES
+   ============================================================================ */
