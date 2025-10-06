@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage q-my-xs" id="logPage">
+  <q-page class="logPage" id="logPage">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -52,13 +52,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-splitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
-              class="full-height full-width"
+              class="full-height full-width logs-splitter-smooth"
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
-                <div class="relative-position full-height">
+                <div class="relative-position full-height" style="overflow: visible !important;">
                   <index-list
-                    v-if="searchObj.meta.showFields"
+                    v-show="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     class="full-height"
                     @setInterestingFieldInSQLQuery="
@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="history"
                 size="100px"
                 color="gray"
-                class="q-mb-md search-history-empty__icon"
+                class="search-history-empty__icon"
               />
             </div>
             <div class="text-h4 search-history-empty__title">
@@ -2650,6 +2650,8 @@ export default defineComponent({
 .logPage {
   height: calc(100vh - $navbarHeight);
   min-height: calc(100vh - $navbarHeight) !important;
+  max-height: calc(100vh - $navbarHeight) !important;
+  overflow: hidden !important;
 
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,
@@ -2698,26 +2700,60 @@ export default defineComponent({
 
   .logs-horizontal-splitter {
     border: 1px solid var(--q-color-grey-3);
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    height: 100% !important;
+    max-height: 100vh !important;
+
     .q-splitter__panel {
       z-index: auto !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      box-sizing: border-box !important;
     }
     .q-splitter__before {
       overflow: visible !important;
     }
+    .q-splitter__after {
+      padding: 0 !important;
+      margin: 0 !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+    }
   }
 
   .thirdlevel {
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    height: 100% !important;
+    overflow: visible !important; /* Changed from hidden to visible for button */
+
     .field-list-collapse-btn {
-      z-index: 11;
+      z-index: 100 !important;
       position: absolute;
       top: 5px;
       font-size: 12px !important;
     }
   }
 
+  .logs-splitter-smooth {
+    .q-splitter__before,
+    .q-splitter__after,
+    .q-splitter__separator {
+      transition: all 0.3s ease-in-out !important;
+    }
+  }
+
   .search-result-container {
     position: relative;
     width: 100%;
+    height: 100%;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
   }
 }
 </style>
