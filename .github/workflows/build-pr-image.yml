@@ -222,3 +222,33 @@ jobs:
           sources: |
             public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
             public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64
+
+  build_pr_image_summary:
+    runs-on: ubuntu-latest
+    needs: [build_pr_image_amd64, build_pr_image_arm64, build]
+    if: always()
+    steps:
+      - name: Check build results
+        run: |
+          if [ "${{ needs.build_pr_image_amd64.result }}" == "success" ] || [ "${{ needs.build_pr_image_amd64.result }}" == "skipped" ]; then
+            echo "AMD64 build passed or skipped"
+          else
+            echo "AMD64 build failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.build_pr_image_arm64.result }}" == "success" ] || [ "${{ needs.build_pr_image_arm64.result }}" == "skipped" ]; then
+            echo "ARM64 build passed or skipped"
+          else
+            echo "ARM64 build failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.build.result }}" == "success" ] || [ "${{ needs.build.result }}" == "skipped" ]; then
+            echo "Manifest build passed or skipped"
+          else
+            echo "Manifest build failed"
+            exit 1
+          fi
+
+          echo "All builds completed successfully"

@@ -191,3 +191,26 @@ jobs:
         if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: web
         run: ./coverage.sh check
+
+  unit_tests_summary:
+    runs-on: ubuntu-latest
+    needs: [backend_unit_tests, ui_unit_tests]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.backend_unit_tests.result }}" == "success" ] || [ "${{ needs.backend_unit_tests.result }}" == "skipped" ]; then
+            echo "Backend tests passed or skipped"
+          else
+            echo "Backend tests failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.ui_unit_tests.result }}" == "success" ] || [ "${{ needs.ui_unit_tests.result }}" == "skipped" ]; then
+            echo "UI tests passed or skipped"
+          else
+            echo "UI tests failed"
+            exit 1
+          fi
+
+          echo "All tests completed successfully"
