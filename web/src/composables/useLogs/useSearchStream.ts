@@ -63,6 +63,7 @@ export const useSearchStream = () => {
     updateUrlQueryParams,
     isNonAggregatedSQLMode,
     fnUnparsedSQL,
+    checkTimestampAlias,
   } = logsUtils();
 
   const {
@@ -1884,6 +1885,13 @@ export const useSearchStream = () => {
         const parsedSQL: any = fnParsedSQL();
         if (parsedSQL != undefined) {
           //check if query is valid or not , if the query is invalid --> empty query
+
+          if (!checkTimestampAlias(searchObj.data.query)) {
+            const errorMsg = `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`;
+            searchObj.data.errorMsg = errorMsg;
+            searchObj.data.errorCode = 400;
+            return false;
+          }
 
           if (Array.isArray(parsedSQL) && parsedSQL.length == 0) {
             notificationMsg.value =
