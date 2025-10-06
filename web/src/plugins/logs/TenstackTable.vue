@@ -389,6 +389,7 @@ import {
   nextTick,
   onMounted,
   onBeforeUnmount,
+  ComputedRef,
 } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import HighLight from "@/components/HighLight.vue";
@@ -464,7 +465,7 @@ const props = defineProps({
     required: false,
   },
   selectedStreamFtsKeys: {
-    type: Array,
+    type: Array as PropType<string[]>,
     default: () => [],
   },
 });
@@ -510,7 +511,7 @@ const columnOrder = ref<any>([]);
 
 const tableRows = ref([...props.rows]);
 
-const selectedStreamFtsKeys = computed(() => {
+const selectedStreamFtsKeys: ComputedRef<string[] | []> = computed(() => {
   return props.selectedStreamFtsKeys || [];
 });
 
