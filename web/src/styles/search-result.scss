@@ -96,6 +96,12 @@
     height: calc(100% - 2.5rem) !important; // 40px (32px pagination header + 8px spacing)
     max-height: calc(100% - 2.5rem) !important;
   }
+
+  // Ensure consistent scrollbar styling
+  .q-table__middle,
+  .q-virtual-scroll__content {
+    overflow-y: auto !important;
+  }
 }
 
 /* ============================================================================

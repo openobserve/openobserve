@@ -1024,6 +1024,7 @@ export default defineComponent({
     display: flex;
     align-items: center;
     transition: all 0.3s linear;
+    pointer-events: none;
 
     &.field_overlay_dark {
       background-color: #181a1b;
@@ -1035,6 +1036,7 @@ export default defineComponent({
       opacity: 0;
       transition: all 0.3s linear;
       margin: 0 1px;
+      pointer-events: auto;
     }
   }
 
@@ -1052,11 +1054,17 @@ export default defineComponent({
 
 .table-head-chip {
   font-family: "Nunito Sans", sans-serif;
+
   .field_overlay {
     background-color: #f5f5f5;
+    pointer-events: none;
 
     &.field_overlay_dark {
       background-color: #565656;
+    }
+
+    .q-icon {
+      pointer-events: auto;
     }
   }
 }
