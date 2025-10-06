@@ -4216,6 +4216,32 @@ export default defineComponent({
   height: 100%;
   overflow: visible;
 
+  // Align all top bar elements vertically
+  > .row:first-child {
+    align-items: center;
+    padding: 0.25rem 0;
+
+    > .col {
+      display: flex;
+      align-items: center;
+      flex-wrap: nowrap;
+    }
+
+    // Normalize all button heights
+    .q-btn {
+      height: 32px !important;
+      min-height: 32px !important;
+    }
+
+    // Normalize select heights
+    .q-select {
+      .q-field__control {
+        height: 32px !important;
+        min-height: 32px !important;
+      }
+    }
+  }
+
   .reset-filters {
     width: 32px;
     height: 32px;
