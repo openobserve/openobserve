@@ -24,8 +24,9 @@ use serde::Deserialize;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::{
+        extractors::Headers,
         models::ai::{PromptRequest, PromptResponse},
-        request::{ai::util::Headers, search::search_stream::report_to_audit},
+        request::search::search_stream::report_to_audit,
     },
 };
 

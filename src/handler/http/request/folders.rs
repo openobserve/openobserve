@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, post, put, web};
+use actix_web::{HttpResponse, Responder, delete, get, post, put, web};
 use config::meta::folder::Folder;
 
 use crate::{
@@ -24,6 +24,8 @@ use crate::{
     },
     service::folders::{self, FolderError},
 };
+#[cfg(feature = "enterprise")]
+use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
 impl From<FolderError> for HttpResponse {
     fn from(value: FolderError) -> Self {
@@ -171,7 +173,7 @@ pub async fn update_folder(
 #[allow(unused_variables)]
 pub async fn list_folders(
     path: web::Path<(String, FolderType)>,
-    req: HttpRequest,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> impl Responder {
     let (org_id, folder_type) = path.into_inner();
 
@@ -179,9 +181,7 @@ pub async fn list_folders(
     let user_id = None;
 
     #[cfg(feature = "enterprise")]
-    let Ok(user_id) = req.headers().get("user_id").map(|v| v.to_str()).transpose() else {
-        return HttpResponse::Forbidden().finish();
-    };
+    let user_id = Some(user_email.user_id.as_str());
 
     match folders::list_folders(&org_id, user_id, folder_type.into()).await {
         Ok(folders) => {
@@ -414,16 +414,17 @@ pub mod deprecated {
     )]
     #[get("/{org_id}/folders")]
     #[allow(unused_variables)]
-    pub async fn list_folders(path: web::Path<String>, req: HttpRequest) -> impl Responder {
+    pub async fn list_folders(
+        path: web::Path<String>,
+        #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    ) -> impl Responder {
         let org_id = path.into_inner();
 
         #[cfg(not(feature = "enterprise"))]
         let user_id = None;
 
         #[cfg(feature = "enterprise")]
-        let Ok(user_id) = req.headers().get("user_id").map(|v| v.to_str()).transpose() else {
-            return HttpResponse::Forbidden().finish();
-        };
+        let user_id = Some(user_email.user_id.as_str());
 
         let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::list_folders(&org_id, user_id, folder_type).await {

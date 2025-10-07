@@ -36,11 +36,12 @@ use crate::{
     common::{
         meta,
         utils::{
+            auth::UserEmail,
             http::{get_or_create_trace_id, get_use_cache_from_request},
             stream::get_settings_max_query_range,
         },
     },
-    handler::http::request::search::error_utils,
+    handler::http::{extractors::Headers, request::search::error_utils},
     service::{
         search::inspector::{SearchInspectorFields, extract_search_inspector_fields},
         self_reporting::http_report_metrics,
@@ -97,6 +98,7 @@ use crate::{
 #[get("/{org_id}/search/profile")]
 pub async fn get_search_profile(
     path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
@@ -114,12 +116,7 @@ pub async fn get_search_profile(
     };
 
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let user_id = user_email.user_id;
 
     let query =
         match web::Query::<hashbrown::HashMap<String, String>>::from_query(in_req.query_string()) {

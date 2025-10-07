@@ -51,6 +51,7 @@ use {
 use crate::handler::http::request::search::error_utils::map_error_to_http_response;
 #[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
+use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
 // 1. submit
 /// SearchSQL
@@ -90,6 +91,7 @@ use crate::service::organization::is_org_in_free_trial_period;
 #[post("/{org_id}/search_jobs")]
 pub async fn submit_job(
     org_id: web::Path<String>,
+    Headers(_user_email): Headers<UserEmail>,
     in_req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
@@ -105,12 +107,7 @@ pub async fn submit_job(
         };
 
         let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-        let user_id = in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
+        let user_id = _user_email.user_id;
 
         #[cfg(feature = "cloud")]
         {
@@ -323,16 +320,11 @@ pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Erro
 #[get("/{org_id}/search_jobs/{job_id}/status")]
 pub async fn get_status(
     path: web::Path<(String, String)>,
-    in_req: HttpRequest,
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
-        let user_id = in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
+        let user_id = _user_email.user_id;
 
         let org_id = path.0.clone();
         let job_id = path.1.clone();
@@ -352,7 +344,6 @@ pub async fn get_status(
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
-        drop(in_req);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
@@ -387,19 +378,12 @@ pub async fn get_status(
 #[post("/{org_id}/search_jobs/{job_id}/cancel")]
 pub async fn cancel_job(
     path: web::Path<(String, String)>,
-    in_req: HttpRequest,
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
-        let user_id = in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
-
-        let org_id = path.0.clone();
-        let job_id = path.1.clone();
+        let user_id = _user_email.user_id;
+        let (org_id, job_id) = path.into_inner();
         match cancel_job_inner(&org_id, &job_id, &user_id).await {
             Ok(res) if res.status() != StatusCode::OK => Ok(res),
             Err(e) => Ok(MetaHttpResponse::bad_request(e)),
@@ -412,7 +396,6 @@ pub async fn cancel_job(
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
-        drop(in_req);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
@@ -456,16 +439,11 @@ pub async fn cancel_job(
 pub async fn get_job_result(
     path: web::Path<(String, String)>,
     req: web::Query<config::meta::search::PaginationQuery>,
-    in_req: HttpRequest,
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
-        let user_id = in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
+        let user_id = _user_email.user_id;
 
         let from = req.from.unwrap_or(0);
         let size = req.size.unwrap_or(100);
@@ -509,7 +487,6 @@ pub async fn get_job_result(
     {
         drop(path);
         let _ = req;
-        drop(in_req);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
@@ -545,19 +522,12 @@ pub async fn get_job_result(
 #[delete("/{org_id}/search_jobs/{job_id}")]
 pub async fn delete_job(
     path: web::Path<(String, String)>,
-    in_req: HttpRequest,
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
-        let user_id = in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
-
-        let org_id = path.0.clone();
-        let job_id = path.1.clone();
+        let user_id = _user_email.user_id;
+        let (org_id, job_id) = path.into_inner();
 
         // 1. cancel the query
         match cancel_job_inner(&org_id, &job_id, &user_id).await {
@@ -585,7 +555,6 @@ pub async fn delete_job(
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
-        drop(in_req);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
@@ -621,19 +590,13 @@ pub async fn delete_job(
 #[post("/{org_id}/search_jobs/{job_id}/retry")]
 pub async fn retry_job(
     path: web::Path<(String, String)>,
-    in_req: HttpRequest,
+    Headers(_user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
-        let user_id = in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
+        let user_id = _user_email.user_id;
 
-        let org_id = path.0.clone();
-        let job_id = path.1.clone();
+        let (org_id, job_id) = path.into_inner();
 
         // 1. check the status of the job, only cancel, finish can be retry
         let status = get(&job_id, &org_id).await;
@@ -665,7 +628,6 @@ pub async fn retry_job(
 
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(in_req);
         drop(path);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }

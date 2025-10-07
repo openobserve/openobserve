@@ -149,14 +149,4 @@ mod tests {
             assert!(result.is_ok() || result.is_err());
         }
     }
-
-    #[cfg(not(feature = "enterprise"))]
-    mod non_enterprise_tests {
-        #[test]
-        fn test_enterprise_functions_not_available() {
-            // Verify that enterprise-specific functions are not compiled
-            // without the enterprise feature
-            assert!(true);
-        }
-    }
 }
