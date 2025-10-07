@@ -15,7 +15,10 @@
 
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use config::meta::{inverted_index::UNKNOWN_NAME, search::ScanStats};
+use config::meta::{
+    inverted_index::UNKNOWN_NAME,
+    search::{PARTIAL_ERROR_RESPONSE_MESSAGE, ScanStats},
+};
 use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
 use sqlparser::ast::{BinaryOperator, Expr};
 use tokio::sync::Mutex;
@@ -226,16 +229,81 @@ pub async fn collect_scan_stats(
 }
 
 pub fn check_query_default_limit_exceeded(num_rows: usize, partial_err: &mut String, sql: &Sql) {
-    let query_default_limit = config::get_config().limit.query_default_limit as usize;
-    if sql.limit > config::QUERY_WITH_NO_LIMIT && sql.limit <= 0 {
-        let capped_err = format!("{} limit: {query_default_limit}", CAPPED_RESULTS_MSG);
-        if num_rows > query_default_limit {
-            if !partial_err.is_empty() {
-                partial_err.push('\n');
-                partial_err.push_str(&capped_err);
-            } else {
-                *partial_err = capped_err;
-            }
+    if is_default_query_limit_exceeded(num_rows, sql) {
+        let capped_err = CAPPED_RESULTS_MSG.to_string();
+        if !partial_err.is_empty() {
+            partial_err.push('\n');
+            partial_err.push_str(&capped_err);
+        } else {
+            *partial_err = capped_err;
         }
+    }
+}
+
+pub fn is_default_query_limit_exceeded(num_rows: usize, sql: &Sql) -> bool {
+    let default_query_limit = config::get_config().limit.query_default_limit as usize;
+    if sql.limit > config::QUERY_WITH_NO_LIMIT && sql.limit <= 0 {
+        num_rows > default_query_limit
+    } else {
+        false
+    }
+}
+
+pub fn is_cachable_function_error(function_error: &[String]) -> bool {
+    if function_error.is_empty() {
+        return true;
+    }
+
+    function_error.iter().all(|error| {
+        // Empty or whitespace-only errors are cachable (no actual error)
+        let trimmed = error.trim();
+        if trimmed.is_empty() {
+            return true;
+        }
+
+        // Check if error contains only cachable messages
+        error.contains(CAPPED_RESULTS_MSG) || error.contains(PARTIAL_ERROR_RESPONSE_MESSAGE)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_cachable_function_error() {
+        let error = vec![];
+        assert_eq!(is_cachable_function_error(&error), true);
+
+        let error = vec!["".to_string()];
+        assert_eq!(is_cachable_function_error(&error), true);
+
+        let error = vec![
+            CAPPED_RESULTS_MSG.to_string(),
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+        ];
+        assert_eq!(is_cachable_function_error(&error), true); // only this is cachable
+
+        let error = vec![
+            CAPPED_RESULTS_MSG.to_string(),
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+            "parquet not found".to_string(),
+        ];
+        assert_eq!(is_cachable_function_error(&error), false);
+
+        let error = vec![
+            "parquet not found".to_string(),
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+        ];
+        assert_eq!(is_cachable_function_error(&error), false);
+
+        let error = vec!["parquet not found".to_string()];
+        assert_eq!(is_cachable_function_error(&error), false);
+
+        let error = vec![
+            "parquet not found".to_string(),
+            CAPPED_RESULTS_MSG.to_string(),
+        ];
+        assert_eq!(is_cachable_function_error(&error), false);
     }
 }

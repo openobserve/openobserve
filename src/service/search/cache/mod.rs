@@ -21,7 +21,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        search::{self, ResponseTook},
+        search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE, ResponseTook},
         self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
@@ -410,7 +410,7 @@ pub async fn search(
     .await;
 
     if res.is_partial {
-        let partial_err = "Please be aware that the response is based on partial data";
+        let partial_err = PARTIAL_ERROR_RESPONSE_MESSAGE;
         res.function_error = if res.function_error.is_empty() {
             vec![partial_err.to_string()]
         } else {
