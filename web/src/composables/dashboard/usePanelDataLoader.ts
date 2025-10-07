@@ -1250,6 +1250,14 @@ export const usePanelDataLoader = (
                   },
                   error: handleSearchError,
                   complete: async (payload: any) => {
+                    // get annotations
+                    const annotationList = shouldFetchAnnotations()
+                      ? await refreshAnnotations(
+                          startISOTimestamp,
+                          endISOTimestamp,
+                        )
+                      : [];
+                    state.annotations = annotationList;
                     state.loading = false;
                     saveCurrentStateToCache();
                     removeTraceId(traceId);
