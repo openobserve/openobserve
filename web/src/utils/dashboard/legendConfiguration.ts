@@ -15,42 +15,6 @@
 
 import { calculateWidthText } from "./convertDataIntoUnitValue";
 
-// TypeScript interfaces for better type safety
-interface ChartDimensions {
-  chartWidth: number;
-  chartHeight: number;
-  containerWidth: number;
-}
-
-interface PanelConfig {
-  show_legends?: boolean;
-  legends_position?: "bottom" | "right" | null;
-  legends_type?: "plain" | "scroll" | null;
-  legend_width?: { value: number; unit: string };
-  legend_height?: { value: number; unit: string };
-  trellis?: { layout?: any };
-}
-
-interface PanelSchema {
-  type: string;
-  config?: PanelConfig;
-}
-
-interface LegendOptions {
-  show?: boolean;
-  type?: string;
-  orient?: string;
-  left?: string | number | null;
-  right?: string | number;
-  top?: string | number;
-  bottom?: string | number;
-  textStyle?: any;
-  height?: number;
-  padding?: number[];
-  tooltip?: any;
-  formatter?: (name: any) => string;
-}
-
 // Constants for better maintainability
 const LEGEND_CONSTANTS = {
   DEFAULT_WIDTH: 800,
@@ -69,7 +33,7 @@ const LEGEND_CONSTANTS = {
 /**
  * Utility function to get chart dimensions safely
  */
-export const getChartDimensions = (chartPanelRef: any): ChartDimensions => ({
+export const getChartDimensions = (chartPanelRef: any) => ({
   chartWidth:
     chartPanelRef.value?.offsetWidth || LEGEND_CONSTANTS.DEFAULT_WIDTH,
   chartHeight:
@@ -80,7 +44,7 @@ export const getChartDimensions = (chartPanelRef: any): ChartDimensions => ({
 /**
  * Utility function to check if legends should be shown
  */
-const shouldShowLegends = (panelSchema: PanelSchema): boolean =>
+const shouldShowLegends = (panelSchema: any): boolean =>
   Boolean(panelSchema.config?.show_legends) &&
   (panelSchema.config?.trellis?.layout === null ||
     panelSchema.config?.trellis?.layout === undefined);
@@ -561,10 +525,10 @@ export const shouldApplyChartAlignment = (
  * @returns {object} Base legend configuration object
  */
 export const createBaseLegendConfig = (
-  panelSchema: PanelSchema,
+  panelSchema: any,
   hoveredSeriesState: any,
   // chartPanelRef?: any, // Add optional chart panel ref for container size calculation
-): LegendOptions => {
+) => {
   const legendPosition = getLegendPosition(
     panelSchema.config?.legends_position,
   );
@@ -580,7 +544,7 @@ export const createBaseLegendConfig = (
   //     ? Math.max(containerWidth * 0.2, minTextWidth)
   //     : maxTextWidth;
 
-  const legendConfig: LegendOptions = {
+  const legendConfig: any = {
     show: shouldShowLegends(panelSchema),
     type: panelSchema.config?.legends_type === "plain" ? "plain" : "scroll",
     orient: legendPosition,
