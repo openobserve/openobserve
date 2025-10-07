@@ -214,6 +214,7 @@ pub async fn get_cached_results(
             ts_column,
             discard_interval: cache_req.discard_interval,
             is_descending: cache_req.is_descending,
+            is_histogram_non_ts_order: cache_req.is_histogram_non_ts_order, // Forward from original request
         },
     )
     .await
