@@ -630,7 +630,7 @@ pub async fn do_partitioned_search(
             total_hits
         };
 
-        if !streaming_aggs {
+        if !is_streaming_aggs {
             if req_size > 0 && remaining_limit <= 0 {
                 // Already reached the limit, skip this partition
                 search_res.hits.clear();
