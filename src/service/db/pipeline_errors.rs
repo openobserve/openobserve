@@ -217,6 +217,7 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), infra::errors::Error> {
 ///
 /// This is used for periodic cleanup of stale errors.
 pub async fn delete_older_than(cutoff_timestamp: i64) -> Result<u64, infra::errors::Error> {
+    let _lock = infra::table::get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let result = PipelineLastErrors::delete_many()
