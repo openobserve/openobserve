@@ -350,7 +350,7 @@ test.describe("Pipeline testcases", () => {
 
     // Click on the editor to type the query
     await page.locator(".view-lines").first().click();
-    const sqlQuery = 'select * from "default"';
+    const sqlQuery = 'select * from "e2e_automate"';
 
     // Locate the editor and type the SQL query if it's not already typed
     await page.click('[data-test="scheduled-pipeline-sql-editor"]');
