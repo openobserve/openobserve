@@ -25,9 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- RED Metrics Dashboard -->
       <TracesMetricsDashboard
-        v-if="
-          searchObj.data.stream.selectedStream.value && searchObj.searchApplied
-        "
+        v-if="searchObj.data.stream.selectedStream.value"
         ref="metricsDashboardRef"
         :streamName="searchObj.data.stream.selectedStream.value"
         :timeRange="{
@@ -35,17 +33,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           endTime: searchObj.data.datetime.endTime,
         }"
         :filter="searchObj.data.editorValue"
+        :show="
+          searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length
+        "
         @time-range-selected="onMetricsTimeRangeSelected"
       />
 
       <div
         data-test="traces-search-result-count"
         class="text-subtitle1 text-bold q-pt-sm q-px-sm"
+        v-show="
+          searchObj.data.stream.selectedStream.value &&
+          !searchObj.data.errorMsg?.trim()?.length &&
+          !searchObj.loading &&
+          searchObj.searchApplied
+        "
       >
         {{ searchObj.data.queryResults?.hits?.length || 0 }} Traces
       </div>
 
+      <div
+        class="full-height flex justify-center items-center tw-pt-[4rem]"
+        v-if="searchObj.loading == true"
+      >
+        <div class="q-pb-lg">
+          <q-spinner-hourglass
+            color="primary"
+            size="40px"
+            style="margin: 0 auto; display: block"
+          />
+          <span class="text-center">
+            Hold on tight, we're fetching your traces.
+          </span>
+        </div>
+      </div>
+      <div
+        v-else-if="
+          searchObj.data.queryResults.hasOwnProperty('total') &&
+          searchObj.data.queryResults?.hits?.length == 0 &&
+          searchObj.loading == false
+        "
+        class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
+      >
+        <q-icon name="info" color="primary"
+size="md" /> No traces found. Please
+        adjust the filters and try again.
+      </div>
       <q-virtual-scroll
+        v-else
+        v-show="
+          searchObj.data.queryResults.hasOwnProperty('total') &&
+          !!searchObj.data.queryResults?.hits?.length
+        "
         id="tracesSearchGridComponent"
         data-test="traces-search-result-virtual-scroll"
         style="height: 400px"
@@ -59,8 +98,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :virtual-scroll-slice-ratio-before="10"
         @virtual-scroll="onScroll"
       >
-        <q-item data-test="traces-search-result-item" :key="index"
-dense>
+        <q-item data-test="traces-search-result-item"
+:key="index" dense>
           <TraceBlock
             :item="item"
             :index="index"
@@ -189,6 +228,10 @@ export default defineComponent({
       });
     };
 
+    const getDashboardData = () => {
+      metricsDashboardRef?.value?.loadDashboard();
+    };
+
     return {
       t,
       store,
@@ -204,6 +247,7 @@ export default defineComponent({
       getImageURL,
       getRowIndex,
       onMetricsTimeRangeSelected,
+      getDashboardData,
     };
   },
 });
