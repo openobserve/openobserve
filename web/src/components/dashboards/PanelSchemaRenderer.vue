@@ -577,6 +577,62 @@ export default defineComponent({
         queryType = 'promql';
       }
 
+      // Get the executed query with variables replaced from metadata
+      // Only use metadata if it's available and has queries
+      const executedQuery = (metadata.value?.queries && metadata.value.queries.length > 0)
+        ? metadata.value.queries[0]?.query || query.query
+        : query.query;
+
+      // Get the Y-axis column for threshold comparison
+      // Only needed for SQL queries, not for PromQL
+      let yAxisColumn = null;
+
+      if (queryType === 'sql') {
+        const clickedSeriesName = contextMenuData.value?.seriesName;
+        const sqlQuery = executedQuery || query.query;
+
+        // First, try to get from query.fields.y if available (most reliable for query builder)
+        if (query.fields?.y && query.fields.y.length > 0) {
+          // For query builder queries, use the Y-axis field
+          const yField = query.fields.y[0];
+          const aliasOrColumn = yField.alias || yField.column;
+
+          // Extract from SQL to get the exact case (including quotes if present)
+          if (sqlQuery) {
+            // Look for pattern: aggregation_func(...) as "alias" or aggregation_func(...) as alias
+            const escapedAlias = aliasOrColumn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`\\s+as\\s+(["']?${escapedAlias}["']?)(?:\\s|,|\\)|$)`, 'i');
+            const match = sqlQuery.match(regex);
+            if (match && match[1]) {
+              // Use the alias with quotes if they exist in SQL
+              yAxisColumn = match[1];
+            } else {
+              yAxisColumn = aliasOrColumn;
+            }
+          } else {
+            yAxisColumn = aliasOrColumn;
+          }
+        } else if (clickedSeriesName && sqlQuery) {
+          // Fallback: try to match the clicked series name in the SQL
+          // First try exact match with the series name
+          const regex = new RegExp(`\\s+as\\s+["']?(${clickedSeriesName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})["']?(?:\\s|,|\\)|$)`, 'i');
+          const match = sqlQuery.match(regex);
+          if (match && match[1]) {
+            yAxisColumn = match[1];
+          } else {
+            // Last resort: extract any aggregation column from SQL (first one found)
+            // Pattern: count(...) as alias, avg(...) as alias, etc.
+            const aggRegex = /(?:count|sum|avg|min|max|median)\s*\([^)]+\)\s+as\s+["']?([^"',\s)]+)["']?/i;
+            const aggMatch = sqlQuery.match(aggRegex);
+            if (aggMatch && aggMatch[1]) {
+              yAxisColumn = aggMatch[1];
+            } else {
+              yAxisColumn = clickedSeriesName;
+            }
+          }
+        }
+      }
+
       const panelDataToPass = {
         panelTitle: panelSchema.value.title || 'Unnamed Panel',
         panelId: panelSchema.value.id,
@@ -585,6 +641,10 @@ export default defineComponent({
         timeRange: selectedTimeObj.value,
         threshold: selection.threshold,
         condition: selection.condition,
+        // Pass the Y-axis column name for threshold comparison
+        yAxisColumn: yAxisColumn,
+        // Pass the executed query with variables already replaced
+        executedQuery: executedQuery,
       };
 
       // Navigate to alert creation page
