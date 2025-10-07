@@ -17,9 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="traces-metrics-dashboard tw-h-[16.25rem] tw-p-2">
     <RenderDashboardCharts
+      v-if="show"
       ref="dashboardChartsRef"
       :viewOnly="true"
-      :dashboardData="dashboardData.data"
+      :dashboardData="dashboardData"
       :currentTimeObj="currentTimeObj"
       searchType="dashboards"
       @updated:dataZoom="onDataZoom"
@@ -42,6 +43,7 @@ import { useStore } from "vuex";
 import useNotifications from "@/composables/useNotifications";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import metrics from "./metrics.json";
+import { deepCopy, getUUID } from "@/utils/zincutils";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -56,38 +58,62 @@ const props = defineProps<{
   streamName: string;
   timeRange: TimeRange;
   filter?: string;
+  show?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "time-range-selected", range: { start: number; end: number }): void;
 }>();
 
-const store = useStore();
 const { showErrorNotification } = useNotifications();
 
-const isCollapsed = ref(false);
 const autoRefreshEnabled = ref(false);
 const autoRefreshIntervalId = ref<number | null>(null);
 const error = ref<string | null>(null);
 const dashboardChartsRef = ref<any>(null);
-
-const dashboardData = { data: {} };
-const currentTimeObj = computed(() => {
-  return {
-    __global: {
-      start_time: new Date(props.timeRange.startTime),
-      end_time: new Date(props.timeRange.endTime),
-      type: "absolute",
-    },
-  };
+const currentTimeObj = ref({
+  __global: {
+    start_time: new Date(props.timeRange.startTime),
+    end_time: new Date(props.timeRange.endTime),
+  },
 });
+
+const dashboardData = ref(null);
 
 const loadDashboard = async () => {
   try {
     error.value = null;
 
+    currentTimeObj.value = {
+      __global: {
+        start_time: new Date(props.timeRange.startTime),
+        end_time: new Date(props.timeRange.endTime),
+      },
+    };
     // Convert the dashboard schema and update stream names
-    dashboardData.data = convertDashboardSchemaVersion(metrics);
+    const convertedDashboard = convertDashboardSchemaVersion(deepCopy(metrics));
+
+    convertedDashboard.tabs[0].panels.forEach((panel, index) => {
+      if (panel.title === "Errors") {
+        convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
+          "queries"
+        ][0].query.replace(
+          "[WHERE_CLAUSE]",
+          props.filter.trim().length
+            ? "WHERE span_status = 'ERROR' and " + props.filter
+            : "WHERE span_status = 'ERROR'",
+        );
+      } else {
+        convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
+          "queries"
+        ][0].query.replace(
+          "[WHERE_CLAUSE]",
+          props.filter.trim().length ? "WHERE " + props.filter : "",
+        );
+      }
+    });
+
+    dashboardData.value = convertedDashboard;
 
     updateLayout();
   } catch (err: any) {
@@ -98,22 +124,6 @@ const loadDashboard = async () => {
 };
 
 const updateLayout = async () => {
-  await nextTick();
-  await nextTick();
-  await nextTick();
-  await nextTick();
-
-  if (dashboardChartsRef.value) {
-    // dashboardChartsRef?.value?.layoutUpdate();
-
-    // Fix for vue-grid-layout overlapping issue with keep-alive
-    setTimeout(() => {
-      if (dashboardChartsRef.value) {
-        // dashboardChartsRef?.value?.layoutUpdate();
-      }
-    }, 100);
-  }
-
   window.dispatchEvent(new Event("resize"));
 };
 
@@ -156,15 +166,6 @@ const stopAutoRefresh = () => {
   }
 };
 
-// Watch for time range changes
-watch(
-  () => [props.timeRange, props.streamName],
-  () => {
-    loadDashboard();
-  },
-  { deep: true },
-);
-
 onMounted(() => {
   loadDashboard();
 });
@@ -178,6 +179,7 @@ defineExpose({
   resetZoom: () => {
     // Dashboard handles zoom reset through toolbar
   },
+  loadDashboard,
 });
 </script>
 

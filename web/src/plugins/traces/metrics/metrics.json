@@ -75,7 +75,7 @@
             "queryType": "sql",
             "queries": [
               {
-                "query": "SELECT histogram(_timestamp) as \"x_axis_1\", max(duration) as \"y_axis_1\"  FROM \"default\"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+                "query": "SELECT histogram(_timestamp) as \"x_axis_1\", max(duration) as \"y_axis_1\"  FROM \"default\" [WHERE_CLAUSE] GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
                 "vrlFunctionQuery": "",
                 "customQuery": false,
                 "fields": {
@@ -139,7 +139,7 @@
           {
             "id": "Panel_ID2185010",
             "type": "bar",
-            "title": "Error",
+            "title": "Errors",
             "description": "",
             "config": {
               "show_legends": true,
@@ -199,7 +199,7 @@
             "queryType": "sql",
             "queries": [
               {
-                "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(span_status) as \"y_axis_1\"  FROM \"default\"  WHERE span_status = 'ERROR'  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+                "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(span_status) as \"y_axis_1\"  FROM \"default\"  [WHERE_CLAUSE]  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
                 "vrlFunctionQuery": "",
                 "customQuery": false,
                 "fields": {
@@ -337,7 +337,7 @@
             "queryType": "sql",
             "queries": [
               {
-                "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\"  FROM \"default\"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+                "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\"  FROM \"default\" [WHERE_CLAUSE] GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
                 "vrlFunctionQuery": "",
                 "customQuery": false,
                 "fields": {
@@ -358,7 +358,7 @@
                   ],
                   "y": [
                     {
-                      "label": "Trace Count",
+                      "label": "Trace Rate",
                       "alias": "y_axis_1",
                       "column": "_timestamp",
                       "color": "#5960b2",
@@ -403,7 +403,7 @@
     ],
     "variables": {
       "list": [],
-      "showDynamicFilters": true
+      "showDynamicFilters": false
     },
     "defaultDatetimeDuration": {
       "type": "relative",
