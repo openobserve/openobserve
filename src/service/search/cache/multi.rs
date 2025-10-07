@@ -194,6 +194,7 @@ async fn recursive_process_multiple_metas(
             );
 
             cached_response.total = cached_response.hits.len();
+            cached_response.size = cached_response.hits.len() as i64;
             if cache_req.discard_interval < 0 {
                 matching_cache_meta.end_time = discard_ts;
             }
