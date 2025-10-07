@@ -2887,9 +2887,9 @@ export const convertSQLData = async (
   // Apply all legend configurations using the new centralized function
   applyLegendConfiguration(
     panelSchema,
-    options,
     chartPanelRef,
     hoveredSeriesState,
+    options,
   );
 
   //check if is there any data else filter out axis or series data
