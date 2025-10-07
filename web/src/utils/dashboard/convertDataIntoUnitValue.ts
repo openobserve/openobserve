@@ -834,31 +834,34 @@ const validateChartFieldsConfiguration = (
     fields?.value_for_maps ?? null,
     fields?.latitude ?? null,
     fields?.longitude ?? null,
-  ]?.filter((it: any) => it && !it?.isDerived && it?.type == "build");
+  ]?.filter((it: any) => it && !it?.isDerived);
 
   /**
-   * Validates a function and its nested function arguments
+   * Validates a function and its nested function arguments, or validates raw query fields
    *
    * Handles the following validation scenarios:
    *
-   * 1. **Required Arguments**: Arguments with `required: true` must be present
+   * 1. **Raw Query Fields**: Fields with `type: "raw"` must have non-empty rawQuery
+   *    Example: Custom SQL query field must have valid query string
+   *
+   * 2. **Required Arguments**: Arguments with `required: true` must be present
    *    Example: count(field) - field is required
    *
-   * 2. **Optional Arguments**: Arguments with `required: false` can be omitted
+   * 3. **Optional Arguments**: Arguments with `required: false` can be omitted
    *    Example: substring(field, start, length?) - length is optional
    *    Example: from_unixtime(timestamp, format?) - format is optional
    *
-   * 3. **Variable Arguments**: Functions with `allowAddArgAt` can accept N arguments
+   * 4. **Variable Arguments**: Functions with `allowAddArgAt` can accept N arguments
    *    - `allowAddArgAt: "n"` means position 0 can repeat infinitely
    *      Example: concat(arg1, arg2, arg3, ..., argN) with min=2
    *    - `allowAddArgAt: "n-1"` means (argsLength-1) position can repeat
    *    - Combined with `min` property to enforce minimum arg count
    *
-   * 4. **Nested Functions**: Arguments with type "function" are validated recursively
+   * 5. **Nested Functions**: Arguments with type "function" are validated recursively
    *    Example: sum(count(field)) - both sum and count are validated
    *    Example: concat(upper(field1), lower(field2)) - all 3 functions validated
    *
-   * 5. **Type Validation**: Each argument type is validated against allowed types
+   * 6. **Type Validation**: Each argument type is validated against allowed types
    *    - field: Must have valid field selection
    *    - function: Recursively validated
    *    - number: Must be valid number
@@ -869,6 +872,14 @@ const validateChartFieldsConfiguration = (
    * @param fieldPath - Path for error messages (e.g., "Field", "Field → Arg 2")
    */
   const validateFunction = (funcConfig: any, fieldPath: string) => {
+    // Handle raw query fields
+    if (funcConfig.type === "raw") {
+      if (!funcConfig.rawQuery || typeof funcConfig.rawQuery !== "string" || funcConfig.rawQuery.trim() === "") {
+        errors.push(`${fieldPath}: Raw query cannot be empty`);
+      }
+      return;
+    }
+
     // Get the selected function schema
     const selectedFunction: any = functionValidation?.find(
       (fn: any) => fn?.functionName === (funcConfig?.functionName ?? null),
