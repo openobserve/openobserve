@@ -23,7 +23,7 @@ env:
 jobs:
   backend_unit_tests:
     runs-on:
-      labels: repo-openobserve-standard-8
+      labels: repo-openobserve-standard-4
     permissions:
       contents: read
 
