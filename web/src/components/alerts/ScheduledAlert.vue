@@ -1215,7 +1215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }" :src="getBtnO2Logo" />
                           <span  
                           class=" tw-font-[400] tw-pl-[4px] tw-text-[12px] tw-pr-[6px] tw-py-[4px] tw-text-[#7980cc]" 
-                          >Generate SQL</span>
+                          > {{  tab == 'sql' ? 'Generate SQL' : 'Generate PromQL' }} </span>
                       </q-btn>
                       </div>
                       <div class="tw-h-full tw-flex tw-justify-center tw-items-center o2-select-input o2-input tw-w-full col"
