@@ -24,26 +24,29 @@
   padding: 0.125rem 0.25rem; // Compact padding
   background: rgba(255, 255, 255, 0.1); // Glassmorphic
   backdrop-filter: blur(10px);
+  margin-top: 0.5rem;
 
   .q-btn {
     padding: 0.125rem 0.25rem;
     min-height: 1.5rem;
     font-size: 0.75rem;
+    border-radius: 0.25rem;
   }
 }
 
 .select-pagination {
   line-height: 1.75rem !important; // 28px - slightly taller to prevent clipping
-  border-radius: 0.5rem !important;
+  border-radius: 0.25rem !important;
   padding: 0.125rem 0.5rem !important; // Add vertical padding
   background: rgba(255, 255, 255, 0.1) !important; // Glassmorphic
   backdrop-filter: blur(10px) !important;
   min-height: 1.75rem !important;
   height: 1.75rem !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid rgb(196, 196, 196) !important;
   display: flex !important;
   align-items: center !important;
   overflow: visible !important;
+  margin-top: 0.45rem;
 
   .q-field__control-container {
     padding-top: 0 !important;
@@ -56,6 +59,7 @@
     display: flex !important;
     align-items: center !important;
     overflow: visible !important;
+    top: -3px;
 
     &:before,
     &:after {
@@ -162,8 +166,8 @@
   overflow: auto !important;
 
   &--with-histogram {
-    height: calc(100% - 8.75rem) !important; // 140px (100px histogram + 32px header + 8px spacing)
-    max-height: calc(100% - 8.75rem) !important;
+    height: calc(100% - 8.0rem) !important; // 128px
+    max-height: calc(100% - 8.0rem) !important;
   }
 
   &--without-histogram {
