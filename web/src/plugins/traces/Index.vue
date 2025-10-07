@@ -1241,16 +1241,13 @@ watch(showFields, () => {
     : 0;
 });
 
-watch(showHistogram, () => {
-  if (
-    searchObj.meta.showHistogram == true &&
-    this.searchObj.meta.sqlMode == false
-  ) {
-    setTimeout(() => {
-      if (this.searchResultRef) this.searchResultRef.reDrawChart();
-    }, 100);
-  }
-});
+// watch(showHistogram, () => {
+//   if (searchObj.meta.showHistogram) {
+//     setTimeout(() => {
+//       if (this.searchResultRef) this.searchResultRef.reDrawChart();
+//     }, 100);
+//   }
+// });
 
 watch(moveSplitter, () => {
   if (searchObj.meta.showFields == false) {

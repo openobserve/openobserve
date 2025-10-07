@@ -24,20 +24,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="width: 100%"
     >
       <!-- RED Metrics Dashboard -->
-      <TracesMetricsDashboard
-        v-if="searchObj.data.stream.selectedStream.value"
-        ref="metricsDashboardRef"
-        :streamName="searchObj.data.stream.selectedStream.value"
-        :timeRange="{
-          startTime: searchObj.data.datetime.startTime,
-          endTime: searchObj.data.datetime.endTime,
-        }"
-        :filter="searchObj.data.editorValue"
-        :show="
-          searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length
-        "
-        @time-range-selected="onMetricsTimeRangeSelected"
-      />
+      <transition
+        enter-active-class="transition-all duration-300 ease-in-out"
+        leave-active-class="transition-all duration-300 ease-in-out"
+        enter-from-class="opacity-0 -translate-y-4 max-h-0"
+        enter-to-class="opacity-100 translate-y-0 max-h-[1000px]"
+        leave-from-class="opacity-100 translate-y-0 max-h-[1000px]"
+        leave-to-class="opacity-0 -translate-y-4 max-h-0"
+      >
+        <TracesMetricsDashboard
+          v-if="searchObj.data.stream.selectedStream.value"
+          v-show="searchObj.meta.showHistogram"
+          ref="metricsDashboardRef"
+          :streamName="searchObj.data.stream.selectedStream.value"
+          :timeRange="{
+            startTime: searchObj.data.datetime.startTime,
+            endTime: searchObj.data.datetime.endTime,
+          }"
+          :filter="searchObj.data.editorValue"
+          :show="
+            searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length
+          "
+          @time-range-selected="onMetricsTimeRangeSelected"
+        />
+      </transition>
 
       <div
         data-test="traces-search-result-count"
