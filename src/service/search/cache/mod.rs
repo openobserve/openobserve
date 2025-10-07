@@ -474,6 +474,16 @@ pub async fn search(
         && (results.first().is_some_and(|res| !res.hits.is_empty())
             || results.last().is_some_and(|res| !res.hits.is_empty()))
     {
+        // Determine if this is a non-timestamp histogram query
+        // Note: write_res.order_by_metadata contains the same ORDER BY info
+        let is_histogram_non_ts_order = c_resp.histogram_interval > 0
+            && !write_res.order_by_metadata.is_empty()
+            && write_res
+                .order_by_metadata
+                .first()
+                .map(|(field, _)| field != &c_resp.ts_column)
+                .unwrap_or(false);
+
         write_results_v2(
             trace_id,
             &c_resp.ts_column,
@@ -484,6 +494,7 @@ pub async fn search(
             is_aggregate,
             c_resp.is_descending,
             c_resp.clear_cache,
+            is_histogram_non_ts_order,
         )
         .await;
     }
@@ -709,6 +720,7 @@ pub async fn _write_results(
     file_path: String,
     is_aggregate: bool,
     is_descending: bool,
+    is_histogram_non_ts_order: bool,
 ) {
     // disable write_results_v1
     // return;
@@ -734,19 +746,20 @@ pub async fn _write_results(
         return;
     }
 
-    let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
-    let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
+    // Calculate actual time range of cached data.
+    // For non-timestamp histogram queries, results may not be time-ordered,
+    // so we must scan all hits to find the true min/max timestamps.
+    let is_time_ordered = !is_histogram_non_ts_order;
+    let (smallest_ts, largest_ts) =
+        extract_timestamp_range(&local_resp.hits, ts_column, is_time_ordered);
 
-    let smallest_ts = std::cmp::min(first_rec_ts, last_rec_ts);
-    let discard_duration = get_config().common.result_cache_discard_duration * 1000 * 1000;
+    let discard_duration = second_micros(get_config().limit.cache_delay_secs);
 
-    if (last_rec_ts - first_rec_ts).abs() < discard_duration
+    if (largest_ts - smallest_ts).abs() < discard_duration
         && smallest_ts > Utc::now().timestamp_micros() - discard_duration
     {
         return;
     }
-
-    let largest_ts = std::cmp::max(first_rec_ts, last_rec_ts);
 
     let cache_end_time = if largest_ts > 0 && largest_ts < req_query_end_time {
         largest_ts
@@ -849,6 +862,7 @@ pub async fn write_results_v2(
     is_aggregate: bool,
     is_descending: bool,
     clear_cache: bool,
+    is_histogram_non_ts_order: bool,
 ) {
     let mut local_resp = res.clone();
     let remove_hit = if is_descending {
@@ -948,19 +962,19 @@ pub async fn write_results_v2(
         return;
     }
 
-    let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
-    let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
+    // For histogram queries with non-timestamp ORDER BY, we need to scan all hits
+    // to find actual min/max timestamps, since results may not be time-ordered
+    let is_time_ordered = !is_histogram_non_ts_order;
+    let (smallest_ts, largest_ts) =
+        extract_timestamp_range(&local_resp.hits, ts_column, is_time_ordered);
 
-    let smallest_ts = std::cmp::min(first_rec_ts, last_rec_ts);
-    let discard_duration = get_config().common.result_cache_discard_duration * 1000 * 1000;
+    let discard_duration = second_micros(get_config().limit.cache_delay_secs);
 
-    if (last_rec_ts - first_rec_ts).abs() < discard_duration
+    if (largest_ts - smallest_ts).abs() < discard_duration
         && smallest_ts > Utc::now().timestamp_micros() - discard_duration
     {
         return;
     }
-
-    let largest_ts = std::cmp::max(first_rec_ts, last_rec_ts);
 
     let cache_end_time = if largest_ts > 0 && largest_ts < req_query_end_time {
         largest_ts

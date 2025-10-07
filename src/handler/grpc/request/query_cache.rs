@@ -45,6 +45,7 @@ impl QueryCache for QueryCacheServerImpl {
                 ts_column: req.timestamp_col,
                 discard_interval: req.discard_interval,
                 is_descending: req.is_descending,
+                is_histogram_non_ts_order: false, // gRPC handler: flag determined at query planning
             },
         )
         .await
@@ -96,6 +97,7 @@ impl QueryCache for QueryCacheServerImpl {
                 ts_column: req.timestamp_col,
                 discard_interval: req.discard_interval,
                 is_descending: req.is_descending,
+                is_histogram_non_ts_order: false, // gRPC handler: flag determined at query planning
             },
         )
         .await;
