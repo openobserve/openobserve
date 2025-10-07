@@ -72,6 +72,18 @@ use crate::{
     },
 };
 
+/// Check if the local node is the same role as the given role group.
+/// If given role group is None, it means the local node is the same role as the given role group.
+/// If given role group is RoleGroup::None, it still means local node is same as the given role.
+fn is_local_same_role(role_group: Option<RoleGroup>) -> bool {
+    if role_group.is_some() {
+        let role_group = role_group.unwrap();
+        role_group == RoleGroup::None || LOCAL_NODE.role_group == role_group
+    } else {
+        true
+    }
+}
+
 #[async_recursion]
 #[tracing::instrument(
     name = "service:search:flight:leader",
@@ -157,19 +169,30 @@ pub async fn search(
         })
         .unwrap_or(Some(RoleGroup::Interactive));
     let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
-    log::debug!("get online querier nodes {:?}", nodes);
+    log::debug!("[trace_id {trace_id}] get online querier nodes {:?}", nodes);
 
     // local mode, only use local node as querier node
     if req.local_mode.unwrap_or_default() {
-        if LOCAL_NODE.is_querier() {
-            log::debug!("local node is a querier, nodes: {:?}", nodes);
+        // If LOCAL_Node is an alert querier and the the role group is interactive
+        // then we must use the an interactive querier NOT background querier
+        // If LOCAL_NODE is alert querier and role group is background, we can use it
+        // If LOCAL_NODE is not alert querier and role group is interactive, we can use it
+        // If LOCAL_NODE is not alert querier and role group is background, we can NOT use it
+        if LOCAL_NODE.is_querier() && is_local_same_role(role_group.clone()) {
+            log::debug!(
+                "[trace_id {trace_id}] local node is a querier, nodes: {:?}",
+                nodes
+            );
             nodes.retain(|n| n.name.eq(&LOCAL_NODE.name));
             log::debug!(
-                "local node is a querier, nodes after filtering: {:?}",
+                "[trace_id {trace_id}] local node is a querier, nodes after filtering: {:?}",
                 nodes
             );
         } else {
-            log::debug!("local node is not a querier, nodes: {:?}", nodes);
+            log::debug!(
+                "[trace_id {trace_id}] local node is not a querier, nodes: {:?}",
+                nodes
+            );
             nodes = nodes
                 .into_iter()
                 .filter(|n| n.is_querier())
@@ -1019,4 +1042,89 @@ pub async fn get_file_id_lists(
         file_lists.insert(stream.clone(), file_id_list);
     }
     Ok(file_lists)
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::cluster::RoleGroup;
+
+    use super::*;
+
+    #[test]
+    fn test_is_local_same_role_with_none_input() {
+        // Test case: When role_group is None, function should return true
+        let result = is_local_same_role(None);
+        assert!(result, "Should return true when role_group is None");
+    }
+
+    #[test]
+    fn test_is_local_same_role_with_role_group_none() {
+        // Test case: When role_group is Some(RoleGroup::None), should return true
+        // because RoleGroup::None always matches
+        let result = is_local_same_role(Some(RoleGroup::None));
+        assert!(
+            result,
+            "Should return true when role_group is RoleGroup::None"
+        );
+    }
+
+    #[test]
+    fn test_is_local_same_role_with_matching_interactive() {
+        // Test case: When role_group matches LOCAL_NODE.role_group (Interactive)
+        // Note: This test assumes LOCAL_NODE.role_group could be Interactive
+        // In practice, you might need to mock LOCAL_NODE for different scenarios
+        let result = is_local_same_role(Some(RoleGroup::Interactive));
+
+        // The result depends on what LOCAL_NODE.role_group actually is
+        // If LOCAL_NODE.role_group == RoleGroup::Interactive, this should be true
+        // If LOCAL_NODE.role_group != RoleGroup::Interactive, this should be false
+        let expected = LOCAL_NODE.role_group == RoleGroup::Interactive;
+        assert_eq!(
+            result, expected,
+            "Should return true only when LOCAL_NODE.role_group matches RoleGroup::Interactive"
+        );
+    }
+
+    #[test]
+    fn test_is_local_same_role_with_matching_background() {
+        // Test case: When role_group matches LOCAL_NODE.role_group (Background)
+        let result = is_local_same_role(Some(RoleGroup::Background));
+
+        // The result depends on what LOCAL_NODE.role_group actually is
+        let expected = LOCAL_NODE.role_group == RoleGroup::Background;
+        assert_eq!(
+            result, expected,
+            "Should return true only when LOCAL_NODE.role_group matches RoleGroup::Background"
+        );
+    }
+
+    #[test]
+    fn test_is_local_same_role_edge_cases() {
+        // Test edge cases and boundary conditions
+
+        // Multiple calls with None should be consistent
+        for _ in 0..3 {
+            assert!(
+                is_local_same_role(None),
+                "Multiple None calls should be consistent"
+            );
+        }
+
+        // Multiple calls with RoleGroup::None should be consistent
+        for _ in 0..3 {
+            assert!(
+                is_local_same_role(Some(RoleGroup::None)),
+                "Multiple RoleGroup::None calls should be consistent"
+            );
+        }
+
+        // Function should be deterministic for the same input
+        let test_role = RoleGroup::Interactive;
+        let first_result = is_local_same_role(Some(test_role));
+        let second_result = is_local_same_role(Some(test_role));
+        assert_eq!(
+            first_result, second_result,
+            "Function should be deterministic for same input"
+        );
+    }
 }
