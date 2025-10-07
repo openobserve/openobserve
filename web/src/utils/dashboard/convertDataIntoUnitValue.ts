@@ -836,126 +836,222 @@ const validateChartFieldsConfiguration = (
     fields?.longitude ?? null,
   ]?.filter((it: any) => it && !it?.isDerived && it?.type == "build");
 
+  /**
+   * Validates a function and its nested function arguments
+   *
+   * Handles the following validation scenarios:
+   *
+   * 1. **Required Arguments**: Arguments with `required: true` must be present
+   *    Example: count(field) - field is required
+   *
+   * 2. **Optional Arguments**: Arguments with `required: false` can be omitted
+   *    Example: substring(field, start, length?) - length is optional
+   *    Example: from_unixtime(timestamp, format?) - format is optional
+   *
+   * 3. **Variable Arguments**: Functions with `allowAddArgAt` can accept N arguments
+   *    - `allowAddArgAt: "n"` means position 0 can repeat infinitely
+   *      Example: concat(arg1, arg2, arg3, ..., argN) with min=2
+   *    - `allowAddArgAt: "n-1"` means (argsLength-1) position can repeat
+   *    - Combined with `min` property to enforce minimum arg count
+   *
+   * 4. **Nested Functions**: Arguments with type "function" are validated recursively
+   *    Example: sum(count(field)) - both sum and count are validated
+   *    Example: concat(upper(field1), lower(field2)) - all 3 functions validated
+   *
+   * 5. **Type Validation**: Each argument type is validated against allowed types
+   *    - field: Must have valid field selection
+   *    - function: Recursively validated
+   *    - number: Must be valid number
+   *    - string: Must be non-empty string
+   *    - histogramInterval: Must be valid interval string
+   *
+   * @param funcConfig - The function configuration to validate
+   * @param fieldPath - Path for error messages (e.g., "Field", "Field → Arg 2")
+   */
+  const validateFunction = (funcConfig: any, fieldPath: string) => {
+    // Get the selected function schema
+    const selectedFunction: any = functionValidation?.find(
+      (fn: any) => fn?.functionName === (funcConfig?.functionName ?? null),
+    );
+
+    // If function is not found, push error
+    if (!selectedFunction) {
+      errors.push(`${fieldPath}: Invalid aggregation function`);
+      return; // Skip further validation if function is invalid
+    }
+
+    // Check if args are valid based on selected function schema
+    const args = funcConfig.args || [];
+    const argsDefinition = selectedFunction.args || [];
+
+    // OPTIONAL ARGUMENTS: Handled by "required": false in argDefinition
+    // VARIABLE ARGUMENTS: Handled by "allowAddArgAt" property
+    // Examples:
+    // - concat: allowAddArgAt="n" with min=2 (can have 2+ args)
+    // - substring: 3rd arg has required=false (optional)
+    const allowAddArgAtValue = selectedFunction.allowAddArgAt;
+    const hasVariableArgs = !!allowAddArgAtValue;
+
+    // Parse the allowAddArgAt value to determine variable argument position
+    // "n" means position 0 (all args can repeat)
+    // "n-1" means (argsLength - 1) position
+    // "n-2" means (argsLength - 2) position
+    let variableArgPosition = -1;
+    if (hasVariableArgs) {
+      if (allowAddArgAtValue === "n") {
+        variableArgPosition = 0; // All arguments can be variable
+      } else if (allowAddArgAtValue.startsWith("n-")) {
+        // Format is "n-1", "n-2", etc.
+        const offset = parseInt(allowAddArgAtValue.substring(2));
+        variableArgPosition = argsDefinition.length - offset;
+      }
+    }
+
+    // Special handling for functions with min requirements
+    // Find the argDefinition that has the min property
+    const minArgDef = argsDefinition.find((def: any) => "min" in def);
+    const minPosition = minArgDef ? argsDefinition.indexOf(minArgDef) : -1;
+
+    // If min is specified and position is valid, check the requirement
+    if (minArgDef && minPosition !== -1) {
+      // For variable args, we count all arguments from the variable position
+      const relevantArgsCount =
+        hasVariableArgs && variableArgPosition <= minPosition
+          ? args.length - variableArgPosition + 1 // +1 because we count the variable position itself
+          : args.length;
+
+      if (relevantArgsCount < minArgDef.min) {
+        errors.push(
+          `${fieldPath}: Requires at least ${minArgDef.min} arguments`,
+        );
+      }
+    }
+
+    // Validate all provided arguments have correct types
+    args.forEach((arg: any, index: number) => {
+      // Skip null/undefined args only if they're optional
+      if (!arg) {
+        // Check if this position is required
+        const isOptional =
+          index < argsDefinition.length && !argsDefinition[index]?.required;
+        if (!isOptional && !hasVariableArgs) {
+          // This is a required arg that's missing - will be caught in "missing required" check below
+        }
+        return;
+      }
+
+      // Determine which arg definition to use for validation
+      let argDefIndex = index;
+
+      // For variable arguments
+      if (hasVariableArgs && index >= variableArgPosition) {
+        // Use the definition at the variable position
+        argDefIndex = variableArgPosition;
+      }
+
+      // Handle out-of-bounds index for non-variable args or unknown formats
+      if (argDefIndex >= argsDefinition.length) {
+        if (!hasVariableArgs) {
+          errors.push(`${fieldPath}: Too many arguments provided`);
+          return;
+        }
+        // Default to the variable argument definition
+        argDefIndex = variableArgPosition;
+      }
+
+      const allowedTypes = argsDefinition[argDefIndex].type.map(
+        (t: any) => t.value,
+      );
+
+      // Check if current argument type is among the allowed types
+      if (arg && !allowedTypes.includes(arg.type)) {
+        errors.push(
+          `${fieldPath}: Argument ${index + 1} has invalid type (expected: ${allowedTypes.join(" or ")})`,
+        );
+        return;
+      }
+
+      // Handle different argument types
+      if (arg.type === "field") {
+        // Validate field value structure
+        if (
+          !arg.value ||
+          typeof arg.value !== "object" ||
+          !("field" in arg.value)
+        ) {
+          errors.push(
+            `${fieldPath}: Argument ${index + 1} is a field but haven't selected any field`,
+          );
+        }
+      } else if (arg.type === "function") {
+        // RECURSIVE VALIDATION: If argument is a function, validate it recursively
+        if (!arg.value || typeof arg.value !== "object") {
+          errors.push(
+            `${fieldPath}: Argument ${index + 1} is a function but has invalid structure`,
+          );
+        } else {
+          // Recursively validate the nested function
+          const nestedPath = `${fieldPath} → Arg ${index + 1}`;
+          validateFunction(arg.value, nestedPath);
+        }
+      } else if (arg.type === "number") {
+        // Validate number type arguments
+        if (arg.value === null || arg.value === undefined || arg.value === "") {
+          errors.push(
+            `${fieldPath}: Argument ${index + 1} is a number but no value entered`,
+          );
+        } else if (typeof arg.value !== "number" || isNaN(arg.value)) {
+          errors.push(
+            `${fieldPath}: Argument ${index + 1} must be a valid number`,
+          );
+        }
+      } else if (arg.type === "string") {
+        // Validate string type arguments
+        if (arg.value === null || arg.value === undefined) {
+          errors.push(
+            `${fieldPath}: Argument ${index + 1} is a string but no value entered`,
+          );
+        } else if (typeof arg.value !== "string" || arg.value.trim() === "") {
+          errors.push(
+            `${fieldPath}: Argument ${index + 1} must be a non-empty string`,
+          );
+        }
+      } else if (arg.type === "histogramInterval") {
+        // Validate histogram interval (e.g., "5 minutes", "1 hour") or null
+        if (!(arg.value === null || typeof arg.value === "string")) {
+          errors.push(
+            `${fieldPath}: Argument ${index + 1} must be a valid histogram interval`,
+          );
+        }
+      }
+    });
+
+    // Check for missing required arguments
+    // This validates:
+    // 1. Required args that are missing (required: true)
+    // 2. Optional args are allowed to be missing (required: false)
+    // 3. Variable args beyond the first instance are allowed (allowAddArgAt)
+    argsDefinition.forEach((argDef: any, index: number) => {
+      // Skip checking variable arg positions beyond the first instance
+      // Example: concat(arg1, arg2, arg3, ...) - only check first 2, rest are variable
+      if (hasVariableArgs && index > variableArgPosition) return;
+
+      // Check if required argument is missing or null/undefined
+      if (argDef.required && (index >= args.length || !args[index])) {
+        errors.push(
+          `${fieldPath}: Missing required argument at position ${index + 1}`,
+        );
+      }
+    });
+  };
+
   if (aggregationFunctionError?.length) {
     //  loop on each fields config
     // compare with function validation schema
     // if validation fails, push error
     aggregationFunctionError?.forEach((it: any) => {
-      // get the selected function schema
-      const selectedFunction: any = functionValidation?.find(
-        (fn: any) => fn?.functionName === (it?.functionName ?? null),
-      );
-
-      // if function is not found, push error
-      if (!selectedFunction) {
-        errors.push(`${it.alias || "Field"}: Invalid aggregation function`);
-        return; // Skip further validation if function is invalid
-      }
-
-      //  check if args are valid based on selected function schema
-      const args = it.args;
-      const argsDefinition = selectedFunction.args;
-
-      // NOTE: Need to consider the case where there can be optional arguments or there can be N number of arguments
-      // WARNING: This needs to be test properly
-      // Proper validation of arguments
-      const allowAddArgAtValue = selectedFunction.allowAddArgAt;
-      const hasVariableArgs = !!allowAddArgAtValue;
-
-      // Parse the allowAddArgAt value to determine variable argument position
-      let variableArgPosition = -1;
-      if (hasVariableArgs) {
-        if (allowAddArgAtValue === "n") {
-          variableArgPosition = 0; // All arguments can be variable
-        } else if (allowAddArgAtValue.startsWith("n-")) {
-          // Format is "n-1", "n-2", etc.
-          const offset = parseInt(allowAddArgAtValue.substring(2));
-          variableArgPosition = argsDefinition.length - offset;
-        }
-      }
-
-      // Special handling for functions with min requirements
-      // Find the argDefinition that has the min property
-      const minArgDef = argsDefinition.find((def: any) => "min" in def);
-      const minPosition = minArgDef ? argsDefinition.indexOf(minArgDef) : -1;
-
-      // If min is specified and position is valid, check the requirement
-      if (minArgDef && minPosition !== -1) {
-        // For variable args, we count all arguments from the variable position
-        const relevantArgsCount =
-          hasVariableArgs && variableArgPosition <= minPosition
-            ? args.length - variableArgPosition + 1 // +1 because we count the variable position itself
-            : args.length;
-
-        if (relevantArgsCount < minArgDef.min) {
-          errors.push(
-            `${it.alias || "Field"}: Requires at least ${minArgDef.min} arguments`,
-          );
-        }
-      }
-
-      // Validate all provided arguments have correct types
-      args.forEach((arg: any, index: number) => {
-        if (!arg) return; // Skip undefined args
-
-        // Determine which arg definition to use for validation
-        let argDefIndex = index;
-
-        // For variable arguments
-        if (hasVariableArgs && index >= variableArgPosition) {
-          // Use the definition at the variable position
-          argDefIndex = variableArgPosition;
-        }
-
-        // Handle out-of-bounds index for non-variable args or unknown formats
-        if (argDefIndex >= argsDefinition.length) {
-          if (!hasVariableArgs) {
-            errors.push(`${it.alias || "Field"}: Too many arguments provided`);
-            return;
-          }
-          // Default to the variable argument definition
-          argDefIndex = variableArgPosition;
-        }
-
-        const allowedTypes = argsDefinition[argDefIndex].type.map(
-          (t: any) => t.value,
-        );
-
-        // Check if current argument type is among the allowed types
-        if (arg && !allowedTypes.includes(arg.type)) {
-          errors.push(
-            `${it.alias || "Field"}: Argument ${index + 1} has invalid type (expected: ${allowedTypes.join(" or ")})`,
-          );
-          return;
-        }
-
-        // TODO: Need to handle all other types of arguments
-        // Additional validation for field type arguments
-        if (arg.type === "field") {
-          // Validate field value structure
-          if (
-            !arg.value ||
-            typeof arg.value !== "object" ||
-            !("field" in arg.value)
-          ) {
-            errors.push(
-              `${it.alias || "Field"}: Argument ${index + 1} is a field but haven't selected any field`,
-            );
-          }
-        }
-      });
-
-      // Check for missing required arguments
-      argsDefinition.forEach((argDef: any, index: number) => {
-        // Skip checking variable arg positions except the first instance
-        if (hasVariableArgs && index > variableArgPosition) return;
-
-        if (argDef.required && (index >= args.length || !args[index])) {
-          errors.push(
-            `${it.alias || "Field"}: Missing required argument at position ${index + 1}`,
-          );
-        }
-      });
+      const fieldPath = it.alias || "Field";
+      validateFunction(it, fieldPath);
     });
   }
 };
