@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               store.state.theme === 'dark'
                 ? 'w-border-gray-800  hover:tw-bg-zinc-800'
-                : 'w-border-gray-100 hover:tw-bg-zinc-100',
+                : 'w-border-gray-100 hover:tw-bg-zinc-200',
               defaultColumns &&
               !wrap &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow

@@ -661,100 +661,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-btn-toggle>
           </div>
-          <div class="q-ml-xs text-right col" v-if="scope.pagesNumber > 1">
-            <q-tooltip
-              data-test="logs-page-fields-list-pagination-tooltip"
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-              class="text-body2"
-            >
-              Total Fields:
-              {{
-                searchObj.data.stream.selectedStream.length > 1
-                  ? searchObj.data.stream.selectedStreamFields.length -
-                    (searchObj.data.stream.selectedStream.length + 1)
-                  : searchObj.data.stream.selectedStreamFields.length
-              }}
-            </q-tooltip>
+          <div class="col"></div>
+          <div class="tw-flex tw-items-center tw-justify-end tw-gap-2">
+            <div v-if="scope.pagesNumber > 1" class="field-list-pagination">
+              <q-tooltip
+                data-test="logs-page-fields-list-pagination-tooltip"
+                anchor="center left"
+                self="center right"
+                max-width="300px"
+                class="text-body2"
+              >
+                Total Fields:
+                {{
+                  searchObj.data.stream.selectedStream.length > 1
+                    ? searchObj.data.stream.selectedStreamFields.length -
+                      (searchObj.data.stream.selectedStream.length + 1)
+                    : searchObj.data.stream.selectedStreamFields.length
+                }}
+              </q-tooltip>
 
-            <q-btn
-              data-test="logs-page-fields-list-pagination-firstpage-button"
-              v-if="scope.pagesNumber > 2"
-              icon="skip_previous"
-              color="grey-8"
-              round
-              dense
-              flat
-              :disable="scope.isFirstPage"
-              @click="scope.firstPage"
-            />
+              <!-- First page button -->
+              <q-btn
+                data-test="logs-page-fields-list-pagination-firstpage-button"
+                icon="fast_rewind"
+                color="primary"
+                flat
+                :disable="scope.isFirstPage"
+                @click="scope.firstPage"
+                class="pagination-nav-btn"
+                aria-label="First page"
+              />
 
-            <q-btn
-              data-test="logs-page-fields-list-pagination-previouspage-button"
-              icon="fast_rewind"
-              color="grey-8"
-              round
-              dense
-              flat
-              :disable="scope.isFirstPage"
-              @click="scope.prevPage"
-            />
+              <!-- Page number buttons (3 at a time) -->
+              <template v-for="page in getPageNumbers(scope.pagination.page, scope.pagesNumber)" :key="page">
+                <q-btn
+                  flat
+                  :data-test="`logs-page-fields-list-pagination-page-${page}-button`"
+                  :class="[
+                    'pagination-page-btn',
+                    scope.pagination.page === page ? 'pagination-page-active' : ''
+                  ]"
+                  @click="setPage(page)"
+                  >{{ page }}</q-btn
+                >
+              </template>
 
-            <q-btn
-              round
-              data-test="logs-page-fields-list-pagination-message-button"
-              dense
-              flat
-              class="text text-caption text-regular"
-              >{{ scope.pagination.page }}/{{ scope.pagesNumber }}</q-btn
-            >
-
-            <q-btn
-              data-test="logs-page-fields-list-pagination-nextpage-button"
-              icon="fast_forward"
-              color="grey-8"
-              round
-              dense
-              flat
-              :disable="scope.isLastPage"
-              @click="scope.nextPage"
-            />
-
-            <q-btn
-              data-test="logs-page-fields-list-pagination-lastpage-button"
-              v-if="scope.pagesNumber > 2"
-              icon="skip_next"
-              color="grey-8"
-              round
-              dense
-              flat
-              :disable="scope.isLastPage"
-              @click="scope.lastPage"
-            />
-          </div>
-          <div
-            class="q-ml-xs text-right"
-            :class="scope.pagesNumber > 1 ? 'col-1' : 'col'"
-          >
-            <q-icon
-              name="restart_alt"
-              size="21px"
-              data-test="logs-page-fields-list-reset-icon"
-              class="cursor-pointer"
-              @click="resetSelectedFileds"
-            />
-            <q-tooltip
-              data-test="logs-page-fields-list-reset-tooltip"
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-              class="text-body2"
-            >
-              <span class="text-bold" color="white">{{
-                t("search.resetFields")
-              }}</span>
-            </q-tooltip>
+              <!-- Last page button -->
+              <q-btn
+                data-test="logs-page-fields-list-pagination-lastpage-button"
+                icon="fast_forward"
+                color="primary"
+                flat
+                :disable="scope.isLastPage"
+                @click="scope.lastPage"
+                class="pagination-nav-btn"
+                aria-label="Last page"
+              />
+            </div>
+            <div class="field-list-reset">
+              <q-icon
+                name="restart_alt"
+                data-test="logs-page-fields-list-reset-icon"
+                class="cursor-pointer reset-icon"
+                @click="resetSelectedFileds"
+              />
+              <q-tooltip
+                data-test="logs-page-fields-list-reset-tooltip"
+                anchor="center left"
+                self="center right"
+                max-width="300px"
+                class="text-body2"
+              >
+                <span class="text-bold" color="white">{{
+                  t("search.resetFields")
+                }}</span>
+              </q-tooltip>
+            </div>
           </div>
         </template>
       </q-table>
@@ -1111,6 +1093,33 @@ export default defineComponent({
     function resetSelectedFileds() {
       searchObj.data.stream.selectedFields = [];
       updatedLocalLogFilterField();
+    }
+
+    // Get page numbers to display (3 at a time)
+    function getPageNumbers(currentPage: number, totalPages: number) {
+      const pages: number[] = [];
+
+      if (totalPages <= 3) {
+        // If 3 or fewer pages, show all
+        for (let i = 1; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        // Show 3 pages centered around current page
+        let startPage = Math.max(1, currentPage - 1);
+        let endPage = Math.min(totalPages, startPage + 2);
+
+        // Adjust if we're near the end
+        if (endPage === totalPages) {
+          startPage = Math.max(1, endPage - 2);
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+          pages.push(i);
+        }
+      }
+
+      return pages;
     }
 
     /**
@@ -1997,6 +2006,10 @@ export default defineComponent({
       }
     };
 
+    const setPage = (page) => {
+      pagination.value = { ...pagination.value, page };
+    };
+
     return {
       t,
       store,
@@ -2080,6 +2093,7 @@ export default defineComponent({
       traceIdMapper,
       checkSelectedFields,
       resetSelectedFileds,
+      getPageNumbers,
       handleSearchResponse,
       handleSearchReset,
       showOnlyInterestingFields,
@@ -2095,6 +2109,7 @@ export default defineComponent({
       getValuesPartition,
       streamList,
       hasUserDefinedSchemas,
+      setPage,
     };
   },
 });
@@ -2171,7 +2186,89 @@ $streamSelectorHeight: 44px;
     width: 100%;
 
     > .q-table__bottom {
-      padding: 0px !important;
+      padding: 0.5rem 0 0.5rem 0.5rem !important; // 8px top, bottom, left padding for button groups
+      min-height: auto !important;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    // Field list pagination styling - right-aligned, consistent with SearchResult
+    .field-list-pagination {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem; // 4px - better spacing
+
+      .pagination-nav-btn {
+        padding: 0 !important;
+        margin: 0 !important;
+        min-width: auto !important;
+        min-height: auto !important;
+        width: auto !important;
+        height: auto !important;
+        border-radius: 0 !important;
+
+        .q-btn__content {
+          font-size: 0.75rem !important; // 12px - even smaller icon
+          padding: 0 !important; // 0px - no padding
+        }
+
+        &.disabled {
+          opacity: 0.4;
+        }
+
+        // Remove hover effects
+        &:hover,
+        &:focus {
+          background-color: transparent !important;
+        }
+
+        .q-focus-helper {
+          display: none !important;
+        }
+      }
+
+      .pagination-page-btn {
+        padding: 0 !important;
+        margin: 0 !important;
+        min-width: auto !important;
+        width: auto !important;
+        min-height: auto !important;
+        height: auto !important;
+        font-size: 0.8125rem !important; // 13px - slightly larger
+        font-weight: 500;
+        line-height: 1;
+        color: var(--o2-text-primary);
+        border-radius: 0.25rem !important; // 4px - rounded border
+        overflow: visible !important;
+
+        .q-btn__content {
+          padding: 0.125rem 0.375rem !important; // 2px 6px - slightly more padding
+          min-height: auto !important;
+          line-height: 1;
+        }
+      }
+
+      .pagination-page-active {
+        background-color: var(--q-primary) !important;
+        color: var(--o2-primary-foreground) !important;
+        font-weight: 600;
+      }
+    }
+
+    .field-list-reset {
+      display: flex;
+      align-items: center;
+
+      .reset-icon {
+        font-size: 1.25rem !important; // 20px
+        color: var(--o2-text-primary);
+        transition: color 0.2s ease;
+
+        &:hover {
+          color: var(--q-primary);
+        }
+      }
     }
   }
 
@@ -2382,23 +2479,25 @@ $streamSelectorHeight: 44px;
     }
 
     .q-table__bottom {
-      padding: 0px !important;
+      padding: 0 !important;
+      min-height: 1.95rem !important; // 31.2px
+      max-height: 1.95rem !important;
     }
 
     .pagination-field-count {
-      line-height: 32px;
+      line-height: 1.95rem; // 31.2px
       font-weight: 700;
-      font-size: 13px;
+      font-size: 0.8125rem; // 13px
     }
   }
 
   .field-table {
     .q-table__bottom {
-      padding: 5px !important;
+      padding: 0.3125rem !important; // 5px
     }
 
     .schema-field-toggle .q-btn {
-      padding: 5px !important;
+      padding: 0.3125rem !important; // 5px
     }
   }
 }

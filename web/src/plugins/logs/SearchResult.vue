@@ -845,7 +845,6 @@ export default defineComponent({
 
   .select-pagination {
     position: relative;
-    top: -5px;
   }
 }
 
