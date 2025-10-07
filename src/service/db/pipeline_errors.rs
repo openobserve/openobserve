@@ -213,6 +213,20 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), infra::errors::Error> {
     Ok(())
 }
 
+/// Deletes pipeline error records older than the specified cutoff timestamp.
+///
+/// This is used for periodic cleanup of stale errors.
+pub async fn delete_older_than(cutoff_timestamp: i64) -> Result<u64, infra::errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let result = PipelineLastErrors::delete_many()
+        .filter(pipeline_last_errors::Column::LastErrorTimestamp.lt(cutoff_timestamp))
+        .exec(client)
+        .await?;
+
+    Ok(result.rows_affected)
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
