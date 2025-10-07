@@ -41,7 +41,7 @@ use infra::{
     errors::Error,
 };
 use proto::cluster_rpc::SearchQuery;
-use result_utils::get_ts_value;
+use result_utils::{extract_timestamp_range, get_ts_value};
 use tracing::Instrument;
 
 use crate::{
@@ -867,25 +867,9 @@ pub async fn _write_results(
     // Calculate actual time range of cached data.
     // For non-timestamp histogram queries, results may not be time-ordered,
     // so we must scan all hits to find the true min/max timestamps.
-    let (smallest_ts, largest_ts) = if is_histogram_non_ts_order {
-        // Scan all hits for non-timestamp ordered histogram queries
-        let mut min_ts = i64::MAX;
-        let mut max_ts = i64::MIN;
-        for hit in &local_resp.hits {
-            let ts = get_ts_value(ts_column, hit);
-            min_ts = min_ts.min(ts);
-            max_ts = max_ts.max(ts);
-        }
-        (min_ts, max_ts)
-    } else {
-        // For time-ordered results, first/last hits have min/max timestamps
-        let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
-        let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
-        (
-            std::cmp::min(first_rec_ts, last_rec_ts),
-            std::cmp::max(first_rec_ts, last_rec_ts),
-        )
-    };
+    let is_time_ordered = !is_histogram_non_ts_order;
+    let (smallest_ts, largest_ts) =
+        extract_timestamp_range(&local_resp.hits, ts_column, is_time_ordered);
 
     let discard_duration = second_micros(get_config().limit.cache_delay_secs);
 
@@ -1098,25 +1082,9 @@ pub async fn write_results_v2(
 
     // For histogram queries with non-timestamp ORDER BY, we need to scan all hits
     // to find actual min/max timestamps, since results may not be time-ordered
-    let (smallest_ts, largest_ts) = if is_histogram_non_ts_order {
-        // For non-timestamp ordered histogram queries, scan all hits to find actual min/max
-        let mut min_ts = i64::MAX;
-        let mut max_ts = i64::MIN;
-        for hit in &local_resp.hits {
-            let ts = get_ts_value(ts_column, hit);
-            min_ts = min_ts.min(ts);
-            max_ts = max_ts.max(ts);
-        }
-        (min_ts, max_ts)
-    } else {
-        // For time-ordered results, first/last hits have min/max timestamps
-        let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
-        let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
-        (
-            std::cmp::min(first_rec_ts, last_rec_ts),
-            std::cmp::max(first_rec_ts, last_rec_ts),
-        )
-    };
+    let is_time_ordered = !is_histogram_non_ts_order;
+    let (smallest_ts, largest_ts) =
+        extract_timestamp_range(&local_resp.hits, ts_column, is_time_ordered);
 
     let discard_duration = second_micros(get_config().limit.cache_delay_secs);
 

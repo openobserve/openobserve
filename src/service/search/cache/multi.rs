@@ -29,7 +29,7 @@ use crate::{
     common::meta::search::{CacheQueryRequest, ResultCacheSelectionStrategy},
     service::search::cache::{
         CachedQueryResponse,
-        result_utils::{get_ts_value, round_down_to_nearest_minute},
+        result_utils::{extract_timestamp_range, get_ts_value, round_down_to_nearest_minute},
     },
 };
 
@@ -198,20 +198,10 @@ async fn recursive_process_multiple_metas(
                 matching_cache_meta.end_time = discard_ts;
             }
             if !cached_response.hits.is_empty() {
-                // For non-timestamp histogram queries, results are not sorted by time
-                // We need to scan all hits to find actual min/max timestamps
-                let (response_start_time, response_end_time) = if cache_req
-                    .is_histogram_non_ts_order
-                {
-                    let mut min_ts = i64::MAX;
-                    let mut max_ts = i64::MIN;
-                    for hit in &cached_response.hits {
-                        let ts = get_ts_value(&cache_req.ts_column, hit);
-                        min_ts = min_ts.min(ts);
-                        max_ts = max_ts.max(ts);
-                    }
-                    (min_ts, max_ts)
-                } else {
+                // Determine if results are time-ordered for optimal timestamp extraction
+                let is_time_ordered = !cache_req.is_histogram_non_ts_order;
+
+                let (response_start_time, response_end_time) = if is_time_ordered {
                     // For time-ordered results, use first/last based on sort order
                     let last_rec_ts =
                         get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
@@ -228,6 +218,13 @@ async fn recursive_process_multiple_metas(
                         last_rec_ts
                     };
                     (start, end)
+                } else {
+                    // Non-time-ordered (e.g., ORDER BY count): scan all hits for accurate min/max
+                    extract_timestamp_range(
+                        &cached_response.hits,
+                        &cache_req.ts_column,
+                        is_time_ordered,
+                    )
                 };
                 log::info!(
                     "[CACHE RESULT {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} , len {}",

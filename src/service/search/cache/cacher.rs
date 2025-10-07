@@ -37,7 +37,10 @@ use crate::{
     service::search::{
         cache::{
             MultiCachedQueryResponse,
-            result_utils::{get_ts_value, round_down_to_nearest_minute},
+            result_utils::{
+                get_ts_value, has_non_timestamp_ordering, is_timestamp_field,
+                round_down_to_nearest_minute,
+            },
         },
         sql::{RE_HISTOGRAM, RE_SELECT_FROM, Sql, generate_histogram_interval},
     },
@@ -198,7 +201,7 @@ pub async fn check_cache(
         // Check if any order_by field matches the result_ts_col
         let mut found_ts_order = false;
         for (field, order) in &order_by {
-            if field.eq(&result_ts_col) || field.replace("\"", "").eq(&result_ts_col) {
+            if is_timestamp_field(field, &result_ts_col) {
                 is_descending = order == &OrderBy::Desc;
                 found_ts_order = true;
                 break;
@@ -220,9 +223,7 @@ pub async fn check_cache(
     // requiring us to scan all hits to find the actual time range.
     let is_histogram_non_ts_order = is_histogram_query
         && !order_by.is_empty()
-        && !order_by
-            .iter()
-            .any(|(field, _)| field == &result_ts_col || field.replace("\"", "") == result_ts_col);
+        && has_non_timestamp_ordering(&order_by, &result_ts_col);
 
     let mut multi_resp = MultiCachedQueryResponse::default();
     if discard_interval > -1 {
@@ -731,7 +732,7 @@ pub fn get_ts_col_order_by(
 
     if !order_by.is_empty() && !result_ts_col.is_empty() {
         for (field, order) in order_by {
-            if field.eq(&result_ts_col) || field.replace("\"", "").eq(&result_ts_col) {
+            if is_timestamp_field(field, &result_ts_col) {
                 is_descending = order == &OrderBy::Desc;
                 break;
             }
