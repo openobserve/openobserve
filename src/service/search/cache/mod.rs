@@ -852,19 +852,35 @@ pub async fn _write_results(
         return;
     }
 
-    let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
-    let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
+    // For histogram queries with non-timestamp ORDER BY, we need to scan all hits
+    // to find actual min/max timestamps, since results may not be time-ordered
+    let (smallest_ts, largest_ts) = if res.histogram_interval.is_some() {
+        // For histogram queries, find actual min/max across all hits
+        let mut min_ts = i64::MAX;
+        let mut max_ts = i64::MIN;
+        for hit in &local_resp.hits {
+            let ts = get_ts_value(ts_column, hit);
+            min_ts = min_ts.min(ts);
+            max_ts = max_ts.max(ts);
+        }
+        (min_ts, max_ts)
+    } else {
+        // For non-histogram, use first/last (assumes time-sorted)
+        let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
+        let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
+        (
+            std::cmp::min(first_rec_ts, last_rec_ts),
+            std::cmp::max(first_rec_ts, last_rec_ts),
+        )
+    };
 
-    let smallest_ts = std::cmp::min(first_rec_ts, last_rec_ts);
     let discard_duration = second_micros(get_config().limit.cache_delay_secs);
 
-    if (last_rec_ts - first_rec_ts).abs() < discard_duration
+    if (largest_ts - smallest_ts).abs() < discard_duration
         && smallest_ts > Utc::now().timestamp_micros() - discard_duration
     {
         return;
     }
-
-    let largest_ts = std::cmp::max(first_rec_ts, last_rec_ts);
 
     let cache_end_time = if largest_ts > 0 && largest_ts < req_query_end_time {
         largest_ts
@@ -1066,19 +1082,35 @@ pub async fn write_results_v2(
         return;
     }
 
-    let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
-    let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
+    // For histogram queries with non-timestamp ORDER BY, we need to scan all hits
+    // to find actual min/max timestamps, since results may not be time-ordered
+    let (smallest_ts, largest_ts) = if res.histogram_interval.is_some() {
+        // For histogram queries, find actual min/max across all hits
+        let mut min_ts = i64::MAX;
+        let mut max_ts = i64::MIN;
+        for hit in &local_resp.hits {
+            let ts = get_ts_value(ts_column, hit);
+            min_ts = min_ts.min(ts);
+            max_ts = max_ts.max(ts);
+        }
+        (min_ts, max_ts)
+    } else {
+        // For non-histogram, use first/last (assumes time-sorted)
+        let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
+        let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
+        (
+            std::cmp::min(first_rec_ts, last_rec_ts),
+            std::cmp::max(first_rec_ts, last_rec_ts),
+        )
+    };
 
-    let smallest_ts = std::cmp::min(first_rec_ts, last_rec_ts);
     let discard_duration = second_micros(get_config().limit.cache_delay_secs);
 
-    if (last_rec_ts - first_rec_ts).abs() < discard_duration
+    if (largest_ts - smallest_ts).abs() < discard_duration
         && smallest_ts > Utc::now().timestamp_micros() - discard_duration
     {
         return;
     }
-
-    let largest_ts = std::cmp::max(first_rec_ts, last_rec_ts);
 
     let cache_end_time = if largest_ts > 0 && largest_ts < req_query_end_time {
         largest_ts
