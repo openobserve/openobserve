@@ -106,6 +106,19 @@ export const usePanelDataLoader = (
     panelSchema.value.id,
   );
 
+  const shouldFetchAnnotations = () => {
+    return [
+      "area",
+      "area-stacked",
+      "bar",
+      "h-bar",
+      "line",
+      "scatter",
+      "stacked",
+      "h-stacked",
+    ].includes(panelSchema.value.type);
+  };
+
   const getFallbackOrderByCol = () => {
     // from panelSchema, get first x axis field alias
     if (panelSchema?.value?.queries?.[0]?.fields?.x) {
@@ -976,7 +989,6 @@ export const usePanelDataLoader = (
     // Log variables for which the API will be skipped
     variablesToSkip.forEach((variableName) => {
       state.loading = false;
-      console.log(`Skipping API for variable: ${variableName}`);
     });
 
     // Return true if there are any variables to skip, indicating loading should be continued
@@ -1258,83 +1270,106 @@ export const usePanelDataLoader = (
 
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
-        // Iterate through each query in the panel schema
-        const queryPromises = panelSchema.value.queries?.map(
-          async (it: any) => {
-            const { query: query1, metadata: metadata1 } = replaceQueryValue(
-              it.query,
-              startISOTimestamp,
-              endISOTimestamp,
-              panelSchema.value.queryType,
-            );
-
-            const { query: query2, metadata: metadata2 } =
-              await applyDynamicVariables(query1, panelSchema.value.queryType);
-
-            const query = query2;
-            const metadata = {
-              originalQuery: it.query,
-              query: query,
-              startTime: startISOTimestamp,
-              endTime: endISOTimestamp,
-              queryType: panelSchema.value.queryType,
-              variables: [...(metadata1 || []), ...(metadata2 || [])],
-            };
-            const { traceparent, traceId } = generateTraceContext();
-            addTraceId(traceId);
-            try {
-              const res = await callWithAbortController(
-                () =>
-                  queryService.metrics_query_range({
-                    org_identifier: store.state.selectedOrganization.identifier,
-                    query: query,
-                    start_time: startISOTimestamp,
-                    end_time: endISOTimestamp,
-                    step: panelSchema.value.config.step_value ?? "0",
-                    dashboard_id: dashboardId?.value,
-                    dashboard_name: dashboardName?.value,
-                    folder_id: folderId?.value,
-                    folder_name: folderName?.value,
-                    panel_id: panelSchema.value.id,
-                    panel_name: panelSchema.value.title,
-                    run_id: runId?.value,
-                    tab_id: tabId?.value,
-                    tab_name: tabName?.value,
-                  }),
-                abortController.signal,
+        try {
+          // Iterate through each query in the panel schema
+          const queryPromises = panelSchema.value.queries?.map(
+            async (it: any) => {
+              const { query: query1, metadata: metadata1 } = replaceQueryValue(
+                it.query,
+                startISOTimestamp,
+                endISOTimestamp,
+                panelSchema.value.queryType,
               );
 
-              state.errorDetail = {
-                message: "",
-                code: "",
+              const { query: query2, metadata: metadata2 } =
+                await applyDynamicVariables(
+                  query1,
+                  panelSchema.value.queryType,
+                );
+
+              const query = query2;
+              const metadata = {
+                originalQuery: it.query,
+                query: query,
+                startTime: startISOTimestamp,
+                endTime: endISOTimestamp,
+                queryType: panelSchema.value.queryType,
+                variables: [...(metadata1 || []), ...(metadata2 || [])],
               };
-              return { result: res.data.data, metadata: metadata };
-            } catch (error) {
-              processApiError(error, "promql");
-              return { result: null, metadata: metadata };
-            } finally {
-              removeTraceId(traceId);
+              const { traceparent, traceId } = generateTraceContext();
+              addTraceId(traceId);
+              try {
+                const res = await callWithAbortController(
+                  () =>
+                    queryService.metrics_query_range({
+                      org_identifier:
+                        store.state.selectedOrganization.identifier,
+                      query: query,
+                      start_time: startISOTimestamp,
+                      end_time: endISOTimestamp,
+                      step: panelSchema.value.config.step_value ?? "0",
+                      dashboard_id: dashboardId?.value,
+                      dashboard_name: dashboardName?.value,
+                      folder_id: folderId?.value,
+                      folder_name: folderName?.value,
+                      panel_id: panelSchema.value.id,
+                      panel_name: panelSchema.value.title,
+                      run_id: runId?.value,
+                      tab_id: tabId?.value,
+                      tab_name: tabName?.value,
+                    }),
+                  abortController.signal,
+                );
+
+                state.errorDetail = {
+                  message: "",
+                  code: "",
+                };
+                return { result: res.data.data, metadata: metadata };
+              } catch (error) {
+                processApiError(error, "promql");
+                return { result: null, metadata: metadata };
+              } finally {
+                removeTraceId(traceId);
+              }
+            },
+          );
+
+          // Start fetching annotations in parallel with queries
+          const annotationsPromise = (async () => {
+            try {
+              if (!shouldFetchAnnotations()) {
+                return [];
+              }
+              const annotationList = await refreshAnnotations(
+                startISOTimestamp,
+                endISOTimestamp,
+              );
+              return annotationList || [];
+            } catch (annotationError) {
+              console.error("Failed to fetch annotations:", annotationError);
+              return [];
             }
-          },
-        );
+          })();
 
-        // get annotations
-        const annotationList = await refreshAnnotations(
-          startISOTimestamp,
-          endISOTimestamp,
-        );
+          // Wait for all query promises to resolve
+          const queryResults: any = await Promise.all(queryPromises);
 
-        // Wait for all query promises to resolve
-        const queryResults: any = await Promise.all(queryPromises);
-        state.loading = false;
-        state.data = queryResults.map((it: any) => it?.result);
-        state.metadata = {
-          queries: queryResults.map((it: any) => it?.metadata),
-        };
-        state.annotations = annotationList || [];
+          state.loading = false;
+          state.data = queryResults.map((it: any) => it?.result);
+          state.metadata = {
+            queries: queryResults.map((it: any) => it?.metadata),
+          };
 
-        // this is async task, which will be executed in background(await is not required)
-        saveCurrentStateToCache();
+          // Wait for annotations to complete and update state
+          // The watcher in PanelSchemaRenderer will trigger re-render when this updates
+          state.annotations = await annotationsPromise;
+
+          // this is async task, which will be executed in background(await is not required)
+          saveCurrentStateToCache();
+        } catch (error) {
+          state.loading = false;
+        }
       } else {
         // copy of current abortController
         // which is used to check whether the current query has been aborted
@@ -1432,6 +1467,26 @@ export const usePanelDataLoader = (
               }
 
               try {
+                // Start fetching annotations in parallel with search
+                const annotationsPromise = (async () => {
+                  try {
+                    if (!shouldFetchAnnotations()) {
+                      return [];
+                    }
+                    const annotationList = await refreshAnnotations(
+                      startISOTimestamp,
+                      endISOTimestamp,
+                    );
+                    return annotationList || [];
+                  } catch (annotationError) {
+                    console.error(
+                      "Failed to fetch annotations:",
+                      annotationError,
+                    );
+                    return [];
+                  }
+                })();
+
                 // get search queries
                 const searchQueries = timeShiftQueries.map(
                   (it: any) => it.searchRequestObj,
@@ -1548,19 +1603,15 @@ export const usePanelDataLoader = (
                     );
                   }
 
-                  // get annotations
-                  const annotationList = await refreshAnnotations(
-                    startISOTimestamp,
-                    endISOTimestamp,
-                  );
-                  state.annotations = annotationList;
-
                   // need to break the loop, save the cache
                   // this is async task, which will be executed in background(await is not required)
                   saveCurrentStateToCache();
                 } finally {
                   removeTraceId(traceId);
                 }
+
+                // Wait for annotations to complete (started in parallel earlier)
+                state.annotations = await annotationsPromise;
               } catch (error) {
                 // Process API error for "sql"
                 processApiError(error, "sql");
@@ -1601,14 +1652,26 @@ export const usePanelDataLoader = (
                 return;
               }
               state.metadata.queries[panelQueryIndex] = metadata;
-              const annotations = await refreshAnnotations(
-                Number(startISOTimestamp),
-                Number(endISOTimestamp),
-              );
 
-              state.annotations = annotations;
+              let annotationsPromise: Promise<any> | null = null;
 
               if (searchResponse?.value?.hits?.length > 0) {
+                // Start fetching annotations in parallel
+                annotationsPromise = (async () => {
+                  try {
+                    if (!shouldFetchAnnotations()) {
+                      return [];
+                    }
+                    const annotationList = await refreshAnnotations(
+                      Number(startISOTimestamp),
+                      Number(endISOTimestamp),
+                    );
+                    return annotationList || [];
+                  } catch (annotationError) {
+                    return [];
+                  }
+                })();
+
                 // Add empty objects to state.resultMetaData for the results of this query
                 state.data.push([]);
                 state?.resultMetaData?.push([{}]); // Initialize as array with one element
@@ -1619,39 +1682,62 @@ export const usePanelDataLoader = (
                 state.resultMetaData[currentQueryIndex] = [searchResponse.value]; // Wrap in array
                 // set loading to false
                 state.loading = false;
+              } else {
+                // Start fetching annotations in parallel for ALL query types
+                annotationsPromise = (async () => {
+                  try {
+                    if (!shouldFetchAnnotations()) {
+                      return [];
+                    }
+                    const annotationList = await refreshAnnotations(
+                      Number(startISOTimestamp),
+                      Number(endISOTimestamp),
+                    );
+                    return annotationList || [];
+                  } catch (annotationError) {
+                    console.error(
+                      "Failed to fetch annotations:",
+                      annotationError,
+                    );
+                    return [];
+                  }
+                })();
 
-                return;
+                if (isStreamingEnabled()) {
+                  await getDataThroughStreaming(
+                    query,
+                    it,
+                    startISOTimestamp,
+                    endISOTimestamp,
+                    pageType,
+                    panelQueryIndex,
+                    abortControllerRef,
+                  );
+                } else if (isWebSocketEnabled()) {
+                  await getDataThroughWebSocket(
+                    query,
+                    it,
+                    startISOTimestamp,
+                    endISOTimestamp,
+                    pageType,
+                    panelQueryIndex,
+                  );
+                } else {
+                  await getDataThroughPartitions(
+                    query,
+                    metadata,
+                    it,
+                    startISOTimestamp,
+                    endISOTimestamp,
+                    pageType,
+                    abortControllerRef,
+                  );
+                }
               }
 
-              if (isStreamingEnabled()) {
-                await getDataThroughStreaming(
-                  query,
-                  it,
-                  startISOTimestamp,
-                  endISOTimestamp,
-                  pageType,
-                  panelQueryIndex,
-                  abortControllerRef,
-                );
-              } else if (isWebSocketEnabled()) {
-                await getDataThroughWebSocket(
-                  query,
-                  it,
-                  startISOTimestamp,
-                  endISOTimestamp,
-                  pageType,
-                  panelQueryIndex,
-                );
-              } else {
-                await getDataThroughPartitions(
-                  query,
-                  metadata,
-                  it,
-                  startISOTimestamp,
-                  endISOTimestamp,
-                  pageType,
-                  abortControllerRef,
-                );
+              // Wait for annotations if they were started
+              if (annotationsPromise) {
+                state.annotations = await annotationsPromise;
               }
 
               // this is async task, which will be executed in background(await is not required)
