@@ -31,7 +31,10 @@ use crate::{
     service::search::{
         cache::{
             MultiCachedQueryResponse,
-            result_utils::{get_ts_value, round_down_to_nearest_minute},
+            result_utils::{
+                get_ts_value, has_non_timestamp_ordering, is_timestamp_field,
+                round_down_to_nearest_minute,
+            },
         },
         sql::{RE_HISTOGRAM, RE_SELECT_FROM, Sql, generate_histogram_interval},
     },

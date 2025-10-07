@@ -31,7 +31,7 @@ use config::{
         hash::Sum64,
         json,
         sql::{is_aggregate_query, is_eligible_for_histogram},
-        time::format_duration,
+        time::{format_duration, second_micros},
     },
 };
 use infra::{
@@ -50,7 +50,7 @@ use crate::{
     service::{
         search::{
             self as SearchService,
-            cache::cacher::check_cache,
+            cache::{cacher::check_cache, result_utils::extract_timestamp_range},
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         },
         self_reporting::{http_report_metrics, report_request_usage_stats},
@@ -477,8 +477,8 @@ pub async fn search(
         // Determine if this is a non-timestamp histogram query
         // Note: write_res.order_by_metadata contains the same ORDER BY info
         let is_histogram_non_ts_order = c_resp.histogram_interval > 0
-            && !write_res.order_by_metadata.is_empty()
-            && write_res
+            && !res.order_by_metadata.is_empty()
+            && res
                 .order_by_metadata
                 .first()
                 .map(|(field, _)| field != &c_resp.ts_column)
@@ -753,7 +753,7 @@ pub async fn _write_results(
     let (smallest_ts, largest_ts) =
         extract_timestamp_range(&local_resp.hits, ts_column, is_time_ordered);
 
-    let discard_duration = second_micros(get_config().limit.cache_delay_secs);
+    let discard_duration = second_micros(get_config().common.result_cache_discard_duration);
 
     if (largest_ts - smallest_ts).abs() < discard_duration
         && smallest_ts > Utc::now().timestamp_micros() - discard_duration
@@ -968,7 +968,7 @@ pub async fn write_results_v2(
     let (smallest_ts, largest_ts) =
         extract_timestamp_range(&local_resp.hits, ts_column, is_time_ordered);
 
-    let discard_duration = second_micros(get_config().limit.cache_delay_secs);
+    let discard_duration = second_micros(get_config().common.result_cache_discard_duration);
 
     if (largest_ts - smallest_ts).abs() < discard_duration
         && smallest_ts > Utc::now().timestamp_micros() - discard_duration

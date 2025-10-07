@@ -25,7 +25,7 @@ use crate::{
     common::meta::search::{CacheQueryRequest, ResultCacheSelectionStrategy},
     service::search::cache::{
         CachedQueryResponse,
-        result_utils::{get_ts_value, round_down_to_nearest_minute},
+        result_utils::{extract_timestamp_range, get_ts_value, round_down_to_nearest_minute},
     },
 };
 
