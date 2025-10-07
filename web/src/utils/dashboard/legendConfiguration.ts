@@ -1325,15 +1325,15 @@ export const applyPieDonutCenterAdjustment = (
  * Applies all legend configurations to the chart options
  *
  * @param {any} panelSchema - The panel schema containing legend configuration
- * @param {any} options - The chart options object to modify
  * @param {any} chartPanelRef - Reference to the chart panel element
  * @param {any} hoveredSeriesState - State for handling hovered series
+ * @param {any} options - The chart options object to modify
  */
 export const applyLegendConfiguration = (
   panelSchema: any,
-  options: any,
   chartPanelRef: any,
   hoveredSeriesState: any,
+  options: any,
 ) => {
   // If trellis is enabled (layout is not null), disable all legend configurations
   if (
