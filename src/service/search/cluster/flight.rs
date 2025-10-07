@@ -75,6 +75,17 @@ use crate::{
     },
 };
 
+/// Check if the local node is the same role as the given role group.
+/// If given role group is None, it means the local node is the same role as the given role group.
+/// If given role group is RoleGroup::None, it still means local node is same as the given role.
+fn is_local_same_role(role_group: Option<RoleGroup>) -> bool {
+    if let Some(role_group) = role_group {
+        role_group == RoleGroup::None || LOCAL_NODE.role_group == role_group
+    } else {
+        true
+    }
+}
+
 #[async_recursion]
 #[tracing::instrument(
     name = "service:search:flight:leader",
@@ -162,12 +173,30 @@ pub async fn search(
         })
         .unwrap_or(Some(RoleGroup::Interactive));
     let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
+    log::debug!("get online querier nodes {:?}", nodes);
 
     // local mode, only use local node as querier node
     if req.local_mode.unwrap_or_default() {
-        if LOCAL_NODE.is_querier() {
+        // If LOCAL_Node is an alert querier and the the role group is interactive
+        // then we must use the an interactive querier NOT background querier
+        // If LOCAL_NODE is alert querier and role group is background, we can use it
+        // If LOCAL_NODE is not alert querier and role group is interactive, we can use it
+        // If LOCAL_NODE is not alert querier and role group is background, we can NOT use it
+        if LOCAL_NODE.is_querier() && is_local_same_role(role_group) {
+            log::debug!(
+                "[trace_id {trace_id}] local node is a querier, nodes: {:?}",
+                nodes
+            );
             nodes.retain(|n| n.name.eq(&LOCAL_NODE.name));
+            log::debug!(
+                "[trace_id {trace_id}] local node is a querier, nodes after filtering: {:?}",
+                nodes
+            );
         } else {
+            log::debug!(
+                "[trace_id {trace_id}] local node is not a querier, nodes: {:?}",
+                nodes
+            );
             nodes = nodes
                 .into_iter()
                 .filter(|n| n.is_querier())
