@@ -20,8 +20,6 @@ import {
   getContrastColor,
   applySeriesColorMappings,
   getUnitValue,
-  calculateBottomLegendHeight,
-  calculateRightLegendWidth,
 } from "./convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
@@ -31,6 +29,10 @@ import {
   getSeriesColor,
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
+import {
+  calculateBottomLegendHeight,
+  calculateRightLegendWidth,
+} from "./legendConfiguration";
 
 let moment: any;
 let momentInitialized = false;

@@ -34,10 +34,6 @@ import {
   getUnitValue,
   isTimeSeries,
   isTimeStamp,
-  calculateChartDimensions,
-  calculatePieChartRadius,
-  shouldApplyChartAlignment,
-  generateChartAlignmentProperties,
 } from "./convertDataIntoUnitValue";
 import {
   calculateGridPositions,
@@ -59,6 +55,10 @@ import {
   applyPieDonutChartAlignment,
   getChartDimensions,
   applyPieDonutCenterAdjustment,
+  calculateChartDimensions,
+  calculatePieChartRadius,
+  shouldApplyChartAlignment,
+  generateChartAlignmentProperties,
 } from "./legendConfiguration";
 
 /**
