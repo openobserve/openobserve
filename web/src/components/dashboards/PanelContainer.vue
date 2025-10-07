@@ -46,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="cursor: pointer"
           data-test="dashboard-panel-description-info"
         >
-          <q-tooltip anchor="bottom right"
-self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right" self="top right"
+max-width="220px">
             <div style="white-space: pre-wrap">
               {{ props.data.description }}
             </div>
@@ -72,8 +72,8 @@ self="top right" max-width="220px">
           @click="showViewPanel = true"
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
         >
-          <q-tooltip anchor="bottom right"
-self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right" self="top right"
+max-width="220px">
             Some dynamic variables are not applied because the field is not
             present in the query's stream. Open Query Inspector to see all the
             details of the variables and queries executed to render this panel
@@ -90,8 +90,8 @@ self="top right" max-width="220px">
           data-test="dashboard-panel-error-data"
           class="warning"
         >
-          <q-tooltip anchor="bottom right"
-self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right" self="top right"
+max-width="220px">
             <div style="white-space: pre-wrap">
               {{ errorData }}
             </div>
@@ -106,8 +106,8 @@ self="top right" max-width="220px">
           data-test="dashboard-panel-max-duration-warning"
           class="warning"
         >
-          <q-tooltip anchor="bottom right"
-self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right" self="top right"
+max-width="220px">
             <div style="white-space: pre-wrap">
               {{ maxQueryRange.join("\n\n") }}
             </div>

@@ -129,8 +129,25 @@ color="primary" size="md" /> Select a stream
 color="primary" size="md" />
               {{ t("search.applySearch") }}
             </div>
-
-            <div data-test="logs-search-search-result">
+            <div
+              v-else-if="
+                searchObj.data.queryResults.hasOwnProperty('total') &&
+                searchObj.data.queryResults?.hits?.length == 0 &&
+                searchObj.loading == false
+              "
+              class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
+            >
+              <q-icon name="info"
+color="primary" size="md" /> No traces found.
+              Please adjust the filters and try again.
+            </div>
+            <div
+              data-test="logs-search-search-result"
+              v-show="
+                searchObj.data.queryResults.hasOwnProperty('total') &&
+                !!searchObj.data.queryResults?.hits?.length
+              "
+            >
               <search-result
                 ref="searchResultRef"
                 @update:datetime="setHistogramDate"
@@ -1171,6 +1188,7 @@ const restoreFilters = (query: string) => {
 };
 
 const setHistogramDate = async (date: any) => {
+  console.log(date);
   searchBarRef.value.dateTimeRef.setCustomDate("absolute", date);
 };
 
