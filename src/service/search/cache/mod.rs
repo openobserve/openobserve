@@ -462,6 +462,16 @@ pub async fn search(
         && (results.first().is_some_and(|res| !res.hits.is_empty())
             || results.last().is_some_and(|res| !res.hits.is_empty()))
     {
+        // Determine if this is a non-timestamp histogram query
+        // Note: write_res.order_by_metadata contains the same ORDER BY info
+        let is_non_ts_histogram = c_resp.histogram_interval > 0
+            && !write_res.order_by_metadata.is_empty()
+            && write_res
+                .order_by_metadata
+                .first()
+                .map(|(field, _)| field != &c_resp.ts_column)
+                .unwrap_or(false);
+
         write_results_v2(
             trace_id,
             &c_resp.ts_column,
@@ -472,6 +482,7 @@ pub async fn search(
             is_aggregate,
             c_resp.is_descending,
             c_resp.clear_cache,
+            is_non_ts_histogram,
         )
         .await;
     }
@@ -825,6 +836,7 @@ pub async fn _write_results(
     file_path: String,
     is_aggregate: bool,
     is_descending: bool,
+    is_non_ts_histogram: bool,
 ) {
     // disable write_results_v1
     // return;
@@ -852,10 +864,11 @@ pub async fn _write_results(
         return;
     }
 
-    // For histogram queries with non-timestamp ORDER BY, we need to scan all hits
-    // to find actual min/max timestamps, since results may not be time-ordered
-    let (smallest_ts, largest_ts) = if res.histogram_interval.is_some() {
-        // For histogram queries, find actual min/max across all hits
+    // Calculate actual time range of cached data.
+    // For non-timestamp histogram queries, results may not be time-ordered,
+    // so we must scan all hits to find the true min/max timestamps.
+    let (smallest_ts, largest_ts) = if is_non_ts_histogram {
+        // Scan all hits for non-timestamp ordered histogram queries
         let mut min_ts = i64::MAX;
         let mut max_ts = i64::MIN;
         for hit in &local_resp.hits {
@@ -865,7 +878,7 @@ pub async fn _write_results(
         }
         (min_ts, max_ts)
     } else {
-        // For non-histogram, use first/last (assumes time-sorted)
+        // For time-ordered results, first/last hits have min/max timestamps
         let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
         let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
         (
@@ -983,6 +996,7 @@ pub async fn write_results_v2(
     is_aggregate: bool,
     is_descending: bool,
     clear_cache: bool,
+    is_non_ts_histogram: bool,
 ) {
     let mut local_resp = res.clone();
 
@@ -1084,8 +1098,8 @@ pub async fn write_results_v2(
 
     // For histogram queries with non-timestamp ORDER BY, we need to scan all hits
     // to find actual min/max timestamps, since results may not be time-ordered
-    let (smallest_ts, largest_ts) = if res.histogram_interval.is_some() {
-        // For histogram queries, find actual min/max across all hits
+    let (smallest_ts, largest_ts) = if is_non_ts_histogram {
+        // For non-timestamp ordered histogram queries, scan all hits to find actual min/max
         let mut min_ts = i64::MAX;
         let mut max_ts = i64::MIN;
         for hit in &local_resp.hits {
@@ -1095,7 +1109,7 @@ pub async fn write_results_v2(
         }
         (min_ts, max_ts)
     } else {
-        // For non-histogram, use first/last (assumes time-sorted)
+        // For time-ordered results, first/last hits have min/max timestamps
         let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
         let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
         (

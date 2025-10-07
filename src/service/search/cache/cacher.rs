@@ -214,6 +214,16 @@ pub async fn check_cache(
     if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
         return MultiCachedQueryResponse::default();
     }
+
+    // Determine if this is a histogram query with non-timestamp ORDER BY.
+    // These queries need special handling because results may not be time-ordered,
+    // requiring us to scan all hits to find the actual time range.
+    let is_non_ts_histogram = is_histogram_query
+        && !order_by.is_empty()
+        && !order_by
+            .iter()
+            .any(|(field, _)| field == &result_ts_col || field.replace("\"", "") == result_ts_col);
+
     let mut multi_resp = MultiCachedQueryResponse::default();
     if discard_interval > -1 {
         multi_resp.histogram_interval = discard_interval / 1000 / 1000;
@@ -231,6 +241,7 @@ pub async fn check_cache(
                     ts_column: result_ts_col.clone(),
                     discard_interval,
                     is_descending,
+                    is_non_ts_histogram,
                 },
                 is_streaming,
             )
@@ -315,6 +326,7 @@ pub async fn check_cache(
                 ts_column: result_ts_col.clone(),
                 discard_interval,
                 is_descending,
+                is_non_ts_histogram,
             },
         )
         .await

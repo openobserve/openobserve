@@ -183,12 +183,14 @@ async fn recursive_process_multiple_metas(
                     && hit_ts < discard_ts
             });
 
-            // Sort the hits by the order
+            // Sort the hits using stored ORDER BY metadata
+            // This preserves the original query's ordering (e.g., ORDER BY count DESC)
+            let order_by_metadata = cached_response.order_by_metadata.clone();
             sort_response(
                 cache_req.is_descending,
                 &mut cached_response,
                 &cache_req.ts_column,
-                &vec![],
+                &order_by_metadata,
             );
 
             cached_response.total = cached_response.hits.len();
@@ -196,19 +198,34 @@ async fn recursive_process_multiple_metas(
                 matching_cache_meta.end_time = discard_ts;
             }
             if !cached_response.hits.is_empty() {
-                let last_rec_ts =
-                    get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
-                let first_rec_ts =
-                    get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
-                let response_start_time = if cache_req.is_descending {
-                    last_rec_ts
+                // For non-timestamp histogram queries, results are not sorted by time
+                // We need to scan all hits to find actual min/max timestamps
+                let (response_start_time, response_end_time) = if cache_req.is_non_ts_histogram {
+                    let mut min_ts = i64::MAX;
+                    let mut max_ts = i64::MIN;
+                    for hit in &cached_response.hits {
+                        let ts = get_ts_value(&cache_req.ts_column, hit);
+                        min_ts = min_ts.min(ts);
+                        max_ts = max_ts.max(ts);
+                    }
+                    (min_ts, max_ts)
                 } else {
-                    first_rec_ts
-                };
-                let response_end_time = if cache_req.is_descending {
-                    first_rec_ts
-                } else {
-                    last_rec_ts
+                    // For time-ordered results, use first/last based on sort order
+                    let last_rec_ts =
+                        get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
+                    let first_rec_ts =
+                        get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
+                    let start = if cache_req.is_descending {
+                        last_rec_ts
+                    } else {
+                        first_rec_ts
+                    };
+                    let end = if cache_req.is_descending {
+                        first_rec_ts
+                    } else {
+                        last_rec_ts
+                    };
+                    (start, end)
                 };
                 log::info!(
                     "[CACHE RESULT {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} , len {}",
@@ -287,6 +304,19 @@ fn get_allowed_up_to(
     cache_req: &CacheQueryRequest,
     discard_duration: i64,
 ) -> i64 {
+    // For non-timestamp histogram queries, results are not sorted by time
+    // Scan all hits to find the actual maximum timestamp
+    if cache_req.is_non_ts_histogram {
+        let max_ts = cached_response
+            .hits
+            .iter()
+            .map(|hit| get_ts_value(&cache_req.ts_column, hit))
+            .max()
+            .unwrap_or(0);
+        return max_ts;
+    }
+
+    // For time-ordered results, use first/last based on sort order
     let first_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
     let last_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
 
