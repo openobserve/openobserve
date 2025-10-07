@@ -2005,6 +2005,18 @@ pub struct Pipeline {
         help = "interval in milliseconds to spawn a new sink task"
     )]
     pub pipeline_sink_task_spawn_interval_ms: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_ERROR_RETENTION_MINS",
+        default = 60,
+        help = "pipeline error retention time in minutes, errors older than this will be cleaned up"
+    )]
+    pub error_retention_mins: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_ERROR_CLEANUP_INTERVAL",
+        default = 300,
+        help = "pipeline error cleanup interval in seconds"
+    )]
+    pub error_cleanup_interval: u64,
 }
 
 #[derive(EnvConfig, Default)]
