@@ -3,7 +3,7 @@ name: API Integration Test
 on:
   push:
     branches:
-      - "main"
+      - "ci/update_workflow_with_internal_runners"
     paths-ignore:
       - "**.md"
       - "**.yml"
@@ -29,7 +29,7 @@ env:
 jobs:
   api_integration_tests:
     name: api_integration_tests
-    runs-on: ubicloud-standard-8
+    runs-on: repo-openobserve-standard-8
     steps:
       - name: Remove unused tools
         run: |
