@@ -403,7 +403,7 @@ async fn handle_node_list_put(
     // check if the same node is already in the cluster
     if let Some(node) = get_cached_node_by_name(&item_value.name).await {
         if node.uuid.ne(&item_value.uuid) {
-            log::info!("[CLUSTER] removing exisiting entry {node:?}, overwriting..");
+            log::info!("[CLUSTER] removing existing entry {node:?}, overwriting..");
             NODES.write().await.remove(&node.uuid);
         }
     }
