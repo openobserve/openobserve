@@ -57,42 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               The scrape interval is the frequency, in seconds, at which the monitoring system collects metrics.
             </span>
           </div>
-          <!-- enable search streaming section -->
-          <div v-if="store.state.zoConfig.streaming_enabled" class="settings-grid-item">
-            <span class="individual-setting-title">
-              {{ t('settings.enableStreamingSearch') }}
-            </span>
-            <q-toggle
-              style="width: 120px;"
-              v-model="enableStreamingSearch"
-              :label="'Enabled'"
-              size="lg"
-              data-test="general-settings-enable-streaming"
-              class="showLabelOnTop o2-toggle-button-lg"
-              :class="store.state.theme == 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-            />
-            <span class="individual-setting-description">
-              Enabling search streaming will increase performance.
-            </span>
-          </div>
-          <!-- enable aggregation cache section -->
-          <div v-if="config.isEnterprise == 'true'" class="settings-grid-item no-border-bottom">
-            <span class="individual-setting-title">
-              {{ t('settings.enableStreamingAggregation') }}
-            </span>
-            <q-toggle
-              style="width: 120px;"
-              v-model="enableStreamingAggregation"
-              :label="'Enabled'"
-              size="lg"
-              data-test="general-settings-enable-streaming-aggregation"
-              class="showLabelOnTop o2-toggle-button-lg"
-              :class="store.state.theme == 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-            />
-            <span class="individual-setting-description">
-              Enabling streaming aggregates will help improve the performance of aggregate queries.
-            </span>
-          </div>
           <span>&nbsp;</span>
 
           <div class="flex justify-start">
@@ -352,16 +316,6 @@ export default defineComponent({
         15,
     );
 
-    const enableStreamingSearch = ref(
-      store.state?.organizationData?.organizationSettings
-        ?.enable_streaming_search ?? false,
-    );
-
-    const enableStreamingAggregation = ref(
-      store.state?.organizationData?.organizationSettings
-        ?.streaming_aggregation_enabled ?? false,
-    );
-
     const loadingState = ref(false);
     const customText = ref("");
     const editingText = ref(false);
@@ -373,14 +327,6 @@ export default defineComponent({
       scrapeIntereval.value =
         store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15;
-
-      enableStreamingSearch.value =
-        store.state?.organizationData?.organizationSettings
-          ?.enable_streaming_search ?? false;
-
-      enableStreamingAggregation.value =
-        store.state?.organizationData?.organizationSettings
-          ?.streaming_aggregation_enabled ?? false;
     };
 
     onActivated(() => {
@@ -411,8 +357,6 @@ export default defineComponent({
         store.dispatch("setOrganizationSettings", {
           ...store.state?.organizationData?.organizationSettings,
           scrape_interval: scrapeIntereval.value,
-          enable_streaming_search: enableStreamingSearch.value,
-          streaming_aggregation_enabled: enableStreamingAggregation.value,
         });
 
         //update settings in backend
@@ -654,8 +598,6 @@ export default defineComponent({
       updateCustomText,
       confirmDeleteImage: ref(false),
       sanitizeInput,
-      enableStreamingSearch,
-      enableStreamingAggregation,
     };
   },
 });
