@@ -157,12 +157,19 @@ pub async fn search(
         })
         .unwrap_or(Some(RoleGroup::Interactive));
     let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
+    log::debug!("get online querier nodes {:?}", nodes);
 
     // local mode, only use local node as querier node
     if req.local_mode.unwrap_or_default() {
         if LOCAL_NODE.is_querier() {
+            log::debug!("local node is a querier, nodes: {:?}", nodes);
             nodes.retain(|n| n.name.eq(&LOCAL_NODE.name));
+            log::debug!(
+                "local node is a querier, nodes after filtering: {:?}",
+                nodes
+            );
         } else {
+            log::debug!("local node is not a querier, nodes: {:?}", nodes);
             nodes = nodes
                 .into_iter()
                 .filter(|n| n.is_querier())
