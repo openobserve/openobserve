@@ -254,14 +254,15 @@ export default defineComponent({
 .syntax-guide-button {
   cursor: pointer;
   text-transform: capitalize;
-  width: 32px;
-  height: 32px;
+  width: 2rem; // 32px
+  height: 2rem; // 32px
   font-weight: bold;
-  border: 1px solid rgba(89, 96, 178, 0.3);
+  border: 0.11rem solid var(--o2-border) !important; // 1px
+  border-radius: 0.375rem; // 6px - modern rounded borders
 }
 
 .syntax-guide-button-dark {
-  border: 1px solid #ffffff !important;
+  border: 0.11rem solid var(--o2-border) !important; // 1px
 }
 
 .sql-mode {
