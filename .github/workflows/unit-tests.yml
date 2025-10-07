@@ -3,11 +3,11 @@ name: Unit tests
 on:
   push:
     branches:
-      - "main"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+      - "ci/update_workflow_with_internal_runners"
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
   pull_request:
     branches:
       - "*"
@@ -23,7 +23,7 @@ env:
 jobs:
   backend_unit_tests:
     runs-on:
-      labels: ubicloud-standard-8
+      labels: repo-openobserve-standard-8
     permissions:
       contents: read
 
@@ -146,7 +146,7 @@ jobs:
 
   ui_unit_tests:
     runs-on:
-      labels: ubicloud-standard-8
+      labels: repo-openobserve-standard-8
     permissions:
       contents: read
 
