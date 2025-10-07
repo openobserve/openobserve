@@ -44,6 +44,7 @@ import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitVal
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import { useAnnotations } from "./useAnnotations";
 import useHttpStreamingSearch from "../useStreamingSearch";
+import useSearch from "@/composables/useSearch";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -80,6 +81,8 @@ export const usePanelDataLoader = (
   let runCount = 0;
 
   const store = useStore();
+
+  const { sortResponse } = useSearch();
 
   const {
     fetchQueryDataWithWebSocket,
@@ -755,6 +758,24 @@ export const usePanelDataLoader = (
     if (state.resultMetaData[payload?.meta?.currentQueryIndex]?.[0]) {
       state.resultMetaData[payload?.meta?.currentQueryIndex][0].hits =
         searchRes?.content?.results?.hits ?? {};
+    }
+    // sort the hits based on order by metadata from BE
+    if (
+      state?.data?.[payload?.meta?.currentQueryIndex]?.length > 0 &&
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
+        lastPartitionIndex
+      ]?.hasOwnProperty("order_by_metadata") &&
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
+        lastPartitionIndex
+      ]?.order_by_metadata?.length > 0
+    ) {
+      sortResponse(
+        state?.data[payload?.meta?.currentQueryIndex],
+        store?.state?.zoConfig?.timestamp_column,
+        state?.resultMetaData?.[payload?.meta?.currentQueryIndex][
+          lastPartitionIndex
+        ]?.order_by_metadata,
+      );
     }
   };
 
