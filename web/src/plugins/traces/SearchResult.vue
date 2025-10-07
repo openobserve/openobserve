@@ -23,13 +23,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="search-list"
       style="width: 100%"
     >
-      <ChartRenderer
-        data-test="traces-search-result-bar-chart"
-        id="traces_scatter_chart"
-        :data="plotChart"
-        style="height: 150px"
-        @updated:dataZoom="onChartUpdate"
-        @click="onChartClick"
+      <!-- RED Metrics Dashboard -->
+      <TracesMetricsDashboard
+        v-if="
+          searchObj.data.stream.selectedStream.value && searchObj.searchApplied
+        "
+        ref="metricsDashboardRef"
+        :streamName="searchObj.data.stream.selectedStream.value"
+        :timeRange="{
+          startTime: searchObj.data.datetime.startTime,
+          endTime: searchObj.data.datetime.endTime,
+        }"
+        :filter="searchObj.data.editorValue"
+        @time-range-selected="onMetricsTimeRangeSelected"
       />
 
       <div
@@ -53,7 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :virtual-scroll-slice-ratio-before="10"
         @virtual-scroll="onScroll"
       >
-        <q-item data-test="traces-search-result-item" :key="index" dense>
+        <q-item data-test="traces-search-result-item" :key="index"
+dense>
           <TraceBlock
             :item="item"
             :index="index"
@@ -66,13 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineAsyncComponent,
-  defineComponent,
-  nextTick,
-  onMounted,
-  ref,
-} from "vue";
+import { defineAsyncComponent, defineComponent, ref } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -80,17 +81,16 @@ import { useI18n } from "vue-i18n";
 import { byString } from "../../utils/json";
 import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
-import { convertTraceData } from "@/utils/traces/convertTraceData";
 import TraceBlock from "./TraceBlock.vue";
 import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
-    ChartRenderer: defineAsyncComponent(
-      () => import("@/components/dashboards/panels/ChartRenderer.vue"),
-    ),
     TraceBlock,
+    TracesMetricsDashboard: defineAsyncComponent(
+      () => import("./metrics/TracesMetricsDashboard.vue"),
+    ),
   },
   emits: [
     "update:scroll",
@@ -112,14 +112,6 @@ export default defineComponent({
       this.searchObj.organizationIdentifier =
         this.store.state.selectedOrganization.identifier;
       this.updatedLocalLogFilterField();
-    },
-    onChartUpdate({ start, end }: { start: any; end: any }) {
-      if (!(start && end)) return;
-      this.searchObj.meta.showDetailTab = false;
-      this.$emit("update:datetime", {
-        start,
-        end,
-      });
     },
     onScroll(info: any) {
       if (
@@ -143,8 +135,6 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
-    // Accessing nested JavaScript objects and arrays by string path
-    // https://stackoverflow.com/questions/6491463/accessing-nested-javascript-objects-and-arrays-by-string-path
     const { t } = useI18n();
     const store = useStore();
     const $q = useQuasar();
@@ -154,28 +144,7 @@ export default defineComponent({
     const totalHeight = ref(0);
 
     const searchTableRef: any = ref(null);
-
-    const plotChart: any = ref({});
-
-    onMounted(() => {
-      reDrawChart();
-    });
-
-    const reDrawChart = () => {
-      if (
-        // eslint-disable-next-line no-prototype-builtins
-        searchObj.data.histogram.data &&
-        searchObj.data.histogram.layout
-      ) {
-        nextTick(() => {
-          plotChart.value = convertTraceData(
-            searchObj.data.histogram,
-            store.state.timezone,
-          );
-          // plotChart.value.forceReLayout();
-        });
-      }
-    };
+    const metricsDashboardRef: any = ref(null);
 
     const expandRowDetail = (props: any) => {
       router.push({
@@ -209,26 +178,32 @@ export default defineComponent({
       emit("remove:searchTerm", term);
     };
 
-    const onChartClick = (data: any) => {
-      expandRowDetail(searchObj.data.queryResults.hits[data.dataIndex]);
+    const onMetricsTimeRangeSelected = (range: {
+      start: number;
+      end: number;
+    }) => {
+      // Update the datetime and trigger a new search
+      emit("update:datetime", {
+        start: range.start,
+        end: range.end,
+      });
     };
 
     return {
       t,
       store,
-      plotChart,
       searchObj,
       updatedLocalLogFilterField,
       byString,
       searchTableRef,
+      metricsDashboardRef,
       addSearchTerm,
       removeSearchTerm,
       expandRowDetail,
       totalHeight,
-      reDrawChart,
       getImageURL,
-      onChartClick,
       getRowIndex,
+      onMetricsTimeRangeSelected,
     };
   },
 });
@@ -236,7 +211,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-table-container {
-  height: calc(100vh - 326px) !important;
+  height: calc(100vh - 426px) !important;
 }
 .max-result {
   width: 170px;
@@ -244,11 +219,6 @@ export default defineComponent({
 
 .search-list {
   width: 100%;
-
-  .chart {
-    width: 100%;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-  }
 
   .my-sticky-header-table {
     .q-table__top,

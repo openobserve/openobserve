@@ -16,7 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="tracePage" id="tracePage" style="min-height: auto">
+  <q-page class="tracePage"
+id="tracePage" style="min-height: auto">
     <div id="tracesSecondLevel">
       <div class="tw-min-h-[82px]">
         <search-bar
@@ -124,7 +125,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-no-stream-selected-text"
                 class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
               >
-                <q-icon name="info" color="primary" size="md" /> Select a stream
+                <q-icon name="info"
+color="primary" size="md" /> Select a stream
                 and press 'Run query' to continue. Additionally, you can apply
                 additional filters and adjust the date range to enhance search.
               </h5>
@@ -138,7 +140,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
             >
-              <q-icon name="info" color="primary" size="md" />
+              <q-icon name="info"
+color="primary" size="md" />
               {{ t("search.applySearch") }}
             </div>
             <div
@@ -149,7 +152,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
             >
-              <q-icon name="info" color="primary" size="md" /> No traces found.
+              <q-icon name="info"
+color="primary" size="md" /> No traces found.
               Please adjust the filters and try again.
             </div>
             <div
@@ -1062,7 +1066,6 @@ onBeforeMount(async () => {
   restoreUrlQueryParams();
   await importSqlParser();
   if (searchObj.loading == false) {
-    // eslint-disable-next-line no-prototype-builtins
     await loadPageData();
   }
 });
@@ -1174,6 +1177,7 @@ const restoreFilters = (query: string) => {
 };
 
 const setHistogramDate = async (date: any) => {
+  console.log(date);
   searchBarRef.value.dateTimeRef.setCustomDate("absolute", date);
   await nextTick();
   await nextTick();

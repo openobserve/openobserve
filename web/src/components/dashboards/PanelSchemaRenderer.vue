@@ -173,7 +173,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'scatter',
               'stacked',
               'h-stacked',
-            ].includes(panelSchema.type) && checkIfPanelIsTimeSeries === true
+            ].includes(panelSchema.type) &&
+            checkIfPanelIsTimeSeries === true &&
+            !viewOnly
           "
           color="primary"
           :icon="isAddAnnotationMode ? 'cancel' : 'edit'"
@@ -220,7 +222,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openDrilldown(index)"
             style="cursor: pointer; display: flex; align-items: center"
           >
-            <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
+            <q-icon class="q-mr-xs q-mt-xs"
+size="16px" name="link" />
             <span>{{ drilldown.name }}</span>
           </div>
         </div>
@@ -437,6 +440,10 @@ export default defineComponent({
       required: false,
       default: false,
     },
+    viewOnly: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -571,21 +578,24 @@ export default defineComponent({
       contextMenuVisible.value = false;
     };
 
-    const handleCreateAlert = (selection: { condition: string; threshold: number }) => {
+    const handleCreateAlert = (selection: {
+      condition: string;
+      threshold: number;
+    }) => {
       hideContextMenu();
 
       // Prepare panel data to pass to alert creation
       const query = panelSchema.value.queries?.[0];
       if (!query) {
-        console.error('No query found in panel');
+        console.error("No query found in panel");
         return;
       }
 
       // Determine query type based on panel configuration
       // Only care about SQL vs PromQL distinction
-      let queryType = 'sql'; // Default to SQL
-      if (panelSchema.value.queryType === 'promql') {
-        queryType = 'promql';
+      let queryType = "sql"; // Default to SQL
+      if (panelSchema.value.queryType === "promql") {
+        queryType = "promql";
       }
 
       // Get the executed query with variables replaced from metadata
@@ -645,7 +655,7 @@ export default defineComponent({
       }
 
       const panelDataToPass = {
-        panelTitle: panelSchema.value.title || 'Unnamed Panel',
+        panelTitle: panelSchema.value.title || "Unnamed Panel",
         panelId: panelSchema.value.id,
         queries: panelSchema.value.queries,
         queryType: queryType,
@@ -660,10 +670,10 @@ export default defineComponent({
 
       // Navigate to alert creation page
       router.push({
-        name: 'addAlert',
+        name: "addAlert",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          fromPanel: 'true',
+          fromPanel: "true",
           panelData: encodeURIComponent(JSON.stringify(panelDataToPass)),
         },
       });
