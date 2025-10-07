@@ -1219,7 +1219,7 @@ pub async fn write_results_to_cache(
 
     if cfg.common.result_cache_enabled && should_cache_results {
         // Determine if this is a non-timestamp histogram query for websocket streaming
-        let is_non_ts_histogram = c_resp.histogram_interval > 0
+        let is_histogram_non_ts_order = c_resp.histogram_interval > 0
             && !merged_response.order_by_metadata.is_empty()
             && merged_response
                 .order_by_metadata
@@ -1237,7 +1237,7 @@ pub async fn write_results_to_cache(
             c_resp.is_aggregate,
             c_resp.is_descending,
             c_resp.clear_cache,
-            is_non_ts_histogram,
+            is_histogram_non_ts_order,
         )
         .await;
     }

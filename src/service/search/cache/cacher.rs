@@ -218,7 +218,7 @@ pub async fn check_cache(
     // Determine if this is a histogram query with non-timestamp ORDER BY.
     // These queries need special handling because results may not be time-ordered,
     // requiring us to scan all hits to find the actual time range.
-    let is_non_ts_histogram = is_histogram_query
+    let is_histogram_non_ts_order = is_histogram_query
         && !order_by.is_empty()
         && !order_by
             .iter()
@@ -241,7 +241,7 @@ pub async fn check_cache(
                     ts_column: result_ts_col.clone(),
                     discard_interval,
                     is_descending,
-                    is_non_ts_histogram,
+                    is_histogram_non_ts_order,
                 },
                 is_streaming,
             )
@@ -326,7 +326,7 @@ pub async fn check_cache(
                 ts_column: result_ts_col.clone(),
                 discard_interval,
                 is_descending,
-                is_non_ts_histogram,
+                is_histogram_non_ts_order,
             },
         )
         .await

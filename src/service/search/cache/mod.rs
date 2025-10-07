@@ -464,7 +464,7 @@ pub async fn search(
     {
         // Determine if this is a non-timestamp histogram query
         // Note: write_res.order_by_metadata contains the same ORDER BY info
-        let is_non_ts_histogram = c_resp.histogram_interval > 0
+        let is_histogram_non_ts_order = c_resp.histogram_interval > 0
             && !write_res.order_by_metadata.is_empty()
             && write_res
                 .order_by_metadata
@@ -482,7 +482,7 @@ pub async fn search(
             is_aggregate,
             c_resp.is_descending,
             c_resp.clear_cache,
-            is_non_ts_histogram,
+            is_histogram_non_ts_order,
         )
         .await;
     }
@@ -836,7 +836,7 @@ pub async fn _write_results(
     file_path: String,
     is_aggregate: bool,
     is_descending: bool,
-    is_non_ts_histogram: bool,
+    is_histogram_non_ts_order: bool,
 ) {
     // disable write_results_v1
     // return;
@@ -867,7 +867,7 @@ pub async fn _write_results(
     // Calculate actual time range of cached data.
     // For non-timestamp histogram queries, results may not be time-ordered,
     // so we must scan all hits to find the true min/max timestamps.
-    let (smallest_ts, largest_ts) = if is_non_ts_histogram {
+    let (smallest_ts, largest_ts) = if is_histogram_non_ts_order {
         // Scan all hits for non-timestamp ordered histogram queries
         let mut min_ts = i64::MAX;
         let mut max_ts = i64::MIN;
@@ -996,7 +996,7 @@ pub async fn write_results_v2(
     is_aggregate: bool,
     is_descending: bool,
     clear_cache: bool,
-    is_non_ts_histogram: bool,
+    is_histogram_non_ts_order: bool,
 ) {
     let mut local_resp = res.clone();
 
@@ -1098,7 +1098,7 @@ pub async fn write_results_v2(
 
     // For histogram queries with non-timestamp ORDER BY, we need to scan all hits
     // to find actual min/max timestamps, since results may not be time-ordered
-    let (smallest_ts, largest_ts) = if is_non_ts_histogram {
+    let (smallest_ts, largest_ts) = if is_histogram_non_ts_order {
         // For non-timestamp ordered histogram queries, scan all hits to find actual min/max
         let mut min_ts = i64::MAX;
         let mut max_ts = i64::MIN;

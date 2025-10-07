@@ -200,7 +200,9 @@ async fn recursive_process_multiple_metas(
             if !cached_response.hits.is_empty() {
                 // For non-timestamp histogram queries, results are not sorted by time
                 // We need to scan all hits to find actual min/max timestamps
-                let (response_start_time, response_end_time) = if cache_req.is_non_ts_histogram {
+                let (response_start_time, response_end_time) = if cache_req
+                    .is_histogram_non_ts_order
+                {
                     let mut min_ts = i64::MAX;
                     let mut max_ts = i64::MIN;
                     for hit in &cached_response.hits {
@@ -306,7 +308,7 @@ fn get_allowed_up_to(
 ) -> i64 {
     // For non-timestamp histogram queries, results are not sorted by time
     // Scan all hits to find the actual maximum timestamp
-    if cache_req.is_non_ts_histogram {
+    if cache_req.is_histogram_non_ts_order {
         let max_ts = cached_response
             .hits
             .iter()
