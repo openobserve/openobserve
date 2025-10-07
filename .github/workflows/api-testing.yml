@@ -4,10 +4,10 @@ on:
   push:
     branches:
       - "ci/update_workflow_with_internal_runners"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+    # paths-ignore:
+    #   - "**.md"
+    #   - "**.yml"
+    #   - "**.yaml"
   pull_request:
     branches:
       - "*"
