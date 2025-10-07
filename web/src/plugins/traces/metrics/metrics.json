@@ -1,417 +1,415 @@
 {
-  "version": 5,
-  "dashboardId": "7287465283705383292",
-  "title": "Traces",
-  "description": "",
-  "role": "",
-  "owner": "omkar1@openobserve.ai",
-  "created": "2025-01-21T13:46:38.982Z",
-  "tabs": [
-    {
-      "tabId": "default",
-      "name": "Default",
-      "panels": [
-        {
-          "id": "Panel_ID1425310",
-          "type": "line",
-          "title": "Duration",
-          "description": "",
-          "config": {
-            "show_legends": false,
-            "legends_position": null,
-            "unit": "microseconds",
-            "decimals": 2,
-            "line_thickness": 1.5,
-            "step_value": "0",
-            "top_results_others": false,
-            "axis_border_show": false,
-            "label_option": {
-              "rotate": 0
-            },
-            "show_symbol": false,
-            "line_interpolation": "smooth",
-            "legend_width": {
-              "unit": "px"
-            },
-            "base_map": {
-              "type": "osm"
-            },
-            "map_type": {
-              "type": "world"
-            },
-            "map_view": {
-              "zoom": 1,
-              "lat": 0,
-              "lng": 0
-            },
-            "map_symbol_style": {
-              "size": "by Value",
-              "size_by_value": {
-                "min": 1,
-                "max": 100
+    "version": 5,
+    "dashboardId": "7287465283705383292",
+    "title": "Traces",
+    "description": "",
+    "role": "",
+    "owner": "",
+    "created": "2025-01-21T13:46:38.982Z",
+    "tabs": [
+      {
+        "tabId": "default",
+        "name": "Default",
+        "panels": [
+          {
+            "id": "Panel_ID1425310",
+            "type": "line",
+            "title": "Duration",
+            "description": "",
+            "config": {
+              "show_legends": true,
+              "legends_position": null,
+              "unit": "microseconds",
+              "decimals": 2,
+              "line_thickness": 1.5,
+              "step_value": "0",
+              "top_results_others": false,
+              "axis_border_show": false,
+              "label_option": {
+                "rotate": 0
               },
-              "size_fixed": 2
-            },
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": [],
-            "connect_nulls": true,
-            "no_value_replacement": "",
-            "wrap_table_cells": false,
-            "table_transpose": false,
-            "table_dynamic_columns": false,
-            "color": {
-              "mode": "palette-classic-by-series",
-              "fixedColor": [
-                "#53ca53"
-              ],
-              "seriesBy": "last",
-              "colorBySeries": []
-            },
-            "trellis": {
-              "layout": null,
-              "num_of_columns": 1,
-              "group_by_y_axis": false
-            },
-            "dataZoom": { "yAxisIndex": 0 }
-          },
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "WITH unique_traces AS (\n    -- Pick one record per trace (earliest timestamp or whatever makes sense)\n    SELECT\n        min(_timestamp) as _time,\n        max(duration) AS max_duration\n    FROM \"default\" [WHERE_CLAUSE] \n    GROUP BY trace_id\n),\nhistogram_data AS (\n    -- Assign histogram buckets\n    SELECT\n        histogram(_time) AS time_bucket,\n        max_duration\n    FROM unique_traces\n)\nSELECT\n    time_bucket,\n    max(max_duration) AS sum_durations\nFROM histogram_data\nGROUP BY time_bucket\nORDER BY time_bucket ASC;",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "traces",
-                "x": [
-                  {
-                    "label": "",
-                    "alias": "time_bucket",
-                    "column": "time_bucket",
-                    "color": null,
-                    "isDerived": true,
-                    "havingConditions": [],
-                    "treatAsNonTimestamp": true
-                  }
-                ],
-                "y": [
-                  {
-                    "label": "",
-                    "alias": "sum_durations",
-                    "column": "sum_durations",
-                    "color": "#5960b2",
-                    "isDerived": true,
-                    "havingConditions": [],
-                    "treatAsNonTimestamp": true
-                  }
-                ],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
+              "show_symbol": true,
+              "line_interpolation": "smooth",
+              "legend_width": {
+                "unit": "px"
               },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1,
-                "limit": 0,
-                "min": 0,
-                "max": 100,
-                "time_shift": []
+              "base_map": {
+                "type": "osm"
+              },
+              "map_type": {
+                "type": "world"
+              },
+              "map_view": {
+                "zoom": 1,
+                "lat": 0,
+                "lng": 0
+              },
+              "map_symbol_style": {
+                "size": "by Value",
+                "size_by_value": {
+                  "min": 1,
+                  "max": 100
+                },
+                "size_fixed": 2
+              },
+              "drilldown": [],
+              "mark_line": [],
+              "override_config": [],
+              "connect_nulls": false,
+              "no_value_replacement": "",
+              "wrap_table_cells": false,
+              "table_transpose": false,
+              "table_dynamic_columns": false,
+              "color": {
+                "mode": "palette-classic-by-series",
+                "fixedColor": [
+                  "#53ca53"
+                ],
+                "seriesBy": "last"
+              },
+              "trellis": {
+                "layout": null,
+                "num_of_columns": 1
               }
-            }
-          ],
-          "layout": {
-            "x": 33,
-            "y": 0,
-            "w": 15,
-            "h": 7,
-            "i": 2
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
-        },
-        {
-          "id": "Panel_ID8254010",
-          "type": "line",
-          "title": "Rate",
-          "description": "",
-          "config": {
-            "show_legends": false,
-            "legends_position": null,
-            "decimals": 0,
-            "line_thickness": 1.5,
-            "step_value": "0",
-            "top_results_others": false,
-            "axis_border_show": false,
-            "label_option": {
-              "rotate": 0
             },
-            "show_symbol": false,
-            "line_interpolation": "smooth",
-            "legend_width": {
-              "unit": "px"
-            },
-            "base_map": {
-              "type": "osm"
-            },
-            "map_type": {
-              "type": "world"
-            },
-            "map_view": {
-              "zoom": 1,
-              "lat": 0,
-              "lng": 0
-            },
-            "map_symbol_style": {
-              "size": "by Value",
-              "size_by_value": {
-                "min": 1,
-                "max": 100
-              },
-              "size_fixed": 2
-            },
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": [],
-            "connect_nulls": true,
-            "no_value_replacement": "",
-            "wrap_table_cells": false,
-            "table_transpose": false,
-            "table_dynamic_columns": false,
-            "color": {
-              "mode": "palette-classic-by-series",
-              "fixedColor": [
-                "#53ca53"
-              ],
-              "seriesBy": "last",
-              "colorBySeries": []
-            },
-            "trellis": {
-              "layout": null,
-              "num_of_columns": 1,
-              "group_by_y_axis": false
-            },
-            "dataZoom": { "yAxisIndex": "none" }
-          },
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "WITH traces AS (SELECT min(_timestamp) as _time, max(trace_id) AS max_trace_id FROM \"default\" [WHERE_CLAUSE] GROUP BY trace_id), histogram_data AS (SELECT histogram(_time) AS time_bucket, max_trace_id FROM traces) SELECT time_bucket, count(max_trace_id) as trace_count FROM histogram_data GROUP BY time_bucket ORDER BY time_bucket ASC;",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "traces",
-                "x": [
-                  {
-                    "label": "",
-                    "alias": "time_bucket",
-                    "column": "time_bucket",
-                    "color": null,
-                    "isDerived": false,
-                    "havingConditions": [],
-                    "treatAsNonTimestamp": true
-                  }
-                ],
-                "y": [
-                  {
-                    "label": "",
-                    "alias": "trace_count",
-                    "column": "trace_count",
-                    "color": "#5960b2",
-                    "aggregationFunction": "count",
-                    "isDerived": false,
-                    "havingConditions": [],
-                    "treatAsNonTimestamp": true
-                  }
-                ],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1,
-                "limit": 0,
-                "min": 0,
-                "max": 100,
-                "time_shift": []
-              }
-            }
-          ],
-          "layout": {
-            "x": 0,
-            "y": 0,
-            "w": 16,
-            "h": 7,
-            "i": 3
-          },
-          "htmlContent": "",
-          "markdownContent": "",
-          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
-        },
-        {
-          "id": "Panel_ID2185010",
-          "type": "bar",
-          "title": "Errors",
-          "description": "",
-          "config": {
-            "show_legends": false,
-            "legends_position": null,
-            "decimals": 0,
-            "line_thickness": 1.5,
-            "step_value": "0",
-            "top_results_others": false,
-            "axis_border_show": false,
-            "label_option": {
-              "rotate": 0
-            },
-            "show_symbol": true,
-            "line_interpolation": "smooth",
-            "legend_width": {
-              "unit": "px"
-            },
-            "base_map": {
-              "type": "osm"
-            },
-            "map_type": {
-              "type": "world"
-            },
-            "map_view": {
-              "zoom": 1,
-              "lat": 0,
-              "lng": 0
-            },
-            "map_symbol_style": {
-              "size": "by Value",
-              "size_by_value": {
-                "min": 1,
-                "max": 100
-              },
-              "size_fixed": 2
-            },
-            "drilldown": [],
-            "mark_line": [],
-            "override_config": [],
-            "connect_nulls": true,
-            "no_value_replacement": "",
-            "wrap_table_cells": false,
-            "table_transpose": false,
-            "table_dynamic_columns": false,
-            "color": {
-              "mode": "fixed",
-              "fixedColor": [
-                "#ff0000"
-              ],
-              "seriesBy": "last",
-              "colorBySeries": []
-            },
-            "trellis": {
-              "layout": null,
-              "num_of_columns": 1,
-              "group_by_y_axis": false
-            },
-            "dataZoom": { "yAxisIndex": "none" }
-          },
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "WITH traces AS (SELECT min(_timestamp) as _time, max(trace_id) AS max_trace_id FROM \"default\" [WHERE_CLAUSE] GROUP BY trace_id), histogram_data AS (SELECT histogram(_time) AS x_axis_1, max_trace_id FROM traces) SELECT x_axis_1, count(max_trace_id) as y_axis_1 FROM histogram_data GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
-              "vrlFunctionQuery": "",
-              "customQuery": true,
-              "fields": {
-                "stream": "default",
-                "stream_type": "traces",
-                "x": [
-                  {
-                    "label": "",
-                    "alias": "x_axis_1",
-                    "column": "x_axis_1",
-                    "color": null,
-                    "aggregationFunction": "histogram",
-                    "sortBy": "ASC",
-                    "isDerived": false,
-                    "havingConditions": [],
-                    "treatAsNonTimestamp": false
-                  }
-                ],
-                "y": [
-                  {
-                    "label": "",
-                    "alias": "y_axis_1",
-                    "column": "y_axis_1",
-                    "color": null,
-                    "aggregationFunction": "count",
-                    "isDerived": false,
-                    "havingConditions": [],
-                    "treatAsNonTimestamp": false
-                  }
-                ],
-                "z": [],
-                "breakdown": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": [
+            "queryType": "sql",
+            "queries": [
+              {
+                "query": "SELECT histogram(_timestamp) as \"x_axis_1\", max(duration) as \"y_axis_1\"  FROM \"default\" [WHERE_CLAUSE] GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+                "vrlFunctionQuery": "",
+                "customQuery": false,
+                "fields": {
+                  "stream": "default",
+                  "stream_type": "traces",
+                  "x": [
                     {
-                      "type": "condition",
-                      "values": [
-                        "ERROR"
-                      ],
-                      "column": "span_status",
-                      "operator": "=",
-                      "value": "ERROR",
-                      "logicalOperator": "AND",
-                      "filterType": "condition"
+                      "label": "Timestamp",
+                      "alias": "x_axis_1",
+                      "column": "_timestamp",
+                      "color": null,
+                      "aggregationFunction": "histogram",
+                      "sortBy": "ASC",
+                      "isDerived": false,
+                      "havingConditions": [],
+                      "treatAsNonTimestamp": false
                     }
-                  ]
+                  ],
+                  "y": [
+                    {
+                      "label": "Duration",
+                      "alias": "y_axis_1",
+                      "column": "duration",
+                      "color": "#5960b2",
+                      "aggregationFunction": "max",
+                      "isDerived": false,
+                      "havingConditions": [],
+                      "treatAsNonTimestamp": false
+                    }
+                  ],
+                  "z": [],
+                  "breakdown": [],
+                  "filter": {
+                    "filterType": "group",
+                    "logicalOperator": "AND",
+                    "conditions": []
+                  }
+                },
+                "config": {
+                  "promql_legend": "",
+                  "layer_type": "scatter",
+                  "weight_fixed": 1,
+                  "limit": 0,
+                  "min": 0,
+                  "max": 100,
+                  "time_shift": []
                 }
-              },
-              "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1,
-                "limit": 0,
-                "min": 0,
-                "max": 100,
-                "time_shift": []
               }
-            }
-          ],
-          "layout": {
-            "x": 16,
-            "y": 0,
-            "w": 17,
-            "h": 7,
-            "i": 1
+            ],
+            "layout": {
+              "x": 31,
+              "y": 0,
+              "w": 17,
+              "h": 7,
+              "i": 1
+            },
+            "htmlContent": "",
+            "markdownContent": "",
+            "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
           },
-
-          "htmlContent": "",
-          "markdownContent": "",
-          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
-        }
-      ]
-    }
-  ],
-  "variables": {
-    "list": [],
-    "showDynamicFilters": false
-  },
-  "defaultDatetimeDuration": {
-    "type": "relative",
-    "relativeTimePeriod": "15m",
-    "startTime": 1749209836019000,
-    "endTime": 1749210736019000
+          {
+            "id": "Panel_ID2185010",
+            "type": "bar",
+            "title": "Errors",
+            "description": "",
+            "config": {
+              "show_legends": true,
+              "legends_position": null,
+              "decimals": 2,
+              "line_thickness": 1.5,
+              "step_value": "0",
+              "top_results_others": false,
+              "axis_border_show": false,
+              "label_option": {
+                "rotate": 0
+              },
+              "show_symbol": true,
+              "line_interpolation": "smooth",
+              "legend_width": {
+                "unit": "px"
+              },
+              "base_map": {
+                "type": "osm"
+              },
+              "map_type": {
+                "type": "world"
+              },
+              "map_view": {
+                "zoom": 1,
+                "lat": 0,
+                "lng": 0
+              },
+              "map_symbol_style": {
+                "size": "by Value",
+                "size_by_value": {
+                  "min": 1,
+                  "max": 100
+                },
+                "size_fixed": 2
+              },
+              "drilldown": [],
+              "mark_line": [],
+              "override_config": [],
+              "connect_nulls": false,
+              "no_value_replacement": "",
+              "wrap_table_cells": false,
+              "table_transpose": false,
+              "table_dynamic_columns": false,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": [
+                  "#ff0000"
+                ],
+                "seriesBy": "last"
+              },
+              "trellis": {
+                "layout": null,
+                "num_of_columns": 1
+              }
+            },
+            "queryType": "sql",
+            "queries": [
+              {
+                "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(span_status) as \"y_axis_1\"  FROM \"default\"  [WHERE_CLAUSE]  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+                "vrlFunctionQuery": "",
+                "customQuery": false,
+                "fields": {
+                  "stream": "default",
+                  "stream_type": "traces",
+                  "x": [
+                    {
+                      "label": "Timestamp",
+                      "alias": "x_axis_1",
+                      "column": "_timestamp",
+                      "color": null,
+                      "aggregationFunction": "histogram",
+                      "sortBy": "ASC",
+                      "isDerived": false,
+                      "havingConditions": [],
+                      "treatAsNonTimestamp": false
+                    }
+                  ],
+                  "y": [
+                    {
+                      "label": "Errors",
+                      "alias": "y_axis_1",
+                      "column": "span_status",
+                      "color": "#5960b2",
+                      "aggregationFunction": "count",
+                      "isDerived": false,
+                      "havingConditions": [],
+                      "treatAsNonTimestamp": false
+                    }
+                  ],
+                  "z": [],
+                  "breakdown": [],
+                  "filter": {
+                    "filterType": "group",
+                    "logicalOperator": "AND",
+                    "conditions": [
+                      {
+                        "type": "condition",
+                        "values": [
+                          "ERROR"
+                        ],
+                        "column": "span_status",
+                        "operator": "=",
+                        "value": "ERROR",
+                        "logicalOperator": "AND",
+                        "filterType": "condition"
+                      }
+                    ]
+                  }
+                },
+                "config": {
+                  "promql_legend": "",
+                  "layer_type": "scatter",
+                  "weight_fixed": 1,
+                  "limit": 0,
+                  "min": 0,
+                  "max": 100,
+                  "time_shift": []
+                }
+              }
+            ],
+            "layout": {
+              "x": 16,
+              "y": 0,
+              "w": 15,
+              "h": 7,
+              "i": 2
+            },
+            "htmlContent": "",
+            "markdownContent": "",
+            "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+          },
+          {
+            "id": "Panel_ID8254010",
+            "type": "line",
+            "title": "Rate",
+            "description": "",
+            "config": {
+              "show_legends": true,
+              "legends_position": null,
+              "decimals": 2,
+              "line_thickness": 1.5,
+              "step_value": "0",
+              "top_results_others": false,
+              "axis_border_show": false,
+              "label_option": {
+                "rotate": 0
+              },
+              "show_symbol": true,
+              "line_interpolation": "smooth",
+              "legend_width": {
+                "unit": "px"
+              },
+              "base_map": {
+                "type": "osm"
+              },
+              "map_type": {
+                "type": "world"
+              },
+              "map_view": {
+                "zoom": 1,
+                "lat": 0,
+                "lng": 0
+              },
+              "map_symbol_style": {
+                "size": "by Value",
+                "size_by_value": {
+                  "min": 1,
+                  "max": 100
+                },
+                "size_fixed": 2
+              },
+              "drilldown": [],
+              "mark_line": [],
+              "override_config": [],
+              "connect_nulls": false,
+              "no_value_replacement": "",
+              "wrap_table_cells": false,
+              "table_transpose": false,
+              "table_dynamic_columns": false,
+              "color": {
+                "mode": "palette-classic-by-series",
+                "fixedColor": [
+                  "#53ca53"
+                ],
+                "seriesBy": "last",
+                "colorBySeries": []
+              },
+              "trellis": {
+                "layout": null,
+                "num_of_columns": 1,
+                "group_by_y_axis": false
+              }
+            },
+            "queryType": "sql",
+            "queries": [
+              {
+                "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\"  FROM \"default\" [WHERE_CLAUSE] GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+                "vrlFunctionQuery": "",
+                "customQuery": false,
+                "fields": {
+                  "stream": "default",
+                  "stream_type": "traces",
+                  "x": [
+                    {
+                      "label": "Timestamp",
+                      "alias": "x_axis_1",
+                      "column": "_timestamp",
+                      "color": null,
+                      "aggregationFunction": "histogram",
+                      "sortBy": "ASC",
+                      "isDerived": false,
+                      "havingConditions": [],
+                      "treatAsNonTimestamp": false
+                    }
+                  ],
+                  "y": [
+                    {
+                      "label": "Trace Rate",
+                      "alias": "y_axis_1",
+                      "column": "_timestamp",
+                      "color": "#5960b2",
+                      "aggregationFunction": "count",
+                      "isDerived": false,
+                      "havingConditions": [],
+                      "treatAsNonTimestamp": false
+                    }
+                  ],
+                  "z": [],
+                  "breakdown": [],
+                  "filter": {
+                    "filterType": "group",
+                    "logicalOperator": "AND",
+                    "conditions": []
+                  }
+                },
+                "config": {
+                  "promql_legend": "",
+                  "layer_type": "scatter",
+                  "weight_fixed": 1,
+                  "limit": 0,
+                  "min": 0,
+                  "max": 100,
+                  "time_shift": []
+                }
+              }
+            ],
+            "layout": {
+              "x": 0,
+              "y": 0,
+              "w": 16,
+              "h": 7,
+              "i": 3
+            },
+            "htmlContent": "",
+            "markdownContent": "",
+            "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+          }
+        ]
+      }
+    ],
+    "variables": {
+      "list": [],
+      "showDynamicFilters": false
+    },
+    "defaultDatetimeDuration": {
+      "type": "relative",
+      "relativeTimePeriod": "15m",
+      "startTime": 1749209836019000,
+      "endTime": 1749210736019000
+    },
+    "folderId": "default"
   }
-}

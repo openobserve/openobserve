@@ -24,29 +24,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="width: 100%"
     >
       <!-- RED Metrics Dashboard -->
-      <transition
-        enter-active-class="transition-all duration-300 ease-in-out"
-        leave-active-class="transition-all duration-300 ease-in-out"
-        enter-from-class="opacity-0 -translate-y-4 max-h-0"
-        enter-to-class="opacity-100 translate-y-0 max-h-[1000px]"
-        leave-from-class="opacity-100 translate-y-0 max-h-[1000px]"
-        leave-to-class="opacity-0 -translate-y-4 max-h-0"
-      >
-        <TracesMetricsDashboard
-          v-if="searchObj.data.stream.selectedStream.value"
-          ref="metricsDashboardRef"
-          :streamName="searchObj.data.stream.selectedStream.value"
-          :timeRange="{
-            startTime: searchObj.data.datetime.startTime,
-            endTime: searchObj.data.datetime.endTime,
-          }"
-          :filter="searchObj.data.editorValue"
-          :show="
-            searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length
-          "
-          @time-range-selected="onMetricsTimeRangeSelected"
-        />
-      </transition>
+      <TracesMetricsDashboard
+        v-if="searchObj.data.stream.selectedStream.value"
+        ref="metricsDashboardRef"
+        :streamName="searchObj.data.stream.selectedStream.value"
+        :timeRange="{
+          startTime: searchObj.data.datetime.startTime,
+          endTime: searchObj.data.datetime.endTime,
+        }"
+        :filter="searchObj.data.editorValue"
+        :show="
+          searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length
+        "
+        @time-range-selected="onMetricsTimeRangeSelected"
+      />
 
       <div
         data-test="traces-search-result-count"
@@ -96,13 +87,9 @@ size="md" /> No traces found. Please
         "
         id="tracesSearchGridComponent"
         data-test="traces-search-result-virtual-scroll"
+        style="height: 400px"
         :items="searchObj.data.queryResults.hits"
         class="traces-table-container"
-        :class="
-          searchObj.meta.showHistogram
-            ? 'tw-h-[calc(100vh-28.375rem)]'
-            : 'tw-h-[calc(100vh-13.125rem)]'
-        "
         v-slot="{ item, index }"
         :virtual-scroll-item-size="25"
         :virtual-scroll-sticky-size-start="0"
@@ -267,6 +254,9 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.traces-table-container {
+  height: calc(100vh - 426px) !important;
+}
 .max-result {
   width: 170px;
 }

@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="tracePage"
-id="tracePage" style="min-height: auto">
+  <q-page class="tracePage" id="tracePage"
+style="min-height: auto">
     <div id="tracesSecondLevel">
       <div class="tw-min-h-[82px]">
         <search-bar
@@ -110,8 +110,8 @@ id="tracePage" style="min-height: auto">
                 data-test="logs-search-no-stream-selected-text"
                 class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
               >
-                <q-icon name="info"
-color="primary" size="md" /> Select a stream
+                <q-icon name="info" color="primary"
+size="md" /> Select a stream
                 and press 'Run query' to continue. Additionally, you can apply
                 additional filters and adjust the date range to enhance search.
               </h5>
@@ -125,29 +125,12 @@ color="primary" size="md" /> Select a stream
               "
               class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
             >
-              <q-icon name="info"
-color="primary" size="md" />
+              <q-icon name="info" color="primary"
+size="md" />
               {{ t("search.applySearch") }}
             </div>
-            <div
-              v-else-if="
-                searchObj.data.queryResults.hasOwnProperty('total') &&
-                searchObj.data.queryResults?.hits?.length == 0 &&
-                searchObj.loading == false
-              "
-              class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
-            >
-              <q-icon name="info"
-color="primary" size="md" /> No traces found.
-              Please adjust the filters and try again.
-            </div>
-            <div
-              data-test="logs-search-search-result"
-              v-show="
-                searchObj.data.queryResults.hasOwnProperty('total') &&
-                !!searchObj.data.queryResults?.hits?.length
-              "
-            >
+
+            <div data-test="logs-search-search-result">
               <search-result
                 ref="searchResultRef"
                 @update:datetime="setHistogramDate"
@@ -1188,7 +1171,6 @@ const restoreFilters = (query: string) => {
 };
 
 const setHistogramDate = async (date: any) => {
-  console.log(date);
   searchBarRef.value.dateTimeRef.setCustomDate("absolute", date);
 };
 
