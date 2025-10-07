@@ -76,8 +76,7 @@ use crate::{
 /// If given role group is None, it means the local node is the same role as the given role group.
 /// If given role group is RoleGroup::None, it still means local node is same as the given role.
 fn is_local_same_role(role_group: Option<RoleGroup>) -> bool {
-    if role_group.is_some() {
-        let role_group = role_group.unwrap();
+    if let Some(role_group) = role_group {
         role_group == RoleGroup::None || LOCAL_NODE.role_group == role_group
     } else {
         true
@@ -178,7 +177,7 @@ pub async fn search(
         // If LOCAL_NODE is alert querier and role group is background, we can use it
         // If LOCAL_NODE is not alert querier and role group is interactive, we can use it
         // If LOCAL_NODE is not alert querier and role group is background, we can NOT use it
-        if LOCAL_NODE.is_querier() && is_local_same_role(role_group.clone()) {
+        if LOCAL_NODE.is_querier() && is_local_same_role(role_group) {
             log::debug!(
                 "[trace_id {trace_id}] local node is a querier, nodes: {:?}",
                 nodes
