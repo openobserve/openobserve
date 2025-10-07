@@ -87,7 +87,9 @@ describe('alertSqlUtils', () => {
       operators.forEach(op => {
         const result = addHavingClauseToQuery(query, 'avg_score', op, 75, parser);
         // Use regex to handle quoted column names
-        expect(result.toLowerCase()).toMatch(new RegExp(`having\\s+(avg_score|"avg_score")\\s+${op.replace(/([<>=])/g, '\\$1')}\\s+75`));
+        // Properly escape special regex characters
+        const escapedOp = op.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        expect(result.toLowerCase()).toMatch(new RegExp(`having\\s+(avg_score|"avg_score")\\s+${escapedOp}\\s+75`));
       });
     });
 
