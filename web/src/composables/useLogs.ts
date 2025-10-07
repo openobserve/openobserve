@@ -6993,7 +6993,7 @@ const useLogs = () => {
     }
     let aggFlag = false;
     if (parsedSQL) {
-      aggFlag = hasAggregation(parsedSQL?.columns);
+      aggFlag = hasAggregation(parsedSQL?.columns) || parsedSQL.groupby !== null;
     }
     if (!aggFlag) {
       return true;
