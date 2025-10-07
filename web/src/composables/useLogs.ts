@@ -6008,6 +6008,20 @@ const useLogs = () => {
         ...response.content.results.hits,
       );
     } 
+
+    // sort the hits based on timestamp column
+    if (
+      searchObj.data.queryResults.hits.length > 0 &&
+      store.state.zoConfig.timestamp_column != "" &&
+      searchObj.data.queryResults.hasOwnProperty("order_by_metadata") &&
+      searchObj.data.queryResults.order_by_metadata.length > 0 
+    ) {
+      sortResponse(
+        searchObj.data.queryResults.hits,
+        store.state.zoConfig.timestamp_column,
+        searchObj.data.queryResults.order_by_metadata
+      );
+    }
     
     if (searchObj.meta.refreshInterval == 0) {
       updatePageCountTotal(payload.queryReq, response.content.results.hits.length, searchObj.data.queryResults.hits.length);
@@ -6085,6 +6099,11 @@ const useLogs = () => {
     //to decide whether to call histogram or not
     if(response.content.results.hasOwnProperty("is_histogram_eligible")){
       searchObj.data.queryResults.is_histogram_eligible = response.content.results.is_histogram_eligible;
+    }
+
+    //Store order_by_metadata to sort hits 
+    if(response.content.results.hasOwnProperty("order_by_metadata")){
+      searchObj.data.queryResults.order_by_metadata = response.content.results.order_by_metadata;
     }
 
     if(searchObj.meta.refreshInterval == 0) {
