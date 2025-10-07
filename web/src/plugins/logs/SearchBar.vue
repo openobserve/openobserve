@@ -36,8 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
                 icon="search"
-                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm"
-                style="height: 32px"
+                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm btn-height-32"
               >
                 <q-tooltip>
                   {{ t("common.search") }}
@@ -52,17 +51,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'selected'
                     : ''
                 "
-                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm"
+                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm btn-height-32"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
                 :disable="isVisualizeDisabled"
                 no-caps
                 size="sm"
-                style="height: 32px"
               >
                 <img
                   :src="visualizeIcon"
                   alt="Visualize"
-                  style="width: 20px; height: 20px"
+                  class="icon-sm"
                 />
                 <q-tooltip v-if="isVisualizeDisabled">
                   {{ t("search.enableSqlModeOrSelectSingleStream") }}
@@ -76,8 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- moved to dropdown if ai chat is enabled -->
         <div
-          style="border: 1px solid #c4c4c4; border-radius: 5px"
-          class="q-pr-xs q-ml-xs tw-flex tw-items-center tw-justify-center"
+          class="toggle-container q-pr-xs q-ml-xs tw-flex tw-items-center tw-justify-center"
           v-if="!store.state.isAiChatEnabled"
         >
           <q-toggle
@@ -92,15 +89,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <img
               :src="histogramIcon"
               alt="Histogram"
-              style="width: 20px; height: 20px"
+              class="icon-sm"
             />
             <q-tooltip>
               {{ t("search.showHistogramLabel") }}
             </q-tooltip>
         </div>
         <div
-          style="border: 1px solid #c4c4c4; border-radius: 5px"
-          class="q-pr-xs q-ml-xs tw-flex tw-items-center tw-justify-center"
+          class="toggle-container q-pr-xs q-ml-xs tw-flex tw-items-center tw-justify-center"
         >
           <q-toggle
             data-test="logs-search-bar-sql-mode-toggle-btn"
@@ -114,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <img
               :src="sqlIcon"
               alt="SQL Mode"
-              style="width: 20px; height: 20px"
+              class="icon-sm"
             />
             <q-tooltip v-if="isSqlModeDisabled">
               {{ t("search.sqlModeDisabledForVisualization") }}
@@ -2872,7 +2868,7 @@ export default defineComponent({
             }
 
             if (searchObj.meta.toggleFunction == false) {
-              searchObj.config.fnSplitterModel = 99.5;
+              searchObj.config.fnSplitterModel = 100;
               resetFunctionContent();
             }
 
@@ -3798,10 +3794,10 @@ export default defineComponent({
         if (searchObj.meta.showTransformEditor) {
           searchObj.config.fnSplitterModel = 60;
         } else {
-          searchObj.config.fnSplitterModel = 99.5;
+          searchObj.config.fnSplitterModel = 100;
         }
       } else {
-        searchObj.config.fnSplitterModel = 99.5;
+        searchObj.config.fnSplitterModel = 100;
       }
     };
     const visualizeIcon = computed(() => {
@@ -4187,7 +4183,7 @@ export default defineComponent({
     },
     toggleTransformEditor(newVal) {
       if (newVal == false) {
-        this.searchObj.config.fnSplitterModel = 99.5;
+        this.searchObj.config.fnSplitterModel = 100;
       } else {
         this.searchObj.config.fnSplitterModel = 60;
       }
@@ -4208,11 +4204,11 @@ export default defineComponent({
 
 <style lang="scss">
 .logs-saved-view-icon:hover {
-  color: black !important;
-  background-color: lightgray !important;
+  color: var(--o2-text-primary) !important;
+  background-color: var(--o2-hover-accent) !important;
 }
 .logs-search-bar-component {
-  padding-bottom: 1px;
+  padding-bottom: 0.0625rem; // 1px
   height: 100%;
   overflow: visible;
 
@@ -4229,26 +4225,48 @@ export default defineComponent({
 
     // Normalize all button heights
     .q-btn {
-      height: 32px !important;
-      min-height: 32px !important;
+      height: 2rem !important; // 32px
+      min-height: 2rem !important;
+      border-radius: 0.375rem; // 6px - modern rounded borders
     }
 
     // Normalize select heights
     .q-select {
       .q-field__control {
-        height: 32px !important;
-        min-height: 32px !important;
+        height: 2rem !important; // 32px
+        min-height: 2rem !important;
+        border-radius: 0.375rem; // 6px
       }
     }
   }
 
   .reset-filters {
-    width: 32px;
-    height: 32px;
+    width: 2rem; // 32px
+    height: 2rem; // 32px
+    border-radius: 0.375rem; // 6px
+    border: 0.11rem solid var(--o2-border) !important; // 1px - override Quasar default
 
     .q-icon {
       margin-right: 0;
     }
+  }
+
+  // Toggle containers with borders
+  .toggle-container {
+    border: 0.0625rem solid var(--o2-border); // 1px
+    border-radius: 0.375rem; // 6px
+  }
+
+  // Icon sizing
+  .icon-sm {
+    width: 1.25rem; // 20px
+    height: 1.25rem; // 20px
+  }
+
+  // Button heights for consistency
+  .btn-height-32 {
+    height: 2rem; // 32px
+    min-height: 2rem;
   }
 
   #logsQueryEditor,
@@ -4257,15 +4275,15 @@ export default defineComponent({
   }
   #fnEditor {
     width: 100%;
-    border-radius: 5px;
-    border: 0px solid #dbdbdb;
+    border-radius: 0.375rem; // 6px
+    border: 0 solid var(--o2-border);
     overflow: hidden;
   }
 
   .q-field--standard .q-field__control:before,
   .q-field--standard .q-field__control:focus:before,
   .q-field--standard .q-field__control:hover:before {
-    border: 0px !important;
+    border: 0 !important;
     border-color: none;
     transition: none;
   }
@@ -4287,47 +4305,47 @@ export default defineComponent({
   }
 
   .function-dropdown {
-    width: 205px;
-    padding-bottom: 0px;
-    border: 1px solid #dbdbdb;
-    border-radius: 5px;
+    width: 12.8125rem; // 205px
+    padding-bottom: 0;
+    border: 0.0625rem solid var(--o2-border); // 1px
+    border-radius: 0.375rem; // 6px
     cursor: pointer;
 
     .q-field__input {
       cursor: pointer;
       font-weight: 600;
-      font-size: 12px;
+      font-size: 0.75rem; // 12px
     }
     .q-field__native,
     .q-field__control {
-      min-height: 29px;
-      height: 29px;
-      padding: 0px 0px 0px 4px;
+      min-height: 1.8125rem; // 29px
+      height: 1.8125rem; // 29px
+      padding: 0 0 0 0.25rem; // 4px
     }
 
     .q-field__marginal {
-      height: 30px;
+      height: 1.875rem; // 30px
     }
   }
 
   .q-toggle__inner {
-    font-size: 30px;
+    font-size: 1.875rem; // 30px
   }
 
   .q-toggle__label {
-    font-size: 12px;
+    font-size: 0.75rem; // 12px
   }
 
   .casesensitive-btn {
-    padding: 8px;
-    margin-left: -6px;
-    background-color: #d5d5d5;
-    border-radius: 0px 3px 3px 0px;
+    padding: 0.5rem; // 8px
+    margin-left: -0.375rem; // -6px
+    background-color: var(--o2-muted-background);
+    border-radius: 0 0.25rem 0.25rem 0; // 0 4px 4px 0
   }
 
   .search-field .q-field {
     &__control {
-      border-radius: 3px 0px 0px 3px !important;
+      border-radius: 0.25rem 0 0 0.25rem !important; // 4px 0 0 4px
     }
 
     &__native {
@@ -4336,9 +4354,8 @@ export default defineComponent({
   }
 
   .search-time {
-    // width: 120px;
     .q-btn-group {
-      border-radius: 3px;
+      border-radius: 0.375rem; // 6px
 
       .q-btn {
         min-height: auto;
@@ -4347,26 +4364,26 @@ export default defineComponent({
   }
 
   .search-dropdown {
-    padding: 0px;
+    padding: 0;
 
     .block {
-      color: $dark-page;
+      color: var(--o2-text-primary);
       font-weight: 600;
-      font-size: 12px;
+      font-size: 0.75rem; // 12px
     }
 
     .q-btn-dropdown__arrow-container {
-      color: $light-text2;
+      color: var(--o2-text-secondary);
     }
   }
 
   .refresh-rate-dropdown-container {
-    width: 220px;
+    width: 13.75rem; // 220px
 
     * .q-btn {
-      font-size: 12px !important;
-      padding-left: 8px;
-      padding-right: 8px;
+      font-size: 0.75rem !important; // 12px
+      padding-left: 0.5rem; // 8px
+      padding-right: 0.5rem; // 8px
     }
   }
 
@@ -4378,8 +4395,8 @@ export default defineComponent({
 
   .resultsOverChart {
     margin-bottom: 0.75rem;
-    font-size: 0.875rem;
-    color: $dark-page;
+    font-size: 0.875rem; // 14px
+    color: var(--o2-text-primary);
     font-weight: 700;
   }
 
@@ -4388,14 +4405,15 @@ export default defineComponent({
     z-index: 10;
 
     .listWrapper {
-      box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 0.1875rem 0.9375rem rgba(0, 0, 0, 0.1); // 0 3px 15px
       transition: height 0.25s ease;
-      height: calc(100vh - 146px);
-      background-color: white;
+      height: calc(100vh - 9.125rem); // 146px
+      background-color: var(--o2-card-background);
       position: absolute;
       top: 2.75rem;
       width: 100%;
       left: 0;
+      border-radius: 0.375rem; // 6px
 
       &:empty {
         height: 0;
@@ -4403,31 +4421,32 @@ export default defineComponent({
 
       &,
       .q-list {
-        border-radius: 3px;
+        border-radius: 0.375rem; // 6px
       }
     }
   }
 
   .fields_autocomplete {
-    max-height: 250px;
+    max-height: 15.625rem; // 250px
   }
 
   .search-button {
-    min-width: 77px;
-    line-height: 29px;
+    min-width: 4.8125rem; // 77px
+    line-height: 1.8125rem; // 29px
     font-weight: bold;
     text-transform: initial;
-    font-size: 11px;
-    color: white;
+    font-size: 0.6875rem; // 11px
+    color: var(--o2-primary-foreground);
+    border-radius: 0.375rem; // 6px
 
     .q-btn__content {
       background: $secondary;
-      border-radius: 3px 3px 3px 3px;
-      padding: 0px 5px;
+      border-radius: 0.375rem; // 6px
+      padding: 0 0.3125rem; // 5px
 
       .q-icon {
-        font-size: 15px;
-        color: #ffffff;
+        font-size: 0.9375rem; // 15px
+        color: var(--o2-primary-foreground);
       }
     }
   }
@@ -4439,56 +4458,61 @@ export default defineComponent({
   }
 
   .download-logs-btn {
-    height: 30px;
+    height: 1.875rem; // 30px
+    border-radius: 0.375rem; // 6px
   }
 
   .save-transform-btn {
-    height: 31px;
+    height: 1.9375rem; // 31px
+    border-radius: 0.375rem; // 6px
   }
 
   .query-editor-container {
-    height: calc(100% - 35px) !important;
+    height: calc(100% - 2.1875rem) !important; // 35px
   }
 
   .logs-auto-refresh-interval {
     .q-btn {
-      min-height: 30px;
-      max-height: 30px;
-      padding: 0 4px;
+      min-height: 1.875rem; // 30px
+      max-height: 1.875rem; // 30px
+      padding: 0 0.25rem; // 4px
+      border-radius: 0.375rem; // 6px
     }
   }
 
   .saved-views-dropdown {
-    border-radius: 4px;
+    border-radius: 0.375rem; // 6px
     button {
-      padding: 4px 5px;
+      padding: 0.25rem 0.3125rem; // 4px 5px
+      border-radius: 0.375rem; // 6px
     }
   }
 
   .savedview-dropdown {
-    width: 215px;
+    width: 13.4375rem; // 215px
     display: inline-block;
-    border: 1px solid #dbdbdb;
+    border: 0.0625rem solid var(--o2-border); // 1px
+    border-radius: 0.375rem; // 6px
 
     .q-field__input {
       cursor: pointer;
       font-weight: 600;
-      font-size: 12px;
+      font-size: 0.75rem; // 12px
     }
     .q-field__native,
     .q-field__control {
-      min-height: 29px !important;
-      height: 29px;
-      padding: 0px 0px 0px 4px;
+      min-height: 1.8125rem !important; // 29px
+      height: 1.8125rem; // 29px
+      padding: 0 0 0 0.25rem; // 4px
     }
 
     .q-field__marginal {
-      height: 30px;
+      height: 1.875rem; // 30px
     }
   }
 
   .saved-view-item {
-    padding: 2px 4px !important;
+    padding: 0.125rem 0.25rem !important; // 2px 4px
   }
 
   .body--dark {
@@ -4507,12 +4531,13 @@ export default defineComponent({
   }
 
   .q-pagination__middle > .q-btn {
-    min-width: 30px !important;
-    max-width: 30px !important;
+    min-width: 1.875rem !important; // 30px
+    max-width: 1.875rem !important; // 30px
+    border-radius: 0.375rem; // 6px
   }
 
   .q-item {
-    padding: 0px !important;
+    padding: 0 !important;
   }
 
   .q-focus-helper:hover {
@@ -4520,69 +4545,71 @@ export default defineComponent({
   }
 
   .favorite-label {
-    line-height: 24px !important;
+    line-height: 1.5rem !important; // 24px
     font-weight: bold !important;
   }
 
   .region-dropdown-btn {
     text-transform: capitalize;
     font-weight: 600;
-    font-size: 12px;
-    padding-left: 8px;
-    height: 30px;
-    padding-top: 3px;
+    font-size: 0.75rem; // 12px
+    padding-left: 0.5rem; // 8px
+    height: 1.875rem; // 30px
+    padding-top: 0.1875rem; // 3px
+    border-radius: 0.375rem; // 6px
 
     .q-btn-dropdown__arrow {
-      margin-left: 0px !important;
+      margin-left: 0 !important;
     }
   }
 
   .download-logs-btn {
     .q-btn-dropdown__arrow {
-      margin-left: 0px !important;
+      margin-left: 0 !important;
     }
   }
 
   .region-dropdown-list {
-    min-width: 150px;
+    min-width: 9.375rem; // 150px
+    border-radius: 0.375rem; // 6px
 
     .q-item__section {
       display: inline-block;
     }
 
     .q-item__label {
-      margin-left: 20px;
+      margin-left: 1.25rem; // 20px
       text-transform: capitalize;
-      margin-top: 2px;
+      margin-top: 0.125rem; // 2px
     }
   }
 }
 .saved-view-table {
   td {
     padding: 0;
-    height: 25px !important;
-    min-height: 25px !important;
+    height: 1.5625rem !important; // 25px
+    min-height: 1.5625rem !important; // 25px
   }
 
   .q-table__control {
-    margin: 0px !important;
+    margin: 0 !important;
     width: 100% !important;
     text-align: right;
   }
 
   .q-table__bottom {
-    padding: 0px !important;
-    min-height: 35px;
+    padding: 0 !important;
+    min-height: 2.1875rem; // 35px
 
     .q-table__control {
-      padding: 0px 10px !important;
+      padding: 0 0.625rem !important; // 10px
     }
   }
 
   .q-table__top {
-    padding: 0px !important;
-    margin: 0px !important;
-    left: 0px;
+    padding: 0 !important;
+    margin: 0 !important;
+    left: 0;
     width: 100%;
 
     .q-table__separator {
@@ -4590,70 +4617,74 @@ export default defineComponent({
     }
 
     .q-table__control {
-      padding: 0px !important;
+      padding: 0 !important;
     }
   }
 
   .q-field--filled .q-field__control {
-    padding: 0px 5px !important;
+    padding: 0 0.3125rem !important; // 5px
   }
 
   .saved-view-item {
-    padding: 4px 5px 4px 10px !important;
+    padding: 0.25rem 0.3125rem 0.25rem 0.625rem !important; // 4px 5px 4px 10px
   }
 
   .q-item__section--main ~ .q-item__section--side {
-    padding-left: 5px !important;
+    padding-left: 0.3125rem !important; // 5px
   }
 }
 
 .logs-visualize-toggle {
   .button-group {
-    border: 1px solid gray !important;
-    border-radius: 9px;
+    border: 0.0625rem solid var(--o2-border) !important; // 1px
+    border-radius: 0.5625rem; // 9px
   }
 
   .button {
-    background-color: #f0eaea;
+    background-color: var(--o2-muted-background);
+    border-radius: 0.375rem; // 6px
+    transition: background-color 0.2s ease;
   }
 
   .button-left {
-    border-top-left-radius: 4px;
-    border-bottom-left-radius: 4px;
-    color: black;
+    border-top-left-radius: 0.375rem; // 6px
+    border-bottom-left-radius: 0.375rem; // 6px
+    color: var(--o2-text-primary);
   }
 
   .button-right {
-    border-top-right-radius: 4px;
-    border-bottom-right-radius: 4px;
-    color: black;
+    border-top-right-radius: 0.375rem; // 6px
+    border-bottom-right-radius: 0.375rem; // 6px
+    color: var(--o2-text-primary);
   }
   .selected {
     background-color: var(--q-primary) !important;
-    color: white;
+    color: var(--o2-primary-foreground) !important;
   }
 }
 
 .file-type-button-group {
   .q-btn {
-    border: 1px solid var(--q-border-color, #e0e0e0);
-    background-color: var(--q-field-bg, #fafafa);
-    color: var(--q-text-color, #000);
+    border: 0.0625rem solid var(--o2-border); // 1px
+    background-color: var(--o2-card-background);
+    color: var(--o2-text-primary);
+    border-radius: 0.375rem; // 6px
+    transition: all 0.2s ease;
 
     &.selected {
       background-color: var(--q-primary) !important;
-      color: white !important;
+      color: var(--o2-primary-foreground) !important;
       border-color: var(--q-primary) !important;
     }
 
     &:first-child {
-      border-top-left-radius: 4px;
-      border-bottom-left-radius: 4px;
+      border-top-left-radius: 0.375rem; // 6px
+      border-bottom-left-radius: 0.375rem; // 6px
     }
 
     &:last-child {
-      border-top-right-radius: 4px;
-      border-bottom-right-radius: 4px;
+      border-top-right-radius: 0.375rem; // 6px
+      border-bottom-right-radius: 0.375rem; // 6px
     }
 
     &:not(:last-child) {
@@ -4661,29 +4692,29 @@ export default defineComponent({
     }
 
     &:hover:not(.selected) {
-      background-color: var(--q-hover-color, #f5f5f5);
+      background-color: var(--o2-hover-accent);
     }
   }
 }
 </style>
-<style scoped>
+<style scoped lang="scss">
 .expand-on-focus {
-  height: calc(100vh - 200px) !important;
+  height: calc(100vh - 12.5rem) !important; // 200px
   z-index: 20 !important;
 }
 
 .file-type label {
   transform: translate(-0.75rem, -175%);
   font-weight: bold;
-  font-size: 14px;
-  color: rgba(0, 0, 0, 0.6);
+  font-size: 0.875rem; // 14px
+  color: var(--o2-text-secondary);
 }
 .q-dark .q-btn {
   font-weight: 600;
-  border: 0px solid rgba(255, 255, 255, 0.2);
+  border: 0 solid rgba(255, 255, 255, 0.2);
 }
 .q-dark .file-type label,
 .q-dark .file-type .q-btn {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--o2-text-secondary);
 }
 </style>
