@@ -403,6 +403,11 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
+    allowAlertCreation: {
+      default: false,
+      required: false,
+      type: Boolean,
+    },
     runId: {
       type: String,
       default: null,
@@ -483,6 +488,7 @@ export default defineComponent({
       folderId,
       reportId,
       allowAnnotationsAdd,
+      allowAlertCreation,
       runId,
       tabId,
       tabName,
@@ -550,6 +556,11 @@ export default defineComponent({
     const contextMenuData = ref<any>(null);
 
     const onChartContextMenu = (event: any) => {
+      // Only show context menu if alert creation is allowed
+      if (!allowAlertCreation.value) {
+        return;
+      }
+
       contextMenuVisible.value = true;
       contextMenuPosition.value = { x: event.x, y: event.y };
       contextMenuValue.value = event.value;
@@ -597,15 +608,15 @@ export default defineComponent({
           const yField = query.fields.y[0];
           const aliasOrColumn = yField.alias || yField.column;
 
-          // Extract from SQL to get the exact case (including quotes if present)
+          // Extract from SQL to get the exact case (without quotes)
           if (sqlQuery) {
             // Look for pattern: aggregation_func(...) as "alias" or aggregation_func(...) as alias
             const escapedAlias = aliasOrColumn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const regex = new RegExp(`\\s+as\\s+(["']?${escapedAlias}["']?)(?:\\s|,|\\)|$)`, 'i');
             const match = sqlQuery.match(regex);
             if (match && match[1]) {
-              // Use the alias with quotes if they exist in SQL
-              yAxisColumn = match[1];
+              // Strip quotes - the parser will add them back if needed
+              yAxisColumn = match[1].replace(/^["']|["']$/g, '');
             } else {
               yAxisColumn = aliasOrColumn;
             }

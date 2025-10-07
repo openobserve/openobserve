@@ -500,6 +500,7 @@ import {
 } from "@/utils/alerts/alertPayload";
 import {
   getParser as getParserUtil,
+  addHavingClauseToQuery,
   type SqlUtilsContext,
 } from "@/utils/alerts/alertSqlUtils";
 
@@ -1113,15 +1114,13 @@ export default defineComponent({
                   const operator = panelData.condition === 'above' ? '>=' : '<=';
                   const yAxisColumn = panelData.yAxisColumn;
 
-                  // Add HAVING clause to the SQL
-                  const sqlLower = sqlQuery.toLowerCase();
-                  if (sqlLower.includes('having')) {
-                    // Already has HAVING clause, add our condition with AND
-                    sqlQuery = sqlQuery.replace(/having\s+/i, `HAVING ${yAxisColumn} ${operator} ${threshold} AND `);
-                  } else {
-                    // No HAVING clause yet, add it at the end
-                    sqlQuery = `${sqlQuery.trim()} HAVING ${yAxisColumn} ${operator} ${threshold}`;
+                  // Use node-sql-parser to properly insert HAVING clause in the correct position
+                  // This handles queries with ORDER BY, LIMIT, OFFSET, etc.
+                  // Ensure parser is initialized first
+                  if (!parser) {
+                    await importSqlParser();
                   }
+                  sqlQuery = addHavingClauseToQuery(sqlQuery, yAxisColumn, operator, threshold, parser);
                 }
 
                 formData.value.query_condition.sql = sqlQuery;
