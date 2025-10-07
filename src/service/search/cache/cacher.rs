@@ -201,12 +201,12 @@ pub async fn check_cache(
                 found_ts_order = true;
                 break;
             }
+        }
 
-            // For histogram queries ordered by non-timestamp columns (e.g., ORDER BY count),
-            // use ascending as default
-            if !found_ts_order && is_histogram_query {
-                is_descending = false;
-            }
+        // For histogram queries ordered by non-timestamp columns (e.g., ORDER BY count),
+        // use ascending as default
+        if !found_ts_order && is_histogram_query {
+            is_descending = false;
         }
     }
     if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
