@@ -45,6 +45,7 @@ import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitVal
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import { useAnnotations } from "./useAnnotations";
 import useHttpStreamingSearch from "../useStreamingSearch";
+import useSearch from "@/composables/useSearch";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -84,6 +85,8 @@ export const usePanelDataLoader = (
   let runCount = 0;
 
   const store = useStore();
+
+  const { sortResponse } = useSearch();
 
   const {
     fetchQueryDataWithWebSocket,
@@ -595,7 +598,9 @@ export const usePanelDataLoader = (
 
           // update result metadata - add to partition results array
           // Store each partition's result metadata
-          state?.resultMetaData?.[currentQueryIndex]?.push(searchRes?.data ?? {});
+          state?.resultMetaData?.[currentQueryIndex]?.push(
+            searchRes?.data ?? {},
+          );
 
           if (
             searchRes.data.is_partial == true &&
@@ -817,6 +822,27 @@ export const usePanelDataLoader = (
       state.resultMetaData[payload?.meta?.currentQueryIndex][
         lastPartitionIndex
       ].hits = searchRes?.content?.results?.hits ?? {};
+    }
+
+    // sort the hits based on order by metadata from BE
+    if (
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
+        lastPartitionIndex
+      ]?.hits?.length > 0 &&
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
+        lastPartitionIndex
+      ]?.hasOwnProperty("order_by_metadata") &&
+      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
+        lastPartitionIndex
+      ]?.order_by_metadata?.length > 0
+    ) {
+      sortResponse(
+        state?.data[payload?.meta?.currentQueryIndex],
+        store?.state?.zoConfig?.timestamp_column,
+        state?.resultMetaData?.[payload?.meta?.currentQueryIndex][
+          lastPartitionIndex
+        ]?.order_by_metadata,
+      );
     }
   };
 
@@ -1679,7 +1705,9 @@ export const usePanelDataLoader = (
                 const currentQueryIndex = state.data.length - 1;
 
                 state.data[currentQueryIndex] = searchResponse.value.hits;
-                state.resultMetaData[currentQueryIndex] = [searchResponse.value]; // Wrap in array
+                state.resultMetaData[currentQueryIndex] = [
+                  searchResponse.value,
+                ]; // Wrap in array
                 // set loading to false
                 state.loading = false;
               } else {
