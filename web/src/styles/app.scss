@@ -1022,5 +1022,56 @@ html, body {
   }
 }
 
+/* ============================================================================
+   SPLITTER SECTION COLLAPSE BUTTON
+   Reusable collapse button for splitter sections across all pages
+   ============================================================================ */
 
+.splitter-section-collapse-btn {
+  z-index: 1001 !important;
+  position: absolute !important;
+  background: rgba(0, 0, 0, 0.05) !important;
+  border-radius: 4px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: all 0.2s ease;
+  min-width: 0.75rem !important;
+  width: 0.75rem !important;
+  height: 36px !important;
+  padding: 0 !important;
+  cursor: pointer;
 
+  .q-icon {
+    color: rgba(0, 0, 0, 0.5) !important;
+    font-size: 18px !important;
+  }
+
+  &:hover {
+    background: var(--q-primary) !important;
+    opacity: 0.85;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+
+    .q-icon {
+      color: white !important;
+    }
+  }
+
+  &--visible {
+    right: -10px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+
+    &:hover {
+      transform: translateY(-50%) translateX(-2px) !important;
+    }
+  }
+
+  &--hidden {
+    left: -10px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+
+    &:hover {
+      transform: translateY(-50%) translateX(10px) !important;
+    }
+  }
+}
