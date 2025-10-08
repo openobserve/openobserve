@@ -228,6 +228,9 @@ jobs:
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
 
+      - name: Create test-results folder for JSON report
+        run: mkdir -p tests/ui-testing/test-results
+
       - uses: actions/setup-node@v5
         with:
           node-version: 22
