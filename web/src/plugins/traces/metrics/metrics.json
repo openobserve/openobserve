@@ -28,7 +28,7 @@
               "label_option": {
                 "rotate": 0
               },
-              "show_symbol": true,
+              "show_symbol": false,
               "line_interpolation": "smooth",
               "legend_width": {
                 "unit": "px"
@@ -86,7 +86,7 @@
                   "stream_type": "traces",
                   "x": [
                     {
-                      "label": "Timestamp",
+                      "label": "",
                       "alias": "x_axis_1",
                       "column": "_timestamp",
                       "color": null,
@@ -99,7 +99,7 @@
                   ],
                   "y": [
                     {
-                      "label": "Duration",
+                      "label": "",
                       "alias": "y_axis_1",
                       "column": "duration",
                       "color": "#5960b2",
@@ -155,7 +155,7 @@
               "label_option": {
                 "rotate": 0
               },
-              "show_symbol": true,
+              "show_symbol": false,
               "line_interpolation": "smooth",
               "legend_width": {
                 "unit": "px"
@@ -213,7 +213,7 @@
                   "stream_type": "traces",
                   "x": [
                     {
-                      "label": "Timestamp",
+                      "label": "",
                       "alias": "x_axis_1",
                       "column": "_timestamp",
                       "color": null,
@@ -226,7 +226,7 @@
                   ],
                   "y": [
                     {
-                      "label": "Errors",
+                      "label": "",
                       "alias": "y_axis_1",
                       "column": "span_status",
                       "color": "#5960b2",
@@ -294,7 +294,7 @@
               "label_option": {
                 "rotate": 0
               },
-              "show_symbol": true,
+              "show_symbol": false,
               "line_interpolation": "smooth",
               "legend_width": {
                 "unit": "px"
@@ -354,7 +354,7 @@
                   "stream_type": "traces",
                   "x": [
                     {
-                      "label": "Timestamp",
+                      "label": "",
                       "alias": "x_axis_1",
                       "column": "_timestamp",
                       "color": null,
@@ -367,7 +367,7 @@
                   ],
                   "y": [
                     {
-                      "label": "Trace Rate",
+                      "label": "",
                       "alias": "y_axis_1",
                       "column": "_timestamp",
                       "color": "#5960b2",
