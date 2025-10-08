@@ -3,7 +3,7 @@ name: Unit tests
 on:
   push:
     branches:
-      - "main"
+      - "ci/update_workflow_with_internal_runners"
     # paths-ignore:
     #   - "**.md"
     #   - "**.yml"
@@ -23,7 +23,7 @@ env:
 jobs:
   backend_unit_tests:
     runs-on:
-      labels: repo-openobserve-standard-4
+      labels: repo-openobserve-standard-16
     permissions:
       contents: read
 

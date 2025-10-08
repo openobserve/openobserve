@@ -46,7 +46,7 @@ jobs:
   build_binary:
     name: build_binary
     runs-on:
-      labels: repo-openobserve-standard-4
+      labels: repo-openobserve-standard-16
 
     steps:
       - name: Remove unused tools
