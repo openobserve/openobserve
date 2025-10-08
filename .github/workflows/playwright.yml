@@ -46,7 +46,7 @@ jobs:
   build_binary:
     name: build_binary
     runs-on:
-      labels: ubicloud-standard-16
+      labels: repo-openobserve-standard-4
 
     steps:
       - name: Remove unused tools
@@ -99,7 +99,7 @@ jobs:
     name: e2e / ${{ matrix.testfolder }}
     needs: [build_binary]
     runs-on:
-      labels: ubicloud-standard-8
+      labels: repo-openobserve-standard-4
     container:
       image: mcr.microsoft.com/playwright:v1.50.0-jammy
       options: --user root
@@ -316,7 +316,7 @@ jobs:
   generate_coverage_report:
     name: Generate Coverage Report
     needs: [build_binary, ui_integration_tests]
-    runs-on: ubicloud-standard-8
+    runs-on: repo-openobserve-standard-4
     if: success() || failure()
 
     steps:
