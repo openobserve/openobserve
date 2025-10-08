@@ -100,9 +100,9 @@ jobs:
     needs: [build_binary]
     runs-on:
       labels: repo-openobserve-standard-4
-    container:
-      image: mcr.microsoft.com/playwright:v1.50.0-jammy
-      options: --user root
+    # container:
+    #   image: mcr.microsoft.com/playwright:v1.50.0-jammy
+    #   options: --user root
     strategy:
       matrix:
         include:
