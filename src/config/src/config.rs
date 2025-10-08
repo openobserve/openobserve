@@ -1536,6 +1536,10 @@ pub struct Limit {
     pub histogram_enabled: bool,
     #[env_config(name = "ZO_CACHE_DELAY_SECS", default = 300)] // seconds
     pub cache_delay_secs: i64,
+    #[env_config(name = "ZO_QUERY_RECOMMENDATION_INTERVAL", default = 300)] // seconds
+    pub query_recommendation_analysis_interval: i64,
+    #[env_config(name = "ZO_QUERY_RECOMMENDATION_LOOKBACK", default = 300)] // seconds
+    pub query_recommendation_lookback_minutes: i64,
 }
 
 #[derive(EnvConfig, Default)]

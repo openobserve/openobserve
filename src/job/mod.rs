@@ -46,6 +46,8 @@ pub(crate) mod pipeline;
 mod pipeline_error_cleanup;
 mod promql;
 mod promql_self_consume;
+#[cfg(feature = "enterprise")]
+mod query_recommendation_analysis;
 mod stats;
 
 pub use file_downloader::{download_from_node, queue_download};
