@@ -1003,7 +1003,6 @@ fn parse_simple_multi_stream_request(
 
     Ok(search::MultiStreamRequest {
         sql: sql_queries,
-        streams: vec![],
         encoding: search::RequestEncoding::Empty,
         timeout: 0,
         from: simple_req.query.from,
@@ -1203,6 +1202,7 @@ pub async fn search_multi_stream(
     }
 
     // Check permissions for all streams upfront before processing queries
+    // Extract stream names from SQL queries and check permissions
     #[cfg(feature = "enterprise")]
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
@@ -1218,7 +1218,42 @@ pub async fn search_multi_stream(
             let user_role = user.role.clone();
             let user_is_external = user.is_external;
 
-            for stream_name in multi_req.streams.iter() {
+            // Extract all stream names from SQL queries
+            let mut stream_names = hashbrown::HashSet::new();
+            for sql_query in &multi_req.sql {
+                match resolve_stream_names(&sql_query.sql) {
+                    Ok(streams) => {
+                        for stream in streams {
+                            stream_names.insert(stream);
+                        }
+                    }
+                    Err(e) => {
+                        #[cfg(feature = "enterprise")]
+                        let error_message = format!("Failed to parse SQL: {e}");
+
+                        let http_response =
+                            map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
+
+                        #[cfg(feature = "enterprise")]
+                        {
+                            report_to_audit(
+                                user_id.clone(),
+                                org_id.clone(),
+                                trace_id.clone(),
+                                http_response.status().into(),
+                                Some(error_message),
+                                &in_req,
+                                body_bytes.clone(),
+                            )
+                            .await;
+                        }
+                        return http_response;
+                    }
+                }
+            }
+
+            // Check permissions for each unique stream
+            for stream_name in stream_names {
                 if !crate::handler::http::auth::validator::check_permissions(
                     &user_id,
                     AuthExtractor {
