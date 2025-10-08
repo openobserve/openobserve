@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @refresh="refreshDashboard"
           @update:initial-variable-values="updateInitialVariableValues"
           @onEditLayout="openEditLayout"
+          @contextmenu="$emit('chart:contextmenu', $event)"
           style="height: 100%; width: 100%"
         />
       </div>
@@ -142,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:initial-variable-values="updateInitialVariableValues"
               @onEditLayout="openEditLayout"
               @update:runId="updateRunId"
+              @contextmenu="$emit('chart:contextmenu', $event)"
             >
             </PanelContainer>
           </div>
