@@ -70,7 +70,10 @@
               "trellis": {
                 "layout": null,
                 "num_of_columns": 1
-              }
+              },
+              "dataZoom": {
+                "yAxisIndex": 0
+              } 
             },
             "queryType": "sql",
             "queries": [
@@ -194,7 +197,10 @@
               "trellis": {
                 "layout": null,
                 "num_of_columns": 1
-              }
+              },
+              "dataZoom": {
+                "yAxisIndex": 0
+              } 
             },
             "queryType": "sql",
             "queries": [
@@ -332,7 +338,10 @@
                 "layout": null,
                 "num_of_columns": 1,
                 "group_by_y_axis": false
-              }
+              },
+              "dataZoom": {
+                "yAxisIndex": 0
+              } 
             },
             "queryType": "sql",
             "queries": [
