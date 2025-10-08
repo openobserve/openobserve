@@ -41,6 +41,7 @@ pub mod ofga;
 pub mod org_users;
 pub mod organization;
 pub mod pipeline;
+pub mod pipeline_errors;
 #[cfg(feature = "enterprise")]
 pub mod re_pattern;
 pub mod saved_view;

@@ -25,6 +25,10 @@ use datafusion::{
     physical_plan::{ExecutionPlan, joins::HashJoinExec},
 };
 
+#[cfg(feature = "enterprise")]
+use crate::service::search::datafusion::optimizer::physical_optimizer::enrichment::{
+    is_enrichment_table, should_use_enrichment_broadcast_join,
+};
 use crate::service::search::datafusion::optimizer::physical_optimizer::utils::is_aggregate_exec;
 
 #[derive(Default, Debug)]
@@ -58,6 +62,22 @@ fn swap_join_order(plan: Arc<dyn ExecutionPlan>) -> Result<Transformed<Arc<dyn E
     if let Some(hash_join) = plan.as_any().downcast_ref::<HashJoinExec>() {
         let left = hash_join.left();
         let right = hash_join.right();
+
+        // If right table is enrichment table and left table is not, swap them
+        #[cfg(feature = "enterprise")]
+        if config::get_config()
+            .common
+            .feature_enrichment_broadcast_join_enabled
+            && !is_enrichment_table(left)
+            && is_enrichment_table(right)
+            && hash_join.join_type().supports_swap()
+            && let Ok(swap_hash_join) = HashJoinExec::swap_inputs(hash_join, hash_join.mode)
+            && should_use_enrichment_broadcast_join(&swap_hash_join)
+        {
+            return Ok(Transformed::yes(swap_hash_join));
+        }
+
+        // If left is not aggregate but right is aggregate, swap them
         if !is_aggregate_exec(left)
             && is_aggregate_exec(right)
             && hash_join.join_type().supports_swap()

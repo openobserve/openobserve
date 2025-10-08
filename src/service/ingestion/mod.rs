@@ -136,11 +136,13 @@ pub fn apply_vrl_fn(
                         TRANSFORM_FAILED,
                     ])
                     .inc();
-                let err_msg = format!(
-                    "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row.",
+                // Log full error with record for debugging
+                log::warn!(
+                    "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row."
                 );
-                log::warn!("{err_msg}");
-                (row, Some(err_msg))
+                // Return only error message without sensitive record data
+                let clean_err = format!("{org_id}/{stream_name:?} vrl failed: {err:?}");
+                (row, Some(clean_err))
             }
         },
         Err(err) => {
@@ -152,11 +154,13 @@ pub fn apply_vrl_fn(
                     TRANSFORM_FAILED,
                 ])
                 .inc();
-            let err_msg = format!(
-                "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row.",
+            // Log full error with record for debugging
+            log::warn!(
+                "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row."
             );
-            log::warn!("{err_msg}");
-            (row, Some(err_msg))
+            // Return only error message without sensitive record data
+            let clean_err = format!("{org_id}/{stream_name:?} vrl runtime error: {err:?}");
+            (row, Some(clean_err))
         }
     }
 }

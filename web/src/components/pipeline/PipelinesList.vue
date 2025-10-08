@@ -196,6 +196,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <PipelineView :pipeline="props.row" />
                   </q-tooltip>
                 </q-btn>
+                <!-- Error Indicator - Always render to maintain alignment -->
+                <div class="q-ml-xs pipeline-error-slot">
+                  <q-btn
+                    v-if="props.row.last_error"
+                    :data-test="`pipeline-list-${props.row.name}-error-indicator`"
+                    icon="error"
+                    class="pipeline-error-indicator"
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    @click.stop="showErrorDialog(props.row)"
+                  >
+                    <q-tooltip>
+                      Last error: {{ new Date(props.row.last_error.last_error_timestamp / 1000).toLocaleString() }}
+                    </q-tooltip>
+                  </q-btn>
+                </div>
               </template>
             </q-td>
           </q-tr>
@@ -308,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:header="props">
             <q-tr :props="props">
               <!-- Adding this block to render the select-all checkbox -->
-              <q-th auto-width>
+              <q-th v-if="columns.length > 0">
                 <q-checkbox
                   v-model="props.selected"
                   size="sm"
@@ -355,6 +374,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="resumePipelineDialogMeta.show"
     @update:shouldStartfromNow="shouldStartfromNow = $event"
   />
+
+  <!-- Pipeline Error Dialog -->
+  <q-dialog v-model="errorDialog.show" @hide="closeErrorDialog">
+    <q-card
+      class="pipeline-error-dialog"
+      :class="store.state.theme === 'dark' ? 'pipeline-error-dialog-dark' : 'pipeline-error-dialog-light'"
+    >
+      <!-- Header with Pipeline Name and Timestamp -->
+      <q-card-section class="pipeline-error-header tw-flex tw-items-center tw-justify-between">
+        <div class="tw-flex-1">
+          <div class="tw-flex tw-items-center tw-gap-3 tw-mb-1">
+            <q-icon name="error" size="24px" class="error-icon" />
+            <span class="pipeline-name">{{ errorDialog.data?.name }}</span>
+          </div>
+          <div class="error-timestamp">
+            <span class="tw-mr-2">Last error:</span>
+            <q-icon name="schedule" size="14px" class="tw-mr-1" />
+            {{ errorDialog.data && new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString() }}
+          </div>
+        </div>
+        <q-btn
+          icon="close"
+          flat
+          round
+          dense
+          @click="closeErrorDialog"
+          class="close-btn"
+        />
+      </q-card-section>
+
+      <q-separator />
+
+      <q-card-section v-if="errorDialog.data" class="pipeline-error-content">
+        <!-- Error Summary -->
+        <div v-if="errorDialog.data.last_error.error_summary" class="tw-mb-4">
+          <div class="section-label tw-mb-2">Error Summary</div>
+          <div class="error-summary-box">
+            {{ errorDialog.data.last_error.error_summary }}
+          </div>
+        </div>
+
+        <!-- Node Errors -->
+        <div v-if="errorDialog.data.last_error.node_errors && Object.keys(errorDialog.data.last_error.node_errors).length > 0">
+          <div class="section-label tw-mb-3">Node Errors</div>
+          <div class="node-errors-container">
+            <div
+              v-for="(nodeError, nodeId) in errorDialog.data.last_error.node_errors"
+              :key="nodeId"
+              class="node-error-item"
+            >
+              <div class="node-error-header">
+                <span class="node-name">{{ nodeError.node_name || nodeId }}</span>
+                <span class="node-type">{{ nodeError.node_type }}</span>
+              </div>
+              <div v-if="nodeError.error_messages && nodeError.error_messages.length > 0" class="node-error-messages">
+                <div v-for="(msg, idx) in nodeError.error_messages" :key="idx" class="error-message">
+                  {{ msg }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </q-card-section>
+
+      <q-card-actions class="pipeline-error-actions">
+        <q-btn
+          flat
+          no-caps
+          label="Close"
+          class="o2-secondary-button tw-h-[36px]"
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          @click="closeErrorDialog"
+        />
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 <script setup lang="ts">
 import {
@@ -481,6 +576,11 @@ const changePagination = (val: { label: string; value: any }) => {
 };
 
 const selectedPipelines = ref<any[]>([]);
+
+const errorDialog = ref({
+  show: false,
+  data: null as any,
+});
 
 const currentRouteName = computed(() => {
   return router.currentRoute.value.name;
@@ -953,6 +1053,16 @@ const visibleRows = computed(() => {
 
 const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
+const showErrorDialog = (pipeline: any) => {
+  errorDialog.value.show = true;
+  errorDialog.value.data = pipeline;
+};
+
+const closeErrorDialog = () => {
+  errorDialog.value.show = false;
+  errorDialog.value.data = null;
+};
+
 const bulkTogglePipelines = async (action: "pause" | "resume") => {
     const dismiss = q.notify({
       spinner: true,
@@ -1062,5 +1172,194 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
   width: 100%;
   justify-content: space-between;
   align-items: center;
+}
+
+.pipeline-error-slot {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  vertical-align: middle;
+}
+
+.pipeline-error-indicator {
+  color: #ef4444 !important;
+  cursor: pointer !important;
+
+  &:hover {
+    background-color: rgba(239, 68, 68, 0.1) !important;
+  }
+}
+
+// Glassmorphic Error Dialog
+.pipeline-error-dialog {
+  min-width: 600px;
+  max-width: 800px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.pipeline-error-dialog-light {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.pipeline-error-dialog-dark {
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.pipeline-error-header {
+  padding: 20px 24px 16px;
+
+  .error-icon {
+    color: #ef4444;
+  }
+
+  .pipeline-name {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .error-timestamp {
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    opacity: 0.7;
+    margin-left: 36px;
+  }
+
+  .close-btn {
+    opacity: 0.6;
+    transition: opacity 0.2s;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+}
+
+.pipeline-error-content {
+  padding: 20px 24px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.section-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+
+.error-summary-box {
+  padding: 16px;
+  border-radius: 8px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #dc2626;
+}
+
+.node-errors-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.node-error-item {
+  padding: 16px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.04);
+  }
+}
+
+.node-error-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+
+  .node-name {
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .node-type {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    background: rgba(99, 102, 241, 0.1);
+    color: #6366f1;
+    font-weight: 500;
+  }
+}
+
+.node-error-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.error-message {
+  padding: 12px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.06);
+  border-left: 3px solid #ef4444;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #991b1b;
+}
+
+.pipeline-error-actions {
+  padding: 16px 24px;
+  justify-content: flex-end;
+}
+
+// Dark mode overrides
+.dark-mode {
+  .pipeline-error-dialog-dark {
+    .error-summary-box {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+    }
+
+    .node-error-item {
+      background: rgba(255, 255, 255, 0.03);
+      border-color: rgba(255, 255, 255, 0.1);
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+    }
+
+    .node-type {
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+    }
+
+    .error-message {
+      background: rgba(239, 68, 68, 0.1);
+      border-left-color: #fca5a5;
+      color: #fecaca;
+    }
+  }
 }
 </style>

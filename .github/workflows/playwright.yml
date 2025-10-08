@@ -8,8 +8,6 @@ on:
       - "**.md"
       - "**.yml"
       - "**.yaml"
-    # paths:
-    #   - "web/**"
   pull_request:
     branches:
       - "*"
@@ -17,8 +15,6 @@ on:
       - "**.md"
       - "**.yml"
       - "**.yaml"
-    # paths:
-    #   - "web/**"
 
 env:
   COLUMNS: 150
@@ -62,6 +58,8 @@ jobs:
 
       - name: Clone the current repo
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
@@ -71,6 +69,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          prefix-key: playwright
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
         with:
@@ -92,7 +91,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: debug-binary
+          name: release-binary
           path: target/x86_64-unknown-linux-gnu/release/openobserve
           retention-days: 1
 
@@ -208,15 +207,17 @@ jobs:
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Download artifacts
         uses: actions/download-artifact@v5
         with:
-          name: debug-binary
-          path: debug-binary
+          name: release-binary
+          path: release-binary
 
       - name: Start OpenObserve
-        run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
+        run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
         run: sleep 15
@@ -229,7 +230,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: lts/*
+          node-version: 22
 
       - name: Install dependencies and run ui-tests
         run: |
@@ -316,11 +317,13 @@ jobs:
     name: Generate Coverage Report
     needs: [build_binary, ui_integration_tests]
     runs-on: ubicloud-standard-8
-    if: always()
+    if: success() || failure()
 
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Download Playwright Coverage Data
         uses: actions/download-artifact@v5

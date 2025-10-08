@@ -119,6 +119,11 @@ impl Sql {
             let schema = infra::schema::get(org_id, &stream_name, stream_type)
                 .await
                 .unwrap_or_else(|_| Schema::empty());
+            if schema.fields().is_empty() {
+                return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                    stream_name,
+                )));
+            }
             total_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(schema)));
         }
 
@@ -224,7 +229,7 @@ impl Sql {
         let mut histogram_interval_visitor =
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
         let _ = statement.visit(&mut histogram_interval_visitor);
-        let histogram_interval = if query.histogram_interval > 0 {
+        let mut histogram_interval = if query.histogram_interval > 0 {
             Some(validate_and_adjust_histogram_interval(
                 query.histogram_interval,
                 Some((query.start_time, query.end_time)),
@@ -232,6 +237,9 @@ impl Sql {
         } else {
             histogram_interval_visitor.interval
         };
+        if !histogram_interval_visitor.is_histogram {
+            histogram_interval = None;
+        }
 
         //********************Change the sql start*********************************//
         // 11. replace approx_percentile_cont to new format

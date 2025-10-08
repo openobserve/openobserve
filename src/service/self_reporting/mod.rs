@@ -215,6 +215,7 @@ pub async fn publish_triggers_usage(trigger: TriggerData) {
 }
 
 pub async fn publish_error(error_data: ErrorData) {
+    // Queue error for batch processing (includes DB upsert and _meta stream ingestion)
     match queues::ERROR_QUEUE
         .enqueue(ReportingData::Error(Box::new(error_data)))
         .await
@@ -315,7 +316,7 @@ pub fn http_report_metrics(
     let uri = format!("/api/org/{uri}");
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            &uri,
+            uri.as_str(),
             code,
             org_id,
             stream_type.as_str(),
@@ -325,7 +326,7 @@ pub fn http_report_metrics(
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            &uri,
+            uri.as_str(),
             code,
             org_id,
             stream_type.as_str(),

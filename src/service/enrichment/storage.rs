@@ -334,34 +334,6 @@ pub mod local {
         Ok(())
     }
 
-    pub async fn list(prefix: &str) -> Result<Vec<String>> {
-        let cfg = config::get_config();
-        let mut keys = Vec::new();
-
-        let mut entries = tokio::fs::read_dir(&cfg.enrichment_table.cache_dir)
-            .await
-            .map_err(|e| anyhow!("Failed to read enrichment table cache directory: {}", e))?;
-        while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            anyhow!(
-                "Failed to read entry in enrichment table cache directory: {}",
-                e
-            )
-        })? {
-            if let Ok(file_name) = entry.file_name().into_string()
-                && file_name.ends_with(".json")
-                && file_name.starts_with(&prefix.replace("/", "_"))
-            {
-                let key = file_name
-                    .strip_suffix(".json")
-                    .unwrap_or(&file_name)
-                    .replace("_", "/");
-                keys.push(key);
-            }
-        }
-
-        Ok(keys)
-    }
-
     pub async fn get_last_updated_at(org_id: &str, table_name: &str) -> Result<i64> {
         let key = get_key(org_id, table_name);
         let metadata_content = get_metadata_content().await?;
@@ -462,5 +434,340 @@ pub mod database {
             Some(_) => Ok(true),
             None => Ok(false),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use serde_json::json;
+    use tokio;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_all_sequential() {
+        // Run all tests sequentially to avoid directory conflicts
+        test_store_and_retrieve().await;
+        test_store_multiple_versions().await;
+        test_retrieve_nonexistent_table().await;
+        test_delete().await;
+        test_delete_nonexistent_table().await;
+        test_get_last_updated_at().await;
+        test_store_data_if_needed().await;
+        test_store_data_if_needed_background().await;
+        test_metadata_persistence().await;
+        test_large_data_handling().await;
+        test_error_handling().await;
+    }
+
+    async fn test_store_and_retrieve() {
+        let org_id = "test_org";
+        let table_name = "test_table";
+        let test_data = vec![
+            json!({"id": 1, "name": "Alice", "age": 25}),
+            json!({"id": 2, "name": "Bob", "age": 30}),
+        ];
+        let updated_at = 1640995200;
+
+        // Test store function
+        let result = local::store(org_id, table_name, &test_data, updated_at).await;
+        assert!(result.is_ok(), "Store should succeed");
+
+        // Verify file was created
+        let key = get_key(org_id, table_name);
+        let table_dir = get_table_dir(&key);
+        let file_path = get_table_path(table_dir.to_str().unwrap(), updated_at);
+        assert!(file_path.exists(), "Data file should exist");
+
+        // Verify metadata was created
+        let metadata_path = get_metadata_path();
+        assert!(metadata_path.exists(), "Metadata file should exist");
+
+        // Test retrieve function
+        let retrieved_data = local::retrieve(org_id, table_name).await;
+        assert!(retrieved_data.is_ok(), "Retrieve should succeed");
+
+        let retrieved_data = retrieved_data.unwrap();
+        assert_eq!(retrieved_data.len(), 2, "Should retrieve 2 records");
+        assert_eq!(
+            retrieved_data[0]["id"],
+            json!(1),
+            "First record should match"
+        );
+        assert_eq!(
+            retrieved_data[1]["id"],
+            json!(2),
+            "Second record should match"
+        );
+    }
+
+    async fn test_store_multiple_versions() {
+        let org_id = "test_org";
+        let table_name = "versioned_table";
+
+        // Store first version
+        let data_v1 = vec![json!({"id": 1, "version": "v1"})];
+        let updated_at_v1 = 1640995200;
+        let result = local::store(org_id, table_name, &data_v1, updated_at_v1).await;
+        assert!(result.is_ok(), "First store should succeed");
+
+        // Store second version
+        let data_v2 = vec![json!({"id": 2, "version": "v2"})];
+        let updated_at_v2 = 1640995300;
+        let result = local::store(org_id, table_name, &data_v2, updated_at_v2).await;
+        assert!(result.is_ok(), "Second store should succeed");
+
+        // Retrieve should get both versions
+        let retrieved_data = local::retrieve(org_id, table_name).await.unwrap();
+        assert_eq!(retrieved_data.len(), 2, "Should retrieve both versions");
+    }
+
+    async fn test_retrieve_nonexistent_table() {
+        let result = local::retrieve("nonexistent_org", "nonexistent_table").await;
+        assert!(
+            result.is_err(),
+            "Should return an error for nonexistent table"
+        );
+    }
+
+    async fn test_delete() {
+        let org_id = "test_org";
+        let table_name = "delete_test_table";
+        let test_data = vec![json!({"id": 1, "data": "test"})];
+        let updated_at = 1640995200;
+
+        // First store some data
+        let result = local::store(org_id, table_name, &test_data, updated_at).await;
+        assert!(result.is_ok(), "Store should succeed");
+
+        // Verify data exists
+        let key = get_key(org_id, table_name);
+        let table_dir = get_table_dir(&key);
+        assert!(table_dir.exists(), "Table directory should exist");
+
+        // Test delete function
+        let result = local::delete(org_id, table_name).await;
+        assert!(result.is_ok(), "Delete should succeed");
+
+        // Verify directory was removed
+        assert!(!table_dir.exists(), "Table directory should be removed");
+
+        // Verify metadata was updated
+        let metadata_content = get_metadata_content().await.unwrap();
+        assert!(
+            !metadata_content.contains_key(&key),
+            "Key should be removed from metadata"
+        );
+    }
+
+    async fn test_delete_nonexistent_table() {
+        // Delete non-existent table should succeed gracefully
+        let result = local::delete("nonexistent_org", "nonexistent_table").await;
+        assert!(
+            result.is_ok(),
+            "Delete should handle nonexistent table gracefully"
+        );
+    }
+
+    async fn test_get_last_updated_at() {
+        let org_id = "test_org";
+        let table_name = "timestamp_test_table";
+        let test_data = vec![json!({"id": 1, "data": "test"})];
+        let updated_at = 1640995200;
+
+        // Test getting timestamp before storing data
+        let result = local::get_last_updated_at(org_id, table_name).await;
+        assert!(result.is_ok(), "Get last updated should succeed");
+        assert_eq!(result.unwrap(), 0, "Should return 0 for non-existent table");
+
+        // Store data
+        local::store(org_id, table_name, &test_data, updated_at)
+            .await
+            .unwrap();
+
+        // Test getting timestamp after storing data
+        let result = local::get_last_updated_at(org_id, table_name).await;
+        assert!(result.is_ok(), "Get last updated should succeed");
+        assert_eq!(
+            result.unwrap(),
+            updated_at,
+            "Should return correct timestamp"
+        );
+    }
+
+    async fn test_store_data_if_needed() {
+        let org_id = "test_org";
+        let table_name = "conditional_test_table";
+        let test_data_v1 = vec![json!({"id": 1, "version": "v1"})];
+        let test_data_v2 = vec![json!({"id": 1, "version": "v2"})];
+        let updated_at_v1 = 1640995200;
+        let updated_at_v2 = 1640995300;
+
+        // Store initial data
+        let result =
+            local::store_data_if_needed(org_id, table_name, &test_data_v1, updated_at_v1).await;
+        assert!(result.is_ok(), "Initial store should succeed");
+
+        // Verify data was stored
+        let retrieved_data = local::retrieve(org_id, table_name).await.unwrap();
+        assert_eq!(
+            retrieved_data[0]["version"],
+            json!("v1"),
+            "Should have v1 data"
+        );
+
+        // Try to store older data (should be ignored)
+        let old_updated_at = 1640995100;
+        let result =
+            local::store_data_if_needed(org_id, table_name, &test_data_v2, old_updated_at).await;
+        assert!(
+            result.is_ok(),
+            "Store with old timestamp should succeed but not update"
+        );
+
+        // Verify data wasn't changed
+        let retrieved_data = local::retrieve(org_id, table_name).await.unwrap();
+        assert_eq!(
+            retrieved_data[0]["version"],
+            json!("v1"),
+            "Should still have v1 data"
+        );
+
+        // Store newer data (should update)
+        let result =
+            local::store_data_if_needed(org_id, table_name, &test_data_v2, updated_at_v2).await;
+        assert!(result.is_ok(), "Store with newer timestamp should succeed");
+
+        // Verify data was updated
+        let retrieved_data = local::retrieve(org_id, table_name).await.unwrap();
+        assert_eq!(
+            retrieved_data[0]["version"],
+            json!("v2"),
+            "Should now have v2 data"
+        );
+    }
+
+    async fn test_store_data_if_needed_background() {
+        let org_id = "test_org";
+        let table_name = "background_test_table";
+        let test_data = vec![json!({"id": 1, "data": "background"})];
+        let updated_at = 1640995200;
+
+        // Test background store
+        let result =
+            local::store_data_if_needed_background(org_id, table_name, &test_data, updated_at)
+                .await;
+        assert!(result.is_ok(), "Background store should succeed");
+
+        // Wait a bit for background task to complete
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Verify data was eventually stored
+        let retrieved_data = local::retrieve(org_id, table_name).await.unwrap();
+        assert_eq!(retrieved_data.len(), 1, "Should have stored 1 record");
+        assert_eq!(
+            retrieved_data[0]["data"],
+            json!("background"),
+            "Should have correct data"
+        );
+    }
+
+    async fn test_metadata_persistence() {
+        let org_id = "test_org";
+        let table_name = "metadata_test_table";
+        let test_data = vec![json!({"id": 1, "data": "test"})];
+        let updated_at = 1640995200;
+
+        // Store data
+        local::store(org_id, table_name, &test_data, updated_at)
+            .await
+            .unwrap();
+
+        // Manually read metadata file
+        let metadata_path = get_metadata_path();
+        let metadata_content = tokio::fs::read_to_string(&metadata_path).await.unwrap();
+        let metadata: HashMap<String, i64> = serde_json::from_str(&metadata_content).unwrap();
+
+        let key = get_key(org_id, table_name);
+        assert!(
+            metadata.contains_key(&key),
+            "Metadata should contain the key"
+        );
+        assert_eq!(
+            metadata[&key], updated_at,
+            "Metadata should have correct timestamp"
+        );
+    }
+
+    async fn test_large_data_handling() {
+        let org_id = "test_org";
+        let table_name = "large_data_table";
+
+        // Create large dataset (1000 records)
+        let large_data: Vec<_> = (0..1000)
+            .map(|i| {
+                json!({
+                    "id": i,
+                    "name": format!("name_{}", i),
+                    "data": "x".repeat(100), // 100 characters per record
+                    "nested": {
+                        "field1": i * 2,
+                        "field2": format!("nested_value_{}", i)
+                    }
+                })
+            })
+            .collect();
+
+        let updated_at = 1640995200;
+
+        // Test storing large data
+        let result = local::store(org_id, table_name, &large_data, updated_at).await;
+        assert!(result.is_ok(), "Should handle large data successfully");
+
+        // Test retrieving large data
+        let retrieved_data = local::retrieve(org_id, table_name).await.unwrap();
+        assert_eq!(
+            retrieved_data.len(),
+            1000,
+            "Should retrieve all 1000 records"
+        );
+        assert_eq!(
+            retrieved_data[0]["id"],
+            json!(0),
+            "First record should be correct"
+        );
+        assert_eq!(
+            retrieved_data[999]["id"],
+            json!(999),
+            "Last record should be correct"
+        );
+    }
+
+    async fn test_error_handling() {
+        // Test with invalid JSON data
+        let org_id = "test_org";
+        let table_name = "error_test_table";
+
+        // Create data that will serialize fine but test edge cases
+        let test_data = vec![
+            json!({"id": 1, "data": null}),
+            json!({"id": 2, "special_chars": "!@#$%^&*()"}),
+        ];
+        let updated_at = 1640995200;
+
+        let result = local::store(org_id, table_name, &test_data, updated_at).await;
+        assert!(
+            result.is_ok(),
+            "Should handle special characters and null values"
+        );
+
+        let retrieved_data = local::retrieve(org_id, table_name).await.unwrap();
+        assert_eq!(retrieved_data.len(), 2, "Should retrieve both records");
+        assert!(
+            retrieved_data[0]["data"].is_null(),
+            "Should preserve null values"
+        );
     }
 }

@@ -937,7 +937,7 @@ pub async fn search_partition(
         .unwrap()
         .num_microseconds()
         .unwrap();
-    if is_aggregate && ts_column.is_some() {
+    if (is_aggregate && ts_column.is_some()) || enable_align_histogram {
         let hist_int = if let Some(hist_int) = sql.histogram_interval {
             hist_int
         } else {
@@ -955,27 +955,6 @@ pub async fn search_partition(
         // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
         if hist_int > 0 {
             min_step *= hist_int;
-        }
-    }
-    // Only for UI search or query param is `true`, we need to generate histogram interval
-    else if enable_align_histogram {
-        if let Some(hist_int) = sql.histogram_interval {
-            // convert seconds to microseconds
-            min_step = hist_int * 1_000_000;
-        } else {
-            let time_range = (req.start_time, req.end_time);
-            let interval = generate_histogram_interval(Some(time_range));
-            match convert_histogram_interval_to_seconds(interval) {
-                Ok(v) => {
-                    // convert seconds to microseconds
-                    min_step = v * 1_000_000
-                }
-                Err(e) => {
-                    log::error!(
-                        "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {e:?}",
-                    );
-                }
-            }
         }
     }
 
@@ -1056,13 +1035,13 @@ pub async fn search_partition(
         part_num,
         step,
         min_step,
-        is_histogram
+        is_histogram || enable_align_histogram
     );
     // Create a partition generator
     let generator = partition::PartitionGenerator::new(
         min_step,
         cfg.limit.search_mini_partition_duration_secs,
-        is_histogram,
+        is_histogram || enable_align_histogram,
     );
 
     if cfg.common.align_partitions_for_index && use_inverted_index(&sql) {

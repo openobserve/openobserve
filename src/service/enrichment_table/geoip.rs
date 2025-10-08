@@ -21,7 +21,7 @@ use config::{MMDB_CITY_FILE_NAME, get_config};
 #[cfg(feature = "enterprise")]
 use maxminddb::geoip2::Enterprise;
 use maxminddb::{
-    MaxMindDBError, Reader,
+    Reader,
     geoip2::{City, ConnectionType, Isp},
 };
 use serde::{Deserialize, Serialize};
@@ -144,7 +144,9 @@ impl Geoip {
         };
 
         match result {
-            Ok(_) | Err(MaxMindDBError::AddressNotFoundError(_)) => Ok(Geoip {
+            // Returns Ok(None) when IP is valid but not found
+            // [Changelog](https://github.com/oschwald/maxminddb-rust/blob/main/CHANGELOG.md#0260---2025-03-28)
+            Ok(_) => Ok(Geoip {
                 last_modified: fs::metadata(&config.path)?.modified()?,
                 dbreader,
                 dbkind,
@@ -173,7 +175,7 @@ impl Geoip {
 
         match self.dbkind {
             DatabaseKind::Asn | DatabaseKind::Isp => {
-                let data = self.dbreader.lookup::<Isp>(ip).ok()?;
+                let data = self.dbreader.lookup::<Isp>(ip).ok()??;
 
                 add_field!("autonomous_system_number", data.autonomous_system_number);
                 add_field!(
@@ -184,7 +186,7 @@ impl Geoip {
                 add_field!("organization", data.organization);
             }
             DatabaseKind::City => {
-                let data = self.dbreader.lookup::<City>(ip).ok()?;
+                let data = self.dbreader.lookup::<City>(ip).ok()??;
 
                 add_field!(
                     "city_name",
@@ -225,13 +227,13 @@ impl Geoip {
                 add_field!("postal_code", data.postal.and_then(|p| p.code));
             }
             DatabaseKind::ConnectionType => {
-                let data = self.dbreader.lookup::<ConnectionType>(ip).ok()?;
+                let data = self.dbreader.lookup::<ConnectionType>(ip).ok()??;
 
                 add_field!("connection_type", data.connection_type);
             }
             #[cfg(feature = "enterprise")]
             DatabaseKind::Enterprise => {
-                let data = self.dbreader.lookup::<Enterprise>(ip).ok()?;
+                let data = self.dbreader.lookup::<Enterprise>(ip).ok()??;
 
                 add_field!(
                     "city_name",
@@ -335,9 +337,10 @@ impl Table for Geoip {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        _wildcard: Option<&Value>, // Use not known yet
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String> {
-        let mut rows = self.find_table_rows(case, condition, select, index)?;
+        let mut rows = self.find_table_rows(case, condition, select, _wildcard, index)?;
 
         match rows.pop() {
             Some(row) if rows.is_empty() => Ok(row),
@@ -354,6 +357,7 @@ impl Table for Geoip {
         _: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        _wildcard: Option<&Value>, // Use not known yet
         _: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         match condition.first() {
@@ -407,5 +411,121 @@ impl std::fmt::Debug for Geoip {
             "Geoip {} database {})",
             self.config.locale, self.config.path
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_database_kind_from_str() {
+        match DatabaseKind::from("GeoLite2-ASN") {
+            DatabaseKind::Asn => {}
+            _ => panic!("Expected DatabaseKind::Asn for 'GeoLite2-ASN'"),
+        }
+
+        match DatabaseKind::from("GeoIP2-ISP") {
+            DatabaseKind::Isp => {}
+            _ => panic!("Expected DatabaseKind::Isp for 'GeoIP2-ISP'"),
+        }
+
+        match DatabaseKind::from("GeoIP2-Connection-Type") {
+            DatabaseKind::ConnectionType => {}
+            _ => panic!("Expected DatabaseKind::ConnectionType for 'GeoIP2-Connection-Type'"),
+        }
+
+        #[cfg(feature = "enterprise")]
+        match DatabaseKind::from("GeoIP2-Enterprise") {
+            DatabaseKind::Enterprise => {}
+            _ => panic!("Expected DatabaseKind::Enterprise for 'GeoIP2-Enterprise'"),
+        }
+
+        match DatabaseKind::from("GeoLite2-City") {
+            DatabaseKind::City => {}
+            _ => panic!("Expected DatabaseKind::City for 'GeoLite2-City'"),
+        }
+
+        match DatabaseKind::from("Unknown-Type") {
+            DatabaseKind::City => {}
+            _ => panic!("Expected DatabaseKind::City for 'Unknown-Type'"),
+        }
+    }
+
+    #[test]
+    fn test_default_locale() {
+        assert_eq!(default_locale(), "en");
+    }
+
+    #[test]
+    fn test_geoip_config_default() {
+        let config = GeoipConfig::default();
+        assert_eq!(config.locale, "en");
+        assert!(config.path.contains("GeoLite2-City.mmdb"));
+    }
+
+    #[test]
+    fn test_geoip_config_new() {
+        let config = GeoipConfig::new("test.mmdb");
+        assert_eq!(config.locale, "en");
+        assert!(config.path.contains("test.mmdb"));
+    }
+
+    #[test]
+    fn test_geoip_config_equality() {
+        let config1 = GeoipConfig {
+            path: "/test/path.mmdb".to_string(),
+            locale: "en".to_string(),
+        };
+
+        let config2 = GeoipConfig {
+            path: "/test/path.mmdb".to_string(),
+            locale: "en".to_string(),
+        };
+
+        let config3 = GeoipConfig {
+            path: "/different/path.mmdb".to_string(),
+            locale: "en".to_string(),
+        };
+
+        assert_eq!(config1, config2);
+        assert_ne!(config1, config3);
+    }
+
+    #[test]
+    fn test_geoip_config_clone() {
+        let config = GeoipConfig {
+            path: "/test/path.mmdb".to_string(),
+            locale: "en".to_string(),
+        };
+
+        let cloned = config.clone();
+        assert_eq!(config, cloned);
+    }
+
+    #[test]
+    fn test_geoip_config_serialization() {
+        let config = GeoipConfig {
+            path: "/test/path.mmdb".to_string(),
+            locale: "fr".to_string(),
+        };
+
+        let serialized = serde_json::to_string(&config).unwrap();
+        let deserialized: GeoipConfig = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(config.path, deserialized.path);
+        assert_eq!(config.locale, deserialized.locale);
+    }
+
+    #[test]
+    fn test_geoip_new_with_invalid_path() {
+        let config = GeoipConfig {
+            path: "/nonexistent/path.mmdb".to_string(),
+            locale: "en".to_string(),
+        };
+
+        let result = Geoip::new(config);
+        assert!(result.is_err());
     }
 }

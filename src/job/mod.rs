@@ -43,6 +43,7 @@ pub mod metrics;
 mod mmdb_downloader;
 #[cfg(feature = "enterprise")]
 pub(crate) mod pipeline;
+mod pipeline_error_cleanup;
 mod promql;
 mod promql_self_consume;
 mod stats;
@@ -315,6 +316,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { file_downloader::run().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { pipeline::run().await });
+    pipeline_error_cleanup::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());

@@ -48,7 +48,6 @@ import {
 } from "@/utils/zincutils";
 
 export const useSearchStream = () => {
-  let histogramResults: any = [];
   const { showErrorNotification } = useNotifications();
   const {
     fnParsedSQL,
@@ -64,6 +63,7 @@ export const useSearchStream = () => {
     updateUrlQueryParams,
     isNonAggregatedSQLMode,
     fnUnparsedSQL,
+    checkTimestampAlias,
   } = logsUtils();
 
   const {
@@ -86,6 +86,7 @@ export const useSearchStream = () => {
     initialQueryPayload,
     searchPartitionMap,
     resetHistogramError,
+    histogramResults,
   } = searchState();
 
   let {
@@ -248,7 +249,7 @@ export const useSearchStream = () => {
 
       if (!isPagination && searchObj.meta.refreshInterval == 0) {
         resetQueryData();
-        histogramResults = [];
+        histogramResults.value = [];
         searchObj.data.queryResults.hits = [];
         searchObj.data.histogram = {
           xData: [],
@@ -463,6 +464,18 @@ export const useSearchStream = () => {
     isPagination: boolean,
     appendResult: boolean = false,
   ) => {
+    // check if histogram interval is undefined, then set current response as histogram response
+    // for visualization, will require to set histogram interval to fill missing values
+    // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+    // created new attribute visualization_histogram_interval to avoid this issue
+    if (
+      !searchObj.data.queryResults.visualization_histogram_interval &&
+      response.content?.results?.histogram_interval
+    ) {
+      searchObj.data.queryResults.visualization_histogram_interval =
+        response.content?.results?.histogram_interval;
+    }
+
     ////// Handle function error ///////
     handleFunctionError(payload.queryReq, response);
 
@@ -653,13 +666,14 @@ export const useSearchStream = () => {
         searchObj.loadingHistogram = false;
         return;
       }
+
       for (
         let currentTime: any = currentTimeToBePassed.timestamp / 1000;
         currentTime < endDateTime;
         currentTime += searchObj.data.histogramInterval / 1000
       ) {
         date = new Date(currentTime);
-        histogramResults.push({
+        histogramResults.value.push({
           zo_sql_key: date.toISOString().slice(0, 19),
           zo_sql_num: 0,
         });
@@ -670,7 +684,7 @@ export const useSearchStream = () => {
         currentTime -= searchObj.data.histogramInterval / 1000
       ) {
         date = new Date(currentTime);
-        histogramResults.push({
+        histogramResults.value.push({
           zo_sql_key: date.toISOString().slice(0, 19),
           zo_sql_num: 0,
         });
@@ -814,17 +828,27 @@ export const useSearchStream = () => {
       payload.type === "search" &&
       response?.type === "search_response_hits"
     ) {
-      const isStreamingAggs = response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs;
-      const shouldAppendStreamingResults = isStreamingAggs ? !response.content?.results?.hits?.length : true;
-      searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition]++;
+      const isStreamingAggs =
+        response.content?.streaming_aggs ||
+        searchObj.data.queryResults.streaming_aggs;
+      const shouldAppendStreamingResults = isStreamingAggs
+        ? !response.content?.results?.hits?.length
+        : true;
+      searchPartitionMap[payload.traceId].chunks[
+        searchPartitionMap[payload.traceId].partition
+      ]++;
       // If single partition has more than 1 chunk, then we need to append the results
-      const isChunkedHits = searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition] > 1;
+      const isChunkedHits =
+        searchPartitionMap[payload.traceId].chunks[
+          searchPartitionMap[payload.traceId].partition
+        ] > 1;
 
       handleStreamingHits(
         payload,
         response,
         payload.isPagination,
-        (shouldAppendStreamingResults && (searchPartitionMap[payload.traceId].partition > 1 || isChunkedHits)),
+        shouldAppendStreamingResults &&
+          (searchPartitionMap[payload.traceId].partition > 1 || isChunkedHits),
       );
       return;
     }
@@ -836,21 +860,26 @@ export const useSearchStream = () => {
       searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
         ? searchPartitionMap[payload.traceId]
         : {
-          partition: 0,
-          chunks: {},
-        };
+            partition: 0,
+            chunks: {},
+          };
 
       const isStreamingAggs = response.content?.streaming_aggs;
-      const shouldAppendStreamingResults = isStreamingAggs ? !response.content?.results?.hits?.length : true;
+      const shouldAppendStreamingResults = isStreamingAggs
+        ? !response.content?.results?.hits?.length
+        : true;
 
       searchPartitionMap[payload.traceId].partition++;
-      searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition] = 0;
-      
+      searchPartitionMap[payload.traceId].chunks[
+        searchPartitionMap[payload.traceId].partition
+      ] = 0;
+
       handleStreamingMetadata(
         payload,
         response,
         payload.isPagination,
-        (shouldAppendStreamingResults && searchPartitionMap[payload.traceId].partition > 1),
+        shouldAppendStreamingResults &&
+          searchPartitionMap[payload.traceId].partition > 1,
       );
       return;
     }
@@ -891,13 +920,15 @@ export const useSearchStream = () => {
       searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
         ? searchPartitionMap[payload.traceId]
         : {
-          partition: 0,
-          chunks: {},
-        };
-                      
+            partition: 0,
+            chunks: {},
+          };
+
       searchPartitionMap[payload.traceId].partition++;
       const isStreamingAggs = response.content?.streaming_aggs;
-      const shouldAppendStreamingResults = isStreamingAggs ? !response.content?.results?.hits?.length : true;
+      const shouldAppendStreamingResults = isStreamingAggs
+        ? !response.content?.results?.hits?.length
+        : true;
 
       if (payload.type === "search") {
         handleLogsResponse(
@@ -905,7 +936,8 @@ export const useSearchStream = () => {
           payload.isPagination,
           payload.traceId,
           response,
-          (shouldAppendStreamingResults && searchPartitionMap[payload.traceId].partition > 1),
+          shouldAppendStreamingResults &&
+            searchPartitionMap[payload.traceId].partition > 1,
         );
       }
 
@@ -1175,7 +1207,7 @@ export const useSearchStream = () => {
       const dateToBePassed = `${day}-${month}-${year}`;
       const hours = String(now.getHours()).padStart(2, "0");
       let minutes = String(now.getMinutes()).padStart(2, "0");
-      if (searchObj.data.histogramInterval / 1000 <= 9999) {
+      if (response.content.results.histogram_interval / 1000 <= 9999) {
         minutes = String(now.getMinutes() + 1).padStart(2, "0");
       }
 
@@ -1192,7 +1224,7 @@ export const useSearchStream = () => {
         currentTime += searchObj.data.histogramInterval / 1000
       ) {
         date = new Date(currentTime);
-        histogramResults.push({
+        histogramResults.value.push({
           zo_sql_key: date.toISOString().slice(0, 19),
           zo_sql_num: 0,
         });
@@ -1203,7 +1235,7 @@ export const useSearchStream = () => {
         currentTime -= searchObj.data.histogramInterval / 1000
       ) {
         date = new Date(currentTime);
-        histogramResults.push({
+        histogramResults.value.push({
           zo_sql_key: date.toISOString().slice(0, 19),
           zo_sql_num: 0,
         });
@@ -1293,7 +1325,7 @@ export const useSearchStream = () => {
 
         await generateHistogramSkeleton();
 
-        histogramResults = [];
+        histogramResults.value = [];
 
         const payload = buildWebSocketPayload(
           searchObj.data.histogramQuery,
@@ -1697,7 +1729,7 @@ export const useSearchStream = () => {
 
         if (data.type === "histogram") await generateHistogramSkeleton();
 
-        if (data.type === "histogram") histogramResults = [];
+        if (data.type === "histogram") histogramResults.value = [];
 
         const payload = buildWebSocketPayload(data.queryReq, false, data.type);
 
@@ -1853,6 +1885,13 @@ export const useSearchStream = () => {
         const parsedSQL: any = fnParsedSQL();
         if (parsedSQL != undefined) {
           //check if query is valid or not , if the query is invalid --> empty query
+
+          if (!checkTimestampAlias(searchObj.data.query)) {
+            const errorMsg = `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`;
+            searchObj.data.errorMsg = errorMsg;
+            searchObj.data.errorCode = 400;
+            return false;
+          }
 
           if (Array.isArray(parsedSQL) && parsedSQL.length == 0) {
             notificationMsg.value =

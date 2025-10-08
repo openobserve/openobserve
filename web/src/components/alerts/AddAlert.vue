@@ -245,6 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div v-else class="q-pa-none q-ma-none q-pr-sm  ">
               <scheduled-alert
+                v-if="!isLoadingPanelData"
                 ref="scheduledAlertRef"
                 :columns="filteredColumns"
                 :conditions="formData.query_condition?.conditions || {}"
@@ -402,7 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
     </div>
-    <div class="flex justify-end items-center q-px-lg " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: fixed; bottom: 0; left: 0; right: 0; height: 70px !important; z-index: 100;">
+    <div class="flex justify-end items-center q-px-lg " :class="store.state.theme === 'dark' ? 'bottom-sticky-dark' : 'bottom-sticky-light'" style="position: fixed; bottom: 0; left: 0; height: 70px !important; z-index: 100;" :style="{ right: store.state.isAiChatEnabled ? '25%' : '0' }">
       <q-btn
         data-test="add-alert-cancel-btn"
         v-close-popup="true"
@@ -453,6 +454,7 @@ import {
   defineComponent,
   ref,
   onMounted,
+  onUnmounted,
   watch,
   type Ref,
   computed,
@@ -505,6 +507,7 @@ import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import AlertsContainer from "./AlertsContainer.vue";
 import JsonEditor from "../common/JsonEditor.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import {
   updateGroup as updateGroupUtil,
   removeConditionGroup as removeConditionGroupUtil,
@@ -671,9 +674,11 @@ export default defineComponent({
     const vrlFunctionError = ref("");
 
     const showTimezoneWarning = ref(false);
-    
+
     const showJsonEditorDialog = ref(false);
     const validationErrors = ref([]);
+
+    const isLoadingPanelData = ref(false);
 
     const { track } = useReo();
 
@@ -711,7 +716,18 @@ export default defineComponent({
     const suffixCode = ref("");
     const alertType = ref(router.currentRoute.value.query.alert_type || "all");
 
-    onMounted(async () => {});
+    onMounted(async () => {
+      // Set up alerts context provider
+      const alertsProvider = createAlertsContextProvider(formData, store, props.isUpdated);
+      contextRegistry.register('alerts', alertsProvider);
+      contextRegistry.setActive('alerts');
+    });
+
+    onUnmounted(() => {
+      // Clean up alerts-specific context provider
+      contextRegistry.unregister('alerts');
+      contextRegistry.setActive('');
+    });
 
     const updateEditorContent = async (stream_name: string) => {
       triggerCols.value = [];
@@ -1046,10 +1062,181 @@ export default defineComponent({
 
     const navigateToErrorField = (formRef: any) => {
       const errorField = formRef.$el.querySelector('.q-field--error');
-      if (errorField) { 
+      if (errorField) {
         errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
+
+    const loadPanelDataIfPresent = async () => {
+      const route = router.currentRoute.value;
+
+      if (route.query.fromPanel === "true" && route.query.panelData) {
+        isLoadingPanelData.value = true;
+        try {
+          const panelData = JSON.parse(decodeURIComponent(route.query.panelData as string));
+
+          if (panelData.queries && panelData.queries.length > 0) {
+            const query = panelData.queries[0];
+
+            formData.value.name = `Alert from ${panelData.panelTitle}`;
+
+            // Show notification that query was imported
+            q.notify({
+              type: "positive",
+              message: t("alerts.importedFromPanel", { panelTitle: panelData.panelTitle }),
+              timeout: 3000,
+            });
+
+            if (query.fields?.stream_type) {
+              formData.value.stream_type = query.fields.stream_type;
+            }
+
+            if (query.fields?.stream) {
+              formData.value.stream_name = query.fields.stream;
+              await updateStreams(false);
+              await updateStreamFields(query.fields.stream);
+            }
+
+            // Set query type based on panel (SQL or PromQL)
+            // Always set a specific type - never leave it as empty string to avoid defaulting to quick mode
+            if (panelData.queryType === "sql") {
+              formData.value.query_condition.type = "sql";
+              // If the panel has a generated query, populate it
+              if (query.query) {
+                formData.value.query_condition.sql = query.query;
+              }
+            } else if (panelData.queryType === "promql") {
+              formData.value.query_condition.type = "promql";
+              if (query.query) {
+                formData.value.query_condition.promql = query.query;
+              }
+            } else {
+              // Default to SQL mode if queryType is not specified
+              // This prevents falling back to quick mode
+              formData.value.query_condition.type = "sql";
+            }
+
+            // Handle query builder fields for SQL panels
+            if (panelData.queryType === "sql" && query.customQuery === false && query.fields) {
+              // Enable aggregation for query builder generated SQL
+              isAggregationEnabled.value = true;
+
+              if (query.fields.x && query.fields.x.length > 0) {
+                if (!formData.value.query_condition.aggregation) {
+                  formData.value.query_condition.aggregation = {
+                    group_by: [],
+                    function: "count",
+                    having: {
+                      column: "",
+                      operator: ">=",
+                      value: 1,
+                    },
+                  };
+                }
+                formData.value.query_condition.aggregation.group_by = query.fields.x.map((x: any) => x.alias || x.column);
+              }
+
+              if (query.fields.y && query.fields.y.length > 0) {
+                const yField = query.fields.y[0];
+                if (yField.aggregationFunction) {
+                  if (!formData.value.query_condition.aggregation) {
+                    formData.value.query_condition.aggregation = {
+                      group_by: [""],
+                      function: "count",
+                      having: {
+                        column: "",
+                        operator: ">=",
+                        value: 1,
+                      },
+                    };
+                  }
+                  formData.value.query_condition.aggregation.function = yField.aggregationFunction.toLowerCase();
+                }
+              }
+
+              if (query.fields.filter && query.fields.filter.length > 0) {
+                const conditions: any[] = [];
+                query.fields.filter.forEach((filter: any) => {
+                  if (filter.type === 'list' && filter.values && filter.values.length > 0) {
+                    conditions.push({
+                      column: filter.column,
+                      operator: "=",
+                      value: filter.values[0],
+                      ignore_case: false
+                    });
+                  }
+                });
+
+                if (conditions.length > 0) {
+                  formData.value.query_condition.conditions = {
+                    groupId: getUUID(),
+                    label: 'and',
+                    items: conditions
+                  };
+                }
+              }
+            }
+
+            if (query.vrlFunctionQuery) {
+              showVrlFunction.value = true;
+              formData.value.query_condition.vrl_function = query.vrlFunctionQuery;
+            }
+
+            if (panelData.timeRange?.value_type === "relative") {
+              const relativeValue = panelData.timeRange.relative_value || 15;
+              const relativePeriod = panelData.timeRange.relative_period || "Minutes";
+
+              let periodInMinutes = relativeValue;
+              if (relativePeriod === "Hours") {
+                periodInMinutes = relativeValue * 60;
+              } else if (relativePeriod === "Days") {
+                periodInMinutes = relativeValue * 60 * 24;
+              } else if (relativePeriod === "Weeks") {
+                periodInMinutes = relativeValue * 60 * 24 * 7;
+              }
+
+              formData.value.trigger_condition.period = periodInMinutes;
+            }
+
+            // Handle threshold and condition from context menu
+            if (panelData.threshold !== undefined && panelData.condition) {
+              formData.value.trigger_condition.threshold = panelData.threshold;
+
+              // Set the operator based on condition
+              if (panelData.condition === 'above') {
+                formData.value.trigger_condition.operator = '>=';
+              } else if (panelData.condition === 'below') {
+                formData.value.trigger_condition.operator = '<=';
+              }
+
+              // If aggregation is enabled, also set the having clause
+              if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
+                if (!formData.value.query_condition.aggregation.having) {
+                  formData.value.query_condition.aggregation.having = {
+                    column: "",
+                    operator: ">=",
+                    value: 1,
+                  };
+                }
+                formData.value.query_condition.aggregation.having.value = panelData.threshold;
+                formData.value.query_condition.aggregation.having.operator =
+                  panelData.condition === 'above' ? '>=' : '<=';
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error loading panel data:", error);
+          q.notify({
+            type: "negative",
+            message: "Failed to load panel data",
+            timeout: 2000
+          });
+        } finally {
+          isLoadingPanelData.value = false;
+        }
+      }
+    };
+
 
     const openJsonEditor = () => {
       showJsonEditorDialog.value = true;
@@ -1175,17 +1362,31 @@ export default defineComponent({
       originalStreamFields,
       generateSqlQuery: generateSqlQueryLocal,
       track,
+      loadPanelDataIfPresent,
+      isLoadingPanelData,
     };
   },
 
-  created() {
+  async created() {
     // TODO OK: Refactor this code
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...cloneDeep(this.modelValue) };
+
+    // Check if this is from a dashboard panel - if so, don't set default query type
+    const route = this.router.currentRoute.value;
+    const isFromPanel = route.query.fromPanel === "true" && route.query.panelData;
+
     if(!this.isUpdated){
       this.formData.is_real_time = this.alertType === 'realTime'? true : false;
     }
       this.formData.is_real_time = this.formData.is_real_time.toString();
+
+    // If from panel, load panel data BEFORE initializing child components
+    // This ensures the correct query type is set before ScheduledAlert initializes
+    if (isFromPanel) {
+      this.formData.query_condition.type = ""; // Temporarily set to empty
+      await this.loadPanelDataIfPresent(); // Load panel data and set correct type
+    }
 
     // Set default frequency to min_auto_refresh_interval
     if (this.store.state?.zoConfig?.min_auto_refresh_interval)

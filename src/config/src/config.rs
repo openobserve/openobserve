@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 8;
+pub const DB_SCHEMA_VERSION: u64 = 10;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -811,7 +811,7 @@ pub struct Common {
     pub feature_join_right_side_max_rows: usize,
     #[env_config(
         name = "ZO_FEATURE_BROADCAST_JOIN_ENABLED",
-        default = false,
+        default = true,
         help = "Enable broadcast join"
     )]
     pub feature_broadcast_join_enabled: bool,
@@ -827,6 +827,12 @@ pub struct Common {
         help = "Max size for left side of broadcast join, default to 10 MB"
     )]
     pub feature_broadcast_join_left_side_max_size: usize, // MB
+    #[env_config(
+        name = "ZO_FEATURE_ENRICHMENT_BROADCAST_JOIN_ENABLED",
+        default = false,
+        help = "Enable enrichment table broadcast join"
+    )]
+    pub feature_enrichment_broadcast_join_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
@@ -1217,7 +1223,7 @@ pub struct Limit {
         help = "Maximum number of fields allowed in user-defined schema"
     )]
     pub user_defined_schema_max_fields: usize,
-    // MB, total data size in memory, default is 50% of system memory
+    // MB, total data size of memtable in memory
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
     pub mem_table_max_size: usize,
     #[env_config(
@@ -1997,6 +2003,18 @@ pub struct Pipeline {
         help = "interval in milliseconds to spawn a new sink task"
     )]
     pub pipeline_sink_task_spawn_interval_ms: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_ERROR_RETENTION_MINS",
+        default = 60,
+        help = "pipeline error retention time in minutes, errors older than this will be cleaned up"
+    )]
+    pub error_retention_mins: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_ERROR_CLEANUP_INTERVAL",
+        default = 300,
+        help = "pipeline error cleanup interval in seconds"
+    )]
+    pub error_cleanup_interval: u64,
 }
 
 #[derive(EnvConfig, Default)]

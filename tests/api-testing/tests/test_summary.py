@@ -456,7 +456,7 @@ def test_summary(create_session, base_url_sc, org_id):
         dashboards_response = resp_get_alldashboards.json()
         print(f"Dashboard list response: {dashboards_response}")
     # Extract the dashboard ID
-        dashboard_id = dashboards_response['dashboards'][0]['v1']['dashboardId']  # Corrected line
+        dashboard_id = dashboards_response['dashboards'][0]['v5']['dashboardId']  # Corrected line
         print(f"Extracted Dashboard ID: {dashboard_id}")
     # Now you can delete the dashboard using the extracted ID
         resp_delete_dashboard = session.delete(

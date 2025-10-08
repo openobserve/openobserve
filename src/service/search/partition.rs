@@ -211,30 +211,29 @@ impl PartitionGenerator {
         let mut partitions = Vec::new();
         let duration = end_time - start_time;
 
-        // Generate partitions by DESC order first, then reverse if needed
-        let mut end = end_time;
-        let mut last_partition_step = end % self.min_step;
+        // Handle the alignment for the first and last partition
+        let mut new_end = end_time;
+        let last_partition_step = end_time % self.min_step;
+        if last_partition_step > 0 && duration > self.min_step * 3 {
+            new_end = end_time - last_partition_step;
+            partitions.push([new_end, end_time]);
+        }
+        let mut new_start = start_time;
+        let last_partition_step = start_time % self.min_step;
+        if last_partition_step > 0 && duration > self.min_step * 3 {
+            new_start = start_time + self.min_step - last_partition_step;
+            partitions.push([start_time, new_start]);
+        }
 
-        while end > start_time {
-            let mut start = max(end - step, start_time);
-            // If the step is greater than the duration, handle the alignment for the boundary
-            // partition
-            if last_partition_step > 0 && duration > self.min_step {
-                // Handle alignment for the first partition
-                partitions.push([end - last_partition_step, end]);
-                start -= last_partition_step;
-                end -= last_partition_step;
-            } else {
-                start = max(start - last_partition_step, start_time);
-            }
-            // Ensure the start time is not less than the start time of the query
-            start = max(start, start_time);
+        let mut end = new_end;
+        while end > new_start {
+            let start = max(end - step, new_start);
             partitions.push([start, end]);
             end = start;
-            last_partition_step = 0;
         }
 
         // We need to reverse partitions if query is ASC order
+        partitions.sort_by(|a, b| b[0].cmp(&a[0]));
         if order_by == OrderBy::Asc {
             partitions.reverse();
         }

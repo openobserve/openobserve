@@ -576,7 +576,7 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
             StreamTable {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
-                data: vec![],
+                data: vec![].into(),
             },
         );
     }
@@ -608,7 +608,7 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
             StreamTable {
                 org_id: tbl.org_id,
                 stream_name: tbl.stream_name,
-                data,
+                data: data.into(),
             },
         );
     }

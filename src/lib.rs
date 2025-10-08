@@ -15,6 +15,7 @@
 
 #![feature(btree_cursors)]
 #![feature(btree_extract_if)]
+#![feature(variant_count)]
 
 #[cfg(feature = "enterprise")]
 pub mod cipher;

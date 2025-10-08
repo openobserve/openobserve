@@ -55,8 +55,9 @@ use crate::service::{
         datafusion::exec::TableBuilder,
         generate_search_schema_diff,
         grpc::{
+            tantivy_result::{TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
             tantivy_result_cache::{self, CacheEntry},
-            utils::{self, TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
+            utils,
         },
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -261,10 +262,10 @@ pub async fn search(
 
     // report cache hit and miss metrics
     metrics::QUERY_DISK_CACHE_HIT_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "parquet"])
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "parquet"])
         .inc_by(cache_hits);
     metrics::QUERY_DISK_CACHE_MISS_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "parquet"])
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "parquet"])
         .inc_by(cache_misses);
 
     scan_stats.idx_took = idx_took as i64;
@@ -558,10 +559,10 @@ pub async fn tantivy_search(
 
     // report cache hit and miss metrics
     metrics::QUERY_DISK_CACHE_HIT_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "index"])
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "index"])
         .inc_by(cache_hits);
     metrics::QUERY_DISK_CACHE_MISS_COUNT
-        .with_label_values(&[&query.org_id, &query.stream_type.to_string(), "index"])
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "index"])
         .inc_by(cache_misses);
 
     let cached_ratio = (scan_stats.querier_memory_cached_files
@@ -836,12 +837,12 @@ async fn search_tantivy_index(
     let mut cache_key = String::new();
     if cfg.common.inverted_index_result_cache_enabled {
         metrics::TANTIVY_RESULT_CACHE_REQUESTS_TOTAL
-            .with_label_values(&[])
+            .with_label_values::<&str>(&[])
             .inc();
         cache_key = generate_cache_key(&index_condition, &idx_optimize_rule, parquet_file);
         if let Some(result) = tantivy_result_cache::GLOBAL_CACHE.get(&cache_key) {
             metrics::TANTIVY_RESULT_CACHE_HITS_TOTAL
-                .with_label_values(&[])
+                .with_label_values::<&str>(&[])
                 .inc();
             return Ok((parquet_file.key.to_string(), result));
         }
@@ -1207,6 +1208,10 @@ mod tests {
     use config::meta::stream::FileMeta;
 
     use super::*;
+    use crate::service::search::{
+        grpc::tantivy_result::TantivyResult,
+        index::{Condition, IndexCondition},
+    };
 
     fn create_file_key(min_ts: i64, max_ts: i64) -> FileKey {
         FileKey {
@@ -1512,8 +1517,6 @@ mod tests {
 
     #[test]
     fn test_generate_cache_key_valid() {
-        use crate::service::search::index::{Condition, IndexCondition};
-
         let mut index_condition = IndexCondition::new();
         index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
         let idx_optimize_rule = Some(config::meta::inverted_index::IndexOptimizeMode::SimpleCount);
@@ -1526,10 +1529,6 @@ mod tests {
 
     #[test]
     fn test_get_cache_entry_row_ids_bitvec_small_percent() {
-        use config::meta::bitvec::BitVec;
-
-        use crate::service::search::grpc::utils::TantivyResult;
-
         let mut bitvec = BitVec::repeat(false, 4);
         bitvec.set(0, true);
         bitvec.set(2, true);
@@ -1552,10 +1551,6 @@ mod tests {
 
     #[test]
     fn test_get_cache_entry_row_ids_bitvec_large_percent() {
-        use config::meta::bitvec::BitVec;
-
-        use crate::service::search::grpc::utils::TantivyResult;
-
         let mut bitvec = BitVec::repeat(false, 4);
         bitvec.set(0, true);
         bitvec.set(1, true);
@@ -1580,8 +1575,6 @@ mod tests {
 
     #[test]
     fn test_get_cache_entry_count() {
-        use crate::service::search::grpc::utils::TantivyResult;
-
         let result = TantivyResult::Count(42);
         let percent = 1.0;
         let parquet_rows = 100;
@@ -1597,8 +1590,6 @@ mod tests {
 
     #[test]
     fn test_get_cache_entry_histogram() {
-        use crate::service::search::grpc::utils::TantivyResult;
-
         let histogram_data = vec![1, 2, 3, 4];
         let result = TantivyResult::Histogram(histogram_data.clone());
         let percent = 1.0;
@@ -1615,10 +1606,6 @@ mod tests {
 
     #[test]
     fn test_get_cache_entry_distinct() {
-        use std::collections::HashSet;
-
-        use crate::service::search::grpc::utils::TantivyResult;
-
         let mut distinct_values = HashSet::new();
         distinct_values.insert("value1".to_string());
         distinct_values.insert("value2".to_string());

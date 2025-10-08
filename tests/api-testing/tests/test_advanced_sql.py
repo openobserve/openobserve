@@ -1,6 +1,7 @@
 import json
 import requests
 import pytest
+import logging
 
 from datetime import datetime, timezone, timedelta
 import time
@@ -47,7 +48,7 @@ def test_e2e_error_rate_analysis(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for info rate analysis")
+        logging.info(f"Found {len(hits)} hits for info rate analysis")
         for i, hit in enumerate(hits):
             assert "pvcount" in hit, f"Hit {i} should contain 'pvcount' field"
             assert "infocount" in hit, f"Hit {i} should contain 'infocount' field"
@@ -59,9 +60,9 @@ def test_e2e_error_rate_analysis(create_session, base_url):
             info_rate = hit["inforate"]
             assert info_rate >= 0, f"Hit {i} info rate should be >= 0, got {info_rate}"
         
-        print(f"✅ All {len(hits)} hits have valid info rate analysis data")
+        logging.info(f"✅ All {len(hits)} hits have valid info rate analysis data")
     else:
-        print("⚠️  No hits found for info rate analysis query")
+        logging.warning("⚠️  No hits found for info rate analysis query")
 
 
 def test_e2e_performance_percentiles(create_session, base_url):
@@ -101,7 +102,7 @@ def test_e2e_performance_percentiles(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for performance percentiles")
+        logging.info(f"Found {len(hits)} hits for performance percentiles")
         for i, hit in enumerate(hits):
             assert "_time" in hit, f"Hit {i} should contain '_time' field (time bucket)"
             assert "p95" in hit, f"Hit {i} should contain 'p95' field"
@@ -119,9 +120,9 @@ def test_e2e_performance_percentiles(create_session, base_url):
             if p95 is not None and p75 is not None and p50 is not None:
                 assert p95 >= p75 >= p50, f"Hit {i} percentiles should be ordered: P95({p95}) >= P75({p75}) >= P50({p50})"
         
-        print(f"✅ All {len(hits)} hits have valid performance percentile data")
+        logging.info(f"✅ All {len(hits)} hits have valid performance percentile data")
     else:
-        print("⚠️  No hits found for performance percentiles query")
+        logging.warning("⚠️  No hits found for performance percentiles query")
 
 
 def test_e2e_log_volume_analysis(create_session, base_url):
@@ -162,7 +163,7 @@ def test_e2e_log_volume_analysis(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for log volume analysis")
+        logging.info(f"Found {len(hits)} hits for log volume analysis")
         for i, hit in enumerate(hits):
             assert "time_bucket" in hit, f"Hit {i} should contain 'time_bucket' field"
             assert "total_logs" in hit, f"Hit {i} should contain 'total_logs' field"
@@ -175,9 +176,9 @@ def test_e2e_log_volume_analysis(create_session, base_url):
             info_count = hit["info_count"]
             assert info_count <= total_logs, f"Hit {i} info_count({info_count}) should be <= total_logs({total_logs})"
         
-        print(f"✅ All {len(hits)} hits have valid log volume analysis data")
+        logging.info(f"✅ All {len(hits)} hits have valid log volume analysis data")
     else:
-        print("⚠️  No hits found for log volume analysis query")
+        logging.warning("⚠️  No hits found for log volume analysis query")
 
 
 def test_e2e_source_analysis(create_session, base_url):
@@ -216,7 +217,7 @@ def test_e2e_source_analysis(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for source analysis")
+        logging.info(f"Found {len(hits)} hits for source analysis")
         for i, hit in enumerate(hits):
             assert "platform" in hit, f"Hit {i} should contain 'platform' field"
             assert "source_group" in hit, f"Hit {i} should contain 'source_group' field"
@@ -226,9 +227,9 @@ def test_e2e_source_analysis(create_session, base_url):
             log_count = hit["log_count"]
             assert log_count > 0, f"Hit {i} log_count should be > 0, got {log_count}"
         
-        print(f"✅ All {len(hits)} hits have valid source analysis data")
+        logging.info(f"✅ All {len(hits)} hits have valid source analysis data")
     else:
-        print("⚠️  No hits found for source analysis query")
+        logging.warning("⚠️  No hits found for source analysis query")
 
 
 def test_e2e_host_performance(create_session, base_url):
@@ -272,7 +273,7 @@ def test_e2e_host_performance(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for host performance analysis")
+        logging.info(f"Found {len(hits)} hits for host performance analysis")
         for i, hit in enumerate(hits):
             assert "hostname" in hit, f"Hit {i} should contain 'hostname' field"
             assert "unique_stream_count" in hit, f"Hit {i} should contain 'unique_stream_count' field"
@@ -281,9 +282,9 @@ def test_e2e_host_performance(create_session, base_url):
             assert "min_float_value" in hit, f"Hit {i} should contain 'min_float_value' field"
             assert "max_float_value" in hit, f"Hit {i} should contain 'max_float_value' field"
         
-        print(f"✅ All {len(hits)} hits have valid host performance data")
+        logging.info(f"✅ All {len(hits)} hits have valid host performance data")
     else:
-        print("⚠️  No hits found for host performance query")
+        logging.warning("⚠️  No hits found for host performance query")
 
 
 def test_e2e_component_percentiles(create_session, base_url):
@@ -326,7 +327,7 @@ def test_e2e_component_percentiles(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for component percentiles")
+        logging.info(f"Found {len(hits)} hits for component percentiles")
         for i, hit in enumerate(hits):
             assert "component" in hit, f"Hit {i} should contain 'component' field"
             assert "p99_took" in hit, f"Hit {i} should contain 'p99_took' field"
@@ -341,9 +342,9 @@ def test_e2e_component_percentiles(create_session, base_url):
             if p99 is not None and p95 is not None and median is not None:
                 assert p99 >= p95 >= median, f"Hit {i} percentiles should be ordered: P99({p99}) >= P95({p95}) >= Median({median})"
         
-        print(f"✅ All {len(hits)} hits have valid component percentile data")
+        logging.info(f"✅ All {len(hits)} hits have valid component percentile data")
     else:
-        print("⚠️  No hits found for component percentiles query")
+        logging.warning("⚠️  No hits found for component percentiles query")
 
 
 def test_e2e_api_log_analysis(create_session, base_url):
@@ -387,7 +388,7 @@ def test_e2e_api_log_analysis(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for API log analysis")
+        logging.info(f"Found {len(hits)} hits for API log analysis")
         for i, hit in enumerate(hits):
             assert "api" in hit, f"Hit {i} should contain 'api' field"
             assert "log_level" in hit, f"Hit {i} should contain 'log_level' field"
@@ -396,9 +397,9 @@ def test_e2e_api_log_analysis(create_session, base_url):
             assert "platform" in hit, f"Hit {i} should contain 'platform' field"
             assert "counter" in hit, f"Hit {i} should contain 'counter' field"
         
-        print(f"✅ All {len(hits)} hits have valid API log analysis data")
+        logging.info(f"✅ All {len(hits)} hits have valid API log analysis data")
     else:
-        print("⚠️  No hits found for API log analysis query")
+        logging.warning("⚠️  No hits found for API log analysis query")
 
 
 def test_e2e_error_categorization(create_session, base_url):
@@ -448,7 +449,7 @@ def test_e2e_error_categorization(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for error categorization")
+        logging.info(f"Found {len(hits)} hits for error categorization")
         for i, hit in enumerate(hits):
             assert "count" in hit, f"Hit {i} should contain 'count' field"
             assert "log_category" in hit, f"Hit {i} should contain 'log_category' field"
@@ -458,9 +459,9 @@ def test_e2e_error_categorization(create_session, base_url):
             count = hit["count"]
             assert count > 0, f"Hit {i} count should be > 0, got {count}"
         
-        print(f"✅ All {len(hits)} hits have valid error categorization data")
+        logging.info(f"✅ All {len(hits)} hits have valid error categorization data")
     else:
-        print("⚠️  No hits found for error categorization query")
+        logging.warning("⚠️  No hits found for error categorization query")
 
 
 def test_e2e_metadata_extraction(create_session, base_url):
@@ -498,7 +499,7 @@ def test_e2e_metadata_extraction(create_session, base_url):
     
     hits = response_data["hits"]
     if len(hits) > 0:
-        print(f"Found {len(hits)} hits for caller extraction")
+        logging.info(f"Found {len(hits)} hits for caller extraction")
         for i, hit in enumerate(hits):
             assert "caller" in hit, f"Hit {i} should contain 'caller' field"
             assert "count" in hit, f"Hit {i} should contain 'count' field"
@@ -507,8 +508,269 @@ def test_e2e_metadata_extraction(create_session, base_url):
             count = hit["count"]
             assert count > 0, f"Hit {i} count should be > 0, got {count}"
         
-        print(f"✅ All {len(hits)} hits have valid caller extraction data")
+        logging.info(f"✅ All {len(hits)} hits have valid caller extraction data")
     else:
-        print("⚠️  No hits found for caller extraction query")
+        logging.warning("⚠️  No hits found for caller extraction query")
 
+
+def test_e2e_time_series_window_functions(create_session, base_url):
+    """Running an E2E test for time-series analysis with window functions."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": """SELECT 
+                histogram(_timestamp) AS time_bucket,
+                kubernetes_namespace_name AS environment,
+                COUNT(*) AS current_count,
+                LAG(COUNT(*)) OVER (
+                    PARTITION BY kubernetes_namespace_name 
+                    ORDER BY histogram(_timestamp)
+                ) AS previous_count,
+                CASE 
+                    WHEN LAG(COUNT(*)) OVER (
+                        PARTITION BY kubernetes_namespace_name 
+                        ORDER BY histogram(_timestamp)
+                    ) IS NOT NULL THEN
+                        ROUND(
+                            ((COUNT(*) - LAG(COUNT(*)) OVER (
+                                PARTITION BY kubernetes_namespace_name 
+                                ORDER BY histogram(_timestamp)
+                            )) * 100.0) / 
+                            LAG(COUNT(*)) OVER (
+                                PARTITION BY kubernetes_namespace_name 
+                                ORDER BY histogram(_timestamp)
+                            ), 2
+                        )
+                    ELSE 0
+                END AS growth_rate_percent
+            FROM "stream_pytest_data"
+            WHERE kubernetes_namespace_name IN ('production', 'staging', 'monitoring', 'default')
+            GROUP BY time_bucket, environment
+            ORDER BY time_bucket, environment""",
+            "start_time": one_hour_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 100,
+        },
+    }
+
+    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+   
+    assert (
+        resp_get_allsearch.status_code == 200
+    ), f"Time-series window functions query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+    
+    response_data = resp_get_allsearch.json()
+    assert "hits" in response_data, "Response should contain 'hits' field"
+    
+    hits = response_data["hits"]
+    if len(hits) > 0:
+        logging.info(f"Found {len(hits)} hits for time-series window functions")
+        for i, hit in enumerate(hits):
+            assert "time_bucket" in hit, f"Hit {i} should contain 'time_bucket' field"
+            assert "environment" in hit, f"Hit {i} should contain 'environment' field"
+            assert "current_count" in hit, f"Hit {i} should contain 'current_count' field"
+            assert "growth_rate_percent" in hit, f"Hit {i} should contain 'growth_rate_percent' field"
+            
+            # Validate counts are positive
+            current_count = hit["current_count"]
+            assert current_count > 0, f"Hit {i} current_count should be > 0, got {current_count}"
+            
+            # Validate environment is one of expected values
+            environment = hit["environment"]
+            assert environment in ['production', 'staging', 'monitoring', 'default'], f"Hit {i} unexpected environment: {environment}"
+            
+            logging.debug(f"Hit {i}: {environment} at {hit['time_bucket']}, count={current_count}, growth={hit['growth_rate_percent']}%")
+        
+        logging.info(f"✅ All {len(hits)} hits have valid time-series window function data")
+    else:
+        logging.warning("⚠️  No hits found for time-series window functions query")
+
+
+def test_e2e_advanced_regex_json_path(create_session, base_url):
+    """Running an E2E test for advanced regex with JSON path extraction."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": """SELECT 
+                regexp_match(message, '/api/([^/]+)')[1] AS api_group,
+                regexp_match(message, '/([^?/]+)(?:\\?|$)')[1] AS endpoint,
+                method AS http_method,
+                AVG(CAST(took AS FLOAT)) AS avg_response_time,
+                COUNT(CASE WHEN CAST(code AS INT) >= 400 THEN 1 END) AS error_count,
+                COUNT(CASE WHEN CAST(code AS INT) >= 500 THEN 1 END) AS server_error_count,
+                approx_percentile_cont(CAST(took AS FLOAT), 0.99) AS p99_response_time,
+                CASE 
+                    WHEN COUNT(CASE WHEN CAST(code AS INT) >= 500 THEN 1 END) > 0 THEN 'Critical'
+                    WHEN COUNT(CASE WHEN CAST(code AS INT) >= 400 THEN 1 END) > 2 THEN 'Warning'
+                    WHEN AVG(CAST(took AS FLOAT)) > 5000 THEN 'Slow'
+                    ELSE 'Healthy'
+                END AS health_status
+            FROM "stream_pytest_data"
+            WHERE message IS NOT NULL 
+                AND message LIKE '/api/%'
+                AND method IS NOT NULL
+                AND took IS NOT NULL
+                AND code IS NOT NULL
+            GROUP BY api_group, endpoint, http_method
+            HAVING COUNT(*) >= 1
+            ORDER BY error_count DESC, avg_response_time DESC""",
+            "start_time": one_hour_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 100,
+        },
+    }
+
+    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+   
+    assert (
+        resp_get_allsearch.status_code == 200
+    ), f"Advanced regex JSON path query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+    
+    response_data = resp_get_allsearch.json()
+    assert "hits" in response_data, "Response should contain 'hits' field"
+    
+    hits = response_data["hits"]
+    if len(hits) > 0:
+        logging.info(f"Found {len(hits)} hits for advanced regex JSON path extraction")
+        for i, hit in enumerate(hits):
+            assert "api_group" in hit, f"Hit {i} should contain 'api_group' field"
+            assert "endpoint" in hit, f"Hit {i} should contain 'endpoint' field"
+            assert "http_method" in hit, f"Hit {i} should contain 'http_method' field"
+            assert "avg_response_time" in hit, f"Hit {i} should contain 'avg_response_time' field"
+            assert "error_count" in hit, f"Hit {i} should contain 'error_count' field"
+            assert "server_error_count" in hit, f"Hit {i} should contain 'server_error_count' field"
+            assert "p99_response_time" in hit, f"Hit {i} should contain 'p99_response_time' field"
+            assert "health_status" in hit, f"Hit {i} should contain 'health_status' field"
+            
+            # Validate counts are non-negative
+            error_count = hit["error_count"]
+            server_error_count = hit["server_error_count"]
+            assert error_count >= 0, f"Hit {i} error_count should be >= 0, got {error_count}"
+            assert server_error_count >= 0, f"Hit {i} server_error_count should be >= 0, got {server_error_count}"
+            assert server_error_count <= error_count, f"Hit {i} server_error_count({server_error_count}) should be <= error_count({error_count})"
+            
+            # Validate health status is one of expected values
+            health_status = hit["health_status"]
+            assert health_status in ['Critical', 'Warning', 'Slow', 'Healthy'], f"Hit {i} unexpected health_status: {health_status}"
+            
+            logging.debug(f"Hit {i}: {hit['api_group']}/{hit['endpoint']} ({hit['http_method']}) - {health_status}, errors={error_count}")
+        
+        logging.info(f"✅ All {len(hits)} hits have valid advanced regex JSON path data")
+    else:
+        logging.warning("⚠️  No hits found for advanced regex JSON path query")
+
+
+def test_e2e_complex_nested_aggregation(create_session, base_url):
+    """Running an E2E test for complex nested aggregation with cross-environment analysis."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
+    json_data = {
+        "query": {
+            "sql": """WITH env_metrics AS (
+                SELECT 
+                    kubernetes_namespace_name AS environment,
+                    kubernetes_container_name AS service,
+                    COUNT(*) AS log_count,
+                    COUNT(CASE WHEN level IN ('error', 'warn') THEN 1 END) AS issue_count,
+                    AVG(CASE WHEN took IS NOT NULL THEN CAST(took AS FLOAT) ELSE NULL END) AS avg_latency
+                FROM "stream_pytest_data"
+                WHERE kubernetes_namespace_name IS NOT NULL
+                GROUP BY environment, service
+            ),
+            env_totals AS (
+                SELECT 
+                    environment,
+                    SUM(log_count) AS total_logs,
+                    SUM(issue_count) AS total_issues,
+                    AVG(avg_latency) AS env_avg_latency
+                FROM env_metrics
+                GROUP BY environment
+            )
+            SELECT 
+                em.environment,
+                em.service,
+                em.log_count,
+                em.issue_count,
+                ROUND((em.log_count * 100.0) / et.total_logs, 2) AS log_share_percent,
+                ROUND((em.issue_count * 100.0) / NULLIF(et.total_issues, 0), 2) AS issue_share_percent,
+                em.avg_latency,
+                et.env_avg_latency,
+                CASE 
+                    WHEN em.avg_latency > et.env_avg_latency * 1.5 THEN 'High Latency'
+                    WHEN em.issue_count > et.total_issues * 0.3 THEN 'High Issues'
+                    WHEN em.log_count > et.total_logs * 0.4 THEN 'High Volume'
+                    ELSE 'Normal'
+                END AS service_status,
+                RANK() OVER (PARTITION BY em.environment ORDER BY em.issue_count DESC) AS issue_rank
+            FROM env_metrics em
+            JOIN env_totals et ON em.environment = et.environment
+            WHERE em.log_count > 0
+            ORDER BY em.environment, issue_rank""",
+            "start_time": one_hour_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 100,
+        },
+    }
+
+    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+   
+    assert (
+        resp_get_allsearch.status_code == 200
+    ), f"Complex nested aggregation query failed with status {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+    
+    response_data = resp_get_allsearch.json()
+    assert "hits" in response_data, "Response should contain 'hits' field"
+    
+    hits = response_data["hits"]
+    if len(hits) > 0:
+        logging.info(f"Found {len(hits)} hits for complex nested aggregation")
+        for i, hit in enumerate(hits):
+            assert "environment" in hit, f"Hit {i} should contain 'environment' field"
+            assert "service" in hit, f"Hit {i} should contain 'service' field"
+            assert "log_count" in hit, f"Hit {i} should contain 'log_count' field"
+            assert "issue_count" in hit, f"Hit {i} should contain 'issue_count' field"
+            assert "log_share_percent" in hit, f"Hit {i} should contain 'log_share_percent' field"
+            assert "service_status" in hit, f"Hit {i} should contain 'service_status' field"
+            assert "issue_rank" in hit, f"Hit {i} should contain 'issue_rank' field"
+            
+            # Validate counts and percentages
+            log_count = hit["log_count"]
+            issue_count = hit["issue_count"]
+            log_share_percent = hit["log_share_percent"]
+            issue_rank = hit["issue_rank"]
+            
+            assert log_count > 0, f"Hit {i} log_count should be > 0, got {log_count}"
+            assert issue_count >= 0, f"Hit {i} issue_count should be >= 0, got {issue_count}"
+            assert 0 <= log_share_percent <= 100, f"Hit {i} log_share_percent should be 0-100, got {log_share_percent}"
+            assert issue_rank >= 1, f"Hit {i} issue_rank should be >= 1, got {issue_rank}"
+            
+            # Validate service status is one of expected values
+            service_status = hit["service_status"]
+            assert service_status in ['High Latency', 'High Issues', 'High Volume', 'Normal'], f"Hit {i} unexpected service_status: {service_status}"
+            
+            logging.debug(f"Hit {i}: {hit['environment']}/{hit['service']} - {service_status}, rank={issue_rank}, share={log_share_percent}%")
+        
+        logging.info(f"✅ All {len(hits)} hits have valid complex nested aggregation data")
+    else:
+        logging.warning("⚠️  No hits found for complex nested aggregation query")
 
