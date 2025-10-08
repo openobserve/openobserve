@@ -33,3 +33,4 @@ CLAUDE.md
 test-results/.last-run.json
 tests/ui-testing/playwright-tests/utils/auth/user.json
 /tests/ui-testing/utils/test-mapping/archived-utils
+/tests/ui-testing/testDinoPOC/MD Files
