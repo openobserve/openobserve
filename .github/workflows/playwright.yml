@@ -220,7 +220,7 @@ jobs:
         run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
-        run: sleep 15
+        run: sleep 60
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
