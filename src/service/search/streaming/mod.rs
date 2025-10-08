@@ -18,7 +18,7 @@
 //! This module contains all the components for handling streaming search requests,
 //! including caching, execution, sorting, and utility functions.
 
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 use config::{
     meta::{
@@ -579,9 +579,11 @@ pub async fn process_search_stream_request_multi(
         return;
     }
 
-    let total_queries = queries.len() as f32;
-    let mut completed_queries = 0;
+    let total_queries = queries.len();
     let _started_at = chrono::Utc::now().timestamp_micros();
+
+    // Shared progress channel for all queries
+    let (progress_tx, mut progress_rx) = mpsc::channel::<(usize, usize)>(100);
 
     // Process each query independently
     let mut query_tasks = Vec::new();
@@ -592,6 +594,7 @@ pub async fn process_search_stream_request_multi(
         let user_id_clone = user_id.clone();
         let sender_clone = sender.clone();
         let search_span_clone = search_span.clone();
+        let progress_tx_clone = progress_tx.clone();
 
         // Clone search context for each query
         let query_search_type = search_type;
@@ -665,14 +668,15 @@ pub async fn process_search_stream_request_multi(
                                 }
                             }
                             StreamResponses::Progress { percent } => {
-                                // Scale progress per query
-                                let global_percent =
-                                    ((query_index as f32 + (percent as f32 / 100.0))
-                                        / total_queries
-                                        * 100.0) as usize;
-                                StreamResponses::Progress {
-                                    percent: global_percent,
-                                }
+                                // Send progress update to consolidator
+                                let _ = progress_tx_clone.send((query_index, percent)).await;
+                                // Don't forward individual progress events
+                                continue;
+                            }
+                            StreamResponses::Done => {
+                                // Don't forward individual Done events
+                                // Only the outer wrapper should send Done
+                                continue;
                             }
                             other => other, // Forward other responses as-is
                         };
@@ -703,26 +707,60 @@ pub async fn process_search_stream_request_multi(
         query_tasks.push(task);
     }
 
+    // Drop original sender so channel closes when all tasks complete
+    drop(progress_tx);
+
+    // Spawn progress consolidator task
+    let sender_for_consolidator = sender.clone();
+    let trace_id_for_consolidator = trace_id.clone();
+    let consolidator_task = tokio::spawn(async move {
+        let mut progress_map: HashMap<usize, usize> = HashMap::new();
+        let mut last_sent_percent = 0;
+
+        while let Some((query_index, percent)) = progress_rx.recv().await {
+            // Update progress for this query
+            progress_map.insert(query_index, percent);
+
+            // Calculate average progress across all queries
+            let sum: usize = progress_map.values().sum();
+            let avg_percent = sum / total_queries;
+
+            // Only send if progress increased (monotonic progress)
+            if avg_percent > last_sent_percent {
+                if sender_for_consolidator
+                    .send(Ok(StreamResponses::Progress {
+                        percent: avg_percent,
+                    }))
+                    .await
+                    .is_err()
+                {
+                    log::warn!(
+                        "[HTTP2_STREAM_MULTI trace_id {trace_id_for_consolidator}] \
+                         Sender closed while sending progress"
+                    );
+                    break;
+                }
+                last_sent_percent = avg_percent;
+            }
+        }
+    });
+
     // Wait for all queries to complete
     for task in query_tasks {
+        // Check if sender is closed before waiting for next task
+        if sender.is_closed() {
+            log::warn!("[HTTP2_STREAM_MULTI trace_id {trace_id}] Sender closed, stopping early");
+            return;
+        }
+
         if let Err(e) = task.await {
             log::error!("[HTTP2_STREAM_MULTI trace_id {trace_id}] Task join error: {e}");
         }
+    }
 
-        completed_queries += 1;
-        let progress = (completed_queries as f32 / total_queries * 100.0) as usize;
-
-        // Send progress update
-        if sender
-            .send(Ok(StreamResponses::Progress { percent: progress }))
-            .await
-            .is_err()
-        {
-            log::warn!(
-                "[HTTP2_STREAM_MULTI trace_id {trace_id}] Sender is closed during progress update"
-            );
-            return;
-        }
+    // Wait for consolidator to finish processing all progress updates
+    if let Err(e) = consolidator_task.await {
+        log::error!("[HTTP2_STREAM_MULTI trace_id {trace_id}] Consolidator task join error: {e}");
     }
 
     log::info!(
