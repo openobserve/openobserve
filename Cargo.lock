@@ -6674,6 +6674,7 @@ dependencies = [
  "actix-web-rust-embed-responder",
  "ahash 0.8.11",
  "anyhow",
+ "arc-swap",
  "argon2",
  "arrow",
  "arrow-flight",

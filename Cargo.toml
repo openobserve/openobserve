@@ -60,6 +60,7 @@ actix-web-rust-embed-responder = { version = "2.2", default-features = false, fe
 actix-tls.workspace = true
 ahash.workspace = true
 anyhow.workspace = true
+arc-swap.workspace = true
 argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true

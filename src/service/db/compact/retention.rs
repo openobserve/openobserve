@@ -24,7 +24,7 @@ use once_cell::sync::Lazy;
 
 use crate::service::db;
 
-static CACHE: Lazy<RwHashMap<String, i64>> = Lazy::new(Default::default);
+pub static CACHE: Lazy<Arc<RwHashMap<String, i64>>> = Lazy::new(Default::default);
 
 #[inline]
 pub fn mk_key(

@@ -23,7 +23,7 @@ use config::{
 use crate::service::db::file_list::local::FILE_DELETION_MANAGER;
 
 pub mod broadcast;
-pub mod parquet;
+pub mod parquet_manager;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_ingester() {
@@ -33,7 +33,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     // load pending delete files to memory cache
     FILE_DELETION_MANAGER.reload_pending_from_local().await?;
 
-    tokio::task::spawn(parquet::run());
+    tokio::task::spawn(parquet_manager::PARQUET_FILE_MANAGER.run());
     tokio::task::spawn(broadcast::run());
     tokio::task::spawn(clean_empty_dirs());
 
