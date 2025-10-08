@@ -2794,6 +2794,11 @@ export default defineComponent({
       z-index: 1 !important; // Lower z-index so scrollbar overlaps it
       // Separator IS draggable, but scrollbar will be on top where they overlap
     }
+
+    // When hovering over the splitter area, slide out the collapsed button
+    &:hover .splitter-section-collapse-btn--hidden {
+      transform: translateY(-50%) translateX(10px) !important;
+    }
   }
 
   .search-result-container {
