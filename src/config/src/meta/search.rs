@@ -1125,9 +1125,6 @@ pub struct MultiStreamRequest {
     #[serde(default, deserialize_with = "deserialize_sql")]
     pub sql: Vec<SqlQuery>, // Use the new struct for SQL queries
     #[serde(default)]
-    pub streams: Vec<String>, /* List of streams for permission checking, count should match sql
-                               * queries */
-    #[serde(default)]
     pub encoding: RequestEncoding,
     #[serde(default)]
     pub timeout: i64,
@@ -1927,7 +1924,6 @@ mod tests {
                     is_old_format: true,
                 },
             ],
-            streams: vec!["table1", "table2"],
             encoding: RequestEncoding::Base64,
             timeout: 30,
             from: 5,
