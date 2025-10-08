@@ -222,8 +222,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openDrilldown(index)"
             style="cursor: pointer; display: flex; align-items: center"
           >
-            <q-icon class="q-mr-xs q-mt-xs"
-size="16px" name="link" />
+            <q-icon class="q-mr-xs q-mt-xs" size="16px"
+name="link" />
             <span>{{ drilldown.name }}</span>
           </div>
         </div>
@@ -458,6 +458,7 @@ export default defineComponent({
     "limit-number-of-series-warning-message-update",
     "is-partial-data-update",
     "series-data-update",
+    "contextmenu",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -600,15 +601,16 @@ export default defineComponent({
 
       // Get the executed query with variables replaced from metadata
       // Only use metadata if it's available and has queries
-      const executedQuery = (metadata.value?.queries && metadata.value.queries.length > 0)
-        ? metadata.value.queries[0]?.query || query.query
-        : query.query;
+      const executedQuery =
+        metadata.value?.queries && metadata.value.queries.length > 0
+          ? metadata.value.queries[0]?.query || query.query
+          : query.query;
 
       // Get the Y-axis column for threshold comparison
       // Only needed for SQL queries, not for PromQL
       let yAxisColumn = null;
 
-      if (queryType === 'sql') {
+      if (queryType === "sql") {
         const clickedSeriesName = contextMenuData.value?.seriesName;
         const sqlQuery = executedQuery || query.query;
 
@@ -621,12 +623,18 @@ export default defineComponent({
           // Extract from SQL to get the exact case (without quotes)
           if (sqlQuery) {
             // Look for pattern: aggregation_func(...) as "alias" or aggregation_func(...) as alias
-            const escapedAlias = aliasOrColumn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const regex = new RegExp(`\\s+as\\s+(["']?${escapedAlias}["']?)(?:\\s|,|\\)|$)`, 'i');
+            const escapedAlias = aliasOrColumn.replace(
+              /[.*+?^${}()|[\]\\]/g,
+              "\\$&",
+            );
+            const regex = new RegExp(
+              `\\s+as\\s+(["']?${escapedAlias}["']?)(?:\\s|,|\\)|$)`,
+              "i",
+            );
             const match = sqlQuery.match(regex);
             if (match && match[1]) {
               // Strip quotes - the parser will add them back if needed
-              yAxisColumn = match[1].replace(/^["']|["']$/g, '');
+              yAxisColumn = match[1].replace(/^["']|["']$/g, "");
             } else {
               yAxisColumn = aliasOrColumn;
             }
@@ -636,14 +644,18 @@ export default defineComponent({
         } else if (clickedSeriesName && sqlQuery) {
           // Fallback: try to match the clicked series name in the SQL
           // First try exact match with the series name
-          const regex = new RegExp(`\\s+as\\s+["']?(${clickedSeriesName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})["']?(?:\\s|,|\\)|$)`, 'i');
+          const regex = new RegExp(
+            `\\s+as\\s+["']?(${clickedSeriesName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})["']?(?:\\s|,|\\)|$)`,
+            "i",
+          );
           const match = sqlQuery.match(regex);
           if (match && match[1]) {
             yAxisColumn = match[1];
           } else {
             // Last resort: extract any aggregation column from SQL (first one found)
             // Pattern: count(...) as alias, avg(...) as alias, etc.
-            const aggRegex = /(?:count|sum|avg|min|max|median)\s*\([^)]+\)\s+as\s+["']?([^"',\s)]+)["']?/i;
+            const aggRegex =
+              /(?:count|sum|avg|min|max|median)\s*\([^)]+\)\s+as\s+["']?([^"',\s)]+)["']?/i;
             const aggMatch = sqlQuery.match(aggRegex);
             if (aggMatch && aggMatch[1]) {
               yAxisColumn = aggMatch[1];
@@ -780,6 +792,7 @@ export default defineComponent({
       parser = null;
     });
     const convertPanelDataCommon = async () => {
+      console.log(panelSchema.value);
       if (
         !errorDetail?.value?.message &&
         validatePanelData?.value?.length === 0
@@ -936,7 +949,7 @@ export default defineComponent({
         handleAddAnnotation(event.start, event.end);
       } else {
         // default behavior
-        emit("updated:data-zoom", event);
+        emit("updated:data-zoom", { ...event, data: panelSchema.value });
       }
     };
 

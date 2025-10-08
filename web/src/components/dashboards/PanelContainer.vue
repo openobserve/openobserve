@@ -377,6 +377,7 @@ max-width="220px">
       "
       @error="onError"
       @is-partial-data-update="handleIsPartialDataUpdate"
+      @contextmenu="$emit('contextmenu', $event)"
       ref="PanleSchemaRendererRef"
       :allowAnnotationsAdd="true"
       :allowAlertCreation="true"
