@@ -35,7 +35,7 @@ module.exports = defineConfig({
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['html'], // Keep existing HTML reporter
-    ['json', { outputFile: './test-results/results.json' }] // Add JSON reporter for TestDino
+    ['json', { outputFile: 'test-results/results.json' }] // Add JSON reporter for TestDino
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
