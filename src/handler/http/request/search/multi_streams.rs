@@ -1002,7 +1002,6 @@ fn parse_simple_multi_stream_request(
 
     Ok(search::MultiStreamRequest {
         sql: sql_queries,
-        streams: vec![],
         encoding: search::RequestEncoding::Empty,
         timeout: 0,
         from: simple_req.query.from,
