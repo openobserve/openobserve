@@ -318,7 +318,7 @@ jobs:
         if: always() && matrix.testfolder == 'Alerts'
         run: |
           cd tests/ui-testing
-          npx tdpw upload --json-report playwright-results/report.json --token ${{ secrets.TESTDINO_API_TOKEN }}
+          npx tdpw upload playwright-results --token ${{ secrets.TESTDINO_API_TOKEN }}
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
