@@ -1064,7 +1064,7 @@ fn default_size() -> i64 {
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
-#[post("/{org_id}/_search_stream_multi")]
+#[post("/{org_id}/_multi_search_stream")]
 pub async fn search_multi_stream(
     org_id: web::Path<String>,
     in_req: HttpRequest,
@@ -1076,7 +1076,7 @@ pub async fn search_multi_stream(
     // Create a tracing span
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!(
-            "/api/{org_id}/_search_stream_multi",
+            "/api/{org_id}/_multi_search_stream",
             org_id = org_id.clone()
         )
     } else {
@@ -1336,7 +1336,7 @@ pub async fn search_multi_stream(
 
     let search_span = setup_tracing_with_trace_id(
         &trace_id,
-        tracing::info_span!("service::search::search_stream_multi_h2"),
+        tracing::info_span!("service::search::multi_search_stream_h2"),
     )
     .await;
 
