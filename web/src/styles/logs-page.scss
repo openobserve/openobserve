@@ -29,25 +29,6 @@
 }
 
 /* ============================================================================
-   FIELD LIST COLLAPSE BUTTON
-   ============================================================================ */
-
-.field-list-collapse-btn {
-  border-radius: 50%;
-  z-index: 100 !important;
-  position: absolute !important;
-
-  &--visible {
-    right: -0.75rem !important; // -12px (adjusted to not be cut off)
-  }
-
-  &--hidden {
-    left: 0.25rem !important; // 4px (when collapsed, show on left side)
-    right: auto !important;
-  }
-}
-
-/* ============================================================================
    VISUALIZE CONTAINER
    ============================================================================ */
 
