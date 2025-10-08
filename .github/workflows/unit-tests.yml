@@ -52,23 +52,23 @@ jobs:
         with:
           fetch-depth: 0
 
-      # - name: Check if API code has changes
-      #   id: check_changes
-      #   run: |
-      #     if [ -n "${{ github.event.before }}" ]; then
-      #       if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -qE '^src/|^Cargo\.(toml|lock)$'; then
-      #         echo "has_changes=true" >> $GITHUB_OUTPUT
-      #       else
-      #         echo "has_changes=false" >> $GITHUB_OUTPUT
-      #       fi
-      #     else
-      #       # For new branches or when before is unavailable, check against base branch
-      #       if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qE '^src/|^Cargo\.(toml|lock)$'; then
-      #         echo "has_changes=true" >> $GITHUB_OUTPUT
-      #       else
-      #         echo "has_changes=false" >> $GITHUB_OUTPUT
-      #       fi
-      #     fi
+      - name: Check if API code has changes
+        id: check_changes
+        run: |
+          if [ -n "${{ github.event.before }}" ]; then
+            if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -qE '^src/|^Cargo\.(toml|lock)$'; then
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+            else
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            # For new branches or when before is unavailable, check against base branch
+            if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qE '^src/|^Cargo\.(toml|lock)$'; then
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+            else
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+            fi
+          fi
 
       - name: Setup Rust Toolchain
         if: steps.check_changes.outputs.has_changes == 'true'
