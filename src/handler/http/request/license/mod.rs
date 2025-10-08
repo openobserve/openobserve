@@ -15,8 +15,8 @@
 
 use actix_web::{HttpResponse, get, post, web};
 use o2_enterprise::enterprise::license::{
-    LICENSE_DB_KEY, License, check_license, get_license, ingestion_used, license_expired,
-    search_used,
+    LICENSE_DB_KEY, License, check_license, get_license, ingestion_limit_exceeded_count,
+    ingestion_used, license_expired,
 };
 use serde::{Deserialize, Serialize};
 
@@ -28,8 +28,8 @@ struct LicenseResponse {
     license: Option<License>,
     installation_id: String,
     expired: bool,
-    search_used: f64,
     ingestion_used: f64,
+    ingestion_exceeded: u8,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -48,7 +48,7 @@ pub async fn get_license_info() -> HttpResponse {
         license,
         installation_id: config::get_instance_id(),
         expired: license_expired().await,
-        search_used: search_used() * 100.0, // convert to percentage
+        ingestion_exceeded: ingestion_limit_exceeded_count(),
         ingestion_used: ingestion_used() * 100.0, // convert to percentage
     };
     HttpResponse::Ok().json(res)

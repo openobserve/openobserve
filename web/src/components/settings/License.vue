@@ -195,6 +195,10 @@
                       <td class="text-weight-bold">Value</td>
                       <td>{{ licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB / day` : '200 GB / day' }}</td>
                     </tr>
+                    <tr>
+                      <td class="text-weight-bold">Limit Exceeded</td>
+                      <td>{{ licenseData?.ingestion_exceeded ? `${licenseData?.ingestion_exceeded} times this month` : '0 times this month' }}</td>
+                    </tr>
                   </tbody>
                 </q-markup-table>
               </q-card-section>
