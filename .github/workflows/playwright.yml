@@ -301,6 +301,12 @@ jobs:
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npx nyc report
 
+      - name: Upload results to TestDino
+        if: always() && matrix.testfolder == 'Alerts'
+        run: |
+          cd tests/ui-testing
+          npx tdpw test-results/results.json --token ${{ secrets.TESTDINO_API_TOKEN }}
+
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
         if: always() && hashFiles('playwright-report/**') != ''
