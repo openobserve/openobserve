@@ -304,21 +304,11 @@ jobs:
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npx nyc report
 
-      - name: Debug - List files in playwright-results
-        if: always()
-        run: |
-          echo "=== Checking if playwright-results directory exists ==="
-          ls -la tests/ui-testing/ | grep playwright-results || echo "playwright-results directory not found"
-          echo "=== Contents of playwright-results directory (if exists) ==="
-          ls -la tests/ui-testing/playwright-results/ || echo "Cannot list playwright-results directory"
-          echo "=== All JSON files in tests/ui-testing ==="
-          find tests/ui-testing -name "*.json" -type f | head -20
-
       - name: Upload results to TestDino
         if: always() && matrix.testfolder == 'Alerts'
         run: |
           cd tests/ui-testing
-          npx tdpw upload playwright-results --token ${{ secrets.TESTDINO_API_TOKEN }} --verbose
+          npx tdpw upload playwright-results --token ${{ secrets.TESTDINO_API_TOKEN }}
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
