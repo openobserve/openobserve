@@ -161,6 +161,14 @@ async fn query(
     let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
+        if crate::service::search::check_search_allowed().is_err() {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    "installation has exceeded the ingestion limit".to_string(),
+                )),
+            );
+        }
         use crate::{
             common::utils::auth::{AuthExtractor, is_root_user},
             service::db::org_users::get_cached_user_org,
@@ -433,6 +441,15 @@ async fn query_range(
             service::db::org_users::get_cached_user_org,
         };
 
+        if crate::service::search::check_search_allowed().is_err() {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    "installation has exceeded the ingestion limit".to_string(),
+                )),
+            );
+        }
+
         let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
             Ok(v) => v,
             Err(e) => {
@@ -686,6 +703,18 @@ async fn series(
                 .json(promql::ApiFuncResponse::<()>::err_bad_data(e, None)));
         }
     };
+
+    #[cfg(feature = "enterprise")]
+    {
+        if crate::service::search::check_search_allowed().is_err() {
+            return Ok(
+                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                    http::StatusCode::TOO_MANY_REQUESTS,
+                    "installation has exceeded the ingestion limit".to_string(),
+                )),
+            );
+        }
+    }
 
     #[cfg(feature = "enterprise")]
     {
