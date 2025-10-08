@@ -3,7 +3,7 @@ name: Unit tests
 on:
   push:
     branches:
-      - "ci/update_workflow_with_internal_runners"
+      - "main"
     # paths-ignore:
     #   - "**.md"
     #   - "**.yml"

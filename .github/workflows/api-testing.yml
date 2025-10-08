@@ -3,7 +3,7 @@ name: API Integration Test
 on:
   push:
     branches:
-      - "ci/update_workflow_with_internal_runners"
+      - "main"
     # paths-ignore:
     #   - "**.md"
     #   - "**.yml"
@@ -48,16 +48,16 @@ jobs:
         run: |
           if [ -n "${{ github.event.before }}" ]; then
             if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -qE '^src/|^Cargo\.(toml|lock)$'; then
-              echo "has_changes=false" >> $GITHUB_OUTPUT
-            else
               echo "has_changes=true" >> $GITHUB_OUTPUT
+            else
+              echo "has_changes=false" >> $GITHUB_OUTPUT
             fi
           else
             # For new branches or when before is unavailable, check against base branch
             if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qE '^src/|^Cargo\.(toml|lock)$'; then
-              echo "has_changes=false" >> $GITHUB_OUTPUT
-            else
               echo "has_changes=true" >> $GITHUB_OUTPUT
+            else
+              echo "has_changes=false" >> $GITHUB_OUTPUT
             fi
           fi
 
