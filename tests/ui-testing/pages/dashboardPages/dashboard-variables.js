@@ -8,13 +8,14 @@ export default class DashboardVariables {
   }
 
   // Method to add a dashboard variable
-  // Parameters: name, streamtype, streamName, field
+  // Parameters: name, streamtype, streamName, field, customValueSearch, filterConfig
   async addDashboardVariable(
     name,
     streamtype,
     streamName,
     field,
-    customValueSearch = false // it is used only when we want to search custom value from variable dropdown
+    customValueSearch = false, // it is used only when we want to search custom value from variable dropdown
+    filterConfig = null // optional filter configuration { filterName, operator, value }
   ) {
     // Open Variable Tab
     await this.page
@@ -56,6 +57,34 @@ export default class DashboardVariables {
       .locator('[data-test="dashboard-variable-field-select"]')
       .fill(field);
     await this.page.getByText(field).click();
+
+    // Add Filter Configuration if provided
+    if (filterConfig) {
+      await this.page
+        .locator('[data-test="dashboard-query-values-filter-name-selector"]')
+        .click();
+      await this.page
+        .locator('[data-test="dashboard-query-values-filter-name-selector"]')
+        .fill(filterConfig.filterName);
+      await this.page
+        .locator('[data-test="dashboard-query-values-filter-operator-selector"]')
+        .click();
+      await this.page
+        .getByRole("option", { name: filterConfig.operator, exact: true })
+        .locator("div")
+        .nth(2)
+        .click();
+      await this.page
+        .locator('[data-test="common-auto-complete"]')
+        .click();
+      await this.page
+        .locator('[data-test="common-auto-complete"]')
+        .fill(filterConfig.value);
+      await this.page
+        .locator('[data-test="variable-tab-panels-default"]')
+        .getByText(filterConfig.value, { exact: true })
+        .click();
+    }
 
     // Save Variable and Close Settings (skip if customValueSearch is true)
     if (!customValueSearch) {
