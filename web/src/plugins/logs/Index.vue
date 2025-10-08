@@ -67,25 +67,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <q-btn
                     data-test="logs-search-field-list-collapse-btn"
-                    :icon="
-                      searchObj.meta.showFields
-                        ? 'chevron_left'
-                        : 'chevron_right'
-                    "
+                    icon="drag_indicator"
                     :title="
                       searchObj.meta.showFields
                         ? 'Collapse Fields'
                         : 'Open Fields'
                     "
+                    flat
                     dense
-                    size="20px"
-                    round
                     :class="[
-                      'q-mr-xs',
-                      'field-list-collapse-btn',
-                      searchObj.meta.showFields ? 'field-list-collapse-btn--visible' : 'field-list-collapse-btn--hidden'
+                      'splitter-section-collapse-btn',
+                      searchObj.meta.showFields
+                        ? 'splitter-section-collapse-btn--visible'
+                        : 'splitter-section-collapse-btn--hidden',
                     ]"
-                    color="primary"
                     @click="collapseFieldList"
                   ></q-btn>
                 </div>
@@ -2714,13 +2709,14 @@ export default defineComponent({
       box-sizing: border-box !important;
     }
     .q-splitter__before {
-      overflow: hidden !important; // Prevent content from overflowing over scrollbar
+      overflow: visible !important; // Allow button to overflow
 
       // IndexList container - full width, scrollbar inside
       > .relative-position {
         width: 100% !important;
         padding: 0 !important;
         margin: 0 !important;
+        overflow: visible !important; // Allow button to overflow
       }
     }
     .q-splitter__after {
@@ -2737,13 +2733,6 @@ export default defineComponent({
     box-sizing: border-box !important;
     height: 100% !important;
     overflow: visible !important; /* Changed from hidden to visible for button */
-
-    .field-list-collapse-btn {
-      z-index: 100 !important;
-      position: absolute;
-      top: 5px;
-      font-size: 12px !important;
-    }
   }
 
   .logs-splitter-smooth {
@@ -2756,6 +2745,11 @@ export default defineComponent({
       transition: none !important;
       z-index: 1 !important; // Lower z-index so scrollbar overlaps it
       // Separator IS draggable, but scrollbar will be on top where they overlap
+    }
+
+    // When hovering over the splitter area, slide out the collapsed button
+    &:hover .splitter-section-collapse-btn--hidden {
+      transform: translateY(-50%) translateX(10px) !important;
     }
   }
 
