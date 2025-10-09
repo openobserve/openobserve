@@ -179,8 +179,7 @@ pub async fn get_enrichment_table_inner(
 
     let values = if (db_stats.end_time > local_last_updated) || local_last_updated == 0 {
         log::debug!("get_enrichment_table: fetching from remote: {org_id}/{table_name}");
-        let batches = enrichment_table::get_enrichment_table_data(org_id, table_name).await?;
-        storage::Values::Json(Arc::new(batches))
+        enrichment_table::get_enrichment_table_data(org_id, table_name).await?
     } else {
         log::debug!("get_enrichment_table: fetching from local: {org_id}/{table_name}");
         storage::local::retrieve(org_id, table_name).await?

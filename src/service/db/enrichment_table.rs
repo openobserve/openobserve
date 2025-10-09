@@ -20,7 +20,7 @@ use arrow::{
     datatypes::DataType,
 };
 use config::{
-    QUERY_WITH_NO_LIMIT,
+    QUERY_WITH_NO_LIMIT, ider,
     meta::stream::{EnrichmentTableMetaStreamStats, StreamType},
     utils::{
         json,
@@ -30,20 +30,23 @@ use config::{
 use infra::{cache::stats, db as infra_db};
 use rayon::prelude::*;
 use vrl::prelude::NotNan;
+#[cfg(feature = "enterprise")]
+use {crate::service::search::SEARCH_SERVER, o2_enterprise::enterprise::search::TaskStatus};
 
 use crate::{
     common::infra::config::ENRICHMENT_TABLES,
-    service::{db as db_service, enrichment::StreamTable, search as SearchService},
+    service::{
+        db as db_service,
+        enrichment::{StreamTable, storage::Values},
+        search::cluster::http as search_cluster,
+    },
 };
 
 /// Will no longer be used as we are using the meta stream stats to store start, end time and size
 pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
 pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
 
-pub async fn get_enrichment_table_data(
-    org_id: &str,
-    name: &str,
-) -> Result<Vec<serde_json::Value>, anyhow::Error> {
+pub async fn get_enrichment_table_data(org_id: &str, name: &str) -> Result<Values, anyhow::Error> {
     let start_time = get_start_time(org_id, name).await;
     let end_time = now_micros();
 
@@ -55,26 +58,62 @@ pub async fn get_enrichment_table_data(
         ..Default::default()
     };
 
-    let req = config::meta::search::Request {
-        query,
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: None,
-        search_event_context: None,
-        use_cache: false,
-        local_mode: Some(true),
-    };
+    let search_query: proto::cluster_rpc::SearchQuery = query.clone().into();
+    let trace_id = ider::generate_trace_id();
+    let request = config::datafusion::request::Request::new(
+        trace_id.clone(),
+        org_id.to_string(),
+        StreamType::EnrichmentTables,
+        0,    // timeout
+        None, // user_id
+        Some((search_query.start_time, search_query.end_time)),
+        None, // search_type
+        query.histogram_interval,
+    );
+
     log::info!("get enrichment table {org_id}/{name} data req start time: {start_time}");
-    // do search
-    match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
-        Ok(res) => {
+
+    #[cfg(feature = "enterprise")]
+    {
+        let sql = Some(query.sql.clone());
+        let start_time = Some(query.start_time);
+        let end_time = Some(query.end_time);
+        // set search task
+        SEARCH_SERVER
+            .insert(
+                trace_id.clone(),
+                TaskStatus::new_leader(
+                    vec![],
+                    true,
+                    None,
+                    Some(org_id.to_string()),
+                    Some(request.stream_type.to_string()),
+                    sql,
+                    start_time,
+                    end_time,
+                    None,
+                    None,
+                ),
+            )
+            .await;
+    }
+
+    let result =
+        search_cluster::search_inner(request, search_query, vec![], vec![], false, None).await;
+
+    #[cfg(feature = "enterprise")]
+    {
+        let _ = SEARCH_SERVER.remove(&trace_id, false).await;
+    }
+
+    // do search using search_inner which returns RecordBatches
+    match result {
+        Ok((batches, _scan_stats, _took_wait, _is_partial, _partial_err)) => {
             log::info!(
-                "get enrichment table {org_id}/{name} data success with hits: {}",
-                res.hits.len()
+                "get enrichment table {org_id}/{name} data success with {} rows",
+                batches.iter().map(|b| b.num_rows()).sum::<usize>()
             );
-            Ok(res.hits)
+            Ok(Values::RecordBatch(batches))
         }
         Err(err) => {
             log::error!("get enrichment table {org_id}/{name} data error: {err}",);
