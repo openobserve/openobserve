@@ -34,8 +34,8 @@ module.exports = defineConfig({
   workers: process.env.CI ? 5 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
-    ['html'], // Keep existing HTML reporter
-    ['json', { outputFile: 'playwright-results/report.json' }] // Add JSON reporter for TestDino
+    ['html', { outputFolder: 'playwright-results/html-report' }], // HTML reporter
+    ['json', { outputFile: 'playwright-results/report.json' }] // JSON reporter for TestDino
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
