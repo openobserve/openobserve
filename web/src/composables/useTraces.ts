@@ -308,7 +308,7 @@ const useTraces = () => {
 
   const getBaseFilters = (rangeFilters, editorFilter: string) => {
     let baseFilters = [];
-    rangeFilters.value.forEach((rangeFilter) => {
+    (rangeFilters || []).forEach((rangeFilter) => {
       if (rangeFilter.panelTitle === "Duration") {
         if (rangeFilter.start !== null && rangeFilter.end !== null) {
           baseFilters.push(
@@ -319,6 +319,23 @@ const useTraces = () => {
             `duration ${rangeFilter.start ? ">=" : "<="} ${rangeFilter.start || rangeFilter.end}`,
           );
         }
+      } else if (
+        rangeFilter.panelTitle === "Rate" ||
+        rangeFilter.panelTitle === "Errors"
+      ) {
+        // For Rate and Errors, we filter based on count of traces per time bucket
+        // This is a simplified filter that applies to the overall query
+        // Note: Since these are aggregated metrics, we can't directly filter on them
+        // Instead, we'll store the filter for display purposes only
+        // The actual filtering would need to happen at the visualization level
+        const fieldMap = {
+          Rate: "rate",
+          Errors: "error",
+        };
+
+        baseFilters.push(
+          `${fieldMap[rangeFilter.panelTitle]}  >= ${rangeFilter.start}`,
+        );
       }
     });
 

@@ -52,15 +52,11 @@ size="18px" class="tw-mx-1" />
         class="filter-chip"
         data-test="range-filter-chip"
       >
-        <span class="chip-label"
-          >{{ filter.panelTitle }}
-          <span
-            v-if="
-              filter.panelTitle === 'Errors' || filter.panelTitle === 'Rate'
-            "
-          >
-            >= {{ filter.start }}</span
-          >
+        <span class="chip-label">
+          {{ filter.panelTitle }}
+          <span v-if="filter.panelTitle === 'Rate' || filter.panelTitle === 'Errors'">
+            >= {{ filter.start }}
+          </span>
           <span v-if="filter.panelTitle === 'Duration'">
             <span v-if="filter.start !== null && filter.end !== null">
               {{ formatTimeWithSuffix(filter.start) }} -
@@ -258,7 +254,7 @@ const createRangeFilter = (data, start = null, end = null) => {
   const panelId = data?.id;
   const panelTitle = data?.title || "Chart";
 
-  if (panelId && panelTitle === "Duration") {
+  if (panelId) {
     searchObj.meta.metricsRangeFilters.set(panelId, {
       panelTitle,
       start: start ? Math.floor(start) : null,

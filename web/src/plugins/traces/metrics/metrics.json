@@ -197,7 +197,7 @@
               "num_of_columns": 1,
               "group_by_y_axis": false
             },
-            "dataZoom": { "yAxisIndex": "none" }
+            "dataZoom": { "yAxisIndex": 0 }
           },
           "queryType": "sql",
           "queries": [
@@ -322,7 +322,7 @@
               "num_of_columns": 1,
               "group_by_y_axis": false
             },
-            "dataZoom": { "yAxisIndex": "none" }
+            "dataZoom": { "yAxisIndex": 0 }
           },
           "queryType": "sql",
           "queries": [
