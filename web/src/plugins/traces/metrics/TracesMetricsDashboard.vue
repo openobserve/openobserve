@@ -309,7 +309,6 @@ const onDataZoom = ({
   if (start && end) {
     // Create or update range filter chip for this panel
     createRangeFilter(data, start1, end1);
-
     emit("time-range-selected", { start, end });
   }
 };
