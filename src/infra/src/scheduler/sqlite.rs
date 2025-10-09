@@ -312,6 +312,26 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(())
     }
 
+    // Does not support bulk updates
+    async fn bulk_update_triggers(&self, _triggers: Vec<Trigger>) -> Result<()> {
+        Ok(())
+    }
+
+    /// Does not support bulk updates
+    async fn bulk_update_status(
+        &self,
+        _updates: Vec<(
+            String,
+            TriggerModule,
+            String,
+            TriggerStatus,
+            i32,
+            Option<String>,
+        )>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
     /// Keeps the trigger alive
     async fn keep_alive(&self, ids: &[i64], alert_timeout: i64, report_timeout: i64) -> Result<()> {
         let now = now_micros();
