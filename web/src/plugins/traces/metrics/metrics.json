@@ -202,7 +202,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT histogram(_timestamp) AS _time, count(distinct(trace_id)) AS _count FROM \"default\" [WHERE_CLAUSE] GROUP BY _time",
+              "query": "WITH traces AS (SELECT min(_timestamp) as _time, max(trace_id) AS max_trace_id FROM \"default\" [WHERE_CLAUSE] GROUP BY trace_id), histogram_data AS (SELECT histogram(_time) AS time_bucket, max_trace_id FROM traces) SELECT time_bucket, count(max_trace_id) as trace_count FROM histogram_data GROUP BY time_bucket ORDER BY time_bucket ASC;",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -211,8 +211,8 @@
                 "x": [
                   {
                     "label": "",
-                    "alias": "_time",
-                    "column": "_time",
+                    "alias": "time_bucket",
+                    "column": "time_bucket",
                     "color": null,
                     "isDerived": false,
                     "havingConditions": [],
@@ -222,8 +222,8 @@
                 "y": [
                   {
                     "label": "",
-                    "alias": "_count",
-                    "column": "_count",
+                    "alias": "trace_count",
+                    "column": "trace_count",
                     "color": "#5960b2",
                     "aggregationFunction": "count",
                     "isDerived": false,
