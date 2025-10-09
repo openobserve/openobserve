@@ -3,7 +3,7 @@ name: API Integration Test
 on:
   push:
     branches:
-      - "main"
+      - "ci/update_workflow_with_internal_runners"
     # paths-ignore:
     #   - "**.md"
     #   - "**.yml"
