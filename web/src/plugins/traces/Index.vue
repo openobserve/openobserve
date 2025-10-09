@@ -727,7 +727,7 @@ async function getQueryData() {
         if (dismiss) dismiss();
       });
   } catch (e) {
-    console.error("Error while fetching traces", e?.message);
+    console.error("Error while fetching traces", e);
     searchObj.loading = false;
     showErrorNotification("Search request failed");
   }
