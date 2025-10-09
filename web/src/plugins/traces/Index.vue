@@ -292,7 +292,7 @@ async function getStreamList() {
           });
       })
       .catch((e) => {
-        searchObj.loading = false;
+        searchObj.loadingStream = false;
         $q.notify({
           type: "negative",
           message:
@@ -301,10 +301,10 @@ async function getStreamList() {
         });
       })
       .finally(() => {
-        searchObj.loading = false;
+        searchObj.loadingStream = false;
       });
   } catch (e) {
-    searchObj.loading = false;
+    searchObj.loadingStream = false;
     console.error("Error while getting streams", e);
     showErrorNotification("Error while getting streams");
   }
@@ -1033,8 +1033,7 @@ function generateHistogramData() {
 }
 
 async function loadPageData() {
-  searchObj.loading = true;
-
+  searchObj.loadingStream = true;
   searchObj.data.resultGrid.currentPage = 0;
 
   // resetSearchObj();
