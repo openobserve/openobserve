@@ -14,9 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
+use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
-use o2_dex::meta::auth::RoleRequest;
+use {
+    crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers},
+    o2_dex::meta::auth::RoleRequest,
+};
 
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
@@ -193,15 +196,17 @@ pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpRespo
     )
 )]
 #[get("/{org_id}/roles")]
-pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn get_roles(
+    org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let mut permitted;
     // Get List of allowed objects
 
-    let user_id = req.headers().get("user_id").unwrap();
     match crate::handler::http::auth::validator::list_objects_for_user(
         &org_id,
-        user_id.to_str().unwrap(),
+        &user_email.user_id,
         "GET",
         "role",
     )
@@ -216,18 +221,18 @@ pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<Ht
     }
     // Get List of allowed objects ends
 
-    if let Some(mut local_permitted) = permitted {
+    if let Some(local_permitted) = permitted.as_mut() {
         let prefix = "role:";
         for value in local_permitted.iter_mut() {
-            if value.starts_with(prefix) {
-                *value = value.strip_prefix(prefix).unwrap().to_string();
+            if let Some(remaining) = value.strip_prefix(prefix) {
+                *value = remaining.to_string();
             }
+
             let role_prefix = format!("{org_id}/");
-            if value.starts_with(&role_prefix) {
-                *value = value.strip_prefix(&role_prefix).unwrap().to_string()
+            if let Some(remaining) = value.strip_prefix(&role_prefix) {
+                *value = remaining.to_string()
             }
         }
-        permitted = Some(local_permitted);
     }
 
     match o2_openfga::authorizer::roles::get_all_roles(&org_id, permitted).await {
@@ -258,10 +263,7 @@ pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<Ht
     )
 )]
 #[get("/{org_id}/roles")]
-pub async fn get_roles(
-    _org_id: web::Path<String>,
-    _req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+pub async fn get_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
@@ -723,16 +725,18 @@ pub async fn update_group(
     )
 )]
 #[get("/{org_id}/groups")]
-pub async fn get_groups(path: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn get_groups(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
 
     let mut permitted;
     // Get List of allowed objects
 
-    let user_id = req.headers().get("user_id").unwrap();
     match crate::handler::http::auth::validator::list_objects_for_user(
         &org_id,
-        user_id.to_str().unwrap(),
+        &user_email.user_id,
         "GET",
         "group",
     )
@@ -1135,7 +1139,7 @@ mod tests {
             let app = test::init_service(App::new().service(update_role)).await;
             let req = test::TestRequest::post()
                 .uri("/test_org/roles/test_role")
-                .set_json(&"test")
+                .set_json("test")
                 .to_request();
 
             let resp = test::call_service(&app, req).await;

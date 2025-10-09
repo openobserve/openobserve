@@ -197,25 +197,19 @@ pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
 #[cfg(not(feature = "enterprise"))]
 pub async fn remove_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
-#[derive(Debug)]
-pub struct UserEmail {
-    pub user_id: String,
+/// A deserializer impl for when a value must be lowercased during deserialization
+fn deserialize_lowercase<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: String = serde::Deserialize::deserialize(deserializer)?;
+    Ok(s.to_lowercase())
 }
 
-impl FromRequest for UserEmail {
-    type Error = Error;
-    type Future = Ready<Result<Self, Error>>;
-
-    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        if let Some(auth_header) = req.headers().get("user_id")
-            && let Ok(user_str) = auth_header.to_str()
-        {
-            return ready(Ok(UserEmail {
-                user_id: user_str.to_lowercase(),
-            }));
-        }
-        ready(Err(actix_web::error::ErrorUnauthorized("No user found")))
-    }
+#[derive(Debug, serde::Deserialize)]
+pub struct UserEmail {
+    #[serde(deserialize_with = "deserialize_lowercase")]
+    pub user_id: String,
 }
 
 #[derive(Debug, PartialEq, Eq)]

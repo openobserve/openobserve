@@ -368,6 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @is-partial-data-update="handleIsPartialDataUpdate"
       ref="PanleSchemaRendererRef"
       :allowAnnotationsAdd="true"
+      :allowAlertCreation="true"
     ></PanelSchemaRenderer>
     <q-dialog v-model="showViewPanel">
       <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>

@@ -138,15 +138,19 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
 
     // 3. get nodes
     let get_node_start = std::time::Instant::now();
-    let role_group = req
-        .search_event_type
-        .as_ref()
-        .map(|v| {
-            SearchEventType::try_from(v.as_str())
-                .ok()
-                .map(RoleGroup::from)
-        })
-        .unwrap_or(Some(RoleGroup::Interactive));
+    let is_local_mode = req.local_mode.unwrap_or_default();
+    let role_group = if is_local_mode {
+        None
+    } else {
+        req.search_event_type
+            .as_ref()
+            .map(|v| {
+                SearchEventType::try_from(v.as_str())
+                    .ok()
+                    .map(RoleGroup::from)
+            })
+            .unwrap_or(Some(RoleGroup::Interactive))
+    };
     let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
 
     // local mode, only use local node as querier node

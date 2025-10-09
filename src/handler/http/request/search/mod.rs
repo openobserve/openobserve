@@ -44,6 +44,7 @@ use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::{
+            auth::UserEmail,
             functions,
             http::{
                 get_dashboard_info_from_request, get_enable_align_histogram_from_request,
@@ -55,6 +56,7 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
+    handler::http::extractors::Headers,
     service::{
         db::enrichment_table,
         metadata::distinct_values::DISTINCT_STREAM_PREFIX,
@@ -219,6 +221,7 @@ pub async fn search(
     org_id: web::Path<String>,
     in_req: HttpRequest,
     body: web::Bytes,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -252,12 +255,7 @@ pub async fn search(
     };
 
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let user_id = &user_email.user_id;
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
@@ -326,7 +324,7 @@ pub async fn search(
             infra::schema::get_settings(&org_id, &stream_name, stream_type).await
         {
             let max_query_range =
-                get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))
+                get_settings_max_query_range(settings.max_query_range, &org_id, Some(user_id))
                     .await;
             if max_query_range > 0
                 && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
@@ -341,7 +339,7 @@ pub async fn search(
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
         if let Some(res) =
-            check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
+            check_stream_permissions(&stream_name, &org_id, user_id, &stream_type).await
         {
             return Ok(res);
         }
@@ -372,12 +370,12 @@ pub async fn search(
                     service::users::get_user,
                 };
 
-                if !is_root_user(&user_id) {
+                if !is_root_user(user_id) {
                     let user: config::meta::user::User =
-                        get_user(Some(&org_id), &user_id).await.unwrap();
+                        get_user(Some(&org_id), user_id).await.unwrap();
 
                     if !crate::handler::http::auth::validator::check_permissions(
-                        &user_id,
+                        user_id,
                         AuthExtractor {
                             auth: "".to_string(),
                             method: "GET".to_string(),
@@ -410,7 +408,7 @@ pub async fn search(
         &trace_id,
         &org_id,
         stream_type,
-        Some(user_id),
+        Some(user_id.to_string()),
         &req,
         range_error,
         false,
@@ -503,6 +501,7 @@ pub async fn search(
 pub async fn around_v1(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
@@ -517,10 +516,7 @@ pub async fn around_v1(
         Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .map(|v| v.to_str().unwrap_or("").to_string());
+    let user_id = Some(user_email.user_id.clone());
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
@@ -616,6 +612,7 @@ pub async fn around_v2(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
     body: web::Bytes,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
@@ -630,10 +627,7 @@ pub async fn around_v2(
         Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .map(|v| v.to_str().unwrap_or("").to_string());
+    let user_id = Some(user_email.user_id.clone());
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
@@ -709,18 +703,14 @@ pub async fn around_v2(
 pub async fn values(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let user_id = &user_email.user_id;
     let http_span = if config::get_config().common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_values",
@@ -743,7 +733,7 @@ pub async fn values(
         stream_type,
         &stream_name,
         &query,
-        &user_id,
+        user_id,
         trace_id,
         http_span,
     )
@@ -1355,6 +1345,7 @@ pub async fn search_partition(
     org_id: web::Path<String>,
     in_req: HttpRequest,
     body: web::Bytes,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -1367,12 +1358,7 @@ pub async fn search_partition(
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
     let org_id = org_id.into_inner();
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let user_id = &user_email.user_id;
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let enable_align_histogram = get_enable_align_histogram_from_request(&query);
@@ -1411,7 +1397,7 @@ pub async fn search_partition(
     let search_res = SearchService::search_partition(
         &trace_id,
         &org_id,
-        Some(&user_id),
+        Some(user_id),
         stream_type,
         &req,
         false,
@@ -1528,6 +1514,7 @@ pub async fn search_history(
     org_id: web::Path<String>,
     in_req: HttpRequest,
     body: web::Bytes,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
@@ -1539,10 +1526,7 @@ pub async fn search_history(
         Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .map(|v| v.to_str().unwrap_or("").to_string());
+    let user_id = Some(user_email.user_id.clone());
 
     let mut req: config::meta::search::SearchHistoryRequest = match json::from_slice(&body) {
         Ok(v) => v,
@@ -1697,6 +1681,7 @@ pub async fn result_schema(
     org_id: web::Path<String>,
     in_req: HttpRequest,
     body: web::Bytes,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
 
@@ -1719,12 +1704,7 @@ pub async fn result_schema(
         }
     }
 
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let user_id = &user_email.user_id;
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
@@ -1774,7 +1754,7 @@ pub async fn result_schema(
             infra::schema::get_settings(&org_id, &stream_name, stream_type).await
         {
             let max_query_range =
-                get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))
+                get_settings_max_query_range(settings.max_query_range, &org_id, Some(user_id))
                     .await;
             if max_query_range > 0
                 && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
@@ -1786,7 +1766,7 @@ pub async fn result_schema(
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
         if let Some(res) =
-            check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
+            check_stream_permissions(&stream_name, &org_id, user_id, &stream_type).await
         {
             return Ok(res);
         }
@@ -1813,12 +1793,12 @@ pub async fn result_schema(
                     service::users::get_user,
                 };
 
-                if !is_root_user(&user_id) {
+                if !is_root_user(user_id) {
                     let user: config::meta::user::User =
-                        get_user(Some(&org_id), &user_id).await.unwrap();
+                        get_user(Some(&org_id), user_id).await.unwrap();
 
                     if !crate::handler::http::auth::validator::check_permissions(
-                        &user_id,
+                        user_id,
                         AuthExtractor {
                             auth: "".to_string(),
                             method: "GET".to_string(),

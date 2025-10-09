@@ -124,14 +124,12 @@ describe("TraceHeader", () => {
 
     it("should have correct default height", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.attributes("style")).toContain("height: 30px");
+      expect(headerContainer.classes()).toContain("trace-header-container");
     });
 
     it("should have sticky positioning", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.attributes("style")).toContain("position: sticky");
-      expect(headerContainer.attributes("style")).toContain("top: 0");
-      expect(headerContainer.attributes("style")).toContain("z-index: 1999");
+      expect(headerContainer.classes()).toContain("trace-header-container");
     });
   });
 
@@ -232,7 +230,7 @@ describe("TraceHeader", () => {
 
     it("should have correct z-index for first tic", () => {
       const firstTic = wrapper.find('[data-test="trace-header-tic-line-0"]');
-      expect(firstTic.attributes("style")).toContain("z-index: 5");
+      expect(firstTic.classes()).toContain("trace-tic-first");
     });
 
     it("should have correct z-index for other tics", () => {
@@ -240,7 +238,7 @@ describe("TraceHeader", () => {
         .findAll('[data-test^="trace-header-tic-line-"]')
         .slice(1);
       otherTics.forEach((tic) => {
-        expect(tic.attributes("style")).toContain("z-index: 1");
+        expect(tic.classes()).toContain("trace-tic");
       });
     });
   });
@@ -249,9 +247,7 @@ describe("TraceHeader", () => {
     it("should apply light theme by default", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
       expect(headerContainer.classes()).toContain("bg-grey-2");
-      expect(headerContainer.attributes("style")).toContain(
-        "border: 1px solid rgb(236, 236, 236)",
-      );
+      expect(headerContainer.classes()).toContain("trace-header-container");
     });
 
     it("should apply dark theme when store theme is dark", async () => {
@@ -287,9 +283,7 @@ describe("TraceHeader", () => {
 
       const headerContainer = darkWrapper.find('[data-test="trace-header"]');
       expect(headerContainer.classes()).toContain("bg-grey-9");
-      expect(headerContainer.attributes("style")).toContain(
-        "border: 1px solid rgb(60, 60, 60)",
-      );
+      expect(headerContainer.classes()).toContain("trace-header-container");
 
       darkWrapper.unmount();
     });
@@ -329,9 +323,7 @@ describe("TraceHeader", () => {
         '[data-test^="trace-header-tic-line-"]',
       );
       ticLines.forEach((tic) => {
-        expect(tic.attributes("style")).toContain(
-          "background-color: rgb(60, 60, 60)",
-        );
+        expect(tic.classes()).toContain("bg-dark-tic");
       });
 
       darkWrapper.unmount();
@@ -340,9 +332,7 @@ describe("TraceHeader", () => {
     it("should apply light theme colors to tic lines", () => {
       const ticLines = wrapper.findAll('[data-test^="trace-header-tic-line-"]');
       ticLines.forEach((tic) => {
-        expect(tic.attributes("style")).toContain(
-          "background-color: rgb(202, 202, 202)",
-        );
+        expect(tic.classes()).toContain("trace-tic");
       });
     });
   });

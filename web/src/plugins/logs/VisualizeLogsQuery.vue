@@ -165,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @error="handleChartApiError"
                         :searchResponse="searchResponse"
                         :is_ui_histogram="is_ui_histogram"
+                        :allowAlertCreation="true"
                         @series-data-update="seriesDataUpdate"
                       />
                     </div>
@@ -342,6 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @error="handleChartApiError"
                         :searchResponse="searchResponse"
                         :is_ui_histogram="is_ui_histogram"
+                        :allowAlertCreation="true"
                         @series-data-update="seriesDataUpdate"
                       />
                     </template>

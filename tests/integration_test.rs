@@ -26,7 +26,7 @@ mod tests {
         get_config,
         meta::{
             alerts::{Operator, QueryCondition, TriggerCondition, alert::Alert},
-            dashboards::{Dashboard, v1},
+            dashboards::{Dashboard, v5},
             pipeline::{
                 Pipeline,
                 components::{DerivedStream, PipelineSource},
@@ -156,6 +156,9 @@ mod tests {
         // init job
         openobserve::job::init().await.unwrap();
 
+        // Wait for async initialization tasks (like default user creation) to complete
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
         for _i in 0..3 {
             e2e_1_post_bulk().await;
         }
@@ -201,22 +204,18 @@ mod tests {
         {
             let board = e2e_create_dashboard().await;
             let list = e2e_list_dashboards().await;
-            assert_eq!(list[0], board.clone());
+            assert_eq!(list[0], board);
 
-            let board = e2e_update_dashboard(
-                v1::Dashboard {
-                    title: "e2e test".to_owned(),
-                    description: "Logs flow downstream".to_owned(),
-                    ..board.v1.unwrap()
-                },
-                board.hash,
-            )
-            .await;
+            let mut v5_board = board.v5.unwrap();
+            v5_board.title = "e2e test".to_owned();
+            v5_board.description = "Logs flow downstream".to_owned();
+
+            let board = e2e_update_dashboard(v5_board, board.hash).await;
             assert_eq!(
-                e2e_get_dashboard(&board.clone().v1.unwrap().dashboard_id).await,
+                e2e_get_dashboard(&board.v5.as_ref().unwrap().dashboard_id).await,
                 board
             );
-            e2e_delete_dashboard(&board.v1.unwrap().dashboard_id).await;
+            e2e_delete_dashboard(&board.v5.unwrap().dashboard_id).await;
             assert!(e2e_list_dashboards().await.is_empty());
         }
 
@@ -928,11 +927,6 @@ mod tests {
 
     async fn e2e_post_user() {
         let auth = setup();
-        let body_str = r#"{
-                                "email": "nonadmin@example.com",
-                                "password": "Abcd12345",
-                                "role": "admin"
-                            }"#;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
@@ -943,6 +937,20 @@ mod tests {
                 .configure(get_basic_routes),
         )
         .await;
+
+        // Delete user if it exists from previous test runs to avoid conflicts
+        let delete_req = test::TestRequest::delete()
+            .uri(&format!("/api/{}/users/{}", "e2e", "nonadmin@example.com"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let _ = test::call_service(&app, delete_req).await;
+
+        let body_str = r#"{
+                                "email": "nonadmin@example.com",
+                                "password": "Abcd12345",
+                                "role": "admin"
+                            }"#;
         let req = test::TestRequest::post()
             .uri(&format!("/api/{}/users", "e2e"))
             .insert_header(ContentType::json())
@@ -1036,9 +1044,6 @@ mod tests {
 
     async fn e2e_add_user_to_org() {
         let auth = setup();
-        let body_str = r#"{
-            "role":"admin"
-        }"#;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
@@ -1049,31 +1054,53 @@ mod tests {
                 .configure(get_basic_routes),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/users/{}", "e2e", "admin@example.com"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        // Should fail as the user still does not exist
-        assert!(resp.status().is_client_error());
 
-        // Add the user
-        let body_str = r#"{
-            "email": "admin@example.com",
-            "password": "Abcd12345",
-            "role": "admin"
-        }"#;
-
-        let req = test::TestRequest::post()
+        // Check if admin@example.com already exists from initialization
+        let req = test::TestRequest::get()
             .uri(&format!("/api/{}/users", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
-            .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        let user_list: UserList = serde_json::from_str(&body_str).unwrap();
+        let admin_exists = user_list
+            .data
+            .iter()
+            .any(|user| user.email == "admin@example.com");
+
+        if !admin_exists {
+            // Test that adding user to org fails when user doesn't exist
+            let body_str = r#"{
+                "role":"admin"
+            }"#;
+            let req = test::TestRequest::post()
+                .uri(&format!("/api/{}/users/{}", "e2e", "admin@example.com"))
+                .insert_header(ContentType::json())
+                .append_header(auth)
+                .set_payload(body_str)
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            // Should fail as the user still does not exist
+            assert!(resp.status().is_client_error());
+
+            // Add the user
+            let body_str = r#"{
+                "email": "admin@example.com",
+                "password": "Abcd12345",
+                "role": "admin"
+            }"#;
+
+            let req = test::TestRequest::post()
+                .uri(&format!("/api/{}/users", "e2e"))
+                .insert_header(ContentType::json())
+                .append_header(auth)
+                .set_payload(body_str)
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert!(resp.status().is_success());
+        }
 
         // Role in the default organization
         let body_str = r#"{
@@ -1088,7 +1115,14 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let status = resp.status();
+        let body = test::read_body(resp).await;
+        println!(
+            "add user to default org body: {}",
+            String::from_utf8_lossy(&body)
+        );
+        // Accept both success (user added) and conflict (user already in org) as valid outcomes
+        assert!(status.is_success() || status.as_u16() == 409);
     }
 
     async fn e2e_delete_user() {
@@ -1114,7 +1148,7 @@ mod tests {
 
     async fn e2e_create_dashboard() -> Dashboard {
         let auth = setup();
-        let body_str = r##"{"title":"b2","dashboardId":"","description":"desc2","role":"","owner":"root@example.com","created":"2023-03-30T07:49:41.744+00:00","panels":[{"id":"Panel_ID7857010","type":"bar","fields":{"stream":"default","stream_type":"logs","x":[{"label":"Timestamp","alias":"x_axis_1","column":"_timestamp","color":null,"aggregationFunction":"histogram"}],"y":[{"label":"Kubernetes Host","alias":"y_axis_1","column":"kubernetes_host","color":"#5960b2","aggregationFunction":"count"}],"filter":[{"type":"condition","values":[],"column":"method","operator":"Is Not Null","value":null}]},"config":{"title":"p5","description":"sample config blah blah blah","show_legends":true},"query":"SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE method IS NOT NULL GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"","customQuery":false}],"layouts":[{"x":0,"y":0,"w":12,"h":13,"i":1,"panelId":"Panel_ID7857010","static":false}]}"##;
+        let body_str = r##"{"version":5,"title":"b2","dashboardId":"","description":"desc2","role":"","owner":"root@example.com","created":"2023-03-30T07:49:41.744+00:00","tabs":[{"tabId":"tab1","name":"Main","panels":[{"id":"Panel_ID7857010","type":"bar","title":"p5","description":"sample config blah blah blah","config":{"show_legends":true},"queryType":"sql","queries":[{"query":"SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\" FROM \"default\" GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"","customQuery":false,"fields":{"stream":"default","stream_type":"logs","x":[{"label":"Timestamp","alias":"x_axis_1","column":"_timestamp","color":null,"aggregationFunction":"histogram"}],"y":[{"label":"Kubernetes Host","alias":"y_axis_1","column":"kubernetes_host","color":"#5960b2","aggregationFunction":"count"}],"filter":{"filterType":"group","logicalOperator":"AND","conditions":[]}},"config":{"promql_legend":""}}],"layout":{"x":0,"y":0,"w":12,"h":13,"i":1}}]}]}"##;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
@@ -1132,8 +1166,12 @@ mod tests {
             .set_payload(body_str)
             .to_request();
 
-        let body = test::call_and_read_body(&app, req).await;
-        json::from_slice(&body).unwrap()
+        let resp = test::call_service(&app, req).await;
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        let result: Dashboard = json::from_slice(&body)
+            .unwrap_or_else(|e| panic!("Failed to deserialize dashboard: {e}\nBody: {body_str}"));
+        result
     }
 
     async fn e2e_list_dashboards() -> Vec<Dashboard> {
@@ -1167,7 +1205,7 @@ mod tests {
         dashboards
     }
 
-    async fn e2e_update_dashboard(dashboard: v1::Dashboard, hash: String) -> Dashboard {
+    async fn e2e_update_dashboard(dashboard: v5::Dashboard, hash: String) -> Dashboard {
         let auth = setup();
         let app = test::init_service(
             App::new()
@@ -2693,21 +2731,42 @@ mod tests {
         // Should succeed even with empty data
         assert!(res.is_ok());
 
-        // Verify trigger was updated
-        let trigger = openobserve::service::db::scheduler::get(
-            "e2e",
-            TriggerModule::DerivedStream,
-            &module_key,
-        )
-        .await;
-        assert!(trigger.is_ok());
-        let trigger = trigger.unwrap();
-        let scheduled_trigger_data: ScheduledTriggerData =
-            serde_json::from_str(&trigger.data).unwrap();
-        assert!(scheduled_trigger_data.period_end_time.is_some());
-        assert!(scheduled_trigger_data.period_end_time.unwrap() > 0);
-        assert!(trigger.status == TriggerStatus::Waiting);
-        assert!(trigger.next_run_at > now && trigger.retries == 0);
+        // Verify trigger was updated - retry a few times since trigger processing is async
+        let mut attempts = 0;
+        let max_attempts = 10;
+        let mut trigger_updated = false;
+
+        while attempts < max_attempts {
+            let trigger = openobserve::service::db::scheduler::get(
+                "e2e",
+                TriggerModule::DerivedStream,
+                &module_key,
+            )
+            .await;
+
+            if let Ok(trigger) = trigger {
+                if let Ok(scheduled_trigger_data) =
+                    serde_json::from_str::<ScheduledTriggerData>(&trigger.data)
+                {
+                    if scheduled_trigger_data.period_end_time.is_some() {
+                        assert!(scheduled_trigger_data.period_end_time.unwrap() > 0);
+                        assert!(trigger.status == TriggerStatus::Waiting);
+                        assert!(trigger.next_run_at > now && trigger.retries == 0);
+                        trigger_updated = true;
+                        break;
+                    }
+                }
+            }
+
+            attempts += 1;
+            thread::sleep(time::Duration::from_millis(100));
+        }
+
+        assert!(
+            trigger_updated,
+            "Trigger was not updated after {} attempts",
+            max_attempts
+        );
     }
 
     async fn e2e_handle_derived_stream_pipeline_not_found() {

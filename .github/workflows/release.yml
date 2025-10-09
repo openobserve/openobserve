@@ -12,27 +12,27 @@ jobs:
       matrix:
         include:
           - arch: x86_64-unknown-linux-gnu
-            os: ubuntu-2204-8-cores
+            os: ubicloud-standard-8
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-amd64
             file_ext: .tar.gz
           - arch: x86_64-unknown-linux-gnu
-            os: ubuntu-2204-8-cores
+            os: ubicloud-standard-8
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-amd64-simd
             file_ext: .tar.gz
           - arch: x86_64-unknown-linux-musl
-            os: ubuntu-2204-8-cores
+            os: ubicloud-standard-8
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-amd64-musl
             file_ext: .tar.gz
           # - arch: aarch64-unknown-linux-musl
-          #   os: ubuntu-2204-8-cores
+          #   os: ubicloud-standard-8
           #   features: "--features mimalloc"
           #   file_name: openobserve-${{ github.ref_name }}-linux-arm64-musl
           #   file_ext: .tar.gz
           - arch: aarch64-unknown-linux-gnu
-            os: ubuntu-2204-8-cores
+            os: ubicloud-standard-8-arm
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-arm64
             file_ext: .tar.gz
@@ -55,23 +55,13 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v5
-
-      - name: Cache cargo assets
-        id: cache
-        uses: actions/cache@v4
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ matrix.arch }}-build-cargo-${{ hashFiles('**/Cargo.lock') }}
+          fetch-depth: 0
 
       - name: Install Node
         uses: actions/setup-node@v5
         with:
-          node-version: 22.x
+          node-version: 22
           cache: "npm"
           cache-dependency-path: web/package-lock.json
       - name: Build UI
@@ -82,35 +72,18 @@ jobs:
           npm install
           npm run build
 
-      - name: Install Protoc for linux
-        if: contains(matrix.arch, 'linux')
-        run: | # Make sure the protoc is >= 3.15
-          wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
-          unzip protoc-21.12-linux-x86_64.zip -d protoc
-          sudo cp protoc/bin/protoc /usr/local/bin/
-          sudo cp -r protoc/include/google /usr/local/include/
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "21.12"
 
-      - name: Install Protoc for windows
-        if: contains(matrix.arch, 'windows')
-        shell: bash
-        run: |
-          curl -L -o protoc-21.12-win64.zip https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-win64.zip
-          unzip protoc-21.12-win64.zip -d protoc
-          cp protoc/bin/protoc.exe C:/windows/system32/protoc.exe
-          cp -r protoc/include/google C:/windows/system32/
-
-      - name: Install Protoc for macos
-        if: contains(matrix.arch, 'darwin')
-        run: |
-          brew install protobuf
-
-      - name: Install dependencies for linux
+      - name: Install dependencies for linux-gnu
         if: contains(matrix.arch, 'linux-gnu')
         run: |
           sudo apt-get -y update
           sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu
 
-      - name: Install dependencies for linux
+      - name: Install dependencies for linux-musl
         if: contains(matrix.arch, 'linux-musl')
         run: |
           sudo apt-get -y update
@@ -118,11 +91,15 @@ jobs:
           sudo ln -s "/usr/bin/g++" "/usr/bin/musl-g++"
 
       - name: Install rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
-          target: ${{ matrix.arch }}
-          override: true
+          targets: ${{ matrix.arch }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          prefix-key: release-${{ matrix.arch }}
 
       - name: Output package versions
         run: protoc --version ; cargo version ; rustc --version ; gcc --version ; g++ --version
@@ -130,11 +107,11 @@ jobs:
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
 
-      - name: Run cargo build
+      - name: Run cargo build (standard)
         if: contains(matrix.file_name, '-simd') == false
         run: cargo build ${{ matrix.features }} --profile release-prod --target ${{ matrix.arch }}
 
-      - name: Run cargo build
+      - name: Run cargo build (SIMD)
         if: contains(matrix.file_name, '-simd')
         run: RUSTFLAGS='-C target-feature=+aes,+avx,+avx2,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx512f,+avx512cd,+avx512bw,+avx512dq,+avx512vl' cargo build ${{ matrix.features }} --profile release-prod --target ${{ matrix.arch }}
 
@@ -177,6 +154,8 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Download artifacts
         uses: actions/download-artifact@v5

@@ -794,4 +794,124 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardCreate.searchDashboard(randomDashboardName);
     await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
+  test("Should apply the filter group inside group - robust version", async ({ page }) => {
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+
+    // Navigate to dashboards
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    // Create a new dashboard
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await page
+      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
+      .waitFor({
+        state: "visible",
+      });
+    await pm.dashboardSetting.openSetting();
+
+    await pm.dashboardVariables.addDashboardVariable(
+      "variablename",
+      "logs",
+      "e2e_automate",
+      "kubernetes_container_name"
+    );
+
+    await page.waitForTimeout(1000);
+    // Add a panel to the dashboard
+    await pm.dashboardCreate.addPanel();
+
+    await pm.dashboardPanelActions.addPanelName(panelName);
+
+    await pm.chartTypeSelector.selectStreamType("logs");
+
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+
+    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
+
+    await waitForDateTimeButtonToBeEnabled(page);
+
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
+
+    await pm.dashboardPanelActions.waitForChartToRender();
+
+    // Select variable value
+    await pm.dashboardVariables.selectValueFromVariableDropDown(
+      "variablename",
+      "ziox"
+    );
+
+    // Add first group
+    await page.locator('[data-test="dashboard-add-condition-add"]').click();
+    await page.getByText("Add Group").click();
+
+    // Wait for first group to be created
+    await page.locator('.group[style*="--group-index: 1"]').waitFor({ state: "visible" });
+
+    // Add first condition in group 1
+    await pm.dashboardFilter.addNestedGroupFilterCondition(
+      1,
+      0,
+      "kubernetes_container_name",
+      "=",
+      "$variablename"
+    );
+
+    // Wait for condition to be applied
+    await page.waitForTimeout(500);
+
+    // Add nested group inside group 1
+    await page
+      .locator('.group[style*="--group-index: 1"]')
+      .locator('[data-test="dashboard-add-condition-add"]')
+      .click();
+    await page.getByText("Add Group").last().click();
+
+    // Wait for nested group to be created
+    await page.locator('.group[style*="--group-index: 2"]').waitFor({ state: "visible" });
+
+    // Add condition in nested group 2
+    await pm.dashboardFilter.addNestedGroupFilterCondition(
+      2,
+      0,
+      "kubernetes_container_image",
+      "<>",
+      "$variablename"
+    );
+
+    // Apply the filters
+    await pm.dashboardPanelActions.applyDashboardBtn();
+
+    await pm.dashboardPanelActions.waitForChartToRender();
+
+    // Verify the variable is displayed
+    await expect(page.getByText("'$variablename'").first()).toBeVisible();
+
+    // Verify the generated query
+    await page
+      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
+      .click();
+
+    await expect(
+      page.getByRole("cell", {
+        name: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE (kubernetes_container_name = \'ziox\' AND (kubernetes_container_image <> \'ziox\')) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        exact: true,
+      })
+    ).toBeVisible();
+
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+    // Save the dashboard panel
+    await pm.dashboardPanelActions.savePanel();
+
+    // Delete the dashboard
+    await pm.dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.searchDashboard(randomDashboardName);
+    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+  });
+
+
 });

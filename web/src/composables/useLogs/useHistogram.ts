@@ -148,7 +148,7 @@ export const useHistogram = () => {
         searchObj.data.queryResults.aggs
       ) {
         histogramMappedData = new Map(
-          histogramResults.map((item: any) => [
+          histogramResults.value.map((item: any) => [
             item.zo_sql_key,
             JSON.parse(JSON.stringify(item)),
           ]),
@@ -222,7 +222,7 @@ export const useHistogram = () => {
       searchObj.data.queryResults.hasOwnProperty("aggs") &&
       searchObj.data.queryResults.aggs
     ) {
-      histogramResults = [];
+      histogramResults.value = [];
       histogramMappedData = [];
       const intervalMs: any =
         INTERVAL_MAP[searchObj.meta.resultGrid.chartInterval];

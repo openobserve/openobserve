@@ -22,7 +22,7 @@ use {
             auth::{UserEmail, check_permissions},
             http::get_or_create_trace_id,
         },
-        handler::http::models::action::TestActionRequest,
+        handler::http::{extractors::Headers, models::action::TestActionRequest},
     },
     actix_http::header::HeaderMap,
     actix_web::post,
@@ -57,7 +57,7 @@ use {
 pub async fn test_action(
     path: web::Path<(String, String)>,
     req: web::Json<TestActionRequest>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, action_id) = path.into_inner();
     let mut req = req.into_inner();

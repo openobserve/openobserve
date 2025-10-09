@@ -359,7 +359,7 @@ export const convertSQLData = async (
     if (
       !interval ||
       !metadata.queries ||
-      !["area-stacked", "line", "area", "bar", "stacked"].includes(
+      !["area-stacked", "line", "area", "bar", "stacked", "scatter"].includes(
         panelSchema.type,
       )
     ) {

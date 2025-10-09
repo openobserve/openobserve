@@ -770,10 +770,10 @@ export const useSearchBar = () => {
       // }
       // searchObjDebug["queryDataEndTime"] = performance.now();
     } catch (e: any) {
-      console.error(
-        `${notificationMsg.value || "Error occurred during the search operation."}`,
-        e,
-      );
+      // console.error(
+      //   `${notificationMsg.value || "Error occurred during the search operation."}`,
+      //   e,
+      // );
       searchObj.loading = false;
       showErrorNotification(
         notificationMsg.value || "Error occurred during the search operation.",

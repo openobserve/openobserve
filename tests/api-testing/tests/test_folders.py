@@ -128,7 +128,7 @@ def test_e2e_createdeletedashboard(create_session, base_url):
         "created": "2023-10-19T14:08:48.090Z",
         "panels": [],
     }
-    dashboard_id = resp_create_dashboard.json()["v1"]["dashboardId"]
+    dashboard_id = resp_create_dashboard.json()["v5"]["dashboardId"]
     dashboard_hash = resp_create_dashboard.json()["hash"]
     resp_update_dashboard = session.put(
         f"{base_url}api/{org_id}/dashboards/{dashboard_id}?hash={dashboard_hash}", json=payload
@@ -216,14 +216,14 @@ def test_e2e_movedashboard(create_session, base_url):
     )
     print(resp_create_dashboard.content)
     try:
-        dashboard_id = resp_create_dashboard.json()["v1"]["dashboardId"]
+        dashboard_id = resp_create_dashboard.json()["v5"]["dashboardId"]
     except KeyError:
         dashboard_id = None
     assert (
         resp_create_dashboard.status_code == 200
     ), f"Created a dashboard 200, but got {resp_create_dashboard.status_code} {resp_create_dashboard.content}"
     try:
-        dashboard_id = resp_create_dashboard.json()["v1"]["dashboardId"]
+        dashboard_id = resp_create_dashboard.json()["v5"]["dashboardId"]
     except KeyError:
         dashboard_id = None
     payload = {"from": folder_id_a, "to": folder_id_b}
@@ -235,7 +235,7 @@ def test_e2e_movedashboard(create_session, base_url):
         resp_move_dashboard.status_code == 200
     ), f"Moved dashboard 200, but got {resp_move_dashboard.status_code} {resp_move_dashboard.content}"
     try:
-        dashboard_id = resp_create_dashboard.json()["v1"]["dashboardId"]
+        dashboard_id = resp_create_dashboard.json()["v5"]["dashboardId"]
     except KeyError:
         dashboard_id = None
     print(resp_move_dashboard.content)

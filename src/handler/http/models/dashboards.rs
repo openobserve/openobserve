@@ -33,6 +33,12 @@ pub enum DashboardRequestBody {
     V5(v5::Dashboard),
 }
 
+/// Tracks the max version of dashboard currently supported.
+/// This value is used as the default when `version` key is missing
+/// in body. This helps avoid manually updating the code when a new
+/// version of dashboard is added.
+const LATEST_DASHBOARD_VERSION: i64 = std::mem::variant_count::<DashboardRequestBody>() as i64;
+
 impl<'de> Deserialize<'de> for DashboardRequestBody {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -40,7 +46,10 @@ impl<'de> Deserialize<'de> for DashboardRequestBody {
     {
         let value = Map::<String, Value>::deserialize(deserializer)?;
 
-        let version = value.get("version").and_then(Value::as_i64).unwrap_or(1);
+        let version = value
+            .get("version")
+            .and_then(Value::as_i64)
+            .unwrap_or(LATEST_DASHBOARD_VERSION);
 
         let dash = match version {
             1 => Self::V1(v1::Dashboard::deserialize(value).map_err(serde::de::Error::custom)?),

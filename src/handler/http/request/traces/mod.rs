@@ -29,10 +29,16 @@ use tracing::{Instrument, Span};
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
-        utils::http::{get_or_create_trace_id, get_use_cache_from_request},
+        utils::{
+            auth::UserEmail,
+            http::{get_or_create_trace_id, get_use_cache_from_request},
+        },
     },
-    handler::http::request::{
-        CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, search::error_utils::map_error_to_http_response,
+    handler::http::{
+        extractors::Headers,
+        request::{
+            CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, search::error_utils::map_error_to_http_response,
+        },
     },
     service::{search as SearchService, traces},
 };
@@ -145,6 +151,7 @@ async fn handle_req(
 pub async fn get_latest_traces(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -164,12 +171,7 @@ pub async fn get_latest_traces(
         let trace_id = get_or_create_trace_id(in_req.headers(), &Span::none());
         (Span::none(), trace_id)
     };
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let user_id = &user_email.user_id;
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
     // Check permissions on stream
@@ -182,15 +184,12 @@ pub async fn get_latest_traces(
             common::utils::auth::{AuthExtractor, is_root_user},
             service::users::get_user,
         };
-        let user_id = in_req.headers().get("user_id").unwrap();
-        if !is_root_user(user_id.to_str().unwrap()) {
-            let user: config::meta::user::User = get_user(Some(&org_id), user_id.to_str().unwrap())
-                .await
-                .unwrap();
+        if !is_root_user(user_id) {
+            let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
             let stream_type_str = StreamType::Traces.as_str();
 
             if !crate::handler::http::auth::validator::check_permissions(
-                user_id.to_str().unwrap(),
+                user_id,
                 AuthExtractor {
                     auth: "".to_string(),
                     method: "GET".to_string(),
@@ -273,7 +272,7 @@ pub async fn get_latest_traces(
     let max_query_range = crate::common::utils::stream::get_max_query_range(
         std::slice::from_ref(&stream_name),
         org_id.as_str(),
-        &user_id,
+        user_id,
         StreamType::Traces,
     )
     .await;
@@ -329,19 +328,13 @@ pub async fn get_latest_traces(
     req.use_cache = get_use_cache_from_request(&query);
 
     let stream_type = StreamType::Traces;
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .unwrap()
-        .to_str()
-        .ok()
-        .map(|v| v.to_string());
+    let user_id_opt = Some(user_id.to_string());
 
     let search_res = SearchService::cache::search(
         &trace_id,
         &org_id,
         stream_type,
-        user_id.clone(),
+        user_id_opt.clone(),
         &req,
         "".to_string(),
         false,
@@ -431,7 +424,7 @@ pub async fn get_latest_traces(
             &trace_id,
             &org_id,
             stream_type,
-            user_id.clone(),
+            user_id_opt.clone(),
             &req,
             "".to_string(),
             false,

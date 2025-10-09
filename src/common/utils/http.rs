@@ -18,10 +18,7 @@ use std::{
     net::{AddrParseError, IpAddr, SocketAddr},
 };
 
-use actix_web::{
-    http::header::{HeaderMap, HeaderName},
-    web::Query,
-};
+use actix_web::http::header::{HeaderMap, HeaderName};
 use config::meta::{
     dashboards::usage_report::DashboardInfo,
     search::{SearchEventContext, SearchEventType, default_use_cache},
@@ -32,16 +29,12 @@ use opentelemetry::{global, propagation::Extractor, trace::TraceContextExt};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[inline(always)]
-pub(crate) fn get_stream_type_from_request(
-    query: &Query<HashMap<String, String>>,
-) -> Option<StreamType> {
+pub(crate) fn get_stream_type_from_request(query: &HashMap<String, String>) -> Option<StreamType> {
     query.get("type").map(|s| StreamType::from(s.as_str()))
 }
 
 #[inline(always)]
-pub(crate) fn get_enable_align_histogram_from_request(
-    query: &Query<HashMap<String, String>>,
-) -> bool {
+pub(crate) fn get_enable_align_histogram_from_request(query: &HashMap<String, String>) -> bool {
     query
         .get("enable_align_histogram")
         .map(|s| s.parse().unwrap_or_default())
@@ -50,7 +43,7 @@ pub(crate) fn get_enable_align_histogram_from_request(
 
 #[inline(always)]
 pub(crate) fn get_ts_from_request_with_key(
-    query: &Query<HashMap<String, String>>,
+    query: &HashMap<String, String>,
     key: &str,
 ) -> Result<i64, String> {
     let value = query
@@ -63,14 +56,14 @@ pub(crate) fn get_ts_from_request_with_key(
 
 #[inline(always)]
 pub(crate) fn get_fallback_order_by_col_from_request(
-    query: &Query<HashMap<String, String>>,
+    query: &HashMap<String, String>,
 ) -> Option<String> {
     query.get("fallback_order_by_col").map(|s| s.to_string())
 }
 
 #[inline(always)]
 pub(crate) fn get_search_type_from_request(
-    query: &Query<HashMap<String, String>>,
+    query: &HashMap<String, String>,
 ) -> Result<Option<SearchEventType>, Error> {
     let event_type = match query.get("search_type") {
         Some(s) => match SearchEventType::try_from(s.as_str()) {
@@ -90,7 +83,7 @@ pub(crate) fn get_search_type_from_request(
 #[inline(always)]
 pub(crate) fn get_search_event_context_from_request(
     search_event_type: &SearchEventType,
-    query: &Query<HashMap<String, String>>,
+    query: &HashMap<String, String>,
 ) -> Option<SearchEventContext> {
     match search_event_type {
         SearchEventType::Dashboards => Some(SearchEventContext::with_dashboard(
@@ -110,7 +103,15 @@ pub(crate) fn get_search_event_context_from_request(
 }
 
 #[inline(always)]
-pub(crate) fn get_use_cache_from_request(query: &Query<HashMap<String, String>>) -> bool {
+fn get_key_as_bool(query: &HashMap<String, String>, key: &str) -> bool {
+    query
+        .get(key)
+        .and_then(|v| v.to_lowercase().as_str().parse::<bool>().ok())
+        .unwrap_or_default()
+}
+
+#[inline(always)]
+pub(crate) fn get_use_cache_from_request(query: &HashMap<String, String>) -> bool {
     if !default_use_cache() {
         return false;
     }
@@ -121,25 +122,17 @@ pub(crate) fn get_use_cache_from_request(query: &Query<HashMap<String, String>>)
 }
 
 #[inline(always)]
-pub(crate) fn get_is_ui_histogram_from_request(query: &Query<HashMap<String, String>>) -> bool {
-    let Some(v) = query.get("is_ui_histogram") else {
-        return false;
-    };
-    v.to_lowercase().as_str().parse::<bool>().unwrap_or(false)
+pub(crate) fn get_is_ui_histogram_from_request(query: &HashMap<String, String>) -> bool {
+    get_key_as_bool(query, "is_ui_histogram")
 }
 
 #[inline(always)]
-pub(crate) fn get_is_multi_stream_search_from_request(
-    query: &Query<HashMap<String, String>>,
-) -> bool {
-    let Some(v) = query.get("is_multi_stream_search") else {
-        return false;
-    };
-    v.to_lowercase().as_str().parse::<bool>().unwrap_or(false)
+pub(crate) fn get_is_multi_stream_search_from_request(query: &HashMap<String, String>) -> bool {
+    get_key_as_bool(query, "is_multi_stream_search")
 }
 
 #[inline(always)]
-pub(crate) fn get_folder(query: &Query<HashMap<String, String>>) -> String {
+pub(crate) fn get_folder(query: &HashMap<String, String>) -> String {
     match query.get("folder") {
         Some(s) => s.to_string(),
         None => config::meta::folder::DEFAULT_FOLDER.to_owned(),
@@ -241,7 +234,7 @@ pub fn get_work_group(work_group_set: Vec<Option<String>>) -> Option<String> {
 
 #[inline(always)]
 pub(crate) fn get_dashboard_info_from_request(
-    query: &Query<HashMap<String, String>>,
+    query: &HashMap<String, String>,
 ) -> Option<DashboardInfo> {
     let run_id = query.get("run_id").map(|s| s.to_string())?;
     let panel_id = query.get("panel_id").map(|s| s.to_string())?;

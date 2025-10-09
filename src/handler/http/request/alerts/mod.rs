@@ -27,6 +27,7 @@ use crate::handler::http::request::search::utils::check_resource_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
+        extractors::Headers,
         models::alerts::{
             requests::{
                 AlertBulkEnableRequest, CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery,
@@ -114,7 +115,7 @@ impl From<AlertError> for HttpResponse {
 pub async fn create_alert(
     path: web::Path<String>,
     req_body: web::Json<CreateAlertRequestBody>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     req: HttpRequest,
 ) -> HttpResponse {
     let org_id = path.into_inner();
@@ -250,7 +251,7 @@ pub async fn export_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 pub async fn update_alert(
     path: web::Path<(String, Ksuid)>,
     req_body: web::Json<UpdateAlertRequestBody>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> HttpResponse {
     let (org_id, alert_id) = path.into_inner();
     let req_body = req_body.into_inner();
@@ -322,7 +323,11 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     )
 )]
 #[get("/v2/{org_id}/alerts")]
-async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse {
+async fn list_alerts(
+    path: web::Path<String>,
+    req: HttpRequest,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> HttpResponse {
     let org_id = path.into_inner();
     let Ok(query) = web::Query::<ListAlertsQuery>::from_query(req.query_string()) else {
         return MetaHttpResponse::bad_request("Error parsing query parameters");
@@ -332,9 +337,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
     #[cfg(not(feature = "enterprise"))]
     let user_id = None;
     #[cfg(feature = "enterprise")]
-    let Ok(user_id) = req.headers().get("user_id").map(|v| v.to_str()).transpose() else {
-        return MetaHttpResponse::forbidden("");
-    };
+    let user_id = Some(user_email.user_id.as_str());
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let scheduled_jobs = scheduler::list_by_org(&org_id, Some(TriggerModule::Alert))
@@ -437,6 +440,7 @@ async fn enable_alert_bulk(
     path: web::Path<String>,
     body: web::Bytes,
     in_req: HttpRequest,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> HttpResponse {
     let org_id = path.into_inner();
     let Ok(query) = web::Query::<EnableAlertQuery>::from_query(in_req.query_string()) else {
@@ -451,17 +455,11 @@ async fn enable_alert_bulk(
 
     #[cfg(feature = "enterprise")]
     {
-        let user_id = in_req
-            .headers()
-            .get("user_id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
+        let user_id = &user_email.user_id;
 
         for id in &req.ids {
             if let Some(res) =
-                check_resource_permissions(&org_id, &user_id, "alerts", &id.to_string(), "PUT")
-                    .await
+                check_resource_permissions(&org_id, user_id, "alerts", &id.to_string(), "PUT").await
             {
                 return res;
             }
@@ -555,7 +553,7 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 async fn move_alerts(
     path: web::Path<String>,
     req_body: web::Json<MoveAlertsRequestBody>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> HttpResponse {
     let org_id = path.into_inner();
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;

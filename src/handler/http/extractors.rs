@@ -1,10 +1,4 @@
-use actix_web::{
-    Error, FromRequest, HttpRequest, dev::Payload, error::ErrorBadRequest, http::header::HeaderMap,
-};
-use futures::future::{Ready, ready};
-use serde::de::DeserializeOwned;
-
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,6 +12,12 @@ use serde::de::DeserializeOwned;
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use actix_web::{
+    Error, FromRequest, HttpRequest, dev::Payload, error::ErrorBadRequest, http::header::HeaderMap,
+};
+use futures::future::{Ready, ready};
+use serde::de::DeserializeOwned;
 
 /// Wrapper extractor to deserialize headers into a struct
 pub struct Headers<T>(pub T);
