@@ -1221,20 +1221,15 @@ export const usePanelDataLoader = (
                   },
                   error: handleSearchError,
                   complete: async (payload: any) => {
-                    // get annotations
-                    const annotationList = shouldFetchAnnotations()
-                      ? await refreshAnnotations(
-                          startISOTimestamp,
-                          endISOTimestamp,
-                        )
-                      : [];
-                    state.annotations = annotationList;
                     state.loading = false;
                     saveCurrentStateToCache();
                     removeTraceId(traceId);
                   },
                   reset: handleSearchReset,
                 });
+
+                // Wait for annotations to complete (started in parallel earlier)
+                state.annotations = await annotationsPromise;
               } catch (error) {
                 // Process API error for "sql"
                 processApiError(error, "sql");
@@ -1318,58 +1313,27 @@ export const usePanelDataLoader = (
                 ]; // Wrap in array
                 // set loading to false
                 state.loading = false;
-              } else {
-                // Start fetching annotations in parallel for ALL query types
-                annotationsPromise = (async () => {
-                  try {
-                    if (!shouldFetchAnnotations()) {
-                      return [];
-                    }
-                    const annotationList = await refreshAnnotations(
-                      Number(startISOTimestamp),
-                      Number(endISOTimestamp),
-                    );
-                    return annotationList || [];
-                  } catch (annotationError) {
-                    console.error(
-                      "Failed to fetch annotations:",
-                      annotationError,
-                    );
+                return;
+              }
+              // Start fetching annotations in parallel for ALL query types
+              annotationsPromise = (async () => {
+                try {
+                  if (!shouldFetchAnnotations()) {
                     return [];
                   }
-                })();
-
-                if (isStreamingEnabled(store.state)) {
-                  await getDataThroughStreaming(
-                    query,
-                    it,
-                    startISOTimestamp,
-                    endISOTimestamp,
-                    pageType,
-                    panelQueryIndex,
-                    abortControllerRef,
+                  const annotationList = await refreshAnnotations(
+                    Number(startISOTimestamp),
+                    Number(endISOTimestamp),
                   );
-                } else if (isWebSocketEnabled(store.state)) {
-                  await getDataThroughWebSocket(
-                    query,
-                    it,
-                    startISOTimestamp,
-                    endISOTimestamp,
-                    pageType,
-                    panelQueryIndex,
+                  return annotationList || [];
+                } catch (annotationError) {
+                  console.error(
+                    "Failed to fetch annotations:",
+                    annotationError,
                   );
-                } else {
-                  await getDataThroughPartitions(
-                    query,
-                    metadata,
-                    it,
-                    startISOTimestamp,
-                    endISOTimestamp,
-                    pageType,
-                    abortControllerRef,
-                  );
+                  return [];
                 }
-              }
+              })();
 
               // Initialize data and resultMetaData arrays for this query index
               // This is necessary before the streaming response handlers try to access them
