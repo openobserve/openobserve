@@ -40,8 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onFilterChange"
           data-test="error-only-toggle"
         />
-        <q-icon name="error"
-size="18px" class="tw-mx-1" />
+        <q-icon name="error" size="18px"
+class="tw-mx-1" />
         <q-tooltip>Show Error Only</q-tooltip>
       </div>
 
@@ -53,7 +53,7 @@ size="18px" class="tw-mx-1" />
         data-test="range-filter-chip"
       >
         <span class="chip-label"
-          >{{ filter.panelTitle }}:
+          >{{ filter.panelTitle }}
           <span
             v-if="
               filter.panelTitle === 'Errors' || filter.panelTitle === 'Rate'
@@ -62,7 +62,13 @@ size="18px" class="tw-mx-1" />
             >= {{ filter.start }}</span
           >
           <span v-if="filter.panelTitle === 'Duration'">
-            {{ filter.start }}µs - {{ filter.end }}µs
+            <span v-if="filter.start !== null && filter.end !== null">
+              {{ filter.start }}µs - {{ filter.end }}µs
+            </span>
+            <span v-else-if="filter.start !== null">
+              >= {{ filter.start }}µs
+            </span>
+            <span v-else-if="filter.end !== null"> <= {{ filter.end }}µs </span>
           </span>
         </span>
         <q-icon
@@ -178,9 +184,15 @@ const getBaseFilters = () => {
   let baseFilters = [];
   rangeFilters.value.forEach((rangeFilter) => {
     if (rangeFilter.panelTitle === "Duration") {
-      baseFilters.push(
-        `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
-      );
+      if (rangeFilter.start !== null && rangeFilter.end !== null) {
+        baseFilters.push(
+          `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
+        );
+      } else {
+        baseFilters.push(
+          `duration ${rangeFilter.start ? ">=" : "<="} ${rangeFilter.start || rangeFilter.end}`,
+        );
+      }
     }
   });
 
@@ -268,6 +280,19 @@ const refreshDashboard = () => {
 //   console.log("event -----", event);
 // };
 
+const createRangeFilter = (data, start = null, end = null) => {
+  const panelId = data?.id;
+  const panelTitle = data?.title || "Chart";
+
+  if (panelId && panelTitle === "Duration") {
+    searchObj.meta.metricsRangeFilters.set(panelId, {
+      panelTitle,
+      start: start ? Math.floor(start) : null,
+      end: end ? Math.floor(end) : null,
+    });
+  }
+};
+
 const onDataZoom = ({
   start,
   end,
@@ -283,16 +308,7 @@ const onDataZoom = ({
 }) => {
   if (start && end) {
     // Create or update range filter chip for this panel
-    const panelId = data?.id;
-    const panelTitle = data?.title || "Chart";
-
-    if (panelId && panelTitle === "Duration") {
-      searchObj.meta.metricsRangeFilters.set(panelId, {
-        panelTitle,
-        start: Math.floor(start1),
-        end: Math.floor(end1),
-      });
-    }
+    createRangeFilter(data, start1, end1);
 
     emit("time-range-selected", { start, end });
   }
@@ -336,13 +352,16 @@ const handleContextMenuSelect = (selection: {
   value: number;
   fieldName: string;
 }) => {
-  hideContextMenu();
+  createRangeFilter(
+    {
+      id: contextMenuData.value.panelId,
+      title: contextMenuData.value.panelTitle,
+    },
+    selection.condition === "gte" ? selection.value : null,
+    selection.condition === "lte" ? selection.value : null,
+  );
 
-  console.log("Context menu selection:", {
-    fieldName: selection.fieldName,
-    condition: selection.condition,
-    value: selection.value,
-  });
+  hideContextMenu();
 
   // You can emit this to parent or handle filtering logic here
   // For example: emit("filter-applied", selection);

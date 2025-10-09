@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="tracePage" id="tracePage"
-style="min-height: auto">
+  <q-page class="tracePage"
+id="tracePage" style="min-height: auto">
     <div id="tracesSecondLevel">
       <div class="tw-min-h-[82px]">
         <search-bar
@@ -110,8 +110,8 @@ style="min-height: auto">
                 data-test="logs-search-no-stream-selected-text"
                 class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
               >
-                <q-icon name="info" color="primary"
-size="md" /> Select a stream
+                <q-icon name="info"
+color="primary" size="md" /> Select a stream
                 and press 'Run query' to continue. Additionally, you can apply
                 additional filters and adjust the date range to enhance search.
               </h5>
@@ -125,8 +125,8 @@ size="md" /> Select a stream
               "
               class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
             >
-              <q-icon name="info" color="primary"
-size="md" />
+              <q-icon name="info"
+color="primary" size="md" />
               {{ t("search.applySearch") }}
             </div>
 
