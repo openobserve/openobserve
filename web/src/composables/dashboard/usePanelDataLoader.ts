@@ -1151,10 +1151,11 @@ export const usePanelDataLoader = (
                       // Store the current query index for the next hits event
                       currentQueryIndexInStream = queryIndex;
                       // Update metadata for this specific query index
-                      if (state.resultMetaData[queryIndex]) {
+                      if (state.resultMetaData[queryIndex] !== undefined) {
                         state.resultMetaData[queryIndex] = {
                           ...(state.resultMetaData[queryIndex] ?? {}),
                           ...results,
+                          streaming_aggs: response?.content?.streaming_aggs ?? false,
                         };
                       }
                     }
@@ -1182,11 +1183,39 @@ export const usePanelDataLoader = (
                       if (
                         queryIndex >= 0 &&
                         queryIndex < state.data.length &&
-                        Array.isArray(hits)
+                        Array.isArray(hits) &&
+                        hits.length > 0
                       ) {
-                        state.data[queryIndex] = [...hits];
+                        // Check if streaming_aggs is enabled
+                        const streaming_aggs =
+                          state.resultMetaData[queryIndex]?.streaming_aggs ?? false;
+
+                        // If streaming_aggs, replace the data (aggregation query)
+                        if (streaming_aggs) {
+                          state.data[queryIndex] = [...hits];
+                        }
+                        // Otherwise, append/prepend based on order_by (multiple partitions)
+                        else {
+                          const orderBy =
+                            state.resultMetaData[queryIndex]?.order_by?.toLowerCase();
+
+                          if (orderBy === "asc") {
+                            // For ascending order, prepend new data at start
+                            state.data[queryIndex] = [
+                              ...hits,
+                              ...(state.data[queryIndex] ?? []),
+                            ];
+                          } else {
+                            // For descending order, append new data at end
+                            state.data[queryIndex] = [
+                              ...(state.data[queryIndex] ?? []),
+                              ...hits,
+                            ];
+                          }
+                        }
+
                         if (state.resultMetaData[queryIndex]) {
-                          state.resultMetaData[queryIndex].hits = hits;
+                          state.resultMetaData[queryIndex].hits = state.data[queryIndex];
                         }
                       }
                       state.errorDetail = { message: "", code: "" };
