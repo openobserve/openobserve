@@ -1262,7 +1262,8 @@
   },
   "traces": {
     "viewLogs": "View Logs",
-    "backToLogs": "Back to Logs"
+    "backToLogs": "Back to Logs",
+    "RedMetrics": "RED Metrics"
   },
   "actions": {
     "testAction": "Test Action",
