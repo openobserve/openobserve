@@ -520,12 +520,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 mod tests {
     use super::*;
 
-    pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-        // Use the optimized get_enrichment_table_data and convert to VRL
-        let batches = get_enrichment_table_data(org_id, name).await?;
-        convert_recordbatch_to_vrl(&batches)
-    }
-
     #[test]
     fn test_convert_to_vrl_string() {
         let value = json::Value::String("123".to_string());
