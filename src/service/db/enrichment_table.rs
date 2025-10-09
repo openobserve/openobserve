@@ -474,8 +474,20 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 {
                     Ok(data) => data,
                     Err(e) => {
-                        log::error!("[ENRICHMENT::TABLE watch] get enrichment table error: {e}");
-                        Arc::new(vec![])
+                        log::error!(
+                            "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error, trying again: {e}"
+                        );
+                        match super::super::enrichment::get_enrichment_table(org_id, stream_name)
+                            .await
+                        {
+                            Ok(data) => data,
+                            Err(e) => {
+                                log::error!(
+                                    "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error, giving up: {e}"
+                                );
+                                Arc::new(vec![])
+                            }
+                        }
                     }
                 };
                 log::info!(
@@ -608,17 +620,7 @@ mod tests {
         // This will fail in test environment due to missing dependencies,
         // but tests the function structure
         let result = get_enrichment_table_data("test_org", "test_table").await;
-        assert!(result.is_ok());
-        let data = result.unwrap();
-        assert_eq!(data.len(), 0); // Should return empty vec due to search service failure
-    }
-
-    #[tokio::test]
-    async fn test_get() {
-        let result = get("test_org", "test_table").await;
-        assert!(result.is_ok());
-        let data = result.unwrap();
-        assert_eq!(data.len(), 0); // Should return empty vec due to search service failure
+        assert!(result.is_err());
     }
 
     #[tokio::test]

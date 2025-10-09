@@ -24,8 +24,9 @@ use serde::Deserialize;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::{
+        extractors::Headers,
         models::ai::{PromptRequest, PromptResponse},
-        request::{ai::util::Headers, search::search_stream::report_to_audit},
+        request::search::search_stream::report_to_audit,
     },
 };
 
@@ -68,13 +69,29 @@ pub async fn chat(Json(body): Json<PromptRequest>) -> impl Responder {
     let config = get_o2_config();
 
     if config.ai.enabled {
-        let response =
-            ai::service::chat(ai::meta::AiServerRequest::new(body.messages, body.model)).await;
+        let response = ai::service::chat(ai::meta::AiServerRequest::new(
+            body.messages,
+            body.model,
+            body.context,
+        ))
+        .await;
         match response {
             Ok(response) => HttpResponse::Ok().json(PromptResponse::from(response)),
             Err(e) => {
-                log::error!("Error in chat: {e}");
-                MetaHttpResponse::internal_error(e)
+                let error_msg = e.to_string();
+                log::error!("Error in chat: {error_msg}");
+
+                // Check if this is a rate limit error (429) - pass through to client
+                if error_msg.contains("status 429") || error_msg.contains("rate_limit_exceeded") {
+                    return HttpResponse::TooManyRequests().json(serde_json::json!({
+                        "error": error_msg,
+                        "code": 429
+                    }));
+                }
+
+                // All other errors (4XX except 429, and 5XX) are internal server errors
+                // as they indicate misconfiguration or provider issues
+                MetaHttpResponse::internal_error(error_msg)
             }
         }
     } else {
@@ -156,16 +173,39 @@ pub async fn chat_stream(
     let auth_str = crate::common::utils::auth::extract_auth_str(&in_req);
 
     let stream = match ai::service::chat_stream(
-        ai::meta::AiServerRequest::new(req_body.messages, req_body.model),
-        org_id.clone(),
+        ai::meta::AiServerRequest::new(req_body.messages, req_body.model, req_body.context),
         auth_str,
     )
     .await
     {
         Ok(stream) => stream,
         Err(e) => {
-            let error_message = Some(e.to_string());
-            // TODO: Handle the error rather than hard coding
+            let error_msg = e.to_string();
+            log::error!("Error in chat_stream: {error_msg}");
+
+            // Check if this is a rate limit error (429) - pass through to client
+            if error_msg.contains("status 429") || error_msg.contains("rate_limit_exceeded") {
+                code = StatusCode::TOO_MANY_REQUESTS.as_u16();
+                let error_message = Some(error_msg.clone());
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    code,
+                    error_message,
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+
+                return HttpResponse::TooManyRequests().json(serde_json::json!({
+                    "error": error_msg,
+                    "code": 429
+                }));
+            }
+
+            // All other errors (4XX except 429, and 5XX) are internal server errors
+            let error_message = Some(error_msg.clone());
             code = StatusCode::INTERNAL_SERVER_ERROR.as_u16();
             report_to_audit(
                 user_id,
@@ -178,8 +218,7 @@ pub async fn chat_stream(
             )
             .await;
 
-            log::error!("Error in chat_stream: {e}");
-            return MetaHttpResponse::bad_request(e.to_string());
+            return MetaHttpResponse::internal_error(error_msg);
         }
     };
 

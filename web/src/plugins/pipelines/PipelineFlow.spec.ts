@@ -247,7 +247,7 @@ describe("PipelineFlow.vue", () => {
   it("should pass correct props to VueFlow", () => {
     wrapper = mount(PipelineFlow);
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
-    expect(vueFlow.props('defaultViewport')).toEqual({ zoom: 1.5 });
+    expect(vueFlow.props('defaultViewport')).toEqual({ zoom: 0.8 });
     expect(vueFlow.props('minZoom')).toBe(0.2);
     expect(vueFlow.props('maxZoom')).toBe(4);
   });

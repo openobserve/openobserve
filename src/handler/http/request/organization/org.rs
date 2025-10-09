@@ -47,6 +47,7 @@ use crate::{
         },
         utils::auth::{UserEmail, is_root_user},
     },
+    handler::http::extractors::Headers,
     service::organization::{self, get_passcode, get_rum_token, update_passcode, update_rum_token},
 };
 
@@ -69,7 +70,10 @@ use crate::{
     )
 )]
 #[get("/organizations")]
-pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn organizations(
+    Headers(user_email): Headers<UserEmail>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let user_id = user_email.user_id.as_str();
     let mut id = 0;
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
@@ -298,7 +302,7 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
 )]
 #[get("/{org_id}/passcode")]
 async fn get_user_passcode(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
@@ -340,7 +344,7 @@ async fn get_user_passcode(
 )]
 #[put("/{org_id}/passcode")]
 async fn update_user_passcode(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
@@ -382,7 +386,7 @@ async fn update_user_passcode(
 )]
 #[get("/{org_id}/rumtoken")]
 async fn get_user_rumtoken(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
@@ -424,7 +428,7 @@ async fn get_user_rumtoken(
 )]
 #[put("/{org_id}/rumtoken")]
 async fn update_user_rumtoken(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
@@ -466,7 +470,7 @@ async fn update_user_rumtoken(
 )]
 #[post("/{org_id}/rumtoken")]
 async fn create_user_rumtoken(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     org_id: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
@@ -505,7 +509,7 @@ async fn create_user_rumtoken(
 )]
 #[post("/organizations")]
 async fn create_org(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     org: web::Json<Organization>,
 ) -> Result<HttpResponse, Error> {
     let mut org = org.into_inner();
@@ -600,7 +604,7 @@ async fn extend_trial_period(
 )]
 #[put("/{org_id}/rename")]
 async fn rename_org(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     path: web::Path<String>,
     new_name: web::Json<OrgRenameBody>,
 ) -> Result<HttpResponse, Error> {
@@ -679,7 +683,7 @@ pub async fn get_org_invites(path: web::Path<String>) -> Result<HttpResponse, Er
 )]
 #[post("/{org_id}/invites")]
 pub async fn generate_org_invite(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     path: web::Path<String>,
     invites: web::Json<OrganizationInvites>,
 ) -> Result<HttpResponse, Error> {
@@ -743,7 +747,7 @@ pub async fn delete_org_invite(path: web::Path<(String, String)>) -> Result<Http
 )]
 #[put("/{org_id}/member_subscription/{invite_token}")]
 async fn accept_org_invite(
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, Error> {
     let (_org, invite_token) = path.into_inner();

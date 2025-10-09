@@ -23,7 +23,10 @@ use config::meta::{
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
+    handler::http::{
+        extractors::Headers,
+        models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
+    },
     service::{
         dashboards::reports::{self, ReportError},
         db::scheduler,
@@ -92,7 +95,7 @@ impl From<ReportError> for HttpResponse {
 pub async fn create_report(
     path: web::Path<String>,
     report: web::Json<Report>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
 
@@ -141,7 +144,7 @@ pub async fn create_report(
 async fn update_report(
     path: web::Path<(String, String)>,
     report: web::Json<Report>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     let mut report = report.into_inner();
@@ -177,7 +180,11 @@ async fn update_report(
     )
 )]
 #[get("/{org_id}/reports")]
-async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn list_reports(
+    org_id: web::Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
 
@@ -196,10 +203,9 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        let user_id = req.headers().get("user_id").unwrap();
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
-            user_id.to_str().unwrap(),
+            &user_email.user_id,
             "GET",
             "report",
         )

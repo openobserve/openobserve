@@ -504,6 +504,8 @@ class="padding-none" />
       :breakpoint="500"
       bordered
       class="o2-bg-color"
+      role="navigation"
+      aria-label="Main navigation"
     >
       <q-list class="leftNavList">
         <menu-link
@@ -628,6 +630,7 @@ import {
   outlinedManageAccounts,
   outlinedDescription,
   outlinedCode,
+  outlinedDevices,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -805,7 +808,7 @@ export default defineComponent({
       },
       {
         title: t("menu.rum"),
-        icon: "devices",
+        icon: outlinedDevices,
         link: "/rum",
         name: "rum",
       },
@@ -1534,6 +1537,8 @@ export default defineComponent({
 
 <style lang="scss">
 @import "../styles/app.scss";
+@import "../styles/menu-variables";
+@import "../styles/menu-animations";
 
 .printMode {
   .q-header {
@@ -1546,6 +1551,21 @@ export default defineComponent({
 
   .q-page-container {
     padding-left: 0px !important;
+  }
+}
+
+// Phase 3: Enhanced drawer with glassmorphism
+.q-drawer {
+  background: linear-gradient(180deg, #0f172a 0%, #020617 100%) !important;
+  backdrop-filter: blur(12px);
+  border-right: 1px solid rgba(71, 85, 105, 0.5) !important;
+  transition: background-color 500ms ease-in-out,
+              border-color 500ms ease-in-out;
+
+  // Light mode
+  body.body--light & {
+    background: rgba(255, 255, 255, 0.8) !important;
+    border-right: 1px solid rgba(226, 232, 240, 0.5) !important;
   }
 }
 
@@ -1614,14 +1634,14 @@ export default defineComponent({
 
 .q-list {
   &.leftNavList {
-    padding-bottom: 0px;
+    padding: 4px 0px 0px 0px;
 
     .q-item {
-      margin: 5px 5px 5px 5px;
+      margin: 0px 5px;
       display: list-item;
       text-align: center;
       list-style: none;
-      padding: 5px 2px;
+      padding: 2px 2px;
       border-radius: 5px;
 
       .q-icon {
@@ -1636,8 +1656,22 @@ export default defineComponent({
 
         .q-item__label {
           color: white;
+
+          // Light mode: make text blue for readability
+          body.body--light & {
+            color: #2563eb !important;
+          }
         }
         color: white;
+
+        // Light mode: make item text blue
+        body.body--light & {
+          color: #2563eb !important;
+
+          .q-icon {
+            color: #2563eb !important;
+          }
+        }
       }
 
       &__label {
@@ -1829,14 +1863,14 @@ body.ai-chat-open {
 }
 
 .ai-btn-active {
-  background-color: #5960b2 !important;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
 }
 .ai-hover-btn {
-  transition: background-color 1s ease;
+  transition: background 0.3s ease;
 }
 
 .ai-hover-btn:hover {
-  background-color: #5960b2;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
 }
 
 .ai-icon {
@@ -1844,7 +1878,7 @@ body.ai-chat-open {
 }
 
 .ai-hover-btn:hover .ai-icon {
-  transform: rotate(-180deg);
+  transform: rotate(180deg);
 }
 
 .organization-menu-o2 {

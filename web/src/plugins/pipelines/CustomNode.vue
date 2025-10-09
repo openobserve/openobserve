@@ -17,8 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup>
 import { Handle } from "@vue-flow/core";
 import useDragAndDrop from "./useDnD";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { getImageURL } from "@/utils/zincutils";
 import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
@@ -50,6 +52,36 @@ const menu = ref(false)
 const showButtons = ref(false)
 const showDeleteTooltip = ref(false)
 let hideButtonsTimeout = null
+
+// Check if current node has errors
+const hasNodeError = computed(() => {
+  const lastError = pipelineObj.currentSelectedPipeline?.last_error;
+  if (!lastError || !lastError.node_errors) return false;
+
+  // node_errors is a JSON object with node IDs as keys
+  const nodeErrors = lastError.node_errors;
+  return nodeErrors && nodeErrors[props.id];
+});
+
+// Get error info for current node
+const getNodeErrorInfo = computed(() => {
+  const lastError = pipelineObj.currentSelectedPipeline?.last_error;
+  if (!lastError || !lastError.node_errors) return null;
+
+  const nodeError = lastError.node_errors[props.id];
+  if (!nodeError) return null;
+
+  // node_errors is an object with structure: { node_id: { errors: [...], error_count: N, ... } }
+  if (nodeError.errors && Array.isArray(nodeError.errors) && nodeError.errors.length > 0) {
+    const errorText = nodeError.errors.join('\n\n');
+    if (nodeError.error_count > nodeError.errors.length) {
+      return `${errorText}\n\n... and ${nodeError.error_count - nodeError.errors.length} more errors`;
+    }
+    return errorText;
+  }
+
+  return null;
+});
 
 // Edge color mapping for different node types
 const getNodeColor = (ioType) => {
@@ -141,6 +173,26 @@ const handleDeleteTooltipLeave = () => {
   showDeleteTooltip.value = false;
 };
 
+// Navigate to function page to fix the error
+const navigateToFunction = (functionName) => {
+  const errorInfo = getNodeErrorInfo.value;
+  const query = {
+    action: "update",
+    name: functionName,
+    org_identifier: store.state.selectedOrganization.identifier,
+  };
+
+  // Add error message to query if available
+  if (errorInfo) {
+    query.error = errorInfo;
+  }
+
+  router.push({
+    name: "functionList",
+    query,
+  });
+};
+
 
 
 const onFunctionClick = (data,event,id) =>{
@@ -225,6 +277,8 @@ const onExternalDestinationClick = (data,event,id) =>{
 }
 
 const { t } = useI18n();
+const router = useRouter();
+const store = useStore();
 
 
 const editNode = (id) => {
@@ -354,8 +408,32 @@ function getIcon(data, ioType) {
           {{ data.name }} - <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
         </div>
       </div>
+
+      <!-- Error Badge for Function Nodes -->
+      <div
+        v-if="hasNodeError"
+        class="error-badge"
+        @click.stop="navigateToFunction(data.name)"
+      >
+        <q-icon name="error" size="sm" />
+        <span v-if="pipelineObj.currentSelectedPipeline?.last_error?.node_errors?.[id]?.error_count" class="error-count">
+          {{ pipelineObj.currentSelectedPipeline.last_error.node_errors[id].error_count }}
+        </span>
+        <q-tooltip
+          anchor="top middle"
+          self="bottom middle"
+          :offset="[0, 10]"
+          max-width="600px"
+          class="pipeline-error-tooltip"
+        >
+          <div style="max-height: 300px; overflow-y: auto;">
+            {{ getNodeErrorInfo || 'Error occurred' }}
+          </div>
+        </q-tooltip>
+      </div>
+
       <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
-        
+
         <q-btn
           flat
           round
@@ -798,19 +876,16 @@ function getIcon(data, ioType) {
 
 // Custom tooltips with arrow pointers
 .custom-tooltip {
-  position: absolute;
-  top: -35px;
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed;
   background: #dc2626;
   color: white;
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 11px;
-  white-space: nowrap;
-  z-index: 20;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   pointer-events: none;
+  white-space: nowrap;
 }
 
 
@@ -832,6 +907,89 @@ function getIcon(data, ioType) {
 
 .delete-arrow {
   border-top-color: #dc2626;
+}
+
+// Pipeline error tooltip styling
+.pipeline-error-tooltip {
+  background: #ef4444 !important;
+  color: white !important;
+  font-size: 12px !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  line-height: 1.5 !important;
+  padding: 10px 14px !important;
+
+  div {
+    max-height: 300px;
+    overflow-y: auto;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 3px;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.5);
+      }
+    }
+  }
+}
+
+// Error badge styling
+.error-badge {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  width: 20px;
+  height: 20px;
+  background: #ef4444;
+  border: 2px solid white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 15;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.5);
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: scale(1.2);
+    box-shadow: 0 3px 10px rgba(239, 68, 68, 0.7);
+    z-index: 20;
+  }
+
+  .q-icon {
+    font-size: 0.9em !important;
+    color: white !important;
+  }
+
+  .error-count {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #dc2626;
+    color: white;
+    font-size: 9px;
+    font-weight: bold;
+    min-width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+    border: 1.5px solid white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
 }
 
 // Node label text styling

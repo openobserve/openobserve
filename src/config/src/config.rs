@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 9;
+pub const DB_SCHEMA_VERSION: u64 = 10;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -962,7 +962,7 @@ pub struct Common {
     // MMDB
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
-    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = true)]
+    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = false)]
     pub mmdb_disable_download: bool,
     #[env_config(name = "ZO_MMDB_UPDATE_DURATION_DAYS", default = 30)] // default 30 days
     pub mmdb_update_duration_days: u64,
@@ -2005,6 +2005,18 @@ pub struct Pipeline {
         help = "interval in milliseconds to spawn a new sink task"
     )]
     pub pipeline_sink_task_spawn_interval_ms: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_ERROR_RETENTION_MINS",
+        default = 60,
+        help = "pipeline error retention time in minutes, errors older than this will be cleaned up"
+    )]
+    pub error_retention_mins: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_ERROR_CLEANUP_INTERVAL",
+        default = 300,
+        help = "pipeline error cleanup interval in seconds"
+    )]
+    pub error_cleanup_interval: u64,
 }
 
 #[derive(EnvConfig, Default)]
