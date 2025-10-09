@@ -33,3 +33,4 @@ CLAUDE.md
 tests/ui-testing/playwright-tests/utils/auth/user.json
 /tests/ui-testing/utils/test-mapping/archived-utils
 /tests/ui-testing/playwright-results
+/tests/ui-testing/testDinoPOC/MD Files

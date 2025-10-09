@@ -305,7 +305,7 @@ jobs:
         run: cd tests/ui-testing && npx nyc report
 
       - name: Upload results to TestDino
-        if: always() && matrix.testfolder == 'Alerts'
+        if: always()
         run: |
           cd tests/ui-testing
           npx tdpw upload playwright-results --json-report playwright-results/report.json --html-report playwright-results/html-report --upload-html --token ${{ secrets.TESTDINO_API_TOKEN }}
