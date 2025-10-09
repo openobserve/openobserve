@@ -565,6 +565,12 @@ export default defineComponent({
 
     const onChartContextMenu = (event: any) => {
       // Only show context menu if alert creation is allowed
+      emit("contextmenu", {
+        ...event,
+        panelTitle: panelSchema.value.title,
+        panelId: panelSchema.value.id,
+      });
+
       if (!allowAlertCreation.value) {
         return;
       }

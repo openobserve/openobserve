@@ -26,10 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
     </span>
     <VariablesValueSelector
-      v-if="currentTimeObj['__global'] || currentTimeObj['__variables'] "
+      v-if="currentTimeObj['__global'] || currentTimeObj['__variables']"
       :variablesConfig="dashboardData?.variables"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
-      :selectedTimeDate="currentTimeObj['__variables'] || currentTimeObj['__global']"
+      :selectedTimeDate="
+        currentTimeObj['__variables'] || currentTimeObj['__global']
+      "
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
       ref="variablesValueSelectorRef"
@@ -88,11 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="height: 100%; width: 100%"
         />
       </div>
-      <div
-        v-else
-        ref="gridStackContainer"
-        class="grid-stack"
-      >
+      <div v-else ref="gridStackContainer"
+class="grid-stack">
         <div
           v-for="item in panels"
           :key="item.id + selectedTabId"
@@ -136,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :dashboardName="dashboardName"
               :folderName="folderName"
+              :allowAlertCreation="allowAlertCreation"
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
               @onMovePanel="onMovePanel"
               @refreshPanelRequest="refreshPanelRequest"
@@ -265,6 +265,10 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    allowAlertCreation: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   components: {
@@ -281,7 +285,7 @@ export default defineComponent({
     const store = useStore();
     const gridStackContainer = ref(null);
 
-    // Initialize GridStack instance 
+    // Initialize GridStack instance
     // (not with ref: https://github.com/gridstack/gridstack.js/issues/2115)
     let gridStackInstance = null;
     const variablesValueSelectorRef = ref(null);
@@ -436,7 +440,7 @@ export default defineComponent({
           }
           currentVariablesDataRef.value = { __global: variablesData.value };
         }
-        return;      
+        return;
       } catch (error) {
         return;
       }
@@ -512,12 +516,11 @@ export default defineComponent({
           tab: route.query.tab ?? props.dashboardData.panels[0]?.tabId,
         },
       });
-    };    
+    };
     // GridStack initialization and methods
-    
+
     let gridStackUpdateInProgress = false;
     const initGridStack = () => {
-
       if (!gridStackContainer.value || gridStackInstance) return;
 
       // Initialize GridStack with optimal configuration
@@ -548,8 +551,7 @@ export default defineComponent({
 
       // Handle layout changes (drag/resize) - only update layout data, don't save during operations
       gridStackInstance.on("change", async (event, items) => {
-    
-        if(gridStackUpdateInProgress) {
+        if (gridStackUpdateInProgress) {
           return;
         }
 
@@ -596,7 +598,7 @@ export default defineComponent({
 
       // Clear all existing widgets completely to prevent stale references
       const existingElements = grid.getGridItems();
-    
+
       // Force clear any remaining grid state
       grid.removeAll(false);
       // Wait for DOM cleanup to complete
@@ -638,7 +640,6 @@ export default defineComponent({
 
       // Wait for all widgets to be added
       await nextTick(); // Ensure DOM is updated
-
 
       // Trigger window resize to ensure charts render correctly
       gridStackUpdateInProgress = false;
