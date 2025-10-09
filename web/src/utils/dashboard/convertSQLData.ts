@@ -1263,7 +1263,7 @@ export const convertSQLData = async (
       bottom: "100%",
       feature: {
         dataZoom: {
-          yAxisIndex: panelSchema.config?.dataZoom.hasOwnProperty("yAxisIndex")
+          yAxisIndex: panelSchema.config?.dataZoom?.hasOwnProperty("yAxisIndex")
             ? panelSchema.config?.dataZoom.yAxisIndex
             : "none",
         },
