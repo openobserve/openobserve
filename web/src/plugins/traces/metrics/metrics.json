@@ -327,7 +327,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(distinct(trace_id)) as \"y_axis_1\" FROM \"default\"  [WHERE_CLAUSE]  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+              "query": "WITH traces AS (SELECT min(_timestamp) as _time, max(trace_id) AS max_trace_id FROM \"default\" [WHERE_CLAUSE] GROUP BY trace_id), histogram_data AS (SELECT histogram(_time) AS x_axis_1, max_trace_id FROM traces) SELECT x_axis_1, count(max_trace_id) as y_axis_1 FROM histogram_data GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
