@@ -105,7 +105,7 @@ http-auth-basic = "0.3"
 itertools.workspace = true
 jsonwebtoken = "9.3"
 log.workspace = true
-maxminddb = "0.25"
+maxminddb = "0.26"
 memchr.workspace = true
 mimalloc = { version = "0.1.43", default-features = false, optional = true }
 once_cell.workspace = true
@@ -115,7 +115,7 @@ opentelemetry-otlp.workspace = true
 opentelemetry-proto.workspace = true
 parking_lot.workspace = true
 prometheus.workspace = true
-promql-parser = "0.4"
+promql-parser = "0.6"
 prost.workspace = true
 prost-wkt-types.workspace = true
 proto.workspace = true
@@ -171,9 +171,8 @@ tantivy.workspace = true
 tantivy-fst.workspace = true
 zip.workspace = true
 futures-util = "0.3.31"
-tokio-tungstenite = "0.24.0"
 tokio-util = "0.7.13"
-pprof = { version = "0.14", features = [
+pprof = { version = "0.15.0", features = [
     "flamegraph",
     "prost-codec",
 ], optional = true }
@@ -195,7 +194,7 @@ async-walkdir.workspace = true
 expect-test.workspace = true
 base64 = "0.22"
 float-cmp = "0.10"
-rcgen = "0.13"
+rcgen = "0.14.4"
 
 [workspace]
 members = [
@@ -238,7 +237,7 @@ async-nats = "0.42"
 async-stream = "0.3.6"
 async-trait = "0.1"
 async-recursion = "1.0"
-async-walkdir = "1.0.0"
+async-walkdir = "2.1.0"
 aws-config = "1.5.17"
 aws-sdk-sns = "1.61.0"
 base64 = "0.22"
@@ -316,7 +315,7 @@ opentelemetry-proto = { version = "0.30", features = [
     "trace",
 ] }
 parking_lot = "0.12"
-prometheus = { version = "0.13", features = ["process"] }
+prometheus = { version = "0.14", features = ["process"] }
 prost = "0.13.1"
 prost-wkt-types = "0.6"
 rand = "0.9.2"
@@ -349,7 +348,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
 sha1 = "0.10.6"
 sha256 = "1.4.0"
-snafu = "0.7.5"
+snafu = "0.8.9"
 snap = "1"
 sqlx = { version = "0.8.3", features = [
     "runtime-tokio-rustls",
@@ -361,7 +360,7 @@ sqlx = { version = "0.8.3", features = [
 strum = { version = "0.27", features = ["derive"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.37"
-tantivy = { version = "0.24", features = ["quickwit"] }
+tantivy = { version = "0.25", features = ["quickwit"] }
 tantivy-fst = "0.5"
 tempfile = "3"
 thiserror = "1.0"
@@ -388,7 +387,7 @@ urlencoding = "2.1"
 utoipa = { version = "5", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
 uuid = { version = "1.18.1", features = ["v7"] }
-vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "063cabbbf4bc6f75794fa0ccd3b0bd5c074f0e35" }
-vrl = { version = "0.22", features = ["value", "compiler", "test"] }
+vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "2003d617c7befdc7aa7f73a37263d272cd4a3718" }
+vrl = { version = "0.27.0", git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["value", "compiler", "test"] }
 zip = "5.1.1"
 zstd = "0.13"

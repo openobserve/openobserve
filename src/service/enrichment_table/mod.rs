@@ -553,17 +553,14 @@ mod tests {
         let mut body = Vec::new();
 
         // Create multipart form data
-        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+        body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
         body.extend_from_slice(
-            format!(
-                "Content-Disposition: form-data; name=\"file\"; filename=\"{}\"\r\n",
-                filename
-            )
-            .as_bytes(),
+            format!("Content-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\n")
+                .as_bytes(),
         );
         body.extend_from_slice(b"Content-Type: text/csv\r\n\r\n");
         body.extend_from_slice(csv_data.as_bytes());
-        body.extend_from_slice(format!("\r\n--{}--\r\n", boundary).as_bytes());
+        body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
 
         // Create a stream from the body
         let stream = stream::iter(vec![Ok(Bytes::from(body))]);
@@ -572,27 +569,27 @@ mod tests {
         let req = test::TestRequest::post()
             .insert_header((
                 "content-type",
-                format!("multipart/form-data; boundary={}", boundary),
+                format!("multipart/form-data; boundary={boundary}"),
             ))
             .to_http_request();
 
-        Multipart::new(&req.headers(), stream)
+        Multipart::new(req.headers(), stream)
     }
 
     // Helper function to create empty multipart
     fn create_empty_multipart() -> Multipart {
         let boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
-        let body = format!("--{}--\r\n", boundary);
+        let body = format!("--{boundary}--\r\n");
         let stream = stream::iter(vec![Ok(Bytes::from(body))]);
 
         let req = test::TestRequest::post()
             .insert_header((
                 "content-type",
-                format!("multipart/form-data; boundary={}", boundary),
+                format!("multipart/form-data; boundary={boundary}"),
             ))
             .to_http_request();
 
-        Multipart::new(&req.headers(), stream)
+        Multipart::new(req.headers(), stream)
     }
 
     // Helper function to create multipart with field without filename
@@ -600,21 +597,21 @@ mod tests {
         let boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
         let mut body = Vec::new();
 
-        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+        body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
         body.extend_from_slice(b"Content-Disposition: form-data; name=\"field\"\r\n\r\n");
         body.extend_from_slice(b"some value");
-        body.extend_from_slice(format!("\r\n--{}--\r\n", boundary).as_bytes());
+        body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
 
         let stream = stream::iter(vec![Ok(Bytes::from(body))]);
 
         let req = test::TestRequest::post()
             .insert_header((
                 "content-type",
-                format!("multipart/form-data; boundary={}", boundary),
+                format!("multipart/form-data; boundary={boundary}"),
             ))
             .to_http_request();
 
-        Multipart::new(&req.headers(), stream)
+        Multipart::new(req.headers(), stream)
     }
 
     #[tokio::test]
@@ -859,7 +856,7 @@ mod tests {
 
         // First file
         let csv1 = "id,name\n1,John\n2,Jane";
-        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+        body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
         body.extend_from_slice(
             b"Content-Disposition: form-data; name=\"file1\"; filename=\"file1.csv\"\r\n",
         );
@@ -869,7 +866,7 @@ mod tests {
 
         // Second file
         let csv2 = "id,age\n1,25\n2,30";
-        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+        body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
         body.extend_from_slice(
             b"Content-Disposition: form-data; name=\"file2\"; filename=\"file2.csv\"\r\n",
         );
@@ -878,18 +875,18 @@ mod tests {
         body.extend_from_slice(b"\r\n");
 
         // End boundary
-        body.extend_from_slice(format!("--{}--\r\n", boundary).as_bytes());
+        body.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
 
         let stream = stream::iter(vec![Ok(Bytes::from(body))]);
 
         let req = test::TestRequest::post()
             .insert_header((
                 "content-type",
-                format!("multipart/form-data; boundary={}", boundary),
+                format!("multipart/form-data; boundary={boundary}"),
             ))
             .to_http_request();
 
-        let multipart = Multipart::new(&req.headers(), stream);
+        let multipart = Multipart::new(req.headers(), stream);
 
         let result = extract_multipart(multipart, false).await;
 
