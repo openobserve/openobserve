@@ -18,6 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="search-bar-component" id="searchBarComponent">
     <div class="row q-py-xs">
       <div class="float-right col flex items-center">
+        <syntax-guide
+          class="q-mr-sm"
+          data-test="logs-search-bar-sql-mode-toggle-btn"
+          :sqlmode="searchObj.meta.sqlMode"
+        />
+        <q-btn
+          label="Reset Filters"
+          no-caps
+          size="sm"
+          icon="restart_alt"
+          class="q-pr-sm q-pl-xs reset-filters"
+          @click="resetFilters"
+        />
         <div
           style="border: 1px solid #c4c4c4; border-radius: 5px"
           class="q-pr-xs q-ml-xs tw-flex tw-items-center tw-justify-center"
@@ -44,22 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("traces.RedMetrics") }}
           </q-tooltip>
         </div>
-        <q-btn
-          data-test="traces-search-bar-reset-filters-btn"
-          no-caps
-          size="13px"
-          icon="restart_alt"
-          class="tw-flex tw-justify-center tw-items-center reset-filters q-ml-xs"
-          @click="resetFilters"
-        >
-          <q-tooltip>
-            {{ t("search.resetFilters") }}
-          </q-tooltip>
-        </q-btn>
-        <syntax-guide
-          data-test="logs-search-bar-sql-mode-toggle-btn"
-          :sqlmode="searchObj.meta.sqlMode"
-        />
       </div>
       <div class="float-right col-auto">
         <div class="float-left">
@@ -657,11 +654,15 @@ export default defineComponent({
   }
 
   .reset-filters {
-    width: 32px;
-    height: 32px;
+    font-size: 22px;
+    height: 29px;
 
-    .q-icon {
-      margin-right: 0;
+    :deep(.block) {
+      font-size: 12px;
+    }
+
+    :deep(.q-icon) {
+      margin-right: 4px;
     }
   }
 }
