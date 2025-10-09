@@ -602,20 +602,27 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
     }
 
     // fill data
-    let start = std::time::Instant::now();
+    let total = std::time::Instant::now();
     for (key, tbl) in tables {
+        let start = std::time::Instant::now();
         let data =
             super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name).await?;
         ENRICHMENT_TABLES.insert(
             key,
             StreamTable {
-                org_id: tbl.org_id,
-                stream_name: tbl.stream_name,
+                org_id: tbl.org_id.clone(),
+                stream_name: tbl.stream_name.clone(),
                 data,
             },
         );
+        log::info!(
+            "EnrichmentTables Cached: org_id: {}, stream_name: {}, took {:?}",
+            tbl.org_id,
+            tbl.stream_name,
+            start.elapsed()
+        );
     }
-    log::info!("EnrichmentTables Cached, took {:?}", start.elapsed());
+    log::info!("EnrichmentTables Cached, took {:?}", total.elapsed());
     Ok(())
 }
 

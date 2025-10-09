@@ -20,21 +20,20 @@ use arrow::{
     datatypes::DataType,
 };
 use config::{
-    meta::stream::{EnrichmentTableMetaStreamStats, PartitionTimeLevel, StreamType},
+    QUERY_WITH_NO_LIMIT,
+    meta::stream::{EnrichmentTableMetaStreamStats, StreamType},
     utils::{
         json,
-        record_batch_ext::convert_json_to_record_batch,
         time::{BASE_TIME, now_micros},
     },
 };
-use infra::{cache::stats, db as infra_db, storage};
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use infra::{cache::stats, db as infra_db};
 use rayon::prelude::*;
 use vrl::prelude::NotNan;
 
 use crate::{
     common::infra::config::ENRICHMENT_TABLES,
-    service::{db as db_service, enrichment::StreamTable},
+    service::{db as db_service, enrichment::StreamTable, search as SearchService},
 };
 
 /// Will no longer be used as we are using the meta stream stats to store start, end time and size
@@ -44,98 +43,46 @@ pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta
 pub async fn get_enrichment_table_data(
     org_id: &str,
     name: &str,
-) -> Result<Vec<RecordBatch>, anyhow::Error> {
+) -> Result<Vec<serde_json::Value>, anyhow::Error> {
     let start_time = get_start_time(org_id, name).await;
     let end_time = now_micros();
-    log::debug!("get enrichment table {org_id}/{name} data req start time: {start_time}");
 
-    let mut all_batches = Vec::new();
-
-    // Get schema for converting database data
-    let schema = infra::schema::get_cache(org_id, name, StreamType::EnrichmentTables)
-        .await?
-        .schema()
-        .clone();
-
-    // 1. Get data from database first (recent data) and convert to RecordBatch
-    if let Ok((db_data, ..)) = get_enrichment_data_from_db(org_id, name).await
-        && !db_data.is_empty()
-    {
-        log::debug!(
-            "get enrichment table {org_id}/{name} found {} records from database",
-            db_data.len()
-        );
-        // Convert JSON to RecordBatch
-        let data_refs: Vec<_> = db_data.iter().map(|row| Arc::new(row.clone())).collect();
-        match convert_json_to_record_batch(&schema, &data_refs) {
-            Ok(batch) => all_batches.push(batch),
-            Err(e) => log::error!("Failed to convert database data to RecordBatch: {e}"),
-        }
-    }
-
-    // 2. Get file list and read from S3 (with disk cache)
-    let files = match crate::service::file_list::query(
-        "",
-        org_id,
-        name,
-        StreamType::EnrichmentTables,
-        PartitionTimeLevel::Unset,
+    let query = config::meta::search::Query {
+        sql: format!("SELECT * FROM \"{name}\""),
         start_time,
         end_time,
-    )
-    .await
-    {
-        Ok(files) => files,
-        Err(err) => {
-            log::error!("get enrichment table {org_id}/{name} file list error: {err:?}");
-            return Ok(all_batches);
-        }
+        size: QUERY_WITH_NO_LIMIT, // -1 means no limit, enrichment table should not be limited
+        ..Default::default()
     };
 
-    if files.is_empty() {
-        log::debug!(
-            "get enrichment table {org_id}/{name} total batches: {}",
-            all_batches.iter().map(|b| b.num_rows()).sum::<usize>()
-        );
-        return Ok(all_batches);
-    }
-
-    log::debug!(
-        "get enrichment table {org_id}/{name} found {} files from S3",
-        files.len()
-    );
-
-    // 3. Read each file directly from S3 (with disk cache) as RecordBatch
-    for file in files.iter() {
-        match read_parquet_file_from_s3(&file.key).await {
-            Ok(batches) => all_batches.extend(batches),
-            Err(e) => log::error!(
-                "Failed to read file {org_id}/{name} from S3 {}: {e}",
-                file.key
-            ),
+    let req = config::meta::search::Request {
+        query,
+        encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
+        clusters: vec![],
+        timeout: 0,
+        search_type: None,
+        search_event_context: None,
+        use_cache: false,
+        local_mode: Some(true),
+    };
+    log::info!("get enrichment table {org_id}/{name} data req start time: {start_time}");
+    // do search
+    match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
+        Ok(res) => {
+            log::info!(
+                "get enrichment table {org_id}/{name} data success with hits: {}",
+                res.hits.len()
+            );
+            Ok(res.hits)
+        }
+        Err(err) => {
+            log::error!("get enrichment table {org_id}/{name} data error: {err}",);
+            Err(anyhow::anyhow!(
+                "get enrichment table {org_id}/{name} error: {err}"
+            ))
         }
     }
-
-    log::info!(
-        "get enrichment table {org_id}/{name} total rows: {}",
-        all_batches.iter().map(|b| b.num_rows()).sum::<usize>()
-    );
-    Ok(all_batches)
-}
-
-/// Helper function to read and parse a parquet file from S3
-async fn read_parquet_file_from_s3(file_key: &str) -> Result<Vec<RecordBatch>, anyhow::Error> {
-    let path = object_store::path::Path::from(file_key);
-    let account = storage::get_account(file_key).unwrap_or_default();
-
-    // Read file from S3 (with disk cache)
-    let result = infra::cache::storage::get(&account, &path).await?;
-    let bytes = result.bytes().await?;
-
-    // Parse parquet file and collect all batches
-    let reader = ParquetRecordBatchReaderBuilder::try_new(bytes)?.build()?;
-    let batches: Result<Vec<_>, _> = reader.collect();
-    Ok(batches?)
 }
 
 pub fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
