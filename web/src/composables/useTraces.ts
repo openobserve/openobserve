@@ -77,6 +77,8 @@ const defaultObject = {
     serviceColors: {} as any,
     redirectedFromLogs: false,
     searchApplied: false,
+    metricsRangeFilters: new Map<string, { panelTitle: string; start: number; end: number }>(),
+    showErrorOnly: false,
   },
   data: {
     query: "",

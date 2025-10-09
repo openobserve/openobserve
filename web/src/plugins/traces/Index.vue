@@ -624,6 +624,27 @@ async function getQueryData() {
 
     let filter = searchObj.data.editorValue.trim();
 
+    // Add RED metrics filters to the query
+    const metricsFilters: string[] = [];
+    searchObj.meta.metricsRangeFilters.forEach((rangeFilter) => {
+      if (rangeFilter.panelTitle === "Duration") {
+        metricsFilters.push(
+          `duration >= ${rangeFilter.start} AND duration <= ${rangeFilter.end}`
+        );
+      }
+      // Note: Rate and Error filters are not applicable to individual trace queries
+      // They are aggregation metrics, not span-level filters
+    });
+
+    // Add Error Only filter
+    if (searchObj.meta.showErrorOnly) {
+      metricsFilters.push("span_status = 'ERROR'");
+    }
+
+    // Combine editor filter with metrics filters
+    const allFilters = [filter, ...metricsFilters].filter(f => f.trim().length > 0);
+    const combinedFilter = allFilters.join(" AND ");
+
     if (queryReq.query.from === 0) searchResultRef.value.getDashboardData();
 
     searchService
@@ -631,7 +652,7 @@ async function getQueryData() {
         org_identifier: searchObj.organizationIdentifier,
         start_time: queryReq.query.start_time,
         end_time: queryReq.query.end_time,
-        filter: filter || "",
+        filter: combinedFilter || "",
         size: queryReq.query.size,
         from: queryReq.query.from,
         stream_name: selectedStreamName.value,
