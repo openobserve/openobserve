@@ -315,6 +315,14 @@ jobs:
           path: tests/ui-testing/playwright-results/
           retention-days: 30
 
+      - name: Upload Test Result Attachments
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-attachments-${{ matrix.testfolder }}
+          path: tests/ui-testing/test-results/
+          retention-days: 30
+
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
         if: always() && hashFiles('playwright-report/**') != ''
@@ -347,6 +355,13 @@ jobs:
         with:
           pattern: playwright-results-*
           path: all-results
+          merge-multiple: false
+
+      - name: Download All Test Attachments
+        uses: actions/download-artifact@v5
+        with:
+          pattern: test-attachments-*
+          path: all-attachments
           merge-multiple: false
 
       - name: Merge Playwright JSON Reports
@@ -437,6 +452,32 @@ jobs:
           fi
 
           echo "HTML report base created"
+
+      - name: Merge Test Result Attachments
+        run: |
+          mkdir -p merged-results/test-results
+          echo "Merging test result attachments from all test folders..."
+
+          # Copy all test-results folders from each matrix job
+          for folder in all-attachments/test-attachments-*/; do
+            if [ -d "$folder" ]; then
+              echo "Processing $(basename $folder)"
+              # Copy all contents to merged test-results
+              cp -r "$folder"* merged-results/test-results/ 2>/dev/null || true
+            fi
+          done
+
+          # Count attachments
+          attachment_count=$(find merged-results/test-results -type f | wc -l)
+          echo "Total attachments merged: $attachment_count"
+
+      - name: Create Symlink for Test Results Path
+        run: |
+          # TestDino expects attachments at the path specified in JSON report
+          # Create directory structure to match the original paths
+          mkdir -p merged-results/tests/ui-testing
+          ln -s ../../test-results merged-results/tests/ui-testing/test-results
+          echo "Symlink created for test-results"
 
       - name: Upload to TestDino
         if: always()
