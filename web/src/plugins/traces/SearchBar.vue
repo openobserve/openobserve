@@ -41,7 +41,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
             size="xs"
             flat
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            "
           >
           </q-toggle>
           <img
@@ -50,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="width: 20px; height: 20px"
           />
           <q-tooltip>
-            {{ t("search.showMetricsLabel") }}
+            {{ t("traces.RedMetrics") }}
           </q-tooltip>
         </div>
       </div>
