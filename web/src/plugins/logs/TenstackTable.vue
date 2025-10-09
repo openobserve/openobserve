@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <table
       v-if="table"
       data-test="logs-search-result-logs-table"
-      class="tw-w-full tw-table-auto"
+      class="tw-w-full tw-table-auto logs-table"
       :style="{
         minWidth: '100%',
         ...columnSizeVars,
@@ -36,11 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <thead
         class="tw-sticky tw-top-0 tw-z-10"
         style="max-height: 44px; height: 22px"
+        v-for="headerGroup in table.getHeaderGroups()"
+        :key="headerGroup.id"
       >
         <vue-draggable
           v-model="columnOrder"
-          v-for="headerGroup in table.getHeaderGroups()"
-          :key="headerGroup.id"
           :element="'table'"
           :animation="200"
           :sort="!isResizingHeader || !defaultColumns"
@@ -161,7 +161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="opacity: 0.7"
           >
             <div class="text-subtitle2 text-weight-bold bg-warning">
-              <q-icon size="xs" name="warning" class="q-mr-xs" />
+              <q-icon size="xs"
+name="warning" class="q-mr-xs" />
               {{ errMsg }}
             </div>
           </td>
@@ -258,10 +259,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <!-- Status color line for entire row -->
-            <div 
-              v-if="!(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow"
+            <div
+              v-if="
+                !(formattedRows[virtualRow.index]?.original as any)
+                  ?.isExpandedRow
+              "
               class="tw-absolute tw-left-0 tw-inset-y-0 tw-w-1 tw-z-10"
-              :style="{ backgroundColor: getRowStatusColor(tableRows[virtualRow.index]) }"
             ></div>
             <td
               v-if="
@@ -277,6 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 show-copy-button
                 class="tw-py-1"
                 mode="expanded"
+                :index="calculateActualIndex(virtualRow.index - 1)"
                 :highlight-query="highlightQuery"
                 @copy="copyLogToClipboard"
                 @add-field-to-table="addFieldToTable"
@@ -318,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="cellIndex == 0"
                   :icon="
-                    expandedRowIndices.includes(virtualRow.index)
+                    expandedRowIndices.has(virtualRow.index)
                       ? 'expand_more'
                       : 'chevron_right'
                   "
@@ -346,13 +350,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @send-to-ai-chat="sendToAiChat"
                   />
                 </template>
-                <LogsHighLighting
-                  :data="cell.column.columnDef.id === 'source' ? cell.row.original : cell.renderValue()"
-                  :show-braces="cell.column.columnDef.id === 'source'"
-                  :show-quotes="cell.column.columnDef.id === 'source'"
-                  :query-string="highlightQuery"
-                  :simple-mode="!(cell.column.columnDef.id === 'source' || isFTSColumn(cell.column.columnDef.id, cell.renderValue(), selectedStreamFtsKeys))"
+                <span
+                  v-if="
+                    processedResults[`${cell.column.id}_${virtualRow.index}`]
+                  "
+                  :key="`${cell.column.id}_${virtualRow.index}`"
+                  v-html="
+                    processedResults[`${cell.column.id}_${virtualRow.index}`]
+                  "
                 />
+                <span v-else>
+                  {{ cell.renderValue() }}
+                </span>
                 <O2AIContextAddBtn
                   v-if="
                     cell.column.columnDef.id ===
@@ -380,6 +389,7 @@ import {
   nextTick,
   onMounted,
   onBeforeUnmount,
+  ComputedRef,
 } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import HighLight from "@/components/HighLight.vue";
@@ -401,6 +411,7 @@ import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
+import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 
 const props = defineProps({
   rows: {
@@ -454,7 +465,7 @@ const props = defineProps({
     required: false,
   },
   selectedStreamFtsKeys: {
-    type: Array,
+    type: Array as PropType<string[]>,
     default: () => [],
   },
 });
@@ -478,6 +489,7 @@ const sorting = ref<SortingState>([]);
 
 const store = useStore();
 const { isFTSColumn } = useTextHighlighter();
+const { processedResults, processHitsInChunks } = useLogsHighlighter();
 
 const getSortingHandler = (e: Event, fn: any) => {
   return fn(e);
@@ -499,7 +511,7 @@ const columnOrder = ref<any>([]);
 
 const tableRows = ref([...props.rows]);
 
-const selectedStreamFtsKeys = computed(() => {
+const selectedStreamFtsKeys: ComputedRef<string[] | []> = computed(() => {
   return props.selectedStreamFtsKeys || [];
 });
 
@@ -516,13 +528,23 @@ const getRowStatusColor = (rowData: any) => {
   return statusInfo.color;
 };
 
-
 watch(
   () => props.columns,
   async (newVal) => {
     columnOrder.value = newVal.map((column: any) => column.id);
 
     await nextTick();
+
+    if(props.columns?.length && tableRows.value?.length && !Object.keys(processedResults.value).length) {
+      processHitsInChunks(
+        tableRows.value,
+        props.columns,
+        true,
+        props.highlightQuery,
+        50,
+        selectedStreamFtsKeys.value
+      );
+    }
 
     if (props.defaultColumns) updateTableWidth();
   },
@@ -540,7 +562,21 @@ watch(
     await nextTick();
     await nextTick();
 
-    expandedRowIndices.value = [];
+
+    if(props.columns?.length && tableRows.value?.length) {
+      processHitsInChunks(
+        tableRows.value,
+        props.columns,
+        true,
+        props.highlightQuery,
+        50,
+        selectedStreamFtsKeys.value
+      );
+    }
+
+    expandedRowIndices.value.clear();
+    // Clear height cache when rows change
+    expandedRowHeights.value = {};
     setExpandedRows();
 
     await nextTick();
@@ -687,15 +723,35 @@ const isFirefox = computed(() => {
 
 const baseOffset = isFirefox.value ? 20 : 0;
 
+// Cache for expanded row heights
+const expandedRowHeights = ref<{ [key: number]: number }>({});
+
 const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
     getScrollElement: () => parentRef.value,
-    estimateSize: () => 20,
-    overscan: 80,
+    estimateSize: (index: number) => {
+      // Check if this is an expanded row (odd indices after expansion)
+      const isExpandedRow = formattedRows.value[index]?.original?.isExpandedRow;
+      return isExpandedRow
+        ? expandedRowHeights.value[index] || 300 // Default expanded height
+        : 22; // Fixed collapsed height
+    },
+    overscan: 20,
     measureElement:
       typeof window !== "undefined" && !isFirefox.value
-        ? (element: any) => element?.getBoundingClientRect().height
+        ? (element: any) => {
+            const index = parseInt(element.dataset.index);
+            // Only measure expanded rows (check if it's actually an expanded row)
+            const isExpandedRow =
+              formattedRows.value[index]?.original?.isExpandedRow;
+            if (isExpandedRow || props.wrap) {
+              const height = element.getBoundingClientRect().height;
+              expandedRowHeights.value[index] = height;
+              return height;
+            }
+            return 22; // Fixed height for collapsed rows
+          }
         : undefined,
   };
 });
@@ -756,7 +812,7 @@ const handleDragEnd = async () => {
   }
 };
 
-const expandedRowIndices = ref<number[]>([]);
+const expandedRowIndices = ref<Set<number>>(new Set());
 
 const handleExpandRow = (index: number) => {
   emits("expandRow", calculateActualIndex(index));
@@ -767,42 +823,70 @@ const handleExpandRow = (index: number) => {
 const expandRow = async (index: number) => {
   let isCollapseOperation = false;
 
-  if (expandedRowIndices.value.includes(index)) {
-    expandedRowIndices.value = expandedRowIndices.value.filter(
-      (i) => i !== index,
-    );
+  if (expandedRowIndices.value.has(index)) {
+    // COLLAPSE OPERATION
+    expandedRowIndices.value.delete(index);
 
-    expandedRowIndices.value = expandedRowIndices.value.map((i) =>
-      i > index ? i - 1 : i,
-    );
+    // Clear cached height for collapsed row
+    delete expandedRowHeights.value[index + 1];
 
+    // Remove the expanded row from tableRows
     tableRows.value.splice(index + 1, 1);
     isCollapseOperation = true;
-  } else {
-    expandedRowIndices.value.push(index);
 
+    // Update all expanded indices that come after this collapsed row
+    const updatedIndices = new Set<number>();
+    expandedRowIndices.value.forEach((i) => {
+      updatedIndices.add(i > index ? i - 1 : i);
+    });
+    expandedRowIndices.value = updatedIndices;
+  } else {
+    // EXPAND OPERATION
+    // First, update all expanded indices that come at or after this position
+    const updatedIndices = new Set<number>();
+    expandedRowIndices.value.forEach((i) => {
+      updatedIndices.add(i >= index ? i + 1 : i);
+    });
+
+    // Add the new expanded index
+    updatedIndices.add(index);
+    expandedRowIndices.value = updatedIndices;
+
+    // Insert the expanded row
     tableRows.value.splice(index + 1, 0, {
       isExpandedRow: true,
       ...(props.rows[index] as {}),
     });
-
-    expandedRowIndices.value = expandedRowIndices.value.map((i) =>
-      i > index ? i + 1 : i,
-    );
   }
-
-  expandedRowIndices.value = expandedRowIndices.value.sort();
 
   tableRows.value = [...tableRows.value];
 
   await nextTick();
 
-  if (isCollapseOperation)
+  if (isCollapseOperation) {
     expandedRowIndices.value.forEach((expandedIndex) => {
       if (expandedIndex !== -1) {
         formattedRows.value[expandedIndex].toggleExpanded();
       }
     });
+  } else {
+    // For expand operation, measure height after DOM update
+    await nextTick();
+
+    // Force the virtualizer to recalculate all sizes
+    if (rowVirtualizer.value) {
+      // Find the actual expanded row element
+      const expandedElement = document.querySelector(
+        `[data-index="${index + 1}"]`,
+      );
+      if (expandedElement && rowVirtualizer.value.measureElement) {
+        rowVirtualizer.value.measureElement(expandedElement);
+      }
+
+      // Trigger a full recalculation
+      rowVirtualizer.value.measure();
+    }
+  }
 };
 
 const calculateActualIndex = (index: number): number => {
@@ -909,6 +993,9 @@ defineExpose({
   selectedStreamFtsKeys,
 });
 </script>
+<style>
+@import "@/assets/styles/log-highlighting.css";
+</style>
 <style scoped lang="scss">
 .resizer {
   position: absolute;
@@ -1010,4 +1097,10 @@ td {
   }
 }
 
+.logs-table {
+  container-type: inline-size;
+  contain: layout style;
+}
+
+/* Import log highlighting CSS classes */
 </style>
