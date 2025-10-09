@@ -40,8 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onFilterChange"
           data-test="error-only-toggle"
         />
-        <q-icon name="error"
-size="18px" class="tw-mx-1" />
+        <q-icon name="error" size="18px"
+class="tw-mx-1" />
         <q-tooltip>Show Error Only</q-tooltip>
       </div>
 
@@ -63,12 +63,15 @@ size="18px" class="tw-mx-1" />
           >
           <span v-if="filter.panelTitle === 'Duration'">
             <span v-if="filter.start !== null && filter.end !== null">
-              {{ filter.start }}µs - {{ filter.end }}µs
+              {{ formatTimeWithSuffix(filter.start) }} -
+              {{ formatTimeWithSuffix(filter.end) }}
             </span>
             <span v-else-if="filter.start !== null">
-              >= {{ filter.start }}µs
+              >= {{ formatTimeWithSuffix(filter.start) }}
             </span>
-            <span v-else-if="filter.end !== null"> <= {{ filter.end }}µs </span>
+            <span v-else-if="filter.end !== null">
+              <= {{ formatTimeWithSuffix(filter.end) }}
+            </span>
           </span>
         </span>
         <q-icon
@@ -120,7 +123,7 @@ import { useStore } from "vuex";
 import useNotifications from "@/composables/useNotifications";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import metrics from "./metrics.json";
-import { deepCopy, getUUID } from "@/utils/zincutils";
+import { deepCopy, formatTimeWithSuffix } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 
 const RenderDashboardCharts = defineAsyncComponent(
