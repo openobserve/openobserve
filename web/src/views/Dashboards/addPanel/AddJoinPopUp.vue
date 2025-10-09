@@ -15,17 +15,10 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div data-test="dashboard-join-pop-up" style="width: 624px">
-    <div
-      style="
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 15px;
-      "
-    >
-      <div style="flex: 1; gap: 8px">
-        <div style="display: flex; align-items: center; gap: 8px">
+  <div data-test="dashboard-join-pop-up" class="join-popup-container">
+    <div class="join-header">
+      <div class="join-section">
+        <div class="join-section-header">
           <LeftJoinSvg class="tw-h-[21px]" />
           <label>Join</label>
         </div>
@@ -36,111 +29,51 @@
           :options="[]"
           :disable="true"
           label="Joining Stream"
-          style="width: 100%"
+          class="full-width"
           data-test="dashboard-config-panel-join-from"
         />
       </div>
-      <div
-        style="
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding-top: 21px;
-          padding-right: 10px;
-          padding-left: 10px;
-        "
-      >
+
+      <div class="join-connector">
         <LeftJoinLineSvg class="tw-h-[40px] tw-w-[58px]" />
       </div>
 
-      <div>
+      <div class="join-type-section">
         <label for="joinType">Join type</label>
-        <div
-          style="
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 8px;
-          "
-        >
+        <div class="join-type-selector">
           <div
-            style="
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              cursor: pointer;
-            "
-            @click="modelValue.joinType = 'left'"
+            class="join-type-option"
+            @click="handleJoinTypeChange('left')"
+            :aria-label="t('panel.leftJoin')"
           >
-            <LeftJoinTypeSvg :shouldFill="modelValue.joinType === 'left'" />
-            <div
-              :class="[
-                modelValue.joinType === 'left'
-                  ? 'text-primary tw-font-[600]'
-                  : '',
-              ]"
-            >
-              Left
-            </div>
+            <LeftJoinTypeSvg :shouldFill="localJoinType === 'left'" />
+            <div :class="getJoinTypeLabelClass('left')">Left</div>
           </div>
           <div
-            style="
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              cursor: pointer;
-            "
-            @click="modelValue.joinType = 'inner'"
+            class="join-type-option"
+            @click="handleJoinTypeChange('inner')"
+            :aria-label="t('panel.innerJoin')"
           >
-            <InnerJoinTypeSvg :shouldFill="modelValue.joinType === 'inner'" />
-            <div
-              :class="[
-                modelValue.joinType === 'inner'
-                  ? 'text-primary tw-font-[600]'
-                  : '',
-              ]"
-            >
-              Inner
-            </div>
+            <InnerJoinTypeSvg :shouldFill="localJoinType === 'inner'" />
+            <div :class="getJoinTypeLabelClass('inner')">Inner</div>
           </div>
           <div
-            style="
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              cursor: pointer;
-            "
-            @click="modelValue.joinType = 'right'"
+            class="join-type-option"
+            @click="handleJoinTypeChange('right')"
+            :aria-label="t('panel.rightJoin')"
           >
-            <RightJoinTypeSvg :shouldFill="modelValue.joinType === 'right'" />
-            <div
-              :class="[
-                modelValue.joinType === 'right'
-                  ? 'text-primary tw-font-[600]'
-                  : '',
-              ]"
-            >
-              Right
-            </div>
+            <RightJoinTypeSvg :shouldFill="localJoinType === 'right'" />
+            <div :class="getJoinTypeLabelClass('right')">Right</div>
           </div>
         </div>
       </div>
 
-      <div
-        style="
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding-top: 21px;
-          padding-right: 10px;
-          padding-left: 10px;
-        "
-      >
+      <div class="join-connector">
         <RightJoinLineSvg class="tw-h-[40px] tw-w-[58px]" />
       </div>
 
-      <div style="flex: 1">
-        <div style="display: flex; align-items: center; gap: 8px">
+      <div class="join-section">
+        <div class="join-section-header">
           <RightJoinSvg class="tw-h-[21px]" />
           <label>On</label>
         </div>
@@ -153,7 +86,7 @@
           emit-value
           map-options
           label="On Stream"
-          style="width: 100%"
+          class="full-width"
           data-test="dashboard-config-panel-join-to"
           use-input
           input-debounce="0"
@@ -172,46 +105,19 @@
           'tw-py-2 tw-text-center tw-text-xs',
           store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-700',
         ]"
-        v-if="
-          modelValue.stream &&
-          modelValue.streamAlias &&
-          modelValue.joinType &&
-          mainStream
-        "
+        v-if="showJoinSummary"
       >
-        Joining <span className="tw-font-semibold">{{ mainStream }}</span> with
-        <span className="tw-font-semibold">{{ modelValue.stream }}</span> with
-        <span className="text-primary"
-          >{{
-            modelValue?.joinType?.charAt(0)?.toUpperCase() +
-            modelValue?.joinType?.slice(1)
-          }}
-          Join</span
-        >
+        Joining <span class="tw-font-semibold">{{ mainStream }}</span> with
+        <span class="tw-font-semibold">{{ modelValue.stream }}</span> with
+        <span class="text-primary">{{ joinTypeLabel }} Join</span>
       </div>
       <div class="tw-border-t tw-border-gray-200 tw-flex-1"></div>
     </div>
 
-    <div style="margin-bottom: 10px">
-      <div style="margin-bottom: 10px">
-        <h3
-          style="
-            font-size: 14px;
-            font-style: normal;
-            font-weight: 600;
-            line-height: normal;
-          "
-        >
-          Joining Clause
-        </h3>
-        <p
-          style="
-            font-size: 12px;
-            font-style: normal;
-            font-weight: 400;
-            line-height: normal;
-          "
-        >
+    <div class="clause-section">
+      <div class="clause-header">
+        <h3 class="clause-title">Joining Clause</h3>
+        <p class="clause-description">
           Select the fields that need to be correlated within the joining
           streams
         </p>
@@ -220,16 +126,11 @@
       <div
         v-for="(arg, argIndex) in modelValue.conditions"
         :key="argIndex + JSON.stringify(arg)"
-        style="
-          margin-bottom: 10px;
-          padding: 10px;
-          border: 1px solid #eee;
-          border-radius: 4px;
-        "
+        class="condition-item"
       >
-        <div>Clause {{ argIndex + 1 }}</div>
-        <div style="display: flex; align-items: center">
-          <div style="flex: 1; margin-right: 10px">
+        <div class="condition-label">Clause {{ argIndex + 1 }}</div>
+        <div class="condition-fields">
+          <div class="field-container">
             <StreamFieldSelect
               :streams="getStreamsBasedJoinIndex()"
               v-model="modelValue.conditions[argIndex].leftField"
@@ -237,8 +138,7 @@
             />
           </div>
 
-          <div style="flex: 1; margin-right: 10px">
-            <!-- operator selector -->
+          <div class="field-container">
             <q-select
               behavior="menu"
               borderless
@@ -251,19 +151,22 @@
             />
           </div>
 
-          <div style="flex: 1; margin-right: 10px">
+          <div class="field-container">
             <StreamFieldSelect
-              :streams="[
-                {
-                  stream: modelValue.stream,
-                  streamAlias: modelValue.streamAlias,
-                },
-              ]"
+              :streams="rightFieldStreams"
               v-model="modelValue.conditions[argIndex].rightField"
+              :data-test="`dashboard-join-condition-right-field-${argIndex}`"
             />
           </div>
 
-          <q-btn @click="addCondition(argIndex)" no-caps dense flat icon="add">
+          <q-btn
+            @click="handleAddCondition(argIndex)"
+            no-caps
+            dense
+            flat
+            icon="add"
+            :aria-label="t('panel.addClause')"
+          >
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -280,8 +183,9 @@
             flat
             round
             :disable="modelValue.conditions.length === 1"
-            @click="removeCondition(argIndex)"
+            @click="handleRemoveCondition(argIndex)"
             class="tw-h-10 tw-w-10"
+            :aria-label="t('panel.removeClause')"
           >
             <q-tooltip
               class="bg-grey-8"
@@ -298,7 +202,15 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, watch, onMounted, inject, ref } from "vue";
+import {
+  defineComponent,
+  watch,
+  onMounted,
+  inject,
+  ref,
+  computed,
+  PropType,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useLoading } from "@/composables/useLoading";
@@ -312,6 +224,49 @@ import RightJoinSvg from "@/components/icons/RightJoinSvg.vue";
 import RightJoinTypeSvg from "@/components/icons/RightJoinTypeSvg.vue";
 import RightJoinLineSvg from "@/components/icons/RightJoinLineSvg.vue";
 import InnerJoinTypeSvg from "@/components/icons/InnerJoinTypeSvg.vue";
+
+interface StreamOption {
+  label: string;
+  value: string;
+}
+
+interface JoinFieldReference {
+  streamAlias: string;
+  field: string;
+}
+
+interface JoinCondition {
+  leftField: JoinFieldReference;
+  rightField: JoinFieldReference;
+  logicalOperator: "AND" | "OR";
+  operation: "=" | "!=" | ">" | "<" | ">=" | "<=";
+}
+
+interface JoinConfig {
+  stream: string;
+  streamAlias: string;
+  joinType: "inner" | "left" | "right";
+  conditions: JoinCondition[];
+}
+
+interface StreamReference {
+  stream: string;
+  streamAlias?: string;
+}
+
+const JOIN_TYPES = {
+  INNER: "inner",
+  LEFT: "left",
+  RIGHT: "right",
+} as const;
+
+const JOIN_OPERATIONS = ["=", "!=", ">", "<", ">=", "<="] as const;
+
+const JOIN_LOGICAL_OPERATORS = {
+  AND: "AND",
+  OR: "OR",
+} as const;
+
 export default defineComponent({
   name: "AddJoinPopUp",
 
@@ -336,7 +291,8 @@ export default defineComponent({
       required: true,
     },
     modelValue: {
-      type: Object,
+      type: Object as PropType<JoinConfig>,
+      required: true,
       default: () => {
         return {
           stream: "",
@@ -361,12 +317,14 @@ export default defineComponent({
     },
   },
 
-  setup(props, { emit }) {
+  emits: ["update:modelValue"],
+
+  setup(props) {
     const { t } = useI18n();
     const store = useStore();
-    const { getStreams, getStream } = useStreams();
+    const { getStreams } = useStreams();
 
-    const dashboardPanelDataPageKey: any = inject(
+    const dashboardPanelDataPageKey = inject<string>(
       "dashboardPanelDataPageKey",
       "dashboard",
     );
@@ -375,73 +333,68 @@ export default defineComponent({
       dashboardPanelDataPageKey,
     );
 
-    const streamOptions = ref([]);
-    const filteredStreamOptions = ref([]);
-    const joinOptions = ["inner", "left", "right"];
-    const operationOptions = ["=", "!=", ">", "<", ">=", "<="];
+    const streamOptions = ref<StreamOption[]>([]);
+    const filteredStreamOptions = ref<StreamOption[]>([]);
+    const operationOptions = [...JOIN_OPERATIONS];
 
-    // get the stream list by making an API call
-    const getStreamList = async (stream_type: any) => {
-      await getStreams(stream_type, false).then((res: any) => {
-        streamOptions.value = res.list.map((stream: any) => {
-          return {
-            label: stream.name,
-            value: stream.name,
-          };
-        });
-
-        if (streamOptions.value.length > 0) {
-          // check if current selected stream is in the list
-          // if not select first stream
-          const selectedStream = streamOptions.value.find((option: any) => {
-            if (option.value === props.modelValue.stream) {
-              return option;
-            }
-          });
-
-          if (!selectedStream) {
-            props.modelValue.stream = res.list[0].name;
-          }
-        }
-      });
-    };
-
-    // get stream list
-    const streamDataLoading = useLoading(async (stream_type: any) => {
-      await getStreamList(stream_type);
-    });
-
-    // get the stream list based on the selected stream type
-    const loadStreamsListBasedOnType = async () => {
-      streamDataLoading.execute(
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream_type,
+    /**
+     * Determines if join summary should be shown
+     */
+    const showJoinSummary = computed(() => {
+      return !!(
+        props.modelValue.stream &&
+        props.modelValue.streamAlias &&
+        props.modelValue.joinType &&
+        props.mainStream
       );
-    };
-
-    // watch the stream type and load the stream list
-    watch(
-      () =>
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream_type,
-      async () => {
-        loadStreamsListBasedOnType();
-      },
-    );
-
-    onMounted(() => {
-      loadStreamsListBasedOnType();
-      filteredStreamOptions.value = [...streamOptions?.value];
     });
 
-    const removeCondition = (argIndex: number) => {
-      props.modelValue.conditions.splice(argIndex, 1);
-    };
+    /**
+     * Gets the formatted join type label
+     */
+    const joinTypeLabel = computed(() => {
+      const joinType = props.modelValue.joinType;
+      return joinType
+        ? joinType.charAt(0).toUpperCase() + joinType.slice(1)
+        : "";
+    });
 
-    const addCondition = (index: number = 0) => {
-      props.modelValue.conditions.splice(index + 1, 0, {
+    /**
+     * Gets local join type for UI binding
+     */
+    const localJoinType = computed(() => props.modelValue.joinType);
+
+    /**
+     * Gets right field streams for condition right side
+     */
+    const rightFieldStreams = computed((): StreamReference[] => {
+      return [
+        {
+          stream: props.modelValue.stream,
+          streamAlias: props.modelValue.streamAlias,
+        },
+      ];
+    });
+
+    /**
+     * Gets the current query stream type
+     */
+    const currentStreamType = computed(() => {
+      try {
+        return dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.stream_type;
+      } catch (error) {
+        console.error("Error getting current stream type:", error);
+        return undefined;
+      }
+    });
+
+    /**
+     * Creates a default join condition
+     */
+    function createDefaultCondition(): JoinCondition {
+      return {
         leftField: {
           streamAlias: "",
           field: "",
@@ -450,58 +403,301 @@ export default defineComponent({
           streamAlias: "",
           field: "",
         },
-        logicalOperator: "and",
+        logicalOperator: JOIN_LOGICAL_OPERATORS.AND,
         operation: "=",
-      });
-    };
+      };
+    }
 
-    const getStreamsBasedJoinIndex = () => {
-      // return list of all streams upto current join index
-      return [
-        {
-          stream:
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream,
-        },
-        ...(dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.joins
-          ?.slice(0, props.joinIndex)
-          ?.map((join: any) => {
-            return { stream: join.stream, streamAlias: join.streamAlias };
-          }) ?? []),
-      ];
-    };
+    /**
+     * Gets CSS class for join type label
+     */
+    function getJoinTypeLabelClass(type: string): string {
+      return props.modelValue.joinType === type
+        ? "text-primary tw-font-[600]"
+        : "";
+    }
 
-    const filterStreamOptions = (val: any, update: any) => {
+    /**
+     * Gets list of streams available for left field based on join index
+     * Returns main stream plus all previously joined streams
+     */
+    function getStreamsBasedJoinIndex(): StreamReference[] {
+      try {
+        const currentQuery =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ];
+
+        if (!currentQuery) return [];
+
+        const mainStream: StreamReference = {
+          stream: currentQuery.fields?.stream || "",
+        };
+
+        const previousJoins =
+          currentQuery.joins?.slice(0, props.joinIndex)?.map(
+            (join: any): StreamReference => ({
+              stream: join.stream,
+              streamAlias: join.streamAlias,
+            }),
+          ) ?? [];
+
+        return [mainStream, ...previousJoins];
+      } catch (error) {
+        console.error("Error getting streams based on join index:", error);
+        return [];
+      }
+    }
+
+    /**
+     * Fetches stream list from API
+     */
+    async function fetchStreamList(streamType: string): Promise<void> {
+      try {
+        const response = await getStreams(streamType, false);
+
+        streamOptions.value = response.list.map(
+          (stream: any): StreamOption => ({
+            label: stream.name,
+            value: stream.name,
+          }),
+        );
+
+        // Select first stream if no stream is selected or current stream is invalid
+        if (streamOptions.value.length > 0) {
+          if (!props.modelValue.stream) {
+            // No stream selected, select first one
+            props.modelValue.stream = streamOptions.value[0].value;
+          } else {
+            // Check if current stream is valid
+            const isCurrentStreamValid = streamOptions.value.some(
+              (option) => option.value === props.modelValue.stream,
+            );
+
+            if (!isCurrentStreamValid) {
+              props.modelValue.stream = streamOptions.value[0].value;
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching stream list:", error);
+        streamOptions.value = [];
+      }
+    }
+
+    /**
+     * Loads stream list based on current query's stream type
+     */
+    async function loadStreamsListBasedOnType(): Promise<void> {
+      const streamType = currentStreamType.value;
+      if (streamType) {
+        await streamDataLoading.execute(streamType);
+      }
+    }
+
+    /**
+     * Filters stream options based on search input
+     */
+    function filterStreamOptions(
+      val: string,
+      update: (fn: () => void) => void,
+    ): void {
       if (val === "") {
         update(() => {
-          filteredStreamOptions.value = [...streamOptions?.value];
+          filteredStreamOptions.value = [...streamOptions.value];
         });
         return;
       }
 
       update(() => {
         const needle = val.toLowerCase();
-        filteredStreamOptions.value = streamOptions?.value?.filter(
-          (stream: any) => stream?.label?.toLowerCase()?.includes(needle),
+        filteredStreamOptions.value = streamOptions.value.filter((stream) =>
+          stream.label.toLowerCase().includes(needle),
         );
       });
-    };
+    }
+
+    /**
+     * Handles join type change
+     */
+    function handleJoinTypeChange(type: "inner" | "left" | "right"): void {
+      try {
+        props.modelValue.joinType = type;
+      } catch (error) {
+        console.error("Error changing join type:", error);
+      }
+    }
+
+    /**
+     * Adds a new condition at specified index
+     */
+    function handleAddCondition(index: number): void {
+      try {
+        const newCondition = createDefaultCondition();
+        props.modelValue.conditions.splice(index + 1, 0, newCondition);
+      } catch (error) {
+        console.error("Error adding condition:", error);
+      }
+    }
+
+    /**
+     * Removes condition at specified index
+     */
+    function handleRemoveCondition(index: number): void {
+      try {
+        if (props.modelValue.conditions.length <= 1) {
+          console.warn("Cannot remove the last condition");
+          return;
+        }
+
+        if (index < 0 || index >= props.modelValue.conditions.length) {
+          console.error(`Invalid condition index: ${index}`);
+          return;
+        }
+
+        props.modelValue.conditions.splice(index, 1);
+      } catch (error) {
+        console.error("Error removing condition:", error);
+      }
+    }
+
+    const streamDataLoading = useLoading(fetchStreamList);
+
+    onMounted(() => {
+      loadStreamsListBasedOnType();
+      filteredStreamOptions.value = [...streamOptions.value];
+    });
+
+    /**
+     * Watch stream type changes and reload stream list
+     */
+    watch(currentStreamType, async () => {
+      await loadStreamsListBasedOnType();
+    });
 
     return {
       t,
-      streamOptions,
-      joinOptions,
-      removeCondition,
-      addCondition,
-      operationOptions,
-      getStreamsBasedJoinIndex,
-      filteredStreamOptions,
-      filterStreamOptions,
       store,
+      operationOptions,
+      filteredStreamOptions,
+      showJoinSummary,
+      joinTypeLabel,
+      localJoinType,
+      rightFieldStreams,
+      getJoinTypeLabelClass,
+      getStreamsBasedJoinIndex,
+      filterStreamOptions,
+      handleJoinTypeChange,
+      handleAddCondition,
+      handleRemoveCondition,
     };
   },
 });
 </script>
+
+<style lang="scss" scoped>
+.join-popup-container {
+  width: 624px;
+}
+
+.join-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.join-section {
+  flex: 1;
+  gap: 8px;
+}
+
+.join-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.join-connector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 21px;
+  padding-right: 10px;
+  padding-left: 10px;
+}
+
+.join-type-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.join-type-selector {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.join-type-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: opacity 0.2s;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.full-width {
+  width: 100%;
+}
+
+.clause-section {
+  margin-bottom: 10px;
+}
+
+.clause-header {
+  margin-bottom: 10px;
+}
+
+.clause-title {
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  margin: 0;
+}
+
+.clause-description {
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: normal;
+  margin: 4px 0 0 0;
+}
+
+.condition-item {
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
+.condition-label {
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.condition-fields {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.field-container {
+  flex: 1;
+}
+</style>
