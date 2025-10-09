@@ -1263,7 +1263,8 @@
   "traces": {
     "viewLogs": "View Logs",
     "backToLogs": "Back to Logs",
-    "RedMetrics": "RED Metrics"
+    "RedMetrics": "RED Metrics",
+    "loadingStream": "Loading Stream..."
   },
   "actions": {
     "testAction": "Test Action",

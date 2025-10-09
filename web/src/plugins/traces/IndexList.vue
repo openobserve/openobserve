@@ -123,6 +123,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="search" />
             </template>
           </q-input>
+          <q-tr
+            v-if="searchObj.loadingStream"
+            class="tw-flex tw-items-center tw-justify-center tw-w-full tw-pt-[2rem]"
+          >
+            <q-td colspan="100%"
+class="text-bold" style="opacity: 0.7">
+              <div
+                class="text-subtitle2 text-weight-bold tw-w-fit tw-mx-auto tw-my-0 tw-flex-col tw-justify-items-center"
+              >
+                <q-spinner-hourglass size="1.8rem" color="primary" />
+                {{ t("traces.loadingStream") }}
+              </div>
+            </q-td>
+          </q-tr>
         </template>
       </q-table>
     </div>
