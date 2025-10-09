@@ -1152,4 +1152,361 @@ mod tests {
         let ksuid3 = ksuid_from_hash(&alert3);
         assert_ne!(ksuid1, ksuid3);
     }
+
+    #[test]
+    fn test_ksuid_different_org() {
+        let alert1 = meta_table_alerts::Alert {
+            name: "alert".to_string(),
+            org_id: "org1".to_string(),
+            stream_type: meta_table_alerts::StreamType::Logs,
+            stream_name: "stream".to_string(),
+            is_real_time: false,
+            query_condition: Default::default(),
+            trigger_condition: Default::default(),
+            destinations: vec![],
+            context_attributes: None,
+            row_template: "".to_string(),
+            description: "".to_string(),
+            enabled: true,
+            tz_offset: 0,
+            last_triggered_at: None,
+            last_satisfied_at: None,
+            owner: None,
+            updated_at: None,
+            last_edited_by: None,
+        };
+
+        let mut alert2 = alert1.clone();
+        alert2.org_id = "org2".to_string();
+
+        let ksuid1 = ksuid_from_hash(&alert1);
+        let ksuid2 = ksuid_from_hash(&alert2);
+        assert_ne!(ksuid1, ksuid2);
+    }
+
+    #[test]
+    fn test_ksuid_different_stream_type() {
+        let alert1 = meta_table_alerts::Alert {
+            name: "alert".to_string(),
+            org_id: "org".to_string(),
+            stream_type: meta_table_alerts::StreamType::Logs,
+            stream_name: "stream".to_string(),
+            is_real_time: false,
+            query_condition: Default::default(),
+            trigger_condition: Default::default(),
+            destinations: vec![],
+            context_attributes: None,
+            row_template: "".to_string(),
+            description: "".to_string(),
+            enabled: true,
+            tz_offset: 0,
+            last_triggered_at: None,
+            last_satisfied_at: None,
+            owner: None,
+            updated_at: None,
+            last_edited_by: None,
+        };
+
+        let mut alert2 = alert1.clone();
+        alert2.stream_type = meta_table_alerts::StreamType::Metrics;
+
+        let ksuid1 = ksuid_from_hash(&alert1);
+        let ksuid2 = ksuid_from_hash(&alert2);
+        assert_ne!(ksuid1, ksuid2);
+    }
+
+    #[test]
+    fn test_ksuid_different_stream_name() {
+        let alert1 = meta_table_alerts::Alert {
+            name: "alert".to_string(),
+            org_id: "org".to_string(),
+            stream_type: meta_table_alerts::StreamType::Logs,
+            stream_name: "stream1".to_string(),
+            is_real_time: false,
+            query_condition: Default::default(),
+            trigger_condition: Default::default(),
+            destinations: vec![],
+            context_attributes: None,
+            row_template: "".to_string(),
+            description: "".to_string(),
+            enabled: true,
+            tz_offset: 0,
+            last_triggered_at: None,
+            last_satisfied_at: None,
+            owner: None,
+            updated_at: None,
+            last_edited_by: None,
+        };
+
+        let mut alert2 = alert1.clone();
+        alert2.stream_name = "stream2".to_string();
+
+        let ksuid1 = ksuid_from_hash(&alert1);
+        let ksuid2 = ksuid_from_hash(&alert2);
+        assert_ne!(ksuid1, ksuid2);
+    }
+
+    #[test]
+    fn test_compare_historic_data_conversion() {
+        let meta_chd = meta_table_alerts::CompareHistoricData {
+            offset: "1h".to_string(),
+        };
+        let ser_chd: alerts_table_ser::CompareHistoricData = meta_chd.into();
+        assert_eq!(ser_chd.offset, "1h");
+    }
+
+    #[test]
+    fn test_frequency_type_conversion() {
+        let cron: alerts_table_ser::FrequencyType = meta_table_alerts::FrequencyType::Cron.into();
+        assert_eq!(i16::from(cron), 0);
+
+        let minutes: alerts_table_ser::FrequencyType =
+            meta_table_alerts::FrequencyType::Minutes.into();
+        assert_eq!(i16::from(minutes), 1);
+    }
+
+    #[test]
+    fn test_agg_function_conversion() {
+        use alerts_table_ser::AggFunction as SerAgg;
+        use meta_table_alerts::AggFunction as MetaAgg;
+
+        let functions = vec![
+            (MetaAgg::Avg, SerAgg::Avg),
+            (MetaAgg::Min, SerAgg::Min),
+            (MetaAgg::Max, SerAgg::Max),
+            (MetaAgg::Sum, SerAgg::Sum),
+            (MetaAgg::Count, SerAgg::Count),
+            (MetaAgg::Median, SerAgg::Median),
+            (MetaAgg::P50, SerAgg::P50),
+            (MetaAgg::P75, SerAgg::P75),
+            (MetaAgg::P90, SerAgg::P90),
+            (MetaAgg::P95, SerAgg::P95),
+            (MetaAgg::P99, SerAgg::P99),
+        ];
+
+        for (meta, expected_ser) in functions {
+            let ser: SerAgg = meta.into();
+            // Use serde to compare since AggFunction doesn't implement PartialEq
+            let ser_json = serde_json::to_string(&ser).unwrap();
+            let expected_json = serde_json::to_string(&expected_ser).unwrap();
+            assert_eq!(ser_json, expected_json);
+        }
+    }
+
+    #[test]
+    fn test_query_type_conversion() {
+        use alerts_table_ser::QueryType as SerQt;
+        use meta_table_alerts::QueryType as MetaQt;
+
+        let custom: SerQt = MetaQt::Custom.into();
+        assert_eq!(i16::from(custom), 0);
+
+        let sql: SerQt = MetaQt::SQL.into();
+        assert_eq!(i16::from(sql), 1);
+
+        let promql: SerQt = MetaQt::PromQL.into();
+        assert_eq!(i16::from(promql), 2);
+    }
+
+    #[test]
+    fn test_condition_operator_conversion() {
+        use alerts_table_ser::ConditionOperator as SerOp;
+        use meta_table_alerts::Operator as MetaOp;
+
+        let operators = vec![
+            (MetaOp::EqualTo, SerOp::EqualTo),
+            (MetaOp::NotEqualTo, SerOp::NotEqualTo),
+            (MetaOp::GreaterThan, SerOp::GreaterThan),
+            (MetaOp::GreaterThanEquals, SerOp::GreaterThanEquals),
+            (MetaOp::LessThan, SerOp::LessThan),
+            (MetaOp::LessThanEquals, SerOp::LessThanEquals),
+            (MetaOp::Contains, SerOp::Contains),
+            (MetaOp::NotContains, SerOp::NotContains),
+        ];
+
+        for (meta, expected_ser) in operators {
+            let ser: SerOp = meta.into();
+            let ser_json = serde_json::to_string(&ser).unwrap();
+            let expected_json = serde_json::to_string(&expected_ser).unwrap();
+            assert_eq!(ser_json, expected_json);
+        }
+    }
+
+    #[test]
+    fn test_threshold_operator_conversion() {
+        use alerts_table_ser::ThresholdOperator as SerOp;
+        use meta_table_alerts::Operator as MetaOp;
+
+        let result: Result<SerOp, _> = MetaOp::EqualTo.try_into();
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().to_string(), "=");
+
+        let result: Result<SerOp, _> = MetaOp::NotEqualTo.try_into();
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().to_string(), "!=");
+
+        let result: Result<SerOp, _> = MetaOp::GreaterThan.try_into();
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().to_string(), ">");
+
+        let result: Result<SerOp, _> = MetaOp::GreaterThanEquals.try_into();
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().to_string(), ">=");
+
+        let result: Result<SerOp, _> = MetaOp::LessThan.try_into();
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().to_string(), "<");
+
+        let result: Result<SerOp, _> = MetaOp::LessThanEquals.try_into();
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().to_string(), "<=");
+
+        // Contains and NotContains should fail
+        let result: Result<SerOp, String> = MetaOp::Contains.try_into();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("contains"));
+
+        let result: Result<SerOp, String> = MetaOp::NotContains.try_into();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not_contains"));
+    }
+
+    #[test]
+    fn test_search_event_type_conversion() {
+        use alerts_table_ser::SearchEventType as SerSe;
+        use meta_table_alerts::SearchEventType as MetaSe;
+
+        let types = vec![
+            (MetaSe::UI, SerSe::Ui, 0),
+            (MetaSe::Dashboards, SerSe::Dashboards, 1),
+            (MetaSe::Reports, SerSe::Reports, 2),
+            (MetaSe::Alerts, SerSe::Alerts, 3),
+            (MetaSe::Values, SerSe::Values, 4),
+            (MetaSe::Other, SerSe::Other, 5),
+            (MetaSe::RUM, SerSe::Rum, 6),
+            (MetaSe::DerivedStream, SerSe::DerivedStream, 7),
+        ];
+
+        for (meta, _expected_ser, expected_i16) in types {
+            let ser: SerSe = meta.into();
+            assert_eq!(i16::from(ser), expected_i16);
+        }
+    }
+
+    #[test]
+    fn test_stream_type_conversion() {
+        use alerts_table_ser::StreamType as SerSt;
+        use meta_table_alerts::StreamType as MetaSt;
+
+        let types = vec![
+            (MetaSt::Logs, SerSt::Logs, "logs"),
+            (MetaSt::Metrics, SerSt::Metrics, "metrics"),
+            (MetaSt::Traces, SerSt::Traces, "traces"),
+            (
+                MetaSt::EnrichmentTables,
+                SerSt::EnrichmentTables,
+                "enrichment_tables",
+            ),
+            (MetaSt::Filelist, SerSt::Filelist, "file_list"),
+            (MetaSt::Metadata, SerSt::Metadata, "metadata"),
+            (MetaSt::Index, SerSt::Index, "index"),
+        ];
+
+        for (meta, _expected_ser, expected_str) in types {
+            let ser: SerSt = meta.into();
+            assert_eq!(ser.to_string(), expected_str);
+        }
+    }
+
+    #[test]
+    fn test_condition_conversion() {
+        use serde_json::json;
+
+        let meta_condition = meta_table_alerts::Condition {
+            column: "status".to_string(),
+            operator: meta_table_alerts::Operator::EqualTo,
+            value: json!("active"),
+            ignore_case: true,
+        };
+
+        let ser_condition: alerts_table_ser::Condition = meta_condition.into();
+        assert_eq!(ser_condition.column, "status");
+        assert_eq!(ser_condition.ignore_case, true);
+
+        let value_str = ser_condition.value.as_str().unwrap();
+        assert_eq!(value_str, "active");
+    }
+
+    #[test]
+    fn test_aggregation_conversion() {
+        use serde_json::json;
+
+        let meta_agg = meta_table_alerts::Aggregation {
+            group_by: Some(vec!["field1".to_string(), "field2".to_string()]),
+            function: meta_table_alerts::AggFunction::Avg,
+            having: meta_table_alerts::Condition {
+                column: "count".to_string(),
+                operator: meta_table_alerts::Operator::GreaterThan,
+                value: json!(10),
+                ignore_case: false,
+            },
+        };
+
+        let ser_agg: alerts_table_ser::Aggregation = meta_agg.into();
+        assert_eq!(ser_agg.group_by.as_ref().unwrap().len(), 2);
+        assert_eq!(ser_agg.having.column, "count");
+        assert_eq!(ser_agg.having.ignore_case, false);
+    }
+
+    #[test]
+    fn test_org_with_alert_org_name() {
+        let org = OrgWithAlert {
+            key1: "test_organization".to_string(),
+        };
+        assert_eq!(org.org_name(), "test_organization");
+    }
+
+    #[test]
+    fn test_meta_alert_with_folder_accessors() {
+        let meta = MetaAlertWithFolder {
+            value: r#"{"name":"test"}"#.to_string(),
+            id: Some(42),
+        };
+        assert_eq!(meta.alert_json(), r#"{"name":"test"}"#);
+        assert_eq!(meta.folder_id(), Some(42));
+
+        let meta_no_folder = MetaAlertWithFolder {
+            value: r#"{"name":"test"}"#.to_string(),
+            id: None,
+        };
+        assert_eq!(meta_no_folder.folder_id(), None);
+    }
+
+    #[test]
+    fn test_threshold_operator_display() {
+        use alerts_table_ser::ThresholdOperator;
+
+        assert_eq!(ThresholdOperator::EqualTo.to_string(), "=");
+        assert_eq!(ThresholdOperator::NotEqualTo.to_string(), "!=");
+        assert_eq!(ThresholdOperator::GreaterThan.to_string(), ">");
+        assert_eq!(ThresholdOperator::GreaterThanEquals.to_string(), ">=");
+        assert_eq!(ThresholdOperator::LessThan.to_string(), "<");
+        assert_eq!(ThresholdOperator::LessThanEquals.to_string(), "<=");
+    }
+
+    #[test]
+    fn test_stream_type_display() {
+        use alerts_table_ser::StreamType;
+
+        assert_eq!(StreamType::Logs.to_string(), "logs");
+        assert_eq!(StreamType::Metrics.to_string(), "metrics");
+        assert_eq!(StreamType::Traces.to_string(), "traces");
+        assert_eq!(
+            StreamType::EnrichmentTables.to_string(),
+            "enrichment_tables"
+        );
+        assert_eq!(StreamType::Filelist.to_string(), "file_list");
+        assert_eq!(StreamType::Metadata.to_string(), "metadata");
+        assert_eq!(StreamType::Index.to_string(), "index");
+    }
 }
