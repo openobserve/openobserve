@@ -356,7 +356,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 #[put("/{org_id}/re_patterns/{id}")]
 pub async fn update(
     path: web::Path<(String, String)>,
-    body: web::Bytes,
+    web::Json(req): web::Json<PatternCreateRequest>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -364,10 +364,6 @@ pub async fn update(
         use o2_enterprise::enterprise::re_patterns::PatternManager;
 
         let (_org_id, id) = path.into_inner();
-        let req: PatternCreateRequest = match serde_json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
 
         match infra::table::re_pattern::get(&id).await {
             Ok(Some(k)) => k,
@@ -401,7 +397,7 @@ pub async fn update(
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
-        drop(body);
+        drop(req);
         Ok(MetaHttpResponse::forbidden("not supported"))
     }
 }
@@ -429,16 +425,11 @@ pub async fn update(
     tag = "RePattern"
 )]
 #[post("/{org_id}/re_patterns/test")]
-pub async fn test(body: web::Bytes) -> Result<HttpResponse, Error> {
+pub async fn test(web::Json(req): web::Json<PatternTestRequest>) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         use infra::table::re_pattern_stream_map::PatternPolicy;
         use o2_enterprise::enterprise::re_patterns::PatternManager;
-
-        let req: PatternTestRequest = match serde_json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
 
         let pattern = req.pattern;
         let inputs = req.test_records;
@@ -460,7 +451,7 @@ pub async fn test(body: web::Bytes) -> Result<HttpResponse, Error> {
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(body);
+        drop(req);
         Ok(MetaHttpResponse::forbidden("not supported"))
     }
 }

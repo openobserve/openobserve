@@ -328,7 +328,6 @@ pub async fn update_role(
         ("org_id" = String, Path, description = "Organization name"),
         ("role_id" = String, Path, description = "Role Id"),
     ),
-    request_body(content = Object, description = "RoleRequest", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
