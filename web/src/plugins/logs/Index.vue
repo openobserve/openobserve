@@ -1129,7 +1129,7 @@ export default defineComponent({
             streams.forEach((stream: string, index: number) => {
               // Add UNION for all but the first SELECT statement
               if (index > 0) {
-                searchObj.data.query += " UNION ";
+                searchObj.data.query += " UNION ALL BY NAME ";
               }
               searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${whereClause}`;
             });
