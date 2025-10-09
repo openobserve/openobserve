@@ -222,8 +222,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openDrilldown(index)"
             style="cursor: pointer; display: flex; align-items: center"
           >
-            <q-icon class="q-mr-xs q-mt-xs" size="16px"
-name="link" />
+            <q-icon class="q-mr-xs q-mt-xs"
+size="16px" name="link" />
             <span>{{ drilldown.name }}</span>
           </div>
         </div>
@@ -954,7 +954,10 @@ export default defineComponent({
         handleAddAnnotation(event.start, event.end);
       } else {
         // default behavior
-        emit("updated:data-zoom", { ...event, data: panelSchema.value });
+        emit("updated:data-zoom", {
+          ...event,
+          data: { id: panelSchema.value.id, title: panelSchema.value.title },
+        });
       }
     };
 
