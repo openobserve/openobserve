@@ -15,12 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="traces-metrics-dashboard tw-p-2">
+  <div class="traces-metrics-dashboard tw-pt-2 tw-px-1">
     <!-- Filters Section -->
     <div
       v-if="show"
-      class="filters-section tw-mb-2 tw-flex tw-items-center tw-gap-2 tw-px-1 tw-flex-wrap"
+      class="filters-section tw-flex tw-items-center tw-gap-2 tw-px-1 tw-flex-wrap"
     >
+      <span class="filters-label tw-text-sm tw-font-semibold">Filters:</span>
       <!-- Error Only Toggle -->
       <div
         style="border: 1px solid #c4c4c4; border-radius: 5px"
@@ -74,7 +75,7 @@ size="18px" class="tw-mx-1" />
     </div>
 
     <!-- Charts Section -->
-    <div class="charts-container">
+    <div class="charts-container" v-show="searchObj.meta.showHistogram">
       <RenderDashboardCharts
         v-if="show"
         ref="dashboardChartsRef"
@@ -88,6 +89,7 @@ size="18px" class="tw-mx-1" />
     </div>
 
     <TracesMetricsContextMenu
+      v-show="searchObj.meta.showHistogram"
       :visible="contextMenuVisible"
       :x="contextMenuPosition.x"
       :y="contextMenuPosition.y"
@@ -115,6 +117,7 @@ import useNotifications from "@/composables/useNotifications";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import metrics from "./metrics.json";
 import { deepCopy, getUUID } from "@/utils/zincutils";
+import useTraces from "@/composables/useTraces";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -142,6 +145,7 @@ const emit = defineEmits<{
 
 const { showErrorNotification } = useNotifications();
 const store = useStore();
+const { searchObj } = useTraces();
 
 const autoRefreshEnabled = ref(false);
 const autoRefreshIntervalId = ref<number | null>(null);
@@ -156,11 +160,14 @@ const currentTimeObj = ref({
 
 const dashboardData = ref(null);
 
-// Filter state
-const showErrorOnly = ref(false);
-const rangeFilters = ref<
-  Map<string, { panelTitle: string; start: number; end: number }>
->(new Map());
+// Use filters from searchObj
+const showErrorOnly = computed({
+  get: () => searchObj.meta.showErrorOnly,
+  set: (val) => {
+    searchObj.meta.showErrorOnly = val;
+  },
+});
+const rangeFilters = computed(() => searchObj.meta.metricsRangeFilters);
 
 // Context menu state
 const contextMenuVisible = ref(false);
@@ -168,6 +175,29 @@ const contextMenuPosition = ref({ x: 0, y: 0 });
 const contextMenuValue = ref(0);
 const contextMenuFieldName = ref("");
 const contextMenuData = ref<any>(null);
+
+const getBaseFilters = () => {
+  let baseFilters = [];
+  rangeFilters.value.forEach((rangeFilter) => {
+    if (rangeFilter.panelTitle === "Duration") {
+      baseFilters.push(
+        `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
+      );
+    }
+  });
+
+  // Add error filter if showErrorOnly is enabled
+  if (showErrorOnly.value) {
+    baseFilters.push("span_status = 'ERROR'");
+  }
+
+  // Add user-provided filters from query editor
+  if (props.filter?.trim().length) {
+    baseFilters.push(props.filter.trim());
+  }
+
+  return baseFilters;
+};
 
 const loadDashboard = async () => {
   try {
@@ -182,28 +212,10 @@ const loadDashboard = async () => {
     // Convert the dashboard schema and update stream names
     const convertedDashboard = convertDashboardSchemaVersion(deepCopy(metrics));
 
+    const baseFilters: string[] = getBaseFilters();
     convertedDashboard.tabs[0].panels.forEach((panel, index) => {
       // Build WHERE clause based on filters
       let whereClause = "";
-      const baseFilters: string[] = [];
-
-      // Add error filter if showErrorOnly is enabled
-      if (showErrorOnly.value) {
-        baseFilters.push("span_status = 'ERROR'");
-      }
-
-      // Add user-provided filters
-      if (props.filter?.trim().length) {
-        baseFilters.push(props.filter.trim());
-      }
-
-      // Add range filter if exists for this panel
-      const rangeFilter = rangeFilters.value.get(panel.id);
-      if (rangeFilter) {
-        baseFilters.push(
-          `_timestamp >= ${rangeFilter.start} AND _timestamp <= ${rangeFilter.end}`,
-        );
-      }
 
       // Special handling for "Errors" panel - always filter by error status
       if (panel.title === "Errors") {
@@ -211,12 +223,11 @@ const loadDashboard = async () => {
         if (props.filter?.trim().length) {
           errorFilters.push(props.filter.trim());
         }
-        // Add range filter for Errors panel if exists
-        if (rangeFilter) {
-          errorFilters.push(
-            `_timestamp >= ${rangeFilter.start} AND _timestamp <= ${rangeFilter.end}`,
-          );
+
+        if (baseFilters.length) {
+          errorFilters.push(...baseFilters);
         }
+
         whereClause = errorFilters.length
           ? "WHERE " + errorFilters.join(" AND ")
           : "";
@@ -227,9 +238,12 @@ const loadDashboard = async () => {
           : "";
       }
 
+      console.log("Where claude ", whereClause);
       convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
         "queries"
       ][0].query.replace("[WHERE_CLAUSE]", whereClause);
+
+      console.log(convertedDashboard.tabs[0].panels[index]["queries"][0].query);
     });
 
     dashboardData.value = convertedDashboard;
@@ -269,14 +283,13 @@ const onDataZoom = ({
   end1: number;
   data: any; // contains panel schema with data.id as panel id
 }) => {
-  console.log("start 1, end 1 ---", start1, end1, data.id);
   if (start && end) {
     // Create or update range filter chip for this panel
     const panelId = data?.id;
     const panelTitle = data?.title || "Chart";
 
-    if (panelId) {
-      rangeFilters.value.set(panelId, {
+    if (panelId && panelTitle === "Duration") {
+      searchObj.meta.metricsRangeFilters.set(panelId, {
         panelTitle,
         start: Math.floor(start1),
         end: Math.floor(end1),
@@ -288,9 +301,7 @@ const onDataZoom = ({
 };
 
 const removeRangeFilter = (panelId: string) => {
-  rangeFilters.value.delete(panelId);
-  // Trigger dashboard reload to remove the filter
-  loadDashboard();
+  searchObj.meta.metricsRangeFilters.delete(panelId);
 };
 
 const formatTimestamp = (timestamp: number) => {
@@ -378,6 +389,7 @@ defineExpose({
     // Dashboard handles zoom reset through toolbar
   },
   loadDashboard,
+  getBaseFilters,
 });
 </script>
 
@@ -402,6 +414,12 @@ defineExpose({
   overflow-y: auto;
 }
 
+// Filters label
+.filters-label {
+  color: #333;
+  user-select: none;
+}
+
 // Filter chip styles
 .filter-chip {
   display: flex;
@@ -424,13 +442,13 @@ defineExpose({
     transition: color 0.2s;
 
     &:hover {
-      color: #d32f2f;
+      color: #0d447a;
     }
   }
 }
 
 // Dark mode support
-:deep(.q-dark) {
+body.body--dark {
   .traces-metrics-dashboard {
     background: var(--q-dark);
   }
@@ -439,13 +457,17 @@ defineExpose({
     background-color: rgba(255, 255, 255, 0.05);
   }
 
+  .filters-label {
+    color: #e0e0e0;
+  }
+
   .filter-chip {
     background-color: #1e3a5f;
     border-color: #2c5282;
     color: #90caf9;
 
     .chip-close-icon:hover {
-      color: #ff5252;
+      color: #ffffff;
     }
   }
 }
