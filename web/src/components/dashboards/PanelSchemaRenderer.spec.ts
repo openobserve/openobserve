@@ -618,7 +618,14 @@ describe("PanelSchemaRenderer", () => {
       wrapper.vm.onDataZoom(mockEvent);
 
       expect(wrapper.emitted("updated:data-zoom")).toBeTruthy();
-      expect(wrapper.emitted("updated:data-zoom")[0][0]).toEqual(mockEvent);
+      const emittedEvent = wrapper.emitted("updated:data-zoom")[0][0];
+      expect(emittedEvent).toMatchObject({
+        start: 100,
+        end: 200,
+        data: {
+          id: expect.any(String),
+        },
+      });
     });
 
     it("should emit metadata-update event", () => {
