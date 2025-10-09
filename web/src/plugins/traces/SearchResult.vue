@@ -34,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <TracesMetricsDashboard
           v-if="searchObj.data.stream.selectedStream.value"
-          v-show="searchObj.meta.showHistogram"
           ref="metricsDashboardRef"
           :streamName="searchObj.data.stream.selectedStream.value"
           :timeRange="{
@@ -97,9 +96,13 @@ size="md" /> No traces found. Please
         "
         id="tracesSearchGridComponent"
         data-test="traces-search-result-virtual-scroll"
-        style="height: 400px"
         :items="searchObj.data.queryResults.hits"
         class="traces-table-container"
+        :class="
+          searchObj.meta.showHistogram
+            ? 'tw-h-[calc(100vh-28.375rem)]'
+            : 'tw-h-[calc(100vh-13.125rem)]'
+        "
         v-slot="{ item, index }"
         :virtual-scroll-item-size="25"
         :virtual-scroll-sticky-size-start="0"
@@ -264,9 +267,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.traces-table-container {
-  height: calc(100vh - 426px) !important;
-}
 .max-result {
   width: 170px;
 }
