@@ -43,6 +43,8 @@ use crate::{
     service::{search as SearchService, traces},
 };
 
+mod filter_parser;
+
 /// TracesIngest
 #[utoipa::path(
     context_path = "/api",
@@ -121,7 +123,7 @@ async fn handle_req(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
-        ("filter" = Option<String>, Query, description = "filter, eg: a=b AND c=d"),
+        ("filter" = Option<String>, Query, description = "filter, eg: a=b AND c=d. Supports composite fields: 'rate' (span count) and 'error' (error count), eg: service_name='app' AND rate > 10 AND error > 0"),
         ("from" = i64, Query, description = "from"), // topN
         ("size" = i64, Query, description = "size"), // topN
         ("start_time" = i64, Query, description = "start time"),
@@ -288,15 +290,50 @@ pub async fn get_latest_traces(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
-    // search
-    let query_sql = format!(
-        "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM {stream_name}"
-    );
-    let query_sql = if filter.is_empty() {
-        format!("{query_sql} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
-    } else {
-        format!("{query_sql} WHERE {filter} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
+    // Parse filter to separate composite fields (rate, error) from regular fields
+    let parsed_filter = match filter_parser::parse_filter(&filter) {
+        Ok(pf) => pf,
+        Err(e) => {
+            log::error!("Failed to parse filter: {e}");
+            return Ok(MetaHttpResponse::bad_request(format!("Invalid filter: {e}")));
+        }
     };
+
+    // Build SELECT clause with composite fields if needed
+    let mut select_fields = vec![
+        "trace_id".to_string(),
+        format!("min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp"),
+        "min(start_time) as trace_start_time".to_string(),
+        "max(end_time) as trace_end_time".to_string(),
+    ];
+
+    if parsed_filter.needs_rate {
+        select_fields.push("COUNT(*) as rate".to_string());
+    }
+    if parsed_filter.needs_error {
+        select_fields.push("SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error".to_string());
+    }
+
+    let select_clause = select_fields.join(", ");
+
+    // Build WHERE clause from regular field conditions
+    let where_clause = if !parsed_filter.where_conditions.is_empty() {
+        format!("WHERE {}", parsed_filter.where_conditions.join(" AND "))
+    } else {
+        String::new()
+    };
+
+    // Build HAVING clause from composite field conditions
+    let having_clause = if !parsed_filter.having_conditions.is_empty() {
+        format!("HAVING {}", parsed_filter.having_conditions.join(" AND "))
+    } else {
+        String::new()
+    };
+
+    // Construct final SQL query
+    let query_sql = format!(
+        "SELECT {select_clause} FROM {stream_name} {where_clause} GROUP BY trace_id {having_clause} ORDER BY zo_sql_timestamp DESC"
+    ).trim().to_string();
     let mut req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: query_sql.to_string(),
