@@ -1141,7 +1141,7 @@ export default defineComponent({
               if (index > 0) {
                 searchObj.data.query += " UNION ALL BY NAME ";
               }
-              searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${whereClause}`;
+              searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}"${whereClause ? " " + whereClause : ""}`;
             });
 
             if (
