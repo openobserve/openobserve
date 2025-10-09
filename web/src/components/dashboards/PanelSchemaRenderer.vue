@@ -924,12 +924,24 @@ export default defineComponent({
       }
     };
 
+    // ResizeObserver to detect chartPanelRef dimension changes
+    let resizeObserver: ResizeObserver | null = null;
+
     onMounted(() => {
-      window.addEventListener("resize", handleWindowLayoutChanges);
+      if (chartPanelRef.value) {
+        resizeObserver = new ResizeObserver(() => {
+          handleWindowLayoutChanges();
+        });
+
+        resizeObserver.observe(chartPanelRef.value);
+      }
     });
 
     onUnmounted(() => {
-      window.removeEventListener("resize", handleWindowLayoutChanges);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+        resizeObserver = null;
+      }
     });
 
     watch(
