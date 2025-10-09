@@ -3368,7 +3368,7 @@ export default defineComponent({
             })
             .filter(Boolean);
 
-          searchObj.data.query = queries.join(" UNION ");
+          searchObj.data.query = queries.join(" UNION ALL BY NAME ");
           searchObj.data.editorValue = searchObj.data.query;
         }
       } else {
