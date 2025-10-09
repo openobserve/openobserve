@@ -40,8 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onFilterChange"
           data-test="error-only-toggle"
         />
-        <q-icon name="error" size="18px"
-class="tw-mx-1" />
+        <q-icon name="error"
+size="18px" class="tw-mx-1" />
         <q-tooltip>Show Error Only</q-tooltip>
       </div>
 
@@ -248,12 +248,9 @@ const loadDashboard = async () => {
           : "";
       }
 
-      console.log("Where claude ", whereClause);
       convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
         "queries"
       ][0].query.replace("[WHERE_CLAUSE]", whereClause);
-
-      console.log(convertedDashboard.tabs[0].panels[index]["queries"][0].query);
     });
 
     dashboardData.value = convertedDashboard;
