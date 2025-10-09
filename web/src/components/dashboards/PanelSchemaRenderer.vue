@@ -798,7 +798,6 @@ export default defineComponent({
       parser = null;
     });
     const convertPanelDataCommon = async () => {
-      console.log(panelSchema.value);
       if (
         !errorDetail?.value?.message &&
         validatePanelData?.value?.length === 0
