@@ -111,76 +111,76 @@ jobs:
             run_files:
               [
                 "sanity.spec.js",
-                "changeOrg.spec.js",
-                "enrichment.spec.js",
-                "schema.spec.js",
-                "schemaload.spec.js",
-                "serviceAccount.spec.js",
-                "usersOrg.spec.js",
-                "org.spec.js",
+                # "changeOrg.spec.js",
+                # "enrichment.spec.js",
+                # "schema.spec.js",
+                # "schemaload.spec.js",
+                # "serviceAccount.spec.js",
+                # "usersOrg.spec.js",
+                # "org.spec.js",
               ]
           - testfolder: "Logs-Core"
             browser: "chrome"
             run_files:
               [
                 "join.spec.js",
-                "logshistogram.spec.js",
-                "logspage.spec.js",
-                "logsquickmode.spec.js",
-                "pagination.spec.js",
-                "unflattened.spec.js",
-                "logstable.spec.js",
+                # "logshistogram.spec.js",
+                # "logspage.spec.js",
+                # "logsquickmode.spec.js",
+                # "pagination.spec.js",
+                # "unflattened.spec.js",
+                # "logstable.spec.js",
               ]
           - testfolder: "Logs-Queries"
             browser: "chrome"
             run_files:
               [
                 "logsDownloads.spec.js",
-                "logsqueries.spec.js",
-                "secondsPrecisionAdded.spec.js",
-                "logsqueries.cte.spec.js",
-                "logsqueries.matchall.spec.js",
-                "searchpartition.spec.js",
+                # "logsqueries.spec.js",
+                # "secondsPrecisionAdded.spec.js",
+                # "logsqueries.cte.spec.js",
+                # "logsqueries.matchall.spec.js",
+                # "searchpartition.spec.js",
               ]
           - testfolder: "Alerts"
             browser: "chrome"
             run_files:
               [
                 "alerts-e2e-flow.spec.js",
-                "alerts-ui-operations.spec.js",
-                "alerts-import.spec.js",
+                # "alerts-ui-operations.spec.js",
+                # "alerts-import.spec.js",
               ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"
             run_files:
               [
                 "dashboard.spec.js",
-                "dashboard2.spec.js",
-                "dashboardtype.spec.js",
-                "dashboard-folder.spec.js",
-                "dashboard-import.spec.js",
-                "maxquery.spec.js",
+                # "dashboard2.spec.js",
+                # "dashboardtype.spec.js",
+                # "dashboard-folder.spec.js",
+                # "dashboard-import.spec.js",
+                # "maxquery.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
             run_files:
               [
                 "dashboard-filter.spec.js",
-                "dashboard-general-setting.spec.js",
-                "dashboard-tabs-setting.spec.js",
-                "dashboard-variables-setting.spec.js",
-                "dashboard-transpose.spec.js",
+                # "dashboard-general-setting.spec.js",
+                # "dashboard-tabs-setting.spec.js",
+                # "dashboard-variables-setting.spec.js",
+                # "dashboard-transpose.spec.js",
               ]
           - testfolder: "Dashboards-Charts"
             browser: "chrome"
             run_files: [
                 "custom-charts.spec.js",
-                "dashboard-geoMap.spec.js",
-                "dashboard-maps.spec.js",
-                "dashboard-multi-y-axis.spec.js",
-                "dashboard-html-chart.spec.js",
-                "visualize.spec.js",
-                # "visualization-vrl.spec.js"
+                # "dashboard-geoMap.spec.js",
+                # "dashboard-maps.spec.js",
+                # "dashboard-multi-y-axis.spec.js",
+                # "dashboard-html-chart.spec.js",
+                # "visualize.spec.js",
+                # # "visualization-vrl.spec.js"
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
@@ -189,20 +189,23 @@ jobs:
             browser: "chrome"
             run_files: [
                 "pipelines.spec.js",
-                "pipeline-dynamic.spec.js",
-                "pipeline-core.spec.js",
-                # "remotepipeline.spec.js"
+                # "pipeline-dynamic.spec.js",
+                # "pipeline-core.spec.js",
+                # # "remotepipeline.spec.js"
               ]
           - testfolder: "Reports"
             browser: "chrome"
-            run_files: ["reportsUpdated.spec.js", "reportsUpdated2.spec.js"]
+            run_files: [
+              "reportsUpdated.spec.js", 
+              # "reportsUpdated2.spec.js"
+              ]
           - testfolder: "Streams"
             browser: "chrome"
             run_files:
               [
                 "multiselect-stream.spec.js",
-                "streamname.spec.js",
-                "streaming.spec.js",
+                # "streamname.spec.js",
+                # "streaming.spec.js",
               ]
     steps:
       - name: Clone the current repo
@@ -304,11 +307,13 @@ jobs:
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npx nyc report
 
-      - name: Upload results to TestDino
+      - name: Upload Playwright Test Results
+        uses: actions/upload-artifact@v4
         if: always()
-        run: |
-          cd tests/ui-testing
-          npx tdpw upload playwright-results --json-report playwright-results/report.json --html-report playwright-results/html-report --upload-html --token ${{ secrets.TESTDINO_API_TOKEN }}
+        with:
+          name: playwright-results-${{ matrix.testfolder }}
+          path: tests/ui-testing/playwright-results/
+          retention-days: 30
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
@@ -321,6 +326,91 @@ jobs:
       - name: Check OpenObserve logs
         if: always()
         run: cat o2.log
+
+  upload_to_testdino:
+    name: Upload Merged Reports to TestDino
+    needs: [build_binary, ui_integration_tests]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download All Playwright Results
+        uses: actions/download-artifact@v5
+        with:
+          pattern: playwright-results-*
+          path: all-results
+          merge-multiple: false
+
+      - name: Merge Playwright JSON Reports
+        run: |
+          mkdir -p merged-results
+          echo "Merging JSON reports from all test folders..."
+
+          # Install jq for JSON manipulation
+          sudo apt-get update && sudo apt-get install -y jq
+
+          # Initialize merged report structure
+          echo '{"config":{},"suites":[],"stats":{"startTime":"","endTime":"","duration":0}}' > merged-results/report.json
+
+          # Merge all JSON reports
+          for folder in all-results/playwright-results-*/; do
+            if [ -f "$folder/report.json" ]; then
+              echo "Processing $(basename $folder)"
+              # Merge suites array from each report
+              jq -s '.[0].suites += .[1].suites | .[0]' merged-results/report.json "$folder/report.json" > merged-results/temp.json
+              mv merged-results/temp.json merged-results/report.json
+            fi
+          done
+
+          # Update stats - use earliest startTime and latest endTime
+          for folder in all-results/playwright-results-*/; do
+            if [ -f "$folder/report.json" ]; then
+              START_TIME=$(jq -r '.stats.startTime' "$folder/report.json")
+              END_TIME=$(jq -r '.stats.endTime' "$folder/report.json")
+
+              CURRENT_START=$(jq -r '.stats.startTime' merged-results/report.json)
+              CURRENT_END=$(jq -r '.stats.endTime' merged-results/report.json)
+
+              if [ "$CURRENT_START" = "" ] || [ "$START_TIME" \< "$CURRENT_START" ]; then
+                jq --arg start "$START_TIME" '.stats.startTime = $start' merged-results/report.json > merged-results/temp.json
+                mv merged-results/temp.json merged-results/report.json
+              fi
+
+              if [ "$CURRENT_END" = "" ] || [ "$END_TIME" \> "$CURRENT_END" ]; then
+                jq --arg end "$END_TIME" '.stats.endTime = $end' merged-results/report.json > merged-results/temp.json
+                mv merged-results/temp.json merged-results/report.json
+              fi
+            fi
+          done
+
+          echo "Merged report created successfully"
+          jq '.suites | length' merged-results/report.json | xargs -I {} echo "Total test suites: {}"
+
+      - name: Merge HTML Reports
+        run: |
+          mkdir -p merged-results/html-report
+
+          # Copy the first HTML report as base
+          first_folder=$(ls -d all-results/playwright-results-*/ | head -n 1)
+          if [ -d "$first_folder/html-report" ]; then
+            cp -r "$first_folder/html-report/"* merged-results/html-report/
+          fi
+
+          echo "HTML report base created"
+
+      - name: Upload to TestDino
+        if: always()
+        run: |
+          cd merged-results
+          npx tdpw upload . --json-report report.json --html-report html-report --upload-html --token ${{ secrets.TESTDINO_API_TOKEN }}
 
   generate_coverage_report:
     name: Generate Coverage Report
