@@ -914,8 +914,10 @@ pub async fn do_partitioned_search(
 /// Check streaming aggregation cache for each partition and identify which partitions
 /// have complete cache available.
 ///
-/// This function checks each partition's time range against the cache and separates
-/// them into cached and uncached (delta) partitions.
+/// DESIGN: This function ONLY identifies cached vs delta partitions. It does NOT prepare
+/// the cache. Cache preparation is handled by flight.rs:run_datafusion when it calls
+/// rewrite_streaming_agg_plan() for the entire query duration. This ensures proper cache
+/// management and avoids conflicts with temporary files.
 ///
 /// Returns: (cached_partitions, delta_partitions)
 #[cfg(feature = "enterprise")]
@@ -965,20 +967,8 @@ async fn check_streaming_aggs_cache_per_partition(
                     end_time
                 );
                 cached_partitions.push([start_time, end_time]);
-
-                // Prepare cache for this partition
-                if let Err(e) = streaming_aggs_exec::prepare_cache(streaming_id, cached_result) {
-                    log::error!(
-                        "[streaming_id {}] check_streaming_aggs_cache_per_partition: error preparing cache for partition [{}, {}]: {}, treating as delta",
-                        streaming_id,
-                        start_time,
-                        end_time,
-                        e
-                    );
-                    // If cache preparation fails, treat it as a delta partition
-                    cached_partitions.pop();
-                    delta_partitions.push([start_time, end_time]);
-                }
+                // NOTE: We do NOT prepare cache here - flight.rs:run_datafusion will handle it
+                // for the entire query duration when it calls rewrite_streaming_agg_plan
             } else {
                 log::debug!(
                     "[streaming_id {}] check_streaming_aggs_cache_per_partition: Partition [{}, {}] is not a complete match, treating as delta",
@@ -1000,7 +990,7 @@ async fn check_streaming_aggs_cache_per_partition(
     }
 
     log::info!(
-        "[streaming_id {}] check_streaming_aggs_cache_per_partition: Found {} cached partitions and {} delta partitions",
+        "[streaming_id {}] check_streaming_aggs_cache_per_partition: Found {} cached partitions and {} delta partitions (cache will be prepared by flight.rs for entire query)",
         streaming_id,
         cached_partitions.len(),
         delta_partitions.len()
