@@ -1816,7 +1816,10 @@ export default defineComponent({
         dashboardPanelData.data.config.trellis.group_by_y_axis = false;
       }
 
-      if (!dashboardPanelData.data.config.show_gridlines) {
+      if (
+        dashboardPanelData.data.config.show_gridlines === null ||
+        dashboardPanelData.data.config.show_gridlines === undefined
+      ) {
         dashboardPanelData.data.config.show_gridlines = true;
       }
     });
