@@ -193,8 +193,13 @@ const store = useStore();
 const router = useRouter();
 const $q = useQuasar();
 const { t } = useI18n();
-const { searchObj, resetSearchObj, getUrlQueryParams, copyTracesUrl } =
-  useTraces();
+const {
+  searchObj,
+  resetSearchObj,
+  getUrlQueryParams,
+  copyTracesUrl,
+  getBaseFilters,
+} = useTraces();
 let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
@@ -624,33 +629,11 @@ async function getQueryData() {
 
     let filter = searchObj.data.editorValue.trim();
 
-    // Add RED metrics filters to the query
-    const metricsFilters: string[] = [];
-    searchObj.meta.metricsRangeFilters.forEach((rangeFilter) => {
-      if (rangeFilter.panelTitle === "Duration") {
-        if (rangeFilter.start !== null && rangeFilter.end !== null) {
-          metricsFilters.push(
-            `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
-          );
-        } else {
-          metricsFilters.push(
-            `duration ${rangeFilter.start ? ">=" : "<="} ${rangeFilter.start || rangeFilter.end}`,
-          );
-        }
-      }
-      // Note: Rate and Error filters are not applicable to individual trace queries
-      // They are aggregation metrics, not span-level filters
-    });
+    // get combined filters from getBaseFilters
+    const allFilters = (
+      getBaseFilters(searchObj.meta.metricsRangeFilters, filter) || []
+    ).filter((f) => f.trim().length > 0);
 
-    // Add Error Only filter
-    if (searchObj.meta.showErrorOnly) {
-      metricsFilters.push("span_status = 'ERROR'");
-    }
-
-    // Combine editor filter with metrics filters
-    const allFilters = [filter, ...metricsFilters].filter(
-      (f) => f.trim().length > 0,
-    );
     const combinedFilter = allFilters.join(" AND ");
 
     if (queryReq.query.from === 0) searchResultRef.value.getDashboardData();
