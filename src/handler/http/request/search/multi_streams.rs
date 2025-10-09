@@ -1255,24 +1255,4 @@ mod tests {
         let decoded = config::utils::base64::decode_url(invalid);
         assert!(decoded.is_err());
     }
-
-    #[test]
-    fn test_time_range_validation() {
-        let start_time = Utc::now().timestamp_micros();
-        let end_time = start_time + 3_600_000_000; // 1 hour later
-
-        assert!(end_time > start_time);
-        assert_eq!(end_time - start_time, 3_600_000_000);
-    }
-
-    #[test]
-    fn test_stream_names_parsing() {
-        let stream_names = "stream1,stream2,stream3";
-        let parsed: Vec<&str> = stream_names.split(',').collect();
-
-        assert_eq!(parsed.len(), 3);
-        assert_eq!(parsed[0], "stream1");
-        assert_eq!(parsed[1], "stream2");
-        assert_eq!(parsed[2], "stream3");
-    }
 }
