@@ -29,28 +29,65 @@ jobs:
 
     # Note: Services always start regardless of conditional logic in steps.
     # GitHub Actions does not support conditional services.
-    services:
-      postgres:
-        image: postgres:17.5-alpine3.22
-        env:
-          POSTGRES_PASSWORD: password
-        ports:
-          - 5432:5432
-        # needed because the postgres container does not provide a healthcheck
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
-      mysql:
-        image: mysql:9.3
-        env:
-          MYSQL_ROOT_PASSWORD: password
-          MYSQL_DATABASE: mysql
-        ports:
-          - 3306:3306
+    # services:
+    #   postgres:
+    #     image: postgres:17.5-alpine3.22
+    #     env:
+    #       POSTGRES_PASSWORD: password
+    #     ports:
+    #       - 5432:5432
+    #     # needed because the postgres container does not provide a healthcheck
+    #     options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    #   mysql:
+    #     image: mysql:9.3
+    #     env:
+    #       MYSQL_ROOT_PASSWORD: password
+    #       MYSQL_DATABASE: mysql
+    #     ports:
+    #       - 3306:3306
 
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - name: Start PostgreSQL
+        run: |
+          docker run -d \
+            --name postgres \
+            -e POSTGRES_PASSWORD=password \
+            -p 5432:5432 \
+            postgres:17.5-alpine3.22
+
+          # Wait for PostgreSQL to be ready
+          for i in {1..30}; do
+            if docker exec postgres pg_isready; then
+              echo "PostgreSQL is ready"
+              break
+            fi
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Start MySQL
+        run: |
+          docker run -d \
+            --name mysql \
+            -e MYSQL_ROOT_PASSWORD=password \
+            -e MYSQL_DATABASE=mysql \
+            -p 3306:3306 \
+            mysql:9.3
+
+          # Wait for MySQL to be ready
+          for i in {1..30}; do
+            if docker exec mysql mysqladmin ping -h localhost -ppassword --silent; then
+              echo "MySQL is ready"
+              break
+            fi
+            echo "Waiting for MySQL..." 
+            sleep 2
+          done
 
       - name: Check if API code has changes
         id: check_changes
