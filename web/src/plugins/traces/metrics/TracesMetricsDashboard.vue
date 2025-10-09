@@ -40,8 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onFilterChange"
           data-test="error-only-toggle"
         />
-        <q-icon name="error"
-size="18px" class="tw-mx-1" />
+        <q-icon name="error" size="18px"
+class="tw-mx-1" />
         <q-tooltip>Show Error Only</q-tooltip>
       </div>
 
@@ -104,12 +104,9 @@ size="18px" class="tw-mx-1" />
 <script lang="ts" setup>
 import {
   ref,
-  watch,
   onMounted,
   onBeforeUnmount,
-  nextTick,
   computed,
-  reactive,
   defineAsyncComponent,
 } from "vue";
 import { useStore } from "vuex";
@@ -399,21 +396,6 @@ defineExpose({
   border-radius: 4px;
   background: var(--q-card-background, #fff);
 }
-
-.dashboard-header {
-  border-bottom: 1px solid rgba(194, 194, 194, 0.48);
-
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.02);
-  }
-}
-
-.metrics-dashboard-content {
-  min-height: auto !important;
-  max-height: calc(100vh - 250px);
-  overflow-y: auto;
-}
-
 // Filters label
 .filters-label {
   color: #333;
@@ -451,10 +433,6 @@ defineExpose({
 body.body--dark {
   .traces-metrics-dashboard {
     background: var(--q-dark);
-  }
-
-  .dashboard-header:hover {
-    background-color: rgba(255, 255, 255, 0.05);
   }
 
   .filters-label {
