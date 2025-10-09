@@ -353,7 +353,7 @@ pub async fn enable_pipeline(
         ("org_id" = String, Path, description = "Organization name"),
         ("value" = bool, Query, description = "Enable or disable pipeline"),
     ),
-    request_body(content = Object, description = "Pipeline id list", content_type = "application/json"),
+    request_body(content = PipelineBulkEnableRequest, description = "Pipeline id list", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),

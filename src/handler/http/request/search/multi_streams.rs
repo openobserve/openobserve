@@ -128,9 +128,10 @@ use crate::{
 #[post("/{org_id}/_search_multi")]
 pub async fn search_multi(
     org_id: web::Path<String>,
-    in_req: HttpRequest,
-    body: web::Bytes,
+    web::Query(query): web::Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
+    web::Json(multi_req): web::Json<search::MultiStreamRequest>,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -163,7 +164,6 @@ pub async fn search_multi(
         }
     }
 
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let dashboard_info = get_dashboard_info_from_request(&query);
@@ -177,14 +177,6 @@ pub async fn search_multi(
     let search_event_context = search_type
         .as_ref()
         .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
-
-    // handle encoding for query and aggs
-    let multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
-        Ok(v) => v,
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
 
     let mut query_fn = multi_req
         .query_fn
@@ -702,7 +694,7 @@ pub async fn search_multi(
 pub async fn _search_partition_multi(
     org_id: web::Path<String>,
     in_req: HttpRequest,
-    body: web::Bytes,
+    web::Json(req): web::Json<search::MultiSearchPartitionRequest>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
@@ -742,13 +734,6 @@ pub async fn _search_partition_multi(
             _ => {}
         }
     }
-
-    let req: search::MultiSearchPartitionRequest = match json::from_slice(&body) {
-        Ok(v) => v,
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
 
     let search_fut = SearchService::search_partition_multi(
         &trace_id,
