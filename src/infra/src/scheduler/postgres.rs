@@ -336,18 +336,17 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         // Build bulk update query using UNNEST
         let query_builder = String::from(
             r#"UPDATE scheduled_jobs SET
-                status = bulk_data.status,
-                retries = bulk_data.retries,
-                next_run_at = bulk_data.next_run_at,
-                is_realtime = bulk_data.is_realtime,
-                is_silenced = bulk_data.is_silenced,
-                data = bulk_data.data
-            FROM (SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::integer[], $6::bigint[], $7::boolean[], $8::boolean[], $9::text[])
-                AS bulk_data(module, org, module_key, status, retries, next_run_at, is_realtime, is_silenced, data)) AS bulk_data
-            WHERE scheduled_jobs.module = bulk_data.module::trigger_module
-                AND scheduled_jobs.org = bulk_data.org
-                AND scheduled_jobs.module_key = bulk_data.module_key
-                AND scheduled_jobs.status = bulk_data.status::trigger_status"#,
+                    status = bulk_data.status::trigger_status,
+                    retries = bulk_data.retries,
+                    next_run_at = bulk_data.next_run_at,
+                    is_realtime = bulk_data.is_realtime,
+                    is_silenced = bulk_data.is_silenced,
+                    data = bulk_data.data
+                FROM (SELECT * FROM UNNEST($1::integer[], $2::text[], $3::text[], $4::integer[], $5::integer[], $6::bigint[], $7::boolean[], $8::boolean[], $9::text[])
+                    AS bulk_data(module, org, module_key, status, retries, next_run_at, is_realtime, is_silenced, data)) AS bulk_data
+                WHERE scheduled_jobs.module = bulk_data.module
+                    AND scheduled_jobs.org = bulk_data.org
+                    AND scheduled_jobs.module_key = bulk_data.module_key"#,
         );
 
         let mut modules = Vec::new();
@@ -385,6 +384,10 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
         match query.execute(&pool).await {
             Ok(_) => {
+                // Report the metric only after the db op is successful
+                DB_QUERY_NUMS
+                    .with_label_values(&["bulk_update", "scheduled_jobs"])
+                    .inc();
                 // Handle cluster coordinator for realtime alerts
                 for trigger in &triggers {
                     if trigger.module == TriggerModule::Alert && trigger.is_realtime {
@@ -437,9 +440,6 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         }
 
         let pool = CLIENT.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["bulk_update_status", "scheduled_jobs"])
-            .inc();
 
         // Separate updates with and without data
         let mut updates_with_data = Vec::new();
@@ -458,13 +458,13 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             let mut orgs = Vec::new();
             let mut modules = Vec::new();
             let mut module_keys = Vec::new();
-            let mut statuses: Vec<TriggerStatus> = Vec::new();
+            let mut statuses = Vec::new();
             let mut retries_vec = Vec::new();
             let mut datas = Vec::new();
 
             for (org, module, module_key, status, retries, data) in &updates_with_data {
                 orgs.push(org.clone());
-                modules.push(module.to_string());
+                modules.push(module.clone());
                 module_keys.push(module_key.clone());
                 statuses.push(status.clone());
                 retries_vec.push(*retries);
@@ -473,13 +473,13 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
             let query = sqlx::query(
                 r#"UPDATE scheduled_jobs SET
-                    status = bulk_data.status::trigger_status,
+                    status = bulk_data.status,
                     retries = bulk_data.retries,
                     data = bulk_data.data
-                FROM (SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::integer[], $6::text[])
+                FROM (SELECT * FROM UNNEST($1::text[], $2::integer[], $3::text[], $4::integer[], $5::integer[], $6::jsonb[])
                     AS bulk_data(org, module, module_key, status, retries, data)) AS bulk_data
                 WHERE scheduled_jobs.org = bulk_data.org
-                    AND scheduled_jobs.module = bulk_data.module::trigger_module
+                    AND scheduled_jobs.module = bulk_data.module
                     AND scheduled_jobs.module_key = bulk_data.module_key"#,
             )
             .bind(orgs)
@@ -498,6 +498,10 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                     self.update_status(&org, module, &module_key, status, retries, data.as_deref())
                         .await?;
                 }
+            } else {
+                DB_QUERY_NUMS
+                    .with_label_values(&["bulk_update_status", "scheduled_jobs"])
+                    .inc();
             }
         }
 
@@ -511,7 +515,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
             for (org, module, module_key, status, retries, _) in &updates_without_data {
                 orgs.push(org.clone());
-                modules.push(module.to_string());
+                modules.push(module.clone());
                 module_keys.push(module_key.clone());
                 statuses.push(status.clone());
                 retries_vec.push(*retries);
@@ -519,12 +523,12 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
             let query = sqlx::query(
                 r#"UPDATE scheduled_jobs SET
-                    status = bulk_data.status::trigger_status,
+                    status = bulk_data.status,
                     retries = bulk_data.retries
-                FROM (SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::integer[])
+                FROM (SELECT * FROM UNNEST($1::text[], $2::integer[], $3::text[], $4::integer[], $5::integer[])
                     AS bulk_data(org, module, module_key, status, retries)) AS bulk_data
                 WHERE scheduled_jobs.org = bulk_data.org
-                    AND scheduled_jobs.module = bulk_data.module::trigger_module
+                    AND scheduled_jobs.module = bulk_data.module
                     AND scheduled_jobs.module_key = bulk_data.module_key"#,
             )
             .bind(orgs)
@@ -542,6 +546,10 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                     self.update_status(&org, module, &module_key, status, retries, data.as_deref())
                         .await?;
                 }
+            } else {
+                DB_QUERY_NUMS
+                    .with_label_values(&["bulk_update_status", "scheduled_jobs"])
+                    .inc();
             }
         }
 

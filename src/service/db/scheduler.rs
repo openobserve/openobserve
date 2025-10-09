@@ -21,12 +21,13 @@ use infra::{
 };
 #[cfg(feature = "enterprise")]
 use {
-    infra::errors::Error, o2_enterprise::enterprise::common::config::get_config as get_o2_config,
+    infra::errors::Error,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::scheduled_jobs::{
+        update_status as ent_update_status, update_trigger as ent_update_trigger,
+    },
     o2_enterprise::enterprise::super_cluster,
 };
-
-mod batch_updater;
-use batch_updater::get_batch_updater;
 
 #[inline]
 pub async fn push(trigger: Trigger) -> Result<()> {
@@ -62,12 +63,12 @@ pub async fn delete(org: &str, module: TriggerModule, key: &str) -> Result<()> {
 
 #[inline]
 pub async fn update_trigger(trigger: Trigger) -> Result<()> {
-    // Use batch updater for better performance
-    get_batch_updater()
-        .update_trigger(trigger)
+    #[cfg(feature = "enterprise")]
+    ent_update_trigger(trigger)
         .await
-        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
-
+        .map_err(|e| Error::Message(e.to_string()))?;
+    #[cfg(not(feature = "enterprise"))]
+    infra_scheduler::update_trigger(trigger, false).await?;
     Ok(())
 }
 
@@ -80,40 +81,12 @@ pub async fn update_status(
     retries: i32,
     data: Option<&str>,
 ) -> Result<()> {
-    // Get full trigger for batch updater (required for super cluster events)
-    let mut full_trigger = match infra_scheduler::get(org, module.clone(), key).await {
-        Ok(trigger) => trigger,
-        Err(_) => {
-            // Fallback to direct update if trigger not found
-            infra_scheduler::update_status(org, module.clone(), key, status.clone(), retries, data)
-                .await?;
-
-            // super cluster
-            #[cfg(feature = "enterprise")]
-            if get_o2_config().super_cluster.enabled {
-                super_cluster::queue::scheduler_update_status(
-                    org, module, key, status, retries, data,
-                )
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
-            }
-
-            return Ok(());
-        }
-    };
-
-    // Update the trigger fields for super cluster events
-    full_trigger.status = status.clone();
-    full_trigger.retries = retries;
-    if let Some(data_str) = data {
-        full_trigger.data = data_str.to_string();
-    }
-
-    // Use batch updater for better performance
-    get_batch_updater()
-        .update_status(org, module, key, status, retries, data, full_trigger)
+    #[cfg(feature = "enterprise")]
+    ent_update_status(org, module, key, status, retries, data)
         .await
-        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        .map_err(|e| Error::Message(e.to_string()))?;
+    #[cfg(not(feature = "enterprise"))]
+    infra_scheduler::update_status(org, module, key, status, retries, data).await?;
 
     Ok(())
 }
