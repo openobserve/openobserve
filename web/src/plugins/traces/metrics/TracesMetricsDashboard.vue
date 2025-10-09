@@ -40,8 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onFilterChange"
           data-test="error-only-toggle"
         />
-        <q-icon name="error" size="18px"
-class="tw-mx-1" />
+        <q-icon name="error"
+size="18px" class="tw-mx-1" />
         <q-tooltip>Show Error Only</q-tooltip>
       </div>
 
@@ -152,7 +152,7 @@ const emit = defineEmits<{
 
 const { showErrorNotification } = useNotifications();
 const store = useStore();
-const { searchObj } = useTraces();
+const { searchObj, getBaseFilters } = useTraces();
 
 const autoRefreshEnabled = ref(false);
 const autoRefreshIntervalId = ref<number | null>(null);
@@ -183,35 +183,6 @@ const contextMenuValue = ref(0);
 const contextMenuFieldName = ref("");
 const contextMenuData = ref<any>(null);
 
-const getBaseFilters = () => {
-  let baseFilters = [];
-  rangeFilters.value.forEach((rangeFilter) => {
-    if (rangeFilter.panelTitle === "Duration") {
-      if (rangeFilter.start !== null && rangeFilter.end !== null) {
-        baseFilters.push(
-          `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
-        );
-      } else {
-        baseFilters.push(
-          `duration ${rangeFilter.start ? ">=" : "<="} ${rangeFilter.start || rangeFilter.end}`,
-        );
-      }
-    }
-  });
-
-  // Add error filter if showErrorOnly is enabled
-  if (showErrorOnly.value) {
-    baseFilters.push("span_status = 'ERROR'");
-  }
-
-  // Add user-provided filters from query editor
-  if (props.filter?.trim().length) {
-    baseFilters.push(props.filter.trim());
-  }
-
-  return baseFilters;
-};
-
 const loadDashboard = async () => {
   try {
     error.value = null;
@@ -225,7 +196,10 @@ const loadDashboard = async () => {
     // Convert the dashboard schema and update stream names
     const convertedDashboard = convertDashboardSchemaVersion(deepCopy(metrics));
 
-    const baseFilters: string[] = getBaseFilters();
+    // get combined filters from getBaseFilters
+    const baseFilters: string[] =
+      getBaseFilters(rangeFilters.value, props.filter) || [];
+
     convertedDashboard.tabs[0].panels.forEach((panel, index) => {
       // Build WHERE clause based on filters
       let whereClause = "";

@@ -306,6 +306,35 @@ const useTraces = () => {
     });
   };
 
+  const getBaseFilters = (rangeFilters, editorFilter: string) => {
+    let baseFilters = [];
+    rangeFilters.value.forEach((rangeFilter) => {
+      if (rangeFilter.panelTitle === "Duration") {
+        if (rangeFilter.start !== null && rangeFilter.end !== null) {
+          baseFilters.push(
+            `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
+          );
+        } else {
+          baseFilters.push(
+            `duration ${rangeFilter.start ? ">=" : "<="} ${rangeFilter.start || rangeFilter.end}`,
+          );
+        }
+      }
+    });
+
+    // Add error filter if showErrorOnly is enabled
+    if (searchObj.meta.showErrorOnly) {
+      baseFilters.push("span_status = 'ERROR'");
+    }
+
+    // Add user-provided filters from query editor
+    if (editorFilter?.trim().length) {
+      baseFilters.push(editorFilter.trim());
+    }
+
+    return baseFilters;
+  };
+
   return {
     searchObj,
     resetSearchObj,
@@ -314,6 +343,7 @@ const useTraces = () => {
     copyTracesUrl,
     buildQueryDetails,
     navigateToLogs,
+    getBaseFilters,
   };
 };
 
