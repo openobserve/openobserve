@@ -300,7 +300,7 @@ export const useSearchBar = () => {
       const streams = searchObj.data.stream.selectedStream;
       const unionquery = streams
         .map((stream: string) => `SELECT [FIELD_LIST] FROM "${stream}"`)
-        .join(" UNION ");
+        .join(" UNION ALL BY NAME ");
 
       const query = searchObj.meta.sqlMode ? queryStr || unionquery : "";
 
