@@ -304,11 +304,21 @@ jobs:
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npx nyc report
 
+      - name: Debug - Check HTML report structure
+        if: always()
+        run: |
+          echo "=== playwright-results structure ==="
+          ls -la tests/ui-testing/playwright-results/
+          echo "=== html-report structure ==="
+          ls -la tests/ui-testing/playwright-results/html-report/
+          echo "=== Check if index.html exists ==="
+          test -f tests/ui-testing/playwright-results/html-report/index.html && echo "index.html EXISTS" || echo "index.html NOT FOUND"
+
       - name: Upload results to TestDino
         if: always() && matrix.testfolder == 'Alerts'
         run: |
           cd tests/ui-testing
-          npx tdpw upload playwright-results --html-report playwright-results/html-report --token ${{ secrets.TESTDINO_API_TOKEN }}
+          npx tdpw upload --json-report playwright-results/report.json --token ${{ secrets.TESTDINO_API_TOKEN }}
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
