@@ -40,8 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onFilterChange"
           data-test="error-only-toggle"
         />
-        <q-icon name="error" size="18px"
-class="tw-mx-1" />
+        <q-icon name="error"
+size="18px" class="tw-mx-1" />
         <q-tooltip>Show Error Only</q-tooltip>
       </div>
 
@@ -82,6 +82,7 @@ class="tw-mx-1" />
         :viewOnly="true"
         :dashboardData="dashboardData"
         :currentTimeObj="currentTimeObj"
+        :allowAlertCreation="false"
         searchType="dashboards"
         @updated:dataZoom="onDataZoom"
         @chart:contextmenu="handleChartContextMenu"
@@ -315,13 +316,15 @@ const handleChartContextMenu = (event: any) => {
   const panelTitle = event.panelTitle || "";
   const seriesName = event.seriesName || "";
 
-  // Use panel title as field name (Rate, Errors, Duration)
-  contextMenuFieldName.value = panelTitle || seriesName || "Value";
+  if (panelTitle === "Duration") {
+    // Use panel title as field name (Rate, Errors, Duration)
+    contextMenuFieldName.value = panelTitle || seriesName || "Value";
 
-  contextMenuVisible.value = true;
-  contextMenuPosition.value = { x: event.x, y: event.y };
-  contextMenuValue.value = event.value;
-  contextMenuData.value = event;
+    contextMenuVisible.value = true;
+    contextMenuPosition.value = { x: event.x, y: event.y };
+    contextMenuValue.value = event.value;
+    contextMenuData.value = event;
+  }
 };
 
 const hideContextMenu = () => {
