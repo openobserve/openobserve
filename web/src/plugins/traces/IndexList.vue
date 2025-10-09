@@ -74,6 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="props.row.ftsKey || !props.row.showValues"
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'hover:tw-bg-zinc-700'
+                    : 'hover:tw-bg-zinc-200'
+                "
                 :title="props.row.label || props.row.name"
               >
                 <div class="field_label ellipsis" style="font-size: 14px">
@@ -81,10 +86,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   class="field_overlay"
-                  :style="{
-                    background:
-                      store.state.theme === 'dark' ? '#414345' : '#e8e8e8',
-                  }"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'tw-bg-zinc-700'
+                      : 'tw-bg-zinc-200'
+                  "
                 >
                   <q-btn
                     :icon="outlinedAdd"
@@ -354,11 +360,16 @@ export default defineComponent({
         }
       }
     }
-    &:hover {
-      .field-container {
-        background-color: #e8e8e8;
-      }
-    }
+    // &:hover {
+    //   .field-container {
+    //     background-color: #e8e8e8;
+    //   }
+    //   body.body--dark {
+    //     .field-container {
+    //       background-color: #424242;
+    //     }
+    //   }
+    // }
   }
 }
 
