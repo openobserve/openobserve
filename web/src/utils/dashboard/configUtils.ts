@@ -110,6 +110,7 @@ export const shouldShowLegendWidth = (dashboardPanelData: any): boolean => {
     dashboardPanelData.data.config.legends_position === "right" &&
     dashboardPanelData.data.config.legends_type === "plain" &&
     dashboardPanelData.data.type !== "sankey" &&
+    dashboardPanelData.data.type !== "maps" &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
@@ -131,6 +132,7 @@ export const shouldShowLegendHeight = (dashboardPanelData: any): boolean => {
       dashboardPanelData.data.config.legends_position === "bottom") &&
     dashboardPanelData.data.config.legends_type === "plain" &&
     dashboardPanelData.data.type !== "sankey" &&
+    dashboardPanelData.data.type !== "maps" &&
     dashboardPanelData.data.config.trellis?.layout === null
   );
 };
