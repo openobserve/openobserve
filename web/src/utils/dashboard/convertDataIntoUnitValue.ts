@@ -2061,7 +2061,7 @@ const validateStreamFields = (
   ]?.fields?.y?.filter(
     (it: any) =>
       !allStreamFields.find(
-        (i: any) => i.name.toLowerCase() == it.column.toLowerCase(),
+        (i: any) => i?.name?.toLowerCase() == it?.column?.toLowerCase(),
       ),
   );
 
