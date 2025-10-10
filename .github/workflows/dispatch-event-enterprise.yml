@@ -32,7 +32,7 @@ jobs:
         run: echo ${{ env.SHORT_COMMIT_ID }}
 
       - name: Repository Dispatch
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@v4
         env:
           TOKEN: ${{ steps.generate_token.outputs.token }}
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
