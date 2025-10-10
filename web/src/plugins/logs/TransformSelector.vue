@@ -15,20 +15,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-toggle
-    data-test="logs-search-bar-show-query-toggle-btn"
-    v-model="searchObj.meta.showTransformEditor"
-    :icon="transformIcon"
-    class="float-left tw-cursor-pointer o2-toggle-button-xs tw-flex tw-items-center tw-justify-center "
-    size="xs"
-    flat
-    :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
-    :disable="!searchObj.data.transformType || searchObj.meta.logsVisualizeToggle === 'visualize'"
-  >
-    <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">
-      {{ getTransformLabelTooltip }}
-    </q-tooltip>
-  </q-toggle>
+  <div class="toolbar-toggle-container float-left">
+    <q-toggle
+      data-test="logs-search-bar-show-query-toggle-btn"
+      v-model="searchObj.meta.showTransformEditor"
+      class="o2-toggle-button-xs"
+      size="xs"
+      flat
+      :class="
+        store.state.theme === 'dark'
+          ? 'o2-toggle-button-xs-dark'
+          : 'o2-toggle-button-xs-light'
+      "
+      :disable="
+        !searchObj.data.transformType ||
+        searchObj.meta.logsVisualizeToggle === 'visualize'
+      "
+    >
+      <q-icon :name="transformIcon" class="toolbar-icon-in-toggle" :class="transformsLabel" />
+      <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">
+        {{ getTransformLabelTooltip }}
+      </q-tooltip>
+    </q-toggle>
+  </div>
 
   <q-btn-group
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
@@ -130,7 +139,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-btn
       data-test="logs-search-bar-save-transform-btn"
       class=" save-transform-btn q-px-sm"
-      size="sm"
       icon="save"
       :disable="searchObj.data.transformType !== 'function' || searchObj.meta.logsVisualizeToggle === 'visualize'"
       @click="fnSavedFunctionDialog"
@@ -254,7 +262,7 @@ const transformsLabel = computed(() => {
 const transformIcon = computed(() => {
   if (!isActionsEnabled.value)
     return "img:" + getImageURL("images/common/function.svg");
-
+  
   if (searchObj.data.transformType === "function")
     return "img:" + getImageURL("images/common/function.svg");
 
@@ -327,6 +335,35 @@ const getTransformLabelTooltip = computed(() => {
 </script>
 
 <style scoped lang="scss">
+.toolbar-toggle-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.175rem; // 0 ~2.8px
+  margin-left: 0.25rem; // 4px
+  border: 0.0625rem solid rgba(0, 0, 0, 0.12); // 1px
+  border-radius: 0.375rem; // 6px
+  transition: all 0.2s ease;
+  margin-right: 0.25rem; // 8px
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+
+  :deep(.q-toggle__inner) {
+    padding: 0;
+  }
+}
+
+.dark-theme .toolbar-toggle-container {
+  border: 0.0625rem solid rgb(196, 196, 196);
+}
+
+.toolbar-icon-in-toggle {
+  font-size: 0.9rem; // ~14.4px
+}
+
 .dark-theme {
   :deep(.transform-icon),
   :deep(.function-icon) {
@@ -336,11 +373,26 @@ const getTransformLabelTooltip = computed(() => {
       }
     }
   }
+
+  .Function {
+    filter: invert(1);
+  }
 }
 
 .transform-selector {
+  border-radius: 0.375rem; // 6px
+
+  .saved-views-dropdown {
+    margin-right: 0.1rem; // 2px
+  }
+
   :deep(.btn-function) {
     width: 140px;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background-color: var(--o2-hover-accent);
+    }
 
     .q-btn__content {
       justify-content: start !important;
@@ -355,7 +407,31 @@ const getTransformLabelTooltip = computed(() => {
       .q-btn-dropdown__arrow {
         margin-left: 4px !important;
       }
+
+      .q-icon {
+        font-size: 1.125rem; // 18px
+      }
     }
+  }
+
+  :deep(.q-btn-dropdown__arrow-container) {
+    transition: all 0.2s ease;
+
+    &:hover {
+      background-color: var(--o2-hover-accent);
+    }
+  }
+}
+
+.save-transform-btn {
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+
+  .q-icon {
+    font-size: 1.125rem; // 18px
   }
 }
 </style>

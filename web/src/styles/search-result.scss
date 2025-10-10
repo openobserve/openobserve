@@ -40,13 +40,13 @@
   padding: 0.125rem 0.5rem !important; // Add vertical padding
   background: rgba(255, 255, 255, 0.1) !important; // Glassmorphic
   backdrop-filter: blur(10px) !important;
-  min-height: 1.75rem !important;
-  height: 1.75rem !important;
+  min-height: 1.45rem !important;
+  height: 1.45rem !important;
   border: 1px solid rgb(196, 196, 196) !important;
   display: flex !important;
   align-items: center !important;
   overflow: visible !important;
-  margin-top: 0.45rem;
+  margin-top: 0.55rem;
 
   .q-field__control-container {
     padding-top: 0 !important;
@@ -76,9 +76,9 @@
 
     input,
     span {
-      line-height: 1.75rem !important;
+      line-height: 1.15rem !important;
       padding: 0 !important;
-      margin: 0 !important;
+      margin: -4px 0 0 0 !important;
     }
   }
 

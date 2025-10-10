@@ -1151,7 +1151,7 @@ export default defineComponent({
 </style>
 <style lang="scss">
 .q-btn--rectangle {
-  border-radius: 3px;
+  border-radius: 0.375rem;
 }
 .date-time-button {
   height: 100%;

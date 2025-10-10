@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
   />
   <q-btn-group
-    class="no-outline q-pa-none no-border float-left q-mr-xs"
+    class="no-outline q-pa-none no-border float-left function-selector"
     :disable="!searchObj.meta.showTransformEditor"
   >
     <q-btn-dropdown
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :icon-right="iconRight"
       :title="t('search.functionPlaceholder')"
       split
-      class="no-outline saved-views-dropdown no-border btn-function"
+      class="saved-views-dropdown btn-function"
       @click="fnSavedFunctionDialog"
     >
       <q-list data-test="logs-search-saved-function-list">
@@ -148,4 +148,63 @@ const applyFunction = (
 };
 </script>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+.toolbar-toggle-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.175rem; // 0 ~2.8px
+  margin-left: 0.25rem; // 4px
+  border: 0.0625rem solid rgba(0, 0, 0, 0.12); // 1px
+  border-radius: 0.375rem; // 6px
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+
+  :deep(.q-toggle__inner) {
+    padding: 0;
+  }
+}
+
+.dark-theme .toolbar-toggle-container {
+  border: 0.0625rem solid rgb(196, 196, 196);
+}
+
+.toolbar-icon-in-toggle {
+  font-size: 0.9rem; // ~14.4px
+}
+
+.function-selector {
+  margin-right: 0.5rem; // 8px
+  border-radius: 0.375rem; // 6px
+
+  :deep(.btn-function) {
+    transition: all 0.2s ease;
+    padding-right: 0.5rem; // 8px
+    margin-right: 0.125rem; // 2px
+
+    &:hover {
+      background-color: var(--o2-hover-accent);
+    }
+
+    .q-btn__content {
+      .q-icon {
+        font-size: 1.125rem; // 18px
+      }
+    }
+  }
+
+  :deep(.q-btn-dropdown__arrow-container) {
+    transition: all 0.2s ease;
+    padding-left: 0.5rem; // 8px
+    margin-left: 0.125rem; // 2px
+
+    &:hover {
+      background-color: var(--o2-hover-accent);
+    }
+  }
+}
+</style>
