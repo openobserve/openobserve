@@ -591,11 +591,7 @@ const validateFieldArgument = (
   index: number,
   errors: string[],
 ) => {
-  if (
-    !arg.value ||
-    typeof arg.value !== "object" ||
-    !("field" in arg.value)
-  ) {
+  if (!arg.value || typeof arg.value !== "object" || !("field" in arg.value)) {
     errors.push(
       `${fieldPath}: Argument ${index + 1} is a field but haven't selected any field`,
     );
@@ -620,9 +616,7 @@ const validateNumberArgument = (
       `${fieldPath}: Argument ${index + 1} is a number but no value entered`,
     );
   } else if (typeof arg.value !== "number" || isNaN(arg.value)) {
-    errors.push(
-      `${fieldPath}: Argument ${index + 1} must be a valid number`,
-    );
+    errors.push(`${fieldPath}: Argument ${index + 1} must be a valid number`);
   }
 };
 
@@ -791,9 +785,7 @@ const validateFunction = (
         : args.length;
 
     if (relevantArgsCount < minArgDef.min) {
-      errors.push(
-        `${fieldPath}: Requires at least ${minArgDef.min} arguments`,
-      );
+      errors.push(`${fieldPath}: Requires at least ${minArgDef.min} arguments`);
     }
   }
 
@@ -1615,7 +1607,12 @@ export const validateSQLPanelFields = (
   isFieldsValidationRequired: boolean = true,
   pageKey?: string,
 ) => {
-  if (isFieldsValidationRequired) {
+  const isPromQLMode = panelData?.queryType === "promql";
+  if (
+    !isPromQLMode &&
+    !panelData?.queries?.[0]?.customQuery &&
+    isFieldsValidationRequired
+  ) {
     // Validate fields configuration based on chart type
     validateChartFieldsConfiguration(
       panelData?.type,
@@ -1768,7 +1765,12 @@ const validatePanelFields = (panel: any, errors: string[] = []) => {
   // Validate panel content based on type
   validatePanelContentByType(panel, errors);
 
-  if (!isPromQLMode && panel.queries?.[currentQueryIndex]?.fields) {
+  // validate fields if not promQL mode and customQuery is false
+  if (
+    !isPromQLMode &&
+    !panel?.queries?.[currentQueryIndex]?.customQuery &&
+    panel.queries?.[currentQueryIndex]?.fields
+  ) {
     // Validate fields configuration based on chart type
     validateChartFieldsConfiguration(
       panel?.type,
