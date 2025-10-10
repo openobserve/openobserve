@@ -336,7 +336,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         // Build bulk update query using UNNEST
         let query_builder = String::from(
             r#"UPDATE scheduled_jobs SET
-                    status = bulk_data.status::trigger_status,
+                    status = bulk_data.status,
                     retries = bulk_data.retries,
                     next_run_at = bulk_data.next_run_at,
                     is_realtime = bulk_data.is_realtime,
