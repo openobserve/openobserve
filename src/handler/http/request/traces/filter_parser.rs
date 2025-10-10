@@ -14,7 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sqlparser::{
-    ast::{BinaryOperator, Expr, FunctionArg, FunctionArguments, Ident, ObjectName, ObjectNamePart},
+    ast::{
+        BinaryOperator, Expr, FunctionArg, FunctionArguments, Ident, ObjectName, ObjectNamePart,
+    },
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
@@ -90,7 +92,8 @@ fn process_expression(expr: &Expr) -> Result<ParsedFilter, String> {
                 // This is a comparison operation - check if it involves composite fields
                 let condition_str = format!("{left} {op} {right}");
 
-                if contains_composite_field(left, "rate") || contains_composite_field(right, "rate") {
+                if contains_composite_field(left, "rate") || contains_composite_field(right, "rate")
+                {
                     // Transform rate condition to COUNT(*) condition
                     let transformed = transform_rate_condition(left, op, right)?;
                     Ok(ParsedFilter {
@@ -99,7 +102,9 @@ fn process_expression(expr: &Expr) -> Result<ParsedFilter, String> {
                         needs_rate: true,
                         needs_error: false,
                     })
-                } else if contains_composite_field(left, "error") || contains_composite_field(right, "error") {
+                } else if contains_composite_field(left, "error")
+                    || contains_composite_field(right, "error")
+                {
                     // Transform error condition to SUM(CASE...) condition
                     let transformed = transform_error_condition(left, op, right)?;
                     Ok(ParsedFilter {
@@ -145,12 +150,18 @@ fn contains_composite_field(expr: &Expr, field_name: &str) -> bool {
 }
 
 /// Transform a rate condition to COUNT(*) condition
-fn transform_rate_condition(left: &Expr, op: &BinaryOperator, right: &Expr) -> Result<String, String> {
+fn transform_rate_condition(
+    left: &Expr,
+    op: &BinaryOperator,
+    right: &Expr,
+) -> Result<String, String> {
     let count_expr = Expr::Function(sqlparser::ast::Function {
         name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("COUNT"))]),
         args: FunctionArguments::List(sqlparser::ast::FunctionArgumentList {
             duplicate_treatment: None,
-            args: vec![FunctionArg::Unnamed(sqlparser::ast::FunctionArgExpr::Wildcard)],
+            args: vec![FunctionArg::Unnamed(
+                sqlparser::ast::FunctionArgExpr::Wildcard,
+            )],
             clauses: vec![],
         }),
         filter: None,
@@ -169,7 +180,11 @@ fn transform_rate_condition(left: &Expr, op: &BinaryOperator, right: &Expr) -> R
 }
 
 /// Transform an error condition to SUM(CASE...) condition
-fn transform_error_condition(left: &Expr, op: &BinaryOperator, right: &Expr) -> Result<String, String> {
+fn transform_error_condition(
+    left: &Expr,
+    op: &BinaryOperator,
+    right: &Expr,
+) -> Result<String, String> {
     // SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END)
     let sum_case_expr = "SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END)";
 

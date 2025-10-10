@@ -295,7 +295,9 @@ pub async fn get_latest_traces(
         Ok(pf) => pf,
         Err(e) => {
             log::error!("Failed to parse filter: {e}");
-            return Ok(MetaHttpResponse::bad_request(format!("Invalid filter: {e}")));
+            return Ok(MetaHttpResponse::bad_request(format!(
+                "Invalid filter: {e}"
+            )));
         }
     };
 
@@ -311,7 +313,8 @@ pub async fn get_latest_traces(
         select_fields.push("COUNT(*) as rate".to_string());
     }
     if parsed_filter.needs_error {
-        select_fields.push("SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error".to_string());
+        select_fields
+            .push("SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error".to_string());
     }
 
     let select_clause = select_fields.join(", ");
