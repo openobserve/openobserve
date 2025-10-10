@@ -144,7 +144,7 @@
           "config": {
             "show_legends": false,
             "legends_position": null,
-            "decimals": 2,
+            "decimals": 0,
             "line_thickness": 1.5,
             "step_value": "0",
             "top_results_others": false,
@@ -269,7 +269,7 @@
           "config": {
             "show_legends": false,
             "legends_position": null,
-            "decimals": 2,
+            "decimals": 0,
             "line_thickness": 1.5,
             "step_value": "0",
             "top_results_others": false,
