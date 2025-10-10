@@ -62,9 +62,13 @@ pub async fn delete(org: &str, module: TriggerModule, key: &str) -> Result<()> {
 }
 
 #[inline]
-pub async fn update_trigger(trigger: Trigger) -> Result<()> {
+pub async fn update_trigger(
+    trigger: Trigger,
+    _is_from_alert_manager: bool,
+    _trace_id: &str,
+) -> Result<()> {
     #[cfg(feature = "enterprise")]
-    ent_update_trigger(trigger)
+    ent_update_trigger(trigger, _is_from_alert_manager, _trace_id)
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
     #[cfg(not(feature = "enterprise"))]
@@ -80,11 +84,22 @@ pub async fn update_status(
     status: TriggerStatus,
     retries: i32,
     data: Option<&str>,
+    _is_from_alert_manager: bool,
+    _trace_id: &str,
 ) -> Result<()> {
     #[cfg(feature = "enterprise")]
-    ent_update_status(org, module, key, status, retries, data)
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
+    ent_update_status(
+        org,
+        module,
+        key,
+        status,
+        retries,
+        data,
+        _is_from_alert_manager,
+        _trace_id,
+    )
+    .await
+    .map_err(|e| Error::Message(e.to_string()))?;
     #[cfg(not(feature = "enterprise"))]
     infra_scheduler::update_status(org, module, key, status, retries, data).await?;
 
@@ -170,7 +185,7 @@ mod tests {
 
         // This test verifies that the function doesn't panic and returns Ok
         // In a real test environment with database setup, it would verify actual batching
-        let result = update_trigger(trigger).await;
+        let result = update_trigger(trigger, true, "trace_id").await;
         // The result might be an error due to missing database, but it shouldn't panic
         assert!(result.is_ok() || result.is_err());
     }
@@ -185,6 +200,8 @@ mod tests {
             TriggerStatus::Processing,
             1,
             Some("test_data"),
+            true,
+            "trace_id",
         )
         .await;
 
