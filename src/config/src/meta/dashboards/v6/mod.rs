@@ -209,6 +209,7 @@ pub struct AxisArg {
 pub enum AxisArgValueWrapper {
     Object(AxisArgValue),
     String(String),
+    #[schema(value_type = f64)]
     Number(OrdF64),
 }
 
