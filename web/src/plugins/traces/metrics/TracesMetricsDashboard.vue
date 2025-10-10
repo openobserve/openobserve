@@ -54,7 +54,11 @@ size="18px" class="tw-mx-1" />
       >
         <span class="chip-label">
           {{ filter.panelTitle }}
-          <span v-if="filter.panelTitle === 'Rate' || filter.panelTitle === 'Errors'">
+          <span
+            v-if="
+              filter.panelTitle === 'Rate' || filter.panelTitle === 'Errors'
+            "
+          >
             >= {{ filter.start }}
           </span>
           <span v-if="filter.panelTitle === 'Duration'">
@@ -148,7 +152,7 @@ const emit = defineEmits<{
 
 const { showErrorNotification } = useNotifications();
 const store = useStore();
-const { searchObj, getBaseFilters } = useTraces();
+const { searchObj, getBaseFilters, getHavingFilters } = useTraces();
 
 const autoRefreshEnabled = ref(false);
 const autoRefreshIntervalId = ref<number | null>(null);
@@ -194,7 +198,7 @@ const loadDashboard = async () => {
 
     // get combined filters from getBaseFilters
     const baseFilters: string[] =
-      getBaseFilters(rangeFilters.value, props.filter) || [];
+      getBaseFilters("red", rangeFilters.value, props.filter) || [];
 
     convertedDashboard.tabs[0].panels.forEach((panel, index) => {
       // Build WHERE clause based on filters
@@ -221,9 +225,15 @@ const loadDashboard = async () => {
           : "";
       }
 
+      const havingFilters = getHavingFilters(rangeFilters.value);
+
       convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
         "queries"
       ][0].query.replace("[WHERE_CLAUSE]", whereClause);
+
+      convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
+        "queries"
+      ][0].query.replace("[HAVING]", havingFilters.join(" AND "));
     });
 
     dashboardData.value = convertedDashboard;
@@ -302,7 +312,7 @@ const handleChartContextMenu = (event: any) => {
   const panelTitle = event.panelTitle || "";
   const seriesName = event.seriesName || "";
 
-  if (panelTitle === "Duration") {
+  if (panelTitle) {
     // Use panel title as field name (Rate, Errors, Duration)
     contextMenuFieldName.value = panelTitle || seriesName || "Value";
 

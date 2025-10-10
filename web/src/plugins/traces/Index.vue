@@ -631,7 +631,7 @@ async function getQueryData() {
 
     // get combined filters from getBaseFilters
     const allFilters = (
-      getBaseFilters(searchObj.meta.metricsRangeFilters, filter) || []
+      getBaseFilters("traces", searchObj.meta.metricsRangeFilters, filter) || []
     ).filter((f) => f.trim().length > 0);
 
     const combinedFilter = allFilters.join(" AND ");
