@@ -138,6 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!store.state.isAiChatEnabled"
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
+          class="syntax-guide-in-toolbar"
         >
         </syntax-guide>
         <q-btn-group class="q-ml-xs no-outline q-pa-none no-border">
@@ -4849,10 +4850,14 @@ export default defineComponent({
   &:hover {
     background-color: var(--o2-hover-accent);
   }
+
+  &.theme-dark {
+    border-color: rgb(196, 196, 196) !important;
+  }
 }
 
-.q-dark .toolbar-reset-btn {
-  border-color: rgba(255, 255, 255, 0.28);
+.q-dark .toolbar-reset-btn, .dark-theme .toolbar-reset-btn {
+  border-color: rgb(196,196,196);
 }
 
 .group-menu-btn {
