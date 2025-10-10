@@ -657,6 +657,28 @@ pub async fn do_partitioned_search(
             is_streaming_aggs,
             use_cache
         );
+
+        // Experimental:
+        // Early cache check for streaming aggregations to improve response times
+        // For streaming aggs, check each partition individually to see if it's cached
+        // and only process the delta (uncached) partitions
+        #[cfg(feature = "enterprise")]
+        if use_cache && partition_resp.streaming_id.is_some() {
+            let streaming_id = partition_resp.streaming_id.as_ref().unwrap();
+            let (cached_partitions, delta_partitions) =
+                check_streaming_aggs_cache_per_partition(streaming_id, &partitions).await;
+
+            log::info!(
+                "[HTTP2_STREAM] [trace_id {}] [streaming_id {}] Cache check: {} cached partitions, {} delta partitions",
+                trace_id,
+                streaming_id,
+                cached_partitions.len(),
+                delta_partitions.len()
+            );
+
+            // Replace partitions with only the delta partitions that need to be searched
+            partitions = delta_partitions;
+        }
     }
 
     // The order by for the partitions is the same as the order by in the query
@@ -887,6 +909,104 @@ pub async fn do_partitioned_search(
     }
 
     Ok(())
+}
+
+/// Check streaming aggregation cache for each partition and identify which partitions
+/// have complete cache available.
+///
+/// This function checks each partition's time range against the cache and separates
+/// them into cached and uncached (delta) partitions.
+///
+/// Returns: (cached_partitions, delta_partitions)
+#[cfg(feature = "enterprise")]
+async fn check_streaming_aggs_cache_per_partition(
+    streaming_id: &str,
+    partitions: &[[i64; 2]],
+) -> (Vec<[i64; 2]>, Vec<[i64; 2]>) {
+    let mut cached_partitions = Vec::new();
+    let mut delta_partitions = Vec::new();
+
+    // Check if cache exists for this streaming_id
+    let streaming_item = streaming_aggs_exec::GLOBAL_CACHE.id_cache.get(streaming_id);
+    let Some(item) = streaming_item else {
+        log::info!(
+            "[streaming_id {}] check_streaming_aggs_cache_per_partition: No cache item found, all partitions are deltas",
+            streaming_id
+        );
+        return (cached_partitions, partitions.to_vec());
+    };
+
+    // Check each partition for cache availability
+    for &[start_time, end_time] in partitions {
+        let cached_result = o2_enterprise::enterprise::search::cache::streaming_agg::get_streaming_cache_file_from_disk(
+            streaming_id,
+            start_time,
+            end_time,
+            &item.get_cache_file_path(),
+        )
+        .await
+        .map_err(|e| {
+            log::info!(
+                "[streaming_id {}] check_streaming_aggs_cache_per_partition: error checking partition [{}, {}]: {}",
+                streaming_id,
+                start_time,
+                end_time,
+                e
+            );
+        })
+        .ok();
+
+        if let Some(cached_result) = cached_result {
+            if cached_result.is_complete_match && !cached_result.file_path.is_empty() {
+                log::info!(
+                    "[streaming_id {}] check_streaming_aggs_cache_per_partition: Partition [{}, {}] has complete cache",
+                    streaming_id,
+                    start_time,
+                    end_time
+                );
+                cached_partitions.push([start_time, end_time]);
+
+                // Prepare cache for this partition
+                if let Err(e) = streaming_aggs_exec::prepare_cache(streaming_id, cached_result) {
+                    log::error!(
+                        "[streaming_id {}] check_streaming_aggs_cache_per_partition: error preparing cache for partition [{}, {}]: {}, treating as delta",
+                        streaming_id,
+                        start_time,
+                        end_time,
+                        e
+                    );
+                    // If cache preparation fails, treat it as a delta partition
+                    cached_partitions.pop();
+                    delta_partitions.push([start_time, end_time]);
+                }
+            } else {
+                log::debug!(
+                    "[streaming_id {}] check_streaming_aggs_cache_per_partition: Partition [{}, {}] is not a complete match, treating as delta",
+                    streaming_id,
+                    start_time,
+                    end_time
+                );
+                delta_partitions.push([start_time, end_time]);
+            }
+        } else {
+            log::debug!(
+                "[streaming_id {}] check_streaming_aggs_cache_per_partition: No cache found for partition [{}, {}], treating as delta",
+                streaming_id,
+                start_time,
+                end_time
+            );
+            delta_partitions.push([start_time, end_time]);
+        }
+    }
+
+    log::info!(
+        "[streaming_id {}] check_streaming_aggs_cache_per_partition: Found {} cached partitions and {} delta partitions",
+        streaming_id,
+        cached_partitions.len(),
+        delta_partitions.len()
+    );
+
+    (cached_partitions, delta_partitions)
 }
 
 async fn get_partitions(
