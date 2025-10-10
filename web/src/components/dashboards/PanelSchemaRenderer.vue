@@ -916,6 +916,34 @@ export default defineComponent({
       { deep: true },
     );
 
+    // Listen for layout changes to update chart dimensions
+    const handleWindowLayoutChanges = async () => {
+      if (chartPanelRef.value) {
+        await nextTick();
+        await convertPanelDataCommon();
+      }
+    };
+
+    // ResizeObserver to detect chartPanelRef dimension changes
+    let resizeObserver: ResizeObserver | null = null;
+
+    onMounted(() => {
+      if (chartPanelRef.value) {
+        resizeObserver = new ResizeObserver(() => {
+          handleWindowLayoutChanges();
+        });
+
+        resizeObserver.observe(chartPanelRef.value);
+      }
+    });
+
+    onUnmounted(() => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+        resizeObserver = null;
+      }
+    });
+
     watch(
       panelData,
       () => {
@@ -1416,7 +1444,11 @@ export default defineComponent({
           variableValue =
             variable.value === null
               ? ""
-              : `${variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value}`;
+              : `${
+                  variable.escapeSingleQuotes
+                    ? escapeSingleQuotes(variable.value)
+                    : variable.value
+                }`;
           // if (query.includes(variableName)) {
           //   metadata.push({
           //     type: "variable",
