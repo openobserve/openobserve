@@ -1536,6 +1536,12 @@ pub struct Limit {
     pub histogram_enabled: bool,
     #[env_config(name = "ZO_CACHE_DELAY_SECS", default = 300)] // seconds
     pub cache_delay_secs: i64,
+    #[env_config(
+        name = "ZO_AGGS_MIN_NUM_PARTITIONS_SECS",
+        default = 3,
+        help = "Aggregates approximate number of seconds for executing search"
+    )]
+    pub aggs_min_num_partition_secs: usize,
 }
 
 #[derive(EnvConfig, Default)]
