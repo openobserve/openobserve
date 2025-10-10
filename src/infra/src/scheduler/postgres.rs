@@ -360,7 +360,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         let mut datas = Vec::new();
 
         for trigger in &triggers {
-            modules.push(trigger.module.to_string());
+            modules.push(trigger.module.clone());
             orgs.push(trigger.org.clone());
             module_keys.push(trigger.module_key.clone());
             statuses.push(trigger.status.clone());
@@ -476,7 +476,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                     status = bulk_data.status,
                     retries = bulk_data.retries,
                     data = bulk_data.data
-                FROM (SELECT * FROM UNNEST($1::text[], $2::integer[], $3::text[], $4::integer[], $5::integer[], $6::jsonb[])
+                FROM (SELECT * FROM UNNEST($1::text[], $2::integer[], $3::text[], $4::integer[], $5::integer[], $6::text[])
                     AS bulk_data(org, module, module_key, status, retries, data)) AS bulk_data
                 WHERE scheduled_jobs.org = bulk_data.org
                     AND scheduled_jobs.module = bulk_data.module
