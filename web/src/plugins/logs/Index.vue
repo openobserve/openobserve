@@ -2766,5 +2766,5 @@ export default defineComponent({
 </style>
 
 <style lang="scss">
-@import '@/styles/logs-page.scss';
+@import '@/styles/logs/logs-page.scss';
 </style>
