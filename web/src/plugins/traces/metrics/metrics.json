@@ -78,7 +78,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "WITH unique_traces AS (\n    -- Pick one record per trace (earliest timestamp or whatever makes sense)\n    SELECT\n        min(_timestamp) as _time,\n        max(duration) AS max_duration\n    FROM \"default\" [WHERE_CLAUSE] \n    GROUP BY trace_id\n),\nhistogram_data AS (\n    -- Assign histogram buckets\n    SELECT\n        histogram(_time) AS time_bucket,\n        max_duration\n    FROM unique_traces\n)\nSELECT\n    time_bucket,\n    max(max_duration) AS sum_durations\nFROM histogram_data\nGROUP BY time_bucket\nORDER BY time_bucket ASC;",
+              "query": "WITH base_traces AS (SELECT trace_id, min(_timestamp) AS _time, max(duration) AS max_duration FROM \"default\" [WHERE_CLAUSE] GROUP BY trace_id) SELECT histogram(_time) AS time_bucket, count(trace_id) AS trace_ids, max(max_duration) AS max_trace_duration FROM base_traces GROUP BY time_bucket [HAVING] ORDER BY time_bucket ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -98,8 +98,8 @@
                 "y": [
                   {
                     "label": "",
-                    "alias": "sum_durations",
-                    "column": "sum_durations",
+                    "alias": "max_trace_duration",
+                    "column": "max_trace_duration",
                     "color": "#5960b2",
                     "isDerived": true,
                     "havingConditions": [],
@@ -144,7 +144,7 @@
           "config": {
             "show_legends": false,
             "legends_position": null,
-            "decimals": 2,
+            "decimals": 0,
             "line_thickness": 1.5,
             "step_value": "0",
             "top_results_others": false,
@@ -197,12 +197,12 @@
               "num_of_columns": 1,
               "group_by_y_axis": false
             },
-            "dataZoom": { "yAxisIndex": 0 }
+            "dataZoom": { "yAxisIndex": "none" }
           },
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT histogram(_timestamp) AS _time, count(distinct(trace_id)) AS _count FROM \"default\" [WHERE_CLAUSE] GROUP BY _time",
+              "query": "WITH base_traces AS (SELECT trace_id, min(_timestamp) AS _time, max(duration) AS max_duration FROM \"default\" [WHERE_CLAUSE] GROUP BY trace_id) SELECT histogram(_time) AS time_bucket, count(trace_id) AS trace_ids, max(max_duration) AS max_trace_duration FROM base_traces GROUP BY time_bucket [HAVING] ORDER BY time_bucket ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -211,8 +211,8 @@
                 "x": [
                   {
                     "label": "",
-                    "alias": "_time",
-                    "column": "_time",
+                    "alias": "time_bucket",
+                    "column": "time_bucket",
                     "color": null,
                     "isDerived": false,
                     "havingConditions": [],
@@ -222,8 +222,8 @@
                 "y": [
                   {
                     "label": "",
-                    "alias": "_count",
-                    "column": "_count",
+                    "alias": "trace_ids",
+                    "column": "trace_ids",
                     "color": "#5960b2",
                     "aggregationFunction": "count",
                     "isDerived": false,
@@ -269,7 +269,7 @@
           "config": {
             "show_legends": false,
             "legends_position": null,
-            "decimals": 2,
+            "decimals": 0,
             "line_thickness": 1.5,
             "step_value": "0",
             "top_results_others": false,
@@ -322,12 +322,12 @@
               "num_of_columns": 1,
               "group_by_y_axis": false
             },
-            "dataZoom": { "yAxisIndex": 0 }
+            "dataZoom": { "yAxisIndex": "none" }
           },
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(distinct(trace_id)) as \"y_axis_1\" FROM \"default\"  [WHERE_CLAUSE]  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+              "query": "WITH base_traces AS ( SELECT trace_id, min(_timestamp) AS _time, max(duration) AS max_duration FROM \"default\" [WHERE_CLAUSE] GROUP BY trace_id ) SELECT histogram(_time) AS time_bucket, count(trace_id) AS trace_ids, max(max_duration) AS max_trace_duration FROM base_traces GROUP BY time_bucket [HAVING] ORDER BY time_bucket ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -336,8 +336,8 @@
                 "x": [
                   {
                     "label": "",
-                    "alias": "x_axis_1",
-                    "column": "x_axis_1",
+                    "alias": "time_bucket",
+                    "column": "time_bucket",
                     "color": null,
                     "aggregationFunction": "histogram",
                     "sortBy": "ASC",
@@ -349,8 +349,8 @@
                 "y": [
                   {
                     "label": "",
-                    "alias": "y_axis_1",
-                    "column": "y_axis_1",
+                    "alias": "trace_ids",
+                    "column": "trace_ids",
                     "color": null,
                     "aggregationFunction": "count",
                     "isDerived": false,
