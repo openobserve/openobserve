@@ -1155,7 +1155,7 @@ export default defineComponent({
 }
 .date-time-button {
   height: 100%;
-  border-radius: 3px;
+  border-radius: 0.375rem;
   padding: 0px 5px;
   font-size: 12px;
   min-width: auto;
@@ -1174,6 +1174,10 @@ export default defineComponent({
     .block {
       font-weight: 600;
     }
+  }
+
+  &:hover {
+    background: rgba(89, 96, 178, 0.3) !important;
   }
 }
 
