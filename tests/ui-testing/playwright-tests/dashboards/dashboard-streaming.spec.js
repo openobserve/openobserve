@@ -149,4 +149,80 @@ test.describe("dashboard streaming testcases", () => {
 
     await pm.managementPage.setStreamingState(false);
   });
+
+  test("should add dashboard variable with filter configuration", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    const panelName = pm.dashboardPanelActions.generateUniquePanelName(
+      "panel-filter-test"
+    );
+
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+
+    await pm.dashboardCreate.createDashboard(
+      randomDashboardName + "_filter"
+    );
+    await page
+      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
+      .waitFor({
+        state: "visible",
+      });
+    await pm.dashboardSetting.openSetting();
+
+    // Add first variable without filter (existing behavior)
+    await pm.dashboardVariables.addDashboardVariable(
+      "variablename",
+      "logs",
+      "e2e_automate",
+      "kubernetes_container_name"
+    );
+
+    // Add second variable with filter configuration
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardVariables.addDashboardVariable(
+      "variablename12",
+      "logs",
+      "e2e_automate",
+      "kubernetes_container_name",
+      false,
+      {
+        filterName: "kubernetes_namespace_name",
+        operator: "=",
+        value: "$variablename"
+      }
+    );
+
+    await page.waitForLoadState("networkidle");
+
+    await pm.dashboardCreate.addPanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_pod_name",
+      "y"
+    );
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await waitForDateTimeButtonToBeEnabled(page);
+
+    // Verify both variables are present
+    const namespaceVariable = page.getByLabel("namespace", { exact: true });
+    const podnameVariable = page.getByLabel("podname", { exact: true });
+
+    await expect(namespaceVariable).toBeVisible();
+    await expect(podnameVariable).toBeVisible();
+
+    await pm.dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.searchDashboard(
+      randomDashboardName + "_filter"
+    );
+    await pm.dashboardCreate.deleteDashboard(
+      randomDashboardName + "_filter"
+    );
+  });
 });
