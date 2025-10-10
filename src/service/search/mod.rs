@@ -895,7 +895,7 @@ pub async fn search_partition(
     #[cfg(feature = "enterprise")]
     if is_streaming_aggregate && total_secs <= cfg.limit.aggs_min_num_partition_secs {
         log::info!(
-            "[trace_id {trace_id}] Disabling streaming aggregation: total_secs ({}) <= aggs_min_num_partitions_secs ({}), returning single partition",
+            "[trace_id {trace_id}] Disabling streaming aggregation: total_secs ({}) <= aggs_min_num_partition_secs ({}), returning single partition",
             total_secs,
             cfg.limit.aggs_min_num_partition_secs
         );
