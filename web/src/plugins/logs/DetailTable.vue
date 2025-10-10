@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="selectedRelativeValue"
               :options="recordSizeOptions"
               dense
-              filled
+              class="select-noof-records"
             ></q-select>
           </div>
           <div class="">
@@ -602,6 +602,13 @@ export default defineComponent({
     .q-btn .q-icon {
       font-size: 12px !important;
     }
+  }
+
+  .select-noof-records {
+    border: 1px solid rgb(196, 196, 196);
+    padding-left: 0.56rem;
+    border-radius: 0.375rem;
+    height: 2.55rem;
   }
 }
 </style>
