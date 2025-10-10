@@ -32,6 +32,16 @@ pub struct ParsedFilter {
     pub needs_error: bool,
 }
 
+impl ParsedFilter {
+    /// Merge another ParsedFilter into this one
+    fn merge(&mut self, other: ParsedFilter) {
+        self.where_conditions.extend(other.where_conditions);
+        self.having_conditions.extend(other.having_conditions);
+        self.needs_rate = self.needs_rate || other.needs_rate;
+        self.needs_error = self.needs_error || other.needs_error;
+    }
+}
+
 /// Parse a filter string and separate composite fields (rate, error) from regular fields
 pub fn parse_filter(filter: &str) -> Result<ParsedFilter, String> {
     if filter.is_empty() {
@@ -63,41 +73,19 @@ pub fn parse_filter(filter: &str) -> Result<ParsedFilter, String> {
     };
 
     // Process the expression tree
-    let mut where_conditions = vec![];
-    let mut having_conditions = vec![];
-    let mut needs_rate = false;
-    let mut needs_error = false;
-
-    process_expression(
-        &where_expr,
-        &mut where_conditions,
-        &mut having_conditions,
-        &mut needs_rate,
-        &mut needs_error,
-    )?;
-
-    Ok(ParsedFilter {
-        where_conditions,
-        having_conditions,
-        needs_rate,
-        needs_error,
-    })
+    process_expression(&where_expr)
 }
 
 /// Recursively process an expression and separate composite from regular fields
-fn process_expression(
-    expr: &Expr,
-    where_conditions: &mut Vec<String>,
-    having_conditions: &mut Vec<String>,
-    needs_rate: &mut bool,
-    needs_error: &mut bool,
-) -> Result<(), String> {
+fn process_expression(expr: &Expr) -> Result<ParsedFilter, String> {
     match expr {
         Expr::BinaryOp { left, op, right } => {
             // Check if this is an AND/OR operation - recurse
             if matches!(op, BinaryOperator::And | BinaryOperator::Or) {
-                process_expression(left, where_conditions, having_conditions, needs_rate, needs_error)?;
-                process_expression(right, where_conditions, having_conditions, needs_rate, needs_error)?;
+                let mut result = process_expression(left)?;
+                let right_result = process_expression(right)?;
+                result.merge(right_result);
+                Ok(result)
             } else {
                 // This is a comparison operation - check if it involves composite fields
                 let condition_str = format!("{left} {op} {right}");
@@ -105,29 +93,43 @@ fn process_expression(
                 if contains_composite_field(left, "rate") || contains_composite_field(right, "rate") {
                     // Transform rate condition to COUNT(*) condition
                     let transformed = transform_rate_condition(left, op, right)?;
-                    having_conditions.push(transformed);
-                    *needs_rate = true;
+                    Ok(ParsedFilter {
+                        where_conditions: vec![],
+                        having_conditions: vec![transformed],
+                        needs_rate: true,
+                        needs_error: false,
+                    })
                 } else if contains_composite_field(left, "error") || contains_composite_field(right, "error") {
                     // Transform error condition to SUM(CASE...) condition
                     let transformed = transform_error_condition(left, op, right)?;
-                    having_conditions.push(transformed);
-                    *needs_error = true;
+                    Ok(ParsedFilter {
+                        where_conditions: vec![],
+                        having_conditions: vec![transformed],
+                        needs_rate: false,
+                        needs_error: true,
+                    })
                 } else {
                     // Regular field condition
-                    where_conditions.push(condition_str);
+                    Ok(ParsedFilter {
+                        where_conditions: vec![condition_str],
+                        having_conditions: vec![],
+                        needs_rate: false,
+                        needs_error: false,
+                    })
                 }
             }
         }
-        Expr::Nested(inner) => {
-            process_expression(inner, where_conditions, having_conditions, needs_rate, needs_error)?;
-        }
+        Expr::Nested(inner) => process_expression(inner),
         _ => {
             // Other expressions are kept as-is in WHERE
-            where_conditions.push(expr.to_string());
+            Ok(ParsedFilter {
+                where_conditions: vec![expr.to_string()],
+                having_conditions: vec![],
+                needs_rate: false,
+                needs_error: false,
+            })
         }
     }
-
-    Ok(())
 }
 
 /// Check if an expression contains a reference to a specific field
