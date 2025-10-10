@@ -274,6 +274,10 @@ export default defineComponent({
   border: 0.0625rem solid rgba(196, 196, 196) !important; // 1px
 }
 
+.dark-theme .syntax-guide-in-toolbar {
+  border: 0.0625rem solid rgba(196, 196, 196) !important; // 1px
+}
+
 .syntax-guide-title {
   width: 420px;
 
