@@ -60,6 +60,9 @@ export default class DashboardVariables {
 
     // Add Filter Configuration if provided
     if (filterConfig) {
+       await this.page.waitForTimeout(2000);
+
+      await this.page.locator('[data-test="dashboard-variable-filter-add-btn"]').click();
       await this.page
         .locator('[data-test="dashboard-query-values-filter-name-selector"]')
         .click();
