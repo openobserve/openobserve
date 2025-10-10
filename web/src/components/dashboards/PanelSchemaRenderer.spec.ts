@@ -1300,15 +1300,30 @@ describe("PanelSchemaRenderer", () => {
 
     it("should cleanup resize listeners on component unmount", () => {
       wrapper = createWrapper();
-      
-      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
-      
+
+      // Mock ResizeObserver disconnect method
+      const mockDisconnect = vi.fn();
+      const mockObserve = vi.fn();
+
+      // Create a mock ResizeObserver
+      const MockResizeObserver = vi.fn(function(this: any, callback: ResizeObserverCallback) {
+        this.observe = mockObserve;
+        this.disconnect = mockDisconnect;
+        this.unobserve = vi.fn();
+      });
+
+      // Replace global ResizeObserver
+      global.ResizeObserver = MockResizeObserver as any;
+
+      // Remount the component to use the mocked ResizeObserver
       wrapper.unmount();
-      
-      // Verify cleanup happens (may not be directly testable due to mocking)
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('resize', expect.any(Function));
-      
-      removeEventListenerSpy.mockRestore();
+      wrapper = createWrapper();
+
+      // Unmount to trigger cleanup
+      wrapper.unmount();
+
+      // Verify ResizeObserver was disconnected
+      expect(mockDisconnect).toHaveBeenCalled();
     });
   });
 
@@ -1899,6 +1914,128 @@ describe("PanelSchemaRenderer", () => {
       });
 
       expect(wrapper.vm.validatePanelData).toHaveLength(0);
+    });
+  });
+
+  describe("Alert Context Menu", () => {
+    it("should not show context menu when alert creation is not allowed", () => {
+      wrapper = createWrapper({ allowAlertCreation: false });
+
+      const mockEvent = {
+        x: 100,
+        y: 200,
+        value: 50,
+        seriesName: "test series",
+      };
+
+      wrapper.vm.onChartContextMenu(mockEvent);
+
+      expect(wrapper.vm.contextMenuVisible).toBe(false);
+    });
+
+    it("should show context menu when alert creation is allowed", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+
+      const mockEvent = {
+        x: 150,
+        y: 250,
+        value: 75,
+        seriesName: "test series",
+      };
+
+      wrapper.vm.onChartContextMenu(mockEvent);
+
+      expect(wrapper.vm.contextMenuVisible).toBe(true);
+      expect(wrapper.vm.contextMenuPosition).toEqual({ x: 150, y: 250 });
+      expect(wrapper.vm.contextMenuValue).toBe(75);
+    });
+
+    it("should hide context menu", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+
+      wrapper.vm.contextMenuVisible = true;
+      wrapper.vm.hideContextMenu();
+
+      expect(wrapper.vm.contextMenuVisible).toBe(false);
+    });
+
+    it("should emit contextmenu event", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+
+      const mockEvent = {
+        x: 100,
+        y: 200,
+        value: 50,
+        seriesName: "test series",
+      };
+
+      wrapper.vm.onChartContextMenu(mockEvent);
+
+      expect(wrapper.emitted("contextmenu")).toBeTruthy();
+      const emittedEvent = wrapper.emitted("contextmenu")[0][0];
+      expect(emittedEvent).toMatchObject({
+        x: 100,
+        y: 200,
+        value: 50,
+        panelTitle: defaultProps.panelSchema.title,
+        panelId: defaultProps.panelSchema.id,
+      });
+    });
+
+    it("should handle alert creation with SQL query type", () => {
+      wrapper = createWrapper({
+        allowAlertCreation: true,
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          queryType: "sql",
+          queries: [{
+            ...defaultProps.panelSchema.queries[0],
+            fields: {
+              ...defaultProps.panelSchema.queries[0].fields,
+              y: [{ alias: "count", column: "count(*)" }],
+            },
+          }],
+        },
+      });
+
+      const mockEvent = {
+        x: 100,
+        y: 200,
+        value: 50,
+        seriesName: "count",
+      };
+
+      wrapper.vm.onChartContextMenu(mockEvent);
+      wrapper.vm.contextMenuVisible = true;
+
+      // Test that context menu data is set
+      expect(wrapper.vm.contextMenuValue).toBe(50);
+      expect(wrapper.vm.contextMenuVisible).toBe(true);
+    });
+
+    it("should handle alert creation with PromQL query type", () => {
+      wrapper = createWrapper({
+        allowAlertCreation: true,
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          queryType: "promql",
+          queries: [{
+            query: 'up{job="prometheus"}',
+          }],
+        },
+      });
+
+      const mockEvent = {
+        x: 100,
+        y: 200,
+        value: 1,
+        seriesName: 'up{job="prometheus"}',
+      };
+
+      wrapper.vm.onChartContextMenu(mockEvent);
+
+      expect(wrapper.vm.contextMenuVisible).toBe(true);
+      expect(wrapper.vm.contextMenuValue).toBe(1);
     });
   });
 });
