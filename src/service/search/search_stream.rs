@@ -676,8 +676,14 @@ pub async fn do_partitioned_search(
                 delta_partitions.len()
             );
 
-            // Replace partitions with only the delta partitions that need to be searched
-            partitions = delta_partitions;
+            if delta_partitions.is_empty() {
+                if partitions.len() > 2 {
+                    partitions = vec![partitions[0], partitions[partitions.len() - 1]]; // Dummy partition to skip search
+                }
+            } else {
+                // Replace partitions with only the delta partitions that need to be searched
+                partitions = delta_partitions;
+            }
         }
     }
 
