@@ -353,7 +353,7 @@ export default defineComponent({
       const chartType = chart?.getOption()?.series?.[0]?.type;
 
       // Only handle contextmenu for bar and line charts
-      if (!chartType || !['bar', 'line'].includes(chartType)) {
+      if (!chartType || !["bar", "line"].includes(chartType)) {
         return;
       }
 
@@ -371,15 +371,20 @@ export default defineComponent({
       if (params.value !== undefined && params.value !== null) {
         // For array format [x, y], take y value
         if (Array.isArray(params.value)) {
-          dataPointValue = params.value[1] !== undefined ? params.value[1] : params.value[0];
+          dataPointValue =
+            params.value[1] !== undefined ? params.value[1] : params.value[0];
         } else {
           dataPointValue = params.value;
         }
       } else if (params.data !== undefined && params.data !== null) {
         // Alternative data format
         if (Array.isArray(params.data)) {
-          dataPointValue = params.data[1] !== undefined ? params.data[1] : params.data[0];
-        } else if (typeof params.data === 'object' && params.data.value !== undefined) {
+          dataPointValue =
+            params.data[1] !== undefined ? params.data[1] : params.data[0];
+        } else if (
+          typeof params.data === "object" &&
+          params.data.value !== undefined
+        ) {
           dataPointValue = params.data.value;
         } else {
           dataPointValue = params.data;
@@ -387,7 +392,11 @@ export default defineComponent({
       }
 
       // Only emit if we have a valid data point value
-      if (dataPointValue !== null && dataPointValue !== undefined && !isNaN(Number(dataPointValue))) {
+      if (
+        dataPointValue !== null &&
+        dataPointValue !== undefined &&
+        !isNaN(Number(dataPointValue))
+      ) {
         emit("contextmenu", {
           x: event?.clientX || 0,
           y: event?.clientY || 0,
@@ -450,6 +459,8 @@ export default defineComponent({
           emit("updated:dataZoom", {
             start: params?.batch[0]?.startValue || 0,
             end: params?.batch[0]?.endValue || 0,
+            start1: params?.batch[1]?.startValue || 0,
+            end1: params?.batch[1]?.endValue || 0,
           });
           restoreChart();
         }
