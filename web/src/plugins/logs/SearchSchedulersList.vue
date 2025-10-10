@@ -32,7 +32,7 @@
             <q-btn
               label="Get Jobs"
               @click="fetchSearchHistory"
-              class="q-ml-md o2-primary-button tw-h-[36px]"
+              class="q-ml-md o2-primary-button tw-h-[36px] tw-rounded-md"
               :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               no-caps
               flat
