@@ -953,13 +953,14 @@ html, body {
 .o2-toggle-button-xs-dark{
   .q-toggle__track{
     background-color: #2f415e;
-    border: 1px solid #6F737A !important;
+    border: 1px solid #9CA3AF !important;
     opacity: 100%;
   }
   .q-toggle__inner--truthy{
     color: #ffffff;
     .q-toggle__track{
       background-color: #6B76E3;
+      border: 1px solid #818CF8 !important;
     }
     }
 }

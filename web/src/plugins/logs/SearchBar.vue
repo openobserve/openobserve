@@ -74,44 +74,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- moved to dropdown if ai chat is enabled -->
         <div
-          class="toggle-container q-pr-xs q-ml-xs tw-flex tw-items-center tw-justify-center"
+          class="toolbar-toggle-container"
           v-if="!store.state.isAiChatEnabled"
         >
           <q-toggle
             data-test="logs-search-bar-show-histogram-toggle-btn"
             v-model="searchObj.meta.showHistogram"
-            class="o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+            class="o2-toggle-button-xs"
             size="xs"
             flat
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            "
           >
           </q-toggle>
-          <img
-              :src="histogramIcon"
-              alt="Histogram"
-              class="icon-sm"
-            />
-            <q-tooltip>
-              {{ t("search.showHistogramLabel") }}
-            </q-tooltip>
+          <img :src="histogramIcon" alt="Histogram" class="toolbar-icon" />
+          <q-tooltip>
+            {{ t("search.showHistogramLabel") }}
+          </q-tooltip>
         </div>
-        <div
-          class="toggle-container q-pr-xs q-ml-xs tw-flex tw-items-center tw-justify-center"
-        >
+        <div class="toolbar-toggle-container">
           <q-toggle
             data-test="logs-search-bar-sql-mode-toggle-btn"
             v-model="searchObj.meta.sqlMode"
             :disable="isSqlModeDisabled"
-            class="o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+            class="o2-toggle-button-xs"
             size="xs"
             flat
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            "
           >
-            <img
-              :src="sqlIcon"
-              alt="SQL Mode"
-              class="icon-sm"
-            />
+            <img :src="sqlIcon" alt="SQL Mode" class="toolbar-icon" />
             <q-tooltip v-if="isSqlModeDisabled">
               {{ t("search.sqlModeDisabledForVisualization") }}
             </q-tooltip>
@@ -125,9 +123,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!store.state.isAiChatEnabled"
           data-test="logs-search-bar-reset-filters-btn"
           no-caps
-          size="13px"
+          flat
+          dense
           icon="restart_alt"
-          class="tw-flex tw-justify-center tw-items-center reset-filters q-ml-xs"
+          class="toolbar-reset-btn"
           @click="resetFilters"
         >
           <q-tooltip>
@@ -145,7 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn-dropdown
             data-test="logs-search-saved-views-btn"
             v-model="savedViewDropdownModel"
-            size="12px"
             icon="save"
             icon-right="saved_search"
             @click="fnSavedView"
@@ -414,139 +412,156 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- this is the button group responsible for showing all the utilities when ai chat is enabled -->
         <q-btn
           v-if="store.state.isAiChatEnabled"
-          class="tw-text-[12px] tw-font-[500] q-ml-xs q-px-sm"
+          class="group-menu-btn"
           no-caps
           menu-anchor="bottom left"
           menu-self="top left"
           icon="menu"
-          size="sm"
-          dense
+          flat
         >
           <q-menu>
-            <div class="row tw-gap-2">
-              <div class="q-mt-xs">
-                <div
-                  class="row no-wrap q-pl-sm q-mt-sm tw-w-[140px] tw-flex tw-items-center"
-                >
-                  <div class="tw-w-[30%]">
-                    <q-toggle
-                      data-test="logs-search-bar-show-histogram-toggle-btn"
-                      v-model="searchObj.meta.showHistogram"
-                      class="q-pb-xs o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
-                      size="xs"
-                      flat
-                      :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
-                    ></q-toggle>
-                  </div>
-                  <q-item-label class="q-ml-xs">
+            <q-list>
+              <!-- Histogram Toggle -->
+              <q-item
+                clickable
+                @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
+                data-test="logs-search-bar-show-histogram-toggle-btn"
+                class="q-pa-sm saved-view-item"
+              >
+                <q-item-section>
+                  <q-item-label class="tw-flex tw-items-center">
+                    <div style="width: 28px; display: flex; align-items: center; margin-right: 12px">
+                      <q-toggle
+                        v-model="searchObj.meta.showHistogram"
+                        size="xs"
+                        flat
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'o2-toggle-button-xs-dark'
+                            : 'o2-toggle-button-xs-light'
+                        "
+                        @click.stop
+                      />
+                    </div>
                     {{ t("search.showHistogramLabel") }}
                   </q-item-label>
-                </div>
+                </q-item-section>
+              </q-item>
 
-                <q-separator />
+              <q-separator />
 
-                <div
-                  class="row no-wrap q-pl-sm q-mt-sm q-py-xs tw-w-[140px] tw-flex tw-items-center"
-                >
-                  <div class="tw-w-[30%]">
-                    <q-toggle
-                      data-test="logs-search-bar-wrap-table-content-toggle-btn"
-                      v-model="searchObj.meta.toggleSourceWrap"
-                      icon="wrap_text"
-                      size="xs"
-                      class="q-pb-xs o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
-                      flat
-                      :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
-                    ></q-toggle>
-                  </div>
-                  <q-item-label class="tw-ml-[2px]"> Wrap Content </q-item-label>
-                </div>
-                <q-separator />
+              <!-- Wrap Content Toggle -->
+              <q-item
+                clickable
+                @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
+                data-test="logs-search-bar-wrap-table-content-toggle-btn"
+                class="q-pa-sm saved-view-item"
+              >
+                <q-item-section>
+                  <q-item-label class="tw-flex tw-items-center">
+                    <div style="width: 28px; display: flex; align-items: center; margin-right: 12px">
+                      <q-toggle
+                        v-model="searchObj.meta.toggleSourceWrap"
+                        size="xs"
+                        flat
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'o2-toggle-button-xs-dark'
+                            : 'o2-toggle-button-xs-light'
+                        "
+                        @click.stop
+                      />
+                    </div>
+                    Wrap Content
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
 
-                <div
-                  class="row no-wrap q-pl-sm q-mt-sm tw-w-[140px] tw-flex tw-items-center"
-                >
-                  <div class="tw-w-[30%]">
-                    <q-toggle
-                      data-test="logs-search-bar-quick-mode-toggle-btn"
-                      v-model="searchObj.meta.quickMode"
-                      @click="handleQuickMode"
-                      class="q-pb-xs o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
-                      size="xs"
-                      flat
-                      :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
-                    ></q-toggle>
-                  </div>
-                  <q-item-label class="tw-ml-[2px]">
+              <q-separator />
+
+              <!-- Quick Mode Toggle -->
+              <q-item
+                clickable
+                @click="searchObj.meta.quickMode = !searchObj.meta.quickMode; handleQuickMode()"
+                data-test="logs-search-bar-quick-mode-toggle-btn"
+                class="q-pa-sm saved-view-item"
+              >
+                <q-item-section>
+                  <q-item-label class="tw-flex tw-items-center">
+                    <div style="width: 28px; display: flex; align-items: center; margin-right: 12px">
+                      <q-toggle
+                        v-model="searchObj.meta.quickMode"
+                        size="xs"
+                        flat
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'o2-toggle-button-xs-dark'
+                            : 'o2-toggle-button-xs-light'
+                        "
+                        @click.stop="handleQuickMode"
+                      />
+                    </div>
                     {{ t("search.quickModeLabel") }}
                   </q-item-label>
-                </div>
-                <q-separator />
+                </q-item-section>
+              </q-item>
 
-                <div
-                  class="row tw-h-[30px] q-pl-sm q-mt-xs no-wrap q-py-xs tw-w-[140px] tw-flex tw-items-center tw-pl-[12px]"
-                >
-                  <div class="tw-w-[30%]">
-                    <syntax-guide
-                      data-test="logs-search-bar-sql-mode-toggle-btn"
-                      :sqlmode="searchObj.meta.sqlMode"
-                      size="10px"
-                      style="margin: 0px"
-                      :style="{
-                        border: !searchObj.meta.sqlMode
-                          ? '1px solid #c4c4c4'
-                          : 'none',
-                      }"
-                    >
-                    </syntax-guide>
-                  </div>
-                  <q-item-label> Syntax Guide </q-item-label>
-                </div>
-                <q-separator />
-                <div
-                  class="row no-wrap q-pl-sm q-mt-xs q-py-xs tw-w-[140px] tw-flex tw-items-center tw-pl-[12px]"
-                >
-                  <div class="tw-w-[30%]">
-                    <q-btn
-                      data-test="logs-search-bar-reset-filters-btn"
-                      no-caps
-                      icon="restart_alt"
-                      size="10px"
-                      dense
-                      class="q-pa-xs"
-                      @click="resetFilters"
-                    >
-                    </q-btn>
-                  </div>
-                  <q-item-label>
+              <q-separator />
+
+              <!-- Syntax Guide -->
+              <q-item clickable class="q-pa-sm saved-view-item">
+                <q-item-section>
+                  <q-item-label class="tw-flex tw-items-center">
+                    <div style="width: 28px; display: flex; align-items: center; justify-content: center; margin-right: 12px">
+                      <syntax-guide
+                        data-test="logs-search-bar-sql-mode-toggle-btn"
+                        :sqlmode="searchObj.meta.sqlMode"
+                        size="0.875rem"
+                        class="syntax-guide-in-menu"
+                      />
+                    </div>
+                    Syntax Guide
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+
+              <q-separator />
+
+              <!-- Reset Filters -->
+              <q-item
+                clickable
+                @click="resetFilters"
+                data-test="logs-search-bar-reset-filters-btn"
+                class="q-pa-sm saved-view-item"
+              >
+                <q-item-section>
+                  <q-item-label class="tw-flex tw-items-center">
+                    <div style="width: 28px; display: flex; align-items: center; justify-content: center; margin-right: 8px; margin-left: 3px;">
+                      <q-icon name="restart_alt" size="20px" />
+                    </div>
                     {{ t("search.resetFilters") }}
                   </q-item-label>
-                </div>
-              </div>
-              <div></div>
-            </div>
+                </q-item-section>
+              </q-item>
+            </q-list>
           </q-menu>
         </q-btn>
         <!-- moved to dropdown if ai chat is enabled -->
-        <div
-          style="border: 1px solid #c4c4c4; border-radius: 5px"
-          class="q-pr-xs q-ml-xs"
-          v-if="!store.state.isAiChatEnabled"
-        >
+        <div class="toolbar-toggle-container" v-if="!store.state.isAiChatEnabled">
           <q-toggle
             data-test="logs-search-bar-quick-mode-toggle-btn"
             v-model="searchObj.meta.quickMode"
             @click="handleQuickMode"
-            class="o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+            class="o2-toggle-button-xs"
             size="xs"
             flat
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            "
           >
-            <img
-              :src="quickModeIcon"
-              alt="Quick Mode"
-              style="width: 20px; height: 20px"
-            />
+            <img :src="quickModeIcon" alt="Quick Mode" class="toolbar-icon" />
             <q-tooltip>
               {{ t("search.quickModeLabel") }}
             </q-tooltip>
@@ -556,25 +571,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="float-right col-auto q-mb-xs">
         <!-- this is moved to dropdown if ai chat is enabled -->
-        <q-toggle
+        <div
           v-if="!store.state.isAiChatEnabled"
-          data-test="logs-search-bar-wrap-table-content-toggle-btn"
-          v-model="searchObj.meta.toggleSourceWrap"
-          icon="wrap_text"
-          class="float-left o2-toggle-button-xs tw-flex tw-items-center tw-justify-center q-mr-xs"
-          size="xs"
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
-          :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
+          class="toolbar-toggle-container float-left"
         >
-          <q-tooltip>
-            {{
-              searchObj.meta.logsVisualizeToggle === "visualize"
-                ? "Not supported for visualization"
-                : t("search.messageWrapContent")
-            }}
-          </q-tooltip>
-        </q-toggle>
+          <q-toggle
+            data-test="logs-search-bar-wrap-table-content-toggle-btn"
+            v-model="searchObj.meta.toggleSourceWrap"
+            class="o2-toggle-button-xs"
+            size="xs"
+            flat
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            "
+            :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
+          >
+            <q-icon name="wrap_text" class="toolbar-icon-in-toggle" />
+            <q-tooltip>
+              {{
+                searchObj.meta.logsVisualizeToggle === "visualize"
+                  ? "Not supported for visualization"
+                  : t("search.messageWrapContent")
+              }}
+            </q-tooltip>
+          </q-toggle>
+        </div>
 
         <transform-selector
           v-if="isActionsEnabled"
@@ -604,7 +627,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           data-test="logs-search-bar-more-options-btn"
           class="q-mr-xs download-logs-btn q-px-sm"
-          size="sm"
           icon="menu"
         >
           <q-menu>
@@ -630,7 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-separator />
               <q-item
                 style="min-width: 150px"
-                class="q-pa-sm saved-view-item"
+                class="q-pa-sm saved-view-item download-menu-parent"
                 clickable
                 v-close-popup
                 v-bind:disable="
@@ -638,6 +660,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchObj.data.queryResults.hasOwnProperty('hits') &&
                   !searchObj.data.queryResults.hits.length
                 "
+                @mouseenter="showDownloadMenu = true"
               >
                 <q-item-section class="cursor-pointer">
                   <q-item-label class="tw-flex tw-items-center tw-gap-2">
@@ -656,6 +679,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="showDownloadMenu"
                   anchor="top end"
                   self="top start"
+                  :offset="[0, 0]"
+                  @mouseenter="showDownloadMenu = true"
+                  @mouseleave="showDownloadMenu = false"
                 >
                   <q-list>
                     <q-item
@@ -1036,7 +1062,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         round
         color="primary"
         @click="isFocused = !isFocused"
-        style="position: absolute; top: 42px; right: 10px; z-index: 20"
+        style="position: absolute; top: 45px; right: 3px; z-index: 20"
       ></q-btn>
     </div>
 
@@ -4460,6 +4486,15 @@ export default defineComponent({
   .download-logs-btn {
     height: 1.875rem; // 30px
     border-radius: 0.375rem; // 6px
+    transition: all 0.2s ease;
+
+    &:hover {
+      background-color: var(--o2-hover-accent);
+    }
+
+    .q-icon {
+      font-size: 1.125rem; // 18px
+    }
   }
 
   .save-transform-btn {
@@ -4477,6 +4512,15 @@ export default defineComponent({
       max-height: 1.875rem; // 30px
       padding: 0 0.25rem; // 4px
       border-radius: 0.375rem; // 6px
+      transition: all 0.2s ease;
+
+      &:hover {
+        background-color: var(--o2-hover-accent);
+      }
+
+      .q-icon {
+        font-size: 1.125rem; // 18px
+      }
     }
   }
 
@@ -4485,6 +4529,10 @@ export default defineComponent({
     button {
       padding: 0.25rem 0.3125rem; // 4px 5px
       border-radius: 0.375rem; // 6px
+    }
+
+    &:hover {
+      background-color: var(--o2-hover-accent);
     }
   }
 
@@ -4515,6 +4563,20 @@ export default defineComponent({
     padding: 0.125rem 0.25rem !important; // 2px 4px
   }
 
+  .download-menu-parent {
+    position: relative;
+
+    &::after {
+      content: "";
+      position: absolute;
+      right: -10px;
+      top: 0;
+      width: 10px;
+      height: 100%;
+      pointer-events: auto;
+    }
+  }
+
   .body--dark {
     .btn-function {
       filter: brightness(100);
@@ -4538,6 +4600,10 @@ export default defineComponent({
 
   .q-item {
     padding: 0 !important;
+
+    &:hover {
+      background-color: var(--o2-hover-accent) !important;
+    }
   }
 
   .q-focus-helper:hover {
@@ -4716,5 +4782,99 @@ export default defineComponent({
 .q-dark .file-type label,
 .q-dark .file-type .q-btn {
   color: var(--o2-text-secondary);
+}
+
+// Toolbar Icon and Toggle Styles
+.toolbar-toggle-container {
+  padding: 0 0.175rem; // 0 ~2.8px
+  margin-left: 0.25rem; // 8px
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.0625rem solid rgba(0, 0, 0, 0.12); // 1px
+  border-radius: 0.375rem; // 6px
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+}
+
+.dark-theme .toolbar-toggle-container {
+  border: 0.0625rem solid rgb(196, 196, 196);
+}
+
+.toolbar-icon {
+  width: 1rem; // 16px
+  height: 1rem; // 16px
+  object-fit: contain;
+}
+
+.q-dark .toolbar-icon {
+  filter: invert(1);
+}
+
+.toolbar-icon-in-toggle {
+  font-size: 0.9rem; // ~14.4px
+}
+
+.syntax-guide-in-menu {
+  :deep(.q-btn) {
+    border: none !important;
+    margin-left: 0 !important;
+
+    &:hover {
+      background-color: transparent !important;
+    }
+
+    &::before {
+      display: none !important;
+    }
+  }
+}
+
+.toolbar-reset-btn {
+  padding: 0.25rem 0.375rem; // 4px 6px
+  margin-left: 0.25rem; // 8px
+  border: 0.0625rem solid rgba(0, 0, 0, 0.12); // 1px
+  border-radius: 0.375rem; // 6px
+  transition: all 0.2s ease;
+  min-height: 1.875rem; // 30px
+
+  .q-icon {
+    font-size: 1.215rem; // 16px
+  }
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+}
+
+.q-dark .toolbar-reset-btn {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.group-menu-btn {
+  padding: 0.25rem 0.25rem !important; // 4px 8px
+  margin-left: 0.25rem; // 8px
+  border: 0.0625rem solid rgba(0, 0, 0, 0.12) !important; // 1px
+  border-radius: 0.375rem; // 6px
+  transition: all 0.2s ease;
+  min-height: 1.875rem !important; // 30px
+  font-size: 0.75rem; // 12px
+  font-weight: 500;
+
+  .q-icon {
+    font-size: 1.125rem; // 18px
+  }
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+}
+
+.dark-theme .group-menu-btn, .q-dark .group-menu-btn {
+  border: 0.0625rem solid rgb(196, 196, 196) !important;
 }
 </style>

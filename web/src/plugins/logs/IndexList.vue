@@ -2239,7 +2239,7 @@ $streamSelectorHeight: 44px;
         font-weight: 500;
         line-height: 1;
         color: var(--o2-text-primary);
-        border-radius: 0.25rem !important; // 4px - rounded border
+        border-radius: 0.375rem !important; // 4px - rounded border
         overflow: visible !important;
 
         .q-btn__content {
@@ -2337,6 +2337,29 @@ $streamSelectorHeight: 44px;
         .field_overlay {
           background-color: #3f4143;
           opacity: 1;
+        }
+      }
+    }
+
+    .field-list-pagination {
+      .q-btn {
+        color: white !important;
+        border-radius: 0.375rem !important;
+      }
+
+      .pagination-page-active {
+        border: 1px solid rgb(196, 196, 196) !important;
+      }
+    }
+
+    .field-list-reset {
+      .reset-icon {
+        color: white;
+        border: 1px solid rgba(196, 196, 196);
+        border-radius: 0.375rem !important;
+
+        &:hover {
+          color: white;
         }
       }
     }
