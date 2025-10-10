@@ -320,7 +320,7 @@ jobs:
         if: always()
         with:
           name: test-attachments-${{ matrix.testfolder }}
-          path: tests/ui-testing/playwright-tests/test-results/
+          path: tests/ui-testing/test-results/
           retention-days: 30
 
       - name: Upload Playwright Report
@@ -475,8 +475,8 @@ jobs:
         run: |
           # TestDino expects attachments at the path specified in JSON report
           # Create directory structure to match the original paths
-          mkdir -p merged-results/tests/ui-testing/playwright-tests
-          ln -s ../../../test-results merged-results/tests/ui-testing/playwright-tests/test-results
+          mkdir -p merged-results/tests/ui-testing
+          ln -s ../../test-results merged-results/tests/ui-testing/test-results
           echo "Symlink created for test-results"
 
       - name: Upload to TestDino
