@@ -63,6 +63,7 @@ pub struct MultiCachedQueryResponse {
     pub file_path: String,
     pub trace_id: String,
     pub order_by: Vec<(String, OrderBy)>,
+    pub clear_cache: bool,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -210,6 +211,7 @@ mod tests {
             is_aggregate: true,
             file_path: "test.json".to_string(),
             trace_id: "trace123".to_string(),
+            clear_cache: false,
         };
 
         assert!(response.has_cached_data);
