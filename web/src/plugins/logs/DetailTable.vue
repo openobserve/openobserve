@@ -67,8 +67,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="log-detail-wrap-values-toggle-btn"
           v-model="shouldWrapValues"
           :label="t('common.wrap')"
-          color="primary"
+          class="o2-toggle-button-xs"
           size="xs"
+          flat
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-xs-dark'
+              : 'o2-toggle-button-xs-light'
+          "
           @update:model-value="toggleWrapLogDetails"
         />
       </div>
@@ -106,19 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-pa-none q-mb-lg"
           data-test="log-detail-table-content"
         >
-          <div
-            v-if="rowData.length == 0"
-            class="q-pt-md"
-            style="max-width: 350px"
-          >
+          <div v-if="rowData.length == 0" class="q-pt-md tw-max-w-[350px]">
             No data available.
           </div>
           <div v-else class="indexDetailsContainer">
-            <q-list
-              separator
-              style="height: calc(100vh - 290)"
-              class="q-px-none q-py-none"
-            >
+            <q-list separator class="q-px-none q-py-none detail-table-list">
               <q-item class="list-head">
                 <q-item-section class="text-bold col-3">
                   {{ t("search.sourceName") }}
@@ -140,9 +138,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ value }}</q-item-section
                 >
                 <q-item-section
-                  class="col-9"
+                  class="col-9 tw-inline tw-relative"
                   :class="!shouldWrapValues ? 'ellipsis' : ''"
-                  style="display: inline;relative"
                 >
                   <q-btn-dropdown
                     :data-test="`log-details-include-exclude-field-btn-${value}`"
@@ -265,9 +262,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <pre
                     :data-test="`log-detail-${value}-value`"
                     class="table-pre"
-                    :style="{
-                      'white-space': !shouldWrapValues ? 'nowrap' : 'pre-wrap',
-                    }"
+                    :class="
+                      !shouldWrapValues
+                        ? 'tw-whitespace-nowrap'
+                        : 'tw-whitespace-pre-wrap'
+                    "
                   ><LogsHighLighting :data="key" :show-braces="false" :query-string="highlightQuery" /></pre>
                 </q-item-section>
               </q-item>
@@ -301,10 +300,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="col-8 row justify-center align-center q-gutter-sm"
         >
-          <div style="line-height: 40px; font-weight: bold">
+          <div class="tw-leading-10 tw-font-bold">
             {{ t("common.noOfRecords") }}
           </div>
-          <div class="" style="minwidth: 150px">
+          <div class="tw-min-w-[150px]">
             <q-select
               v-model="selectedRelativeValue"
               :options="recordSizeOptions"
