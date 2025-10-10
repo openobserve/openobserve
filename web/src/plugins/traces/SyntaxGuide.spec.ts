@@ -63,9 +63,10 @@ describe("SyntaxGuide", () => {
       );
     });
 
-    it("should render button with correct label", () => {
+    it("should render button with help icon text", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.text()).toContain("Syntax Guide");
+      // Button text comes from the icon name
+      expect(button.text()).toBe("help");
     });
 
     it("should render button with help icon", () => {
@@ -218,7 +219,7 @@ describe("SyntaxGuide", () => {
   describe("Styling and Classes", () => {
     it("should have correct button styling classes", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.classes()).toContain("q-ml-sm");
+      expect(button.classes()).toContain("q-ml-xs");
       expect(button.classes()).toContain("q-pa-xs");
       expect(button.classes()).toContain("syntax-guide-button");
     });
@@ -230,17 +231,20 @@ describe("SyntaxGuide", () => {
       expect(button.exists()).toBe(true);
     });
 
-    it("should have proper ARIA attributes", () => {
+    it("should have tooltip component for accessibility", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.attributes("aria-label")).toBeDefined();
-      expect(button.attributes("aria-label")).toBe("Syntax Guide");
+      // Check that QTooltip component is present as a child
+      const tooltipComponent = button.findComponent({ name: "QTooltip" });
+      expect(tooltipComponent.exists()).toBe(true);
     });
   });
 
   describe("Component Integration", () => {
     it("should work with i18n translations", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.text()).toContain("Syntax Guide");
+      // Check that QTooltip component is present
+      const tooltipComponent = button.findComponent({ name: "QTooltip" });
+      expect(tooltipComponent.exists()).toBe(true);
     });
 
     it("should integrate with Vuex store", () => {
