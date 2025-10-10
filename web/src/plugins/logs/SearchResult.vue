@@ -1096,6 +1096,23 @@ export default defineComponent({
     height: 30px;
   }
 }
+
+// Pagination dark mode styles
+.dark-theme {
+  .q-pagination__content {
+    input {
+      border: 1px solid rgba(255, 255, 255, 0.28) !important;
+      color: rgba(255, 255, 255, 0.87);
+      background-color: transparent;
+    }
+
+    .q-btn {
+      color: white !important;
+      border-radius: 0.375rem !important;
+    }
+  }
+}
+
 .histogram-unavailable-text {
   color: #f5a623;
 }

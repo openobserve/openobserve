@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-btn
     data-cy="syntax-guide-button"
-    size="sm"
     dense
     flat
     class="q-ml-xs q-pa-xs"
@@ -254,20 +253,25 @@ export default defineComponent({
 .syntax-guide-button {
   cursor: pointer;
   text-transform: capitalize;
-  width: 2rem; // 32px
-  height: 2rem; // 32px
-  font-weight: bold;
-  border: 0.11rem solid var(--o2-border) !important; // 1px
-  border-radius: 0.375rem; // 6px - modern rounded borders
+  min-width: 1.875rem; // 30px
+  min-height: 1.875rem; // 30px
+  padding: 0.25rem 0.375rem; // 4px 6px
+  font-weight: normal;
+  border: 0.0625rem solid rgba(0, 0, 0, 0.12) !important; // 1px
+  border-radius: 0.375rem; // 6px
+  transition: all 0.2s ease;
+
+  .q-btn__content .q-icon {
+    font-size: 1.125rem; // 18px
+  }
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
 }
 
 .syntax-guide-button-dark {
-  border: 0.11rem solid var(--o2-border) !important; // 1px
-}
-
-.sql-mode {
-  background-color: rgba(89, 96, 178, 0.8);
-  color: #ffffff;
+  border: 0.0625rem solid rgba(196, 196, 196) !important; // 1px
 }
 
 .syntax-guide-title {
