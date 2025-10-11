@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </span>
                   </div>
-                  <div class="tw-h-[calc(100vh-500px)]">
+                  <div class="tw-h-[calc(100vh-500px)] tw-min-h-[140px]">
                     <PanelSchemaRenderer
                       v-if="chartData"
                       @metadata-update="metaDataValue"

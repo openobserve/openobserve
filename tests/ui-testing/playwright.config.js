@@ -19,6 +19,8 @@ if (!process.env.ZO_BASE_URL || !process.env.ZO_ROOT_USER_EMAIL || !process.env.
  */
 module.exports = defineConfig({
   testDir: './playwright-tests',
+  /* Output directory for test artifacts */
+  outputDir: './test-results',
   /* Exclude archived tests from all test runs */
   testIgnore: ['**/test-archives/**', '**/*_old.js'],
   /* Global setup and teardown */
@@ -33,7 +35,10 @@ module.exports = defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 5 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  reporter: [
+    ['html', { outputFolder: 'playwright-results/html-report' }], // HTML reporter
+    ['json', { outputFile: 'playwright-results/report.json' }] // JSON reporter for TestDino
+  ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */

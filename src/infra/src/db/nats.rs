@@ -792,3 +792,233 @@ fn key_encode(key: &str) -> String {
 fn key_decode(key: &str) -> String {
     base64::decode(&key.replace('-', "+").replace('_', "/")).unwrap()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_key_encode_simple() {
+        let key = "test_key";
+        let encoded = key_encode(key);
+        assert!(!encoded.contains('/'));
+        assert!(!encoded.contains('+'));
+    }
+
+    #[test]
+    fn test_key_encode_with_special_chars() {
+        let key = "test/key+with/special";
+        let encoded = key_encode(key);
+        assert!(!encoded.contains('/'));
+        assert!(!encoded.contains('+'));
+    }
+
+    #[test]
+    fn test_key_encode_decode_roundtrip() {
+        let keys = vec![
+            "simple_key",
+            "key/with/slashes",
+            "key+with+plus",
+            "key with spaces",
+            "/leading/slash",
+            "trailing/slash/",
+            "key_with_underscores",
+            "key-with-dashes",
+            "123456789",
+            "special!@#$%^&*()",
+        ];
+
+        for key in keys {
+            let encoded = key_encode(key);
+            let decoded = key_decode(&encoded);
+            assert_eq!(
+                decoded, key,
+                "Failed roundtrip for key: '{}', encoded: '{}', decoded: '{}'",
+                key, encoded, decoded
+            );
+        }
+    }
+
+    #[test]
+    fn test_key_encode_empty_string() {
+        let key = "";
+        let encoded = key_encode(key);
+        let decoded = key_decode(&encoded);
+        assert_eq!(decoded, key);
+    }
+
+    #[test]
+    fn test_key_encode_unicode() {
+        let keys = vec!["你好世界", "🎉🎊", "Ñoño", "Café"];
+
+        for key in keys {
+            let encoded = key_encode(key);
+            let decoded = key_decode(&encoded);
+            assert_eq!(decoded, key, "Failed roundtrip for unicode key: '{}'", key);
+        }
+    }
+
+    #[test]
+    fn test_key_encode_no_url_unsafe_chars() {
+        let key = "test/key+value";
+        let encoded = key_encode(key);
+
+        // Ensure no URL-unsafe characters
+        assert!(!encoded.contains('/'), "Encoded key contains '/'");
+        assert!(!encoded.contains('+'), "Encoded key contains '+'");
+    }
+
+    #[test]
+    fn test_nats_db_new() {
+        let db = NatsDb::new("test_prefix");
+        assert_eq!(db.prefix, "test_prefix");
+    }
+
+    #[test]
+    fn test_nats_db_new_removes_trailing_slash() {
+        let db = NatsDb::new("test_prefix/");
+        assert_eq!(db.prefix, "test_prefix");
+    }
+
+    #[test]
+    fn test_nats_db_new_multiple_trailing_slashes() {
+        // trim_end_matches removes all matching chars from the end
+        let db = NatsDb::new("test_prefix///");
+        assert_eq!(db.prefix, "test_prefix");
+    }
+
+    #[test]
+    fn test_nats_db_super_cluster() {
+        let db = NatsDb::super_cluster();
+        assert_eq!(db.prefix, SUPER_CLUSTER_PREFIX.trim_end_matches('/'));
+    }
+
+    #[test]
+    fn test_locker_new() {
+        let locker = Locker::new("/test/key");
+        assert_eq!(locker.key, "/locker/test/key");
+        assert!(!locker.lock_id.is_empty());
+        assert_eq!(locker.state.load(Ordering::SeqCst), 0);
+        assert!(locker.tx.is_none());
+    }
+
+    #[test]
+    fn test_locker_new_without_leading_slash() {
+        let locker = Locker::new("test/key");
+        assert_eq!(locker.key, "/lockertest/key");
+    }
+
+    #[test]
+    fn test_locker_state_init() {
+        let locker = Locker::new("/test");
+        // Initial state should be 0 (init)
+        assert_eq!(locker.state.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn test_locker_unique_lock_ids() {
+        let locker1 = Locker::new("/key1");
+        let locker2 = Locker::new("/key2");
+
+        // Each locker should have a unique lock_id
+        assert_ne!(locker1.lock_id, locker2.lock_id);
+    }
+
+    #[test]
+    fn test_key_decode_handles_url_safe_chars() {
+        // Test that decode properly reverses the URL-safe encoding
+        let original = "test/key+value";
+        let encoded = key_encode(original);
+
+        // Verify the encoding doesn't contain original unsafe chars
+        assert!(!encoded.contains('/'));
+        assert!(!encoded.contains('+'));
+
+        let decoded = key_decode(&encoded);
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn test_key_encode_consistent() {
+        let key = "consistent_key";
+        let encoded1 = key_encode(key);
+        let encoded2 = key_encode(key);
+
+        // Same input should always produce same output
+        assert_eq!(encoded1, encoded2);
+    }
+
+    #[test]
+    fn test_key_encode_different_keys() {
+        let encoded1 = key_encode("key1");
+        let encoded2 = key_encode("key2");
+
+        // Different inputs should produce different outputs
+        assert_ne!(encoded1, encoded2);
+    }
+
+    #[test]
+    fn test_super_cluster_prefix() {
+        assert_eq!(SUPER_CLUSTER_PREFIX, "super_cluster_kv_");
+    }
+
+    #[test]
+    fn test_locker_constants() {
+        assert_eq!(LOCKER_WATCHER_CHECK_TTL, 1);
+        assert_eq!(LOCKER_WATCHER_UPDATE_TTL, 10);
+    }
+
+    #[test]
+    fn test_key_encode_long_string() {
+        let long_key = "a".repeat(1000);
+        let encoded = key_encode(&long_key);
+        let decoded = key_decode(&encoded);
+        assert_eq!(decoded, long_key);
+    }
+
+    #[test]
+    fn test_key_encode_newlines_and_tabs() {
+        let key = "key\nwith\nnewlines\tand\ttabs";
+        let encoded = key_encode(key);
+        let decoded = key_decode(&encoded);
+        assert_eq!(decoded, key);
+    }
+
+    #[test]
+    fn test_key_encode_binary_like_data() {
+        let key = "key\0with\0null\0bytes";
+        let encoded = key_encode(key);
+        let decoded = key_decode(&encoded);
+        assert_eq!(decoded, key);
+    }
+
+    #[test]
+    fn test_nats_db_prefix_no_modification_without_slash() {
+        let db = NatsDb::new("no_slash_prefix");
+        assert_eq!(db.prefix, "no_slash_prefix");
+    }
+
+    #[test]
+    fn test_nats_db_empty_prefix() {
+        let db = NatsDb::new("");
+        assert_eq!(db.prefix, "");
+    }
+
+    #[test]
+    fn test_nats_db_slash_only_prefix() {
+        let db = NatsDb::new("/");
+        assert_eq!(db.prefix, "");
+    }
+
+    #[test]
+    fn test_key_encode_base64_padding() {
+        // Test various lengths to ensure base64 padding is handled correctly
+        let keys = vec!["a", "ab", "abc", "abcd", "abcde"];
+
+        for key in keys {
+            let encoded = key_encode(key);
+            let decoded = key_decode(&encoded);
+            assert_eq!(decoded, key, "Failed for key of length: {}", key.len());
+        }
+    }
+}

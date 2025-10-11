@@ -21,14 +21,20 @@ use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 
 use crate::{
-    common::meta::{
-        http::HttpResponse as MetaHttpResponse,
-        ingestion::{
-            GCPIngestionRequest, HecResponse, HecStatus, IngestionRequest,
-            KinesisFHIngestionResponse, KinesisFHRequest,
+    common::{
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            ingestion::{
+                GCPIngestionRequest, HecResponse, HecStatus, IngestionRequest,
+                KinesisFHIngestionResponse, KinesisFHRequest,
+            },
         },
+        utils::auth::UserEmail,
     },
-    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    handler::http::{
+        extractors::Headers,
+        request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    },
     service::logs::{self, otlp::handle_request},
 };
 
@@ -58,10 +64,11 @@ pub async fn bulk(
     thread_id: web::Data<usize>,
     org_id: web::Path<String>,
     body: web::Bytes,
-    in_req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
+    let user_email = &user_email.user_id;
 
     // log start processing time
     let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
@@ -126,10 +133,11 @@ pub async fn multi(
     thread_id: web::Data<usize>,
     path: web::Path<(String, String)>,
     body: web::Bytes,
-    in_req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
-    let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
+    let user_email = &user_email.user_id;
 
     // log start processing time
     let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
@@ -207,10 +215,11 @@ pub async fn json(
     thread_id: web::Data<usize>,
     path: web::Path<(String, String)>,
     body: web::Bytes,
-    in_req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
-    let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
+    let user_email = &user_email.user_id;
 
     // log start processing time
     let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
@@ -288,10 +297,11 @@ pub async fn handle_kinesis_request(
     thread_id: web::Data<usize>,
     path: web::Path<(String, String)>,
     post_data: web::Json<KinesisFHRequest>,
-    in_req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
-    let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
+    let user_email = &user_email.user_id;
     let request_id = post_data.request_id.clone();
     let request_time = post_data
         .timestamp
@@ -341,10 +351,11 @@ pub async fn handle_gcp_request(
     thread_id: web::Data<usize>,
     path: web::Path<(String, String)>,
     post_data: web::Json<GCPIngestionRequest>,
-    in_req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
-    let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
+    let user_email = &user_email.user_id;
     Ok(
         match logs::ingest::ingest(
             **thread_id,
@@ -396,12 +407,13 @@ pub async fn handle_gcp_request(
 pub async fn otlp_logs_write(
     thread_id: web::Data<usize>,
     org_id: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
-    let user_email = req.headers().get("user_id").unwrap().to_str().unwrap();
+    let user_email = &user_email.user_id;
     let in_stream_name = req
         .headers()
         .get(&config::get_config().grpc.stream_header_key)
@@ -497,10 +509,11 @@ pub async fn hec(
     thread_id: web::Data<usize>,
     org_id: web::Path<String>,
     body: web::Bytes,
-    in_req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
+    let user_email = &user_email.user_id;
 
     // log start processing time
     let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {

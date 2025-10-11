@@ -802,6 +802,10 @@ export const getStreamNameFromQuery = async (query: any) => {
         const parsedQuery = parser?.astify(query);
         if (parsedQuery?.with) {
             let withObj = parsedQuery.with;
+            // Ensure withObj is an array before iterating
+            if (!Array.isArray(withObj)) {
+              withObj = [withObj];
+            }
             withObj.forEach((obj: any) => {
               // Recursively extract table names from the WITH statement with depth protection
               const MAX_RECURSION_DEPTH = 50; // Prevent stack overflow

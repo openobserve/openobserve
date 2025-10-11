@@ -510,6 +510,10 @@ export const formatTimeWithSuffix = (us: number) => {
     return "0us";
   }
 
+  if (us >= 1000 * 1000 * 60) {
+    return `${(us / 1000 / 1000 / 60).toFixed(2)}m`;
+  }
+
   if (us >= 1000 * 1000) {
     return `${(us / 1000 / 1000).toFixed(2)}s`;
   }
@@ -1258,4 +1262,3 @@ export const getDuration = (createdAt: number) => {
     duration: durationFormatter(durationInSeconds),
   };
 };
-

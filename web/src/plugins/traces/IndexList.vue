@@ -74,6 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="props.row.ftsKey || !props.row.showValues"
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'hover:tw-bg-zinc-700'
+                    : 'hover:tw-bg-zinc-200'
+                "
                 :title="props.row.label || props.row.name"
               >
                 <div class="field_label ellipsis" style="font-size: 14px">
@@ -81,10 +86,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   class="field_overlay"
-                  :style="{
-                    background:
-                      store.state.theme === 'dark' ? '#414345' : '#e8e8e8',
-                  }"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'tw-bg-zinc-700'
+                      : 'tw-bg-zinc-200'
+                  "
                 >
                   <q-btn
                     :icon="outlinedAdd"
@@ -117,6 +123,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="search" />
             </template>
           </q-input>
+          <q-tr
+            v-if="searchObj.loadingStream"
+            class="tw-flex tw-items-center tw-justify-center tw-w-full tw-pt-[2rem]"
+          >
+            <q-td colspan="100%"
+class="text-bold" style="opacity: 0.7">
+              <div
+                class="text-subtitle2 text-weight-bold tw-w-fit tw-mx-auto tw-my-0 tw-flex-col tw-justify-items-center"
+              >
+                <q-spinner-hourglass size="1.8rem" color="primary" />
+                {{ t("traces.loadingStream") }}
+              </div>
+            </q-td>
+          </q-tr>
         </template>
       </q-table>
     </div>
@@ -354,11 +374,16 @@ export default defineComponent({
         }
       }
     }
-    &:hover {
-      .field-container {
-        background-color: #e8e8e8;
-      }
-    }
+    // &:hover {
+    //   .field-container {
+    //     background-color: #e8e8e8;
+    //   }
+    //   body.body--dark {
+    //     .field-container {
+    //       background-color: #424242;
+    //     }
+    //   }
+    // }
   }
 }
 

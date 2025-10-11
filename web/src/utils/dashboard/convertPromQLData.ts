@@ -100,12 +100,17 @@ export const convertPromQLData = async (
   // get the total series
   let totalSeries = 0;
   searchQueryData.forEach((queryData: any) => {
-    totalSeries += queryData.result?.length || 0;
+    if (queryData && queryData.result) {
+      totalSeries += queryData.result.length || 0;
+    }
   });
 
   // Limit number of series to limitSeries
   const limitedSearchQueryData = searchQueryData.map((queryData: any) => {
-    const remainingSeries = queryData.result?.slice(0, limitSeries);
+    if (!queryData || !queryData.result) {
+      return queryData;
+    }
+    const remainingSeries = queryData.result.slice(0, limitSeries);
     limitSeries = limitSeries - remainingSeries.length;
     return {
       ...queryData,
@@ -130,11 +135,13 @@ export const convertPromQLData = async (
   let xAxisData: any = new Set();
 
   // add all series timestamp
-  limitedSearchQueryData.forEach((queryData: any) =>
-    queryData.result.forEach((result: any) =>
-      result.values.forEach((value: any) => xAxisData.add(value[0])),
-    ),
-  );
+  limitedSearchQueryData.forEach((queryData: any) => {
+    if (queryData && queryData.result) {
+      queryData.result.forEach((result: any) =>
+        result.values.forEach((value: any) => xAxisData.add(value[0])),
+      );
+    }
+  });
 
   // sort the timestamp and make an array
   xAxisData = Array.from(xAxisData).sort();
@@ -351,7 +358,7 @@ export const convertPromQLData = async (
     xAxis: {
       type: "time",
       axisLine: {
-        show: searchQueryData?.every((it: any) => it.result.length == 0)
+        show: searchQueryData?.every((it: any) => it && it.result && it.result.length == 0)
           ? true
           : (panelSchema.config?.axis_border_show ?? false),
       },
@@ -383,7 +390,7 @@ export const convertPromQLData = async (
         },
       },
       axisLine: {
-        show: searchQueryData?.every((it: any) => it.result.length == 0)
+        show: searchQueryData?.every((it: any) => it && it.result && it.result.length == 0)
           ? true
           : (panelSchema.config?.axis_border_show ?? false),
       },

@@ -252,9 +252,9 @@ describe("SearchBar", () => {
 
   describe("Component structure", () => {
     it("should render reset filters button", () => {
-      const resetBtn = wrapper.find(".reset-filters");
+      const resetBtn = wrapper.find('[data-test="traces-search-bar-reset-filters-btn"]');
       expect(resetBtn.exists()).toBe(true);
-      expect(resetBtn.text()).toContain("Reset Filters");
+      expect(resetBtn.find('.q-icon').exists()).toBe(true);
     });
 
     it("should render syntax guide component", () => {

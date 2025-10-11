@@ -27,6 +27,7 @@ const defaultObject = {
   organizationIdentifier: "",
   runQuery: false,
   loading: false,
+  loadingStream: false,
 
   config: {
     splitterModel: 20,
@@ -77,6 +78,11 @@ const defaultObject = {
     serviceColors: {} as any,
     redirectedFromLogs: false,
     searchApplied: false,
+    metricsRangeFilters: new Map<
+      string,
+      { panelTitle: string; start: number; end: number }
+    >(),
+    showErrorOnly: false,
   },
   data: {
     query: "",
@@ -177,7 +183,7 @@ const useTraces = () => {
     searchObj.data.traceDetails.isLoadingTraceDetails = false;
     searchObj.data.traceDetails.isLoadingTraceMeta = false;
   };
-  
+
   const updatedLocalLogFilterField = (): void => {
     const identifier: string = searchObj.organizationIdentifier || "default";
     const selectedFields: any =
@@ -216,7 +222,7 @@ const useTraces = () => {
   }
 
   const copyTracesUrl = (
-    customTimeRange: { from: string; to: string } | null = null
+    customTimeRange: { from: string; to: string } | null = null,
   ) => {
     const queryParams = getUrlQueryParams(true);
 

@@ -15,7 +15,10 @@
 
 use core::result::Result::Ok;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
+use actix_web::{
+    HttpRequest, HttpResponse, delete, get, post, put,
+    web::{self, Query},
+};
 use config::{
     meta::{
         alerts::alert::{Alert, AlertListFilter},
@@ -31,6 +34,7 @@ use crate::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::{auth::UserEmail, http::get_stream_type_from_request},
     },
+    handler::http::extractors::Headers,
     service::{
         alerts::alert::{self, AlertError},
         db::scheduler,
@@ -66,7 +70,7 @@ use crate::{
 pub async fn save_alert(
     path: web::Path<(String, String)>,
     alert: web::Json<Alert>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
     req: HttpRequest,
 ) -> HttpResponse {
     let (org_id, stream_name) = path.into_inner();
@@ -123,7 +127,7 @@ pub async fn save_alert(
 pub async fn update_alert(
     path: web::Path<(String, String, String)>,
     alert: web::Json<Alert>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> HttpResponse {
     let (org_id, stream_name, name) = path.into_inner();
 
@@ -222,18 +226,22 @@ async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest)
     )
 )]
 #[get("/{org_id}/alerts")]
-async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse {
+async fn list_alerts(
+    path: web::Path<String>,
+    Query(mut query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    // req: HttpRequest,
+) -> HttpResponse {
     let org_id = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
 
     let mut _alert_list_from_rbac = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        let user_id = req.headers().get("user_id").unwrap();
+        let user_id = user_email.user_id;
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
-            user_id.to_str().unwrap(),
+            user_id.as_str(),
             "GET",
             "alert",
         )
@@ -249,7 +257,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
         // Get List of allowed objects ends
     }
 
-    let user_filter = query.get("owner").map(|v| v.to_string());
+    let user_filter = query.remove("owner");
     let enabled_filter = query
         .get("enabled")
         .and_then(|field| field.parse::<bool>().ok());

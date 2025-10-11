@@ -500,6 +500,7 @@ import {
 } from "@/utils/alerts/alertPayload";
 import {
   getParser as getParserUtil,
+  addHavingClauseToQuery,
   type SqlUtilsContext,
 } from "@/utils/alerts/alertSqlUtils";
 
@@ -1101,14 +1102,35 @@ export default defineComponent({
             // Always set a specific type - never leave it as empty string to avoid defaulting to quick mode
             if (panelData.queryType === "sql") {
               formData.value.query_condition.type = "sql";
-              // If the panel has a generated query, populate it
-              if (query.query) {
-                formData.value.query_condition.sql = query.query;
+              // Use executedQuery if available (has variables replaced), otherwise use query.query
+              const sourceQuery = panelData.executedQuery || query.query;
+              if (sourceQuery) {
+                let sqlQuery = sourceQuery;
+
+                // If threshold is provided and we have a SQL query with GROUP BY,
+                // add a HAVING clause to filter the aggregated column
+                if (panelData.threshold !== undefined && panelData.condition && panelData.yAxisColumn) {
+                  const threshold = panelData.threshold;
+                  const operator = panelData.condition === 'above' ? '>=' : '<=';
+                  const yAxisColumn = panelData.yAxisColumn;
+
+                  // Use node-sql-parser to properly insert HAVING clause in the correct position
+                  // This handles queries with ORDER BY, LIMIT, OFFSET, etc.
+                  // Ensure parser is initialized first
+                  if (!parser) {
+                    await importSqlParser();
+                  }
+                  sqlQuery = addHavingClauseToQuery(sqlQuery, yAxisColumn, operator, threshold, parser);
+                }
+
+                formData.value.query_condition.sql = sqlQuery;
               }
             } else if (panelData.queryType === "promql") {
               formData.value.query_condition.type = "promql";
-              if (query.query) {
-                formData.value.query_condition.promql = query.query;
+              // Use executedQuery if available (has variables replaced), otherwise use query.query
+              const sourceQuery = panelData.executedQuery || query.query;
+              if (sourceQuery) {
+                formData.value.query_condition.promql = sourceQuery;
               }
             } else {
               // Default to SQL mode if queryType is not specified
@@ -1151,6 +1173,8 @@ export default defineComponent({
                     };
                   }
                   formData.value.query_condition.aggregation.function = yField.aggregationFunction.toLowerCase();
+                  // Set the having.column to the Y-axis field for threshold comparison
+                  formData.value.query_condition.aggregation.having.column = yField.alias || yField.column;
                 }
               }
 
@@ -1200,28 +1224,43 @@ export default defineComponent({
 
             // Handle threshold and condition from context menu
             if (panelData.threshold !== undefined && panelData.condition) {
-              formData.value.trigger_condition.threshold = panelData.threshold;
+              // For SQL with aggregation: use HAVING clause for value comparison
+              // For PromQL: use promql_condition for value comparison
+              // In both cases, set trigger_condition.threshold to 1 (fire when any row/result is returned)
 
-              // Set the operator based on condition
-              if (panelData.condition === 'above') {
-                formData.value.trigger_condition.operator = '>=';
-              } else if (panelData.condition === 'below') {
-                formData.value.trigger_condition.operator = '<=';
-              }
-
-              // If aggregation is enabled, also set the having clause
-              if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
-                if (!formData.value.query_condition.aggregation.having) {
-                  formData.value.query_condition.aggregation.having = {
-                    column: "",
-                    operator: ">=",
+              if (panelData.queryType === 'promql') {
+                // For PromQL: Set up promql_condition with the threshold
+                if (!formData.value.query_condition.promql_condition) {
+                  formData.value.query_condition.promql_condition = {
+                    operator: '>=',
                     value: 1,
                   };
                 }
-                formData.value.query_condition.aggregation.having.value = panelData.threshold;
-                formData.value.query_condition.aggregation.having.operator =
+                formData.value.query_condition.promql_condition.value = panelData.threshold;
+                formData.value.query_condition.promql_condition.operator =
                   panelData.condition === 'above' ? '>=' : '<=';
+              } else {
+                // For SQL: Set up aggregation HAVING clause with the threshold
+                // If aggregation is enabled, set the having clause
+                if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
+                  if (!formData.value.query_condition.aggregation.having) {
+                    formData.value.query_condition.aggregation.having = {
+                      column: "",
+                      operator: ">=",
+                      value: 1,
+                    };
+                  }
+                  formData.value.query_condition.aggregation.having.value = panelData.threshold;
+                  formData.value.query_condition.aggregation.having.operator =
+                    panelData.condition === 'above' ? '>=' : '<=';
+                }
               }
+
+              // Set alert trigger threshold to 1 and operator to >=
+              // This means: fire the alert when ANY row is returned from the query
+              // (The actual value comparison is done in HAVING clause for SQL or in PromQL query)
+              formData.value.trigger_condition.threshold = 1;
+              formData.value.trigger_condition.operator = '>=';
             }
           }
         } catch (error) {

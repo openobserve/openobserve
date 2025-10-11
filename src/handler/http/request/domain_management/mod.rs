@@ -90,7 +90,7 @@ pub async fn get_domain_management_config(path: web::Path<String>) -> Result<Htt
     params(
         ("org_id" = String, Path, description = "Organization name (must be meta org)"),
     ),
-    request_body(content = Object, description = "Domain management configuration", content_type = "application/json"),
+    request_body(content = DomainManagementRequest, description = "Domain management configuration", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Bad Request", content_type = "application/json", body = ()),

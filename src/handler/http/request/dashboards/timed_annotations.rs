@@ -58,10 +58,9 @@ use crate::{
 #[post("/{org_id}/dashboards/{dashboard_id}/annotations")]
 pub async fn create_annotations(
     path: web::Path<(String, String)>,
-    body: web::Bytes,
+    web::Json(req): web::Json<TimedAnnotationReq>,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, dashboard_id) = path.into_inner();
-    let req = serde_json::from_slice::<TimedAnnotationReq>(&body)?;
     if let Err(validation_err) = req.validate() {
         return Ok(MetaHttpResponse::bad_request(validation_err));
     }
@@ -176,10 +175,9 @@ pub async fn get_annotations(
 #[delete("/{org_id}/dashboards/{dashboard_id}/annotations")]
 pub async fn delete_annotations(
     path: web::Path<(String, String)>,
-    body: web::Bytes,
+    web::Json(req): web::Json<TimedAnnotationDelete>,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, dashboard_id) = path.into_inner();
-    let req: TimedAnnotationDelete = serde_json::from_slice(&body)?;
     if let Err(validation_err) = req.validate() {
         return Ok(MetaHttpResponse::bad_request(validation_err));
     }
@@ -230,10 +228,9 @@ pub async fn delete_annotations(
 #[put("/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}")]
 pub async fn update_annotations(
     path: web::Path<(String, String, String)>,
-    body: web::Bytes,
+    web::Json(mut req): web::Json<TimedAnnotation>,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, dashboard_id, timed_annotation_id) = path.into_inner();
-    let mut req: TimedAnnotation = serde_json::from_slice(&body)?;
     // ensure the annotation id is always set for update
     req.annotation_id = Some(timed_annotation_id.clone());
     if let Err(validation_err) = req.validate() {
@@ -288,10 +285,9 @@ pub async fn update_annotations(
 #[delete("/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}")]
 pub async fn delete_annotation_panels(
     path: web::Path<(String, String, String)>,
-    body: web::Bytes,
+    web::Json(panels): web::Json<Vec<String>>,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, _dashboard_id, timed_annotation_id) = path.into_inner();
-    let panels: Vec<String> = serde_json::from_slice(&body)?;
     if panels.is_empty() {
         return Ok(MetaHttpResponse::bad_request(
             "panels cannot be empty".to_string(),

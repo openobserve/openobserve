@@ -19,13 +19,16 @@ use hashbrown::HashMap;
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::models::dashboards::{
-        DashboardRequestBody,
-        DashboardResponseBody,
-        ListDashboardsQuery,
-        ListDashboardsResponseBody,
-        MoveDashboardRequestBody,
-        MoveDashboardsRequestBody, // UpdateDashboardRequestBody, UpdateDashboardResponseBody,
+    handler::http::{
+        extractors::Headers,
+        models::dashboards::{
+            DashboardRequestBody,
+            DashboardResponseBody,
+            ListDashboardsQuery,
+            ListDashboardsResponseBody,
+            MoveDashboardRequestBody,
+            MoveDashboardsRequestBody, // UpdateDashboardRequestBody, UpdateDashboardResponseBody,
+        },
     },
     service::dashboards::{self, DashboardError},
 };
@@ -106,7 +109,7 @@ pub async fn create_dashboard(
     path: web::Path<String>,
     req_body: web::Json<DashboardRequestBody>,
     req: HttpRequest,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> impl Responder {
     let org_id = path.into_inner();
     let folder = get_folder(req.query_string());
@@ -152,7 +155,7 @@ async fn update_dashboard(
     path: web::Path<(String, String)>,
     req_body: web::Json<DashboardRequestBody>,
     req: HttpRequest,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
@@ -347,7 +350,7 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
 async fn move_dashboard(
     path: web::Path<(String, String)>,
     req_body: web::Json<MoveDashboardRequestBody>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     // For this endpoint, openfga check is already done in the middleware
@@ -395,7 +398,7 @@ async fn move_dashboard(
 async fn move_dashboards(
     path: web::Path<String>,
     req_body: web::Json<MoveDashboardsRequestBody>,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> HttpResponse {
     let org_id = path.into_inner();
     // For this endpoint, openfga check is needed here, as we don't do openfga check in the

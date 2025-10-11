@@ -16,7 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="tracePage" id="tracePage" style="min-height: auto">
+  <q-page class="tracePage"
+id="tracePage" style="min-height: auto">
     <div id="tracesSecondLevel">
       <div class="tw-min-h-[82px]">
         <search-bar
@@ -60,21 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #after>
-            <div
-              class="full-height flex justify-center items-center"
-              v-if="searchObj.loading == true"
-            >
-              <div class="q-pb-lg">
-                <q-spinner-hourglass
-                  color="primary"
-                  size="40px"
-                  style="margin: 0 auto; display: block"
-                />
-                <span class="text-center">
-                  Hold on tight, we're fetching your traces.
-                </span>
-              </div>
-            </div>
             <div
               v-if="
                 searchObj.data.errorMsg !== '' && searchObj.loading == false
@@ -124,7 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-no-stream-selected-text"
                 class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
               >
-                <q-icon name="info" color="primary" size="md" /> Select a stream
+                <q-icon name="info"
+color="primary" size="md" /> Select a stream
                 and press 'Run query' to continue. Additionally, you can apply
                 additional filters and adjust the date range to enhance search.
               </h5>
@@ -138,27 +125,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
             >
-              <q-icon name="info" color="primary" size="md" />
+              <q-icon name="info"
+color="primary" size="md" />
               {{ t("search.applySearch") }}
             </div>
-            <div
-              v-else-if="
-                searchObj.data.queryResults.hasOwnProperty('total') &&
-                searchObj.data.queryResults?.hits?.length == 0 &&
-                searchObj.loading == false
-              "
-              class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
-            >
-              <q-icon name="info" color="primary" size="md" /> No traces found.
-              Please adjust the filters and try again.
-            </div>
-            <div
-              data-test="logs-search-search-result"
-              v-show="
-                searchObj.data.queryResults.hasOwnProperty('total') &&
-                !!searchObj.data.queryResults?.hits?.length
-              "
-            >
+
+            <div data-test="logs-search-search-result">
               <search-result
                 ref="searchResultRef"
                 @update:datetime="setHistogramDate"
@@ -320,7 +292,7 @@ async function getStreamList() {
           });
       })
       .catch((e) => {
-        searchObj.loading = false;
+        searchObj.loadingStream = false;
         $q.notify({
           type: "negative",
           message:
@@ -329,10 +301,10 @@ async function getStreamList() {
         });
       })
       .finally(() => {
-        searchObj.loading = false;
+        searchObj.loadingStream = false;
       });
   } catch (e) {
-    searchObj.loading = false;
+    searchObj.loadingStream = false;
     console.error("Error while getting streams", e);
     showErrorNotification("Error while getting streams");
   }
@@ -652,12 +624,43 @@ async function getQueryData() {
 
     let filter = searchObj.data.editorValue.trim();
 
+    // Add RED metrics filters to the query
+    const metricsFilters: string[] = [];
+    searchObj.meta.metricsRangeFilters.forEach((rangeFilter) => {
+      if (rangeFilter.panelTitle === "Duration") {
+        if (rangeFilter.start !== null && rangeFilter.end !== null) {
+          metricsFilters.push(
+            `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
+          );
+        } else {
+          metricsFilters.push(
+            `duration ${rangeFilter.start ? ">=" : "<="} ${rangeFilter.start || rangeFilter.end}`,
+          );
+        }
+      }
+      // Note: Rate and Error filters are not applicable to individual trace queries
+      // They are aggregation metrics, not span-level filters
+    });
+
+    // Add Error Only filter
+    if (searchObj.meta.showErrorOnly) {
+      metricsFilters.push("span_status = 'ERROR'");
+    }
+
+    // Combine editor filter with metrics filters
+    const allFilters = [filter, ...metricsFilters].filter(
+      (f) => f.trim().length > 0,
+    );
+    const combinedFilter = allFilters.join(" AND ");
+
+    if (queryReq.query.from === 0) searchResultRef.value.getDashboardData();
+
     searchService
       .get_traces({
         org_identifier: searchObj.organizationIdentifier,
         start_time: queryReq.query.start_time,
         end_time: queryReq.query.end_time,
-        filter: filter || "",
+        filter: combinedFilter || "",
         size: queryReq.query.size,
         from: queryReq.query.from,
         stream_name: selectedStreamName.value,
@@ -698,12 +701,8 @@ async function getQueryData() {
 
         updateFieldValues(res.data.hits);
 
-        generateHistogramData();
-
         //update grid columns
         updateGridColumns();
-
-        // dismiss();
       })
       .catch((err) => {
         searchObj.loading = false;
@@ -1034,8 +1033,7 @@ function generateHistogramData() {
 }
 
 async function loadPageData() {
-  searchObj.loading = true;
-
+  searchObj.loadingStream = true;
   searchObj.data.resultGrid.currentPage = 0;
 
   // resetSearchObj();
@@ -1062,7 +1060,6 @@ onBeforeMount(async () => {
   restoreUrlQueryParams();
   await importSqlParser();
   if (searchObj.loading == false) {
-    // eslint-disable-next-line no-prototype-builtins
     await loadPageData();
   }
 });
@@ -1175,11 +1172,6 @@ const restoreFilters = (query: string) => {
 
 const setHistogramDate = async (date: any) => {
   searchBarRef.value.dateTimeRef.setCustomDate("absolute", date);
-  await nextTick();
-  await nextTick();
-  await nextTick();
-
-  searchData();
 };
 
 const isStreamSelected = computed(() => {
@@ -1277,16 +1269,13 @@ watch(showFields, () => {
     : 0;
 });
 
-watch(showHistogram, () => {
-  if (
-    searchObj.meta.showHistogram == true &&
-    this.searchObj.meta.sqlMode == false
-  ) {
-    setTimeout(() => {
-      if (this.searchResultRef) this.searchResultRef.reDrawChart();
-    }, 100);
-  }
-});
+// watch(showHistogram, () => {
+//   if (searchObj.meta.showHistogram) {
+//     setTimeout(() => {
+//       if (this.searchResultRef) this.searchResultRef.reDrawChart();
+//     }, 100);
+//   }
+// });
 
 watch(moveSplitter, () => {
   if (searchObj.meta.showFields == false) {
