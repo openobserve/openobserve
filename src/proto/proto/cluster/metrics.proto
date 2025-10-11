@@ -10,6 +10,8 @@ import "cluster/common.proto";
 
 service Metrics {
     rpc Query (MetricsQueryRequest) returns (MetricsQueryResponse) {}
+    // Server-streaming RPC: Data will stream multiple MetricsQueryResponse messages
+    rpc Data (MetricsQueryRequest) returns (stream MetricsQueryResponse) {}
 }
 
 message MetricsQueryRequest {
@@ -19,6 +21,7 @@ message MetricsQueryRequest {
     MetricsQueryStmt  query = 5;
     int64           timeout = 8;
     bool           no_cache = 9;
+    bool  is_super_cluster = 10;
 }
 
 message MetricsQueryStmt {
