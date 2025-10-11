@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw-leading-10 tw-font-bold">
             {{ t("common.noOfRecords") }}
           </div>
-          <div class="tw-min-w-[150px]">
+          <div class="tw-min-w-[70px]">
             <q-select
               v-model="selectedRelativeValue"
               :options="recordSizeOptions"
