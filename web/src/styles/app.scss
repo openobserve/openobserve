@@ -1,5 +1,88 @@
 @import 'variables';
 
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* ============================================================================
+   MODERN LEAN SCROLLBAR STYLES
+   Thin, minimal design with primary color scheme
+   ============================================================================ */
+
+::-webkit-scrollbar {
+  width: 0.5rem; // 8px - thinner for modern look
+  height: 0.5rem; // 8px
+}
+
+::-webkit-scrollbar-track {
+  background: transparent; // Clean, minimal track
+  border-radius: 0.25rem; // 4px - subtle rounding
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(87, 95, 197, 0.4); // Light primary color
+  border-radius: 0.25rem; // 4px - subtle rounding
+  transition: background 0.2s ease;
+  cursor: pointer; // Hand pointer
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(87, 95, 197, 0.6); // Slightly darker on hover
+  cursor: pointer; // Hand pointer
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: rgba(87, 95, 197, 0.8); // More visible when dragging
+  cursor: grabbing; // Grabbing hand when dragging
+}
+
+// Dark theme scrollbar
+.theme-dark {
+  ::-webkit-scrollbar-track {
+    background: transparent; // Clean, minimal track
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(161, 175, 255, 0.4); // Light dark-mode primary color
+    transition: background 0.2s ease;
+    cursor: pointer; // Hand pointer
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(161, 175, 255, 0.6);
+    cursor: pointer; // Hand pointer
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: rgba(161, 175, 255, 0.8);
+    cursor: grabbing; // Grabbing hand when dragging
+  }
+}
+
+// Light theme scrollbar
+.theme-light {
+  ::-webkit-scrollbar-track {
+    background: transparent; // Clean, minimal track
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(87, 95, 197, 0.4); // Light primary color
+    transition: background 0.2s ease;
+    cursor: pointer; // Hand pointer
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(87, 95, 197, 0.6);
+    cursor: pointer; // Hand pointer
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: rgba(87, 95, 197, 0.8);
+    cursor: grabbing; // Grabbing hand when dragging
+  }
+}
+
 
 .q-w-sm {
   width: 360px;
@@ -613,7 +696,7 @@
   font-weight: 500 !important;
   line-height: 16px !important;
   padding: 0px 12px !important;
-  border-radius: 4px !important;
+  border-radius: 0.375rem !important;
   min-width: 90px !important;
 }
 .o2-primary-button-small{
@@ -870,13 +953,14 @@
 .o2-toggle-button-xs-dark{
   .q-toggle__track{
     background-color: #2f415e;
-    border: 1px solid #6F737A !important;
+    border: 1px solid #9CA3AF !important;
     opacity: 100%;
   }
   .q-toggle__inner--truthy{
     color: #ffffff;
     .q-toggle__track{
       background-color: #6B76E3;
+      border: 1px solid #818CF8 !important;
     }
     }
 }
@@ -939,5 +1023,61 @@
   }
 }
 
+/* ============================================================================
+   SPLITTER SECTION COLLAPSE BUTTON
+   Reusable collapse button for splitter sections across all pages
+   ============================================================================ */
 
+.splitter-section-collapse-btn {
+  z-index: 1001 !important;
+  position: absolute !important;
+  background: lightgray !important;
+  border-radius: 4px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: all 0.2s ease;
+  min-width: 0.75rem !important;
+  width: 0.75rem !important;
+  height: 36px !important;
+  padding: 0 !important;
+  cursor: pointer;
 
+  .q-icon {
+    color: rgba(0, 0, 0, 0.5) !important;
+    font-size: 18px !important;
+  }
+
+  &:hover {
+    background: var(--q-primary) !important;
+    opacity: 0.85;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+
+    .q-icon {
+      color: white !important;
+    }
+  }
+
+  &--visible {
+    right: -10px !important;
+    top: 5% !important;
+    transform: translateY(-50%) !important;
+
+    &:hover {
+      transform: translateY(-50%) translateX(-2px) !important;
+    }
+  }
+
+  &--hidden {
+    left: -10px !important;
+    top: 5% !important;
+    transform: translateY(-50%) !important;
+
+    &:hover {
+      transform: translateY(-50%) translateX(10px) !important;
+    }
+  }
+}
+
+.q-splitter--vertical > .q-splitter__separator > div {
+  left:0px;
+  right: 0px;
+}

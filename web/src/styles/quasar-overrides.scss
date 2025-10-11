@@ -1,27 +1,28 @@
 @mixin scrollbars(
-  $size: 6px,
+  $size: 8px,
   $foreground-color: $primary,
   $background-color: mix($foreground-color, white, 35%)
 ) {
+  // Disabled - using global glassmorphic scrollbar from app.scss
   // For Google Chrome
-  &::-webkit-scrollbar {
-    width: $size;
-    height: $size;
-  }
+  // &::-webkit-scrollbar {
+  //   width: $size;
+  //   height: $size;
+  // }
 
-  &::-webkit-scrollbar-thumb {
-    background: $foreground-color;
-  }
+  // &::-webkit-scrollbar-thumb {
+  //   background: $foreground-color;
+  // }
 
-  &::-webkit-scrollbar-track {
-    background: $background-color;
-  }
+  // &::-webkit-scrollbar-track {
+  //   background: $background-color;
+  // }
 
   // For Internet Explorer
-  & {
-    scrollbar-face-color: $foreground-color;
-    scrollbar-track-color: $background-color;
-  }
+  // & {
+  //   scrollbar-face-color: $foreground-color;
+  //   scrollbar-track-color: $background-color;
+  // }
 }
 
 /* cyrillic-ext */

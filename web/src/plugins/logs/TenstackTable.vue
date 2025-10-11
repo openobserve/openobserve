@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="parentRef" class="container tw-overflow-x-auto tw-relative">
+  <div ref="parentRef" class="container tw-overflow-x-auto tw-relative table-container">
     <table
       v-if="table"
       data-test="logs-search-result-logs-table"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? tableRowSize + 'px'
                   : table.getTotalSize() + 'px',
             minWidth: '100%',
-            background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
+            background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
           }"
           tag="tr"
           @start="(event) => handleDragStart(event)"
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :colspan="columnOrder.length"
             class="text-bold"
             :style="{
-              background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
+              background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
               opacity: 0.7,
             }"
           >
@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               store.state.theme === 'dark'
                 ? 'w-border-gray-800  hover:tw-bg-zinc-800'
-                : 'w-border-gray-100 hover:tw-bg-zinc-100',
+                : 'w-border-gray-100 hover:tw-bg-zinc-200',
               defaultColumns &&
               !wrap &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
@@ -910,104 +910,5 @@ defineExpose({
 });
 </script>
 <style scoped lang="scss">
-.resizer {
-  position: absolute;
-  top: 0;
-  height: 100%;
-  width: 5px;
-  cursor: col-resize;
-  user-select: none;
-  touch-action: none;
-}
-
-.resizer.ltr {
-  right: 0;
-}
-
-.resizer.rtl {
-  left: 0;
-}
-
-.resizer.isResizing {
-  background: $primary;
-  opacity: 1;
-}
-
-.container {
-  height: calc(100vh - 294px);
-  overflow: auto;
-}
-
-.cursor-pointer {
-  cursor: pointer;
-}
-
-.select-none {
-  user-select: none;
-}
-
-.text-left {
-  text-align: left;
-}
-
-table {
-  border-collapse: collapse;
-  border-spacing: 0;
-  font-size: 12px !important;
-}
-
-thead {
-  background: lightgray;
-  font-family: "Nunito Sans", sans-serif;
-  font-size: 14px !important;
-}
-
-.table-row {
-  border-bottom: 1px solid gray;
-}
-
-th {
-  text-align: left;
-
-  &:hover {
-    .column-actions {
-      visibility: visible !important;
-    }
-  }
-}
-
-td {
-  font-family: monospace;
-}
-
-.thead-sticky tr > *,
-.tfoot-sticky tr > * {
-  position: sticky;
-  opacity: 1;
-  z-index: 1;
-  background: #f5f5f5;
-}
-
-.q-table--dark .thead-sticky tr > *,
-.q-table--dark .tfoot-sticky tr > * {
-  background: #565656;
-}
-
-.table-cell {
-  &:hover {
-    .table-cell-actions {
-      display: block !important;
-    }
-  }
-}
-
-.table-row-hover {
-  &:hover {
-    .ai-btn {
-      visibility: visible !important;
-      z-index: 2;
-    }
-  }
-}
-
+@import '@/styles/logs/tenstack-table.scss';
 </style>
