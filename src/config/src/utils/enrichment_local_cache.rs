@@ -65,7 +65,7 @@ pub fn get_table_dir(key: &str) -> PathBuf {
 }
 
 pub fn get_table_path(table_dir: &str, created_at: i64) -> PathBuf {
-    PathBuf::from(format!("{table_dir}/{created_at}.json"))
+    PathBuf::from(format!("{table_dir}/{created_at}.parquet"))
 }
 
 pub fn get_metadata_path() -> PathBuf {
@@ -119,12 +119,12 @@ mod tests {
         let created_at = 1640995200; // 2022-01-01 00:00:00 UTC
 
         let table_path = get_table_path(table_dir, created_at);
-        let expected_path = format!("{table_dir}/{created_at}.json");
+        let expected_path = format!("{table_dir}/{created_at}.parquet");
         assert_eq!(table_path.to_string_lossy(), expected_path);
 
         // Test with different timestamp
         let table_path2 = get_table_path(table_dir, 1640995300);
-        let expected_path2 = format!("{}/{}.json", table_dir, 1640995300);
+        let expected_path2 = format!("{}/{}.parquet", table_dir, 1640995300);
         assert_eq!(table_path2.to_string_lossy(), expected_path2);
     }
 

@@ -274,6 +274,305 @@ pub fn convert_json_to_record_batch(
     RecordBatch::try_new(schema.clone(), cols)
 }
 
+// convert vrl values directly to record batch
+pub fn convert_vrl_to_record_batch(
+    schema: &Arc<Schema>,
+    data: &[vrl::value::Value],
+) -> Result<RecordBatch, ArrowError> {
+    // collect all keys from the vrl data
+    let mut keys = HashSet::with_capacity(schema.fields().len());
+    let mut max_keys = 0;
+    for record in data.iter() {
+        if let vrl::value::Value::Object(obj) = record {
+            if obj.len() > max_keys {
+                max_keys = obj.len();
+            }
+            for k in obj.keys() {
+                keys.insert(k.as_str());
+            }
+        }
+    }
+
+    // create builders for each key
+    let records_len = data.len();
+    let mut builders: FxIndexMap<&str, (&DataType, Box<dyn ArrayBuilder>)> = schema
+        .fields()
+        .iter()
+        .filter(|f| keys.contains(f.name().as_str()))
+        .map(|f| {
+            (
+                f.name().as_str(),
+                (f.data_type(), make_builder(f.data_type(), records_len)),
+            )
+        })
+        .collect();
+
+    // fill builders with data
+    let mut record_keys = HashSet::with_capacity(max_keys);
+    for record in data.iter() {
+        record_keys.clear();
+        if let vrl::value::Value::Object(obj) = record {
+            for (k, v) in obj {
+                let key_str = k.as_str();
+                record_keys.insert(key_str);
+                let Some((data_type, builder)) = builders.get_mut(key_str) else {
+                    continue;
+                };
+                match data_type {
+                    DataType::Utf8 => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<StringBuilder>()
+                            .unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Bytes(bytes) => {
+                                b.append_value(String::from_utf8_lossy(bytes));
+                            }
+                            vrl::value::Value::Integer(i) => b.append_value(i.to_string()),
+                            vrl::value::Value::Float(f) => b.append_value(f.to_string()),
+                            vrl::value::Value::Boolean(b_val) => b.append_value(b_val.to_string()),
+                            vrl::value::Value::Timestamp(ts) => {
+                                b.append_value(ts.timestamp_nanos_opt().unwrap_or(0).to_string())
+                            }
+                            _ => b.append_value(v.to_string()),
+                        }
+                    }
+                    DataType::Utf8View => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<StringViewBuilder>()
+                            .unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Bytes(bytes) => {
+                                b.append_value(String::from_utf8_lossy(bytes));
+                            }
+                            vrl::value::Value::Integer(i) => b.append_value(i.to_string()),
+                            vrl::value::Value::Float(f) => b.append_value(f.to_string()),
+                            vrl::value::Value::Boolean(b_val) => b.append_value(b_val.to_string()),
+                            vrl::value::Value::Timestamp(ts) => {
+                                b.append_value(ts.timestamp_nanos_opt().unwrap_or(0).to_string())
+                            }
+                            _ => b.append_value(v.to_string()),
+                        }
+                    }
+                    DataType::LargeUtf8 => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<LargeStringBuilder>()
+                            .unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Bytes(bytes) => {
+                                b.append_value(String::from_utf8_lossy(bytes));
+                            }
+                            vrl::value::Value::Integer(i) => b.append_value(i.to_string()),
+                            vrl::value::Value::Float(f) => b.append_value(f.to_string()),
+                            vrl::value::Value::Boolean(b_val) => b.append_value(b_val.to_string()),
+                            vrl::value::Value::Timestamp(ts) => {
+                                b.append_value(ts.timestamp_nanos_opt().unwrap_or(0).to_string())
+                            }
+                            _ => b.append_value(v.to_string()),
+                        }
+                    }
+                    DataType::Int64 => {
+                        let b = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Integer(i) => b.append_value(*i),
+                            vrl::value::Value::Float(f) => b.append_value(f.into_inner() as i64),
+                            vrl::value::Value::Boolean(b_val) => b.append_value(*b_val as i64),
+                            vrl::value::Value::Bytes(bytes) => {
+                                let s = String::from_utf8_lossy(bytes);
+                                b.append_value(s.parse::<i64>().unwrap_or(0));
+                            }
+                            vrl::value::Value::Timestamp(ts) => {
+                                b.append_value(ts.timestamp_nanos_opt().unwrap_or(0) / 1000);
+                            }
+                            _ => b.append_value(0),
+                        }
+                    }
+                    DataType::UInt64 => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<UInt64Builder>()
+                            .unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Integer(i) => b.append_value(*i as u64),
+                            vrl::value::Value::Float(f) => b.append_value(f.into_inner() as u64),
+                            vrl::value::Value::Boolean(b_val) => b.append_value(*b_val as u64),
+                            vrl::value::Value::Bytes(bytes) => {
+                                let s = String::from_utf8_lossy(bytes);
+                                b.append_value(s.parse::<u64>().unwrap_or(0));
+                            }
+                            vrl::value::Value::Timestamp(ts) => {
+                                b.append_value(ts.timestamp_nanos_opt().unwrap_or(0) as u64 / 1000);
+                            }
+                            _ => b.append_value(0),
+                        }
+                    }
+                    DataType::Float64 => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<Float64Builder>()
+                            .unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Integer(i) => b.append_value(*i as f64),
+                            vrl::value::Value::Float(f) => b.append_value(f.into_inner()),
+                            vrl::value::Value::Boolean(b_val) => {
+                                b.append_value(*b_val as i64 as f64)
+                            }
+                            vrl::value::Value::Bytes(bytes) => {
+                                let s = String::from_utf8_lossy(bytes);
+                                b.append_value(s.parse::<f64>().unwrap_or(0.0));
+                            }
+                            vrl::value::Value::Timestamp(ts) => {
+                                b.append_value(
+                                    ts.timestamp_nanos_opt().unwrap_or(0) as f64 / 1000.0,
+                                );
+                            }
+                            _ => b.append_value(0.0),
+                        }
+                    }
+                    DataType::Boolean => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<BooleanBuilder>()
+                            .unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Boolean(b_val) => b.append_value(*b_val),
+                            vrl::value::Value::Integer(i) => b.append_value(*i > 0),
+                            vrl::value::Value::Float(f) => b.append_value(f.into_inner() > 0.0),
+                            vrl::value::Value::Bytes(bytes) => {
+                                let s = String::from_utf8_lossy(bytes);
+                                b.append_value(s.parse::<bool>().unwrap_or(false));
+                            }
+                            _ => b.append_value(false),
+                        }
+                    }
+                    DataType::Binary => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<BinaryBuilder>()
+                            .unwrap();
+                        match v {
+                            vrl::value::Value::Null => b.append_null(),
+                            vrl::value::Value::Bytes(bytes) => {
+                                let hex_string = String::from_utf8_lossy(bytes);
+                                let bin_data = hex::decode(hex_string.as_ref()).map_err(|_| {
+                                    ArrowError::SchemaError(
+                                        "Cannot convert VRL bytes to [DataType::Binary] from non-hex string value"
+                                            .to_string(),
+                                    )
+                                })?;
+                                b.append_value(bin_data);
+                            }
+                            _ => {
+                                let hex_string = v.to_string();
+                                let bin_data = hex::decode(hex_string).map_err(|_| {
+                                    ArrowError::SchemaError(
+                                        "Cannot convert VRL value to [DataType::Binary] from non-hex string value"
+                                            .to_string(),
+                                    )
+                                })?;
+                                b.append_value(bin_data);
+                            }
+                        }
+                    }
+                    DataType::Null => {
+                        let b = builder.as_any_mut().downcast_mut::<NullBuilder>().unwrap();
+                        b.append_null();
+                    }
+                    _ => {
+                        return Err(ArrowError::SchemaError(
+                            "Cannot convert VRL to RecordBatch from non-basic type value"
+                                .to_string(),
+                        ));
+                    }
+                }
+            }
+        }
+
+        // fill null for missing keys
+        builders.iter_mut().for_each(|(k, (data_type, b))| {
+            if !record_keys.contains(k) {
+                match data_type {
+                    DataType::Utf8 => {
+                        b.as_any_mut()
+                            .downcast_mut::<StringBuilder>()
+                            .unwrap()
+                            .append_null();
+                    }
+                    DataType::Utf8View => {
+                        b.as_any_mut()
+                            .downcast_mut::<StringViewBuilder>()
+                            .unwrap()
+                            .append_null();
+                    }
+                    DataType::LargeUtf8 => {
+                        b.as_any_mut()
+                            .downcast_mut::<LargeStringBuilder>()
+                            .unwrap()
+                            .append_null();
+                    }
+                    DataType::Int64 => {
+                        b.as_any_mut()
+                            .downcast_mut::<Int64Builder>()
+                            .unwrap()
+                            .append_null();
+                    }
+                    DataType::UInt64 => {
+                        b.as_any_mut()
+                            .downcast_mut::<UInt64Builder>()
+                            .unwrap()
+                            .append_null();
+                    }
+                    DataType::Float64 => {
+                        b.as_any_mut()
+                            .downcast_mut::<Float64Builder>()
+                            .unwrap()
+                            .append_null();
+                    }
+                    DataType::Boolean => {
+                        b.as_any_mut()
+                            .downcast_mut::<BooleanBuilder>()
+                            .unwrap()
+                            .append_null();
+                    }
+                    DataType::Binary => {
+                        b.as_any_mut()
+                            .downcast_mut::<BinaryBuilder>()
+                            .unwrap()
+                            .append_null();
+                    }
+                    DataType::Null => {
+                        b.as_any_mut()
+                            .downcast_mut::<NullBuilder>()
+                            .unwrap()
+                            .append_null();
+                    }
+                    _ => {}
+                }
+            }
+        });
+    }
+
+    let mut cols: Vec<ArrayRef> = Vec::with_capacity(schema.fields().len());
+    for field in schema.fields() {
+        if let Some((_, builder)) = builders.get_mut(field.name().as_str()) {
+            cols.push(builder.finish());
+        } else {
+            cols.push(new_null_array(field.data_type(), records_len))
+        }
+    }
+
+    RecordBatch::try_new(schema.clone(), cols)
+}
+
 // TODO: remove it after upgrade arrow-rs to 56.0.0.
 fn make_builder(data_type: &DataType, records_len: usize) -> Box<dyn ArrayBuilder> {
     match data_type {
@@ -1306,6 +1605,103 @@ mod test {
 | Bob   | 30  |
 +-------+-----+"
         );
+    }
+
+    // Test case for convert_vrl_to_record_batch
+    #[tokio::test]
+    async fn test_convert_vrl_to_record_batch() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("age", DataType::Int64, false),
+            Field::new("score", DataType::Float64, true),
+            Field::new("active", DataType::Boolean, false),
+        ]));
+
+        let data = vec![
+            vrl::value::Value::Object(
+                [
+                    ("name".into(), vrl::value::Value::from("Alice")),
+                    ("age".into(), vrl::value::Value::Integer(25)),
+                    (
+                        "score".into(),
+                        vrl::value::Value::Float(vrl::prelude::NotNan::new(85.5).unwrap()),
+                    ),
+                    ("active".into(), vrl::value::Value::Boolean(true)),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+            vrl::value::Value::Object(
+                [
+                    ("name".into(), vrl::value::Value::from("Bob")),
+                    ("age".into(), vrl::value::Value::Integer(30)),
+                    ("score".into(), vrl::value::Value::Null), // missing score
+                    ("active".into(), vrl::value::Value::Boolean(false)),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+            vrl::value::Value::Object(
+                [
+                    ("name".into(), vrl::value::Value::from("Charlie")),
+                    ("age".into(), vrl::value::Value::Integer(35)),
+                    (
+                        "score".into(),
+                        vrl::value::Value::Float(vrl::prelude::NotNan::new(92.1).unwrap()),
+                    ),
+                    ("active".into(), vrl::value::Value::Boolean(true)),
+                    // extra field that's not in schema should be ignored
+                    ("extra".into(), vrl::value::Value::from("ignored")),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+        ];
+
+        let record_batch = convert_vrl_to_record_batch(&schema, &data).unwrap();
+
+        assert_eq!(record_batch.num_rows(), 3);
+        assert_eq!(record_batch.schema(), schema);
+
+        // Test string column
+        let name_array = record_batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(name_array.value(0), "Alice");
+        assert_eq!(name_array.value(1), "Bob");
+        assert_eq!(name_array.value(2), "Charlie");
+
+        // Test int64 column
+        let age_array = record_batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(age_array.value(0), 25);
+        assert_eq!(age_array.value(1), 30);
+        assert_eq!(age_array.value(2), 35);
+
+        // Test float64 column with null values
+        let score_array = record_batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        assert_eq!(score_array.value(0), 85.5);
+        assert!(score_array.is_null(1)); // Bob's score should be null
+        assert_eq!(score_array.value(2), 92.1);
+
+        // Test boolean column
+        let active_array = record_batch
+            .column(3)
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .unwrap();
+        assert_eq!(active_array.value(0), true);
+        assert_eq!(active_array.value(1), false);
+        assert_eq!(active_array.value(2), true);
     }
 
     // Test case for convert_json_to_record_batch that contains utf8view
