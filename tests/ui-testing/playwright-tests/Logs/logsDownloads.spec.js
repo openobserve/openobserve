@@ -156,7 +156,7 @@ test.describe("Logs Downloads testcases", () => {
         await setupLogsPage(page);
         await page.waitForTimeout(2000);
 
-        await pageManager.logsPage.clickMoreOptionsButton();
+        await pageManager.logsPage.hoverMoreOptionsButton();
         await pageManager.logsPage.clickDownloadResultsForCustom();
         await pageManager.logsPage.expectCustomDownloadDialogVisible();
         await pageManager.logsPage.clickCustomDownloadRangeSelect();
@@ -177,7 +177,7 @@ test.describe("Logs Downloads testcases", () => {
         await setupLogsPage(page);
         await page.waitForTimeout(2000);
 
-        await pageManager.logsPage.clickMoreOptionsButton();
+        await pageManager.logsPage.hoverMoreOptionsButton();
         await pageManager.logsPage.clickDownloadResultsForCustom();
         await pageManager.logsPage.expectCustomDownloadDialogVisible();
         await pageManager.logsPage.clickCustomDownloadRangeSelect();
