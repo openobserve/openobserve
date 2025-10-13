@@ -683,7 +683,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- First page button -->
               <q-btn
                 data-test="logs-page-fields-list-pagination-firstpage-button"
-                icon="fast_rewind"
+                icon="skip_previous"
                 color="primary"
                 flat
                 :disable="scope.isFirstPage"
@@ -709,7 +709,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Last page button -->
               <q-btn
                 data-test="logs-page-fields-list-pagination-lastpage-button"
-                icon="fast_forward"
+                icon="skip_next"
                 color="primary"
                 flat
                 :disable="scope.isLastPage"
