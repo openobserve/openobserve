@@ -6681,6 +6681,7 @@ dependencies = [
  "argon2",
  "arrow",
  "arrow-flight",
+ "arrow-json",
  "arrow-schema",
  "async-recursion",
  "async-stream",
