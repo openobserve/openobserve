@@ -92,6 +92,91 @@ pub async fn get_metadata_content() -> Result<HashMap<String, i64>> {
     }
 }
 
+/// Clean up old JSON format enrichment tables from disk
+/// Scans the enrichment table cache directory and removes any directories containing .json files
+pub async fn cleanup_old_json_format() -> Result<()> {
+    let cfg = get_config();
+    let cache_dir = if cfg.enrichment_table.cache_dir.is_empty() {
+        format!("{}/enrichment_table_cache", cfg.common.data_cache_dir)
+    } else {
+        cfg.enrichment_table.cache_dir.clone()
+    };
+
+    let cache_path = std::path::Path::new(&cache_dir);
+    if !cache_path.exists() {
+        return Ok(());
+    }
+
+    log::info!(
+        "Checking for old JSON format enrichment tables in {}",
+        cache_dir
+    );
+
+    let mut has_old_json = false;
+
+    // Scan all directories recursively for non-metadata JSON files
+    let mut org_entries = tokio::fs::read_dir(cache_path).await?;
+    while let Some(org_entry) = org_entries.next_entry().await? {
+        let org_path = org_entry.path();
+        if !org_path.is_dir() {
+            continue;
+        }
+
+        // Scan table directories
+        let mut table_entries = tokio::fs::read_dir(&org_path).await?;
+        while let Some(table_entry) = table_entries.next_entry().await? {
+            let table_path = table_entry.path();
+            if !table_path.is_dir() {
+                continue;
+            }
+
+            // Check if this table directory contains .json files (excluding metadata.json)
+            let mut file_entries = tokio::fs::read_dir(&table_path).await?;
+            while let Some(file_entry) = file_entries.next_entry().await? {
+                let file_path = file_entry.path();
+                if file_path.is_file()
+                    && file_path.extension().unwrap_or_default() == "json"
+                    && file_entry.file_name() != "metadata.json"
+                {
+                    has_old_json = true;
+                    break;
+                }
+            }
+
+            if has_old_json {
+                break;
+            }
+        }
+
+        if has_old_json {
+            break;
+        }
+    }
+
+    // If we found any old JSON files, remove all data in cache_dir
+    if has_old_json {
+        log::info!(
+            "Found old JSON format enrichment tables, removing all data in cache directory: {}",
+            cache_dir
+        );
+
+        // Remove all entries in the cache directory
+        let mut entries = tokio::fs::read_dir(cache_path).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            if path.is_dir() {
+                tokio::fs::remove_dir_all(&path).await?;
+            } else {
+                tokio::fs::remove_file(&path).await?;
+            }
+        }
+
+        log::info!("Successfully cleaned up all data in cache directory");
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
