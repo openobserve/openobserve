@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :key="item.name + index"
       :data-test="`dashboard-variable-${item}-selector`"
     >
-      <div v-if="item.type == 'query_values'">
+      <div v-if="item.type == 'query_values' && (item._isCurrentLevel !== false)">
         <VariableQueryValueSelector
           class="q-mr-lg q-mt-xs"
           v-show="!item.hideOnDashboard"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @search="onVariableSearch(index, $event)"
         />
       </div>
-      <div v-else-if="item.type == 'constant'">
+      <div v-else-if="item.type == 'constant' && (item._isCurrentLevel !== false)">
         <q-input
           v-show="!item.hideOnDashboard"
           class="q-mr-lg q-mt-xs"
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           hide-bottom-space
         ></q-input>
       </div>
-      <div v-else-if="item.type == 'textbox'">
+      <div v-else-if="item.type == 'textbox' && (item._isCurrentLevel !== false)">
         <q-input
           v-show="!item.hideOnDashboard"
           class="q-mr-lg q-mt-xs"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           hide-bottom-space
         ></q-input>
       </div>
-      <div v-else-if="item.type == 'custom'">
+      <div v-else-if="item.type == 'custom' && (item._isCurrentLevel !== false)">
         <VariableCustomValueSelector
           v-show="!item.hideOnDashboard"
           class="q-mr-lg q-mt-xs"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onVariablesValueUpdated(index)"
         />
       </div>
-      <div v-else-if="item.type == 'dynamic_filters'">
+      <div v-else-if="item.type == 'dynamic_filters' && (item._isCurrentLevel !== false)">
         <VariableAdHocValueSelector
           class="q-mr-lg q-mt-xs"
           v-model="item.value"
@@ -111,6 +111,7 @@ export default defineComponent({
     "variablesConfig",
     "initialVariableValues",
     "showDynamicFilters",
+    "lazyLoad", // If true, don't auto-load on mount, wait for explicit trigger
   ],
   emits: ["variablesData"],
   components: {
@@ -476,6 +477,12 @@ export default defineComponent({
               `Received options being set: ${JSON.stringify(variableObject.options)}`,
             );
 
+            console.log(`[VariablesValueSelector] Options set for "${variableObject.name}":`, {
+              optionsCount: variableObject.options.length,
+              _isCurrentLevel: variableObject._isCurrentLevel,
+              isVisible: variableObject._isCurrentLevel !== false
+            });
+
             const originalValue = JSON.parse(
               JSON.stringify(variableObject.value),
             );
@@ -622,6 +629,14 @@ export default defineComponent({
         return;
       }
 
+      console.log('[VariablesValueSelector] Initializing with config:', {
+        totalVariables: props.variablesConfig.list?.length,
+        variables: props.variablesConfig.list?.map((v: any) => ({
+          name: v.name,
+          _isCurrentLevel: v._isCurrentLevel
+        }))
+      });
+
       // make list of variables using variables config list
       // set initial variables values from props
       props?.variablesConfig?.list?.forEach((item: any) => {
@@ -763,8 +778,10 @@ export default defineComponent({
       // reject all promises
       rejectAllPromises();
 
-      // load all variables
-      loadAllVariablesData(true);
+      // load all variables only if not lazy loading
+      if (!props.lazyLoad) {
+        loadAllVariablesData(true);
+      }
 
       // Set initial load flag to false after first load
       // isInitialLoad.value = false;
@@ -790,8 +807,10 @@ export default defineComponent({
         // reject all promises
         rejectAllPromises();
         skipAPILoad.value = false;
-        // load all variables
-        loadAllVariablesData(true);
+        // load all variables only if not lazy loading
+        if (!props.lazyLoad) {
+          loadAllVariablesData(true);
+        }
 
         // Set initial load flag to false after load
         // isInitialLoad.value = false;
@@ -814,14 +833,112 @@ export default defineComponent({
       },
     );
 
+    // Watch for changes in initialVariableValues (from parent) and reload dependent variables
+    watch(
+      () => JSON.stringify(props.initialVariableValues?.value || {}),
+      async (newVal, oldVal) => {
+        if (!oldVal || oldVal === '{}') {
+          console.log('[VariablesValueSelector] Skipping cascade - first load');
+          return; // Skip initial load
+        }
+        if (newVal === oldVal) return; // No changes
+
+        console.log('[VariablesValueSelector] Parent values changed, checking dependencies');
+        console.log('[VariablesValueSelector] Dependency graph:', variablesDependencyGraph);
+        console.log('[VariablesValueSelector] Local variables:', variablesData.values.map((v: any) => v.name));
+
+        // Compare old and new values to find what changed
+        const oldValues = oldVal ? JSON.parse(oldVal) : {};
+        const newValues = newVal ? JSON.parse(newVal) : {};
+        const changedVars: string[] = [];
+
+        Object.keys(newValues).forEach(varName => {
+          if (JSON.stringify(oldValues[varName]) !== JSON.stringify(newValues[varName])) {
+            changedVars.push(varName);
+          }
+        });
+
+        if (changedVars.length === 0) {
+          console.log('[VariablesValueSelector] No parent values changed');
+          return;
+        }
+
+        console.log('[VariablesValueSelector] Changed parent variables:', changedVars);
+
+        // IMPORTANT: Update variablesData.values with new parent values BEFORE reloading
+        // This ensures child variables use the NEW parent values when they build queries
+        variablesData.values.forEach((v: any) => {
+          if (newValues[v.name] !== undefined) {
+            const oldValue = v.value;
+            v.value = newValues[v.name];
+            console.log(`[VariablesValueSelector] Updated ${v.name} in local state from`, oldValue, 'to', v.value);
+          }
+        });
+
+        // Also update oldVariablesData for change detection
+        Object.keys(newValues).forEach(varName => {
+          oldVariablesData[varName] = newValues[varName];
+        });
+
+        // Check which local variables depend on changed parent variables
+        const affectedVariables = variablesData.values.filter((v: any) => {
+          const deps = variablesDependencyGraph[v.name]?.parentVariables || [];
+          const isAffected = deps.some((dep: string) => changedVars.includes(dep));
+          console.log(`[VariablesValueSelector] Variable ${v.name} deps:`, deps, 'affected:', isAffected);
+          return isAffected;
+        });
+
+        if (affectedVariables.length === 0) {
+          console.log('[VariablesValueSelector] No local variables depend on changed parents');
+          return;
+        }
+
+        console.log('[VariablesValueSelector] Reloading affected variables:', affectedVariables.map((v: any) => v.name));
+
+        // Sort variables by dependency order (independent first)
+        const sortedVariables = affectedVariables.sort((a: any, b: any) => {
+          const aDeps = variablesDependencyGraph[a.name]?.parentVariables || [];
+          const bDeps = variablesDependencyGraph[b.name]?.parentVariables || [];
+          // Variables with fewer dependencies load first
+          return aDeps.length - bDeps.length;
+        });
+
+        // Reload affected variables SEQUENTIALLY to prevent multiple simultaneous API calls
+        for (const variable of sortedVariables) {
+          console.log(`[VariablesValueSelector] Reloading variable ${variable.name} with new parent values`);
+          variable.isVariableLoadingPending = true;
+          variable.isVariablePartialLoaded = false;
+          variable.isLoading = true;
+          variable.value = variable.multiSelect ? [] : null;
+          variable.options = [];
+
+          // Wait for this variable to complete before starting next
+          await loadSingleVariableDataByName(variable, false);
+          console.log(`[VariablesValueSelector] Completed reloading ${variable.name}`);
+        }
+      }
+    );
+
     const emitVariablesData = () => {
-      emit("variablesData", {
+      const dataToEmit = {
         isVariablesLoading: variablesData.isVariablesLoading,
         values: variablesData.values.map((v: any) => ({
           ...v,
           options: undefined, // Don't emit options to prevent unnecessary updates
         })),
+      };
+
+      console.log(`[VariablesValueSelector] Emitting variables data:`, {
+        totalVariables: dataToEmit.values.length,
+        currentLevelVariables: dataToEmit.values.filter((v: any) => v._isCurrentLevel === true).map((v: any) => v.name),
+        allVariables: dataToEmit.values.map((v: any) => ({
+          name: v.name,
+          _isCurrentLevel: v._isCurrentLevel,
+          hasValue: v.value !== null && v.value !== undefined
+        }))
       });
+
+      emit("variablesData", dataToEmit);
     };
 
     // it is used to change/update initial variables values from outside the component
@@ -1878,6 +1995,7 @@ export default defineComponent({
       loadVariableOptions,
       onVariableSearch,
       cancelAllVariableOperations,
+      loadAllVariablesData, // Expose for manual triggering when lazy loading
     };
   },
 });
