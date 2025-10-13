@@ -370,8 +370,8 @@ const useTraces = () => {
         // Instead, we'll store the filter for display purposes only
         // The actual filtering would need to happen at the visualization level
         const fieldMap = {
-          Rate: "trace_ids",
-          Errors: "max_trace_duration",
+          Rate: "max_rate",
+          Errors: "error_rate",
         };
 
         baseFilters.push(

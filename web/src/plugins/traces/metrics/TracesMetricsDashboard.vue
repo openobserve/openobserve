@@ -238,9 +238,12 @@ const loadDashboard = async () => {
         "queries"
       ][0].query.replace("[WHERE_CLAUSE]", whereClause);
 
+      const havingFiltersStr = havingFilters.length
+        ? " HAVING " + havingFilters.join(" AND ")
+        : "";
       convertedDashboard.tabs[0].panels[index]["queries"][0].query = panel[
         "queries"
-      ][0].query.replace("[HAVING]", havingFilters.join(" AND "));
+      ][0].query.replace("[HAVING]", havingFiltersStr);
     });
 
     dashboardData.value = convertedDashboard;
