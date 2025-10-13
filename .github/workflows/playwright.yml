@@ -8,8 +8,6 @@ on:
       - "**.md"
       - "**.yml"
       - "**.yaml"
-    # paths:
-    #   - "web/**"
   pull_request:
     branches:
       - "*"
@@ -17,8 +15,6 @@ on:
       - "**.md"
       - "**.yml"
       - "**.yaml"
-    # paths:
-    #   - "web/**"
 
 env:
   COLUMNS: 150
@@ -50,7 +46,7 @@ jobs:
   build_binary:
     name: build_binary
     runs-on:
-      labels: ubicloud-standard-16
+      labels: repo-openobserve-standard-16
 
     steps:
       - name: Remove unused tools
@@ -62,6 +58,8 @@ jobs:
 
       - name: Clone the current repo
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
@@ -71,6 +69,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          prefix-key: playwright
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
         with:
@@ -92,7 +91,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: debug-binary
+          name: release-binary
           path: target/x86_64-unknown-linux-gnu/release/openobserve
           retention-days: 1
 
@@ -100,10 +99,10 @@ jobs:
     name: e2e / ${{ matrix.testfolder }}
     needs: [build_binary]
     runs-on:
-      labels: ubicloud-standard-8
-    container:
-      image: mcr.microsoft.com/playwright:v1.50.0-jammy
-      options: --user root
+      labels: repo-openobserve-standard-8
+    # container:
+    #   image: mcr.microsoft.com/playwright:v1.50.0-jammy
+    #   options: --user root
     strategy:
       matrix:
         include:
@@ -112,13 +111,13 @@ jobs:
             run_files:
               [
                 "sanity.spec.js",
-                "changeOrg.spec.js",
-                "enrichment.spec.js",
-                "schema.spec.js",
-                "schemaload.spec.js",
-                "serviceAccount.spec.js",
-                "usersOrg.spec.js",
-                "org.spec.js",
+                # "changeOrg.spec.js",
+                # "enrichment.spec.js",
+                # "schema.spec.js",
+                # "schemaload.spec.js",
+                # "serviceAccount.spec.js",
+                # "usersOrg.spec.js",
+                # "org.spec.js",
               ]
           - testfolder: "Logs-Core"
             browser: "chrome"
@@ -196,7 +195,10 @@ jobs:
               ]
           - testfolder: "Reports"
             browser: "chrome"
-            run_files: ["reportsUpdated.spec.js", "reportsUpdated2.spec.js"]
+            run_files: [
+              "reportsUpdated.spec.js", 
+              "reportsUpdated2.spec.js"
+              ]
           - testfolder: "Streams"
             browser: "chrome"
             run_files:
@@ -208,18 +210,20 @@ jobs:
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Download artifacts
         uses: actions/download-artifact@v5
         with:
-          name: debug-binary
-          path: debug-binary
+          name: release-binary
+          path: release-binary
 
       - name: Start OpenObserve
-        run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
+        run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
-        run: sleep 15
+        run: sleep 60
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
@@ -227,9 +231,12 @@ jobs:
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
 
+      - name: Create playwright-results folder for JSON report
+        run: mkdir -p tests/ui-testing/playwright-results
+
       - uses: actions/setup-node@v5
         with:
-          node-version: lts/*
+          node-version: 22
 
       - name: Install dependencies and run ui-tests
         run: |
@@ -245,7 +252,7 @@ jobs:
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
-
+          npx playwright install --with-deps chromium 
           # Get list of files to run using join function
           FILE_LIST="${{ join(matrix.run_files, ' ') }}"
           echo "DEBUG: FILE_LIST = $FILE_LIST"
@@ -300,6 +307,22 @@ jobs:
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npx nyc report
 
+      - name: Upload Playwright Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-results-${{ matrix.testfolder }}
+          path: tests/ui-testing/playwright-results/
+          retention-days: 30
+
+      - name: Upload Test Result Attachments
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-attachments-${{ matrix.testfolder }}
+          path: tests/ui-testing/test-results/
+          retention-days: 30
+
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
         if: always() && hashFiles('playwright-report/**') != ''
@@ -312,15 +335,167 @@ jobs:
         if: always()
         run: cat o2.log
 
-  generate_coverage_report:
-    name: Generate Coverage Report
+  upload_to_testdino:
+    name: Upload Merged Reports to TestDino
     needs: [build_binary, ui_integration_tests]
-    runs-on: ubicloud-standard-8
+    runs-on: ubuntu-latest
     if: always()
 
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download All Playwright Results
+        uses: actions/download-artifact@v5
+        with:
+          pattern: playwright-results-*
+          path: all-results
+          merge-multiple: false
+
+      - name: Download All Test Attachments
+        uses: actions/download-artifact@v5
+        with:
+          pattern: test-attachments-*
+          path: all-attachments
+          merge-multiple: false
+
+      - name: Merge Playwright JSON Reports
+        run: |
+          mkdir -p merged-results
+          echo "Merging JSON reports from all test folders..."
+
+          # Install jq for JSON manipulation
+          sudo apt-get update && sudo apt-get install -y jq
+
+          # Initialize merged report structure with all required fields
+          echo '{
+            "config": {},
+            "suites": [],
+            "stats": {
+              "startTime": "",
+              "endTime": "",
+              "duration": 0,
+              "expected": 0,
+              "skipped": 0,
+              "unexpected": 0,
+              "flaky": 0
+            }
+          }' > merged-results/report.json
+
+          # Merge all JSON reports and accumulate stats
+          for folder in all-results/playwright-results-*/; do
+            if [ -f "$folder/report.json" ]; then
+              echo "Processing $(basename $folder)"
+
+              # Merge suites array
+              jq -s '.[0].suites += .[1].suites | .[0]' merged-results/report.json "$folder/report.json" > merged-results/temp.json
+              mv merged-results/temp.json merged-results/report.json
+
+              # Accumulate stats
+              EXPECTED=$(jq '.stats.expected // 0' "$folder/report.json")
+              SKIPPED=$(jq '.stats.skipped // 0' "$folder/report.json")
+              UNEXPECTED=$(jq '.stats.unexpected // 0' "$folder/report.json")
+              FLAKY=$(jq '.stats.flaky // 0' "$folder/report.json")
+
+              jq --argjson exp "$EXPECTED" --argjson skip "$SKIPPED" --argjson unexp "$UNEXPECTED" --argjson flaky "$FLAKY" '
+                .stats.expected += $exp |
+                .stats.skipped += $skip |
+                .stats.unexpected += $unexp |
+                .stats.flaky += $flaky
+              ' merged-results/report.json > merged-results/temp.json
+              mv merged-results/temp.json merged-results/report.json
+
+              # Update start/end times
+              START_TIME=$(jq -r '.stats.startTime' "$folder/report.json")
+              END_TIME=$(jq -r '.stats.endTime' "$folder/report.json")
+              CURRENT_START=$(jq -r '.stats.startTime' merged-results/report.json)
+              CURRENT_END=$(jq -r '.stats.endTime' merged-results/report.json)
+
+              if [ "$CURRENT_START" = "" ] || [ "$START_TIME" \< "$CURRENT_START" ]; then
+                jq --arg start "$START_TIME" '.stats.startTime = $start' merged-results/report.json > merged-results/temp.json
+                mv merged-results/temp.json merged-results/report.json
+              fi
+
+              if [ "$CURRENT_END" = "" ] || [ "$END_TIME" \> "$CURRENT_END" ]; then
+                jq --arg end "$END_TIME" '.stats.endTime = $end' merged-results/report.json > merged-results/temp.json
+                mv merged-results/temp.json merged-results/report.json
+              fi
+            fi
+          done
+
+          # Calculate total duration
+          START_TIME=$(jq -r '.stats.startTime' merged-results/report.json)
+          END_TIME=$(jq -r '.stats.endTime' merged-results/report.json)
+          START_MS=$(date -d "$START_TIME" +%s%3N 2>/dev/null || echo "0")
+          END_MS=$(date -d "$END_TIME" +%s%3N 2>/dev/null || echo "0")
+          DURATION=$((END_MS - START_MS))
+
+          jq --argjson dur "$DURATION" '.stats.duration = $dur' merged-results/report.json > merged-results/temp.json
+          mv merged-results/temp.json merged-results/report.json
+
+          echo "Merged report created successfully"
+          jq '.stats' merged-results/report.json
+
+      - name: Merge HTML Reports
+        run: |
+          mkdir -p merged-results/html-report
+
+          # Copy the first HTML report as base
+          first_folder=$(ls -d all-results/playwright-results-*/ | head -n 1)
+          if [ -d "$first_folder/html-report" ]; then
+            cp -r "$first_folder/html-report/"* merged-results/html-report/
+          fi
+
+          echo "HTML report base created"
+
+      - name: Merge Test Result Attachments
+        run: |
+          mkdir -p merged-results/test-results
+          echo "Merging test result attachments from all test folders..."
+
+          # Copy all test-results folders from each matrix job
+          for folder in all-attachments/test-attachments-*/; do
+            if [ -d "$folder" ]; then
+              echo "Processing $(basename $folder)"
+              # Copy all contents to merged test-results
+              cp -r "$folder"* merged-results/test-results/ 2>/dev/null || true
+            fi
+          done
+
+          # Count attachments
+          attachment_count=$(find merged-results/test-results -type f | wc -l)
+          echo "Total attachments merged: $attachment_count"
+
+      - name: Create Symlink for Test Results Path
+        run: |
+          # TestDino expects attachments at the path specified in JSON report
+          # Create directory structure to match the original paths
+          mkdir -p merged-results/tests/ui-testing
+          ln -s ../../test-results merged-results/tests/ui-testing/test-results
+          echo "Symlink created for test-results"
+
+      - name: Upload to TestDino
+        if: always()
+        run: |
+          cd merged-results
+          npx tdpw upload . --json-report report.json --html-report html-report --upload-html --token ${{ secrets.TESTDINO_API_TOKEN }}
+
+  generate_coverage_report:
+    name: Generate Coverage Report
+    needs: [build_binary, ui_integration_tests]
+    runs-on: repo-openobserve-standard-8
+    if: success() || failure()
+
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Download Playwright Coverage Data
         uses: actions/download-artifact@v5

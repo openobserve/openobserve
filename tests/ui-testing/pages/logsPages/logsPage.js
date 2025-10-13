@@ -158,41 +158,41 @@ export class LogsPage {
         const logsUrl = '/web/logs'; // Using the same pattern as in test files
         const orgId = orgIdentifier || process.env["ORGNAME"];
         const fullUrl = `${logsUrl}?org_identifier=${orgId}&fn_editor=true`;
-        
-        
+
+
         // Include fn_editor=true to ensure VRL editor is available for tests that need it
         await this.page.goto(fullUrl);
-        
-        
+
+
         // Wait for page load and check for VRL editor
         await this.page.waitForLoadState('domcontentloaded');
-        
+
         // Wait for VRL editor to be available (with retries)
         let fnEditorExists = 0;
         let retries = 5;
-        
+
         while (fnEditorExists === 0 && retries > 0) {
             await this.page.waitForLoadState('networkidle', { timeout: 10000 });
             fnEditorExists = await this.page.locator('#fnEditor').count();
-            
+
             if (fnEditorExists === 0) {
                 await this.page.waitForTimeout(2000);
                 retries--;
             }
         }
-        
+
         if (fnEditorExists === 0) {
-            
+
             // Try reloading with explicit parameters
             const currentUrl = new URL(this.page.url());
             currentUrl.searchParams.set('fn_editor', 'true');
             currentUrl.searchParams.set('vrl', 'true'); // Try alternative parameter
-            
+
             await this.page.goto(currentUrl.toString());
             await this.page.waitForLoadState('networkidle', { timeout: 15000 });
-            
+
             fnEditorExists = await this.page.locator('#fnEditor').count();
-            
+
             if (fnEditorExists === 0) {
                 // Take screenshot for debugging
             }
@@ -234,18 +234,18 @@ export class LogsPage {
     }
 
     async selectIndexStream(streamName) {
-        console.log(`[DEBUG] selectIndexStream: Starting selection for stream: ${streamName}`);
+        testLogger.debug(`selectIndexStream: Starting selection for stream: ${streamName}`);
         try {
             await this.page.locator(this.indexDropDown).waitFor({ timeout: 10000 });
             await this.page.locator(this.indexDropDown).click();
-            console.log(`[DEBUG] selectIndexStream: Clicked dropdown`);
+            testLogger.debug(`selectIndexStream: Clicked dropdown`);
             await this.page.waitForTimeout(2000);
-            
+
             await this.page.locator(this.streamToggle).waitFor({ timeout: 10000 });
             await this.page.locator(this.streamToggle).click();
-            console.log(`[DEBUG] selectIndexStream: Successfully selected stream with default method`);
+            testLogger.debug(`selectIndexStream: Successfully selected stream with default method`);
         } catch (error) {
-            console.log(`[DEBUG] Failed to select stream with default method, trying alternative approach: ${error.message}`);
+            testLogger.debug(`Failed to select stream with default method, trying alternative approach: ${error.message}`);
             // Fallback to the old method
             await this.selectIndexStreamOld(streamName);
         }
@@ -257,30 +257,30 @@ export class LogsPage {
     }
 
     async selectIndexStreamOld(streamName) {
-        console.log(`[DEBUG] selectIndexStreamOld: Starting selection for stream: ${streamName}`);
+        testLogger.debug(`selectIndexStreamOld: Starting selection for stream: ${streamName}`);
         try {
             // Click the dropdown
             await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
-            console.log(`[DEBUG] selectIndexStreamOld: Clicked dropdown`);
+            testLogger.debug(`selectIndexStreamOld: Clicked dropdown`);
             await this.page.waitForTimeout(2000);
-            
+
             // Quick attempt to find and click the stream by text
-            console.log(`[DEBUG] selectIndexStreamOld: Trying to find stream by text: ${streamName}`);
+            testLogger.debug(`selectIndexStreamOld: Trying to find stream by text: ${streamName}`);
             await this.page.getByText(streamName, { exact: true }).first().click({ timeout: 5000 });
-            console.log(`[DEBUG] selectIndexStreamOld: Successfully selected stream by text: ${streamName}`);
-            
+            testLogger.debug(`selectIndexStreamOld: Successfully selected stream by text: ${streamName}`);
+
         } catch (error) {
-            console.log(`[DEBUG] selectIndexStreamOld: Failed to select stream ${streamName}: ${error.message}`);
-            
+            testLogger.debug(`selectIndexStreamOld: Failed to select stream ${streamName}: ${error.message}`);
+
             // Quick fallback: just select the first available stream
-            console.log(`[DEBUG] selectIndexStreamOld: Trying to select first available stream as fallback`);
+            testLogger.debug(`selectIndexStreamOld: Trying to select first available stream as fallback`);
             try {
                 await this.page.locator('[data-test*="log-search-index-list-stream-toggle-"]').first().click({ timeout: 5000 });
-                console.log(`[DEBUG] selectIndexStreamOld: Selected first available stream as fallback`);
+                testLogger.debug(`selectIndexStreamOld: Selected first available stream as fallback`);
             } catch (fallbackError) {
-                console.log(`[DEBUG] selectIndexStreamOld: Fallback also failed: ${fallbackError.message}`);
+                testLogger.debug(`selectIndexStreamOld: Fallback also failed: ${fallbackError.message}`);
                 // Don't throw error, just log it and continue
-                console.log(`[DEBUG] selectIndexStreamOld: Continuing without stream selection`);
+                testLogger.debug(`selectIndexStreamOld: Continuing without stream selection`);
             }
         }
     }
@@ -323,7 +323,7 @@ export class LogsPage {
             // If logs table doesn't appear, check for error message
             const errorMessage = this.page.locator(this.errorMessage);
             if (await errorMessage.isVisible()) {
-                console.log('Query completed with error message');
+                testLogger.debug('Query completed with error message');
             } else {
                 // Wait a bit more for any UI updates
                 await this.page.waitForTimeout(2000);
@@ -347,7 +347,7 @@ export class LogsPage {
             // If logs table doesn't appear, check for error message
             const errorMessage = this.page.locator(this.errorMessage);
             if (await errorMessage.isVisible()) {
-                console.log('Query completed with error message');
+                testLogger.debug('Query completed with error message');
             } else {
                 // Wait a bit more for any UI updates
                 await this.page.waitForTimeout(2000);
@@ -383,7 +383,7 @@ export class LogsPage {
             // If logs table doesn't appear, check for error message
             const errorMessage = this.page.locator(this.errorMessage);
             if (await errorMessage.isVisible()) {
-                console.log('Query completed with error message');
+                testLogger.debug('Query completed with error message');
             } else {
                 // Wait a bit more for any UI updates
                 await this.page.waitForTimeout(2000);
@@ -420,7 +420,7 @@ export class LogsPage {
             // If logs table doesn't appear, check for error message
             const errorMessage = this.page.locator(this.errorMessage);
             if (await errorMessage.isVisible()) {
-                console.log('Query completed with error message');
+                testLogger.debug('Query completed with error message');
             } else {
                 // Wait a bit more for any UI updates
                 await this.page.waitForTimeout(2000);
@@ -446,7 +446,7 @@ export class LogsPage {
             // If logs table doesn't appear, check for error message
             const errorMessage = this.page.locator(this.errorMessage);
             if (await errorMessage.isVisible()) {
-                console.log('Query completed with error message');
+                testLogger.debug('Query completed with error message');
             } else {
                 // Wait a bit more for any UI updates
                 await this.page.waitForTimeout(2000);
@@ -473,7 +473,7 @@ export class LogsPage {
             // If logs table doesn't appear, check for error message
             const errorMessage = this.page.locator(this.errorMessage);
             if (await errorMessage.isVisible()) {
-                console.log('Query completed with error message');
+                testLogger.debug('Query completed with error message');
             } else {
                 // Wait a bit more for any UI updates
                 await this.page.waitForTimeout(2000);
@@ -501,7 +501,7 @@ export class LogsPage {
             // If logs table doesn't appear, check for error message
             const errorMessage = this.page.locator(this.errorMessage);
             if (await errorMessage.isVisible()) {
-                console.log('Query completed with error message');
+                testLogger.debug('Query completed with error message');
             } else {
                 // Wait a bit more for any UI updates
                 await this.page.waitForTimeout(2000);
@@ -528,7 +528,7 @@ export class LogsPage {
             // If logs table doesn't appear, check for error message
             const errorMessage = this.page.locator(this.errorMessage);
             if (await errorMessage.isVisible()) {
-                console.log('Query completed with error message');
+                testLogger.debug('Query completed with error message');
             } else {
                 // Wait a bit more for any UI updates
                 await this.page.waitForTimeout(2000);
@@ -559,7 +559,7 @@ export class LogsPage {
             // If logs table doesn't appear, check for error message
             const errorMessage = this.page.locator(this.errorMessage);
             if (await errorMessage.isVisible()) {
-                console.log('Query completed with error message');
+                testLogger.debug('Query completed with error message');
             } else {
                 // Wait a bit more for any UI updates
                 await this.page.waitForTimeout(2000);
@@ -671,7 +671,7 @@ export class LogsPage {
             // If logs table doesn't appear, check for error message
             const errorMessage = this.page.locator(this.errorMessage);
             if (await errorMessage.isVisible()) {
-                console.log('Query completed with error message');
+                testLogger.debug('Query completed with error message');
             } else {
                 // Wait a bit more for any UI updates
                 await this.page.waitForTimeout(2000);
@@ -744,79 +744,79 @@ export class LogsPage {
     }
 
         async verifyStreamingModeResponse() {
-        console.log("[DEBUG] Waiting for search response...");
+        testLogger.debug("[DEBUG] Waiting for search response...");
         const searchPromise = this.page.waitForResponse(response => {
             const url = response.url();
             const method = response.request().method();
-            console.log(`[DEBUG] Response: ${method} ${url}`);
+            testLogger.debug(`[DEBUG] Response: ${method} ${url}`);
             return url.includes('/api/default/_search') && method === 'POST';
         });
         
         const searchResponse = await searchPromise;
-        console.log(`[DEBUG] Search response status: ${searchResponse.status()}`);
+        testLogger.debug(`[DEBUG] Search response status: ${searchResponse.status()}`);
         expect(searchResponse.status()).toBe(200);
         
         const searchData = await searchResponse.json();
-        console.log("[DEBUG] Search response data:", JSON.stringify(searchData, null, 2));
-        console.log("[DEBUG] searchData type:", typeof searchData);
-        console.log("[DEBUG] searchData keys:", Object.keys(searchData || {}));
+        testLogger.debug("[DEBUG] Search response data:", JSON.stringify(searchData, null, 2));
+        testLogger.debug("[DEBUG] searchData type:", typeof searchData);
+        testLogger.debug("[DEBUG] searchData keys:", Object.keys(searchData || {}));
         expect(searchData).toBeDefined();
         
         // Check if this is a partition response (non-streaming) or streaming response
         if (searchData.partitions) {
-            console.log("[DEBUG] Received partition response (non-streaming mode)");
+            testLogger.debug("[DEBUG] Received partition response (non-streaming mode)");
             expect(searchData.partitions).toBeDefined();
             expect(searchData.histogram_interval).toBeDefined();
         } else if (searchData.hits) {
-            console.log("[DEBUG] Received streaming response");
+            testLogger.debug("[DEBUG] Received streaming response");
             expect(searchData.hits).toBeDefined();
         } else {
-            console.log("[DEBUG] Unexpected response structure:", JSON.stringify(searchData, null, 2));
+            testLogger.debug("[DEBUG] Unexpected response structure:", JSON.stringify(searchData, null, 2));
             throw new Error(`Unexpected response structure: ${JSON.stringify(searchData)}`);
         }
     }
 
     async clickRunQueryButtonAndVerifyStreamingResponse() {
-        console.log("[DEBUG] Setting up response listener before clicking run query button");
+        testLogger.debug("[DEBUG] Setting up response listener before clicking run query button");
         const searchPromise = this.page.waitForResponse(response => {
             const url = response.url();
             const method = response.request().method();
-            console.log(`[DEBUG] Response: ${method} ${url}`);
+            testLogger.debug(`[DEBUG] Response: ${method} ${url}`);
             return url.includes('/api/default/_search') && method === 'POST';
         });
         
         await this.clickRunQueryButton();
         
         const searchResponse = await searchPromise;
-        console.log(`[DEBUG] Search response status: ${searchResponse.status()}`);
+        testLogger.debug(`[DEBUG] Search response status: ${searchResponse.status()}`);
         expect(searchResponse.status()).toBe(200);
         
         // Check if this is a streaming response (SSE format) or JSON response
         const responseUrl = searchResponse.url();
         if (responseUrl.includes('_search_stream')) {
-            console.log("[DEBUG] Received streaming response (SSE format)");
+            testLogger.debug("[DEBUG] Received streaming response (SSE format)");
             const responseText = await searchResponse.text();
-            console.log("[DEBUG] Streaming response text (first 200 chars):", responseText.substring(0, 200));
+            testLogger.debug("[DEBUG] Streaming response text (first 200 chars):", responseText.substring(0, 200));
             expect(responseText).toBeDefined();
             expect(responseText.length).toBeGreaterThan(0);
         } else {
-            console.log("[DEBUG] Received JSON response");
+            testLogger.debug("[DEBUG] Received JSON response");
             const searchData = await searchResponse.json();
-            console.log("[DEBUG] Search response data:", JSON.stringify(searchData, null, 2));
-            console.log("[DEBUG] searchData type:", typeof searchData);
-            console.log("[DEBUG] searchData keys:", Object.keys(searchData || {}));
+            testLogger.debug("[DEBUG] Search response data:", JSON.stringify(searchData, null, 2));
+            testLogger.debug("[DEBUG] searchData type:", typeof searchData);
+            testLogger.debug("[DEBUG] searchData keys:", Object.keys(searchData || {}));
             expect(searchData).toBeDefined();
             
             // Check if this is a partition response or regular search response
             if (searchData.partitions) {
-                console.log("[DEBUG] Received partition response (non-streaming mode)");
+                testLogger.debug("[DEBUG] Received partition response (non-streaming mode)");
                 expect(searchData.partitions).toBeDefined();
                 expect(searchData.histogram_interval).toBeDefined();
             } else if (searchData.hits) {
-                console.log("[DEBUG] Received regular search response");
+                testLogger.debug("[DEBUG] Received regular search response");
                 expect(searchData.hits).toBeDefined();
             } else {
-                console.log("[DEBUG] Unexpected response structure:", JSON.stringify(searchData, null, 2));
+                testLogger.debug("[DEBUG] Unexpected response structure:", JSON.stringify(searchData, null, 2));
                 throw new Error(`Unexpected response structure: ${JSON.stringify(searchData)}`);
             }
         }
@@ -835,7 +835,7 @@ export class LogsPage {
             
             await this.page.waitForTimeout(3000);
         } catch (error) {
-            console.error('Error in clickExplore:', error);
+            testLogger.error('Error in clickExplore:', error);
             throw error;
         }
     }
@@ -854,13 +854,13 @@ export class LogsPage {
             
             await this.page.waitForTimeout(1000);
         } catch (error) {
-            console.error('Error in openTimestampMenu:', error);
+            testLogger.error('Error in openTimestampMenu:', error);
             try {
                 await this.page.waitForTimeout(2000);
                 await this.timestampColumnMenu.click({ force: true });
                 await this.page.waitForTimeout(1000);
             } catch (retryError) {
-                console.error('Error in openTimestampMenu retry:', retryError);
+                testLogger.error('Error in openTimestampMenu retry:', retryError);
                 throw retryError;
             }
         }
@@ -912,18 +912,18 @@ export class LogsPage {
             });
             await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
         } catch (error) {
-            console.error('Error in validateResult:', error);
+            testLogger.error('Error in validateResult:', error);
             // Check if there's an error message visible
             const errorMessage = this.page.locator(this.errorMessage);
             if (await errorMessage.isVisible()) {
                 const errorText = await errorMessage.textContent();
-                console.error('Error message found:', errorText);
+                testLogger.error('Error message found:', errorText);
                 throw new Error(`Query failed with error: ${errorText}`);
             }
             // Check if there's a "no data found" message
             const noDataMessage = this.page.getByText('No data found');
             if (await noDataMessage.isVisible()) {
-                console.log('No data found for the query');
+                testLogger.debug('No data found for the query');
                 return; // This is acceptable for some queries
             }
             throw error;
@@ -953,7 +953,7 @@ export class LogsPage {
             // If logs table doesn't appear, check for error message
             const errorMessage = this.page.locator(this.errorMessage);
             if (await errorMessage.isVisible()) {
-                console.log('Query completed with error message');
+                testLogger.debug('Query completed with error message');
             } else {
                 // Wait a bit more for any UI updates
                 await this.page.waitForTimeout(2000);
@@ -984,7 +984,7 @@ export class LogsPage {
             // If logs table doesn't appear, check for error message
             const errorMessage = this.page.locator(this.errorMessage);
             if (await errorMessage.isVisible()) {
-                console.log('Query completed with error message');
+                testLogger.debug('Query completed with error message');
             } else {
                 // Wait a bit more for any UI updates
                 await this.page.waitForTimeout(2000);
@@ -1091,7 +1091,7 @@ export class LogsPage {
             // If logs table doesn't appear, check for error message
             const errorMessage = this.page.locator(this.errorMessage);
             if (await errorMessage.isVisible()) {
-                console.log('Query completed with error message');
+                testLogger.debug('Query completed with error message');
             } else {
                 // Wait a bit more for any UI updates
                 await this.page.waitForTimeout(2000);
@@ -1114,7 +1114,7 @@ export class LogsPage {
                 }
                 previousValue = currentValue;
             } catch (error) {
-                console.error('Error parsing cell content:', sourceCell);
+                testLogger.error('Error parsing cell content:', sourceCell);
                 throw error;
             }
         }
@@ -1868,7 +1868,7 @@ export class LogsPage {
         // If no data is available, trigger a refresh and wait
         const pageText = await logsPage.textContent();
         if (pageText.includes('No events found')) {
-            console.log('No events found, attempting to refresh...');
+            testLogger.debug('No events found, attempting to refresh...');
             await this.clickRefreshButton();
             await this.page.waitForLoadState('networkidle');
             // Wait additional time for data to load
@@ -1914,7 +1914,7 @@ export class LogsPage {
             const editor = document.querySelector(queryEditorSelector).querySelector('.monaco-editor');
             return editor ? editor.textContent.trim() : null;
         }, this.queryEditor);
-        console.log(text);
+        testLogger.debug(text);
         return await expect(text.replace(/\s/g, "")).toContain(expectedQuery.replace(/\s/g, ""));
     }
 
@@ -2006,7 +2006,7 @@ export class LogsPage {
         // Count rows in the CSV file
         const rows = content.split('\n').filter(line => line.trim() !== '');
         const rowCount = rows.length - 1; // Subtract 1 for header row
-        console.log(`Download ${expectedFileName}: ${rowCount} data rows`);
+        testLogger.debug(`Download ${expectedFileName}: ${rowCount} data rows`);
         
         // Assert row count based on scenario
         if (expectedFileName.includes('custom_100.csv')) {
@@ -2071,7 +2071,7 @@ export class LogsPage {
         const firstRecord = jsonData[0];
         expect(firstRecord).toHaveProperty('_timestamp');
 
-        console.log(`JSON Download ${expectedFileName}: ${jsonData.length} records`);
+        testLogger.debug(`JSON Download ${expectedFileName}: ${jsonData.length} records`);
 
         return downloadPath;
     }
@@ -2098,7 +2098,7 @@ export class LogsPage {
         const firstRecord = jsonData[0];
         expect(firstRecord).toHaveProperty('_timestamp');
 
-        console.log(`JSON Download ${expectedFileName}: ${jsonData.length} records (expected ${expectedCount})`);
+        testLogger.debug(`JSON Download ${expectedFileName}: ${jsonData.length} records (expected ${expectedCount})`);
 
         return downloadPath;
     }

@@ -359,7 +359,7 @@ export const convertSQLData = async (
     if (
       !interval ||
       !metadata.queries ||
-      !["area-stacked", "line", "area", "bar", "stacked"].includes(
+      !["area-stacked", "line", "area", "bar", "stacked", "scatter"].includes(
         panelSchema.type,
       )
     ) {
@@ -1263,7 +1263,9 @@ export const convertSQLData = async (
       bottom: "100%",
       feature: {
         dataZoom: {
-          yAxisIndex: "none",
+          yAxisIndex: panelSchema.config?.dataZoom?.hasOwnProperty("yAxisIndex")
+            ? panelSchema.config?.dataZoom.yAxisIndex
+            : "none",
         },
       },
     },
@@ -1625,8 +1627,8 @@ export const convertSQLData = async (
         panelSchema.type == "line" || panelSchema.type == "area"
           ? { opacity: 0.8 }
           : panelSchema.type == "bar"
-          ? { barMinHeight: 1 }
-          : {},
+            ? { barMinHeight: 1 }
+            : {},
       );
 
       if (
@@ -2323,7 +2325,6 @@ export const convertSQLData = async (
       break;
     }
 
-    // eslint-disable-next-line no-fallthrough
     default: {
       break;
     }

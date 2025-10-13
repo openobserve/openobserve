@@ -1215,7 +1215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }" :src="getBtnO2Logo" />
                           <span  
                           class=" tw-font-[400] tw-pl-[4px] tw-text-[12px] tw-pr-[6px] tw-py-[4px] tw-text-[#7980cc]" 
-                          >Generate SQL</span>
+                          > {{  tab == 'sql' ? 'Generate SQL' : 'Generate PromQL' }} </span>
                       </q-btn>
                       </div>
                       <div class="tw-h-full tw-flex tw-justify-center tw-items-center o2-select-input o2-input tw-w-full col"
@@ -1320,11 +1320,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :debounceTime="300"
                         v-model:query="promqlQuery"
                         @update:query="updateQueryValue"
-                      :class="[
-                        promqlQuery === '' ? 'empty-query' : '',
-                        store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode',
-                        'tw-h-[calc(100%-62px)]'
-                      ]"
+                        :class="[
+                          promqlQuery === '' ? 'empty-query' : '',
+                          store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode',
+                        ]"
+                        :style="{
+                            height:' calc(100% - 70px)'
+                          }"
                       @blur="onBlurQueryEditor"
                       style="min-height: 10rem;"
                     />
@@ -1513,12 +1515,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           </div>
 
-          <div class="tw-w-full"
-          :class="expandSqlOutput ? 
-          expandCombinedOutput ?  'tw-flex-1 tw-h-[calc(50%-24px)]' : 'tw-flex-1tw-h-[calc(100%-24px)]' 
-          : expandCombinedOutput ? 'tw-flex-1 tw-h-[24px]' : 'tw-flex-1 tw-h-[calc(100%-24px)]'"
+          <div v-if="tab !== 'promql'"  class="tw-w-full"
+              :class="expandSqlOutput ? 
+              expandCombinedOutput ?  'tw-flex-1 tw-h-[calc(50%-24px)]' : 'tw-flex-1tw-h-[calc(100%-24px)]' 
+              : expandCombinedOutput ? 'tw-flex-1 tw-h-[24px]' : 'tw-flex-1 tw-h-[calc(100%-24px)]'"
           >
-            <div v-if="tab !== 'promql'" class="tw-flex tw-flex-col tw-items-start tw-justify-between tw-h-fit">
+            <div class="tw-flex tw-flex-col tw-items-start tw-justify-between tw-h-fit">
             <FullViewContainer
               name="Combined Output"
               label="Combined Output"
@@ -1869,6 +1871,8 @@ const updateTab = () => {
   updateAggregationToggle();
   emits("update:query_type", tab.value);
   emits("input:update", "query_type", tab.value);
+  outputEvents.value = "";
+  outputFnEvents.value = "";
 };
 
 const getDefaultPromqlCondition = () => {
@@ -2384,20 +2388,18 @@ const onColumnSelect = () => {
       const periodInMicroseconds = triggerData.value.period * 60 * 1000000;
       const endTime = new Date().getTime() * 1000; // ← Use 1000 to get microseconds
       const startTime = endTime - periodInMicroseconds;
-
-        queryReq.query.start_time = startTime;
-        queryReq.query.end_time = endTime;
-          outputEvents.value = "";
+        outputEvents.value = "";
+        queryReq.query = promqlQuery.value;
         try {
           const res = await searchService.metrics_query_range({
               org_identifier: store.state.selectedOrganization.identifier,
-              query: queryReq,
+              query: queryReq.query,
               start_time: startTime,
               end_time: endTime,
               step: '0'
             })
-          if(res.data.hits.length > 0){
-              outputEvents.value = JSON.stringify(res.data.hits,null,2);
+          if(res?.data?.data?.result.length > 0){
+              outputEvents.value = JSON.stringify(res?.data?.data?.result,null,2);
           }
         } catch (err: any) {
           runPromqlError.value = err.response.data.error ?? "Something went wrong";

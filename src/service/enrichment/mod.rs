@@ -20,6 +20,8 @@ use config::utils::time::parse_str_to_time;
 use vector_enrichment::{Case, IndexHandle, Table};
 use vrl::value::{KeyString, ObjectMap, Value};
 
+use crate::service::db::enrichment_table;
+
 pub mod storage;
 
 #[derive(Clone)]
@@ -156,63 +158,50 @@ fn get_data(
 pub async fn get_enrichment_table(
     org_id: &str,
     table_name: &str,
-) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-    let records = get_enrichment_table_json(org_id, table_name).await?;
-
-    Ok(records
-        .iter()
-        .map(crate::service::db::enrichment_table::convert_to_vrl)
-        .collect())
+) -> Result<Arc<Vec<vrl::value::Value>>, anyhow::Error> {
+    let value_type = get_enrichment_table_inner(org_id, table_name).await?;
+    value_type.to_vrl()
 }
 
-pub async fn get_enrichment_table_json(
+/// Retrieve enrichment table data as Values (optimized version)
+/// This function returns data in the most efficient format based on the source
+pub async fn get_enrichment_table_inner(
     org_id: &str,
     table_name: &str,
-) -> Result<Vec<serde_json::Value>, anyhow::Error> {
-    log::debug!("get_enrichment_table_json: {org_id}/{table_name}");
-    let mut records = vec![];
-    let db_stats = crate::service::db::enrichment_table::get_meta_table_stats(org_id, table_name)
+) -> Result<storage::Values, anyhow::Error> {
+    log::debug!("get_enrichment_table: {org_id}/{table_name}");
+    let db_stats = enrichment_table::get_meta_table_stats(org_id, table_name)
         .await
         .unwrap_or_default();
-    let local_stats_last_updated = storage::local::get_last_updated_at(org_id, table_name)
+    let local_last_updated = storage::local::get_last_updated_at(org_id, table_name)
         .await
         .unwrap_or_default();
 
-    if (db_stats.end_time > local_stats_last_updated) || local_stats_last_updated == 0 {
-        log::debug!("get_enrichment_table_json: fetching from remote: {org_id}/{table_name}");
-        let data =
-            crate::service::db::enrichment_table::get_enrichment_table_data(org_id, table_name)
-                .await?;
-        records.extend(data);
+    let values = if (db_stats.end_time > local_last_updated) || local_last_updated == 0 {
+        log::debug!("get_enrichment_table: fetching from remote: {org_id}/{table_name}");
+        enrichment_table::get_enrichment_table_data(org_id, table_name).await?
     } else {
-        log::debug!("get_enrichment_table_json: fetching from local: {org_id}/{table_name}");
-        // fetch from local cache and put into records
-        let data = storage::local::retrieve(org_id, table_name).await?;
-        records.extend(data);
+        log::debug!("get_enrichment_table: fetching from local: {org_id}/{table_name}");
+        storage::local::retrieve(org_id, table_name).await?
+    };
+
+    // Store to local cache in background if needed
+    if values.is_empty() {
+        log::debug!("get_enrichment_table: empty data for {org_id}/{table_name}");
+        return Ok(values);
     }
 
-    records.sort_by(|a, b| {
-        a.get("_timestamp")
-            .unwrap()
-            .as_i64()
-            .unwrap()
-            .cmp(&b.get("_timestamp").unwrap().as_i64().unwrap())
-    });
-    if records.is_empty() {
-        return Ok(vec![]);
-    }
-    let last_updated_at = records
-        .last()
-        .unwrap()
-        .get("_timestamp")
-        .unwrap()
-        .as_i64()
-        .unwrap();
-    storage::local::store_data_if_needed_background(org_id, table_name, &records, last_updated_at)
-        .await?;
+    let last_updated_at = values.last_updated_at();
+    storage::local::store_data_if_needed_background(
+        org_id,
+        table_name,
+        values.clone(),
+        last_updated_at,
+    )
+    .await?;
 
-    log::debug!("get_enrichment_table_json: fetched from {org_id}/{table_name}");
-    Ok(records)
+    log::debug!("get_enrichment_table: fetched from {org_id}/{table_name}");
+    Ok(values)
 }
 
 #[cfg(test)]
