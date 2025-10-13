@@ -2759,18 +2759,16 @@ mod tests {
             )
             .await;
 
-            if let Ok(trigger) = trigger {
-                if let Ok(scheduled_trigger_data) =
+            if let Ok(trigger) = trigger
+                && let Ok(scheduled_trigger_data) =
                     serde_json::from_str::<ScheduledTriggerData>(&trigger.data)
-                {
-                    if scheduled_trigger_data.period_end_time.is_some() {
-                        assert!(scheduled_trigger_data.period_end_time.unwrap() > 0);
-                        assert!(trigger.status == TriggerStatus::Waiting);
-                        assert!(trigger.next_run_at > now && trigger.retries == 0);
-                        trigger_updated = true;
-                        break;
-                    }
-                }
+                && scheduled_trigger_data.period_end_time.is_some()
+            {
+                assert!(scheduled_trigger_data.period_end_time.unwrap() > 0);
+                assert!(trigger.status == TriggerStatus::Waiting);
+                assert!(trigger.next_run_at > now && trigger.retries == 0);
+                trigger_updated = true;
+                break;
             }
 
             attempts += 1;
@@ -2779,8 +2777,7 @@ mod tests {
 
         assert!(
             trigger_updated,
-            "Trigger was not updated after {} attempts",
-            max_attempts
+            "Trigger was not updated after {max_attempts} attempts"
         );
     }
 
