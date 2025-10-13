@@ -124,12 +124,16 @@ export default class DashboardVariables {
 
     // Save Variable and Close Settings (skip if customValueSearch is true)
     // if (!customValueSearch) {
-    await this.page
-      .locator('[data-test="dashboard-variable-save-btn"]')
-      .click();
-    await this.page
-      .locator('[data-test="dashboard-settings-close-btn"]')
-      .click();
+    const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
+    await saveBtn.waitFor({ state: "visible", timeout: 10000 });
+    await saveBtn.click();
+
+    // Wait for the save action to complete and DOM to stabilize
+    await this.page.waitForLoadState('networkidle');
+
+    const closeBtn = this.page.locator('[data-test="dashboard-settings-close-btn"]');
+    await closeBtn.waitFor({ state: "visible", timeout: 10000 });
+    await closeBtn.click({ force: true });
     // }
   }
 
