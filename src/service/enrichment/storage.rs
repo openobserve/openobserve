@@ -510,34 +510,6 @@ pub mod local {
         Ok(())
     }
 
-    pub async fn list(prefix: &str) -> Result<Vec<String>> {
-        let cfg = config::get_config();
-        let mut keys = Vec::new();
-
-        let mut entries = tokio::fs::read_dir(&cfg.enrichment_table.cache_dir)
-            .await
-            .map_err(|e| anyhow!("Failed to read enrichment table cache directory: {}", e))?;
-        while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            anyhow!(
-                "Failed to read entry in enrichment table cache directory: {}",
-                e
-            )
-        })? {
-            if let Ok(file_name) = entry.file_name().into_string()
-                && file_name.ends_with(".parquet")
-                && file_name.starts_with(&prefix.replace("/", "_"))
-            {
-                let key = file_name
-                    .strip_suffix(".parquet")
-                    .unwrap_or(&file_name)
-                    .replace("_", "/");
-                keys.push(key);
-            }
-        }
-
-        Ok(keys)
-    }
-
     pub async fn get_last_updated_at(org_id: &str, table_name: &str) -> Result<i64> {
         let key = get_key(org_id, table_name);
         let metadata_content = get_metadata_content().await?;
