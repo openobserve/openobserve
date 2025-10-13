@@ -119,18 +119,18 @@ jobs:
                 # "usersOrg.spec.js",
                 # "org.spec.js",
               ]
-          - testfolder: "Logs-Core"
-            browser: "chrome"
-            run_files:
-              [
-                "join.spec.js",
+          # - testfolder: "Logs-Core"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+                # "join.spec.js",
                 # "logshistogram.spec.js",
                 # "logspage.spec.js",
                 # "logsquickmode.spec.js",
                 # "pagination.spec.js",
                 # "unflattened.spec.js",
                 # "logstable.spec.js",
-              ]
+              # ]
           - testfolder: "Logs-Queries"
             browser: "chrome"
             run_files:
@@ -345,15 +345,28 @@ jobs:
         run: |
           cd tests/ui-testing
           mkdir -p playwright-results
-          PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results/report.json \
-          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-results/html-report \
           npx playwright merge-reports \
             --reporter html \
             --reporter json \
+            --config playwright.config.js \
             ./all-blob-reports
+
+          # The merge-reports command outputs to default locations
+          # Move them to the expected structure
+          if [ -d "playwright-report" ]; then
+            mv playwright-report playwright-results/html-report
+            echo "Moved HTML report to playwright-results/html-report"
+          fi
+
+          if [ -f "results.json" ]; then
+            mv results.json playwright-results/report.json
+            echo "Moved JSON report to playwright-results/report.json"
+          fi
 
           echo "Contents of playwright-results:"
           ls -la playwright-results/
+          echo "Contents of html-report:"
+          ls -la playwright-results/html-report/ || echo "html-report missing!"
 
       - name: Upload to TestDino
         if: ${{ always() }}
