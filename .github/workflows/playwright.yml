@@ -344,17 +344,13 @@ jobs:
       - name: Merge Reports
         run: |
           cd tests/ui-testing
+          mkdir -p playwright-results
           PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results/report.json \
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-results/html-report \
           npx playwright merge-reports \
             --reporter html \
             --reporter json \
             ./all-blob-reports
-
-          # Move HTML report to expected location
-          if [ -d "playwright-report" ]; then
-            mkdir -p playwright-results
-            mv playwright-report playwright-results/html-report
-          fi
 
           echo "Contents of playwright-results:"
           ls -la playwright-results/
