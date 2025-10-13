@@ -363,9 +363,9 @@ jobs:
         if: ${{ always() }}
         run: |
           cd tests/ui-testing
-          npx --yes tdpw upload \
-            --json-report results.json \
-            --html-report playwright-report \
+          npx --yes tdpw upload playwright-results \
+            --json-report playwright-results/report.json \
+            --html-report playwright-results/html-report \
             --upload-html \
             --token="${{ secrets.TESTDINO_API_TOKEN }}"
 
