@@ -353,7 +353,7 @@ jobs:
         if: ${{ always() }}
         run: |
           cd tests/ui-testing
-          npx --yes tdpw upload playwright-results \
+          npx --yes tdpw upload \
             --json-report playwright-results/report.json \
             --html-report playwright-results/html-report \
             --upload-html \
