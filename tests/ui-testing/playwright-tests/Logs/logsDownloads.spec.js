@@ -100,8 +100,8 @@ test.describe("Logs Downloads testcases", () => {
 
     // 1. Normal Downloads
     await executeDownloadTest('Normal CSV Download', async () => {
-      await pageManager.logsPage.hoverMoreOptionsButton();
-      await pageManager.logsPage.clickDownloadResults();
+      await pageManager.logsPage.clickMoreOptionsButton();
+      await pageManager.logsPage.hoverDownloadResults();
       const csvDownloadPromise = pageManager.logsPage.waitForDownload();
 
       const csvButton = page.getByText('CSV', { exact: true });
@@ -109,7 +109,8 @@ test.describe("Logs Downloads testcases", () => {
         await csvButton.waitFor({ state: 'visible', timeout: 3000 });
         await csvButton.click();
       } catch (error) {
-        await pageManager.logsPage.hoverMoreOptionsButton();
+        await pageManager.logsPage.clickMoreOptionsButton();
+        await pageManager.logsPage.hoverDownloadResults();
         await csvButton.click();
       }
 
@@ -125,8 +126,8 @@ test.describe("Logs Downloads testcases", () => {
       await setupLogsPage(page);
       await page.waitForTimeout(2000);
 
-      await pageManager.logsPage.hoverMoreOptionsButton();
-      await pageManager.logsPage.clickDownloadResults();
+      await pageManager.logsPage.clickMoreOptionsButton();
+      await pageManager.logsPage.hoverDownloadResults();
       const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
 
       const jsonButton = page.getByText('JSON', { exact: true });
@@ -134,7 +135,8 @@ test.describe("Logs Downloads testcases", () => {
         await jsonButton.waitFor({ state: 'visible', timeout: 3000 });
         await jsonButton.click();
       } catch (error) {
-        await pageManager.logsPage.hoverMoreOptionsButton();
+        await pageManager.logsPage.clickMoreOptionsButton();
+        await pageManager.logsPage.hoverDownloadResults();
         await jsonButton.click();
       }
 
@@ -154,7 +156,7 @@ test.describe("Logs Downloads testcases", () => {
         await setupLogsPage(page);
         await page.waitForTimeout(2000);
 
-        await pageManager.logsPage.hoverMoreOptionsButton();
+        await pageManager.logsPage.clickMoreOptionsButton();
         await pageManager.logsPage.clickDownloadResultsForCustom();
         await pageManager.logsPage.expectCustomDownloadDialogVisible();
         await pageManager.logsPage.clickCustomDownloadRangeSelect();
@@ -175,7 +177,7 @@ test.describe("Logs Downloads testcases", () => {
         await setupLogsPage(page);
         await page.waitForTimeout(2000);
 
-        await pageManager.logsPage.hoverMoreOptionsButton();
+        await pageManager.logsPage.clickMoreOptionsButton();
         await pageManager.logsPage.clickDownloadResultsForCustom();
         await pageManager.logsPage.expectCustomDownloadDialogVisible();
         await pageManager.logsPage.clickCustomDownloadRangeSelect();
@@ -200,8 +202,8 @@ test.describe("Logs Downloads testcases", () => {
       await setupLogsPage(page);
       await setupSQLMode(page);
 
-      await pageManager.logsPage.hoverMoreOptionsButton();
-      await pageManager.logsPage.clickDownloadResults();
+      await pageManager.logsPage.clickMoreOptionsButton();
+      await pageManager.logsPage.hoverDownloadResults();
       const csvDownloadPromise = pageManager.logsPage.waitForDownload();
       await page.getByText('CSV', { exact: true }).click();
       const csvDownload = await csvDownloadPromise;
@@ -217,8 +219,8 @@ test.describe("Logs Downloads testcases", () => {
       await setupLogsPage(page);
       await setupSQLMode(page);
 
-      await pageManager.logsPage.hoverMoreOptionsButton();
-      await pageManager.logsPage.clickDownloadResults();
+      await pageManager.logsPage.clickMoreOptionsButton();
+      await pageManager.logsPage.hoverDownloadResults();
       const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
       await page.getByText('JSON', { exact: true }).click();
       const jsonDownload = await jsonDownloadPromise;

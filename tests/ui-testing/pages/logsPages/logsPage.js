@@ -2113,9 +2113,8 @@ export class LogsPage {
         return await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').hover();
     }
 
-    async clickDownloadResults() {
-        await this.page.getByText('keyboard_arrow_right').click();
-        return await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
+    async hoverDownloadResults() {
+        return await this.page.getByText('keyboard_arrow_right').hover();
     }
 
     async clickDownloadResultsForCustom() {
