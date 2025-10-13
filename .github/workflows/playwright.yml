@@ -344,29 +344,17 @@ jobs:
       - name: Merge Reports
         run: |
           cd tests/ui-testing
-          mkdir -p playwright-results
-          npx playwright merge-reports \
-            --reporter html \
-            --reporter json \
-            --config playwright.config.js \
-            ./all-blob-reports
 
-          # The merge-reports command outputs to default locations
-          # Move them to the expected structure
-          if [ -d "playwright-report" ]; then
-            mv playwright-report playwright-results/html-report
-            echo "Moved HTML report to playwright-results/html-report"
-          fi
-
-          if [ -f "results.json" ]; then
-            mv results.json playwright-results/report.json
-            echo "Moved JSON report to playwright-results/report.json"
-          fi
+          # Unset CI to use non-CI reporter config (html + json instead of blob)
+          unset CI
+          npx playwright merge-reports --config playwright.config.js ./all-blob-reports
 
           echo "Contents of playwright-results:"
           ls -la playwright-results/
           echo "Contents of html-report:"
-          ls -la playwright-results/html-report/ || echo "html-report missing!"
+          ls -la playwright-results/html-report/
+          echo "Checking report.json:"
+          ls -lh playwright-results/report.json
 
       - name: Upload to TestDino
         if: ${{ always() }}
