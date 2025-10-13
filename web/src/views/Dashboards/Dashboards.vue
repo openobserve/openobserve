@@ -222,8 +222,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           @row-click="onRowClick"
           data-test="dashboard-table"
-          class="o2-quasar-table"
-          :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+          :style="(!filterQuery.length && dashboards.length > 0) ? 'height: calc(100vh - 112px)' : ''"
+          class="o2-quasar-table o2-quasar-table-header-sticky"
+          :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
         >
           <!-- if data not available show nodata component -->
           <template #no-data>
@@ -239,6 +240,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="props.selected"
                   size="sm"
                   color="secondary"
+                     :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                  class="o2-table-checkbox"
                   @update:model-value="props.select"
                 />
               </q-th>
@@ -258,14 +261,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <!-- body selection which on click selects the dashboard -->
           <template #body-selection="scope">
-            <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+            <q-checkbox v-model="scope.selected" size="sm" 
+              :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+              class="o2-table-checkbox"
+             />
+          </template>
+          <template #body-cell-name="props">
+            <q-td :props="props">
+              <div :title="props.value" class="text-truncate">
+                {{
+                  props.value && props.value.length > 30
+                    ? props.value.slice(0, 30) + "..."
+                    : props.value
+                }}
+                <q-tooltip v-if="props.value && props.value.length > 30" class="q-mt-lg tw-w-[300px]" anchor="top middle" self="bottom middle">
+                  {{ props.value }}
+                </q-tooltip>
+              </div>
+            </q-td>
+
           </template>
           <template #body-cell-description="props">
             <q-td :props="props">
               <div :title="props.value">
                 {{
-                  props.value && props.value.length > 45
-                    ? props.value.slice(0, 45) + "..."
+                  props.value && props.value.length > 30
+                    ? props.value.slice(0, 30) + "..."
                     : props.value
                 }}
               </div>
@@ -322,49 +343,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ></q-btn>
             </q-td>
           </template>
-          <!-- searchBar at top -->
-          <template #top="scope">
-            <!-- table pagination -->
-            <QTablePagination
-              :scope="scope"
-              :pageTitle="t('dashboard.header')"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              position="top"
-              @update:changeRecordPerPage="changePagination"
-            />
-          </template>
-
           <template #bottom="scope">
+               <div class="bottom-btn tw-h-[48px]">
+                     <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[250px] tw-mr-md">
+                  {{ resultTotal }} {{ t('dashboard.header') }}
+                </div>
+              <div class="bottom-btn-dashboard-list">
+                <q-btn
+                  v-if="selected.length > 0"
+                  data-test="dashboard-list-move-across-folders-btn"
+                  class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  @click="moveMultipleDashboards"
+                >
+                  <q-icon :name="outlinedDriveFileMove" size="16px" />
+                  <span class="tw-ml-2">Move</span>
+              </q-btn>
+                <q-btn
+                  v-if="selected.length > 0"
+                  data-test="dashboard-list-export-dashboards-btn"
+                  class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  @click="multipleExportDashboard"
+                >
+                  <q-icon name="download" size="16px" />
+                <span class="tw-ml-2">Export</span>
+              </q-btn>
+              </div>
             <QTablePagination
               :scope="scope"
               :resultTotal="resultTotal"
               :perPageOptions="perPageOptions"
-              :maxRecordToReturn="maxRecordToReturn"
               position="bottom"
               @update:changeRecordPerPage="changePagination"
               @update:maxRecordToReturn="changeMaxRecordToReturn"
             />
-            <div class="bottom-btn-dashboard-list">
-                <q-btn
-                  v-if="selected.length > 0"
-                  data-test="dashboard-list-move-across-folders-btn"
-                  class="flex items-center move-btn-dashboard-list q-mr-md no-border"
-                  color="secondary"
-                  :icon="outlinedDriveFileMove"
-                  :label="'Move'"
-                  @click="moveMultipleDashboards"
-                />
-                <q-btn
-                  v-if="selected.length > 0"
-                  data-test="dashboard-list-export-dashboards-btn"
-                  class="flex items-center export-btn-dashboard-list no-border"
-                  color="secondary"
-                  icon="download"
-                  :label="'Export'"
-                  @click="multipleExportDashboard"
-                />
-              </div>
+            </div>
+
           </template>
         </q-table>
 
@@ -1286,13 +1301,6 @@ export default defineComponent({
   }
 }
 
-.dashboards-list-page {
-  :deep(.q-table th),
-  :deep(.q-table td) {
-    padding: 0px 16px;
-    height: 32px;
-  }
-}
 
 .folder-name {
   white-space: nowrap;
@@ -1328,5 +1336,12 @@ export default defineComponent({
 
 .export-btn-dashboard-list {
   width: calc(10vw);
+}
+
+.bottom-btn {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
 }
 </style>
