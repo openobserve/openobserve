@@ -3876,9 +3876,14 @@ mod tests {
         ]);
 
         // Use infra::schema::merge to create/update the schema in the database
-        let result =
-            infra::schema::merge(org_id, table_name, StreamType::EnrichmentTables, &schema, None)
-                .await;
+        let result = infra::schema::merge(
+            org_id,
+            table_name,
+            StreamType::EnrichmentTables,
+            &schema,
+            None,
+        )
+        .await;
 
         // Ignore error if schema already exists
         match result {
