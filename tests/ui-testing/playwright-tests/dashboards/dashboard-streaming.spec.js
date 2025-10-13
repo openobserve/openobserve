@@ -186,15 +186,34 @@ test.describe("dashboard streaming testcases", () => {
       "variablename12",
       "logs",
       "e2e_automate",
-      "kubernetes_container_name",
+      "kubernetes_namespace_name",
       false,
+
+      //This is the filter configuration for the second variable we can add the filter values like below with the filter name, operator and value
       {
-        filterName: "kubernetes_namespace_name",
+        filterName: "kubernetes_container_name",
         operator: "=",
         value: "$variablename"
       }
     );
 
+     // Add second variable with filter configuration
+     await pm.dashboardSetting.openSetting();
+     await pm.dashboardVariables.addDashboardVariable(
+       "variablename123",
+       "logs",
+       "e2e_automate",
+       "kubernetes_pod_name",
+       false,
+ 
+       //This is the filter configuration for the second variable we can add the filter values like below with the filter name, operator and value
+       {
+         filterName: "kubernetes_namespace_name",
+         operator: "=",
+         value: "$variablename12"
+       }
+     );
+  
     await page.waitForLoadState("networkidle");
 
     await pm.dashboardCreate.addPanel();
@@ -203,19 +222,32 @@ test.describe("dashboard streaming testcases", () => {
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
     await pm.chartTypeSelector.searchAndAddField(
-      "kubernetes_pod_name",
+      "kubernetes_container_name",
       "y"
     );
 
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "filter"
+    );
+      // Add filter conditions
+      await pm.dashboardFilter.addFilterCondition(
+        0,
+        "kubernetes_container_name",
+        "",
+        "=",
+        "$variablename"
+      );
+
     await pm.dashboardPanelActions.applyDashboardBtn();
     await waitForDateTimeButtonToBeEnabled(page);
+    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardPanelActions.waitForChartToRender();
 
-    // Verify both variables are present
-    const namespaceVariable = page.getByLabel("namespace", { exact: true });
-    const podnameVariable = page.getByLabel("podname", { exact: true });
-
-    await expect(namespaceVariable).toBeVisible();
-    await expect(podnameVariable).toBeVisible();
+    await pm.dashboardVariables.selectValueFromVariableDropDown(
+      "variablename",
+      "ziox"
+    );
 
     await pm.dashboardCreate.backToDashboardList();
     await pm.dashboardCreate.searchDashboard(
