@@ -438,7 +438,7 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
 #[post("/v2/{org_id}/alerts/bulk/enable")]
 async fn enable_alert_bulk(
     path: web::Path<String>,
-    body: web::Bytes,
+    web::Json(req): web::Json<AlertBulkEnableRequest>,
     in_req: HttpRequest,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> HttpResponse {
@@ -447,11 +447,6 @@ async fn enable_alert_bulk(
         return MetaHttpResponse::bad_request("Error parsing query parameters");
     };
     let should_enable = query.0.value;
-
-    let req: AlertBulkEnableRequest = match serde_json::from_slice(&body) {
-        Ok(v) => v,
-        Err(_) => return MetaHttpResponse::bad_request("invalid body"),
-    };
 
     #[cfg(feature = "enterprise")]
     {

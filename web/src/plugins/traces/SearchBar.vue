@@ -18,18 +18,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="search-bar-component" id="searchBarComponent">
     <div class="row q-py-xs">
       <div class="float-right col flex items-center">
+        <div
+          style="border: 1px solid #c4c4c4; border-radius: 5px"
+          class="q-pr-xs q-ml-xs tw-flex tw-items-center tw-justify-center"
+        >
+          <q-toggle
+            data-test="traces-search-bar-show-metrics-toggle-btn"
+            v-model="searchObj.meta.showHistogram"
+            class="o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+            size="xs"
+            flat
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            "
+          >
+          </q-toggle>
+          <img
+            :src="metricsIcon"
+            alt="Metrics"
+            style="width: 20px; height: 20px"
+          />
+          <q-tooltip>
+            {{ t("traces.RedMetrics") }}
+          </q-tooltip>
+        </div>
+        <q-btn
+          data-test="traces-search-bar-reset-filters-btn"
+          no-caps
+          size="13px"
+          icon="restart_alt"
+          class="tw-flex tw-justify-center tw-items-center reset-filters q-ml-xs"
+          @click="resetFilters"
+        >
+          <q-tooltip>
+            {{ t("search.resetFilters") }}
+          </q-tooltip>
+        </q-btn>
         <syntax-guide
-          class="q-mr-sm"
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
-        />
-        <q-btn
-          label="Reset Filters"
-          no-caps
-          size="sm"
-          icon="restart_alt"
-          class="q-pr-sm q-pl-xs reset-filters"
-          @click="resetFilters"
         />
       </div>
       <div class="float-right col-auto">
@@ -116,10 +145,12 @@ import {
   defineAsyncComponent,
   onBeforeUnmount,
   onActivated,
+  computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
+import { useStore } from "vuex";
 
 import DateTime from "@/components/DateTime.vue";
 import useTraces from "@/composables/useTraces";
@@ -131,6 +162,7 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import AppTabs from "@/components/common/AppTabs.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useStreams from "@/composables/useStreams";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -169,6 +201,7 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
+    const store = useStore();
     const btnRefreshInterval = ref(null);
 
     const { searchObj } = useTraces();
@@ -420,9 +453,16 @@ export default defineComponent({
       dateTimeRef.value?.setDateType("absolute");
     };
 
+    const metricsIcon = computed(() => {
+      return store.state.theme === "dark"
+        ? getImageURL("images/common/bar_chart_histogram_light.svg")
+        : getImageURL("images/common/bar_chart_histogram.svg");
+    });
+
     return {
       t,
       router,
+      store,
       searchObj,
       queryEditorRef,
       btnRefreshInterval,
@@ -439,6 +479,7 @@ export default defineComponent({
       resetFilters,
       shareLink,
       updateNewDateTime,
+      metricsIcon,
     };
   },
   computed: {
@@ -616,15 +657,11 @@ export default defineComponent({
   }
 
   .reset-filters {
-    font-size: 22px;
-    height: 29px;
+    width: 32px;
+    height: 32px;
 
-    :deep(.block) {
-      font-size: 12px;
-    }
-
-    :deep(.q-icon) {
-      margin-right: 4px;
+    .q-icon {
+      margin-right: 0;
     }
   }
 }

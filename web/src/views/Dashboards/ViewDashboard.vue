@@ -260,6 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardName="currentDashboardData.data?.title"
         :folderName="folderNameFromFolderId"
         :selectedDateForViewPanel="selectedDate"
+        :allowAlertCreation="true"
         @onDeletePanel="onDeletePanel"
         @onMovePanel="onMovePanel"
         @updated:data-zoom="onDataZoom"
@@ -374,7 +375,10 @@ import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
-import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
+import {
+  createDashboardsContextProvider,
+  contextRegistry,
+} from "@/composables/contextProviders";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -630,14 +634,14 @@ export default defineComponent({
 
       // Set up dashboard context provider
       const dashboardProvider = createDashboardsContextProvider(
-        route, 
-        store, 
-        undefined, 
-        false, 
-        currentDashboardData
+        route,
+        store,
+        undefined,
+        false,
+        currentDashboardData,
       );
-      contextRegistry.register('dashboards', dashboardProvider);
-      contextRegistry.setActive('dashboards');
+      contextRegistry.register("dashboards", dashboardProvider);
+      contextRegistry.setActive("dashboards");
     });
 
     const setTimeString = () => {
@@ -670,7 +674,7 @@ export default defineComponent({
       currentDashboardData.data = await getDashboard(
         store,
         route.query.dashboard,
-        (route.query.folder ?? "default"),
+        route.query.folder ?? "default",
       );
 
       if (
@@ -832,7 +836,7 @@ export default defineComponent({
       return router.push({
         path: "/dashboards",
         query: {
-          folder: (route.query.folder ?? "default"),
+          folder: route.query.folder ?? "default",
         },
       });
     };
@@ -844,7 +848,7 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
-          folder: (route.query.folder ?? "default"),
+          folder: route.query.folder ?? "default",
           tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
         },
       });
@@ -963,7 +967,7 @@ export default defineComponent({
           store,
           route.query.dashboard,
           panelId,
-          (route.query.folder ?? "default"),
+          route.query.folder ?? "default",
           route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
         );
         await loadDashboard();
@@ -993,7 +997,7 @@ export default defineComponent({
           store,
           route.query.dashboard,
           panelId,
-          (route.query.folder ?? "default"),
+          route.query.folder ?? "default",
           route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
           newTabId,
         );
@@ -1126,11 +1130,11 @@ export default defineComponent({
 
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
-      
+
       // Clean up dashboard context provider
-      contextRegistry.unregister('dashboards');
-      contextRegistry.setActive('');
-      
+      contextRegistry.unregister("dashboards");
+      contextRegistry.setActive("");
+
       // Clear all refs
       cleanupRefs();
     });
