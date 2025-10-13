@@ -1968,6 +1968,16 @@ CREATE TABLE IF NOT EXISTS stream_stats
     add_column("file_list", column, data_type).await?;
     add_column("file_list_history", column, data_type).await?;
 
+    // create column index_footer_offset and index_footer_size for puffin footer optimization
+    let column = "index_footer_offset";
+    let data_type = "BIGINT";
+    add_column("file_list", column, data_type).await?;
+    add_column("file_list_history", column, data_type).await?;
+    let column = "index_footer_size";
+    let data_type = "INT";
+    add_column("file_list", column, data_type).await?;
+    add_column("file_list_history", column, data_type).await?;
+
     Ok(())
 }
 

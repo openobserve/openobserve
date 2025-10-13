@@ -438,6 +438,8 @@ async fn generate_dump(
         compressed_size: buf.len() as i64,
         index_size: 0,
         flattened: false,
+        index_footer_offset: None,
+        index_footer_size: None,
     };
 
     // first store the file in storage

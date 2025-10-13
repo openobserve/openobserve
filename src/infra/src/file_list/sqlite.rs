@@ -117,8 +117,8 @@ impl super::FileList for SqliteFileList {
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
         let meta = &dump_file.meta;
 
-        if let Err(e) = sqlx::query(r#" INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);"#)
+        if let Err(e) = sqlx::query(r#" INSERT INTO file_list (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, index_footer_offset, index_footer_size)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);"#)
         .bind(&dump_file.account)
         .bind(org_id)
         .bind(stream_key)
@@ -132,6 +132,8 @@ impl super::FileList for SqliteFileList {
         .bind(meta.compressed_size)
         .bind(meta.index_size)
         .bind(meta.flattened)
+        .bind(meta.index_footer_offset)
+        .bind(meta.index_footer_size)
         .execute(&mut *tx)
         .await{
             if let Err(e) = tx.rollback().await {
@@ -1411,8 +1413,8 @@ impl SqliteFileList {
         let client = client.lock().await;
         match  sqlx::query(
             format!(r#"
-INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);
+INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at, index_footer_offset, index_footer_size)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18);
         "#).as_str(),
     )
         .bind(id)
@@ -1431,6 +1433,8 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
         .bind(meta.flattened)
         .bind(now_ts)
         .bind(now_ts)
+        .bind(meta.index_footer_offset)
+        .bind(meta.index_footer_size)
         .execute(&*client)
         .await {
             Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
@@ -1458,7 +1462,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
             for files in chunks {
                 let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                format!("INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)").as_str(),
+                format!("INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at, index_footer_offset, index_footer_size)").as_str(),
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let id = if item.id > 0 { Some(item.id) } else { None };
@@ -1480,7 +1484,9 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
                         .push_bind(item.meta.index_size)
                         .push_bind(item.meta.flattened)
                         .push_bind(now_ts)
-                        .push_bind(now_ts);
+                        .push_bind(now_ts)
+                        .push_bind(item.meta.index_footer_offset)
+                        .push_bind(item.meta.index_footer_size);
                 });
                 query_builder.push(" ON CONFLICT(id) DO NOTHING");
                 if let Err(e) = query_builder.build().execute(&mut *tx).await {
@@ -1731,6 +1737,16 @@ CREATE TABLE IF NOT EXISTS stream_stats
     add_column(&client, "file_list_history", column, data_type).await?;
     let column = "updated_at";
     let data_type = "BIGINT default 0 not null";
+    add_column(&client, "file_list", column, data_type).await?;
+    add_column(&client, "file_list_history", column, data_type).await?;
+
+    // create column index_footer_offset and index_footer_size for puffin footer optimization
+    let column = "index_footer_offset";
+    let data_type = "BIGINT";
+    add_column(&client, "file_list", column, data_type).await?;
+    add_column(&client, "file_list_history", column, data_type).await?;
+    let column = "index_footer_size";
+    let data_type = "INT";
     add_column(&client, "file_list", column, data_type).await?;
     add_column(&client, "file_list_history", column, data_type).await?;
 

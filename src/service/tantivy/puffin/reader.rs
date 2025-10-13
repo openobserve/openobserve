@@ -93,6 +93,70 @@ impl PuffinBytesReader {
         self.metadata = Some(puffin_meta);
         Ok(())
     }
+
+    /// Optimized footer parsing using pre-known footer_cache blob metadata.
+    /// This fetches the footer_cache blob + puffin footer in a single HTTP request.
+    /// Reduces HTTP requests from 3-4 to 1 for maximum performance.
+    ///
+    /// # Arguments
+    /// * `footer_cache_offset` - Offset of the footer_cache blob (last blob before footer)
+    /// * `footer_cache_size` - Size of the footer_cache blob
+    ///
+    /// # Returns
+    /// Returns the footer_cache bytes along with parsing the puffin metadata
+    pub async fn parse_footer_and_get_cache_optimized(
+        &mut self,
+        footer_cache_offset: i64,
+        footer_cache_size: i32,
+    ) -> Result<bytes::Bytes> {
+        if self.source.size < MIN_FILE_SIZE {
+            return Err(anyhow!(
+                "Unexpected bytes size: minimal size {} vs actual size {}",
+                MIN_FILE_SIZE,
+                self.source.size
+            ));
+        }
+
+        // Fetch from footer_cache blob offset to end of file in a single request
+        // This includes: [footer_cache_blob_data | puffin_footer]
+        let start_offset = footer_cache_offset as u64;
+        ensure!(
+            start_offset < self.source.size,
+            anyhow!("Footer cache offset beyond file size")
+        );
+
+        let combined_data = infra::cache::storage::get_range(
+            &self.account,
+            &self.source.location,
+            start_offset..self.source.size,
+        )
+        .await?;
+
+        // Extract footer_cache from the beginning
+        let footer_cache_size = footer_cache_size as usize;
+        ensure!(
+            combined_data.len() >= footer_cache_size,
+            anyhow!("Combined data too small for footer_cache")
+        );
+
+        let footer_cache_bytes = combined_data.slice(0..footer_cache_size);
+
+        // The rest is the puffin footer
+        let footer_data = combined_data.slice(footer_cache_size..);
+
+        // Parse the puffin footer to get blob metadata
+        // The footer size is not known, but we can calculate it from the data
+        let footer_size = footer_data.len();
+        let puffin_meta =
+            PuffinFooterBytesReader::parse_from_bytes(footer_data, footer_size as u64)?;
+
+        // Store metadata if not already set
+        if self.metadata.is_none() {
+            self.metadata = Some(puffin_meta);
+        }
+
+        Ok(footer_cache_bytes)
+    }
 }
 
 /// Footer layout: HeadMagic Payload PayloadSize Flags FootMagic
@@ -118,6 +182,74 @@ impl PuffinFooterBytesReader {
 }
 
 impl PuffinFooterBytesReader {
+    /// Parse footer from bytes buffer (optimized single-request path)
+    fn parse_from_bytes(footer_data: bytes::Bytes, footer_size: u64) -> Result<PuffinMeta> {
+        if footer_data.len() != footer_size as usize {
+            return Err(anyhow!(
+                "Footer size mismatch: expected {} vs actual {}",
+                footer_size,
+                footer_data.len()
+            ));
+        }
+
+        // The footer_data contains: HeadMagic Payload PayloadSize Flags FootMagic
+        // Verify head magic
+        ensure!(
+            footer_data.slice(0..MAGIC_SIZE as usize).to_vec() == MAGIC,
+            anyhow!("Header MAGIC mismatch in footer")
+        );
+
+        // Extract footer magic (last 4 bytes)
+        let footer_magic_start = footer_data.len() - MAGIC_SIZE as usize;
+        ensure!(
+            footer_data
+                .slice(footer_magic_start..footer_data.len())
+                .to_vec()
+                == MAGIC,
+            anyhow!("Footer MAGIC mismatch")
+        );
+
+        // Extract flags (4 bytes before footer magic)
+        let flags_start = footer_magic_start - FLAGS_SIZE as usize;
+        let mut flags_bytes = [0u8; 4];
+        footer_data
+            .slice(flags_start..footer_magic_start)
+            .copy_to_slice(&mut flags_bytes);
+        let flags = PuffinFooterFlags::from_bits(u32::from_le_bytes(flags_bytes))
+            .ok_or_else(|| anyhow!("Error parsing Puffin flags from bytes"))?;
+
+        // Extract payload size (4 bytes before flags)
+        let payload_size_start = MAGIC_SIZE as usize;
+        let payload_size_end = payload_size_start + FOOTER_PAYLOAD_SIZE_SIZE as usize;
+        let mut payload_size_bytes = [0u8; 4];
+        footer_data
+            .slice(payload_size_start..payload_size_end)
+            .copy_to_slice(&mut payload_size_bytes);
+        let payload_size = i32::from_le_bytes(payload_size_bytes) as u64;
+
+        // Extract and parse payload
+        let payload_start = payload_size_end;
+        let payload_end = payload_start + payload_size as usize;
+        ensure!(
+            payload_end <= flags_start,
+            anyhow!("Payload extends beyond expected bounds")
+        );
+
+        let payload_data = &footer_data.slice(payload_start..payload_end);
+
+        // Parse payload (with optional compression)
+        let metadata = if flags.contains(PuffinFooterFlags::COMPRESSED) {
+            let decoder = zstd::Decoder::new(&payload_data[..])?;
+            serde_json::from_reader(decoder)
+                .map_err(|e| anyhow!("Error decompress footer payload {}", e.to_string()))?
+        } else {
+            serde_json::from_slice(payload_data)
+                .map_err(|e| anyhow!("Error serializing footer {}", e.to_string()))?
+        };
+
+        Ok(metadata)
+    }
+
     async fn parse(mut self) -> Result<PuffinMeta> {
         // read footer
         if self.source.size < FOOTER_SIZE {
@@ -127,6 +259,8 @@ impl PuffinFooterBytesReader {
                 self.source.size
             ));
         }
+        // this can be paired with the header check range request
+        // we need to validate
         let footer = infra::cache::storage::get_range(
             &self.account,
             &self.source.location,
@@ -169,6 +303,7 @@ impl PuffinFooterBytesReader {
                 self.source.size
             ));
         }
+        // read the payload in the footer which sits after fotter header and before payload size
         let payload = infra::cache::storage::get_range(
             &self.account,
             &self.source.location,
@@ -200,10 +335,12 @@ impl PuffinFooterBytesReader {
         }
     }
 
+    // this can be combined to `parse_payload`, in favor of parse don't validate
     fn validate_payload(&self) -> Result<()> {
         let puffin_metadata = self.metadata.as_ref().expect("metadata is not set");
 
         let mut offset = MAGIC_SIZE;
+        // validate the offset for blobs in the puffin file
         for blob in &puffin_metadata.blobs {
             ensure!(
                 blob.offset == offset,

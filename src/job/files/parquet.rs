@@ -669,6 +669,8 @@ async fn merge_files(
         compressed_size: 0,
         flattened: false,
         index_size: 0,
+        index_footer_offset: None,
+        index_footer_size: None,
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_files error: records is 0"));
@@ -832,7 +834,7 @@ async fn merge_files(
 
     // generate tantivy inverted index and write to storage
     let (schema, reader) = get_recordbatch_reader_from_bytes(&buf).await?;
-    let index_size = create_tantivy_index(
+    let (index_size, footer_metadata) = create_tantivy_index(
         "INGESTER",
         &new_file_key,
         &full_text_search_fields,
@@ -843,6 +845,10 @@ async fn merge_files(
     .await
     .map_err(|e| anyhow::anyhow!("generate_tantivy_index_on_ingester error: {}", e))?;
     new_file_meta.index_size = index_size as i64;
+    if let Some(metadata) = footer_metadata {
+        new_file_meta.index_footer_offset = Some(metadata.offset);
+        new_file_meta.index_footer_size = Some(metadata.size);
+    }
 
     Ok((account, new_file_key, new_file_meta, retain_file_list))
 }

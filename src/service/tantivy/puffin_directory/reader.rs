@@ -65,6 +65,64 @@ impl PuffinDirReader {
             blobs_metadata: Arc::new(blobs_metadata),
         })
     }
+
+    /// Optimized path that fetches footer_cache + puffin footer in a single HTTP request.
+    /// Uses pre-known footer_cache blob metadata from the database.
+    ///
+    /// # Arguments
+    /// * `account` - The account name for storage access
+    /// * `source` - Object metadata for the puffin file
+    /// * `footer_cache_offset` - Offset of the footer_cache blob (last blob)
+    /// * `footer_cache_size` - Size of the footer_cache blob
+    ///
+    /// # Returns
+    /// Returns (PuffinDirReader, footer_cache_bytes) for immediate use
+    pub async fn from_path_optimized(
+        account: String,
+        source: object_store::ObjectMeta,
+        footer_cache_offset: i64,
+        footer_cache_size: i32,
+    ) -> io::Result<(Self, bytes::Bytes)> {
+        let mut source = PuffinBytesReader::new(account, source);
+
+        // Fetch footer_cache and parse footer in a single HTTP request
+        let footer_cache_bytes = source
+            .parse_footer_and_get_cache_optimized(footer_cache_offset, footer_cache_size)
+            .await
+            .map_err(|e| {
+                io::Error::other(format!(
+                    "Error reading footer_cache and metadata from puffin file: {e}"
+                ))
+            })?;
+
+        // Get the parsed metadata
+        let Some(metadata) = source.get_metadata().await.map_err(|e| {
+            io::Error::other(format!(
+                "Error getting parsed metadata from puffin file: {e}"
+            ))
+        })?
+        else {
+            return Err(io::Error::other(
+                "Metadata not available after optimized parsing",
+            ));
+        };
+
+        let mut blobs_metadata = HashMap::new();
+        for meta in metadata.blobs {
+            // Fetch the files names from the blob_meta itself
+            if let Some(file_name) = meta.properties.get("blob_tag") {
+                let path = PathBuf::from(file_name);
+                blobs_metadata.insert(path, Arc::new(meta));
+            }
+        }
+
+        let reader = Self {
+            source: Arc::new(source),
+            blobs_metadata: Arc::new(blobs_metadata),
+        };
+
+        Ok((reader, footer_cache_bytes))
+    }
 }
 
 impl Clone for PuffinDirReader {

@@ -292,6 +292,10 @@ pub struct FileMeta {
     pub compressed_size: i64,
     pub index_size: i64,
     pub flattened: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index_footer_offset: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index_footer_size: Option<i32>,
 }
 
 impl FileMeta {
@@ -569,6 +573,8 @@ impl From<&cluster_rpc::FileMeta> for FileMeta {
             compressed_size: req.compressed_size,
             flattened: false,
             index_size: req.index_size,
+            index_footer_offset: None,
+            index_footer_size: None,
         }
     }
 }

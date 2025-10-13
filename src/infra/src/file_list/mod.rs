@@ -592,6 +592,10 @@ pub struct FileRecord {
     pub created_at: i64,
     #[sqlx(default)]
     pub updated_at: i64,
+    #[sqlx(default)]
+    pub index_footer_offset: Option<i64>,
+    #[sqlx(default)]
+    pub index_footer_size: Option<i32>,
 }
 
 impl From<&FileRecord> for FileKey {
@@ -617,6 +621,8 @@ impl From<&FileRecord> for FileMeta {
             compressed_size: r.compressed_size,
             index_size: r.index_size,
             flattened: r.flattened,
+            index_footer_offset: r.index_footer_offset,
+            index_footer_size: r.index_footer_size,
         }
     }
 }

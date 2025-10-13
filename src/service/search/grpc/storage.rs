@@ -806,7 +806,9 @@ pub async fn get_tantivy_directory(
     file_account: &str,
     file_name: &str,
     file_size: i64,
-) -> anyhow::Result<PuffinDirReader> {
+    footer_cache_offset: Option<i64>,
+    footer_cache_size: Option<i32>,
+) -> anyhow::Result<(PuffinDirReader, Option<bytes::Bytes>)> {
     let file_account = file_account.to_string();
     let source = object_store::ObjectMeta {
         location: file_name.into(),
@@ -815,7 +817,17 @@ pub async fn get_tantivy_directory(
         e_tag: None,
         version: None,
     };
-    Ok(PuffinDirReader::from_path(file_account, source).await?)
+
+    // Use optimized path if footer metadata is available
+    if let (Some(offset), Some(size)) = (footer_cache_offset, footer_cache_size) {
+        let (reader, footer_cache_bytes) =
+            PuffinDirReader::from_path_optimized(file_account, source, offset, size).await?;
+        Ok((reader, Some(footer_cache_bytes)))
+    } else {
+        // Fallback to old approach for backward compatibility
+        let reader = PuffinDirReader::from_path(file_account, source).await?;
+        Ok((reader, None))
+    }
 }
 
 async fn search_tantivy_index(
@@ -851,16 +863,26 @@ async fn search_tantivy_index(
     // open the tantivy index
     log::debug!("[trace_id {trace_id}] init cache for tantivy file: {ttv_file_name}");
 
-    let puffin_dir = Arc::new(
-        get_tantivy_directory(
-            trace_id,
-            &file_account,
-            &ttv_file_name,
-            parquet_file.meta.index_size,
-        )
-        .await?,
-    );
-    let footer_cache = FooterCache::from_directory(puffin_dir.clone()).await?;
+    let (puffin_dir, footer_cache_bytes) = get_tantivy_directory(
+        trace_id,
+        &file_account,
+        &ttv_file_name,
+        parquet_file.meta.index_size,
+        parquet_file.meta.index_footer_offset,
+        parquet_file.meta.index_footer_size,
+    )
+    .await?;
+
+    let puffin_dir = Arc::new(puffin_dir);
+
+    // Create footer cache from the optimized bytes if available, otherwise load from directory
+    let footer_cache = if let Some(bytes) = footer_cache_bytes {
+        let owned_bytes = tantivy::directory::OwnedBytes::new(bytes.to_vec());
+        FooterCache::from_bytes(owned_bytes)?
+    } else {
+        FooterCache::from_directory(puffin_dir.clone()).await?
+    };
+
     let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
     let reader_directory: Box<dyn Directory> = Box::new(cache_dir);
 

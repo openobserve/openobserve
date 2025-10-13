@@ -26,7 +26,7 @@ use tantivy::{
     directory::{Directory, RamDirectory, WatchCallback, WatchHandle, error::OpenReadError},
 };
 
-use super::{FOOTER_CACHE, footer_cache::build_footer_cache};
+use super::footer_cache::build_footer_cache;
 use crate::service::tantivy::{
     puffin::{BlobTypes, writer::PuffinBytesWriter},
     puffin_directory::{ALLOWED_FILE_EXT, META_JSON},
@@ -73,7 +73,8 @@ impl PuffinDirWriter {
     }
 
     // This function will serialize the directory into a single puffin file
-    pub fn to_puffin_bytes(&self) -> Result<Vec<u8>> {
+    // Returns the puffin bytes and footer metadata (offset and size of the footer_cache blob)
+    pub fn to_puffin_bytes(&self) -> Result<(Vec<u8>, super::super::puffin::FooterMetadata)> {
         let mut puffin_buf: Vec<u8> = Vec::new();
         let mut puffin_writer = PuffinBytesWriter::new(&mut puffin_buf);
         let mut segment_id = String::new();
@@ -113,18 +114,30 @@ impl PuffinDirWriter {
                 .context("Failed to add blob")?;
         }
 
-        // write footer cache
-        let meta_bytes = build_footer_cache(self.ram_directory.clone())?;
+        // Write footer_cache as the last blob (instead of base64 in properties)
+        // This allows us to fetch the footer_cache + puffin footer in a single HTTP request
+        let footer_cache_bytes = build_footer_cache(self.ram_directory.clone())?;
+        let footer_cache_offset = puffin_writer.current_offset();
+        let footer_cache_size = footer_cache_bytes.len() as i32;
+
         puffin_writer
             .add_blob(
-                &meta_bytes,
+                &footer_cache_bytes,
                 BlobTypes::O2TtvFooterV1,
-                FOOTER_CACHE.to_string(),
+                "footer_cache".to_string(),
             )
-            .context("Failed to add meta bytes blob")?;
+            .context("Failed to add footer_cache blob")?;
 
+        // Finish writing (adds the puffin footer)
         puffin_writer.finish().context("Failed to finish writing")?;
-        Ok(puffin_buf)
+
+        // Return metadata about the footer_cache blob position
+        let footer_metadata = super::super::puffin::FooterMetadata::new(
+            footer_cache_offset as i64,
+            footer_cache_size,
+        );
+
+        Ok((puffin_buf, footer_metadata))
     }
 }
 
@@ -386,8 +399,10 @@ mod tests {
         let result = writer.to_puffin_bytes();
         assert!(result.is_ok());
 
-        let bytes = result.unwrap();
+        let (bytes, footer_metadata) = result.unwrap();
         assert!(!bytes.is_empty());
+        assert!(footer_metadata.offset > 0);
+        assert!(footer_metadata.size > 0);
 
         // Should be significantly larger than empty puffin
         assert!(bytes.len() > 100);
@@ -434,7 +449,7 @@ mod tests {
 
         // Should only include allowed files
         // We can't easily inspect the puffin contents here, but we can verify it doesn't fail
-        let bytes = result.unwrap();
+        let (bytes, _footer_metadata) = result.unwrap();
         assert!(!bytes.is_empty());
     }
 
@@ -470,7 +485,7 @@ mod tests {
         let result = writer.to_puffin_bytes();
         assert!(result.is_ok());
 
-        let bytes = result.unwrap();
+        let (bytes, _footer_metadata) = result.unwrap();
         assert!(!bytes.is_empty());
 
         // Should contain all the file data plus puffin overhead
@@ -539,7 +554,7 @@ mod tests {
         let result = writer.to_puffin_bytes();
         assert!(result.is_ok());
 
-        let bytes = result.unwrap();
+        let (bytes, _footer_metadata) = result.unwrap();
         assert!(bytes.len() > 1_000_000); // Should be at least as large as the file
     }
 
@@ -636,7 +651,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Should successfully extract segment ID and create puffin file
-        let bytes = result.unwrap();
+        let (bytes, _footer_metadata) = result.unwrap();
         assert!(!bytes.is_empty());
     }
 

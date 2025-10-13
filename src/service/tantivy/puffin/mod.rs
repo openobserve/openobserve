@@ -22,6 +22,79 @@ pub mod reader;
 pub mod writer;
 
 /// puffin specs constants
+///
+///
+///  ┌─────────────────────────────────────────────────────────────────┐
+///  │                     HEADER MAGIC (4 bytes)                      │
+///  │                   [0x50, 0x46, 0x41, 0x31]                      │
+///  │                         "PFA1"                                  │
+///  ├─────────────────────────────────────────────────────────────────┤
+///  │                      BLOB 1: meta.json                          │
+///  │                    (BlobType: O2TtvV1)                          │
+///  │   {                                                             │
+///  │     "index_settings": {...},                                    │
+///  │     "segments": [...],                                          │
+///  │     "schema": [...],                                            │
+///  │     "opstamp": 0                                                │
+///  │   }                                                             │
+///  ├─────────────────────────────────────────────────────────────────┤
+///  │                   BLOB 2: segment_ABC.term                      │
+///  │                    (BlobType: O2TtvV1)                          │
+///  │              [Term dictionary FST binary data]                  │
+///  ├─────────────────────────────────────────────────────────────────┤
+///  │                    BLOB 3: segment_ABC.idx                      │
+///  │                    (BlobType: O2TtvV1)                          │
+///  │              [Posting lists binary data]                        │
+///  ├─────────────────────────────────────────────────────────────────┤
+///  │                    BLOB 4: segment_ABC.pos                      │
+///  │                    (BlobType: O2TtvV1)                          │
+///  │              [Position data binary data]                        │
+///  ├─────────────────────────────────────────────────────────────────┤
+///  │                   BLOB 5: segment_ABC.fast                      │
+///  │                    (BlobType: O2TtvV1)                          │
+///  │              [Fast fields columnar data]                        │
+///  ├─────────────────────────────────────────────────────────────────┤
+///  │                   BLOB 6: footer_cache                          │
+///  │                  (BlobType: O2TtvFooterV1)                      │
+///  │   [Footer cache serialized data - see previous explanation]     │
+///  ├─────────────────────────────────────────────────────────────────┤
+///  │                          FOOTER                                 │
+///  │   ┌───────────────────────────────────────────────────────┐     │
+///  │   │  Footer Header Magic (4 bytes): "PFA1"                │     │
+///  │   ├───────────────────────────────────────────────────────┤     │
+///  │   │  Metadata Payload (JSON):                             │     │
+///  │   │  {                                                    │     │
+///  │   │    "blobs": [                                         │     │
+///  │   │      {                                                │     │
+///  │   │        "type": "o2-ttv-v1",                           │     │
+///  │   │        "offset": 4,                                   │     │
+///  │   │        "length": 523,                                 │     │
+///  │   │        "properties": {                                │     │
+///  │   │          "blob_tag": "meta.json"                      │     │
+///  │   │        }                                              │     │
+///  │   │      },                                               │     │
+///  │   │      {                                                │     │
+///  │   │        "type": "o2-ttv-v1",                           │     │
+///  │   │        "offset": 527,                                 │     │
+///  │   │        "length": 15234,                               │     │
+///  │   │        "properties": {                                │     │
+///  │   │          "blob_tag": "segment_ABC.term"               │     │
+///  │   │        }                                              │     │
+///  │   │      },                                               │     │
+///  │   │      ... (more blob metadata)                         │     │
+///  │   │    ],                                                 │     │
+///  │   │    "properties": {}                                   │     │
+///  │   │  }                                                    │     │
+///  │   ├───────────────────────────────────────────────────────┤     │
+///  │   │  Payload Size (4 bytes, i32, little-endian)           │     │
+///  │   ├───────────────────────────────────────────────────────┤     │
+///  │   │  Flags (4 bytes, u32, little-endian)                  │     │
+///  │   │  0x00000000 = DEFAULT (uncompressed)                  │     │
+///  │   │  0x00000001 = COMPRESSED                              │     │
+///  │   ├───────────────────────────────────────────────────────┤     │
+///  │   │  Footer Tail Magic (4 bytes): "PFA1"                  │     │
+///  │   └───────────────────────────────────────────────────────┘     │
+///  └─────────────────────────────────────────────────────────────────┘
 pub const MAGIC: [u8; 4] = [0x50, 0x46, 0x41, 0x31];
 pub const MAGIC_SIZE: u64 = MAGIC.len() as u64;
 pub const MIN_FILE_SIZE: u64 = MAGIC_SIZE + MIN_DATA_SIZE;
@@ -29,6 +102,21 @@ pub const FLAGS_SIZE: u64 = 4;
 pub const FOOTER_PAYLOAD_SIZE_SIZE: u64 = 4;
 pub const FOOTER_SIZE: u64 = MAGIC_SIZE + FLAGS_SIZE + FOOTER_PAYLOAD_SIZE_SIZE;
 pub const MIN_DATA_SIZE: u64 = MAGIC_SIZE + FLAGS_SIZE + FOOTER_PAYLOAD_SIZE_SIZE + MAGIC_SIZE; // without any blobs
+
+/// Metadata about the puffin footer location and size
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FooterMetadata {
+    /// Offset from the start of the file where the footer begins
+    pub offset: i64,
+    /// Size of the footer in bytes
+    pub size: i32,
+}
+
+impl FooterMetadata {
+    pub fn new(offset: i64, size: i32) -> Self {
+        Self { offset, size }
+    }
+}
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

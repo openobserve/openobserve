@@ -105,6 +105,8 @@ fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
             original_size: original_size_col.value(idx),
             compressed_size: compressed_size_col.value(idx),
             index_size: index_size_col.value(idx),
+            index_footer_offset: None,
+            index_footer_size: None,
             created_at: created_at_col.value(idx),
             updated_at: updated_at_col.value(idx),
         };

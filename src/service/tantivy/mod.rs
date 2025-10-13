@@ -43,7 +43,7 @@ pub(crate) async fn create_tantivy_index(
     index_fields: &[String],
     schema: Arc<Schema>,
     reader: ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
-) -> Result<usize, anyhow::Error> {
+) -> Result<(usize, Option<puffin::FooterMetadata>), anyhow::Error> {
     let start = std::time::Instant::now();
     let caller = format!("[{caller}:JOB]");
 
@@ -57,14 +57,14 @@ pub(crate) async fn create_tantivy_index(
     )
     .await?;
     if index.is_none() {
-        return Ok(0);
+        return Ok((0, None));
     }
-    let puffin_bytes = dir.to_puffin_bytes()?;
+    let (puffin_bytes, footer_metadata) = dir.to_puffin_bytes()?;
     let index_size = puffin_bytes.len();
 
     // write fst bytes into disk
     let Some(idx_file_name) = convert_parquet_file_name_to_tantivy_file(parquet_file_name) else {
-        return Ok(0);
+        return Ok((0, None));
     };
 
     let cfg = get_config();
@@ -94,7 +94,7 @@ pub(crate) async fn create_tantivy_index(
             return Err(e.into());
         }
     }
-    Ok(index_size)
+    Ok((index_size, Some(footer_metadata)))
 }
 
 /// Create a tantivy index in the given directory for the record batch
@@ -737,7 +737,9 @@ mod tests {
         .await;
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 0); // Should return 0 for empty data
+        let (index_size, footer_metadata) = result.unwrap();
+        assert_eq!(index_size, 0); // Should return 0 for empty data
+        assert!(footer_metadata.is_none()); // Should return None for empty data
     }
 
     #[tokio::test]
@@ -757,7 +759,9 @@ mod tests {
         .await;
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 0); // Should return 0 when no fields to index
+        let (index_size, footer_metadata) = result.unwrap();
+        assert_eq!(index_size, 0); // Should return 0 when no fields to index
+        assert!(footer_metadata.is_none()); // Should return None when no fields to index
     }
 
     #[tokio::test]
@@ -777,7 +781,9 @@ mod tests {
         .await;
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 0); // Should return 0 when filename conversion fails
+        let (index_size, footer_metadata) = result.unwrap();
+        assert_eq!(index_size, 0); // Should return 0 when filename conversion fails
+        assert!(footer_metadata.is_none()); // Should return None when filename conversion fails
     }
 
     // Note: Full testing of create_tantivy_index with storage operations would require

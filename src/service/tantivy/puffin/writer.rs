@@ -43,6 +43,21 @@ impl<W> PuffinBytesWriter<W> {
         }
     }
 
+    /// Returns the current write offset (number of bytes written so far)
+    pub fn current_offset(&self) -> u64 {
+        self.written_bytes
+    }
+
+    /// Set a property in the puffin file metadata
+    pub fn set_property(&mut self, key: String, value: String) {
+        self.properties.insert(key, value);
+    }
+
+    /// Set multiple properties in the puffin file metadata
+    pub fn set_properties(&mut self, properties: HashMap<String, String>) {
+        self.properties.extend(properties);
+    }
+
     fn build_blob_metadata(
         &self,
         blob_type: BlobTypes,
@@ -84,12 +99,16 @@ impl<W: io::Write> PuffinBytesWriter<W> {
         Ok(())
     }
 
-    pub fn finish(&mut self) -> Result<u64> {
+    pub fn finish(&mut self) -> Result<super::FooterMetadata> {
         self.add_header_if_needed()
             .context("Error writing puffin header")?;
-        self.write_footer().context("Error writing puffin footer")?;
+        let footer_offset = self.written_bytes as i64;
+        let footer_size = self.write_footer().context("Error writing puffin footer")?;
         self.writer.flush()?;
-        Ok(self.written_bytes)
+        Ok(super::FooterMetadata::new(
+            footer_offset,
+            footer_size as i32,
+        ))
     }
 
     fn add_header_if_needed(&mut self) -> Result<()> {
@@ -100,15 +119,16 @@ impl<W: io::Write> PuffinBytesWriter<W> {
         Ok(())
     }
 
-    fn write_footer(&mut self) -> Result<()> {
+    fn write_footer(&mut self) -> Result<usize> {
         let footer_bytes = PuffinFooterWriter::new(
             mem::take(&mut self.blobs_metadata),
             mem::take(&mut self.properties),
         )
         .into_bytes()?;
+        let footer_size = footer_bytes.len();
         self.writer.write_all(&footer_bytes)?;
-        self.written_bytes += footer_bytes.len() as u64;
-        Ok(())
+        self.written_bytes += footer_size as u64;
+        Ok(footer_size)
     }
 }
 
