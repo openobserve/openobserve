@@ -60,44 +60,43 @@ export default class DashboardVariables {
 
     // Add Filter Configuration if provided
     if (filterConfig) {
-       await this.page.waitForTimeout(2000);
+      await this.page.waitForTimeout(2000);
 
-      await this.page.locator('[data-test="dashboard-variable-filter-add-btn"]').click();
+      await this.page.locator('[data-test="dashboard-add-filter-btn"]').click();
+      await this.page.waitForTimeout(2000);
       await this.page
         .locator('[data-test="dashboard-query-values-filter-name-selector"]')
         .click();
       await this.page
         .locator('[data-test="dashboard-query-values-filter-name-selector"]')
         .fill(filterConfig.filterName);
+
       await this.page
-        .locator('[data-test="dashboard-query-values-filter-operator-selector"]')
+        .getByRole("option", { name: filterConfig.filterName })
+        .click();
+
+      await this.page
+        .locator(
+          '[data-test="dashboard-query-values-filter-operator-selector"]'
+        )
         .click();
       await this.page
         .getByRole("option", { name: filterConfig.operator, exact: true })
         .locator("div")
         .nth(2)
         .click();
-      await this.page
-        .locator('[data-test="common-auto-complete"]')
-        .click();
+      await this.page.locator('[data-test="common-auto-complete"]').click();
       await this.page
         .locator('[data-test="common-auto-complete"]')
         .fill(filterConfig.value);
-      await this.page
-        .locator('[data-test="variable-tab-panels-default"]')
-        .getByText(filterConfig.value, { exact: true })
-        .click();
+      await this.page.waitForTimeout(2000);
+      // await this.page
+      //   .locator('[data-test="common-auto-complete-option"]')
+      //   .getByText(filterConfig.value, { exact: true })
+      //   .click();
     }
 
-    // Save Variable and Close Settings (skip if customValueSearch is true)
-    if (!customValueSearch) {
-      await this.page
-        .locator('[data-test="dashboard-variable-save-btn"]')
-        .click();
-      await this.page
-        .locator('[data-test="dashboard-settings-close-btn"]')
-        .click();
-    }
+    await this.page.waitForTimeout(2000);
 
     // Custom Value Search if want to search custom value from variable dropdown
     if (customValueSearch) {
@@ -121,15 +120,17 @@ export default class DashboardVariables {
       await this.page
         .locator('[data-test="dashboard-variable-custom-value-0"]')
         .fill("test");
-
-      // Save Variable and Close Settings
-      await this.page
-        .locator('[data-test="dashboard-variable-save-btn"]')
-        .click();
-      await this.page
-        .locator('[data-test="dashboard-settings-close-btn"]')
-        .click();
     }
+
+    // Save Variable and Close Settings (skip if customValueSearch is true)
+    // if (!customValueSearch) {
+    await this.page
+      .locator('[data-test="dashboard-variable-save-btn"]')
+      .click();
+    await this.page
+      .locator('[data-test="dashboard-settings-close-btn"]')
+      .click();
+    // }
   }
 
   // Dynamic function to fill input by label
