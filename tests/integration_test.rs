@@ -1426,6 +1426,8 @@ mod tests {
     }
 
     async fn e2e_post_alert_template() {
+        use actix_web::body::MessageBody;
+
         let auth = setup();
         let body_str = r#"{"name":"slackTemplate","body":"{\"text\":\"For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active app_name {app_name}\"}"}"#;
         let app = test::init_service(
@@ -1446,8 +1448,12 @@ mod tests {
             .to_request();
         let resp = test::call_service(&app, req).await;
         let status = resp.status();
-        let text = resp.text().await;
-        println!("e2e_post_alert_template: status: {:?}, text: {:?}", status, text);
+        let text = resp.into_body().try_into_bytes().unwrap_or_default();
+        let text = String::from_utf8_lossy(&text).to_string();
+        println!(
+            "e2e_post_alert_template: status: {:?}, text: {:?}",
+            status, text
+        );
         assert!(status.is_success());
     }
 
