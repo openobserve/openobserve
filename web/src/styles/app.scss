@@ -5,6 +5,16 @@ html, body {
   padding: 0 !important;
 }
 
+body {
+  background-color: rgb(70 100 150 / var(--tw-bg-opacity, 1));
+  background: linear-gradient(to bottom right, #e7ebf3, #620e8cb0); /* or your gradient */
+  box-shadow: inset 100px 100px 100px rgba(1700, 0, 0, 0.05);
+}
+
+.q-page {
+  margin: 0.188rem 0.188rem 0 0.188rem
+}
+
 /* ============================================================================
    MODERN LEAN SCROLLBAR STYLES
    Thin, minimal design with primary color scheme

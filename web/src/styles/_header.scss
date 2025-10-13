@@ -1,0 +1,121 @@
+// Header Styles with Glass Effect
+// Ensures proper visibility and styling for header elements
+
+// ============================================
+// Header Component Specific Styles
+// ============================================
+
+// Custom logo text
+.header-logo-text {
+  color: var(--text-primary) !important;
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+// Header icon sizing
+.header-icon {
+  font-size: var(--header-icon-size, 1.5625rem) !important; // 25px
+  width: 1.5625rem !important;
+  height: 1.5625rem !important;
+}
+
+// Settings icon
+.q-icon[name*="settings"] {
+  color: var(--text-secondary) !important;
+}
+
+// Quota warning in header
+.quota-warning-container {
+  .q-banner {
+    background: var(--warning-bg) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--warning-color);
+    border-radius: 0.5rem;
+  }
+}
+
+// AI Assistant button in header
+.ai-assistant-btn {
+  &.active {
+    background: var(--ai-btn-active-bg) !important;
+  }
+
+  &:hover {
+    background: var(--ai-btn-hover-bg) !important;
+  }
+}
+
+// ============================================
+// Organization Selector in Header
+// ============================================
+
+.org-selector {
+  .q-field__control {
+    color: var(--text-primary) !important;
+  }
+
+  .q-field__native,
+  input {
+    color: var(--text-primary) !important;
+  }
+
+  .q-icon {
+    color: var(--text-secondary) !important;
+  }
+}
+
+// ============================================
+// User Menu in Header
+// ============================================
+
+.user-menu {
+  .q-item__label {
+    color: var(--text-primary) !important;
+  }
+
+  .q-item__section--avatar {
+    .q-icon {
+      color: var(--text-secondary) !important;
+    }
+  }
+}
+
+.q-drawer {
+  background-color: var(--o2-primary-background);
+  color: var(--o2-text-primary);
+  opacity: 0.75;
+  text-align: center;
+}
+
+// // ============================================
+// // Theme Switcher in Header
+// // ============================================
+
+// .theme-switcher {
+//   .q-icon {
+//     color: var(--text-secondary) !important;
+//     transition: transform $transition-base;
+//   }
+
+//   &:hover .q-icon {
+//     transform: rotate(180deg);
+//   }
+// }
+
+// ============================================
+// Responsive Adjustments
+// ============================================
+
+// @media (max-width: 1024px) {
+//   .header-icon {
+//     font-size: 1.375rem !important; // 22px on mobile
+//     width: 1.375rem !important;
+//     height: 1.375rem !important;
+//   }
+// }
+
+// @media (max-width: 600px) {
+//   .q-header .q-toolbar {
+//     min-height: 3rem; // 48px on mobile
+//   }
+// }
