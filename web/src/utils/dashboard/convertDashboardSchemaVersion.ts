@@ -61,10 +61,14 @@ const migrateV5FieldsToV6 = (
 ) => {
   // if fieldItem is undefined, do nothing
   if (!fieldItem) return;
+
+  // Check if aggregation function is histogram
+  const isHistogram = fieldItem.aggregationFunction === "histogram";
+
   // mirgrate old args
   // previously, args was only used for histogram interval
-  // so, add arg type as histogramInterval
-  if (!fieldItem.args) {
+  // so, add arg type as histogramInterval only if function is histogram
+  if (!fieldItem.args || !isHistogram) {
     fieldItem.args = [];
   } else {
     fieldItem.args.forEach((arg: any) => {
