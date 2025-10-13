@@ -35,10 +35,12 @@ module.exports = defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 5 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: [
-    ['html', { outputFolder: 'playwright-results/html-report' }], // HTML reporter
-    ['json', { outputFile: 'playwright-results/report.json' }] // JSON reporter for TestDino
-  ],
+  reporter: process.env.CI
+    ? [['blob']] // Use blob reporter in CI for merging across shards
+    : [
+        ['html', { outputFolder: 'playwright-results/html-report', open: 'never' }], // HTML reporter
+        ['json', { outputFile: 'playwright-results/report.json' }] // JSON reporter for TestDino
+      ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
