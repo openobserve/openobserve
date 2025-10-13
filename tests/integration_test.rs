@@ -1445,7 +1445,10 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let status = resp.status();
+        let text = resp.text().await;
+        println!("e2e_post_alert_template: status: {:?}, text: {:?}", status, text);
+        assert!(status.is_success());
     }
 
     async fn e2e_get_alert_template() {
