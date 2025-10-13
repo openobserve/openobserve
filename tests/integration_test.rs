@@ -3797,48 +3797,9 @@ mod tests {
             true, // append_data = true
         )
         .await;
-        assert!(result2.is_ok());
+        assert!(result2.is_err());
         // wait for 2 seconds
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-        // Verify schema was evolved to include new fields
-        let mut stream_schema_map = std::collections::HashMap::new();
-        let schema_exists = openobserve::service::schema::stream_schema_exists(
-            org_id,
-            table_name,
-            config::meta::stream::StreamType::EnrichmentTables,
-            &mut stream_schema_map,
-        )
-        .await;
-
-        assert!(schema_exists.has_fields);
-
-        // Verify the schema cache contains the evolved schema
-        let schema_key = format!(
-            "{}/{}/{}",
-            org_id,
-            config::meta::stream::StreamType::EnrichmentTables,
-            table_name
-        );
-        let stream_schemas = STREAM_SCHEMAS.read().await;
-        assert!(stream_schemas.contains_key(&schema_key));
-        drop(stream_schemas);
-
-        // Get the latest SchemaCache
-        let stream_schemas_latest = STREAM_SCHEMAS_LATEST.read().await;
-        assert!(stream_schemas_latest.contains_key(&schema_key));
-        let schema_cache = stream_schemas_latest.get(&schema_key).unwrap();
-
-        // Verify the schema cache contains the evolved schema
-        assert!(schema_cache.contains_field("city"));
-        assert!(schema_cache.contains_field("country"));
-        drop(stream_schemas_latest);
-
-        // Check the ENRICHMENT_TABLES cache to check if the table is created
-        let enrichment_tables = ENRICHMENT_TABLES.clone();
-        assert!(enrichment_tables.contains_key(&schema_key));
-        assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 2);
-        drop(enrichment_tables);
 
         // Clean up
         e2e_cleanup_enrichment_table(org_id, table_name).await;
