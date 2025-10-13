@@ -344,16 +344,20 @@ jobs:
       - name: Merge Reports
         run: |
           cd tests/ui-testing
-          npx playwright merge-reports --reporter html --reporter json ../all-blob-reports
+          mkdir -p playwright-results
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-results/html-report \
+          PLAYWRIGHT_JSON_OUTPUT_NAME=playwright-results/report.json \
+          npx playwright merge-reports --reporter html --reporter json --config playwright.config.js ../all-blob-reports
 
       - name: Upload to TestDino
         if: ${{ always() }}
         run: |
           cd tests/ui-testing
-          npx --yes tdpw ./playwright-report \
-           --token="${{ secrets.TESTDINO_API_TOKEN }}" \
-           --upload-html \
-           --upload-traces
+          npx --yes tdpw upload playwright-results \
+            --json-report playwright-results/report.json \
+            --html-report playwright-results/html-report \
+            --upload-html \
+            --token="${{ secrets.TESTDINO_API_TOKEN }}"
 
   generate_coverage_report:
     name: Generate Coverage Report
