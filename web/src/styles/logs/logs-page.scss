@@ -9,12 +9,6 @@
    LAYOUT HELPERS
    ============================================================================ */
 
-.logPage {
-  padding: 0 !important;
-  margin: 0 !important;
-  box-sizing: border-box !important;
-}
-
 .full-width {
   width: 100%;
 }
@@ -359,7 +353,7 @@
   }
 
   .query-editor-container {
-    height: calc(100% - 2.1875rem) !important; // 35px
+    height: calc(100% - 2.675rem) !important; // 35px
   }
 
   .logs-auto-refresh-interval {

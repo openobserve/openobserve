@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.data.stream.selectedStreamFields.length == 0) &&
         searchObj.loading == false
       "
-      class="index-table q-mt-xs"
+      class="index-table"
     >
       <h3
         data-test="logs-search-no-field-found-text"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         selected stream.
       </h3>
     </div>
-    <div v-else class="index-table q-mt-xs">
+    <div v-else class="index-table">
       <q-table
         data-test="log-search-index-list-fields-table"
         v-model="sortedStreamFields"
@@ -518,7 +518,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="searchObj.data.stream.filterField"
             data-cy="index-field-search-input"
             filled
-            borderless
             dense
             clearable
             debounce="1"

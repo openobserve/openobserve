@@ -86,175 +86,175 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #after>
-                <div
-                  v-if="
-                    searchObj.data.filterErrMsg !== '' &&
-                    searchObj.loading == false
-                  "
-                  class="q-mt-lg"
-                >
-                  <h5 class="text-center">
-                    <q-icon name="warning" color="warning" size="10rem" /><br />
-                    <div
-                      data-test="logs-search-filter-error-message"
-                      v-html="searchObj.data.filterErrMsg"
-                    ></div>
-                  </h5>
-                </div>
-                <div
-                  v-else-if="
-                    searchObj.data.errorMsg !== '' && searchObj.loading == false
-                  "
-                  class="q-ma-lg"
-                >
-                  <h5 class="text-center q-ma-none">
-                    <div
-                      data-test="logs-search-result-not-found-text"
-                      v-if="
-                        searchObj.data.errorCode == 0 &&
-                        searchObj.data.errorMsg == ''
-                      "
-                    >
-                      Result not found.
-                      <q-btn
+                <div style="background-color: white; height: 100%;">
+                  <div
+                    v-if="
+                      searchObj.data.filterErrMsg !== '' &&
+                      searchObj.loading == false
+                    "
+                  >
+                    <h5 class="text-center">
+                      <q-icon name="warning" color="warning" size="10rem" /><br />
+                      <div
+                        data-test="logs-search-filter-error-message"
+                        v-html="searchObj.data.filterErrMsg"
+                      ></div>
+                    </h5>
+                  </div>
+                  <div
+                    v-else-if="
+                      searchObj.data.errorMsg !== '' && searchObj.loading == false
+                    "
+                  >
+                    <h5 class="text-center q-ma-none">
+                      <div
+                        data-test="logs-search-result-not-found-text"
                         v-if="
-                          searchObj.data.errorMsg != '' ||
-                          searchObj?.data?.functionError != ''
+                          searchObj.data.errorCode == 0 &&
+                          searchObj.data.errorMsg == ''
                         "
-                        @click="toggleErrorDetails"
-                        size="sm"
-                        data-test="logs-page-result-error-details-btn-result-not-found"
-                        >{{ t("search.functionErrorBtnLabel") }}</q-btn
                       >
-                    </div>
-                    <div data-test="logs-search-error-message" v-else>
-                      Error occurred while retrieving search events.
-                      <q-btn
-                        v-if="
-                          searchObj.data.errorMsg != '' ||
-                          searchObj?.data?.functionError != ''
-                        "
-                        @click="toggleErrorDetails"
-                        size="sm"
-                        data-test="logs-page-result-error-details-btn"
-                        >{{ t("search.histogramErrorBtnLabel") }}</q-btn
-                      >
-                    </div>
-                    <div
-                      data-test="logs-search-error-20003"
-                      v-if="parseInt(searchObj.data.errorCode) == 20003"
-                    >
-                      <q-btn
-                        no-caps
-                        unelevated
-                        size="sm"
-                        bg-secondary
-                        class="no-border bg-secondary text-white"
-                        :to="
-                          '/streams?dialog=' +
-                          searchObj.data.stream.selectedStream.label
-                        "
-                        >Click here</q-btn
-                      >
-                      to configure a full text search field to the stream.
-                    </div>
-                    <q-item-label>{{
-                      searchObj.data.additionalErrorMsg
-                    }}</q-item-label>
-                  </h5>
-                </div>
-                <div
-                  v-else-if="
-                    searchObj.data.stream.selectedStream.length == 0 &&
-                    searchObj.loading == false
-                  "
-                  class="row q-mt-lg"
-                >
-                  <h6
-                    data-test="logs-search-no-stream-selected-text"
-                    class="text-center col-10 q-mx-none"
-                  >
-                    <q-icon name="info" color="primary" size="md" /> Select a
-                    stream and press 'Run query' to continue. Additionally, you
-                    can apply additional filters and adjust the date range to
-                    enhance search.
-                  </h6>
-                </div>
-                <div
-                  v-else-if="
-                    searchObj.data.queryResults.hasOwnProperty('hits') &&
-                    searchObj.data.queryResults.hits.length == 0 &&
-                    searchObj.loading == false &&
-                    searchObj.meta.searchApplied == true
-                  "
-                  class="row q-mt-lg"
-                >
-                  <h6
-                    data-test="logs-search-error-message"
-                    class="text-center q-ma-none col-10"
-                  >
-                    <q-icon name="info" color="primary" size="md" />
-                    {{ t("search.noRecordFound") }}
-                    <q-btn
-                      v-if="
-                        searchObj.data.errorMsg != '' ||
-                        searchObj?.data?.functionError != ''
-                      "
-                      @click="toggleErrorDetails"
-                      size="sm"
-                      data-test="logs-page-result-error-details-btn-norecord"
-                      >{{ t("search.functionErrorBtnLabel") }}</q-btn
-                    ><br />
-                  </h6>
-                </div>
-                <div
-                  v-else-if="
-                    searchObj.data.queryResults.hasOwnProperty('hits') &&
-                    searchObj.data.queryResults.hits.length == 0 &&
-                    searchObj.loading == false &&
-                    searchObj.meta.searchApplied == false
-                  "
-                  class="row q-mt-lg"
-                >
-                  <h6
-                    data-test="logs-search-error-message"
-                    class="text-center q-ma-none col-10"
-                  >
-                    <q-icon name="info" color="primary" size="md" />
-                    {{ t("search.applySearch") }}
-                  </h6>
-                </div>
-                <div
-                  v-else
-                  data-test="logs-search-search-result"
-                  class="full-height search-result-container"
-                >
-                  <search-result
-                    ref="searchResultRef"
-                    :expandedLogs="expandedLogs"
-                    @update:datetime="setHistogramDate"
-                    @update:scroll="getMoreData"
-                    @update:recordsPerPage="getMoreDataRecordsPerPage"
-                    @expandlog="toggleExpandLog"
-                    @send-to-ai-chat="sendToAiChat"
-                  />
-                </div>
-                <div class="text-center col-10 q-ma-none">
-                  <h5>
-                    <span v-if="disableMoreErrorDetails">
-                      <SanitizedHtmlRenderer
-                        data-test="logs-search-detail-error-message"
-                        :htmlContent="searchObj?.data?.errorMsg"
-                      />
-                      <div class="error-display__message">
-                        {{ searchObj?.data?.errorDetail }}
+                        Result not found.
+                        <q-btn
+                          v-if="
+                            searchObj.data.errorMsg != '' ||
+                            searchObj?.data?.functionError != ''
+                          "
+                          @click="toggleErrorDetails"
+                          size="sm"
+                          data-test="logs-page-result-error-details-btn-result-not-found"
+                          >{{ t("search.functionErrorBtnLabel") }}</q-btn
+                        >
                       </div>
-                      <SanitizedHtmlRenderer
-                        data-test="logs-search-detail-function-error-message"
-                        :htmlContent="searchObj?.data?.functionError"
-                      />
-                    </span>
-                  </h5>
+                      <div data-test="logs-search-error-message" v-else>
+                        Error occurred while retrieving search events.
+                        <q-btn
+                          v-if="
+                            searchObj.data.errorMsg != '' ||
+                            searchObj?.data?.functionError != ''
+                          "
+                          @click="toggleErrorDetails"
+                          size="sm"
+                          data-test="logs-page-result-error-details-btn"
+                          >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                        >
+                      </div>
+                      <div
+                        data-test="logs-search-error-20003"
+                        v-if="parseInt(searchObj.data.errorCode) == 20003"
+                      >
+                        <q-btn
+                          no-caps
+                          unelevated
+                          size="sm"
+                          bg-secondary
+                          class="no-border bg-secondary text-white"
+                          :to="
+                            '/streams?dialog=' +
+                            searchObj.data.stream.selectedStream.label
+                          "
+                          >Click here</q-btn
+                        >
+                        to configure a full text search field to the stream.
+                      </div>
+                      <q-item-label>{{
+                        searchObj.data.additionalErrorMsg
+                      }}</q-item-label>
+                    </h5>
+                  </div>
+                  <div
+                    v-else-if="
+                      searchObj.data.stream.selectedStream.length == 0 &&
+                      searchObj.loading == false
+                    "
+                    class="row"
+                  >
+                    <h6
+                      data-test="logs-search-no-stream-selected-text"
+                      class="text-center col-10 q-mx-none"
+                    >
+                      <q-icon name="info" color="primary" size="md" /> Select a
+                      stream and press 'Run query' to continue. Additionally, you
+                      can apply additional filters and adjust the date range to
+                      enhance search.
+                    </h6>
+                  </div>
+                  <div
+                    v-else-if="
+                      searchObj.data.queryResults.hasOwnProperty('hits') &&
+                      searchObj.data.queryResults.hits.length == 0 &&
+                      searchObj.loading == false &&
+                      searchObj.meta.searchApplied == true
+                    "
+                    class="row"
+                  >
+                    <h6
+                      data-test="logs-search-error-message"
+                      class="text-center q-ma-none col-10"
+                    >
+                      <q-icon name="info" color="primary" size="md" />
+                      {{ t("search.noRecordFound") }}
+                      <q-btn
+                        v-if="
+                          searchObj.data.errorMsg != '' ||
+                          searchObj?.data?.functionError != ''
+                        "
+                        @click="toggleErrorDetails"
+                        size="sm"
+                        data-test="logs-page-result-error-details-btn-norecord"
+                        >{{ t("search.functionErrorBtnLabel") }}</q-btn
+                      ><br />
+                    </h6>
+                  </div>
+                  <div
+                    v-else-if="
+                      searchObj.data.queryResults.hasOwnProperty('hits') &&
+                      searchObj.data.queryResults.hits.length == 0 &&
+                      searchObj.loading == false &&
+                      searchObj.meta.searchApplied == false
+                    "
+                    class="row"
+                  >
+                    <h6
+                      data-test="logs-search-error-message"
+                      class="text-center q-ma-none col-10"
+                    >
+                      <q-icon name="info" color="primary" size="md" />
+                      {{ t("search.applySearch") }}
+                    </h6>
+                  </div>
+                  <div
+                    v-else
+                    data-test="logs-search-search-result"
+                    class="full-height search-result-container"
+                  >
+                    <search-result
+                      ref="searchResultRef"
+                      :expandedLogs="expandedLogs"
+                      @update:datetime="setHistogramDate"
+                      @update:scroll="getMoreData"
+                      @update:recordsPerPage="getMoreDataRecordsPerPage"
+                      @expandlog="toggleExpandLog"
+                      @send-to-ai-chat="sendToAiChat"
+                    />
+                  </div>
+                  <div class="text-center col-10 q-ma-none">
+                    <h5>
+                      <span v-if="disableMoreErrorDetails">
+                        <SanitizedHtmlRenderer
+                          data-test="logs-search-detail-error-message"
+                          :htmlContent="searchObj?.data?.errorMsg"
+                        />
+                        <div class="error-display__message">
+                          {{ searchObj?.data?.errorDetail }}
+                        </div>
+                        <SanitizedHtmlRenderer
+                          data-test="logs-search-detail-function-error-message"
+                          :htmlContent="searchObj?.data?.functionError"
+                        />
+                      </span>
+                    </h5>
+                  </div>
                 </div>
               </template>
             </q-splitter>
@@ -2643,9 +2643,9 @@ export default defineComponent({
 
 <style lang="scss">
 .logPage {
-  height: calc(100vh - $navbarHeight);
-  min-height: calc(100vh - $navbarHeight) !important;
-  max-height: calc(100vh - $navbarHeight) !important;
+  height: calc(100vh - $navbarHeight - 100px);
+  min-height: calc(100vh - $navbarHeight - 10px) !important;
+  max-height: calc(100vh - $navbarHeight - 100px) !important;
   overflow: hidden !important;
 
   .index-menu .field_list .field_overlay .field_label,
