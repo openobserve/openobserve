@@ -237,6 +237,8 @@ pub struct Response {
     pub converted_histogram_query: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_histogram_eligible: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query_index: Option<usize>,
 }
 
 /// Iterator for Streaming response of search `Response`
@@ -404,6 +406,7 @@ impl Response {
             order_by_metadata: Vec::new(),
             converted_histogram_query: None,
             is_histogram_eligible: None,
+            query_index: None,
         }
     }
 

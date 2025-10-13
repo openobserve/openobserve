@@ -90,7 +90,7 @@ export const DEFAULT_LOGS_CONFIG = {
   loadingStream: false,
   loadingSavedView: false,
   shouldIgnoreWatcher: false,
-  communicationMethod: "http" as const,
+  communicationMethod: "streaming" as const,
   config: {
     splitterModel: 20,
     lastSplitterPosition: 0,
