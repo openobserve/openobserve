@@ -33,7 +33,7 @@ _cov_test() {
         --ignore-filename-regex 'job|.*generated.*' \
         --test-threads=1 \
         --no-fail-fast \
-        --retries 3 \
+        --retries 1 \
         "$@"
 }
 
