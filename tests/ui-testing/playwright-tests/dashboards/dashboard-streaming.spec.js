@@ -244,12 +244,19 @@ test.describe("dashboard streaming testcases", () => {
     await pm.dashboardTimeRefresh.setRelative("6", "w");
     await pm.dashboardPanelActions.waitForChartToRender();
 
+
+    await pm.dashboardPanelActions.savePanel();
+    await page.waitForLoadState("networkidle");
+
+
     await pm.dashboardVariables.selectValueFromVariableDropDown(
       "variablename",
       "ziox"
     );
+    
+    await page.waitForTimeout(4000);
 
-    await pm.dashboardCreate.backToDashboardList();
+  await pm.dashboardCreate.backToDashboardList();
     await pm.dashboardCreate.searchDashboard(
       randomDashboardName + "_filter"
     );
