@@ -107,6 +107,7 @@ export class LogsPage {
         this.menuLink = link => `[data-test="menu-link-${link}"]`;
         this.searchAroundBtn = '[data-test="logs-search-bar-search-around-btn"]';
         this.pagination = '[data-test="logs-search-pagination"]';
+        this.resultPagination = '[data-test="logs-search-result-pagination"]';
         this.sqlPagination = '[data-test="logs-search-sql-pagination"]';
         this.sqlGroupOrderLimitPagination = '[data-test="logs-search-sql-group-order-limit-pagination"]';
         this.interestingFieldBtn = field => `[data-test="log-search-index-list-interesting-${field}-field-btn"]`;
@@ -874,7 +875,7 @@ export class LogsPage {
     }
 
     async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
-        await this.page.getByText(resultsPerPage, { exact: true }).click();
+        await this.page.locator(this.resultPagination).getByRole('button', { name: resultsPerPage, exact: true }).click();
         await this.page.waitForTimeout(5000); // Increased wait time for UI update
         
         // Use flexible assertions based on the results per page
