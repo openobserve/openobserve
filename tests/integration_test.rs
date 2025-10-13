@@ -3797,7 +3797,9 @@ mod tests {
             true, // append_data = true
         )
         .await;
-        assert!(result2.is_err());
+        assert!(result2.is_ok());
+        let result = result2.unwrap();
+        assert!(!result.status().is_success());
         // wait for 2 seconds
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
