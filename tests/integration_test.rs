@@ -1450,9 +1450,7 @@ mod tests {
         let status = resp.status();
         let text = resp.into_body().try_into_bytes().unwrap_or_default();
         let text = String::from_utf8_lossy(&text).to_string();
-        println!(
-            "e2e_post_alert_template: status: {status:?}, text: {text:?}"
-        );
+        println!("e2e_post_alert_template: status: {status:?}, text: {text:?}");
         assert!(status.is_success());
     }
 
