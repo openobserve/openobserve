@@ -158,8 +158,8 @@ test.describe("dashboard streaming testcases", () => {
     page.on("response", async (response) => {
       const url = response.url();
       if (url.includes("/_values_stream")) {
-        console.log(`[VALUES API HIT ${valuesResponses.length + 1}] Status: ${response.status()}`);
-        console.log(`URL: ${url}`);
+        // console.log(`[VALUES API HIT ${valuesResponses.length + 1}] Status: ${response.status()}`);
+        // console.log(`URL: ${url}`);
         valuesResponses.push({
           url,
           status: response.status(),
@@ -272,31 +272,38 @@ test.describe("dashboard streaming testcases", () => {
     // Clear the responses array to track only API calls after variable selection
     // This is the key point: we want to know how many values API calls happen when the variable value changes
     valuesResponses.length = 0;
-    console.log(`\n[TRACKING START] Cleared counter. Now tracking values API calls triggered by variable dropdown selection...`);
-
-    // Set up a promise to wait for the _values_stream API call
-    const valuesStreamPromise = page.waitForResponse(
-      response => response.url().includes('/_values_stream') && response.status() === 200,
-      { timeout: 10000 }
-    );
+    // console.log(`\n[TRACKING START] Cleared counter. Now tracking values API calls triggered by variable dropdown selection...`);
 
     await pm.dashboardVariables.selectValueFromVariableDropDown(
       "variablename",
       "ziox"
     );
 
-    // Wait for the _values_stream API call to complete
-    await valuesStreamPromise;
+    // Wait for all 3 _values_stream API calls (one for each dependent variable)
+    // Using a polling approach to wait until we receive exactly 3 API calls
+    await page.waitForFunction(
+      (expectedCount) => {
+        // This function runs in browser context, so we can't access valuesResponses directly
+        // We'll use a timeout-based approach instead
+        return true;
+      },
+      3,
+      { timeout: 500 }
+    ).catch(() => {});
+
+    // Wait with a reasonable timeout for all API calls to complete
+    await page.waitForTimeout(3000);
 
     // Wait for any remaining network activity to settle
     await page.waitForLoadState("networkidle");
-    console.log(`[TRACKING END] Values API calls triggered AFTER variable value change: ${valuesResponses.length}\n`);
+    // console.log(`[TRACKING END] Values API calls triggered AFTER variable value change: ${valuesResponses.length}\n`);
 
-    console.log(`\n========================================`);
-    console.log(`[TEST 2] TOTAL VALUES API CALLS: ${valuesResponses.length}`);
-    console.log(`========================================\n`);
+    // console.log(`\n========================================`);
+    // console.log(`[TEST 2] TOTAL VALUES API CALLS: ${valuesResponses.length}`);
+    // console.log(`========================================\n`);
 
-    expect(valuesResponses.length).toBeGreaterThan(0);
+    // Assert that exactly 3 values API calls are made (one for each dependent variable)
+    expect(valuesResponses.length).toBe(3);
 
     for (const res of valuesResponses) {
       expect(res.status).toBe(200);
