@@ -151,8 +151,8 @@ test.describe("Unflattened testcases", () => {
 
     testLogger.info('Starting data ingestion with updated schema');
     await ingestion(page);
-    testLogger.info('Data ingestion completed, waiting 3s for indexing');
-    await page.waitForTimeout(3000);
+    testLogger.info('Data ingestion completed, waiting 5s for indexing');
+    await page.waitForTimeout(5000);
 
     testLogger.info('Closing stream dialog and navigating to logs explorer');
     await pageManager.unflattenedPage.closeButton.waitFor();
@@ -237,8 +237,8 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
     testLogger.info('Starting data ingestion with updated schema');
     await ingestion(page);
-    testLogger.info('Data ingestion completed, waiting 3s for indexing');
-    await page.waitForTimeout(3000);
+    testLogger.info('Data ingestion completed, waiting 5s for indexing');
+    await page.waitForTimeout(5000);
 
     testLogger.info('Closing stream dialog and navigating to logs explorer');
     await pageManager.unflattenedPage.closeButton.waitFor();
@@ -296,7 +296,6 @@ test.describe("Unflattened testcases", () => {
 
     testLogger.info('Replacing query with SELECT * FROM "e2e_automate"');
     await pageManager.unflattenedPage.logsSearchBarQueryEditor.waitFor();
-    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').first().click();
     await pageManager.unflattenedPage.logsSearchBarQueryEditor.click();
     await page.keyboard.press('Control+a');
     await page.keyboard.type('SELECT * FROM "e2e_automate"');
@@ -305,7 +304,7 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
     await page.locator("[data-test='logs-search-bar-refresh-btn']").click();
     testLogger.info('Query executed, waiting for results to load');
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
 
     testLogger.info('Expanding first log row from SELECT * results');
     await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
@@ -318,11 +317,25 @@ test.describe("Unflattened testcases", () => {
 
     testLogger.info('Waiting for _o2_id field to appear in log details');
     try {
+      // Check if any fields are visible first
+      const jsonContent = page.locator('[data-test="log-detail-json-content"]');
+      await jsonContent.waitFor({ timeout: 5000 });
+      testLogger.info('Log detail JSON content is visible');
+
       await pageManager.unflattenedPage.o2IdText.waitFor({ timeout: 30000 });
       testLogger.info('Successfully found _o2_id field');
       await pageManager.unflattenedPage.o2IdText.click();
     } catch (error) {
       testLogger.error('Failed to find _o2_id field in log details', { error: error.message });
+
+      // Log what fields are actually present
+      try {
+        const allKeys = await page.locator('[data-test="log-detail-json-content"] [data-test^="log-expand-detail-key-"]').allTextContents();
+        testLogger.error('Available fields in log detail', { fields: allKeys });
+      } catch (e) {
+        testLogger.error('Could not retrieve available fields');
+      }
+
       throw error;
     }
 
@@ -371,8 +384,8 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
     testLogger.info('Ingesting data with Store Original Data OFF');
     await ingestion(page);
-    testLogger.info('Data ingestion completed, waiting 3s for indexing');
-    await page.waitForTimeout(3000);
+    testLogger.info('Data ingestion completed, waiting 5s for indexing');
+    await page.waitForTimeout(5000);
 
     testLogger.info('Navigating to logs explorer');
     await pageManager.unflattenedPage.exploreButton.waitFor();
