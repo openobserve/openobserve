@@ -183,10 +183,7 @@ export default defineComponent({
   padding: 0;
   border: 1px solid #c4c4c4;
   border-radius: 4px;
-}
-
-.normal-mode {
-  background-color: rgba(0, 0, 0, 0.05);
+  font-size: 0.8rem !important;
 }
 
 .sql-mode {
