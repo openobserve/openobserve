@@ -983,12 +983,14 @@ pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
 }
 
 /// Custom span processor that filters spans based on their name prefix
+#[cfg(feature = "enterprise")]
 #[derive(Debug)]
 struct FilteringSpanProcessor<P> {
     inner: P,
     prefix_filter: Option<String>,
 }
 
+#[cfg(feature = "enterprise")]
 impl<P> FilteringSpanProcessor<P> {
     fn new(inner: P, prefix_filter: Option<String>) -> Self {
         Self {
@@ -998,6 +1000,7 @@ impl<P> FilteringSpanProcessor<P> {
     }
 }
 
+#[cfg(feature = "enterprise")]
 impl<P: opentelemetry_sdk::trace::SpanProcessor> opentelemetry_sdk::trace::SpanProcessor
     for FilteringSpanProcessor<P>
 {
