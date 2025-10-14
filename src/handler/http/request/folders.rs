@@ -304,7 +304,7 @@ pub mod deprecated {
     #[utoipa::path(
         context_path = "/api",
         tag = "Folders",
-        operation_id = "CreateFolder",
+        operation_id = "CreateFolderDeprecated",
         summary = "Create a new folder (deprecated)",
         description = "Creates a new dashboard folder - this endpoint is deprecated",
         security(
@@ -351,7 +351,7 @@ pub mod deprecated {
     #[utoipa::path(
         context_path = "/api",
         tag = "Folders",
-        operation_id = "UpdateFolder",
+        operation_id = "UpdateFolderDeprecated",
         summary = "Update an existing folder (deprecated)",
         description = "Updates folder details like name and description - this endpoint is deprecated",
         security(
@@ -396,7 +396,7 @@ pub mod deprecated {
     #[utoipa::path(
         context_path = "/api",
         tag = "Folders",
-        operation_id = "ListFolders",
+        operation_id = "ListFoldersDeprecated",
         summary = "List all folders (deprecated)",
         description = "Retrieves all dashboard folders for the organization - this endpoint is deprecated",
         security(
@@ -441,7 +441,7 @@ pub mod deprecated {
     #[utoipa::path(
         context_path = "/api",
         tag = "Folders",
-        operation_id = "GetFolder",
+        operation_id = "GetFolderDeprecated",
         summary = "Get folder by ID (deprecated)",
         description = "Retrieves a specific folder by its identifier - this endpoint is deprecated",
         security(
@@ -477,7 +477,7 @@ pub mod deprecated {
     #[utoipa::path(
         context_path = "/api",
         tag = "Folders",
-        operation_id = "GetFolderByName",
+        operation_id = "GetFolderByNameDeprecated",
         summary = "Get folder by name (deprecated)",
         description = "Retrieves a folder using its name instead of ID - this endpoint is deprecated",
         security(
@@ -513,7 +513,7 @@ pub mod deprecated {
     #[utoipa::path(
         context_path = "/api",
         tag = "Folders",
-        operation_id = "DeleteFolder",
+        operation_id = "DeleteFolderDeprecated",
         summary = "Delete a folder (deprecated)",
         description = "Removes a folder and all its contents - this endpoint is deprecated",
         security(
