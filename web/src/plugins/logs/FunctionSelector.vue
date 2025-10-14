@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
   />
   <q-btn-group
-    class="no-outline q-pa-none no-border float-left q-mr-xs"
+    class="no-outline q-pa-none no-border float-left function-selector"
     :disable="!searchObj.meta.showTransformEditor"
   >
     <q-btn-dropdown
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :icon-right="iconRight"
       :title="t('search.functionPlaceholder')"
       split
-      class="no-outline saved-views-dropdown no-border btn-function"
+      class="saved-views-dropdown btn-function"
       @click="fnSavedFunctionDialog"
     >
       <q-list data-test="logs-search-saved-function-list">
@@ -148,4 +148,6 @@ const applyFunction = (
 };
 </script>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+@import '@/styles/logs/function-selector.scss';
+</style>
