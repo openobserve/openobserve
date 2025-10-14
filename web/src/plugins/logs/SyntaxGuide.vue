@@ -23,9 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[
       sqlmode ? 'sql-mode' : 'normal-mode',
       !store.state.isAiChatEnabled ? 'syntax-guide-button' : '',
-      store.state.theme == 'dark' && !sqlmode ? 'syntax-guide-button-dark' : ''
+      store.state.theme == 'dark' && !sqlmode ? 'syntax-guide-button-dark' : '',
     ]"
-    icon="help"
+    :icon="outlinedHelpOutline"
   >
     <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
       <q-card flat v-if="!sqlmode">
@@ -131,21 +131,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <li>
                   For phrase prefix search use
                   <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE match_all('error code*')</span
+                    >SELECT * FROM <b>stream</b> WHERE match_all('error
+                    code*')</span
                   >
                   to find phrases starting with 'error code'.
                 </li>
                 <li>
                   For case sensitive search use
                   <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE match_all('traceHits')</span
+                    >SELECT * FROM <b>stream</b> WHERE
+                    match_all('traceHits')</span
                   >
                   with exact case matching.
                 </li>
                 <li>
                   For postfix search use
                   <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE match_all('*failed')</span
+                    >SELECT * FROM <b>stream</b> WHERE
+                    match_all('*failed')</span
                   >
                   to find all terms ending with 'failed'.
                 </li>
@@ -206,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card>
     </q-menu>
     <q-tooltip>
-      {{ t('search.syntaxGuideLabel') }}
+      {{ t("search.syntaxGuideLabel") }}
     </q-tooltip>
   </q-btn>
 </template>
@@ -215,6 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { outlinedHelpOutline } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "ComponentSearchSyntaxGuide",
@@ -230,6 +234,7 @@ export default defineComponent({
     return {
       t,
       store,
+      outlinedHelpOutline,
     };
   },
 });

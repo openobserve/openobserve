@@ -57,11 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
               >
-                <img
-                  :src="visualizeIcon"
-                  alt="Visualize"
-                  class="icon-sm"
-                />
+                <img :src="visualizeIcon" alt="Visualize"
+class="icon-sm" />
                 <q-tooltip v-if="isVisualizeDisabled">
                   {{ t("search.enableSqlModeOrSelectSingleStream") }}
                 </q-tooltip>
@@ -90,7 +87,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
           </q-toggle>
-          <img :src="histogramIcon" alt="Histogram" class="toolbar-icon" />
+          <img :src="histogramIcon"
+alt="Histogram" class="toolbar-icon" />
           <q-tooltip>
             {{ t("search.showHistogramLabel") }}
           </q-tooltip>
@@ -109,7 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'o2-toggle-button-xs-light'
             "
           >
-            <img :src="sqlIcon" alt="SQL Mode" class="toolbar-icon" />
+            <img :src="sqlIcon"
+alt="SQL Mode" class="toolbar-icon" />
             <q-tooltip v-if="isSqlModeDisabled">
               {{ t("search.sqlModeDisabledForVisualization") }}
             </q-tooltip>
@@ -145,8 +144,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn-dropdown
             data-test="logs-search-saved-views-btn"
             v-model="savedViewDropdownModel"
-            icon="save"
-            icon-right="saved_search"
+            :icon="outlinedSave"
+            :icon-right="outlinedSavedSearch"
             @click="fnSavedView"
             @show="loadSavedView"
             split
@@ -224,7 +223,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </q-tr>
                     </template>
                     <template v-slot:body-cell-view_name="props">
-                      <q-td :props="props" class="field_list" no-hover>
+                      <q-td :props="props"
+class="field_list" no-hover>
                         <q-item
                           class="q-pa-sm saved-view-item"
                           clickable
@@ -425,13 +425,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Histogram Toggle -->
               <q-item
                 clickable
-                @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
+                @click="
+                  searchObj.meta.showHistogram = !searchObj.meta.showHistogram
+                "
                 data-test="logs-search-bar-show-histogram-toggle-btn"
                 class="q-pa-sm saved-view-item"
               >
                 <q-item-section>
                   <q-item-label class="tw-flex tw-items-center">
-                    <div style="width: 28px; display: flex; align-items: center; margin-right: 12px">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        margin-right: 12px;
+                      "
+                    >
                       <q-toggle
                         v-model="searchObj.meta.showHistogram"
                         size="xs"
@@ -454,13 +463,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Wrap Content Toggle -->
               <q-item
                 clickable
-                @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
+                @click="
+                  searchObj.meta.toggleSourceWrap =
+                    !searchObj.meta.toggleSourceWrap
+                "
                 data-test="logs-search-bar-wrap-table-content-toggle-btn"
                 class="q-pa-sm saved-view-item"
               >
                 <q-item-section>
                   <q-item-label class="tw-flex tw-items-center">
-                    <div style="width: 28px; display: flex; align-items: center; margin-right: 12px">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        margin-right: 12px;
+                      "
+                    >
                       <q-toggle
                         v-model="searchObj.meta.toggleSourceWrap"
                         size="xs"
@@ -483,13 +502,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Quick Mode Toggle -->
               <q-item
                 clickable
-                @click="searchObj.meta.quickMode = !searchObj.meta.quickMode; handleQuickMode()"
+                @click="
+                  searchObj.meta.quickMode = !searchObj.meta.quickMode;
+                  handleQuickMode();
+                "
                 data-test="logs-search-bar-quick-mode-toggle-btn"
                 class="q-pa-sm saved-view-item"
               >
                 <q-item-section>
                   <q-item-label class="tw-flex tw-items-center">
-                    <div style="width: 28px; display: flex; align-items: center; margin-right: 12px">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        margin-right: 12px;
+                      "
+                    >
                       <q-toggle
                         v-model="searchObj.meta.quickMode"
                         size="xs"
@@ -513,7 +542,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-item clickable class="q-pa-sm saved-view-item">
                 <q-item-section>
                   <q-item-label class="tw-flex tw-items-center">
-                    <div style="width: 28px; display: flex; align-items: center; justify-content: center; margin-right: 12px">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin-right: 12px;
+                      "
+                    >
                       <syntax-guide
                         data-test="logs-search-bar-sql-mode-toggle-btn"
                         :sqlmode="searchObj.meta.sqlMode"
@@ -537,7 +574,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section>
                   <q-item-label class="tw-flex tw-items-center">
-                    <div style="width: 28px; display: flex; align-items: center; justify-content: center; margin-right: 8px; margin-left: 3px;">
+                    <div
+                      style="
+                        width: 28px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin-right: 8px;
+                        margin-left: 3px;
+                      "
+                    >
                       <q-icon name="restart_alt" size="20px" />
                     </div>
                     {{ t("search.resetFilters") }}
@@ -548,7 +594,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-menu>
         </q-btn>
         <!-- moved to dropdown if ai chat is enabled -->
-        <div class="toolbar-toggle-container" v-if="!store.state.isAiChatEnabled">
+        <div
+          class="toolbar-toggle-container"
+          v-if="!store.state.isAiChatEnabled"
+        >
           <q-toggle
             data-test="logs-search-bar-quick-mode-toggle-btn"
             v-model="searchObj.meta.quickMode"
@@ -562,7 +611,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'o2-toggle-button-xs-light'
             "
           >
-            <img :src="quickModeIcon" alt="Quick Mode" class="toolbar-icon" />
+            <img :src="quickModeIcon"
+alt="Quick Mode" class="toolbar-icon" />
             <q-tooltip>
               {{ t("search.quickModeLabel") }}
             </q-tooltip>
@@ -694,7 +744,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         downloadLogs(searchObj.data.queryResults.hits, 'csv')
                       "
                     >
-                      <q-icon name="grid_on" size="14px" class="q-pr-sm" />
+                      <q-icon name="grid_on"
+size="14px" class="q-pr-sm" />
                       <q-item-section>
                         <q-item-label
                           class="tw-flex tw-items-center tw-gap-2 q-mr-md"
@@ -712,7 +763,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         downloadLogs(searchObj.data.queryResults.hits, 'json')
                       "
                     >
-                      <q-icon name="data_object" size="14px" class="q-pr-sm" />
+                      <q-icon name="data_object"
+size="14px" class="q-pr-sm" />
                       <q-item-section>
                         <q-item-label
                           class="tw-flex tw-items-center tw-gap-2 q-mr-md"
@@ -895,7 +947,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('search.runQuery')"
                 class="q-pa-none o2-primary-button tw-h-[30px]"
                 no-caps
-                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-primary-button-dark'
+                    : 'o2-primary-button-light'
+                "
                 @click="handleRunQueryFn"
                 :disable="disable"
                 >{{ t("search.runQuery") }}</q-btn
@@ -927,9 +983,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 :title="t('search.runQuery')"
                 class="q-pa-none o2-primary-button tw-h-[30px]"
-                style="font-size: 11px;"
+                style="font-size: 11px"
                 no-caps
-                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-primary-button-dark'
+                    : 'o2-primary-button-light'
+                "
                 @click="handleRunQueryFn"
                 :disable="
                   searchObj.loading == true ||
@@ -1380,7 +1440,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <div class="text-left q-mb-xs">
               No of Records:
-              <q-icon name="info" size="17px" class="q-ml-xs cursor-pointer">
+              <q-icon name="info"
+size="17px" class="q-ml-xs cursor-pointer">
                 <q-tooltip
                   anchor="center right"
                   self="center left"
@@ -1417,7 +1478,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="opacity: 0.8"
             class="text-left mapping-warning-msg q-mt-md"
           >
-            <q-icon name="warning" color="red" class="q-mr-sm" />
+            <q-icon name="warning"
+color="red" class="q-mr-sm" />
             <span>Histogram will be disabled for the schedule job</span>
           </div>
         </q-card-section>
@@ -1540,6 +1602,10 @@ import {
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
+import {
+  outlinedSavedSearch,
+  outlinedSave,
+} from "@quasar/extras/material-icons-outlined";
 
 const defaultValue: any = () => {
   return {
@@ -1712,12 +1778,8 @@ export default defineComponent({
     } = useSearchBar();
     const { loadStreamLists, extractFields } = useStreamFields();
 
-    const {
-      refreshData,
-      handleRunQuery,
-      getJobData,
-      routeToSearchSchedule,
-    } = useLogs();
+    const { refreshData, handleRunQuery, getJobData, routeToSearchSchedule } =
+      useLogs();
 
     const { isStreamExists, isStreamFetched, getStreams } = useStreams();
     const queryEditorRef = ref(null);
@@ -4012,6 +4074,8 @@ export default defineComponent({
       buildStreamQuery,
       updateActionSelection,
       updateEditorWidth,
+      outlinedSavedSearch,
+      outlinedSave,
     };
   },
   computed: {
@@ -4131,8 +4195,7 @@ export default defineComponent({
                     filter +
                     " group by" +
                     afterGroupBy;
-                } 
-                else if (query.toLowerCase().includes("limit")) {
+                } else if (query.toLowerCase().includes("limit")) {
                   const [beforeLimit, afterLimit] = queryIndexSplit(
                     query,
                     "limit",
@@ -4169,8 +4232,7 @@ export default defineComponent({
                     filter +
                     " group by" +
                     afterGroupBy;
-                }
-                 else if (query.toLowerCase().includes("limit")) {
+                } else if (query.toLowerCase().includes("limit")) {
                   const [beforeLimit, afterLimit] = queryIndexSplit(
                     query,
                     "limit",
@@ -4297,8 +4359,9 @@ export default defineComponent({
   }
 }
 
-.q-dark .toolbar-reset-btn, .dark-theme .toolbar-reset-btn {
-  border-color: rgb(196,196,196);
+.q-dark .toolbar-reset-btn,
+.dark-theme .toolbar-reset-btn {
+  border-color: rgb(196, 196, 196);
 }
 
 .group-menu-btn {
@@ -4320,7 +4383,8 @@ export default defineComponent({
   }
 }
 
-.dark-theme .group-menu-btn, .q-dark .group-menu-btn {
+.dark-theme .group-menu-btn,
+.q-dark .group-menu-btn {
   border: 0.0625rem solid rgb(196, 196, 196) !important;
 }
 </style>

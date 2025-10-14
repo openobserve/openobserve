@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           aria-live="polite"
           :aria-label="`${badge} notifications`"
         >
-          {{ badge > 99 ? '99+' : badge }}
+          {{ badge > 99 ? "99+" : badge }}
         </div>
       </div>
       <q-item-label>{{ title }}</q-item-label>
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           aria-live="polite"
           :aria-label="`${badge} notifications`"
         >
-          {{ badge > 99 ? '99+' : badge }}
+          {{ badge > 99 ? "99+" : badge }}
         </div>
       </div>
       <q-item-label>{{ title }}</q-item-label>
@@ -135,17 +135,20 @@ export default defineComponent({
 
     // Phase 5: Accessibility - compute active state
     const isActive = computed(() => {
-      return router.currentRoute.value.path.indexOf(props.link) === 0 && props.link !== '/';
+      return (
+        router.currentRoute.value.path.indexOf(props.link) === 0 &&
+        props.link !== "/"
+      );
     });
 
     // Phase 5: Accessibility - compute ARIA label with fallback
     const ariaLabel = computed(() => {
-      let label = props.title || 'Navigation link';
+      let label = props.title || "Navigation link";
       if (props.badge && props.badge > 0) {
         label += ` (${props.badge} notifications)`;
       }
       if (isActive.value) {
-        label += ' - Current page';
+        label += " - Current page";
       }
       return label;
     });
@@ -209,7 +212,7 @@ export default defineComponent({
     background-color: var(--o2-theme-elements);
     color: var(--o2-menu-text-active);
     // Rich, vibrant multi-layer gradient background
-    
+
     // .q-icon {
     //   // Minimal icon glow
     //   filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.4));
@@ -235,8 +238,7 @@ export default defineComponent({
       background: var(--o2-theme-elements);
       border-radius: 0 2px 2px 0;
       // Minimal glow
-      box-shadow:
-        0 0 6px rgba(168, 85, 247, 0.5);
+      box-shadow: 0 0 6px rgba(168, 85, 247, 0.5);
     }
 
     // Subtle animated glow overlay
@@ -247,7 +249,7 @@ export default defineComponent({
       left: 0;
       right: 0;
       bottom: 0;
-      
+
       border-radius: 6px;
       pointer-events: none;
     }
@@ -327,13 +329,16 @@ body.body--light {
 
       :deep(.q-icon),
       :deep(.q-item-label) {
-        color: #374151;
+        color: var(--o2-active-button-text);
       }
     }
 
     &.q-router-link--active {
-      background: linear-gradient(135deg, color-mix(in srgb, var(--o2-theme-elements) 50%, white) 0%, var(--o2-theme-background) 100%) !important;
-      border: 1px solid var(--o2-theme-elements) !important;
+      background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--o2-theme-elements) 80%, white) 100%,
+        var(--o2-theme-background) 100%
+      ) !important;
       box-shadow: 0px 0px 2px var(--o2-theme-background) !important;
       color: var(--o2-theme-elements) !important;
 
@@ -346,7 +351,11 @@ body.body--light {
       }
 
       &::before {
-        background: linear-gradient(180deg, var(--o2-theme-elements) 0%, var(--o2-theme-background) 100%) !important;
+        background: linear-gradient(
+          180deg,
+          var(--o2-theme-elements) 0%,
+          var(--o2-theme-background) 100%
+        ) !important;
         box-shadow: 0 0 8px rgba(37, 99, 235, 0.5) !important;
       }
     }

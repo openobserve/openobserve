@@ -86,7 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="cloud"
             class="warning-msg tw-inline tw-mr-2"
           >
-            <q-icon name="warning" size="xs" class="warning" />Hello Dev{{
+            <q-icon name="warning"
+size="xs" class="warning" />Hello Dev{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -202,14 +203,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               <q-item-section>
                                 <q-item-label
-                                    data-test="organization-menu-item-label-item-label"
-                                    class="tw-overflow-hidden tw-whitespace-nowrap tw-text-ellipsis tw-max-w-[450px]"
+                                  data-test="organization-menu-item-label-item-label"
+                                  class="tw-overflow-hidden tw-whitespace-nowrap tw-text-ellipsis tw-max-w-[450px]"
+                                >
+                                  {{
+                                    props.row.label.length > 30
+                                      ? props.row.label.substring(0, 30) +
+                                        "... | " +
+                                        props.row.identifier
+                                      : props.row.label +
+                                        " | " +
+                                        props.row.identifier
+                                  }}
+                                  <q-tooltip
+                                    v-if="props.row.label.length > 30"
+                                    anchor="bottom middle"
+                                    self="top start"
                                   >
-                                    {{ props.row.label.length > 30 ? props.row.label.substring(0, 30) + '... | ' + props.row.identifier : props.row.label + ' | ' + props.row.identifier }}
-                                    <q-tooltip v-if="props.row.label.length > 30"  anchor="bottom middle" self="top start">
-                                      {{ props.row.label }}
-                                    </q-tooltip>
-                                  </q-item-label>
+                                    {{ props.row.label }}
+                                  </q-tooltip>
+                                </q-item-label>
                               </q-item-section>
                             </q-item>
                           </q-td>
@@ -278,20 +291,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="menu-link-slack-item"
           >
             <div class="row items-center no-wrap">
-              <q-icon
-                ><component :is="slackIcon"
-              /></q-icon>
+              <q-icon><component :is="slackIcon" /></q-icon>
             </div>
             <q-tooltip anchor="top middle" self="bottom middle">
               {{ t("menu.slack") }}
             </q-tooltip>
           </q-btn>
-          <q-btn round flat dense :ripple="false" data-test="menu-link-help-item">
+          <q-btn
+            round
+            flat
+            dense
+            :ripple="false"
+            data-test="menu-link-help-item"
+          >
             <div class="row items-center no-wrap">
-              <q-icon
-                name="help_outline"
-                class="header-icon"
-              ></q-icon>
+              <q-icon name="help_outline" class="header-icon"></q-icon>
               <q-tooltip anchor="top middle" self="bottom middle">
                 {{ t("menu.help") }}
               </q-tooltip>
@@ -351,10 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="router.push({ name: 'settings' })"
           >
             <div class="row items-center no-wrap">
-              <q-icon
-                :name="outlinedSettings"
-                class="header-icon"
-              ></q-icon>
+              <q-icon :name="outlinedSettings" class="header-icon"></q-icon>
             </div>
             <q-tooltip anchor="top middle" self="bottom middle">
               {{ t("menu.settings") }}
@@ -409,7 +420,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-separator />
                 <q-item clickable>
                   <q-item-section avatar>
-                    <q-icon size="xs" name="language" class="padding-none" />
+                    <q-icon size="xs"
+name="language" class="padding-none" />
                   </q-item-section>
                   <q-item-section>
                     <q-item-label class="tw-max-w-[150px]">{{
@@ -479,7 +491,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="signout"
                 >
                   <q-item-section avatar>
-                    <q-icon size="xs" name="exit_to_app" class="padding-none" />
+                    <q-icon size="xs"
+name="exit_to_app" class="padding-none" />
                   </q-item-section>
                   <q-item-section>
                     <q-item-label>{{ t("menu.signOut") }}</q-item-label>
@@ -545,7 +558,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-    <q-dialog v-model="showGetStarted" maximized full-height>
+    <q-dialog v-model="showGetStarted"
+maximized full-height>
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </q-dialog>
   </q-layout>
@@ -727,13 +741,15 @@ export default defineComponent({
 
     const filteredOrganizations = computed(() => {
       //we will return all organizations if searchQuery is empty
-      //else we will search based upon label or identifier that we get from the search query 
+      //else we will search based upon label or identifier that we get from the search query
       //if anyone of the orgs matches either label or identifier then we will return that orgs
       if (!searchQuery.value) return orgOptions.value;
       const toBeSearched = searchQuery.value.toLowerCase().trim();
       return orgOptions.value.filter((org: any) => {
         const labelMatch = org.label?.toLowerCase().includes(toBeSearched);
-        const identifierMatch = org.identifier?.toLowerCase().includes(toBeSearched);
+        const identifierMatch = org.identifier
+          ?.toLowerCase()
+          .includes(toBeSearched);
         return labelMatch || identifierMatch;
       });
     });
@@ -1616,24 +1632,32 @@ export default defineComponent({
       padding: 2px 2px;
       border-radius: 5px;
 
-      &.q-router-link--active {
-        background: linear-gradient(135deg, color-mix(in srgb, var(--o2-theme-elements) 50%, white) 0%, var(--o2-theme-background) 100%) !important;
-        border: 1px solid var(--o2-theme-elements) !important;
-        box-shadow: 0px 0px 2px var(--o2-theme-background) !important;
-        
-        // Light mode: make item text blue
-        body.body--light & {
-          
-          .q-icon {
-            color: var(--o2-menu-icon-active) !important;
-          }
-        }
-      }
-
       &__label {
         font-size: 12px;
         font-weight: 600;
         color: var(--o2-menu-text-active);
+      }
+
+      &.q-router-link--active {
+        background: linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--o2-theme-elements) 80%, white) 100%,
+          var(--o2-theme-background) 100%
+        ) !important;
+        box-shadow: 0px 0px 2px var(--o2-theme-background) !important;
+
+        // Light mode: make item text blue
+        body.body--light & {
+          .q-icon {
+            color: var(--o2-active-button-text) !important;
+          }
+        }
+
+        .q-item__label {
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--o2-active-button-text);
+        }
       }
     }
   }
@@ -1825,7 +1849,11 @@ body.ai-chat-open {
 }
 
 .ai-hover-btn:hover {
-  background: linear-gradient(135deg, var(--o2-theme-elements) 0%, var(--o2-theme-elements) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    var(--o2-theme-elements) 0%,
+    var(--o2-theme-elements) 100%
+  ) !important;
 }
 
 .ai-icon {

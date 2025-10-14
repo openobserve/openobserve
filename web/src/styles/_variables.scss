@@ -236,10 +236,11 @@ $o2-dark-teal-900: #9BDDD6;
 // $o2-theme-elements: #0B2C43;
 
 // $o2-theme-background: #E9F4F4;
-// $o2-theme-elements: #1664A6;
+$o2-theme-elements: #1664a6; // OCHIN
+$o2-active-button-text: #f4f4f4;
 
 $o2-theme-background: #fafbfd;
-$o2-theme-elements: #04c9b7;
+// $o2-theme-elements: #04c9b7;
 $o2-menu-background: #ffffff; 
 $o2-card-background: #ffffff; 
 $o2-hover-background: #d9e2ef;
@@ -250,8 +251,8 @@ $o2-scrollbar-thumb: #EFEFEF;
 $o2-scrollbar-thumb-hover: #DCDCDC;
 $o2-hover-bg: #FCFCFC;
 
-$o2-dark-theme-background: #1c1c1f;
-$o2-dark-theme-elements: #04c9b7;
+$o2-dark-theme-background: #0B162C;
+$o2-dark-theme-elements: #1664a6;
 $o2-dark-menu-background: #252529;  
 $o2-dark-card-background: #2c2c2e;
 $o2-dark-hover-background: #76838f;
@@ -293,6 +294,7 @@ $o2-dark-hover-bg: #F3F4F6;
 
   --o2-theme-background: #{$o2-theme-background};
   --o2-theme-elements: #{$o2-theme-elements};
+  --o2-active-button-text : #{$o2-active-button-text};
 
   --o2-menu-background: #{$o2-menu-background};
   --o2-menu-icon-active: #{$o2-gray-1400};      // Main text color

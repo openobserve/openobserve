@@ -32,7 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         searchObj.meta.logsVisualizeToggle === 'visualize'
       "
     >
-      <q-icon :name="transformIcon" class="toolbar-icon-in-toggle" :class="transformsLabel" />
+      <q-icon
+        :name="transformIcon"
+        class="toolbar-icon-in-toggle"
+        :class="transformsLabel"
+      />
       <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">
         {{ getTransformLabelTooltip }}
       </q-tooltip>
@@ -138,16 +142,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <q-btn
       data-test="logs-search-bar-save-transform-btn"
-      class=" save-transform-btn q-px-sm"
-      icon="save"
-      :disable="searchObj.data.transformType !== 'function' || searchObj.meta.logsVisualizeToggle === 'visualize'"
+      class="save-transform-btn q-px-sm"
+      :icon="outlinedSave"
+      :disable="
+        searchObj.data.transformType !== 'function' ||
+        searchObj.meta.logsVisualizeToggle === 'visualize'
+      "
       @click="fnSavedFunctionDialog"
     >
       <q-tooltip class="tw-text-[12px]" :offset="[0, 6]">
         {{
           searchObj.data.transformType === "action"
             ? t("search.saveActionDisabled")
-            : searchObj.meta.logsVisualizeToggle === 'visualize' ? 'Not supported for visualization' : t("common.save")
+            : searchObj.meta.logsVisualizeToggle === "visualize"
+              ? "Not supported for visualization"
+              : t("common.save")
         }}
       </q-tooltip>
     </q-btn>
@@ -162,6 +171,7 @@ import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import { outlinedSave } from "@quasar/extras/material-icons-outlined";
 
 const props = defineProps<{
   functionOptions: { name: string; function: string }[];
@@ -248,7 +258,8 @@ const transformsLabel = computed(() => {
     return searchObj.data.selectedTransform.name;
   }
 
-  if (searchObj.meta.logsVisualizeToggle === 'visualize') return "Function selection is not supported for visualization";
+  if (searchObj.meta.logsVisualizeToggle === "visualize")
+    return "Function selection is not supported for visualization";
 
   if (!isActionsEnabled.value) return "Function";
 
@@ -262,7 +273,7 @@ const transformsLabel = computed(() => {
 const transformIcon = computed(() => {
   if (!isActionsEnabled.value)
     return "img:" + getImageURL("images/common/function.svg");
-  
+
   if (searchObj.data.transformType === "function")
     return "img:" + getImageURL("images/common/function.svg");
 
@@ -318,9 +329,9 @@ const fnSavedFunctionDialog = () => {
 };
 
 const getTransformLabelTooltip = computed(() => {
-
   // function selection is not supported for visualization
-  if (searchObj.meta.logsVisualizeToggle === 'visualize') return "Function selection is not supported for visualization";
+  if (searchObj.meta.logsVisualizeToggle === "visualize")
+    return "Function selection is not supported for visualization";
 
   if (!isActionsEnabled.value) return "Toggle Function Editor";
 
@@ -335,5 +346,12 @@ const getTransformLabelTooltip = computed(() => {
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/logs/transform-selector.scss';
+@import "@/styles/logs/transform-selector.scss";
+</style>
+<style lang="scss">
+.save-transform-btn {
+  .q-btn__content {
+    padding-left: 0 !important;
+  }
+}
 </style>

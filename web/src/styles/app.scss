@@ -128,12 +128,12 @@ body {
 }
 
 .o2-primary-button-light {
-  background-color: color-mix(in srgb, var(--o2-theme-elements) 90%, white) !important;
+  background-color: color-mix(in srgb, var(--o2-theme-elements) 100%, white) !important;
   color: white;
 }
 
 .bg-primary {
-  background-color: color-mix(in srgb, var(--o2-theme-elements) 70%, white) !important;
+  background-color: color-mix(in srgb, var(--o2-theme-elements) 80%, white) !important;
   color: black;
 }
 
@@ -141,12 +141,12 @@ body {
   border: 0.0625rem solid var(--o2-border-color);
   border-radius: 0.375rem;
   .q-btn.selected {
-    background-color: color-mix(in srgb, var(--o2-theme-elements) 70%, white);
-    color: var(--o2-selected-button-text);
+    background-color: color-mix(in srgb, var(--o2-theme-elements) 80%, white);
+    color: var(--o2-active-button-text);
   }
 
   .q-btn {
-    color: var(--o2-selected-button-text);
+    color: var(--o2-active-button-text);
   }
 
   &:hover {
@@ -914,7 +914,7 @@ body {
 }
 //TODO o2: after getting the dark theme work on it
 .o2-primary-button-dark{
-  background-color: #575FC5 !important;
+  background-color: var(--o2-theme-elements) !important;
   color: #ffffff !important;
   border: 0.0625rem solid #575FC5 !important;
   &:hover{
