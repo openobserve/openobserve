@@ -6,7 +6,7 @@ import PageManager from '../../pages/page-manager.js';
 // (unused CommonActions import removed)
 const testLogger = require('../utils/test-logger.js');
 
-test.describe.configure({ mode: "parallel" });
+test.describe.configure({ mode: "serial" });
 const streamName = `stream${Date.now()}`;
 
 async function login(page) {
@@ -87,7 +87,7 @@ test.describe("Unflattened testcases", () => {
     const search = page.waitForResponse(logData.applyQuery);
     // Strategic 1000ms wait for complex operation completion - this is functionally necessary
   await page.waitForTimeout(1000);
-    await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
+    await pageManager.unflattenedPage.logsSearchBarRefreshButton.click({
       force: true,
     });
     // get the data from the search variable
@@ -138,43 +138,48 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Stream details sidebar opened');
 
     testLogger.info('Switching to Configuration tab');
-    await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
-    await page.getByRole('tab', { name: 'Configuration' }).click();
-
-    testLogger.info('Toggling Store Original Data setting');
-    await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor();
-    await pageManager.unflattenedPage.storeOriginalDataToggle.click();
-
-    testLogger.info('Updating schema with new settings');
-    await pageManager.unflattenedPage.schemaUpdateButton.waitFor();
-    await pageManager.unflattenedPage.schemaUpdateButton.click();
-
-    testLogger.info('Schema update initiated, waiting for completion');
+    await pageManager.unflattenedPage.configurationTab.waitFor({ state: "visible", timeout: 5000 });
+    await pageManager.unflattenedPage.configurationTab.click();
+    testLogger.info('Configuration tab clicked, waiting for content to load');
     await page.waitForTimeout(1000);
 
-    testLogger.info('Starting data ingestion with updated schema');
-    await ingestion(page);
-    testLogger.info('Data ingestion completed, waiting 3s for indexing');
-    await page.waitForTimeout(3000);
-
-    testLogger.info('Closing stream dialog and navigating to logs explorer');
-    await pageManager.unflattenedPage.closeButton.waitFor();
-    await pageManager.unflattenedPage.closeButton.click();
-
-    testLogger.info('Clicking Explore button to view logs');
-    await pageManager.unflattenedPage.exploreButton.waitFor();
-    await pageManager.unflattenedPage.exploreButton.click();
+    testLogger.info('Waiting for Store Original Data toggle to be visible');
+    await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor({ state: "visible", timeout: 5000 });
+    testLogger.info('Clicking Store Original Data toggle');
+    await pageManager.unflattenedPage.storeOriginalDataToggle.click();
+    testLogger.info('Toggle clicked');
     await page.waitForTimeout(500);
 
-    testLogger.info('Opening date/time picker');
-    await pageManager.unflattenedPage.dateTimeButton.waitFor();
-    await pageManager.unflattenedPage.dateTimeButton.click();
+    testLogger.info('Waiting for Update Settings button to be visible');
+    await pageManager.unflattenedPage.schemaUpdateButton.waitFor({ state: "visible", timeout: 5000 });
+    testLogger.info('Clicking Update Settings button');
+    await pageManager.unflattenedPage.schemaUpdateButton.click();
+    testLogger.info('Update Settings button clicked');
 
-    testLogger.info('Selecting relative time range');
-    await pageManager.unflattenedPage.relativeTab.waitFor();
-    await pageManager.unflattenedPage.relativeTab.click();
+    testLogger.info('Waiting for Stream settings updated snackbar');
+    await expect(pageManager.unflattenedPage.streamSettingsUpdatedSnackbar).toBeVisible({ timeout: 10000 });
+    testLogger.info('Stream settings successfully updated - snackbar confirmed');
     await page.waitForTimeout(1000);
-    testLogger.info('Time range selected, waiting for results to load');
+
+    testLogger.info('Closing stream details dialog');
+    await pageManager.unflattenedPage.closeButton.waitFor();
+    await pageManager.unflattenedPage.closeButton.click();
+    testLogger.info('Stream details dialog closed');
+    await page.waitForTimeout(500);
+
+    testLogger.info('Re-ingesting data with updated schema (Store Original Data ON)');
+    await ingestion(page);
+    testLogger.info('Data ingestion completed, waiting 5s for indexing with _o2_id field');
+    await page.waitForTimeout(5000);
+
+    testLogger.info('Navigating to logs page to verify _o2_id field');
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.waitForTimeout(1000);
+
+    testLogger.info('Selecting e2e_automate stream in logs');
+    await pageManager.logsPage.selectStream("e2e_automate");
+    await applyQueryButton(page);
+    testLogger.info('Search query applied, logs should now contain _o2_id field');
 
     testLogger.info('Expanding first log row');
     await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
@@ -203,7 +208,50 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Closing log detail dialog');
     await pageManager.unflattenedPage.closeDialog.waitFor();
     await pageManager.unflattenedPage.closeDialog.click();
-    testLogger.info('Test completed successfully');
+
+    // Cleanup: Toggle Store Original Data back OFF
+    testLogger.info('Cleanup: Toggling Store Original Data back OFF');
+    testLogger.info('Navigating to Streams menu');
+    await pageManager.unflattenedPage.streamsMenu.waitFor();
+    await pageManager.unflattenedPage.streamsMenu.click();
+
+    testLogger.info('Searching for stream: e2e_automate');
+    await pageManager.unflattenedPage.searchStreamInput.waitFor();
+    await pageManager.unflattenedPage.searchStreamInput.click();
+    await pageManager.unflattenedPage.searchStreamInput.fill("e2e_automate");
+    await page.waitForTimeout(500);
+
+    testLogger.info('Opening stream detail dialog');
+    await pageManager.unflattenedPage.streamDetailButton.waitFor();
+    await pageManager.unflattenedPage.streamDetailButton.click();
+
+    await page.waitForTimeout(2000);
+    testLogger.info('Stream details sidebar opened');
+
+    testLogger.info('Switching to Configuration tab');
+    await pageManager.unflattenedPage.configurationTab.waitFor({ state: "visible", timeout: 5000 });
+    await pageManager.unflattenedPage.configurationTab.click();
+    testLogger.info('Configuration tab clicked, waiting for content to load');
+    await page.waitForTimeout(1000);
+
+    testLogger.info('Waiting for Store Original Data toggle to be visible');
+    await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor({ state: "visible", timeout: 5000 });
+    testLogger.info('Clicking Store Original Data toggle to turn OFF');
+    await pageManager.unflattenedPage.storeOriginalDataToggle.click();
+    testLogger.info('Toggle clicked (turned OFF)');
+    await page.waitForTimeout(500);
+
+    testLogger.info('Waiting for Update Settings button to be visible');
+    await pageManager.unflattenedPage.schemaUpdateButton.waitFor({ state: "visible", timeout: 5000 });
+    testLogger.info('Clicking Update Settings button');
+    await pageManager.unflattenedPage.schemaUpdateButton.click();
+    testLogger.info('Update Settings button clicked');
+
+    testLogger.info('Waiting for Stream settings updated snackbar');
+    await expect(pageManager.unflattenedPage.streamSettingsUpdatedSnackbar).toBeVisible({ timeout: 10000 });
+    testLogger.info('Stream settings successfully updated - Store Original Data now OFF');
+
+    testLogger.info('Test completed successfully with cleanup');
   });
 
 
@@ -229,45 +277,53 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Stream details sidebar opened');
 
     testLogger.info('Switching to Configuration tab');
-    await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
-    await page.getByRole('tab', { name: 'Configuration' }).click();
+    await pageManager.unflattenedPage.configurationTab.waitFor({ state: "visible", timeout: 5000 });
+    await pageManager.unflattenedPage.configurationTab.click();
+    testLogger.info('Configuration tab clicked, waiting for content to load');
+    await page.waitForTimeout(1000);
 
-    testLogger.info('Toggling Store Original Data setting');
-    await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor();
+    testLogger.info('Waiting for Store Original Data toggle to be visible');
+    await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor({ state: "visible", timeout: 5000 });
+    testLogger.info('Clicking Store Original Data toggle');
     await pageManager.unflattenedPage.storeOriginalDataToggle.click();
-
-    testLogger.info('Updating schema with new settings');
-    await pageManager.unflattenedPage.schemaUpdateButton.waitFor();
-    await pageManager.unflattenedPage.schemaUpdateButton.click();
-
+    testLogger.info('Toggle clicked');
     await page.waitForTimeout(500);
-    testLogger.info('Starting data ingestion with updated schema');
-    await ingestion(page);
-    testLogger.info('Data ingestion completed, waiting 3s for indexing');
-    await page.waitForTimeout(3000);
 
-    testLogger.info('Closing stream dialog and navigating to logs explorer');
+    testLogger.info('Waiting for Update Settings button to be visible');
+    await pageManager.unflattenedPage.schemaUpdateButton.waitFor({ state: "visible", timeout: 5000 });
+    testLogger.info('Clicking Update Settings button');
+    await pageManager.unflattenedPage.schemaUpdateButton.click();
+    testLogger.info('Update Settings button clicked');
+
+    testLogger.info('Waiting for Stream settings updated snackbar');
+    await expect(pageManager.unflattenedPage.streamSettingsUpdatedSnackbar).toBeVisible({ timeout: 10000 });
+    testLogger.info('Stream settings successfully updated - snackbar confirmed');
+    await page.waitForTimeout(1000);
+
+    testLogger.info('Closing stream details dialog');
     await pageManager.unflattenedPage.closeButton.waitFor();
     await pageManager.unflattenedPage.closeButton.click();
-
-    testLogger.info('Clicking Explore button to view logs');
-    await pageManager.unflattenedPage.exploreButton.waitFor();
-    await pageManager.unflattenedPage.exploreButton.click();
+    testLogger.info('Stream details dialog closed');
     await page.waitForTimeout(500);
+
+    testLogger.info('Re-ingesting data with updated schema (Store Original Data ON)');
+    await ingestion(page);
+    testLogger.info('Data ingestion completed, waiting 5s for indexing with _o2_id field');
+    await page.waitForTimeout(5000);
+
+    testLogger.info('Navigating to logs page to verify _o2_id field');
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.waitForTimeout(1000);
+
+    testLogger.info('Selecting e2e_automate stream in logs');
+    await pageManager.logsPage.selectStream("e2e_automate");
 
     testLogger.info('Toggling Quick Mode if needed');
     await toggleQuickModeIfOff(page);
     await page.waitForTimeout(500);
 
-    testLogger.info('Opening date/time picker');
-    await pageManager.unflattenedPage.dateTimeButton.waitFor();
-    await pageManager.unflattenedPage.dateTimeButton.click();
-
-    testLogger.info('Selecting relative time range');
-    await pageManager.unflattenedPage.relativeTab.waitFor();
-    await pageManager.unflattenedPage.relativeTab.click();
-    await page.waitForTimeout(1000);
-    testLogger.info('Time range selected, waiting for results to load');
+    await applyQueryButton(page);
+    testLogger.info('Search query applied, logs should now contain _o2_id field');
 
     testLogger.info('Opening all fields panel');
     await pageManager.unflattenedPage.allFieldsButton.waitFor();
@@ -308,7 +364,7 @@ test.describe("Unflattened testcases", () => {
 
     testLogger.info('Executing SELECT * query to fetch fresh data with _o2_id');
     await page.waitForTimeout(500);
-    await page.locator("[data-test='logs-search-bar-refresh-btn']").click();
+    await pageManager.unflattenedPage.logsSearchBarRefreshButton.click();
     testLogger.info('Query executed, waiting for results to load');
     await page.waitForTimeout(2000);
 
@@ -324,8 +380,7 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Waiting for _o2_id field to appear in log details');
     try {
       // Check if any fields are visible first
-      const jsonContent = page.locator('[data-test="log-detail-json-content"]');
-      await jsonContent.waitFor({ timeout: 5000 });
+      await pageManager.unflattenedPage.logDetailJsonContent.waitFor({ timeout: 5000 });
       testLogger.info('Log detail JSON content is visible');
 
       await pageManager.unflattenedPage.o2IdText.waitFor({ timeout: 30000 });
@@ -336,7 +391,7 @@ test.describe("Unflattened testcases", () => {
 
       // Log what fields are actually present
       try {
-        const allKeys = await page.locator('[data-test="log-detail-json-content"] [data-test^="log-expand-detail-key-"]').allTextContents();
+        const allKeys = await pageManager.unflattenedPage.allLogDetailKeys.allTextContents();
         testLogger.error('Available fields in log detail', { fields: allKeys });
       } catch (e) {
         testLogger.error('Could not retrieve available fields');
@@ -415,8 +470,8 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.logTableRowExpandMenu.click();
     await page.waitForTimeout(500);
 
-    await page.getByText("arrow_drop_down_timestamp:").waitFor();
-    await page.getByText("arrow_drop_down_timestamp:").click();
+    await pageManager.unflattenedPage.timestampDropdown.waitFor();
+    await pageManager.unflattenedPage.timestampDropdown.click();
     testLogger.info('Test completed successfully');
 });
 
