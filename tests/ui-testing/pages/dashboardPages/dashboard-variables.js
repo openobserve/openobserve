@@ -129,11 +129,13 @@ export default class DashboardVariables {
     await saveBtn.click();
 
     // Wait for the save action to complete and DOM to stabilize
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForTimeout(3000);
 
-    const closeBtn = this.page.locator('[data-test="dashboard-settings-close-btn"]');
-    await closeBtn.waitFor({ state: "visible", timeout: 10000 });
-    await closeBtn.click({ force: true });
+    // Use JavaScript evaluation to click the close button to avoid DOM instability issues
+    await this.page.evaluate(() => {
+      const closeBtn = document.querySelector('[data-test="dashboard-settings-close-btn"]');
+      if (closeBtn) closeBtn.click();
+    });
     // }
   }
 

@@ -33,6 +33,8 @@ test.describe("dashboard streaming testcases", () => {
     page.on("response", async (response) => {
       const url = response.url();
       if (url.includes("/_values_stream")) {
+        console.log(`[VALUES API HIT ${valuesResponses.length + 1}] Status: ${response.status()}`);
+        console.log(`URL: ${url}`);
         valuesResponses.push({
           url,
           status: response.status(),
@@ -108,6 +110,10 @@ test.describe("dashboard streaming testcases", () => {
     // Wait for any remaining network activity to settle
     await page.waitForLoadState("networkidle");
 
+    console.log(`\n========================================`);
+    console.log(`[TEST 1] TOTAL VALUES API CALLS: ${valuesResponses.length}`);
+    console.log(`========================================\n`);
+
     expect(valuesResponses.length).toBeGreaterThan(0);
 
     for (const res of valuesResponses) {
@@ -122,6 +128,7 @@ test.describe("dashboard streaming testcases", () => {
         res.url.includes("streaming") ||
         res.url.includes("sql=")
     );
+    console.log(`[TEST 1] Streaming-aware API calls: ${streamingAwareCalls.length}`);
     expect(streamingAwareCalls.length).toBeGreaterThan(0);
 
     await pm.chartTypeSelector.searchAndAddField(
@@ -153,7 +160,25 @@ test.describe("dashboard streaming testcases", () => {
   test("should add dashboard variable with filter configuration", async ({
     page,
   }) => {
+    const valuesResponses = [];
+
+    page.on("response", async (response) => {
+      const url = response.url();
+      if (url.includes("/_values_stream")) {
+        console.log(`[VALUES API HIT ${valuesResponses.length + 1}] Status: ${response.status()}`);
+        console.log(`URL: ${url}`);
+        valuesResponses.push({
+          url,
+          status: response.status(),
+          hasStreaming: url.includes("_values_stream"),
+        });
+      }
+    });
+
     const pm = new PageManager(page);
+
+    // Enable streaming mode by setting use_streaming=true
+    await pm.managementPage.setStreamingState(true);
 
     const panelName = pm.dashboardPanelActions.generateUniquePanelName(
       "panel-filter-test"
@@ -255,6 +280,31 @@ test.describe("dashboard streaming testcases", () => {
     );
     
     await page.waitForTimeout(4000);
+
+
+    // Wait for any remaining network activity to settle
+    await page.waitForLoadState("networkidle");
+
+    console.log(`\n========================================`);
+    console.log(`[TEST 2] TOTAL VALUES API CALLS: ${valuesResponses.length}`);
+    console.log(`========================================\n`);
+
+    expect(valuesResponses.length).toBeGreaterThan(0);
+
+    for (const res of valuesResponses) {
+      expect(res.status).toBe(200);
+    }
+
+    // Verify that streaming parameters are present in API calls
+    const streamingAwareCalls = valuesResponses.filter(
+      (res) =>
+        res.url.includes("_values_stream") ||
+        res.url.includes("use_streaming") ||
+        res.url.includes("streaming") ||
+        res.url.includes("sql=")
+    );
+    console.log(`[TEST 2] Streaming-aware API calls: ${streamingAwareCalls.length}`);
+    expect(streamingAwareCalls.length).toBeGreaterThan(0);
 
   await pm.dashboardCreate.backToDashboardList();
     await pm.dashboardCreate.searchDashboard(
