@@ -188,10 +188,28 @@ async fn main() -> Result<(), anyhow::Error> {
         })?;
         None
     } else if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+        log::info!("OpenTelemetry tracing enabled - initializing tracer provider");
         tracer_provider = Some(enable_tracing()?);
+        log::info!("Tracer provider initialized successfully");
         None
     } else {
-        Some(setup_logs())
+        // Check if AI tracing is enabled independently
+        #[cfg(feature = "enterprise")]
+        {
+            use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+            let o2_cfg = get_o2_config();
+
+            if o2_cfg.ai.traces_enabled {
+                tracer_provider = Some(enable_tracing()?);
+                None
+            } else {
+                Some(setup_logs())
+            }
+        }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            Some(setup_logs())
+        }
     };
 
     log::info!("Starting OpenObserve {}", config::VERSION);
@@ -964,12 +982,71 @@ pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
     guard
 }
 
+/// Custom span processor that filters spans based on their name prefix
+#[cfg(feature = "enterprise")]
+#[derive(Debug)]
+struct FilteringSpanProcessor<P> {
+    inner: P,
+    prefix_filter: Option<String>,
+}
+
+#[cfg(feature = "enterprise")]
+impl<P> FilteringSpanProcessor<P> {
+    fn new(inner: P, prefix_filter: Option<String>) -> Self {
+        Self {
+            inner,
+            prefix_filter,
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+impl<P: opentelemetry_sdk::trace::SpanProcessor> opentelemetry_sdk::trace::SpanProcessor
+    for FilteringSpanProcessor<P>
+{
+    fn on_start(&self, span: &mut opentelemetry_sdk::trace::Span, cx: &opentelemetry::Context) {
+        // Always call inner on_start - we can only filter on_end when we have the full span data
+        self.inner.on_start(span, cx);
+    }
+
+    fn on_end(&self, span: opentelemetry_sdk::trace::SpanData) {
+        // If no filter is set, pass through all spans
+        if let Some(prefix) = &self.prefix_filter {
+            let span_name = span.name.as_ref();
+            // Only process spans that match the prefix
+            if !span_name.starts_with(prefix) {
+                return;
+            }
+        }
+        self.inner.on_end(span);
+    }
+
+    fn force_flush(&self) -> Result<(), opentelemetry_sdk::error::OTelSdkError> {
+        self.inner.force_flush()
+    }
+
+    fn shutdown(&self) -> Result<(), opentelemetry_sdk::error::OTelSdkError> {
+        self.inner.shutdown()
+    }
+
+    fn shutdown_with_timeout(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<(), opentelemetry_sdk::error::OTelSdkError> {
+        self.inner.shutdown_with_timeout(timeout)
+    }
+}
+
 fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyhow::Error> {
     let cfg = get_config();
     opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
-    let tracer = opentelemetry_sdk::trace::SdkTracerProvider::builder();
-    let tracer = if cfg.common.otel_otlp_grpc_url.is_empty() {
-        tracer.with_span_processor(
+
+    let mut tracer_builder = opentelemetry_sdk::trace::SdkTracerProvider::builder();
+
+    // Add main OpenObserve OTLP exporter (if general tracing is enabled)
+    if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+        tracer_builder = if cfg.common.otel_otlp_grpc_url.is_empty() {
+            tracer_builder.with_span_processor(
             opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
                 {
                     let mut headers = HashMap::new();
@@ -996,8 +1073,8 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
             )
             .build(),
         )
-    } else {
-        tracer.with_span_processor(
+        } else {
+            tracer_builder.with_span_processor(
             opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
                 {
                     let mut metadata = MetadataMap::new();
@@ -1025,10 +1102,152 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
             )
             .build(),
         )
-    };
+        };
+        log::info!("Main OpenObserve OTLP exporter configured");
+    }
+
+    // Handle AI tracing (enterprise feature)
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+        let o2_cfg = get_o2_config();
+
+        // If AI tracing is enabled but general tracing is NOT enabled,
+        // we need to add OpenObserve OTLP exporter for AI traces
+        if o2_cfg.ai.traces_enabled
+            && !cfg.common.tracing_enabled
+            && !cfg.common.tracing_search_enabled
+        {
+            log::info!("AI tracing enabled independently - configuring OpenObserve OTLP exporter");
+
+            // Add OpenObserve exporter for AI traces
+            if !cfg.common.otel_otlp_url.is_empty() {
+                let mut headers = HashMap::new();
+                headers.insert(
+                    cfg.common.tracing_header_key.clone(),
+                    cfg.common.tracing_header_value.clone(),
+                );
+
+                let oo_exporter = opentelemetry_otlp::SpanExporter::builder()
+                    .with_http()
+                    .with_http_client(
+                        reqwest::Client::builder()
+                            .danger_accept_invalid_certs(true)
+                            .timeout(Duration::from_secs(10))
+                            .connect_timeout(Duration::from_secs(5))
+                            .pool_idle_timeout(Duration::from_secs(60))
+                            .pool_max_idle_per_host(10)
+                            .build()?,
+                    )
+                    .with_endpoint(&cfg.common.otel_otlp_url)
+                    .with_headers(headers)
+                    .build()?;
+
+                let oo_processor = opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
+                    oo_exporter,
+                    opentelemetry_sdk::runtime::Tokio,
+                )
+                .build();
+
+                // Wrap with filtering processor to only send AI traces
+                let filtered_processor = FilteringSpanProcessor::new(
+                    oo_processor,
+                    Some("ai.".to_string()), // Only send spans starting with "ai."
+                );
+
+                tracer_builder = tracer_builder.with_span_processor(filtered_processor);
+                log::info!(
+                    "AI traces (ai.* spans only) will be sent to OpenObserve: {}",
+                    cfg.common.otel_otlp_url
+                );
+            } else if !cfg.common.otel_otlp_grpc_url.is_empty() {
+                let mut metadata = MetadataMap::new();
+                metadata.insert(
+                    MetadataKey::from_str(&cfg.common.tracing_header_key).unwrap(),
+                    MetadataValue::from_str(&cfg.common.tracing_header_value).unwrap(),
+                );
+
+                let oo_exporter = opentelemetry_otlp::SpanExporter::builder()
+                    .with_tonic()
+                    .with_endpoint(&cfg.common.otel_otlp_grpc_url)
+                    .with_metadata(metadata)
+                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                    .build()?;
+
+                let oo_processor = opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
+                    oo_exporter,
+                    opentelemetry_sdk::runtime::Tokio,
+                )
+                .build();
+
+                // Wrap with filtering processor to only send AI traces
+                let filtered_processor = FilteringSpanProcessor::new(
+                    oo_processor,
+                    Some("ai.".to_string()), // Only send spans starting with "ai."
+                );
+
+                tracer_builder = tracer_builder.with_span_processor(filtered_processor);
+                log::info!(
+                    "AI traces (ai.* spans only) will be sent to OpenObserve (gRPC): {}",
+                    cfg.common.otel_otlp_grpc_url
+                );
+            } else {
+                log::warn!(
+                    "AI tracing enabled but ZO_OTEL_OTLP_URL not configured - AI traces will not be exported"
+                );
+            }
+        }
+
+        // Additionally, if O2_AI_EVAL_OTLP_ENDPOINT is set, send AI traces to evaluation platform
+        // too
+        let eval_endpoint = std::env::var("O2_AI_EVAL_OTLP_ENDPOINT")
+            .ok()
+            .or_else(|| o2_cfg.ai.eval_otlp_endpoint.clone())
+            .filter(|s| !s.is_empty());
+
+        if let Some(endpoint) = eval_endpoint {
+            log::info!(
+                "Configuring additional AI evaluation OTLP exporter to: {}",
+                endpoint
+            );
+
+            let eval_exporter = opentelemetry_otlp::SpanExporter::builder()
+                .with_tonic()
+                .with_endpoint(endpoint)
+                .with_timeout(std::time::Duration::from_secs(10))
+                .build()?;
+
+            let eval_processor = opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
+                eval_exporter,
+                opentelemetry_sdk::runtime::Tokio,
+            )
+            .build();
+
+            // Wrap with filtering processor to only send AI traces
+            let filtered_eval_processor =
+                FilteringSpanProcessor::new(eval_processor, Some("ai.".to_string()));
+
+            tracer_builder = tracer_builder.with_span_processor(filtered_eval_processor);
+            log::info!(
+                "AI evaluation OTLP exporter configured - AI traces (ai.* spans only) will be sent to evaluation platform"
+            );
+        }
+    }
+
+    // Add UUID v7 ID generator and resource attributes
+    tracer_builder = tracer_builder.with_id_generator({
+        #[cfg(feature = "enterprise")]
+        {
+            o2_enterprise::enterprise::ai::tracing::UuidV7IdGenerator
+        }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            opentelemetry_sdk::trace::RandomIdGenerator::default()
+        }
+    });
 
     // Store the tracer provider before installing batch processor
-    let tracer = tracer.with_resource(
+    let tracer = tracer_builder.with_resource(
         Resource::builder()
             .with_attributes(vec![
                 KeyValue::new("service.name", cfg.common.node_role.to_string()),
@@ -1254,16 +1473,10 @@ mod tests {
         // 2. Missing configuration
         // 3. Network issues
         // We're testing that it doesn't panic unexpectedly beyond expected tracing setup issues
-        if result.is_err() {
-            // If there was a panic, it's likely the expected "global subscriber already set" error
-            // This is acceptable in test environments when tests run in parallel
-            println!(
-                "enable_tracing() panicked (expected in test environment when tests run in parallel)"
-            );
-        }
         // Don't assert result.is_ok() because parallel tests will fail due to global subscriber
-        // conflicts The important thing is that we can call the function without unexpected
-        // panics
+        // conflicts (expected in test environment when tests run in parallel)
+        // The important thing is that we can call the function without unexpected panics
+        let _ = result;
     }
 
     #[cfg(feature = "enterprise")]
