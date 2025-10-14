@@ -1221,10 +1221,8 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
             .build();
 
             // Wrap with filtering processor to only send AI traces
-            let filtered_eval_processor = FilteringSpanProcessor::new(
-                eval_processor,
-                Some("ai.".to_string()),
-            );
+            let filtered_eval_processor =
+                FilteringSpanProcessor::new(eval_processor, Some("ai.".to_string()));
 
             tracer_builder = tracer_builder.with_span_processor(filtered_eval_processor);
             log::info!(
