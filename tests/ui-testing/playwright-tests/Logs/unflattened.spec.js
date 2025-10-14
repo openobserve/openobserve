@@ -132,7 +132,10 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Opening stream detail dialog');
     await pageManager.unflattenedPage.streamDetailButton.waitFor();
     await pageManager.unflattenedPage.streamDetailButton.click();
-    await page.waitForTimeout(500);
+
+    // Wait for stream details sidebar to fully open and load
+    await page.waitForTimeout(2000);
+    testLogger.info('Stream details sidebar opened');
 
     testLogger.info('Switching to Configuration tab');
     await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
@@ -151,8 +154,8 @@ test.describe("Unflattened testcases", () => {
 
     testLogger.info('Starting data ingestion with updated schema');
     await ingestion(page);
-    testLogger.info('Data ingestion completed, waiting 5s for indexing');
-    await page.waitForTimeout(5000);
+    testLogger.info('Data ingestion completed, waiting 3s for indexing');
+    await page.waitForTimeout(3000);
 
     testLogger.info('Closing stream dialog and navigating to logs explorer');
     await pageManager.unflattenedPage.closeButton.waitFor();
@@ -220,7 +223,10 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Opening stream detail dialog');
     await pageManager.unflattenedPage.streamDetailButton.waitFor();
     await pageManager.unflattenedPage.streamDetailButton.click();
-    await page.waitForTimeout(500);
+
+    // Wait for stream details sidebar to fully open and load
+    await page.waitForTimeout(2000);
+    testLogger.info('Stream details sidebar opened');
 
     testLogger.info('Switching to Configuration tab');
     await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
@@ -237,8 +243,8 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
     testLogger.info('Starting data ingestion with updated schema');
     await ingestion(page);
-    testLogger.info('Data ingestion completed, waiting 5s for indexing');
-    await page.waitForTimeout(5000);
+    testLogger.info('Data ingestion completed, waiting 3s for indexing');
+    await page.waitForTimeout(3000);
 
     testLogger.info('Closing stream dialog and navigating to logs explorer');
     await pageManager.unflattenedPage.closeButton.waitFor();
@@ -304,7 +310,7 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
     await page.locator("[data-test='logs-search-bar-refresh-btn']").click();
     testLogger.info('Query executed, waiting for results to load');
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(2000);
 
     testLogger.info('Expanding first log row from SELECT * results');
     await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
@@ -363,7 +369,10 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Opening stream detail dialog');
     await pageManager.unflattenedPage.streamDetailButton.waitFor();
     await pageManager.unflattenedPage.streamDetailButton.click();
-    await page.waitForTimeout(500);
+
+    // Wait for stream details sidebar to fully open and load
+    await page.waitForTimeout(2000);
+    testLogger.info('Stream details sidebar opened');
 
     testLogger.info('Switching to Configuration tab');
     await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
@@ -384,8 +393,8 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
     testLogger.info('Ingesting data with Store Original Data OFF');
     await ingestion(page);
-    testLogger.info('Data ingestion completed, waiting 5s for indexing');
-    await page.waitForTimeout(5000);
+    testLogger.info('Data ingestion completed, waiting 3s for indexing');
+    await page.waitForTimeout(3000);
 
     testLogger.info('Navigating to logs explorer');
     await pageManager.unflattenedPage.exploreButton.waitFor();
