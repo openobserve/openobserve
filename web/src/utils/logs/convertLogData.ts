@@ -101,7 +101,10 @@ export const convertLogData = (
         type: "bar",
         emphasis: { focus: "series" },
         itemStyle: {
-          color: "#7A80C2",
+          color: "rgba(4, 201, 183, 1)",
+          // shadowBlur: 10,
+          // shadowOffsetX: 0,
+          // shadowOffsetY: 4,
         },
       },
     ],

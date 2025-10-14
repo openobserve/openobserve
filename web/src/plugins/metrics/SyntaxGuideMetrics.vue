@@ -154,9 +154,6 @@ export default defineComponent({
   font-size: 14px;
   line-height: 23px;
 }
-.q-btn:before {
-  border: 0px solid #d5d5d5;
-}
 
 .syntax-guide-button {
   cursor: pointer;

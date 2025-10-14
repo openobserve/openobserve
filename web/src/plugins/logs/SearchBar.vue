@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
           dense
           icon="restart_alt"
-          class="toolbar-reset-btn"
+          class="toolbar-btn"
           @click="resetFilters"
         >
           <q-tooltip>
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!store.state.isAiChatEnabled"
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
-          class="syntax-guide-in-toolbar"
+          class="toolbar-btn"
         >
         </syntax-guide>
         <q-btn-group class="q-ml-xs no-outline q-pa-none no-border">
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="fnSavedView"
             @show="loadSavedView"
             split
-            class="no-outline saved-views-dropdown no-border"
+            class="no-outline toolbar-btn-group no-border"
           >
             <q-list
               :style="
@@ -614,7 +614,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-btn
           data-test="logs-search-bar-share-link-btn"
-          class="q-mr-xs download-logs-btn q-px-sm"
+          class="q-mr-xs toolbar-btn"
           size="sm"
           icon="share"
           @click="shareLink.execute()"
@@ -627,7 +627,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-btn
           data-test="logs-search-bar-more-options-btn"
-          class="q-mr-xs download-logs-btn q-px-sm"
+          class="q-mr-xs toolbar-btn"
           icon="menu"
         >
           <q-menu>
@@ -4250,27 +4250,6 @@ export default defineComponent({
   color: var(--o2-text-secondary);
 }
 
-// Toolbar Icon and Toggle Styles
-.toolbar-toggle-container {
-  padding: 0 0.175rem; // 0 ~2.8px
-  margin-left: 0.25rem; // 8px
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0.0625rem solid rgba(0, 0, 0, 0.12); // 1px
-  border-radius: 0.375rem; // 6px
-  transition: all 0.2s ease;
-  cursor: pointer;
-
-  &:hover {
-    background-color: var(--o2-hover-accent);
-  }
-}
-
-.dark-theme .toolbar-toggle-container {
-  border: 0.0625rem solid rgb(196, 196, 196);
-}
-
 .toolbar-icon {
   width: 1rem; // 16px
   height: 1rem; // 16px
@@ -4307,13 +4286,10 @@ export default defineComponent({
   border-radius: 0.375rem; // 6px
   transition: all 0.2s ease;
   min-height: 1.875rem; // 30px
+  background: transparent;
 
   .q-icon {
     font-size: 1.215rem; // 16px
-  }
-
-  &:hover {
-    background-color: var(--o2-hover-accent);
   }
 
   &.theme-dark {

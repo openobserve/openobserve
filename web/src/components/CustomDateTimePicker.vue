@@ -255,7 +255,7 @@ const computedClass = computed(() => {
   padding: 0px 5px;
   font-size: 12px;
   min-width: auto;
-  background: rgba(89, 96, 178, 0.2) !important;
+  background: transparent !important;
 
   .q-icon.on-right {
     transition: transform 0.25s ease;

@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div class="row query-editor-container">
-      <div class="col" style="border-top: 1px solid #dbdbdb; height: 100px">
+      <div class="col" style="height: 100px">
         <b>Query Editor:</b>
         <code-query-editor
           editor-id="logsStreamQueryEditor"

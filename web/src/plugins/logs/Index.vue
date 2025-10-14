@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" color="primary" size="md" /> Select a
+                      <q-icon name="info" /> Select a
                       stream and press 'Run query' to continue. Additionally, you
                       can apply additional filters and adjust the date range to
                       enhance search.
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-error-message"
                       class="text-center q-ma-none col-10"
                     >
-                      <q-icon name="info" color="primary" size="md" />
+                      <q-icon name="info" />
                       {{ t("search.noRecordFound") }}
                       <q-btn
                         v-if="
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-error-message"
                       class="text-center q-ma-none col-10"
                     >
-                      <q-icon name="info" color="primary" size="md" />
+                      <q-icon name="info" />
                       {{ t("search.applySearch") }}
                     </h6>
                   </div>
@@ -290,7 +290,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <q-icon
                 name="history"
-                size="100px"
                 color="gray"
                 class="search-history-empty__icon"
               />

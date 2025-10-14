@@ -23,26 +23,27 @@ body {
     }
 
     &:hover {
+      background: var(--o2-button-hover-bg);
       box-shadow: none;
     }
   }
 }
 
 .q-header {
-  // box-shadow: 1px 0px 1px color-mix(in srgb, var(--o2-theme-elements) 100%, white);
+  // box-shadow: 0.0625rem 0px 0.0625rem color-mix(in srgb, var(--o2-theme-elements) 100%, white);
   background-color: var(--o2-menu-background);
-  border-bottom: 1px solid var(--o2-border-color);
+  border-bottom: 0.0625rem solid var(--o2-border-color);
 }
 
 .o2-navigation {
-  // box-shadow: -1px 1px 6px color-mix(in srgb, var(--o2-theme-elements) 100%, white);
+  // box-shadow: -0.0625rem 0.0625rem 6px color-mix(in srgb, var(--o2-theme-elements) 100%, white);
   background-color: var(--o2-menu-background);
-  border-right: 1px solid var(--o2-border-color);
+  border-right: 0.0625rem solid var(--o2-border-color);
 }
 
-.q-page {
-  padding: 0 0 0 0.375rem;
-}
+// .q-page {
+//   padding: 0 0 0 0.375rem;
+// }
 
 .q-toolbar {
   padding: 0 0 0 0.75rem; //. give me rem unit
@@ -51,6 +52,24 @@ body {
 // .q-btn, .q-btn .selected {
 //     background-color: color-mix(in srgb, var(--o2-theme-elements) 10%, white);
 // }
+
+.q-btn-dropdown {
+  border: 0.0625rem solid var(--o2-border-color) !important;
+}
+
+.q-btn-group {
+  .q-btn {
+    border: 0px !important;
+  }
+
+  .q-icon {
+    font-size: 1rem;
+  }
+
+  .q-btn__content {
+    padding: 0.15rem 0 0 0.25rem;
+  }
+}
 
 .q-field--filled .q-field__control {
   background-color: var(--o2-primary-background);
@@ -64,19 +83,19 @@ body {
 }
 .q-splitter--horizontal > .q-splitter__separator {
   width: 100%;
-  height: 1px; // 4px – lighter and thinner than 7px
-  box-shadow: inset 0 1px 6px lightgray;
-  // border: 1px solid color-mix(in srgb, var(--o2-theme-elements) 100%, white);
+  height: 0.0625rem; // 4px – lighter and thinner than 7px
+  box-shadow: inset 0 0.0625rem 6px var(--o2-border-color);
+  // border: 0.0625rem solid color-mix(in srgb, var(--o2-theme-elements) 100%, white);
   // background: color-mix(in srgb, var(--o2-theme-elements) 10%, white);
 }
 
 
 .q-splitter--vertical > .q-splitter__separator {
-  width: 1px;
+  width: 0.0625rem;
   height: 100%;
-  // box-shadow: 1px 1px 10px color-mix(in srgb, var(--o2-theme-elements) 100%, white);
-  border-right: 1px solid var(--o2-border-color);
-  // border: 1px solid color-mix(in srgb, var(--o2-theme-elements) 100%, white);
+  // box-shadow: 0.0625rem 0.0625rem 10px color-mix(in srgb, var(--o2-theme-elements) 100%, white);
+  border-right: 0.0625rem solid var(--o2-border-color);
+  // border: 0.0625rem solid color-mix(in srgb, var(--o2-theme-elements) 100%, white);
   // background: color-mix(in srgb, var(--o2-theme-elements) 10%, white);
 }
 
@@ -104,7 +123,6 @@ body {
   }
 
   &::after {
-    border-bottom: 1px solid transparent;
     background: transparent;
   }
 }
@@ -120,6 +138,8 @@ body {
 }
 
 .button-group {
+  border: 0.0625rem solid var(--o2-border-color);
+  border-radius: 0.375rem;
   .q-btn.selected {
     background-color: color-mix(in srgb, var(--o2-theme-elements) 70%, white);
     color: var(--o2-selected-button-text);
@@ -135,12 +155,59 @@ body {
 }
 
 .logs-search-result-container {
-  background-color: var(--o2-card-background);
+  background-color: transparent;
   height: 100%;
   border-radius: 0.375rem;
-  box-shadow: 1px 1px 6px color-mix(in srgb, var(--o2-theme-elements) 100%, white);
+  box-shadow: 0.0625rem 0.0625rem 6px color-mix(in srgb, var(--o2-theme-elements) 100%, white);
   display: flex;
   flex-direction: column;
+}
+
+// Toolbar Icon and Toggle Styles
+.toolbar-toggle-container {
+  padding: 0 0.175rem; // 0 ~2.8px
+  margin-left: 0.25rem; // 8px
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.0625rem solid var(--o2-border-color); // 0.0625rem
+  border-radius: 0.375rem; // 6px
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    background-color: transparent;
+  }
+}
+
+.dark-theme .toolbar-toggle-container {
+  border: 0.0625rem solid rgb(196, 196, 196);
+}
+
+.toolbar-btn {
+  padding: 0.25rem 0.375rem; // 4px 6px
+  margin-left: 0.25rem; // 8px
+  border: 0.0625rem solid var(--o2-border-color); // 1px
+  border-radius: 0.375rem; // 6px
+  transition: all 0.2s ease;
+  min-height: 1.875rem; // 30px
+  background: transparent;
+
+  .q-icon {
+    font-size: 1rem; // 16px
+  }
+}
+
+.toolbar-btn-group {
+  border-radius: 0.375rem; // 6px
+  button {
+    padding: 0 0 0 0; // 4px 5px
+    border-radius: 0.375rem; // 6px
+  }
+
+  &:hover {
+    background-color: transparent;
+  }
 }
 
 /* ============================================================================
@@ -246,11 +313,11 @@ body {
 }
 
 .border-bottom {
-  border-bottom: 1px solid $border-color;
+  border-bottom: 0.0625rem solid $border-color;
 }
 
 .border-right {
-  border-right: 1px solid $border-color;
+  border-right: 0.0625rem solid $border-color;
 }
 
 // For Dashboard draggable color change
@@ -376,13 +443,13 @@ body {
 
 .o2-card-wrapper {
   box-shadow: none;
-  border: 1px solid #E4E7EC;
+  border: 0.0625rem solid #E4E7EC;
 }
 
 .body--dark {
   .o2-card-wrapper {
     box-shadow: none;
-    border: 1px solid #454F5B;
+    border: 0.0625rem solid #454F5B;
     background-color: #212121;
   } 
 }
@@ -478,7 +545,7 @@ body {
 .o2-last-row-border-light{
   tr:last-child{
     td{
-      border-bottom: 1px solid #E4E7EC !important;
+      border-bottom: 0.0625rem solid #E4E7EC !important;
     }
   }
 }
@@ -486,7 +553,7 @@ body {
 .o2-last-row-border-dark{
   tr:last-child{
     td{
-      border-bottom: 1px solid #575A5A !important;
+      border-bottom: 0.0625rem solid #575A5A !important;
     }
   }
 }
@@ -563,7 +630,7 @@ body {
 //so to make this work just introduce a new div around the app-tabs component and add the class app-tabs-container to it
 //and then add the class tabs-selection-container-dark or tabs-selection-container-light to the app-tabs component
 .app-tabs-container{
-  border: 1px solid #cacaca;
+  border: 0.0625rem solid #cacaca;
   padding: 2px;
   border-radius: 2px;
 }
@@ -583,8 +650,8 @@ body {
   .active{
     background-color: $primary !important;
     color: white !important;
-    border: 1px solid #cacaca !important;
-    border-bottom: 1px solid #cacaca !important;
+    border: 0.0625rem solid #cacaca !important;
+    border-bottom: 0.0625rem solid #cacaca !important;
   }
   .rum-tab:hover{
     background-color: #373A3B !important;
@@ -609,7 +676,7 @@ body {
   .rum-tab.active{
     background-color: $primary !important;
     color: white !important;
-    border: 1px solid #cacaca !important;
+    border: 0.0625rem solid #cacaca !important;
   }
   .rum-tab:hover{
     background-color: #f0f0f0 !important;
@@ -690,7 +757,7 @@ body {
 
 .o2-numeric-input-light{
   .q-field__inner{
-    border: 1px solid #C4C4C4 !important;
+    border: 0.0625rem solid #C4C4C4 !important;
   }
   .q-field__control{
     background-color: #ffffff !important;
@@ -699,7 +766,7 @@ body {
 //TODO O2: after getting the dark theme work on it
 .o2-numeric-input-dark{
   .q-field__inner{
-    border: 1px solid #454F5B !important;
+    border: 0.0625rem solid #454F5B !important;
   }
   .q-field__control{
     background-color: #212121 !important;
@@ -740,14 +807,14 @@ body {
 .o2-search-input-light{
   .q-field__control{
     background-color: #ffffff !important;
-    outline: 1px solid #C9CCD6 !important;
+    outline: 0.0625rem solid #C9CCD6 !important;
 
   }
 }
 .o2-search-input-dark{
   .q-field__control{
     background-color: #2B2D30 !important;
-    border: 1px solid #4E5157 !important;
+    border: 0.0625rem solid #4E5157 !important;
   }
 }
 //this is done because we need to select the search input when it is focused
@@ -808,12 +875,12 @@ body {
 
 .o2-secondary-button-light{
   color: #19191E !important;
-  border: 1px solid #D3D5DB !important;
+  border: 0.0625rem solid #D3D5DB !important;
   background-color: #F7F8FA;
 }
 .o2-secondary-button-dark{
   color: #DFE1E5 !important;
-  border: 1px solid #6F737A !important;
+  border: 0.0625rem solid #6F737A !important;
 }
 
 
@@ -839,20 +906,20 @@ body {
 .o2-primary-button-lightbk{
   background-color: #575FC5 !important;
   color: #ffffff !important;
-  border: 1px solid #575FC5 !important;
+  border: 0.0625rem solid #575FC5 !important;
   &:hover{
     background-color: var(--o2-theme-elements) !important;
-    border: 1px solid var(--o2-theme-elements) !important;
+    border: 0.0625rem solid var(--o2-theme-elements) !important;
   }
 }
 //TODO o2: after getting the dark theme work on it
 .o2-primary-button-dark{
   background-color: #575FC5 !important;
   color: #ffffff !important;
-  border: 1px solid #575FC5 !important;
+  border: 0.0625rem solid #575FC5 !important;
   &:hover{
     background-color: var(--o2-theme-elements) !important;
-    border: 1px solid var(--o2-theme-elements) !important;
+    border: 0.0625rem solid var(--o2-theme-elements) !important;
   }
 }
 
@@ -887,7 +954,7 @@ body {
 .o2-toggle-button-sm-light{
   .q-toggle__track{
     background-color: color-mix(in srgb, var(--o2-hover-accent) 100%, white);
-    border: 1px solid #D3D5DB !important;
+    border: 0.0625rem solid #D3D5DB !important;
     opacity: 80%;
   }
   .q-toggle__inner--truthy{
@@ -901,7 +968,7 @@ body {
 .o2-toggle-button-sm-dark{
   .q-toggle__track{
     background-color: color-mix(in srgb, var(--o2-hover-accent) 100%, white);
-    border: 1px solid #6F737A !important;
+    border: 0.0625rem solid #6F737A !important;
     opacity: 80%;
   }
   .q-toggle__inner--truthy{
@@ -957,7 +1024,7 @@ body {
 .o2-toggle-button-lg-light{
   .q-toggle__track{
     background-color: color-mix(in srgb, var(--o2-hover-accent) 100%, white);
-    border: 1px solid #D3D5DB !important;
+    border: 0.0625rem solid #D3D5DB !important;
     opacity: 80%;
   }
   .q-toggle__inner--truthy{
@@ -971,7 +1038,7 @@ body {
 .o2-toggle-button-lg-dark{
   .q-toggle__track{
     background-color: color-mix(in srgb, var(--o2-hover-accent) 100%, white);
-    border: 1px solid #6F737A !important;
+    border: 0.0625rem solid #6F737A !important;
     opacity: 80%;
   }
   .q-toggle__inner--truthy{
@@ -1010,10 +1077,10 @@ body {
   }
   
   .q-toggle__track{
-    height: 20px;
-    padding-bottom: 16px;
-    border-radius: 16px;
-    width: 32px;
+    height: 15px;
+    padding-bottom: 13px;
+    border-radius: 9px;
+    width: 30px;
     background-color: #EBECF0;
     opacity: 80%;
   }
@@ -1031,7 +1098,7 @@ body {
       display: none !important;
     }
     .q-icon{
-      right: 1px
+      right: 0.0625rem
     }
   }
 
@@ -1048,7 +1115,7 @@ body {
         display: none !important;
       }
       .q-icon{
-        left: 1px;
+        left: 0.0625rem;
         color: black;
       }
     }
@@ -1066,7 +1133,7 @@ body {
 .o2-toggle-button-xs-light{
   .q-toggle__track{
     background-color: color-mix(in srgb, var(--o2-hover-accent) 100%, white);
-    border: 1px solid #D3D5DB !important;
+    border: 0.0625rem solid #D3D5DB !important;
     opacity: 100%;
   }
   .q-toggle__inner--truthy{
@@ -1080,14 +1147,14 @@ body {
 .o2-toggle-button-xs-dark{
   .q-toggle__track{
     background-color: color-mix(in srgb, var(--o2-hover-accent) 100%, white);
-    border: 1px solid #9CA3AF !important;
+    border: 0.0625rem solid #9CA3AF !important;
     opacity: 80%;
   }
   .q-toggle__inner--truthy{
     color: #ffffff;
     .q-toggle__track{
       background-color: var(--o2-theme-elements);
-      border: 1px solid #818CF8 !important;
+      border: 0.0625rem solid #818CF8 !important;
     }
     }
 }
@@ -1115,7 +1182,7 @@ body {
 
 .o2-text-input-light{
   .q-field__inner{
-    border: 1px solid #C4C4C4 !important;
+    border: 0.0625rem solid #C4C4C4 !important;
   } 
   .q-field__control{
     background-color: #ffffff !important;
@@ -1124,7 +1191,7 @@ body {
 //TODO O2: after getting the dark theme work on it
 .o2-text-input-dark{
   .q-field__inner{
-    border: 1px solid #454F5B !important;
+    border: 0.0625rem solid #454F5B !important;
   }
   .q-field__control{
     background-color: #212121 !important;
@@ -1158,23 +1225,22 @@ body {
 .splitter-section-collapse-btn {
   z-index: 1001 !important;
   position: absolute !important;
-  background: color-mix(in srgb, grey 100%, white 0%) !important;
+  background: color-mix(in srgb, var(--o2-icon-color) 20%, white 0%) !important;
   border-radius: 4px !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   transition: all 0.2s ease;
   min-width: 0.45rem !important;
   width: 0.45rem !important;
   height: 36px !important;
   padding: 0 !important;
   cursor: pointer;
+  top: 5% !important;
 
   .q-icon {
-    color: rgba(0, 0, 0, 0.5) !important;
     font-size: 18px !important;
   }
 
   &:hover {
-    background: color-mix(in srgb, grey 100%, white 0%) !important;
+    background: color-mix(in srgb, var(--o2-theme-elements) 70%, white 0%) !important;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
 
     .q-icon {
@@ -1183,23 +1249,13 @@ body {
   }
 
   &--visible {
-    right: -10px !important;
+    right: -4px !important;
     top: 5% !important;
-    transform: translateY(-50%) !important;
-
-    &:hover {
-      transform: translateY(-50%) translateX(-2px) !important;
-    }
   }
 
   &--hidden {
-    left: -10px !important;
+    right: -4px !important;
     top: 5% !important;
-    transform: translateY(-50%) !important;
-
-    &:hover {
-      transform: translateY(-50%) translateX(10px) !important;
-    }
   }
 }
 

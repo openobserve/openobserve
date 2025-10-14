@@ -248,19 +248,19 @@ $o2-icon-color: #444444;
 $o2-scrollbar-track: transparent;
 $o2-scrollbar-thumb: #EFEFEF;
 $o2-scrollbar-thumb-hover: #DCDCDC;
-$o2-button-hover-bg: #F3F4F6;
+$o2-hover-bg: #FCFCFC;
 
 $o2-dark-theme-background: #1c1c1f;
 $o2-dark-theme-elements: #04c9b7;
 $o2-dark-menu-background: #252529;  
 $o2-dark-card-background: #2c2c2e;
 $o2-dark-hover-background: #76838f;
-$o2-dark-border-color: #E5E7EB;
-$o2-dark-icon-color: #444444;
+$o2-dark-border-color: rgba(255, 255, 255, 0.28);
+$o2-dark-icon-color: #EFEFEF;
 $o2-dark-scrollbar-track: transparent;
 $o2-dark-scrollbar-thumb: #EFEFEF;
 $o2-dark-scrollbar-thumb-hover: #DCDCDC;
-$o2-button-hover-bg: #F3F4F6;
+$o2-dark-hover-bg: #F3F4F6;
 
 // Semantic Colors - Light Mode
 :root {
@@ -307,7 +307,7 @@ $o2-button-hover-bg: #F3F4F6;
   --o2-border-color: #{$o2-border-color};
   --o2-icon-color: #{$o2-icon-color};
 
-  --o2-button-hover-bg: #{$o2-button-hover-bg};
+  --o2-hover-bg: #{$o2-hover-bg};
 }
 
 // Semantic Colors - Dark Mode
@@ -355,5 +355,5 @@ $o2-button-hover-bg: #F3F4F6;
   --o2-border-color: #{$o2-dark-border-color};
   --o2-icon-color: #{$o2-dark-icon-color};
 
-  --o2-button-hover-bg: #{$o2-button-hover-bg};
+  --o2-hover-bg: #{$o2-dark-hover-bg};
 }

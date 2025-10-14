@@ -1159,7 +1159,8 @@ export default defineComponent({
   padding: 0px 5px;
   font-size: 12px;
   min-width: auto;
-  background: rgba(89, 96, 178, 0.2) !important;
+  background: transparent !important;
+  border: 0.0625rem solid var(--o2-border-color);
 
   .q-icon.on-right {
     transition: transform 0.25s ease;
@@ -1174,10 +1175,6 @@ export default defineComponent({
     .block {
       font-weight: 600;
     }
-  }
-
-  &:hover {
-    background: rgba(89, 96, 178, 0.3) !important;
   }
 }
 
