@@ -329,9 +329,6 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         }
 
         let pool = CLIENT.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["bulk_update", "scheduled_jobs"])
-            .inc();
 
         // Build bulk update query using UNNEST
         let query_builder = String::from(
