@@ -395,8 +395,42 @@ export default defineComponent({
       
       if (urlInstallationId && urlLicenseKey && licenseData.value.installation_id) {
         if (urlInstallationId === licenseData.value.installation_id) {
-          licenseKey.value = urlLicenseKey;
-          isLicenseKeyAutoFilled.value = true;
+          // Check if license is already active
+          if (licenseData.value.license && licenseData.value.license.active) {
+            // License is active, show dialog asking if they want to update
+            $q.dialog({
+              title: 'License Already Active',
+              message: 'Your license is still active. Do you want to update it with the new license key?',
+              persistent: true,
+              ok: {
+                label: 'Yes, update license',
+                color: 'primary',
+                noCaps: true,
+                unelevated: true
+              },
+              cancel: {
+                label: 'No, keep current',
+                color: 'grey-7',
+                noCaps: true,
+                outline: true
+              }
+            }).onOk(() => {
+              // User wants to update, fill the key and show update form
+              licenseKey.value = urlLicenseKey;
+              isLicenseKeyAutoFilled.value = true;
+              showUpdateFormAndFocus();
+            }).onCancel(() => {
+              // User doesn't want to update, clear URL parameters
+              const url = new URL(window.location.href);
+              url.searchParams.delete('installation_id');
+              url.searchParams.delete('license_key');
+              window.history.replaceState({}, document.title, url.toString());
+            });
+          } else {
+            // No active license, proceed with normal auto-fill
+            licenseKey.value = urlLicenseKey;
+            isLicenseKeyAutoFilled.value = true;
+          }
         }
       }
     };
