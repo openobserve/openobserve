@@ -18,7 +18,16 @@
               Installation ID: <strong>{{ licenseData.installation_id || 'N/A' }}</strong>
             </div>
             <div class="q-mt-md text-body2">
-              Contact your administrator for getting a license and paste the key here:
+              Contact your administrator for getting a license and paste the key here, <strong>or:</strong>
+              <q-btn
+                color="primary"
+                no-caps
+                label="Get License"
+                @click="redirectToGetLicense"
+                class="q-ml-sm"
+                size="sm"
+                borderless
+              />
             </div>
           </q-card-section>
         </q-card>
@@ -32,9 +41,14 @@
               type="textarea"
               rows="8"
               placeholder="Paste your license key here..."
-              class="q-mb-md"
               style="min-height: 200px;"
             />
+            <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
+              <div class="modern-info-banner">
+                <q-icon name="check_circle" class="text-green-6 q-mr-sm" size="20px" />
+                <span class="text-body2">License key auto-filled from URL. Click "Update License" to apply.</span>
+              </div>
+            </div>
             <q-btn
               color="primary"
               label="Update License"
@@ -131,9 +145,14 @@
               type="textarea"
               rows="8"
               placeholder="Paste new license key here..."
-              class="q-mb-md"
               style="min-height: 200px;"
             />
+            <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
+              <div class="modern-info-banner">
+                <q-icon name="check_circle" class="text-green-6 q-mr-sm" size="20px" />
+                <span class="text-body2">License key auto-filled from URL. Click "Update License" to apply.</span>
+              </div>
+            </div>
             <div class="row q-gutter-sm">
               <q-btn
                 outline
@@ -269,6 +288,7 @@ export default defineComponent({
     const licenseKey = ref("");
     const showUpdateForm = ref(false);
     const showLicenseKeyModal = ref(false);
+    const isLicenseKeyAutoFilled = ref(false);
     const store = useStore();
 
     const loadLicenseData = async () => {
@@ -276,6 +296,7 @@ export default defineComponent({
         loading.value = true;
         const response = await licenseServer.get_license();
         licenseData.value = response.data;
+        checkAndAutoFillLicenseFromUrl();
       } catch (error) {
         console.error("Error loading license data:", error);
         $q.notify({
@@ -296,7 +317,15 @@ export default defineComponent({
           message: "License updated successfully",
         });
         licenseKey.value = "";
+        isLicenseKeyAutoFilled.value = false;
         showUpdateForm.value = false;
+        
+        // Clear URL parameters after successful license update
+        const url = new URL(window.location.href);
+        url.searchParams.delete('installation_id');
+        url.searchParams.delete('license_key');
+        window.history.replaceState({}, document.title, url.toString());
+        
         await loadLicenseData();
       } catch (error) {
         console.error("Error updating license:", error);
@@ -349,6 +378,26 @@ export default defineComponent({
           type: "negative",
           message: "Failed to copy license key",
         });
+      }
+    };
+
+    const redirectToGetLicense = () => {
+      const baseUrl = window.location.origin;
+      const installationId = licenseData.value.installation_id || '';
+      const licenseUrl = `http://localhost:3002/user/request-license?base_url=${encodeURIComponent(baseUrl)}&license_id=${encodeURIComponent(installationId)}`;
+      window.open(licenseUrl, '_blank');
+    };
+
+    const checkAndAutoFillLicenseFromUrl = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlInstallationId = urlParams.get('installation_id');
+      const urlLicenseKey = urlParams.get('license_key');
+      
+      if (urlInstallationId && urlLicenseKey && licenseData.value.installation_id) {
+        if (urlInstallationId === licenseData.value.installation_id) {
+          licenseKey.value = urlLicenseKey;
+          isLicenseKeyAutoFilled.value = true;
+        }
       }
     };
 
@@ -419,6 +468,9 @@ export default defineComponent({
       maskKey,
       getMaskedLicenseKey,
       copyLicenseKey,
+      redirectToGetLicense,
+      isLicenseKeyAutoFilled,
+      checkAndAutoFillLicenseFromUrl,
     };
   },
 });
@@ -457,6 +509,17 @@ export default defineComponent({
   }
 }
 
+.modern-info-banner {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+
 .body--dark {
   .gradient-banner {
     background: linear-gradient(
@@ -468,6 +531,12 @@ export default defineComponent({
 
   .license-expiry-container {
     border: 1px solid #454F5B;
+  }
+
+  .modern-info-banner {
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   }
 }
 </style>

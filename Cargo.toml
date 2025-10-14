@@ -22,9 +22,14 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = []
-enterprise = []
-cloud = []
+default = ["enterprise"]
+enterprise = [
+    "dep:o2_enterprise",
+    "dep:o2_openfga",
+    "dep:o2_dex",
+    "dep:o2_ratelimit",
+]
+cloud = ["infra/cloud", "enterprise", "o2_enterprise/cloud"]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = ["dep:pprof"]
@@ -107,6 +112,10 @@ log.workspace = true
 maxminddb = "0.26"
 memchr.workspace = true
 mimalloc = { version = "0.1.43", default-features = false, optional = true }
+o2_dex = { version = "0.1.0", path = "../o2-enterprise/o2_dex", optional = true }
+o2_enterprise = { version = "0.1.0", path = "../o2-enterprise/o2_enterprise", optional = true, default-features = false }
+o2_openfga = { version = "0.1.0", path = "../o2-enterprise/o2_openfga", optional = true }
+o2_ratelimit = { version = "0.1.0", path = "../o2-enterprise/o2_ratelimit", optional = true }
 once_cell.workspace = true
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
@@ -170,6 +179,7 @@ tantivy.workspace = true
 tantivy-fst.workspace = true
 zip.workspace = true
 futures-util = "0.3.31"
+tokio-tungstenite = "0.27.0"
 tokio-util = "0.7.13"
 pprof = { version = "0.15.0", features = [
     "flamegraph",
