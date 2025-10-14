@@ -238,8 +238,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @send-to-ai-chat="sendToAiChat"
                     />
                   </div>
-                  <div class="text-center col-10 q-ma-none">
-                    <h5>
+                  <div class="text-center tw-h-[10px] col-10 q-ma-none">
+                    <!-- need to check with Bhargav why we needed this here  -->
+                    <h5 v-if="false">
                       <span v-if="disableMoreErrorDetails">
                         <SanitizedHtmlRenderer
                           data-test="logs-search-detail-error-message"

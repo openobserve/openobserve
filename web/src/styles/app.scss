@@ -137,7 +137,7 @@ body {
 }
 
 .bg-primary {
-  background-color: color-mix(in srgb, var(--o2-theme-elements) 70%, white) !important;
+  background-color: color-mix(in srgb, var(--o2-theme-elements) 90%, rgb(159, 84, 250)) !important;
   color: black;
 }
 
@@ -145,7 +145,7 @@ body {
   border: 0.0625rem solid var(--o2-border-color);
   border-radius: 0.375rem;
   .q-btn.selected {
-    background-color: color-mix(in srgb, var(--o2-theme-elements) 70%, white);
+    background-color: color-mix(in srgb, var(--o2-theme-elements) 100%, white);
     color: var(--o2-selected-button-text);
   }
 
@@ -190,7 +190,7 @@ body {
   justify-content: center;
   border: 0.0625rem solid var(--o2-border-color); // 0.0625rem
   border-radius: 0.375rem; // 6px
-  transition: all 0.2s ease;
+
   cursor: pointer;
 
   &:hover {
@@ -900,11 +900,11 @@ body {
 
 
 .o2-primary-button{
-  font-size: 13px ;
-  font-weight: 500 !important;
+  font-size: 12px ;
+  font-weight: 600 !important;
   line-height: 16px !important;
   padding: 0px 12px !important;
-  border-radius: 0.375rem !important;
+  border-radius: 0.4rem !important;
   min-width: 90px !important;
 }
 .o2-primary-button-small{
@@ -982,7 +982,7 @@ body {
 .o2-toggle-button-sm-dark{
   .q-toggle__track{
     background-color: color-mix(in srgb, var(--o2-hover-accent) 100%, white);
-    border: 0.0625rem solid #6F737A !important;
+    border: 0.0625rem solid #7233e8 !important;
     opacity: 80%;
   }
   .q-toggle__inner--truthy{
@@ -1052,7 +1052,7 @@ body {
 .o2-toggle-button-lg-dark{
   .q-toggle__track{
     background-color: color-mix(in srgb, var(--o2-hover-accent) 100%, white);
-    border: 0.0625rem solid #6F737A !important;
+    border: 0.0625rem solid #7233e8 !important;
     opacity: 80%;
   }
   .q-toggle__inner--truthy{
@@ -1161,14 +1161,14 @@ body {
 .o2-toggle-button-xs-dark{
   .q-toggle__track{
     background-color: color-mix(in srgb, var(--o2-hover-accent) 100%, white);
-    border: 0.0625rem solid #9CA3AF !important;
+     border: 0.0625rem solid #7233e8 !important;
     opacity: 80%;
   }
   .q-toggle__inner--truthy{
-    color: #ffffff;
+    color: #f1f0f1;
     .q-toggle__track{
       background-color: var(--o2-theme-elements);
-      border: 0.0625rem solid #818CF8 !important;
+        border: 0.0625rem solid #7233e8 !important;
     }
     }
 }

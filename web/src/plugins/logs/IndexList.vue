@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @filter="filterStreamFn"
         @update:model-value="handleMultiStreamSelection"
         :title="searchObj.data.stream.selectedStream.join(',')"
+        style="border-bottom: 1px solid #58555e;"
       >
         <template #no-option>
           <q-item>
@@ -545,7 +546,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="schema-field-toggle q-mr-xs"
               toggle-color="primary"
               bordered
-              size="8px"
+              size="4px"
               color="white"
               text-color="primary"
               @update:model-value="toggleSchema"
@@ -607,7 +608,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-btn-toggle>
           </div>
-          <div v-else-if="searchObj.meta.quickMode">
+          <div class="tw-ml-2 " v-else-if="searchObj.meta.quickMode">
             <q-btn-toggle
               no-caps
               v-model="showOnlyInterestingFields"
@@ -615,7 +616,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="schema-field-toggle q-mr-xs"
               toggle-color="primary"
               bordered
-              size="8px"
+              dense
+              size="4px"
               color="white"
               text-color="primary"
               :options="selectedFieldsBtnGroupOption"
@@ -623,7 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template v-slot:all_fields_slot>
                 <div data-test="logs-all-fields-btn">
-                  <q-icon name="schema"></q-icon>
+                  <q-icon size="12px" name="schema"></q-icon>
                   <q-tooltip
                     data-test="logs-page-fields-list-all-fields-warning-tooltip"
                     anchor="center right"
@@ -644,8 +646,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="searchObj.meta.quickMode"
               >
                 <div data-test="logs-interesting-fields-btn">
-                  <q-icon name="info" />
-                  <q-icon name="schema"></q-icon>
+                  <q-icon size="12px" name="info" />
+                  <q-icon size="12px" name="schema"></q-icon>
                   <q-tooltip
                     anchor="center right"
                     self="center left"

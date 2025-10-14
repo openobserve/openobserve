@@ -614,7 +614,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-btn
           data-test="logs-search-bar-share-link-btn"
-          class="q-mr-xs toolbar-btn"
+          class="toolbar-btn"
           size="sm"
           icon="share"
           @click="shareLink.execute()"
@@ -883,7 +883,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button tw-w-[90px]"
+                class="q-pa-none  search-button cancel-search-button tw-w-[90px]"
                 @click="cancelVisualizeQueries"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -914,7 +914,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.cancel')"
-                class="q-pa-none search-button cancel-search-button tw-w-[90px]"
+                class="q-pa-none -tw-mr-[4px] search-button cancel-search-button tw-w-[90px]"
                 @click="cancelQuery"
                 >{{ t("search.cancel") }}</q-btn
               >
@@ -925,7 +925,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 :title="t('search.runQuery')"
-                class="q-pa-none o2-primary-button tw-h-[30px]"
+                class="q-pa-none o2-primary-button -tw-mr-[4px] tw-h-[30px]"
                 no-caps
                 @click="handleRunQueryFn"
                 :disable="
@@ -3825,7 +3825,7 @@ export default defineComponent({
       }
     };
     const visualizeIcon = computed(() => {
-      return searchObj.meta.logsVisualizeToggle === "visualize"
+      return searchObj.meta.logsVisualizeToggle === "visualize" || store.state.theme === "dark"
         ? getImageURL("images/common/visualize_icon_light.svg")
         : getImageURL("images/common/visualize_icon_dark.svg");
     });

@@ -1617,7 +1617,7 @@ export default defineComponent({
       border-radius: 5px;
 
       &.q-router-link--active {
-        background: linear-gradient(135deg, color-mix(in srgb, var(--o2-theme-elements) 50%, white) 0%, var(--o2-theme-background) 100%) !important;
+        background: linear-gradient(150deg, color-mix(in srgb, var(--o2-theme-elements) 80%, white) 0%, var(--o2-theme-background) 100%) !important;
         border: 1px solid var(--o2-theme-elements) !important;
         box-shadow: 0px 0px 2px var(--o2-theme-background) !important;
         
