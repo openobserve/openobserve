@@ -46,7 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="cursor: pointer"
           data-test="dashboard-panel-description-info"
         >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right"
+self="top right" max-width="220px">
             <div style="white-space: pre-wrap">
               {{ props.data.description }}
             </div>
@@ -71,7 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="showViewPanel = true"
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
         >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right"
+self="top right" max-width="220px">
             Some dynamic variables are not applied because the field is not
             present in the query's stream. Open Query Inspector to see all the
             details of the variables and queries executed to render this panel
@@ -88,7 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-error-data"
           class="warning"
         >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right"
+self="top right" max-width="220px">
             <div style="white-space: pre-wrap">
               {{ errorData }}
             </div>
@@ -103,7 +106,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-max-duration-warning"
           class="warning"
         >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right"
+self="top right" max-width="220px">
             <div style="white-space: pre-wrap">
               {{ maxQueryRange.join("\n\n") }}
             </div>
@@ -182,8 +186,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tooltip>
             {{
               variablesDataUpdated
-                ? t('panel.refreshToApplyVariables')
-                : t('panel.refresh')
+                ? t("panel.refreshToApplyVariables")
+                : t("panel.refresh")
             }}
           </q-tooltip>
         </q-btn>
@@ -202,7 +206,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="onPanelModifyClick('EditPanel')"
             >
               <q-item-section>
-                <q-item-label data-test="dashboard-edit-panel" class="q-pa-sm"
+                <q-item-label
+                  data-test="dashboard-edit-panel"
+                  class="q-pa-sm"
                   >{{ t("panel.editPanel") }}</q-item-label
                 >
               </q-item-section>
@@ -213,7 +219,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="onPanelModifyClick('EditLayout')"
             >
               <q-item-section>
-                <q-item-label data-test="dashboard-edit-layout" class="q-pa-sm"
+                <q-item-label
+                  data-test="dashboard-edit-layout"
+                  class="q-pa-sm"
                   >{{ t("panel.editLayout") }}</q-item-label
                 >
               </q-item-section>
@@ -237,7 +245,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="onPanelModifyClick('DeletePanel')"
             >
               <q-item-section>
-                <q-item-label data-test="dashboard-delete-panel" class="q-pa-sm"
+                <q-item-label
+                  data-test="dashboard-delete-panel"
+                  class="q-pa-sm"
                   >{{ t("panel.deletePanel") }}</q-item-label
                 >
               </q-item-section>
@@ -350,6 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :tabName="props.tabName"
       :dashboardName="props.dashboardName"
       :folderName="props.folderName"
+      :viewOnly="viewOnly"
       @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
       @limit-number-of-series-warning-message-update="
@@ -366,8 +377,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       @error="onError"
       @is-partial-data-update="handleIsPartialDataUpdate"
+      @contextmenu="$emit('contextmenu', $event)"
       ref="PanleSchemaRendererRef"
       :allowAnnotationsAdd="true"
+      :allowAlertCreation="allowAlertCreation"
     ></PanelSchemaRenderer>
     <q-dialog v-model="showViewPanel">
       <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>
@@ -461,6 +474,7 @@ export default defineComponent({
     "tabName",
     "dashboardName",
     "folderName",
+    "allowAlertCreation",
   ],
   components: {
     PanelSchemaRenderer,
@@ -749,7 +763,9 @@ export default defineComponent({
               t("panel.panelDuplicationFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? t("panel.panelDuplicationFailed"));
+          showErrorNotification(
+            error?.message ?? t("panel.panelDuplicationFailed"),
+          );
         }
       }
       // Hide the loading spinner notification.
@@ -950,7 +966,7 @@ export default defineComponent({
         this.$q.notify({
           type: "negative",
           message: this.t("panel.noQueriesToCreateAlert"),
-          timeout: 2000
+          timeout: 2000,
         });
         return;
       }
@@ -960,7 +976,7 @@ export default defineComponent({
         this.$q.notify({
           type: "negative",
           message: this.t("panel.panelQueryMustHaveStream"),
-          timeout: 2000
+          timeout: 2000,
         });
         return;
       }
@@ -969,8 +985,10 @@ export default defineComponent({
       if (unsupportedTypes.includes(this.props.data.type)) {
         this.$q.notify({
           type: "warning",
-          message: this.t("panel.unsupportedPanelTypeAlert", { type: this.props.data.type }),
-          timeout: 3000
+          message: this.t("panel.unsupportedPanelTypeAlert", {
+            type: this.props.data.type,
+          }),
+          timeout: 3000,
         });
       }
 
@@ -980,7 +998,7 @@ export default defineComponent({
         queries: this.props.data.queries || [],
         queryType: this.props.data.queryType,
         metadata: this.metaData,
-        timeRange: this.props.selectedTimeDate
+        timeRange: this.props.selectedTimeDate,
       };
 
       const encodedData = encodeURIComponent(JSON.stringify(panelData));
@@ -990,8 +1008,8 @@ export default defineComponent({
           org_identifier: this.store.state.selectedOrganization.identifier,
           folder: "default",
           fromPanel: "true",
-          panelData: encodedData
-        }
+          panelData: encodedData,
+        },
       });
     },
   },

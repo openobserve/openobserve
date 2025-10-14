@@ -245,6 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div v-else class="q-pa-none q-ma-none q-pr-sm  ">
               <scheduled-alert
+                v-if="!isLoadingPanelData"
                 ref="scheduledAlertRef"
                 :columns="filteredColumns"
                 :conditions="formData.query_condition?.conditions || {}"
@@ -499,6 +500,7 @@ import {
 } from "@/utils/alerts/alertPayload";
 import {
   getParser as getParserUtil,
+  addHavingClauseToQuery,
   type SqlUtilsContext,
 } from "@/utils/alerts/alertSqlUtils";
 
@@ -677,9 +679,7 @@ export default defineComponent({
     const showJsonEditorDialog = ref(false);
     const validationErrors = ref([]);
 
-    onMounted(async () => {
-      await loadPanelDataIfPresent();
-    });
+    const isLoadingPanelData = ref(false);
 
     const { track } = useReo();
 
@@ -1070,7 +1070,9 @@ export default defineComponent({
 
     const loadPanelDataIfPresent = async () => {
       const route = router.currentRoute.value;
+
       if (route.query.fromPanel === "true" && route.query.panelData) {
+        isLoadingPanelData.value = true;
         try {
           const panelData = JSON.parse(decodeURIComponent(route.query.panelData as string));
 
@@ -1096,16 +1098,49 @@ export default defineComponent({
               await updateStreamFields(query.fields.stream);
             }
 
-            if (panelData.queryType === "sql" && query.query) {
+            // Set query type based on panel (SQL or PromQL)
+            // Always set a specific type - never leave it as empty string to avoid defaulting to quick mode
+            if (panelData.queryType === "sql") {
               formData.value.query_condition.type = "sql";
-              formData.value.query_condition.sql = query.query;
-              isAggregationEnabled.value = false;
-            } else if (panelData.queryType === "promql" && query.query) {
+              // Use executedQuery if available (has variables replaced), otherwise use query.query
+              const sourceQuery = panelData.executedQuery || query.query;
+              if (sourceQuery) {
+                let sqlQuery = sourceQuery;
+
+                // If threshold is provided and we have a SQL query with GROUP BY,
+                // add a HAVING clause to filter the aggregated column
+                if (panelData.threshold !== undefined && panelData.condition && panelData.yAxisColumn) {
+                  const threshold = panelData.threshold;
+                  const operator = panelData.condition === 'above' ? '>=' : '<=';
+                  const yAxisColumn = panelData.yAxisColumn;
+
+                  // Use node-sql-parser to properly insert HAVING clause in the correct position
+                  // This handles queries with ORDER BY, LIMIT, OFFSET, etc.
+                  // Ensure parser is initialized first
+                  if (!parser) {
+                    await importSqlParser();
+                  }
+                  sqlQuery = addHavingClauseToQuery(sqlQuery, yAxisColumn, operator, threshold, parser);
+                }
+
+                formData.value.query_condition.sql = sqlQuery;
+              }
+            } else if (panelData.queryType === "promql") {
               formData.value.query_condition.type = "promql";
-              formData.value.query_condition.promql = query.query;
+              // Use executedQuery if available (has variables replaced), otherwise use query.query
+              const sourceQuery = panelData.executedQuery || query.query;
+              if (sourceQuery) {
+                formData.value.query_condition.promql = sourceQuery;
+              }
+            } else {
+              // Default to SQL mode if queryType is not specified
+              // This prevents falling back to quick mode
+              formData.value.query_condition.type = "sql";
             }
 
-            if (query.customQuery === false && query.fields) {
+            // Handle query builder fields for SQL panels
+            if (panelData.queryType === "sql" && query.customQuery === false && query.fields) {
+              // Enable aggregation for query builder generated SQL
               isAggregationEnabled.value = true;
 
               if (query.fields.x && query.fields.x.length > 0) {
@@ -1138,6 +1173,8 @@ export default defineComponent({
                     };
                   }
                   formData.value.query_condition.aggregation.function = yField.aggregationFunction.toLowerCase();
+                  // Set the having.column to the Y-axis field for threshold comparison
+                  formData.value.query_condition.aggregation.having.column = yField.alias || yField.column;
                 }
               }
 
@@ -1184,6 +1221,47 @@ export default defineComponent({
 
               formData.value.trigger_condition.period = periodInMinutes;
             }
+
+            // Handle threshold and condition from context menu
+            if (panelData.threshold !== undefined && panelData.condition) {
+              // For SQL with aggregation: use HAVING clause for value comparison
+              // For PromQL: use promql_condition for value comparison
+              // In both cases, set trigger_condition.threshold to 1 (fire when any row/result is returned)
+
+              if (panelData.queryType === 'promql') {
+                // For PromQL: Set up promql_condition with the threshold
+                if (!formData.value.query_condition.promql_condition) {
+                  formData.value.query_condition.promql_condition = {
+                    operator: '>=',
+                    value: 1,
+                  };
+                }
+                formData.value.query_condition.promql_condition.value = panelData.threshold;
+                formData.value.query_condition.promql_condition.operator =
+                  panelData.condition === 'above' ? '>=' : '<=';
+              } else {
+                // For SQL: Set up aggregation HAVING clause with the threshold
+                // If aggregation is enabled, set the having clause
+                if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
+                  if (!formData.value.query_condition.aggregation.having) {
+                    formData.value.query_condition.aggregation.having = {
+                      column: "",
+                      operator: ">=",
+                      value: 1,
+                    };
+                  }
+                  formData.value.query_condition.aggregation.having.value = panelData.threshold;
+                  formData.value.query_condition.aggregation.having.operator =
+                    panelData.condition === 'above' ? '>=' : '<=';
+                }
+              }
+
+              // Set alert trigger threshold to 1 and operator to >=
+              // This means: fire the alert when ANY row is returned from the query
+              // (The actual value comparison is done in HAVING clause for SQL or in PromQL query)
+              formData.value.trigger_condition.threshold = 1;
+              formData.value.trigger_condition.operator = '>=';
+            }
           }
         } catch (error) {
           console.error("Error loading panel data:", error);
@@ -1192,6 +1270,8 @@ export default defineComponent({
             message: "Failed to load panel data",
             timeout: 2000
           });
+        } finally {
+          isLoadingPanelData.value = false;
         }
       }
     };
@@ -1322,17 +1402,30 @@ export default defineComponent({
       generateSqlQuery: generateSqlQueryLocal,
       track,
       loadPanelDataIfPresent,
+      isLoadingPanelData,
     };
   },
 
-  created() {
+  async created() {
     // TODO OK: Refactor this code
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...cloneDeep(this.modelValue) };
+
+    // Check if this is from a dashboard panel - if so, don't set default query type
+    const route = this.router.currentRoute.value;
+    const isFromPanel = route.query.fromPanel === "true" && route.query.panelData;
+
     if(!this.isUpdated){
       this.formData.is_real_time = this.alertType === 'realTime'? true : false;
     }
       this.formData.is_real_time = this.formData.is_real_time.toString();
+
+    // If from panel, load panel data BEFORE initializing child components
+    // This ensures the correct query type is set before ScheduledAlert initializes
+    if (isFromPanel) {
+      this.formData.query_condition.type = ""; // Temporarily set to empty
+      await this.loadPanelDataIfPresent(); // Load panel data and set correct type
+    }
 
     // Set default frequency to min_auto_refresh_interval
     if (this.store.state?.zoConfig?.min_auto_refresh_interval)

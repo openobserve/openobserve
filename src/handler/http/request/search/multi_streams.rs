@@ -41,6 +41,7 @@ use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::{
+            auth::UserEmail,
             functions,
             http::{
                 get_dashboard_info_from_request, get_enable_align_histogram_from_request,
@@ -50,7 +51,9 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
-    handler::http::request::search::error_utils::map_error_to_http_response,
+    handler::http::{
+        extractors::Headers, request::search::error_utils::map_error_to_http_response,
+    },
     service::{search as SearchService, self_reporting::report_request_usage_stats},
 };
 
@@ -125,8 +128,10 @@ use crate::{
 #[post("/{org_id}/_search_multi")]
 pub async fn search_multi(
     org_id: web::Path<String>,
+    web::Query(query): web::Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
+    web::Json(multi_req): web::Json<search::MultiStreamRequest>,
     in_req: HttpRequest,
-    body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -159,7 +164,6 @@ pub async fn search_multi(
         }
     }
 
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let dashboard_info = get_dashboard_info_from_request(&query);
@@ -174,14 +178,6 @@ pub async fn search_multi(
         .as_ref()
         .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
 
-    // handle encoding for query and aggs
-    let multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
-        Ok(v) => v,
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
-
     let mut query_fn = multi_req
         .query_fn
         .as_ref()
@@ -195,7 +191,7 @@ pub async fn search_multi(
 
     let mut range_error = String::new();
 
-    let user_id = in_req.headers().get("user_id").unwrap().to_str().unwrap();
+    let user_id = &user_email.user_id;
     let mut queries = multi_req.to_query_req();
     let mut multi_res = search::Response::new(multi_req.from, multi_req.size);
 
@@ -698,7 +694,8 @@ pub async fn search_multi(
 pub async fn _search_partition_multi(
     org_id: web::Path<String>,
     in_req: HttpRequest,
-    body: web::Bytes,
+    web::Json(req): web::Json<search::MultiSearchPartitionRequest>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -714,12 +711,7 @@ pub async fn _search_partition_multi(
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
     let org_id = org_id.into_inner();
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let user_id = &user_email.user_id;
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let enable_align_histogram = get_enable_align_histogram_from_request(&query);
@@ -743,17 +735,10 @@ pub async fn _search_partition_multi(
         }
     }
 
-    let req: search::MultiSearchPartitionRequest = match json::from_slice(&body) {
-        Ok(v) => v,
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
-
     let search_fut = SearchService::search_partition_multi(
         &trace_id,
         &org_id,
-        &user_id,
+        user_id,
         stream_type,
         &req,
         enable_align_histogram,
@@ -867,6 +852,7 @@ pub async fn _search_partition_multi(
 pub async fn around_multi(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -882,10 +868,7 @@ pub async fn around_multi(
         Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .map(|v| v.to_str().unwrap_or("").to_string());
+    let user_id = Some(user_email.user_id.clone());
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_names = base64::decode_url(&stream_names)?;
@@ -1256,25 +1239,5 @@ mod tests {
         let invalid = "invalid_base64!@#";
         let decoded = config::utils::base64::decode_url(invalid);
         assert!(decoded.is_err());
-    }
-
-    #[test]
-    fn test_time_range_validation() {
-        let start_time = Utc::now().timestamp_micros();
-        let end_time = start_time + 3_600_000_000; // 1 hour later
-
-        assert!(end_time > start_time);
-        assert_eq!(end_time - start_time, 3_600_000_000);
-    }
-
-    #[test]
-    fn test_stream_names_parsing() {
-        let stream_names = "stream1,stream2,stream3";
-        let parsed: Vec<&str> = stream_names.split(',').collect();
-
-        assert_eq!(parsed.len(), 3);
-        assert_eq!(parsed[0], "stream1");
-        assert_eq!(parsed[1], "stream2");
-        assert_eq!(parsed[2], "stream3");
     }
 }

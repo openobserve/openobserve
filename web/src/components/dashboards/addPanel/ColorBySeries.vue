@@ -115,10 +115,22 @@ export default defineComponent({
       ) {
         const pieDonutSeriesNames = chartOptions.series[0].data
           .filter((item: any) => item && item.name) // Filter out invalid items
-          .map((item: any) => ({  
+          .map((item: any) => ({
             name: item.name,
           }));
         return { series: pieDonutSeriesNames };
+      }
+      // For gauge charts, extract series names from each series' data[0].name
+      if (panelType === "gauge" && chartOptions?.series) {
+        const gaugeSeriesNames = chartOptions.series
+          .filter(
+            (series: any) =>
+              series && series.data && series.data[0] && series.data[0].name,
+          ) // Filter out invalid series
+          .map((series: any) => ({
+            name: series.data[0].name,
+          }));
+        return { series: gaugeSeriesNames };
       }
 
       // For other chart types, use the existing logic

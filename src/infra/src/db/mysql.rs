@@ -862,3 +862,290 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
     log::info!("[MYSQL] index {idx_name} deleted successfully");
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mysql_db_new() {
+        let db = MysqlDb::new();
+        // Just verify it can be instantiated
+        assert_eq!(std::mem::size_of_val(&db), 0); // Zero-sized type
+    }
+
+    #[test]
+    fn test_mysql_db_default() {
+        let db = MysqlDb::default();
+        assert_eq!(std::mem::size_of_val(&db), 0);
+    }
+
+    #[test]
+    fn test_parse_key_full() {
+        let key = "/module/key1/key2";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "key1");
+        assert_eq!(k2, "key2");
+    }
+
+    #[test]
+    fn test_parse_key_no_leading_slash() {
+        let key = "module/key1/key2";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "key1");
+        assert_eq!(k2, "key2");
+    }
+
+    #[test]
+    fn test_parse_key_module_only() {
+        let key = "/module";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "");
+        assert_eq!(k2, "");
+    }
+
+    #[test]
+    fn test_parse_key_module_and_key1() {
+        let key = "/module/key1";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "key1");
+        assert_eq!(k2, "");
+    }
+
+    #[test]
+    fn test_parse_key_with_slashes_in_key2() {
+        let key = "/module/key1/key2/subkey/subsubkey";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "key1");
+        assert_eq!(k2, "key2/subkey/subsubkey");
+    }
+
+    #[test]
+    fn test_parse_key_empty() {
+        let key = "";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "");
+        assert_eq!(k1, "");
+        assert_eq!(k2, "");
+    }
+
+    #[test]
+    fn test_build_key_without_start_dt() {
+        let key = super::super::build_key("module", "key1", "key2", 0);
+        assert_eq!(key, "/module/key1/key2");
+    }
+
+    #[test]
+    fn test_build_key_with_start_dt() {
+        let key = super::super::build_key("module", "key1", "key2", 1234567890);
+        assert_eq!(key, "/module/key1/key2/1234567890");
+    }
+
+    #[test]
+    fn test_build_key_empty_parts() {
+        let key = super::super::build_key("", "", "", 0);
+        // When key1 is empty, implementation adds trailing slash
+        assert_eq!(key, "//");
+    }
+
+    #[test]
+    fn test_build_key_with_special_chars() {
+        let key = super::super::build_key("mod-ule", "key_1", "key.2", 0);
+        assert_eq!(key, "/mod-ule/key_1/key.2");
+    }
+
+    #[test]
+    fn test_index_statement_new() {
+        let stmt = IndexStatement::new("test_idx", "test_table", false, &["col1", "col2"]);
+        assert_eq!(stmt.idx_name, "test_idx");
+        assert_eq!(stmt.table, "test_table");
+        assert_eq!(stmt.unique, false);
+        assert_eq!(stmt.fields, vec!["col1", "col2"]);
+    }
+
+    #[test]
+    fn test_index_statement_unique() {
+        let stmt = IndexStatement::new("unique_idx", "table", true, &["id"]);
+        assert_eq!(stmt.idx_name, "unique_idx");
+        assert_eq!(stmt.table, "table");
+        assert_eq!(stmt.unique, true);
+        assert_eq!(stmt.fields, vec!["id"]);
+    }
+
+    #[test]
+    fn test_index_statement_single_field() {
+        let stmt = IndexStatement::new("single_idx", "table", false, &["field"]);
+        assert_eq!(stmt.fields.len(), 1);
+        assert_eq!(stmt.fields[0], "field");
+    }
+
+    #[test]
+    fn test_index_statement_multiple_fields() {
+        let stmt = IndexStatement::new("multi_idx", "table", false, &["f1", "f2", "f3", "f4"]);
+        assert_eq!(stmt.fields.len(), 4);
+    }
+
+    #[test]
+    fn test_db_index_hash_same() {
+        use std::collections::HashSet;
+
+        let idx1 = DBIndex {
+            name: "test_idx".to_string(),
+            table: "test_table".to_string(),
+        };
+        let idx2 = DBIndex {
+            name: "test_idx".to_string(),
+            table: "test_table".to_string(),
+        };
+
+        let mut set = HashSet::new();
+        set.insert(idx1);
+        // Same values should be contained
+        assert!(set.contains(&idx2));
+    }
+
+    #[test]
+    fn test_db_index_hash_different_name() {
+        use std::collections::HashSet;
+
+        let idx1 = DBIndex {
+            name: "idx1".to_string(),
+            table: "table".to_string(),
+        };
+        let idx2 = DBIndex {
+            name: "idx2".to_string(),
+            table: "table".to_string(),
+        };
+
+        let mut set = HashSet::new();
+        set.insert(idx1);
+        // Different name should not be contained
+        assert!(!set.contains(&idx2));
+    }
+
+    #[test]
+    fn test_db_index_hash_different_table() {
+        use std::collections::HashSet;
+
+        let idx1 = DBIndex {
+            name: "idx".to_string(),
+            table: "table1".to_string(),
+        };
+        let idx2 = DBIndex {
+            name: "idx".to_string(),
+            table: "table2".to_string(),
+        };
+
+        let mut set = HashSet::new();
+        set.insert(idx1);
+        // Different table should not be contained
+        assert!(!set.contains(&idx2));
+    }
+
+    #[test]
+    fn test_db_index_hash() {
+        use std::collections::HashSet;
+
+        let idx1 = DBIndex {
+            name: "idx".to_string(),
+            table: "table".to_string(),
+        };
+        let idx2 = DBIndex {
+            name: "idx".to_string(),
+            table: "table".to_string(),
+        };
+        let idx3 = DBIndex {
+            name: "different".to_string(),
+            table: "table".to_string(),
+        };
+
+        let mut set = HashSet::new();
+        set.insert(idx1);
+        assert!(set.contains(&idx2)); // Same as idx1
+        assert!(!set.contains(&idx3)); // Different
+    }
+
+    #[test]
+    fn test_sql_quote_escaping() {
+        // Test that single quotes in keys would need to be escaped
+        let key = "key'with'quotes";
+        let escaped = key.replace("'", "''");
+        assert_eq!(escaped, "key''with''quotes");
+    }
+
+    #[test]
+    fn test_sql_like_pattern_construction() {
+        let key2 = "prefix";
+        let pattern = format!("{key2}/%");
+        assert_eq!(pattern, "prefix/%");
+    }
+
+    #[test]
+    fn test_parse_key_with_numbers() {
+        let key = "/123/456/789";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "123");
+        assert_eq!(k1, "456");
+        assert_eq!(k2, "789");
+    }
+
+    #[test]
+    fn test_parse_key_with_hyphens_underscores() {
+        let key = "/test-module/test_key1/test-key-2";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "test-module");
+        assert_eq!(k1, "test_key1");
+        assert_eq!(k2, "test-key-2");
+    }
+
+    #[test]
+    fn test_build_key_roundtrip() {
+        let original_parts = ("module", "key1", "key2");
+        let key = super::super::build_key(original_parts.0, original_parts.1, original_parts.2, 0);
+        let (module, k1, k2) = super::super::parse_key(&key);
+        assert_eq!(module, original_parts.0);
+        assert_eq!(k1, original_parts.1);
+        assert_eq!(k2, original_parts.2);
+    }
+
+    #[test]
+    fn test_build_key_with_negative_start_dt() {
+        // Negative start_dt should still be treated as 0 in the build logic
+        let key = super::super::build_key("module", "key1", "key2", -1);
+        // Based on the implementation, negative values might be included
+        // This test documents the current behavior
+        assert!(key.contains("module"));
+        assert!(key.contains("key1"));
+        assert!(key.contains("key2"));
+    }
+
+    #[test]
+    fn test_index_statement_empty_fields() {
+        let stmt = IndexStatement::new("empty_idx", "table", false, &[]);
+        assert_eq!(stmt.fields.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_key_trailing_slash() {
+        let key = "/module/key1/key2/";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "key1");
+        // Trailing slash creates an empty segment at the end
+        assert!(k2.starts_with("key2"));
+    }
+
+    #[test]
+    fn test_parse_key_multiple_slashes() {
+        let key = "/module//key1///key2";
+        let (module, k1, _k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        // Double slashes create empty segments
+        assert!(k1.is_empty() || k1 == "key1");
+    }
+}

@@ -17,15 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="col column overflow-hidden full-height">
+  <div class="col column full-height" style="overflow: hidden !important; padding: 0 !important; margin: 0 !important; height: 100%;">
     <div
-      class="search-list full-height"
+      class="search-list full-height full-width"
       ref="searchListContainer"
-      style="width: 100%"
     >
-      <div class="row tw-min-h-[44px]">
+      <div class="row tw-min-h-[28px]">
         <div
-          class="col-7 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders"
+          class="col-7 text-left q-pl-lg bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -35,21 +34,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="col-7 text-left q-pl-lg q-mt-xs warning flex items-center"
+          class="col-7 text-left q-pl-lg warning flex items-center"
         >
           {{ noOfRecordsTitle }}
           <span v-if="searchObj.loadingCounter" class="q-ml-md">
             <q-spinner-hourglass
               color="primary"
               size="25px"
-              style="margin: 0 auto; display: block"
+              class="search-spinner"
             />
             <q-tooltip
               anchor="center right"
               self="center left"
               max-width="300px"
             >
-              <span style="font-size: 14px">Fetching the search events</span>
+              <span class="search-loading-text">Fetching the search events</span>
             </q-tooltip>
           </span>
           <div
@@ -73,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="col-5 text-right q-pr-md q-gutter-xs pagination-block">
+        <div class="col-5 text-right q-pr-sm q-gutter-xs pagination-block">
           <q-pagination
             v-if="searchObj.meta.resultGrid.showPagination"
             :disable="searchObj.loading == true"
@@ -108,7 +107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             rowsPerPageLabel="Rows per page"
             :rows-per-page-options="rowsPerPageOptions"
             :rows-per-page="searchObj.meta.resultGrid.rowsPerPage"
-            style="line-height: 30px; max-height: 30px"
             data-test="logs-search-result-pagination"
           />
           <q-select
@@ -119,15 +117,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="float-right select-pagination"
             size="sm"
             dense
+            borderless
             @update:model-value="getPageData('recordsPerPage')"
-            style="line-height: 20px"
           ></q-select>
         </div>
       </div>
       <div
-        :style="{
-          height: searchObj.meta.showHistogram ? '100px' : '0px',
-        }"
+        :class="[
+          'histogram-container',
+          searchObj.meta.showHistogram ? 'histogram-container--visible' : 'histogram-container--hidden'
+        ]"
         v-if="
           searchObj.data?.histogram?.errorMsg == '' &&
           searchObj.data.histogram.errorCode != -1
@@ -141,12 +140,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           data-test="logs-search-result-bar-chart"
           :data="plotChart"
-          style="max-height: 100px"
+          class="histogram-chart"
           @updated:dataZoom="onChartUpdate"
         />
 
         <div
-          style="height: 100px"
+          class="histogram-empty"
           v-else-if="
             searchObj.meta.showHistogram &&
             !searchObj.loadingHistogram &&
@@ -154,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <h3 class="text-center">
-            <span style="min-height: 50px">
+            <span class="histogram-empty__message">
               <q-icon name="warning" color="warning" size="xs"></q-icon> No data
               found for histogram.</span
             >
@@ -162,25 +161,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          style="height: 100px"
+          class="histogram-empty"
           v-else-if="
             searchObj.meta.showHistogram && Object.keys(plotChart)?.length === 0
           "
         >
           <h3 class="text-center">
-            <span style="min-height: 50px; color: transparent">.</span>
+            <span class="histogram-empty__message" style="color: transparent">.</span>
           </h3>
         </div>
 
         <div
-          class="q-pb-lg"
-          style="top: 50px; position: absolute; left: 50%"
+          class="q-pb-sm histogram-loader"
           v-if="histogramLoader"
         >
           <q-spinner-hourglass
             color="primary"
             size="25px"
-            style="margin: 0 auto; display: block"
+            class="search-spinner"
           />
         </div>
       </div>
@@ -192,8 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <h6
-          class="text-center"
-          style="margin: 30px 0px"
+          class="text-center histogram-error"
           v-if="
             searchObj.data.histogram.errorCode != 0 &&
             searchObj.data.histogram.errorCode != -1
@@ -243,14 +240,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :default-columns="!searchObj.data.stream.selectedFields.length"
         class="col-12"
-        :style="{
-          height:
-            !searchObj.meta.showHistogram ||
-            (searchObj.meta.showHistogram &&
-              searchObj.data.histogram.errorCode == -1)
-              ? 'calc(100% - 40px)'
-              : 'calc(100% - 140px)',
-        }"
+        :class="[
+          !searchObj.meta.showHistogram ||
+          (searchObj.meta.showHistogram &&
+            searchObj.data.histogram.errorCode == -1)
+            ? 'table-container--without-histogram'
+            : 'table-container--with-histogram'
+        ]"
         @update:columnSizes="handleColumnSizesUpdate"
         @update:columnOrder="handleColumnOrderUpdate"
         @copy="copyLogToClipboard"
@@ -284,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]
           "
           :stream-type="searchObj.data.stream.streamType"
-          style="margin-bottom: 15px"
+          class="detail-table-dialog"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
           :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
           :highlight-query="
@@ -837,254 +833,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.max-result {
-  width: 170px;
-}
-
-.pagination-block {
-  .q-field--dense .q-field__control,
-  .q-field--dense .q-field__marginal {
-    height: 30px !important;
-  }
-
-  .select-pagination {
-    position: relative;
-    top: -5px;
-  }
-}
-
-.search-list {
-  width: 100%;
-
-  .chart {
-    width: 100%;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-  }
-
-  .my-sticky-header-table {
-    .q-table__top,
-    .q-table__bottom,
-    thead tr:first-child th {
-      /* bg color is important for th; just specify one */
-      background-color: white;
-    }
-
-    thead tr th {
-      position: sticky;
-      z-index: 1;
-    }
-
-    thead tr:first-child th {
-      top: 0;
-    }
-
-    /* this is when the loading indicator appears */
-    &.q-table--loading thead tr:last-child th {
-      /* height of all previous header rows */
-      top: 48px;
-    }
-  }
-
-  .q-table__top {
-    padding-left: 0;
-    padding-top: 0;
-  }
-
-  .q-table thead tr,
-  .q-table tbody td,
-  .q-table th,
-  .q-table td {
-    height: 25px;
-    padding: 0px 5px;
-    font-size: 0.75rem;
-  }
-
-  .q-table__bottom {
-    width: 100%;
-  }
-
-  .q-table__bottom {
-    min-height: 40px;
-    padding-top: 0;
-    padding-bottom: 0;
-  }
-
-  .q-td {
-    overflow: hidden;
-    min-width: 100px;
-
-    .expanded {
-      margin: 0;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      word-break: break-all;
-    }
-  }
-
-  .highlight {
-    background-color: rgb(255, 213, 0);
-  }
-
-  .table-header {
-    // text-transform: capitalize;
-
-    .table-head-chip {
-      background-color: #f5f5f5;
-      padding: 0px;
-
-      .header-col-title {
-        margin-right: 0.5rem;
-        font-size: 14px;
-        color: $dark;
-      }
-
-      .close-icon {
-        &:hover {
-          opacity: 0.7;
-        }
-      }
-
-      .q-table th.sortable {
-        cursor: pointer;
-        text-transform: capitalize;
-        font-weight: bold;
-      }
-    }
-
-    &.isClosable {
-      padding-right: 30px;
-      position: relative;
-
-      .q-table-col-close {
-        transform: translateX(26px);
-        position: absolute;
-        margin-top: 2px;
-        color: #808080;
-      }
-    }
-
-    .q-table th.sortable {
-      cursor: pointer;
-      text-transform: capitalize;
-      font-weight: bold;
-    }
-  }
-}
-.thead-sticky tr > *,
-.tfoot-sticky tr > * {
-  position: sticky;
-  opacity: 1;
-  z-index: 1;
-  background: #f5f5f5;
-}
-
-.q-table--dark .thead-sticky tr > *,
-.q-table--dark .tfoot-sticky tr > * {
-  background: #565656;
-}
-
-.q-table--dark .table-header {
-  // text-transform: capitalize;
-
-  .table-head-chip {
-    background-color: #565656;
-  }
-}
-
-.thead-sticky tr:last-child > * {
-  top: 0;
-}
-
-.tfoot-sticky tr:first-child > * {
-  bottom: 0;
-}
-
-.field_list,
-.table-head-chip {
-  padding: 0px;
-  margin-bottom: 0.125rem;
-  position: relative;
-  overflow: visible;
-  cursor: default;
-  font-size: 12px;
-  font-family: monospace;
-
-  .field_overlay {
-    width: fit-content;
-    position: absolute;
-    height: 100%;
-    right: 0;
-    top: 0;
-    background-color: #ffffff;
-    border-radius: 6px;
-    padding: 0 6px;
-    visibility: hidden;
-    display: flex;
-    align-items: center;
-    transition: all 0.3s linear;
-
-    &.field_overlay_dark {
-      background-color: #181a1b;
-    }
-
-    .q-icon,
-    .q-toggle__inner {
-      cursor: pointer;
-      opacity: 0;
-      transition: all 0.3s linear;
-      margin: 0 1px;
-    }
-  }
-
-  &:hover {
-    .field_overlay {
-      visibility: visible;
-
-      .q-icon,
-      .q-toggle__inner {
-        opacity: 1;
-      }
-    }
-  }
-}
-
-.table-head-chip {
-  font-family: "Nunito Sans", sans-serif;
-  .field_overlay {
-    background-color: #f5f5f5;
-
-    &.field_overlay_dark {
-      background-color: #565656;
-    }
-  }
-}
+@import '@/styles/logs/search-result.scss';
 </style>
 
-<style lang="scss">
-.search-list {
-  .copy-log-btn {
-    .q-icon {
-      font-size: 12px !important;
-    }
-  }
-
-  .view-trace-btn {
-    .q-icon {
-      font-size: 13px !important;
-    }
-  }
-
-  .q-pagination__content input {
-    border: 1px solid lightgrey;
-    top: 7px;
-    position: relative;
-    height: 30px;
-  }
-}
-.histogram-unavailable-text {
-  color: #f5a623;
-}
-.histogram-unavailable-text-light {
-  color: #ff8800;
-}
-</style>

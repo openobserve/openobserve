@@ -830,7 +830,7 @@ pub struct Common {
     pub feature_broadcast_join_left_side_max_size: usize, // MB
     #[env_config(
         name = "ZO_FEATURE_ENRICHMENT_BROADCAST_JOIN_ENABLED",
-        default = false,
+        default = true,
         help = "Enable enrichment table broadcast join"
     )]
     pub feature_enrichment_broadcast_join_enabled: bool,
@@ -963,7 +963,7 @@ pub struct Common {
     // MMDB
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
-    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = true)]
+    #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = false)]
     pub mmdb_disable_download: bool,
     #[env_config(name = "ZO_MMDB_UPDATE_DURATION_DAYS", default = 30)] // default 30 days
     pub mmdb_update_duration_days: u64,
@@ -1537,6 +1537,12 @@ pub struct Limit {
     pub histogram_enabled: bool,
     #[env_config(name = "ZO_CACHE_DELAY_SECS", default = 300)] // seconds
     pub cache_delay_secs: i64,
+    #[env_config(
+        name = "ZO_AGGS_MIN_NUM_PARTITIONS_SECS",
+        default = 3,
+        help = "Aggregates approximate number of seconds for executing search"
+    )]
+    pub aggs_min_num_partition_secs: usize,
 }
 
 #[derive(EnvConfig, Default)]
@@ -2006,6 +2012,18 @@ pub struct Pipeline {
         help = "interval in milliseconds to spawn a new sink task"
     )]
     pub pipeline_sink_task_spawn_interval_ms: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_ERROR_RETENTION_MINS",
+        default = 60,
+        help = "pipeline error retention time in minutes, errors older than this will be cleaned up"
+    )]
+    pub error_retention_mins: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_ERROR_CLEANUP_INTERVAL",
+        default = 300,
+        help = "pipeline error cleanup interval in seconds"
+    )]
+    pub error_cleanup_interval: u64,
 }
 
 #[derive(EnvConfig, Default)]
