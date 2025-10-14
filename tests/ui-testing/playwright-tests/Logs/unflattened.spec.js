@@ -97,17 +97,16 @@ test.describe("Unflattened testcases", () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     pageManager = new PageManager(page);
-    // Strategic 500ms wait for operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
+    await page.waitForTimeout(500);
     await ingestion(page);
-    // Strategic 500ms wait for medium operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
+    // Wait for data to be indexed before navigating to logs
+    await page.waitForTimeout(2000);
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await pageManager.logsPage.selectStream("e2e_automate"); 
+    await pageManager.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
   });
 
@@ -116,252 +115,287 @@ test.describe("Unflattened testcases", () => {
   });
 
   test("stream to toggle store original data toggle and display o2 id", async ({ page }) => {
+    testLogger.info('Starting test: toggle store original data and display o2 id');
+
     // Navigate to Streams Menu
-    await pageManager.unflattenedPage.streamsMenu.waitFor(); // Wait for the streams menu to be visible
-    await pageManager.unflattenedPage.streamsMenu.click();
-  
-    // Search for Stream and access details
-    await pageManager.unflattenedPage.searchStreamInput.waitFor(); // Wait for the search input to be ready
-    await pageManager.unflattenedPage.searchStreamInput.click();
-    await pageManager.unflattenedPage.searchStreamInput.fill("e2e_automate");
-    // Strategic 500ms wait for operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
-  
-    await pageManager.unflattenedPage.streamDetailButton.waitFor(); // Ensure the stream detail button is visible
-    await pageManager.unflattenedPage.streamDetailButton.click();
-    // Strategic 500ms wait for operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
-
-    //before toggling we need to make sure that we shift to configuration tab 
-    await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
-    await page.getByRole('tab', { name: 'Configuration' }).click();
-    // Toggle 'Store Original Data' and update schema
-    await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor(); // Wait for the toggle to be visible
-    await pageManager.unflattenedPage.storeOriginalDataToggle.click();
-  
-    await pageManager.unflattenedPage.schemaUpdateButton.waitFor(); // Wait for the schema update button to be clickable
-    await pageManager.unflattenedPage.schemaUpdateButton.click();
-  
-    // Strategic 1000ms wait for schema update processing - this is functionally necessary
-  await page.waitForTimeout(1000); // Ensure the schema update is processed
-    await ingestion(page); // Custom ingestion function
-    // Strategic 1000ms wait for data ingestion completion - this is functionally necessary
-  await page.waitForTimeout(1000); // Allow time for ingestion
-  
-    // Close the dialog and explore the stream
-    await pageManager.unflattenedPage.closeButton.waitFor(); // Wait for the close button to be visible
-    await pageManager.unflattenedPage.closeButton.click();
-  
-    await pageManager.unflattenedPage.exploreButton.waitFor(); // Wait for the explore button to be clickable
-    await pageManager.unflattenedPage.exploreButton.click();
-  
-    // Strategic 500ms wait for operation completion - this is functionally necessary
-  await page.waitForTimeout(500); // Small delay to ensure page readiness
-  
-    // Select date and time
-    await pageManager.unflattenedPage.dateTimeButton.waitFor(); // Wait for the date-time button
-    await pageManager.unflattenedPage.dateTimeButton.click();
-  
-    await pageManager.unflattenedPage.relativeTab.waitFor(); // Wait for the relative tab to be visible
-    await pageManager.unflattenedPage.relativeTab.click();
-  
-    // Strategic 500ms wait for medium operation completion - this is functionally necessary
-  await page.waitForTimeout(500); // Wait for the relative tab to load
-  
-    // Expand log table row and verify details
-    await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor(); // Wait for the expand menu to appear
-    await pageManager.unflattenedPage.logTableRowExpandMenu.click();
-  
-    await pageManager.unflattenedPage.logSourceColumn.waitFor(); // Ensure the source column is ready
-    await pageManager.unflattenedPage.logSourceColumn.click();
-  
-    // Strategic 1500ms wait for complex UI update and o2 ID element rendering - this is functionally necessary
-  await page.waitForTimeout(1500); // Extended wait to ensure o2 ID element is rendered
-  
-    await pageManager.unflattenedPage.o2IdText.waitFor({ timeout: 30000 }); // Extended timeout for o2 ID text visibility
-    await pageManager.unflattenedPage.o2IdText.click();
-  
-    await pageManager.unflattenedPage.unflattenedTab.waitFor(); // Wait for the unflattened tab to be visible
-    await pageManager.unflattenedPage.unflattenedTab.click();
-  
-    // Strategic 500ms wait for operation completion - this is functionally necessary
-  await page.waitForTimeout(500); // Small delay before closing
-  
-    // Close the dialog
-    await pageManager.unflattenedPage.closeDialog.waitFor(); // Wait for the close button in the dialog
-    await pageManager.unflattenedPage.closeDialog.click();
-  });
-
-
-  test("stream to display o2 id when quick mode is on and select * query is added", async ({ page }) => {
-    // Navigate to Streams Menu
+    testLogger.info('Navigating to Streams menu');
     await pageManager.unflattenedPage.streamsMenu.waitFor();
     await pageManager.unflattenedPage.streamsMenu.click();
 
     // Search for Stream and access details
+    testLogger.info('Searching for stream: e2e_automate');
     await pageManager.unflattenedPage.searchStreamInput.waitFor();
     await pageManager.unflattenedPage.searchStreamInput.click();
     await pageManager.unflattenedPage.searchStreamInput.fill("e2e_automate");
-    // Strategic 500ms wait for operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
-    
+    await page.waitForTimeout(500);
+
+    testLogger.info('Opening stream detail dialog');
     await pageManager.unflattenedPage.streamDetailButton.waitFor();
     await pageManager.unflattenedPage.streamDetailButton.click();
-    // Strategic 500ms wait for operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
-    //before toggling we need to make sure that we shift to configuration tab 
+    await page.waitForTimeout(500);
+
+    testLogger.info('Switching to Configuration tab');
     await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
     await page.getByRole('tab', { name: 'Configuration' }).click();
-    // Toggle 'Store Original Data' and update schema
+
+    testLogger.info('Toggling Store Original Data setting');
     await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor();
     await pageManager.unflattenedPage.storeOriginalDataToggle.click();
-    
+
+    testLogger.info('Updating schema with new settings');
     await pageManager.unflattenedPage.schemaUpdateButton.waitFor();
     await pageManager.unflattenedPage.schemaUpdateButton.click();
-    
-    // Strategic 500ms wait for operation completion - this is functionally necessary
-  await page.waitForTimeout(500); // Timeout to ensure process completes
-    await ingestion(page);
-    // Strategic 500ms wait for medium operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
 
-    // Close the dialog and explore the stream
+    testLogger.info('Schema update initiated, waiting for completion');
+    await page.waitForTimeout(1000);
+
+    testLogger.info('Starting data ingestion with updated schema');
+    await ingestion(page);
+    testLogger.info('Data ingestion completed, waiting 3s for indexing');
+    await page.waitForTimeout(3000);
+
+    testLogger.info('Closing stream dialog and navigating to logs explorer');
     await pageManager.unflattenedPage.closeButton.waitFor();
     await pageManager.unflattenedPage.closeButton.click();
-    
+
+    testLogger.info('Clicking Explore button to view logs');
     await pageManager.unflattenedPage.exploreButton.waitFor();
     await pageManager.unflattenedPage.exploreButton.click();
-    // Strategic 500ms wait for medium operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
+    await page.waitForTimeout(500);
 
-    // Toggle Quick Mode if it's off
-    await toggleQuickModeIfOff(page);
-    // Strategic 500ms wait for operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
-
-    // Select date and time
+    testLogger.info('Opening date/time picker');
     await pageManager.unflattenedPage.dateTimeButton.waitFor();
     await pageManager.unflattenedPage.dateTimeButton.click();
-    
+
+    testLogger.info('Selecting relative time range');
     await pageManager.unflattenedPage.relativeTab.waitFor();
     await pageManager.unflattenedPage.relativeTab.click();
-    // Strategic 500ms wait for medium operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
+    testLogger.info('Time range selected, waiting for results to load');
 
+    testLogger.info('Expanding first log row');
+    await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
+    await pageManager.unflattenedPage.logTableRowExpandMenu.click();
+
+    testLogger.info('Opening log source details');
+    await pageManager.unflattenedPage.logSourceColumn.waitFor();
+    await pageManager.unflattenedPage.logSourceColumn.click();
+    await page.waitForTimeout(1500);
+
+    testLogger.info('Waiting for _o2_id field to appear in log details');
+    try {
+      await pageManager.unflattenedPage.o2IdText.waitFor({ timeout: 30000 });
+      testLogger.info('Successfully found _o2_id field');
+      await pageManager.unflattenedPage.o2IdText.click();
+    } catch (error) {
+      testLogger.error('Failed to find _o2_id field in log details', { error: error.message });
+      throw error;
+    }
+
+    testLogger.info('Switching to unflattened tab');
+    await pageManager.unflattenedPage.unflattenedTab.waitFor();
+    await pageManager.unflattenedPage.unflattenedTab.click();
+    await page.waitForTimeout(500);
+
+    testLogger.info('Closing log detail dialog');
+    await pageManager.unflattenedPage.closeDialog.waitFor();
+    await pageManager.unflattenedPage.closeDialog.click();
+    testLogger.info('Test completed successfully');
+  });
+
+
+  test("stream to display o2 id when quick mode is on and select * query is added", async ({ page }) => {
+    testLogger.info('Starting test: display o2 id with quick mode and SELECT * query');
+
+    testLogger.info('Navigating to Streams menu');
+    await pageManager.unflattenedPage.streamsMenu.waitFor();
+    await pageManager.unflattenedPage.streamsMenu.click();
+
+    testLogger.info('Searching for stream: e2e_automate');
+    await pageManager.unflattenedPage.searchStreamInput.waitFor();
+    await pageManager.unflattenedPage.searchStreamInput.click();
+    await pageManager.unflattenedPage.searchStreamInput.fill("e2e_automate");
+    await page.waitForTimeout(500);
+
+    testLogger.info('Opening stream detail dialog');
+    await pageManager.unflattenedPage.streamDetailButton.waitFor();
+    await pageManager.unflattenedPage.streamDetailButton.click();
+    await page.waitForTimeout(500);
+
+    testLogger.info('Switching to Configuration tab');
+    await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
+    await page.getByRole('tab', { name: 'Configuration' }).click();
+
+    testLogger.info('Toggling Store Original Data setting');
+    await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor();
+    await pageManager.unflattenedPage.storeOriginalDataToggle.click();
+
+    testLogger.info('Updating schema with new settings');
+    await pageManager.unflattenedPage.schemaUpdateButton.waitFor();
+    await pageManager.unflattenedPage.schemaUpdateButton.click();
+
+    await page.waitForTimeout(500);
+    testLogger.info('Starting data ingestion with updated schema');
+    await ingestion(page);
+    testLogger.info('Data ingestion completed, waiting 3s for indexing');
+    await page.waitForTimeout(3000);
+
+    testLogger.info('Closing stream dialog and navigating to logs explorer');
+    await pageManager.unflattenedPage.closeButton.waitFor();
+    await pageManager.unflattenedPage.closeButton.click();
+
+    testLogger.info('Clicking Explore button to view logs');
+    await pageManager.unflattenedPage.exploreButton.waitFor();
+    await pageManager.unflattenedPage.exploreButton.click();
+    await page.waitForTimeout(500);
+
+    testLogger.info('Toggling Quick Mode if needed');
+    await toggleQuickModeIfOff(page);
+    await page.waitForTimeout(500);
+
+    testLogger.info('Opening date/time picker');
+    await pageManager.unflattenedPage.dateTimeButton.waitFor();
+    await pageManager.unflattenedPage.dateTimeButton.click();
+
+    testLogger.info('Selecting relative time range');
+    await pageManager.unflattenedPage.relativeTab.waitFor();
+    await pageManager.unflattenedPage.relativeTab.click();
+    await page.waitForTimeout(1000);
+    testLogger.info('Time range selected, waiting for results to load');
+
+    testLogger.info('Opening all fields panel');
     await pageManager.unflattenedPage.allFieldsButton.waitFor();
     await pageManager.unflattenedPage.allFieldsButton.click();
 
-    // Search for 'kubernetes_pod_id' field
+    testLogger.info('Searching for field: kubernetes_pod_id');
     await pageManager.unflattenedPage.indexFieldSearchInput.waitFor();
     await pageManager.unflattenedPage.indexFieldSearchInput.fill("kubernetes_pod_id");
-    
-    // Strategic 500ms wait for medium operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
+    await page.waitForTimeout(500);
+
+    testLogger.info('Selecting kubernetes_pod_id field');
     await page
       .locator('[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]')
       .first()
-      .waitFor(); // Wait for the specific button to be visible
+      .waitFor();
     await page
       .locator('[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]')
       .first()
       .click();
 
-    // Switch to SQL mode and validate query editor content
+    testLogger.info('Switching to SQL mode');
     await pageManager.unflattenedPage.sqlModeToggle.waitFor();
     await pageManager.unflattenedPage.sqlModeToggle.click();
-    
-    // Strategic 500ms wait for medium operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
+    await page.waitForTimeout(500);
+
+    testLogger.info('Verifying kubernetes_pod_id appears in query editor');
     await expect(
       pageManager.unflattenedPage.logsSearchBarQueryEditor
         .getByText(/kubernetes_pod_id/)
         .first()
     ).toBeVisible();
 
-    // Update the query editor with 'SELECT * FROM "e2e_automate"'
+    testLogger.info('Replacing query with SELECT * FROM "e2e_automate"');
     await pageManager.unflattenedPage.logsSearchBarQueryEditor.waitFor();
     await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').first().click();
     await pageManager.unflattenedPage.logsSearchBarQueryEditor.click();
+    await page.keyboard.press('Control+a');
     await page.keyboard.type('SELECT * FROM "e2e_automate"');
-    // Strategic 500ms wait for medium operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
 
-    // Interact with log table rows and verify details
+    testLogger.info('Executing SELECT * query to fetch fresh data with _o2_id');
+    await page.waitForTimeout(500);
+    await page.locator("[data-test='logs-search-bar-refresh-btn']").click();
+    testLogger.info('Query executed, waiting for results to load');
+    await page.waitForTimeout(2000);
+
+    testLogger.info('Expanding first log row from SELECT * results');
     await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
     await pageManager.unflattenedPage.logTableRowExpandMenu.click();
-    
+
+    testLogger.info('Opening log source details');
     await pageManager.unflattenedPage.logSourceColumn.waitFor();
     await pageManager.unflattenedPage.logSourceColumn.click();
-    
-    // Strategic 1500ms wait for complex UI update and o2 ID element rendering - this is functionally necessary
-  await page.waitForTimeout(1500); // Extended wait to ensure o2 ID element is rendered
-    await pageManager.unflattenedPage.o2IdText.waitFor({ timeout: 30000 }); // Extended timeout for o2 ID text visibility
-    await pageManager.unflattenedPage.o2IdText.click();
-    
-    // Strategic 500ms wait for operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
+    await page.waitForTimeout(1500);
+
+    testLogger.info('Waiting for _o2_id field to appear in log details');
+    try {
+      await pageManager.unflattenedPage.o2IdText.waitFor({ timeout: 30000 });
+      testLogger.info('Successfully found _o2_id field');
+      await pageManager.unflattenedPage.o2IdText.click();
+    } catch (error) {
+      testLogger.error('Failed to find _o2_id field in log details', { error: error.message });
+      throw error;
+    }
+
+    await page.waitForTimeout(500);
+    testLogger.info('Switching to unflattened tab');
     await pageManager.unflattenedPage.unflattenedTab.waitFor();
     await pageManager.unflattenedPage.unflattenedTab.click();
-    // Strategic 500ms wait for operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
+    await page.waitForTimeout(500);
 
-    // Close the dialog
+    testLogger.info('Closing log detail dialog');
     await pageManager.unflattenedPage.closeDialog.waitFor();
     await pageManager.unflattenedPage.closeDialog.click();
 
-    // Repeat the process: Navigate back to Streams Menu, search, toggle, etc.
+    testLogger.info('Toggling Store Original Data back OFF to clean up');
+    testLogger.info('Navigating back to Streams menu');
     await pageManager.unflattenedPage.streamsMenu.waitFor();
     await pageManager.unflattenedPage.streamsMenu.click();
-    
+
+    testLogger.info('Searching for stream: e2e_automate');
     await pageManager.unflattenedPage.searchStreamInput.waitFor();
     await pageManager.unflattenedPage.searchStreamInput.click();
     await pageManager.unflattenedPage.searchStreamInput.fill("e2e_automate");
-    // Strategic 500ms wait for operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
-    
+    await page.waitForTimeout(500);
+
+    testLogger.info('Opening stream detail dialog');
     await pageManager.unflattenedPage.streamDetailButton.waitFor();
     await pageManager.unflattenedPage.streamDetailButton.click();
-    // Strategic 500ms wait for operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
-    //before toggling we need to make sure that we shift to configuration tab 
+    await page.waitForTimeout(500);
+
+    testLogger.info('Switching to Configuration tab');
     await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
     await page.getByRole('tab', { name: 'Configuration' }).click();
+
+    testLogger.info('Toggling Store Original Data OFF');
     await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor();
     await pageManager.unflattenedPage.storeOriginalDataToggle.click();
-    
+
+    testLogger.info('Updating schema');
     await pageManager.unflattenedPage.schemaUpdateButton.waitFor();
     await pageManager.unflattenedPage.schemaUpdateButton.click();
-    
+
+    testLogger.info('Closing dialog');
     await pageManager.unflattenedPage.closeButton.waitFor();
     await pageManager.unflattenedPage.closeButton.click();
-    
-    // Strategic 500ms wait for operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
+
+    await page.waitForTimeout(500);
+    testLogger.info('Ingesting data with Store Original Data OFF');
     await ingestion(page);
-    
-    // Strategic 500ms wait for medium operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
+    testLogger.info('Data ingestion completed, waiting 3s for indexing');
+    await page.waitForTimeout(3000);
+
+    testLogger.info('Navigating to logs explorer');
     await pageManager.unflattenedPage.exploreButton.waitFor();
     await pageManager.unflattenedPage.exploreButton.click();
-    
-    // Strategic 1000ms wait for complex operation completion - this is functionally necessary
-  await page.waitForTimeout(1000);
+    await page.waitForTimeout(1000);
+
+    testLogger.info('Opening date/time picker');
     await pageManager.unflattenedPage.dateTimeButton.waitFor();
     await pageManager.unflattenedPage.dateTimeButton.click();
-    
+
+    testLogger.info('Selecting relative time range');
     await pageManager.unflattenedPage.relativeTab.waitFor();
     await pageManager.unflattenedPage.relativeTab.click();
-    // Strategic 500ms wait for medium operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
 
-    // Final log row interaction
+    testLogger.info('Verifying timestamp field is visible (final verification)');
     await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
     await pageManager.unflattenedPage.logTableRowExpandMenu.click();
-    
-    // Strategic 500ms wait for medium operation completion - this is functionally necessary
-  await page.waitForTimeout(500);
+    await page.waitForTimeout(500);
+
     await page.getByText("arrow_drop_down_timestamp:").waitFor();
     await page.getByText("arrow_drop_down_timestamp:").click();
+    testLogger.info('Test completed successfully');
 });
 
 
