@@ -206,32 +206,19 @@ export default defineComponent({
   // Phase 2 & 3: Enhanced active state with modern UX
   &.q-router-link--active {
     transform: translateZ(0) !important;
+    background-color: var(--o2-theme-elements);
+    color: var(--o2-menu-text-active);
     // Rich, vibrant multi-layer gradient background
-    background:
-      linear-gradient(135deg, rgba(168, 85, 247, 0.4) 0%, rgba(236, 72, 153, 0.35) 100%),
-      linear-gradient(180deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.25) 100%) !important;
-    // Stronger border with glow
-    border: 1px solid rgba(168, 85, 247, 0.6) !important;
-    // Minimal shadow for subtle depth
-    box-shadow:
-      0 0 8px rgba(168, 85, 247, 0.2),
-      0 2px 8px rgba(168, 85, 247, 0.25),
-      inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
-    color: white !important;
-    transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
-    // Subtle inner highlight for depth
-    position: relative;
-    backdrop-filter: blur(8px) !important;
-
-    .q-icon {
-      // Minimal icon glow
-      filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.4));
-      color: #e9d5ff; // Lighter purple for better visibility
-    }
+    
+    // .q-icon {
+    //   // Minimal icon glow
+    //   filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.4));
+    //   color: #e9d5ff; // Lighter purple for better visibility
+    // }
 
     .q-item-label {
       font-weight: 700;
-      color: #f3e8ff; // Very light purple/white for contrast
+      color: var(--o2-text-secondary); // Very light purple/white for contrast
       text-shadow: 0 0 4px rgba(168, 85, 247, 0.3);
     }
 
@@ -245,7 +232,7 @@ export default defineComponent({
       top: 50%;
       transform: translateY(-50%);
       // Brighter gradient
-      background: linear-gradient(180deg, #c084fc 0%, #a855f7 50%, #9333ea 100%);
+      background: var(--o2-theme-elements);
       border-radius: 0 2px 2px 0;
       // Minimal glow
       box-shadow:
@@ -260,7 +247,7 @@ export default defineComponent({
       left: 0;
       right: 0;
       bottom: 0;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, transparent 50%, rgba(0, 0, 0, 0.1) 100%);
+      
       border-radius: 6px;
       pointer-events: none;
     }
@@ -345,23 +332,21 @@ body.body--light {
     }
 
     &.q-router-link--active {
-      background: linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(168, 85, 247, 0.25) 100%) !important;
-      border: 1px solid rgba(59, 130, 246, 0.5) !important;
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
-      color: #2563eb !important;
+      background: linear-gradient(135deg, color-mix(in srgb, var(--o2-theme-elements) 50%, white) 0%, var(--o2-theme-background) 100%) !important;
+      border: 1px solid var(--o2-theme-elements) !important;
+      box-shadow: 0px 0px 2px var(--o2-theme-background) !important;
+      color: var(--o2-theme-elements) !important;
 
       :deep(.q-icon) {
-        color: #2563eb !important;
         filter: drop-shadow(0 0 8px rgba(37, 99, 235, 0.5)) !important;
       }
 
       :deep(.q-item-label) {
-        color: #2563eb !important;
         font-weight: 700 !important;
       }
 
       &::before {
-        background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%) !important;
+        background: linear-gradient(180deg, var(--o2-theme-elements) 0%, var(--o2-theme-background) 100%) !important;
         box-shadow: 0 0 8px rgba(37, 99, 235, 0.5) !important;
       }
     }

@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #after>
-                <div style="background-color: white; height: 100%;">
+                <div class="logs-search-result-container">
                   <div
                     v-if="
                       searchObj.data.filterErrMsg !== '' &&

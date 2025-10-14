@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-btn class="round-button" round flat dense :ripple="false" @click="toggleDarkMode">
-    <q-icon :name="DarkModeIcon" size="25px" class="header-icon"></q-icon>
+    <q-icon :name="DarkModeIcon" class="header-icon"></q-icon>
     <q-tooltip anchor="top middle" self="bottom middle">
       Switch to {{ darkMode ? "Light Mode" : "Dark Mode" }}
     </q-tooltip>
@@ -99,26 +99,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.light-mode {
-  background-color: #ffffff;
-  color: #000000;
-}
-
-.dark-mode {
-  background-color: #36383a;
-  color: #ffffff;
-}
-
-.round-button {
-  border: none;
-  border-radius: 50%;
-  box-shadow: none;
-  transition: box-shadow 0.3s ease;
-}
-
-.round-button:hover {
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-</style>

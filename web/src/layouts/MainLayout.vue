@@ -78,21 +78,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-toolbar-title></q-toolbar-title>
         <div
-          class="headerMenu float-left"
+          class="float-left tw-mr-2"
           v-if="store.state.organizationData.quotaThresholdMsg"
         >
           <div
             type="warning"
             icon="cloud"
-            class="warning-msg"
-            style="display: inline"
+            class="warning-msg tw-inline tw-mr-2"
           >
-            <q-icon name="warning" size="xs" class="warning" />{{
+            <q-icon name="warning" size="xs" class="warning" />Hello Dev{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
           <q-btn
-            color="secondary"
             size="sm"
             style="display: inline; padding: 5px 10px"
             rounded
@@ -103,13 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >Upgrade to PRO Plan</q-btn
           >
         </div>
-        <div style="
-    display: inherit;
-    background-color: white;
-    border-radius: 0.375rem;
-    padding: 0 0.25rem;
-    opacity: 0.8;
-">
+        <div class="headerMenu">
           <q-btn
             v-if="
               config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
@@ -287,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="row items-center no-wrap">
               <q-icon
-                ><component :is="slackIcon" size="25px" class="header-icon"
+                ><component :is="slackIcon"
               /></q-icon>
             </div>
             <q-tooltip anchor="top middle" self="bottom middle">
@@ -298,7 +290,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="row items-center no-wrap">
               <q-icon
                 name="help_outline"
-                size="25px"
                 class="header-icon"
               ></q-icon>
               <q-tooltip anchor="top middle" self="bottom middle">
@@ -362,7 +353,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="row items-center no-wrap">
               <q-icon
                 :name="outlinedSettings"
-                size="25px"
                 class="header-icon"
               ></q-icon>
             </div>
@@ -381,7 +371,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="row items-center no-wrap">
               <q-icon
                 :name="user.picture ? user.picture : 'person'"
-                size="25px"
                 class="header-icon"
               ></q-icon>
               <q-tooltip anchor="top middle" self="bottom middle">
@@ -508,8 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       show-if-above
       :width="80"
       :breakpoint="500"
-      bordered
-      class="o2-bg-color"
+      class="o2-navigation"
       role="navigation"
       aria-label="Main navigation"
     >
@@ -1560,16 +1548,6 @@ export default defineComponent({
   }
 }
 
-// Phase 3: Enhanced drawer with glassmorphism
-.q-drawer {
-  background: linear-gradient(180deg, #0f172a 0%, #020617 100%) !important;
-
-  // Light mode
-  body.body--light & {
-    background: rgba(255, 255, 255, 0.25) !important;
-  }
-}
-
 .warning-msg {
   background-color: var(--q-warning);
   padding: 5px;
@@ -1615,8 +1593,6 @@ export default defineComponent({
 }
 
 .headerMenu {
-  margin-right: 1rem;
-
   .block {
     font-weight: 700;
     color: #404040;
@@ -1626,10 +1602,6 @@ export default defineComponent({
 .q-item {
   min-height: 30px;
   padding: 8px 8px;
-}
-
-.o2-bg-color {
-  background-color: rgba(89, 96, 178, 0.08);
 }
 
 .q-list {
@@ -1644,32 +1616,16 @@ export default defineComponent({
       padding: 2px 2px;
       border-radius: 5px;
 
-      .q-icon {
-        height: 1.5rem;
-        width: 1.5rem;
-      }
-
       &.q-router-link--active {
-        .q-icon img {
-          filter: brightness(100);
-        }
-
-        .q-item__label {
-          color: white;
-
-          // Light mode: make text blue for readability
-          body.body--light & {
-            color: #2563eb !important;
-          }
-        }
-        color: white;
-
+        background: linear-gradient(135deg, color-mix(in srgb, var(--o2-theme-elements) 50%, white) 0%, var(--o2-theme-background) 100%) !important;
+        border: 1px solid var(--o2-theme-elements) !important;
+        box-shadow: 0px 0px 2px var(--o2-theme-background) !important;
+        
         // Light mode: make item text blue
         body.body--light & {
-          color: #2563eb !important;
-
+          
           .q-icon {
-            color: #2563eb !important;
+            color: var(--o2-menu-icon-active) !important;
           }
         }
       }
@@ -1677,7 +1633,7 @@ export default defineComponent({
       &__label {
         font-size: 12px;
         font-weight: 600;
-        color: grey;
+        color: var(--o2-menu-text-active);
       }
     }
   }
@@ -1735,8 +1691,6 @@ export default defineComponent({
 }
 
 .headerMenu {
-  margin-right: 1rem;
-
   .block {
     font-weight: 700;
     color: #404040;
@@ -1746,8 +1700,9 @@ export default defineComponent({
   &.leftNavList {
     .q-item {
       .q-icon {
-        height: 1.5rem;
-        width: 1.5rem;
+        height: 1.2rem;
+        width: 1.2rem;
+        color: var(--o2-icon-color);
       }
 
       &.q-router-link--active {
@@ -1870,7 +1825,7 @@ body.ai-chat-open {
 }
 
 .ai-hover-btn:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, var(--o2-theme-elements) 0%, var(--o2-theme-elements) 100%) !important;
 }
 
 .ai-icon {

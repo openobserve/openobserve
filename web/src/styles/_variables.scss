@@ -228,6 +228,40 @@ $o2-dark-teal-700: #42B1A4;
 $o2-dark-teal-800: #60C0B5;
 $o2-dark-teal-900: #9BDDD6;
 
+// $o2-theme-background: #37596F;
+// $o2-theme-elements: #214364;
+// grey f4f4f4
+
+// $o2-theme-background: #21434E;
+// $o2-theme-elements: #0B2C43;
+
+// $o2-theme-background: #E9F4F4;
+// $o2-theme-elements: #1664A6;
+
+$o2-theme-background: #fafbfd;
+$o2-theme-elements: #04c9b7;
+$o2-menu-background: #ffffff; 
+$o2-card-background: #ffffff; 
+$o2-hover-background: #d9e2ef;
+$o2-border-color: #E5E7EB;
+$o2-icon-color: #444444;
+$o2-scrollbar-track: transparent;
+$o2-scrollbar-thumb: #EFEFEF;
+$o2-scrollbar-thumb-hover: #DCDCDC;
+$o2-button-hover-bg: #F3F4F6;
+
+$o2-dark-theme-background: #1c1c1f;
+$o2-dark-theme-elements: #04c9b7;
+$o2-dark-menu-background: #252529;  
+$o2-dark-card-background: #2c2c2e;
+$o2-dark-hover-background: #76838f;
+$o2-dark-border-color: #E5E7EB;
+$o2-dark-icon-color: #444444;
+$o2-dark-scrollbar-track: transparent;
+$o2-dark-scrollbar-thumb: #EFEFEF;
+$o2-dark-scrollbar-thumb-hover: #DCDCDC;
+$o2-button-hover-bg: #F3F4F6;
+
 // Semantic Colors - Light Mode
 :root {
   // Backgrounds
@@ -253,9 +287,27 @@ $o2-dark-teal-900: #9BDDD6;
   // Interactive Elements
   --o2-primary-color: #{$o2-iris-1100};     // Primary actions/buttons
   --o2-primary-foreground: #{$o2-gray-100}; // Text on primary color
-  --o2-hover-accent: #{$o2-iris-400};       // Hover state accent
+  --o2-hover-accent: #{$o2-hover-background};       // Hover state accent
   --o2-destructive-foreground: #{$o2-gray-100}; // Text on destructive buttons
   --o2-focus-ring: #{$o2-iris-1200};        // Focus state indicator
+
+  --o2-theme-background: #{$o2-theme-background};
+  --o2-theme-elements: #{$o2-theme-elements};
+
+  --o2-menu-background: #{$o2-menu-background};
+  --o2-menu-icon-active: #{$o2-gray-1400};      // Main text color
+  --o2-menu-text-active: #{$o2-gray-1400};      // Main text color
+  --o2-card-background: #{$o2-card-background};
+  --o2-button-text: #{$o2-gray-1400};
+
+  --o2-scrollbar-track: #{$o2-scrollbar-track};
+  --o2-scrollbar-thumb: #{$o2-scrollbar-thumb};
+  --o2-scrollbar-thumb-hover: #{$o2-scrollbar-thumb-hover};
+
+  --o2-border-color: #{$o2-border-color};
+  --o2-icon-color: #{$o2-icon-color};
+
+  --o2-button-hover-bg: #{$o2-button-hover-bg};
 }
 
 // Semantic Colors - Dark Mode
@@ -283,7 +335,25 @@ $o2-dark-teal-900: #9BDDD6;
   // Interactive Elements
   --o2-primary-color: #{$o2-dark-iris-1000};  // Primary actions
   --o2-primary-foreground: #{$o2-dark-gray-100}; // Text on primary
-  --o2-hover-accent: #{$o2-dark-iris-1000};   // Hover accents
+  --o2-hover-accent: #{$o2-dark-hover-background};   // Hover accents
   --o2-destructive-foreground: #{$o2-dark-gray-100}; // Destructive text
   --o2-focus-ring: #{$o2-dark-iris-600};      // Focus indicators
+
+  --o2-theme-background: #{$o2-dark-theme-background};
+  --o2-theme-elements: #{$o2-dark-theme-elements};
+
+  --o2-menu-background: #{$o2-dark-menu-background}; 
+  --o2-menu-icon-active: #{$o2-dark-gray-1400};      // Main text color
+  --o2-menu-text-active: #{$o2-dark-gray-1400};      // Main text color
+  --o2-card-background: #{$o2-dark-card-background};
+  --o2-button-text: #{$o2-gray-1400};
+
+  --o2-scrollbar-track: #{$o2-dark-scrollbar-track};
+  --o2-scrollbar-thumb: #{$o2-dark-scrollbar-thumb};
+  --o2-scrollbar-thumb-hover: #{$o2-dark-scrollbar-thumb-hover};
+
+  --o2-border-color: #{$o2-dark-border-color};
+  --o2-icon-color: #{$o2-dark-icon-color};
+
+  --o2-button-hover-bg: #{$o2-button-hover-bg};
 }
