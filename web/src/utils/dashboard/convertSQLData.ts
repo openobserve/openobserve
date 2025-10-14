@@ -34,6 +34,7 @@ import {
   getUnitValue,
   isTimeSeries,
   isTimeStamp,
+  normalizeTimestamp,
 } from "./convertDataIntoUnitValue";
 import {
   calculateGridPositions,
@@ -447,9 +448,14 @@ export const convertSQLData = async (
       ...getZAxisKeys(),
       ...getBreakDownKeys(),
     ];
-    const timeBasedKey = keys?.find((key) =>
-      isTimeSeries([getDataValue(searchQueryDataFirstEntry, key)]),
-    );
+    const timeBasedKey = keys?.find((key) => {
+      const sampleData = [getDataValue(searchQueryDataFirstEntry, key)];
+      return (
+        isTimeSeries(sampleData) ||
+        isTimeStamp(sampleData, null) ||
+        key === store.state.zoConfig.timestamp_column
+      );
+    });
 
     if (!timeBasedKey) {
       return JSON.parse(JSON.stringify(processedData));
@@ -2163,7 +2169,8 @@ export const convertSQLData = async (
           // convert time string to selected timezone
           xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map(
             (it: any) => {
-              return formatDate(toZonedTime(it + "Z", store.state.timezone));
+              const zonedDate = toZonedTime(normalizeTimestamp(it), store.state.timezone);
+              return format(zonedDate, "HH:mm:ss");
             },
           );
         }
@@ -2179,7 +2186,8 @@ export const convertSQLData = async (
           // convert time string to selected timezone
           xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map(
             (it: any) => {
-              return formatDate(toZonedTime(it + "Z", store.state.timezone));
+              const zonedDate = toZonedTime(normalizeTimestamp(it), store.state.timezone);
+              return format(zonedDate, "HH:mm:ss");
             },
           );
         }
@@ -2471,17 +2479,47 @@ export const convertSQLData = async (
     options.xAxis[0].data.length > 0
   ) {
     // auto SQL: if x axis has time series(aggregation function is histogram)
-    const field = panelSchema.queries[0].fields?.x.find(
+    // First check for default _timestamp field
+    let field = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
         it.aggregationFunction == "histogram" &&
         it.column == store.state.zoConfig.timestamp_column,
     );
 
-    const timestampField = panelSchema.queries[0].fields?.x.find(
+    let timestampField = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
         !it.aggregationFunction &&
         it.column == store.state.zoConfig.timestamp_column,
     );
+
+    // If no default _timestamp field found, check for any custom timestamp field
+    if (!field && !timestampField) {
+      // Sample the x-axis data to detect timestamp-like fields
+      const sample = options.xAxis[0].data.slice(
+        0,
+        Math.min(20, options.xAxis[0].data.length),
+      );
+
+      const isTimeSeriesData = isTimeSeries(sample);
+      const isTimeStampData = isTimeStamp(sample, null);
+
+      if (isTimeSeriesData || isTimeStampData) {
+        // Find the first X-axis field that could be a timestamp
+        const xFields = panelSchema.queries[0].fields?.x || [];
+
+        if (isTimeSeriesData) {
+          // Look for histogram aggregation on any field that might be a timestamp
+          field = xFields.find(
+            (it: any) => it.aggregationFunction == "histogram",
+          );
+        }
+
+        if (!field && (isTimeSeriesData || isTimeStampData)) {
+          // Look for any non-aggregated field that might be a timestamp
+          timestampField = xFields.find((it: any) => !it.aggregationFunction);
+        }
+      }
+    }
 
     //if x axis has time series
     if (field || timestampField) {
@@ -2497,14 +2535,15 @@ export const convertSQLData = async (
         // if value field is not present in the data than use null
         if (field) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => {
-            const xKey = options.xAxis[0].data[index] + "Z";
+            const timestamp = normalizeTimestamp(options.xAxis[0].data[index]);
+            const xKey = timestamp;
             let x;
             if (timeStringCache[xKey]) {
               x = timeStringCache[xKey];
             } else {
               // need to consider time range gap
               x = toZonedTime(
-                new Date(options.xAxis[0].data[index] + "Z").getTime() +
+                new Date(timestamp).getTime() +
                   (metadata?.queries[0]?.timeRangeGap.seconds ?? 0),
                 store.state.timezone,
               );
@@ -2537,9 +2576,21 @@ export const convertSQLData = async (
       if (panelSchema.config.trellis?.layout) {
         options.xAxis.forEach((axis: any) => {
           axis.type = "time";
+          axis.axisLabel = {
+            formatter: function (value: any) {
+              const zonedDate = toZonedTime(new Date(value), store.state.timezone);
+              return format(zonedDate, "HH:mm:ss");
+            },
+          };
         });
       } else {
         options.xAxis[0].type = "time";
+        options.xAxis[0].axisLabel = {
+          formatter: function (value: any) {
+            const zonedDate = toZonedTime(new Date(value), store.state.timezone);
+            return format(zonedDate, "HH:mm:ss");
+          },
+        };
       }
 
       options.xAxis[0].data = [];
@@ -2688,26 +2739,32 @@ export const convertSQLData = async (
       options?.series?.forEach((seriesObj: any) => {
         // if value field is not present in the data than use null
         if (isTimeSeriesData) {
-          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-            // need to consider time range gap
-            toZonedTime(
-              new Date(options.xAxis[0].data[index] + "Z").getTime() +
-                (metadata?.queries[0]?.timeRangeGap.seconds ?? 0),
-              store.state.timezone,
-            ),
-            it ?? null,
-          ]);
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => {
+            const timestamp = normalizeTimestamp(options.xAxis[0].data[index]);
+            return [
+              // need to consider time range gap
+              toZonedTime(
+                new Date(timestamp).getTime() +
+                  (metadata?.queries[0]?.timeRangeGap.seconds ?? 0),
+                store.state.timezone,
+              ),
+              it ?? null,
+            ];
+          });
         } else if (isTimeStampData) {
-          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
-            // need to consider time range gap
-            toZonedTime(
-              (new Date(options.xAxis[0].data[index]).getTime() +
-                (metadata?.queries[0]?.timeRangeGap.seconds ?? 0)) /
-                1000,
-              store.state.timezone,
-            ),
-            it ?? null,
-          ]);
+          seriesObj.data = seriesObj?.data?.map((it: any, index: any) => {
+            const timestamp = normalizeTimestamp(options.xAxis[0].data[index]);
+            return [
+              // need to consider time range gap
+              toZonedTime(
+                (new Date(timestamp).getTime() +
+                  (metadata?.queries[0]?.timeRangeGap.seconds ?? 0)) /
+                  1000,
+                store.state.timezone,
+              ),
+              it ?? null,
+            ];
+          });
         }
       });
 
@@ -2715,9 +2772,21 @@ export const convertSQLData = async (
       if (panelSchema.config.trellis?.layout) {
         options.xAxis.forEach((axis: any) => {
           axis.type = "time";
+          axis.axisLabel = {
+            formatter: function (value: any) {
+              const zonedDate = toZonedTime(new Date(value), store.state.timezone);
+              return format(zonedDate, "HH:mm:ss");
+            },
+          };
         });
       } else {
         options.xAxis[0].type = "time";
+        options.xAxis[0].axisLabel = {
+          formatter: function (value: any) {
+            const zonedDate = toZonedTime(new Date(value), store.state.timezone);
+            return format(zonedDate, "HH:mm:ss");
+          },
+        };
       }
 
       options.xAxis[0].data = [];

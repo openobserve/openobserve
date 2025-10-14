@@ -334,7 +334,7 @@ export const formatUnitValue = (obj: any) => {
 };
 
 /**
- * Formats the given date into a string in the format "YY-MM-DD HH:MM:SS".
+ * Formats the given date into a string in the format "YY-MM-DD HH:MM".
  *
  * @param {any} date - The date to be formatted.
  * @return {string} The formatted date string.
@@ -345,17 +345,113 @@ export const formatDate = (date: any) => {
   const day = String(date.getDate()).padStart(2, "0");
   const hours = String(date.getHours()).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
 
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+};
+
+/**
+ * Formats the given date into a time string in the format "HH:MM".
+ *
+ * @param {any} date - The date to be formatted.
+ * @return {string} The formatted time string.
+ */
+export const formatTimeOnly = (date: any) => {
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${hours}:${minutes}`;
 };
 
 // Check if the sample is time series
 export const isTimeSeries = (sample: any) => {
-  const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
+  if (!Array.isArray(sample) || sample.length === 0) {
+    return false;
+  }
+
+  // Check if the data structure matches time patterns
   return sample.every((value: any) => {
-    return iso8601Pattern.test(value);
+    if (value === null || value === undefined || value === "") {
+      return false;
+    }
+
+    const strValue = String(value);
+
+    // Various time patterns that should be treated as time series
+    const timeFormats = [
+      // ISO format variations (including nanoseconds up to 9 digits)
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/,
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{1,9}$/,
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{1,9}Z$/,
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/,
+      // Date-time format
+      /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+      // Unix timestamp (10-16 digits)
+      /^\d{10,16}$/,
+      // Date only
+      /^\d{4}-\d{2}-\d{2}$/,
+      // Time only
+      /^\d{2}:\d{2}:\d{2}$/,
+    ];
+
+    // Check if value matches any time format
+    const matchesTimeFormat = timeFormats.some((pattern) =>
+      pattern.test(strValue),
+    );
+    // Also check if it's a valid date when parsed
+    const isValidDate =
+      !isNaN(Date.parse(strValue)) && Date.parse(strValue) > 0;
+
+    return matchesTimeFormat || isValidDate;
   });
+};
+
+/**
+ * Checks if a single value is a time format string
+ * @param value - The value to check
+ * @returns boolean indicating if the value is a time format
+ */
+export const isTimeFormatValue = (value: any): boolean => {
+  if (value === null || value === undefined || value === "") {
+    return false;
+  }
+
+  const strValue = String(value);
+
+  // Various time patterns that should be treated as time format
+  const timeFormats = [
+    // ISO format variations (including nanoseconds up to 9 digits)
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/,
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{1,9}$/,
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{1,9}Z$/,
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/,
+    // Date-time format
+    /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+    // Unix timestamp (10-16 digits)
+    /^\d{10,16}$/,
+  ];
+
+  return timeFormats.some((pattern) => pattern.test(strValue));
+};
+
+/**
+ * Normalizes a timestamp string by ensuring it has 'Z' suffix for UTC
+ * @param value - The timestamp value to normalize
+ * @returns normalized timestamp string
+ */
+export const normalizeTimestamp = (value: any): string => {
+  if (!isTimeFormatValue(value)) {
+    return value;
+  }
+
+  const strValue = String(value);
+
+  // If it's a unix timestamp (numeric), return as-is
+  if (/^\d{10,16}$/.test(strValue)) {
+    return strValue;
+  }
+
+  // Add "Z" only if the timestamp doesn't already end with it
+  return strValue.endsWith("Z") ? strValue : strValue + "Z";
 };
 
 // Check if the sample is timestamp (16 digit microseconds)
