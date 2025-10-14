@@ -88,6 +88,8 @@ struct PatternListResponse {
 struct PatternTestRequest {
     pattern: String,
     test_records: Vec<String>,
+    #[serde(default)]
+    policy: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct PatternTestResponse {
@@ -453,9 +455,13 @@ pub async fn test(body: web::Bytes) -> Result<HttpResponse, Error> {
 
         let pattern = req.pattern;
         let inputs = req.test_records;
+        // Default to Redact if policy not specified for backward compatibility
+        let policy = req.policy.as_ref().map(|p| p.as_str()).unwrap_or("Redact");
+        let policy = PatternPolicy::from(policy);
+
         let mut ret = Vec::with_capacity(inputs.len());
         for i in inputs {
-            match PatternManager::test_pattern(pattern.clone(), i, PatternPolicy::Redact) {
+            match PatternManager::test_pattern(pattern.clone(), i, policy) {
                 Ok(v) => {
                     ret.push(v);
                 }
