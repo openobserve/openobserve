@@ -90,6 +90,7 @@ datafusion-functions-aggregate-common.workspace = true
 datafusion-functions-json.workspace = true
 arrow.workspace = true
 arrow-flight.workspace = true
+arrow-json.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true
@@ -363,7 +364,7 @@ sysinfo = "0.37"
 tantivy = { version = "0.25", features = ["quickwit"] }
 tantivy-fst = "0.5"
 tempfile = "3"
-thiserror = "1.0"
+thiserror = "2.0.17"
 time = "0.3"
 tokio = { version = "1", features = ["full"] }
 tokio-rustls = { version = "0.26", default-features = false, features = [
@@ -389,5 +390,5 @@ utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
 uuid = { version = "1.18.1", features = ["v7"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "2003d617c7befdc7aa7f73a37263d272cd4a3718" }
 vrl = { version = "0.27.0", git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["value", "compiler", "test"] }
-zip = "5.1.1"
+zip = "6.0.0"
 zstd = "0.13"
