@@ -22,7 +22,8 @@ use config::{
     DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{
-            ResultSchemaResponse, SearchEventType, SearchHistoryHitResponse, default_use_cache,
+            Request, ResultSchemaResponse, SearchEventType, SearchHistoryHitResponse,
+            SearchHistoryRequest, SearchPartitionRequest, default_use_cache,
         },
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
         sql::resolve_stream_names,
@@ -174,7 +175,7 @@ async fn can_use_distinct_stream(
         ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
         ("is_multi_stream_search" = bool, Query, description = "Indicate is search is for multi stream"),
     ),
-    request_body(content = Object, description = "Search query", content_type = "application/json", example = json!({
+    request_body(content = Request, description = "Search query", content_type = "application/json", example = json!({
         "query": {
             "sql": "select * from k8s ",
             "start_time": 1675182660872049i64,
@@ -219,9 +220,9 @@ async fn can_use_distinct_stream(
 #[post("/{org_id}/_search")]
 pub async fn search(
     org_id: web::Path<String>,
-    in_req: HttpRequest,
-    body: web::Bytes,
     Headers(user_email): Headers<UserEmail>,
+    web::Json(mut req): web::Json<Request>,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -264,11 +265,6 @@ pub async fn search(
 
     let dashboard_info = get_dashboard_info_from_request(&query);
 
-    // handle encoding for query and aggs
-    let mut req: config::meta::search::Request = match json::from_slice(&body) {
-        Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
@@ -1344,7 +1340,7 @@ async fn values_v1(
 pub async fn search_partition(
     org_id: web::Path<String>,
     in_req: HttpRequest,
-    body: web::Bytes,
+    web::Json(mut req): web::Json<SearchPartitionRequest>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
@@ -1382,10 +1378,6 @@ pub async fn search_partition(
         }
     }
 
-    let mut req: config::meta::search::SearchPartitionRequest = match json::from_slice(&body) {
-        Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.sql) {
         req.sql = sql;
     }
@@ -1513,7 +1505,7 @@ pub async fn search_partition(
 pub async fn search_history(
     org_id: web::Path<String>,
     in_req: HttpRequest,
-    body: web::Bytes,
+    web::Json(mut req): web::Json<SearchHistoryRequest>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
@@ -1528,12 +1520,6 @@ pub async fn search_history(
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
     let user_id = Some(user_email.user_id.clone());
 
-    let mut req: config::meta::search::SearchHistoryRequest = match json::from_slice(&body) {
-        Ok(v) => v,
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
     // restrict history only to path org_id
     req.org_id = Some(org_id.clone());
     // restrict history only to requested user_id
@@ -1679,9 +1665,9 @@ pub async fn search_history(
 #[post("/{org_id}/result_schema")]
 pub async fn result_schema(
     org_id: web::Path<String>,
-    in_req: HttpRequest,
-    body: web::Bytes,
     Headers(user_email): Headers<UserEmail>,
+    web::Query(query): web::Query<HashMap<String, String>>,
+    web::Json(mut req): web::Json<Request>,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
 
@@ -1706,21 +1692,13 @@ pub async fn result_schema(
 
     let user_id = &user_email.user_id;
 
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let use_cache = get_use_cache_from_request(&query);
-    let is_streaming = {
-        match query.get("is_streaming") {
-            None => false,
-            Some(v) => v.to_lowercase().as_str().parse::<bool>().unwrap_or(false),
-        }
-    };
-
-    let mut req: config::meta::search::Request = match json::from_slice(&body) {
-        Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
+    let is_streaming = query
+        .get("is_streaming")
+        .and_then(|v| v.to_lowercase().parse::<bool>().ok())
+        .unwrap_or_default();
 
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
         req.query.sql = sql;

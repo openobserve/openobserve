@@ -173,7 +173,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'scatter',
               'stacked',
               'h-stacked',
-            ].includes(panelSchema.type) && checkIfPanelIsTimeSeries === true
+            ].includes(panelSchema.type) &&
+            checkIfPanelIsTimeSeries === true &&
+            !viewOnly
           "
           color="primary"
           :icon="isAddAnnotationMode ? 'cancel' : 'edit'"
@@ -220,7 +222,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openDrilldown(index)"
             style="cursor: pointer; display: flex; align-items: center"
           >
-            <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
+            <q-icon class="q-mr-xs q-mt-xs"
+size="16px" name="link" />
             <span>{{ drilldown.name }}</span>
           </div>
         </div>
@@ -403,6 +406,11 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
+    allowAlertCreation: {
+      default: false,
+      required: false,
+      type: Boolean,
+    },
     runId: {
       type: String,
       default: null,
@@ -432,6 +440,10 @@ export default defineComponent({
       required: false,
       default: false,
     },
+    viewOnly: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -446,6 +458,7 @@ export default defineComponent({
     "limit-number-of-series-warning-message-update",
     "is-partial-data-update",
     "series-data-update",
+    "contextmenu",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -483,6 +496,7 @@ export default defineComponent({
       folderId,
       reportId,
       allowAnnotationsAdd,
+      allowAlertCreation,
       runId,
       tabId,
       tabName,
@@ -550,6 +564,17 @@ export default defineComponent({
     const contextMenuData = ref<any>(null);
 
     const onChartContextMenu = (event: any) => {
+      // Only show context menu if alert creation is allowed
+      emit("contextmenu", {
+        ...event,
+        panelTitle: panelSchema.value.title,
+        panelId: panelSchema.value.id,
+      });
+
+      if (!allowAlertCreation.value) {
+        return;
+      }
+
       contextMenuVisible.value = true;
       contextMenuPosition.value = { x: event.x, y: event.y };
       contextMenuValue.value = event.value;
@@ -560,39 +585,113 @@ export default defineComponent({
       contextMenuVisible.value = false;
     };
 
-    const handleCreateAlert = (selection: { condition: string; threshold: number }) => {
+    const handleCreateAlert = (selection: {
+      condition: string;
+      threshold: number;
+    }) => {
       hideContextMenu();
 
       // Prepare panel data to pass to alert creation
       const query = panelSchema.value.queries?.[0];
       if (!query) {
-        console.error('No query found in panel');
+        console.error("No query found in panel");
         return;
       }
 
       // Determine query type based on panel configuration
       // Only care about SQL vs PromQL distinction
-      let queryType = 'sql'; // Default to SQL
-      if (panelSchema.value.queryType === 'promql') {
-        queryType = 'promql';
+      let queryType = "sql"; // Default to SQL
+      if (panelSchema.value.queryType === "promql") {
+        queryType = "promql";
+      }
+
+      // Get the executed query with variables replaced from metadata
+      // Only use metadata if it's available and has queries
+      const executedQuery =
+        metadata.value?.queries && metadata.value.queries.length > 0
+          ? metadata.value.queries[0]?.query || query.query
+          : query.query;
+
+      // Get the Y-axis column for threshold comparison
+      // Only needed for SQL queries, not for PromQL
+      let yAxisColumn = null;
+
+      if (queryType === "sql") {
+        const clickedSeriesName = contextMenuData.value?.seriesName;
+        const sqlQuery = executedQuery || query.query;
+
+        // First, try to get from query.fields.y if available (most reliable for query builder)
+        if (query.fields?.y && query.fields.y.length > 0) {
+          // For query builder queries, use the Y-axis field
+          const yField = query.fields.y[0];
+          const aliasOrColumn = yField.alias || yField.column;
+
+          // Extract from SQL to get the exact case (without quotes)
+          if (sqlQuery) {
+            // Look for pattern: aggregation_func(...) as "alias" or aggregation_func(...) as alias
+            const escapedAlias = aliasOrColumn.replace(
+              /[.*+?^${}()|[\]\\]/g,
+              "\\$&",
+            );
+            const regex = new RegExp(
+              `\\s+as\\s+(["']?${escapedAlias}["']?)(?:\\s|,|\\)|$)`,
+              "i",
+            );
+            const match = sqlQuery.match(regex);
+            if (match && match[1]) {
+              // Strip quotes - the parser will add them back if needed
+              yAxisColumn = match[1].replace(/^["']|["']$/g, "");
+            } else {
+              yAxisColumn = aliasOrColumn;
+            }
+          } else {
+            yAxisColumn = aliasOrColumn;
+          }
+        } else if (clickedSeriesName && sqlQuery) {
+          // Fallback: try to match the clicked series name in the SQL
+          // First try exact match with the series name
+          const regex = new RegExp(
+            `\\s+as\\s+["']?(${clickedSeriesName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})["']?(?:\\s|,|\\)|$)`,
+            "i",
+          );
+          const match = sqlQuery.match(regex);
+          if (match && match[1]) {
+            yAxisColumn = match[1];
+          } else {
+            // Last resort: extract any aggregation column from SQL (first one found)
+            // Pattern: count(...) as alias, avg(...) as alias, etc.
+            const aggRegex =
+              /(?:count|sum|avg|min|max|median)\s*\([^)]+\)\s+as\s+["']?([^"',\s)]+)["']?/i;
+            const aggMatch = sqlQuery.match(aggRegex);
+            if (aggMatch && aggMatch[1]) {
+              yAxisColumn = aggMatch[1];
+            } else {
+              yAxisColumn = clickedSeriesName;
+            }
+          }
+        }
       }
 
       const panelDataToPass = {
-        panelTitle: panelSchema.value.title || 'Unnamed Panel',
+        panelTitle: panelSchema.value.title || "Unnamed Panel",
         panelId: panelSchema.value.id,
         queries: panelSchema.value.queries,
         queryType: queryType,
         timeRange: selectedTimeObj.value,
         threshold: selection.threshold,
         condition: selection.condition,
+        // Pass the Y-axis column name for threshold comparison
+        yAxisColumn: yAxisColumn,
+        // Pass the executed query with variables already replaced
+        executedQuery: executedQuery,
       };
 
       // Navigate to alert creation page
       router.push({
-        name: 'addAlert',
+        name: "addAlert",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          fromPanel: 'true',
+          fromPanel: "true",
           panelData: encodeURIComponent(JSON.stringify(panelDataToPass)),
         },
       });
@@ -855,7 +954,10 @@ export default defineComponent({
         handleAddAnnotation(event.start, event.end);
       } else {
         // default behavior
-        emit("updated:data-zoom", event);
+        emit("updated:data-zoom", {
+          ...event,
+          data: { id: panelSchema.value.id, title: panelSchema.value.title },
+        });
       }
     };
 

@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <router-view></router-view>
+  <router-view
+    :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
+  ></router-view>
 </template>
 
 <script lang="ts">
@@ -44,6 +46,10 @@ export default {
       // const credsInfo = JSON.parse(creds);
       // store.dispatch("login", credsInfo);
       router.push("/logs");
+    }
+
+    return {
+      store,
     }
   },
 };

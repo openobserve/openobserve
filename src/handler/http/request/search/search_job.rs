@@ -16,6 +16,7 @@
 use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, delete, get, post, web};
+use config::meta::search::Request;
 #[cfg(feature = "enterprise")]
 use {
     crate::handler::http::request::search::{
@@ -36,7 +37,7 @@ use {
     config::{
         get_config,
         meta::{
-            search::{Request, Response, SearchEventType},
+            search::{Response, SearchEventType},
             sql::resolve_stream_names,
             stream::StreamType,
         },
@@ -93,7 +94,7 @@ pub async fn submit_job(
     org_id: web::Path<String>,
     Headers(_user_email): Headers<UserEmail>,
     in_req: HttpRequest,
-    body: web::Bytes,
+    web::Json(req): web::Json<Request>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -134,11 +135,7 @@ pub async fn submit_job(
         };
         let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
-        // handle encoding for query and aggs
-        let mut req: config::meta::search::Request = match json::from_slice(&body) {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
+        let mut req = req;
         if let Err(e) = req.decode() {
             return Ok(MetaHttpResponse::bad_request(e));
         }
@@ -213,7 +210,7 @@ pub async fn submit_job(
     {
         drop(org_id);
         drop(in_req);
-        drop(body);
+        drop(req);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
