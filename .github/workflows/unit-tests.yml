@@ -103,7 +103,8 @@ jobs:
           # required for all dbs
           export ZO_INTERNAL_GRPC_TOKEN=fake
           export ZO_TEXT_DATA_TYPE=text
-
+          mkdir /tmp/data
+          export ZO_DATA_DIR=/tmp/data
           # setup and run with postgres
           echo "Running with postgres"
           export ZO_META_STORE=postgres
@@ -111,9 +112,9 @@ jobs:
           ./coverage.sh run-cov
 
           # cleanup
-          rm -rf data
+          rm -rf /tmp/data
+          mkdir /tmp/data
           rm -rf ./json
-          rm -rf ./src/infra/data
 
           # Run with sqlite
           echo "Running with sqlite"
@@ -122,9 +123,9 @@ jobs:
           ./coverage.sh run-cov
 
           # cleanup
-          rm -rf data
+          rm -rf /tmp/data
+          mkdir /tmp/data
           rm -rf ./json
-          rm -rf ./src/infra/data
 
           # setup and run with mysql
           echo "Running with mysql"
