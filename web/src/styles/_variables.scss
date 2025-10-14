@@ -249,11 +249,12 @@ $o2-scrollbar-track: transparent;
 $o2-scrollbar-thumb: #EFEFEF;
 $o2-scrollbar-thumb-hover: #DCDCDC;
 $o2-hover-bg: #FCFCFC;
+$o2-text-primary: #19191E;
 
 $o2-dark-theme-background: #1c1c1f;
 $o2-dark-theme-elements: #04c9b7;
-$o2-dark-menu-background: #252529;  
-$o2-dark-card-background: #2c2c2e;
+$o2-dark-menu-background: #1c1c1f;  
+$o2-dark-card-background: #1c1c1f;
 $o2-dark-hover-background: #76838f;
 $o2-dark-border-color: rgba(255, 255, 255, 0.28);
 $o2-dark-icon-color: #EFEFEF;
@@ -261,6 +262,7 @@ $o2-dark-scrollbar-track: transparent;
 $o2-dark-scrollbar-thumb: #EFEFEF;
 $o2-dark-scrollbar-thumb-hover: #DCDCDC;
 $o2-dark-hover-bg: #F3F4F6;
+$o2-dark-text-primary: #E5E5E7;
 
 // Semantic Colors - Light Mode
 :root {
@@ -270,7 +272,7 @@ $o2-dark-hover-bg: #F3F4F6;
   --o2-muted-background: #{$o2-gray-300};    // Subtle gray background
   
   // Text Colors
-  --o2-text-primary: #{$o2-gray-1400};      // Main text color
+  --o2-text-primary: #{o2-text-primary};      // Main text color
   --o2-text-secondary: #{$o2-gray-1000};    // Less prominent text
   --o2-text-muted: #{$o2-gray-900};         // Muted text
   
@@ -318,7 +320,7 @@ $o2-dark-hover-bg: #F3F4F6;
   --o2-muted-background: #{$o2-dark-gray-1100};    // Muted background
   
   // Text Colors
-  --o2-text-primary: #{$o2-dark-gray-300};    // Main text in dark mode
+  --o2-text-primary: #{$o2-dark-text-primary};    // Main text in dark mode
   --o2-text-secondary: #{$o2-dark-gray-700};  // Secondary text
   --o2-text-muted: #{$o2-dark-gray-900};      // Muted text
   

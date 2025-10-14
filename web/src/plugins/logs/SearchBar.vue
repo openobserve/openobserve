@@ -895,7 +895,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('search.runQuery')"
                 class="q-pa-none o2-primary-button tw-h-[30px]"
                 no-caps
-                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                 @click="handleRunQueryFn"
                 :disable="disable"
                 >{{ t("search.runQuery") }}</q-btn
@@ -927,9 +926,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 :title="t('search.runQuery')"
                 class="q-pa-none o2-primary-button tw-h-[30px]"
-                style="font-size: 11px;"
                 no-caps
-                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                 @click="handleRunQueryFn"
                 :disable="
                   searchObj.loading == true ||

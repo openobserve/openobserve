@@ -31,13 +31,15 @@ body {
 
 .q-header {
   // box-shadow: 0.0625rem 0px 0.0625rem color-mix(in srgb, var(--o2-theme-elements) 100%, white);
-  background-color: var(--o2-menu-background);
+  // background-color: var(--o2-menu-background);
+  background-color: transparent;
   border-bottom: 0.0625rem solid var(--o2-border-color);
 }
 
 .o2-navigation {
   // box-shadow: -0.0625rem 0.0625rem 6px color-mix(in srgb, var(--o2-theme-elements) 100%, white);
-  background-color: var(--o2-menu-background);
+  // background-color: var(--o2-menu-background);
+  background-color: transparent;
   border-right: 0.0625rem solid var(--o2-border-color);
 }
 
@@ -86,7 +88,7 @@ body {
   height: 0.0625rem; // 4px – lighter and thinner than 7px
   box-shadow: inset 0 0.0625rem 6px var(--o2-border-color);
   // border: 0.0625rem solid color-mix(in srgb, var(--o2-theme-elements) 100%, white);
-  // background: color-mix(in srgb, var(--o2-theme-elements) 10%, white);
+  // background: color-mix(in srgb, var(--o2-theme-elements) 15%, white);
 }
 
 
@@ -96,7 +98,9 @@ body {
   // box-shadow: 0.0625rem 0.0625rem 10px color-mix(in srgb, var(--o2-theme-elements) 100%, white);
   border-right: 0.0625rem solid var(--o2-border-color);
   // border: 0.0625rem solid color-mix(in srgb, var(--o2-theme-elements) 100%, white);
-  // background: color-mix(in srgb, var(--o2-theme-elements) 10%, white);
+  // background: color-mix(in srgb, var(--o2-theme-elements) 15%, white);;
+  // background-color: color-mix(in srgb, var(--o2-theme-elements) 10%, white);
+  // box-shadow: 0 0.025rem 0.75rem color-mix(in srgb, var(--o2-theme-elements) 10%, black);
 }
 
 .q-splitter__panel.q-splitter__after,
@@ -154,13 +158,27 @@ body {
   }
 }
 
+.logs-search-bar-component, .logsPageMainSection {
+  background-color: var(--o2-card-background);
+}
+
 .logs-search-result-container {
-  background-color: transparent;
+  background-color: var(--o2-card-background);
   height: 100%;
   border-radius: 0.375rem;
   box-shadow: 0.0625rem 0.0625rem 6px color-mix(in srgb, var(--o2-theme-elements) 100%, white);
   display: flex;
   flex-direction: column;
+
+  // .logs-highlight-json {
+  //   span {
+  //     color: var(--o2-text-primary) !important;
+  //   }
+  // }
+}
+
+.o2-primary-button {
+  background-color: var(--o2-theme-elements) !important;
 }
 
 // Toolbar Icon and Toggle Styles
@@ -178,10 +196,6 @@ body {
   &:hover {
     background-color: transparent;
   }
-}
-
-.dark-theme .toolbar-toggle-container {
-  border: 0.0625rem solid rgb(196, 196, 196);
 }
 
 .toolbar-btn {
@@ -1233,7 +1247,6 @@ body {
   height: 36px !important;
   padding: 0 !important;
   cursor: pointer;
-  top: 5% !important;
 
   .q-icon {
     font-size: 18px !important;
@@ -1250,12 +1263,12 @@ body {
 
   &--visible {
     right: -4px !important;
-    top: 5% !important;
+    top: 3% !important;
   }
 
   &--hidden {
     right: -4px !important;
-    top: 5% !important;
+    top: 3% !important;
   }
 }
 
