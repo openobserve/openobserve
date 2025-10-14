@@ -1451,8 +1451,7 @@ mod tests {
         let text = resp.into_body().try_into_bytes().unwrap_or_default();
         let text = String::from_utf8_lossy(&text).to_string();
         println!(
-            "e2e_post_alert_template: status: {:?}, text: {:?}",
-            status, text
+            "e2e_post_alert_template: status: {status:?}, text: {text:?}"
         );
         assert!(status.is_success());
     }
@@ -3896,7 +3895,7 @@ mod tests {
         // Test store function
         let test_data = Values::Json(Arc::new(test_data));
         let result = local::store(org_id, table_name, test_data, updated_at).await;
-        println!("Store result: {:?}", result);
+        println!("Store result: {result:?}");
         assert!(result.is_ok(), "Store should succeed");
 
         // Verify file was created

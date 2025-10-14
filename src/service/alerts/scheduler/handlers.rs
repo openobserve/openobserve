@@ -739,7 +739,7 @@ async fn handle_report_triggers(
 ) -> Result<(), anyhow::Error> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let query_trace_id = ider::generate_trace_id();
-    let scheduler_trace_id = format!("{}/{}", trace_id, query_trace_id);
+    let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
     let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_report_trigger,org: {}, module_key: {}",
@@ -1120,7 +1120,7 @@ async fn handle_derived_stream_triggers(
                 trigger.org
             );
             new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-            db::scheduler::update_trigger(new_trigger).await?;
+            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             return Ok(());
         }
     }

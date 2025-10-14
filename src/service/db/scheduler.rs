@@ -76,6 +76,7 @@ pub async fn update_trigger(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 #[inline]
 pub async fn update_status(
     org: &str,
