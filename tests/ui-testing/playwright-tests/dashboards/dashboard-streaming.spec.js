@@ -33,8 +33,6 @@ test.describe("dashboard streaming testcases", () => {
     page.on("response", async (response) => {
       const url = response.url();
       if (url.includes("/_values_stream")) {
-        console.log(`[VALUES API HIT ${valuesResponses.length + 1}] Status: ${response.status()}`);
-        console.log(`URL: ${url}`);
         valuesResponses.push({
           url,
           status: response.status(),
@@ -110,10 +108,6 @@ test.describe("dashboard streaming testcases", () => {
     // Wait for any remaining network activity to settle
     await page.waitForLoadState("networkidle");
 
-    console.log(`\n========================================`);
-    console.log(`[TEST 1] TOTAL VALUES API CALLS: ${valuesResponses.length}`);
-    console.log(`========================================\n`);
-
     expect(valuesResponses.length).toBeGreaterThan(0);
 
     for (const res of valuesResponses) {
@@ -128,7 +122,6 @@ test.describe("dashboard streaming testcases", () => {
         res.url.includes("streaming") ||
         res.url.includes("sql=")
     );
-    console.log(`[TEST 1] Streaming-aware API calls: ${streamingAwareCalls.length}`);
     expect(streamingAwareCalls.length).toBeGreaterThan(0);
 
     await pm.chartTypeSelector.searchAndAddField(
@@ -273,17 +266,31 @@ test.describe("dashboard streaming testcases", () => {
     await pm.dashboardPanelActions.savePanel();
     await page.waitForLoadState("networkidle");
 
+    // Wait to ensure all previous network activity has completed
+    await page.waitForTimeout(1000);
+
+    // Clear the responses array to track only API calls after variable selection
+    // This is the key point: we want to know how many values API calls happen when the variable value changes
+    valuesResponses.length = 0;
+    console.log(`\n[TRACKING START] Cleared counter. Now tracking values API calls triggered by variable dropdown selection...`);
+
+    // Set up a promise to wait for the _values_stream API call
+    const valuesStreamPromise = page.waitForResponse(
+      response => response.url().includes('/_values_stream') && response.status() === 200,
+      { timeout: 10000 }
+    );
 
     await pm.dashboardVariables.selectValueFromVariableDropDown(
       "variablename",
       "ziox"
     );
-    
-    await page.waitForTimeout(4000);
 
+    // Wait for the _values_stream API call to complete
+    await valuesStreamPromise;
 
     // Wait for any remaining network activity to settle
     await page.waitForLoadState("networkidle");
+    console.log(`[TRACKING END] Values API calls triggered AFTER variable value change: ${valuesResponses.length}\n`);
 
     console.log(`\n========================================`);
     console.log(`[TEST 2] TOTAL VALUES API CALLS: ${valuesResponses.length}`);
