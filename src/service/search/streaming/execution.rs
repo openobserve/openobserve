@@ -391,8 +391,6 @@ pub fn handle_partial_response(mut res: Response) -> Response {
             vec![PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()]
         } else {
             res.function_error
-                .push(PARTIAL_ERROR_RESPONSE_MESSAGE.to_string());
-            res.function_error
         };
     }
     res
