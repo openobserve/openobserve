@@ -56,8 +56,7 @@ const convertPanelSchemaVersion = (data: any) => {
 
 const migrateV5FieldsToV6 = (
   fieldItem: any,
-  isCustomQuery: boolean,
-  stream: string,
+  isCustomQuery: boolean
 ) => {
   // if fieldItem is undefined, do nothing
   if (!fieldItem) return;
@@ -89,7 +88,7 @@ const migrateV5FieldsToV6 = (
       type: "field",
       value: {
         field: fieldItem.column,
-        streamAlias: stream,
+        streamAlias: null,
       },
     });
     delete fieldItem.column;
@@ -108,15 +107,14 @@ const migrateV5FieldsToV6 = (
 function migrateFields(
   fields: any | any[],
   isCustomQuery: boolean,
-  stream: string,
-  migrateFunction: (field: any, isCustomQuery: boolean, stream: string) => void,
+  migrateFunction: (field: any, isCustomQuery: boolean) => void,
 ) {
   if (Array.isArray(fields)) {
     fields.forEach((field: any) =>
-      migrateFunction(field, isCustomQuery, stream),
+      migrateFunction(field, isCustomQuery),
     );
   } else {
-    migrateFunction(fields, isCustomQuery, stream);
+    migrateFunction(fields, isCustomQuery);
   }
 }
 
@@ -126,7 +124,7 @@ function migrateFields(
  * @param filter The filter object to migrate
  * @returns The migrated filter object
  */
-function migrateFilterConditions(filter: any, stream: string): any {
+function migrateFilterConditions(filter: any): any {
   if (!filter) return filter;
 
   if (filter.conditions && Array.isArray(filter.conditions)) {
@@ -134,13 +132,13 @@ function migrateFilterConditions(filter: any, stream: string): any {
     filter.conditions = filter.conditions.map((condition: any) => {
       // If it's a group, recursively process it
       if (condition.filterType === "group") {
-        return migrateFilterConditions(condition, stream);
+        return migrateFilterConditions(condition);
       }
 
       // For regular conditions, convert string column to object with streamAlias and field
       if (typeof condition.column === "string") {
         condition.column = {
-          streamAlias: stream,
+          streamAlias: null,
           field: condition.column,
         };
       }

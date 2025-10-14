@@ -117,11 +117,8 @@ pub struct Panel {
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Query {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub query: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vrl_function_query: Option<String>,
-    #[serde(default)]
     pub custom_query: bool,
     pub fields: PanelFields,
     pub config: QueryConfig,
@@ -222,7 +219,6 @@ pub enum PanelFilter {
 pub struct GroupType {
     pub filter_type: String,
     pub logical_operator: String,
-    #[serde(default)]
     pub conditions: Vec<PanelFilter>,
 }
 
@@ -249,17 +245,12 @@ pub struct StreamFieldObj {
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FilterCondition {
-    #[serde(rename = "type", default)]
+    #[serde(rename = "type")]
     pub typ: String,
-    #[serde(default)]
     pub values: Vec<String>,
-    #[serde(default)]
     pub column: Option<StreamFieldObj>,
-    #[serde(default)]
     pub operator: Option<String>,
-    #[serde(default)]
     pub value: Option<String>,
-    #[serde(default)]
     pub logical_operator: String,
     pub filter_type: String,
 }
@@ -493,24 +484,23 @@ pub struct DrillDownVariables {
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct QueryConfig {
-    #[serde(default)]
-    pub promql_legend: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub layer_type: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    promql_legend: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    layer_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<f64>)]
-    pub weight_fixed: Option<OrdF64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    weight_fixed: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<f64>)]
-    pub limit: Option<OrdF64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    limit: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<f64>)]
-    pub min: Option<OrdF64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    min: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<f64>)]
-    pub max: Option<OrdF64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub time_shift: Option<Vec<TimeShift>>,
+    max: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    time_shift: Option<Vec<TimeShift>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
