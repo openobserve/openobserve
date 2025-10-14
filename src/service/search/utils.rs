@@ -268,6 +268,7 @@ pub fn is_default_query_limit_exceeded(num_rows: usize, sql: &Sql) -> bool {
     }
 }
 
+#[allow(dead_code)]
 pub fn is_cachable_function_error(function_error: &[String]) -> bool {
     if function_error.is_empty() {
         return true;

@@ -54,10 +54,7 @@ use crate::{
     service::{
         db::enrichment_table,
         metadata::distinct_values::DISTINCT_STREAM_PREFIX,
-        search::{
-            self as SearchService, datafusion::plan::projections::get_result_schema,
-            utils::is_cachable_function_error,
-        },
+        search::{self as SearchService, datafusion::plan::projections::get_result_schema},
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
@@ -397,14 +394,6 @@ pub async fn search(
         Ok(mut res) => {
             res.set_took(start.elapsed().as_millis() as usize);
             res.converted_histogram_query = converted_histogram_query;
-
-            // Check if function error is only query limit default error and only `ui`
-            if req.search_type == Some(SearchEventType::UI)
-                && is_cachable_function_error(&res.function_error)
-            {
-                res.function_error.clear();
-            }
-
             Ok(HttpResponse::Ok().json(res))
         }
         Err(err) => {
