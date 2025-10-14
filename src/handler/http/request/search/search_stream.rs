@@ -432,7 +432,7 @@ pub async fn search_http2_stream(
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
         let chunks_iter = match result {
             Ok(mut v) => {
-                // Check if function error is only - querm limit default error and only `ui`
+                // Check if function error is only - query limit default error and only `ui`
                 if let StreamResponses::SearchResponse {
                     ref mut results, ..
                 } = v
