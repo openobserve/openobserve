@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="tracePage"
-id="tracePage" style="min-height: auto">
+  <q-page class="tracePage tw-min-h-auto" id="tracePage">
     <div id="tracesSecondLevel">
       <div class="tw-min-h-[82px]">
         <search-bar
@@ -32,14 +31,13 @@ id="tracePage" style="min-height: auto">
       </div>
       <div
         id="tracesThirdLevel"
-        class="row scroll traces-search-result-container"
-        style="width: 100%"
+        class="row scroll traces-search-result-container tw-w-full"
       >
         <!-- Note: Splitter max-height to be dynamically calculated with JS -->
         <q-splitter
           v-model="searchObj.config.splitterModel"
           :limits="searchObj.config.splitterLimit"
-          style="width: 100%"
+          class="tw-w-full"
           @update:model-value="onSplitterUpdate"
         >
           <template #before v-if="searchObj.meta.showFields">
@@ -57,7 +55,7 @@ id="tracePage" style="min-height: auto">
               text-color="white"
               size="20px"
               icon="drag_indicator"
-              style="top: 10px"
+              class="tw-t-[0.625rem]"
             />
           </template>
           <template #after>
@@ -78,8 +76,7 @@ id="tracePage" style="min-height: auto">
                 </div>
                 <SanitizedHtmlRenderer
                   data-test="logs-search-error-message"
-                  :htmlContent="`${searchObj.data.errorMsg}
-                  ${searchObj.data.errorDetail ? `<h6 style='font-size: 14px; margin: 0;'>${searchObj.data.errorDetail}</h6>` : ''}`"
+                  :htmlContent="getErrorContent"
                 />
                 <div
                   data-test="logs-search-error-20003"
@@ -110,8 +107,8 @@ id="tracePage" style="min-height: auto">
                 data-test="logs-search-no-stream-selected-text"
                 class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
               >
-                <q-icon name="info"
-color="primary" size="md" /> Select a stream
+                <q-icon name="info" color="primary"
+size="md" /> Select a stream
                 and press 'Run query' to continue. Additionally, you can apply
                 additional filters and adjust the date range to enhance search.
               </h5>
@@ -125,8 +122,8 @@ color="primary" size="md" /> Select a stream
               "
               class="text-center tw-mx-[10%] tw-my-[40px] tw-text-[20px]"
             >
-              <q-icon name="info"
-color="primary" size="md" />
+              <q-icon name="info" color="primary"
+size="md" />
               {{ t("search.applySearch") }}
             </div>
 
@@ -148,7 +145,6 @@ color="primary" size="md" />
 <script lang="ts" setup>
 // @ts-nocheck
 import {
-  defineComponent,
   ref,
   onDeactivated,
   onActivated,
@@ -157,7 +153,7 @@ import {
   defineAsyncComponent,
   watch,
 } from "vue";
-import { useQuasar, date, copyToClipboard } from "quasar";
+import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -168,7 +164,6 @@ import searchService from "@/services/search";
 import TransformService from "@/services/jstransform";
 import {
   b64EncodeUnicode,
-  verifyOrganizationStatus,
   b64DecodeUnicode,
   formatTimeWithSuffix,
   timestampToTimezoneDate,
@@ -193,8 +188,7 @@ const store = useStore();
 const router = useRouter();
 const $q = useQuasar();
 const { t } = useI18n();
-const { searchObj, resetSearchObj, getUrlQueryParams, copyTracesUrl } =
-  useTraces();
+const { searchObj, getUrlQueryParams, copyTracesUrl } = useTraces();
 let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
@@ -357,78 +351,6 @@ function loadStreamLists() {
   }
 }
 
-function getConsumableDateTime() {
-  try {
-    if (searchObj.data.datetime.tab == "relative") {
-      let period = "";
-      let periodValue = 0;
-      // quasar does not support arithmetic on weeks. convert to days.
-
-      if (
-        searchObj.data.datetime.relative.period.label.toLowerCase() == "weeks"
-      ) {
-        period = "days";
-        periodValue = searchObj.data.datetime.relative.value * 7;
-      } else {
-        period = searchObj.data.datetime.relative.period.label.toLowerCase();
-        periodValue = searchObj.data.datetime.relative.value;
-      }
-      const subtractObject = '{"' + period + '":' + periodValue + "}";
-
-      let endTimeStamp = new Date();
-      if (searchObj.data.resultGrid.currentPage > 0) {
-        endTimeStamp = searchObj.data.resultGrid.currentDateTime;
-      } else {
-        searchObj.data.resultGrid.currentDateTime = endTimeStamp;
-      }
-
-      const startTimeStamp = date.subtractFromDate(
-        endTimeStamp,
-        JSON.parse(subtractObject),
-      );
-
-      return {
-        start_time: startTimeStamp,
-        end_time: endTimeStamp,
-      };
-    } else {
-      let start, end;
-      if (
-        searchObj.data.datetime.absolute.date.from == "" &&
-        searchObj.data.datetime.absolute.startTime == ""
-      ) {
-        start = new Date();
-      } else {
-        start = new Date(
-          searchObj.data.datetime.absolute.date.from +
-            " " +
-            searchObj.data.datetime.absolute.startTime,
-        );
-      }
-      if (
-        searchObj.data.datetime.absolute.date.to == "" &&
-        searchObj.data.datetime.absolute.endTime == ""
-      ) {
-        end = new Date();
-      } else {
-        end = new Date(
-          searchObj.data.datetime.absolute.date.to +
-            " " +
-            searchObj.data.datetime.absolute.endTime,
-        );
-      }
-      const rVal = {
-        start_time: start,
-        end_time: end,
-      };
-      return rVal;
-    }
-  } catch (e) {
-    searchObj.loading = false;
-    console.error("Error while getting consumable date time");
-  }
-}
-
 const getDefaultRequest = () => {
   return {
     query: {
@@ -511,35 +433,6 @@ function buildSearch() {
     );
   }
 }
-
-const showTraceDetailsError = () => {
-  showErrorNotification(
-    `Trace ${router.currentRoute.value.query.trace_id} not found`,
-  );
-  const query = cloneDeep(router.currentRoute.value.query);
-  delete query.trace_id;
-  router.push({
-    name: "traces",
-    query: {
-      ...query,
-    },
-  });
-  return;
-};
-
-const buildTraceSearchQuery = (trace: string) => {
-  const req = getDefaultRequest();
-  req.query.from = 0;
-  req.query.size = 1000;
-  req.query.start_time = trace.trace_start_time - 30000000;
-  req.query.end_time = trace.trace_end_time + 30000000;
-
-  req.query.sql = b64EncodeUnicode(
-    `SELECT * FROM ${selectedStreamName.value} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
-  );
-
-  return req;
-};
 
 const updateFieldValues = (data) => {
   const excludedFields = [store.state.zoConfig.timestamp_column];
@@ -734,11 +627,6 @@ async function getQueryData() {
           searchObj.data.errorDetail = err.response.data.error_detail;
           searchObj.data.errorCode = err.response.data.code;
         }
-
-        // $q.notify({
-        //   message: searchObj.data.errorMsg,
-        //   color: "negative",
-        // });
       })
       .finally(() => {
         if (dismiss) dismiss();
@@ -1046,16 +934,6 @@ async function loadPageData() {
   await getStreamList();
 }
 
-function refreshStreamData() {
-  // searchObj.loading = true;
-  // this.searchObj.data.resultGrid.currentPage = 0;
-  // resetSearchObj();
-  // searchObj.organizationIdentifier =
-  //   store.state.selectedOrganization.identifier;
-  // //get stream list
-  // getStreamList();
-}
-
 onBeforeMount(async () => {
   restoreUrlQueryParams();
   await importSqlParser();
@@ -1229,29 +1107,13 @@ const onChangeStream = () => {
 const showFields = computed(() => {
   return searchObj.meta.showFields;
 });
-const showHistogram = computed(() => {
-  return searchObj.meta.showHistogram;
-});
-const showQuery = computed(() => {
-  return searchObj.meta.showQuery;
-});
+
 const moveSplitter = computed(() => {
   return searchObj.config.splitterModel;
 });
-const changeStream = computed(() => {
-  return searchObj.data.stream.selectedStream;
-});
-const changeRelativeDate = computed(() => {
-  return (
-    searchObj.data.datetime.relative.value +
-    searchObj.data.datetime.relative.period.value
-  );
-});
+
 const updateSelectedColumns = computed(() => {
   return searchObj.data.stream.selectedFields.length;
-});
-const runQuery = computed(() => {
-  return searchObj.runQuery;
 });
 
 watch(showFields, () => {
@@ -1269,39 +1131,22 @@ watch(showFields, () => {
     : 0;
 });
 
-// watch(showHistogram, () => {
-//   if (searchObj.meta.showHistogram) {
-//     setTimeout(() => {
-//       if (this.searchResultRef) this.searchResultRef.reDrawChart();
-//     }, 100);
-//   }
-// });
-
 watch(moveSplitter, () => {
   if (searchObj.meta.showFields == false) {
     searchObj.meta.showFields = this.searchObj.config.splitterModel > 0;
   }
 });
 
-// watch(
-//   changeStream,
-//   (stream, oldStream) => {
-//     if (stream.value === oldStream.value) return;
-//     if (searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
-//       if (oldStream.value) {
-//         searchObj.data.query = "";
-//         searchObj.data.advanceFiltersQuery = "";
-//       }
-//       setTimeout(() => {
-//         runQueryFn();
-//         extractFields();
-//       }, 500);
-//     }
-//   },
-//   {
-//     immediate: false,
-//   },
-// );
+const getErrorContent = computed(() => {
+  return `${searchObj.data.errorMsg}
+                  ${
+                    searchObj.data.errorDetail
+                      ? `<h6 class="
+tw-text-[0.875rem]
+tw-m-0">${searchObj.data.errorDetail}</h6>`
+                      : ""
+                  }`;
+});
 
 watch(updateSelectedColumns, () => {
   searchObj.meta.resultGrid.manualRemoveFields = true;
@@ -1331,24 +1176,6 @@ watch(updateSelectedColumns, () => {
 
   .q-item__label span {
     /* text-transform: capitalize; */
-  }
-
-  .index-table :hover::-webkit-scrollbar,
-  #tracesSearchGridComponent:hover::-webkit-scrollbar {
-    height: 13px;
-    width: 13px;
-  }
-
-  .index-table ::-webkit-scrollbar-track,
-  #tracesSearchGridComponent::-webkit-scrollbar-track {
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-    border-radius: 10px;
-  }
-
-  .index-table ::-webkit-scrollbar-thumb,
-  #tracesSearchGridComponent::-webkit-scrollbar-thumb {
-    border-radius: 10px;
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
   }
 
   .q-table__top {

@@ -18,32 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="search-bar-component" id="searchBarComponent">
     <div class="row q-py-xs">
       <div class="float-right col flex items-center">
-        <div
-          style="border: 1px solid #c4c4c4; border-radius: 5px"
-          class="q-pr-xs q-ml-xs tw-flex tw-items-center tw-justify-center"
-        >
-          <q-toggle
-            data-test="traces-search-bar-show-metrics-toggle-btn"
-            v-model="searchObj.meta.showHistogram"
-            class="o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
-            size="xs"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
-          >
-          </q-toggle>
-          <img
-            :src="metricsIcon"
-            alt="Metrics"
-            style="width: 20px; height: 20px"
-          />
-          <q-tooltip>
-            {{ t("traces.RedMetrics") }}
-          </q-tooltip>
-        </div>
+        <app-toggle
+          data-test="traces-search-bar-show-metrics-toggle-btn"
+          v-model="searchObj.meta.showHistogram"
+          toggle-class="o2-toggle-button-xs tw-flex tw-items-center tw-justify-center"
+          :img="metricsIcon"
+          :title="t(`traces.RedMetrics`)"
+        />
         <q-btn
           data-test="traces-search-bar-reset-filters-btn"
           no-caps
@@ -163,6 +144,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useStreams from "@/composables/useStreams";
 import { getImageURL } from "@/utils/zincutils";
+import AppToggle from "@/components/common/AppToggle.vue";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -174,6 +156,7 @@ export default defineComponent({
     SyntaxGuide,
     AppTabs,
     ConfirmDialog,
+    AppToggle,
   },
   emits: ["searchdata", "shareLink"],
   props: {
@@ -455,8 +438,8 @@ export default defineComponent({
 
     const metricsIcon = computed(() => {
       return store.state.theme === "dark"
-        ? getImageURL("images/common/bar_chart_histogram_light.svg")
-        : getImageURL("images/common/bar_chart_histogram.svg");
+        ? "images/common/bar_chart_histogram_light.svg"
+        : "images/common/bar_chart_histogram.svg";
     });
 
     return {
