@@ -140,7 +140,7 @@ impl TraceInfo {
                 // Validate trace_id (32 hex chars, not all zeros)
                 if trace_id.len() == 32
                     && trace_id.chars().all(|c| c.is_ascii_hexdigit())
-                    && !trace_id.chars().all(|c| c == '0')
+                    && trace_id.chars().any(|c| c != '0')
                 {
                     return trace_id;
                 }
