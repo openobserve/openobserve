@@ -23,7 +23,7 @@ use crate::{
     errors,
 };
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum PatternPolicy {
     DropField,
     Redact,
