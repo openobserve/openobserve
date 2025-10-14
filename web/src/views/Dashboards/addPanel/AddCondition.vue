@@ -224,7 +224,7 @@ export default defineComponent({
         .find(
           (it: any) =>
             it.column == props?.condition?.column?.field &&
-            it.stream == getStreamNameFromStreamAlias(props?.condition?.column?.stream),
+            it.stream == getStreamNameFromStreamAlias(props?.condition?.column?.streamAlias),
         )
         ?.value?.filter((option: any) =>
           option?.toLowerCase().includes(searchTerm.value.toLowerCase()),

@@ -241,13 +241,20 @@ pub struct BackgroundValue {
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct StreamFieldObj {
+    pub field: Option<String>,
+    pub stream_alias: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FilterCondition {
     #[serde(rename = "type", default)]
     pub typ: String,
     #[serde(default)]
     pub values: Vec<String>,
     #[serde(default)]
-    pub column: String,
+    pub column: Option<StreamFieldObj>,
     #[serde(default)]
     pub operator: Option<String>,
     #[serde(default)]

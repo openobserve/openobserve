@@ -2351,7 +2351,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
    */
   const buildCondition = (condition: any) => {
     const streamAlias =
-      condition.column.streamAlias ??
+      condition?.column?.streamAlias ??
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.stream;
@@ -2489,7 +2489,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
    * @returns {string} - the WHERE clause as a string.
    */
   const buildWhereClause = (filterData: any) => {
-    const whereConditions = filterData.map(buildCondition).filter(Boolean);
+    const whereConditions = filterData?.map(buildCondition)?.filter(Boolean);
 
     const logicalOperators = filterData.map((it: any) => it.logicalOperator);
 

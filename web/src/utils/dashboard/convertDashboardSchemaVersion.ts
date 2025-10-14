@@ -126,7 +126,7 @@ function migrateFields(
  * @param filter The filter object to migrate
  * @returns The migrated filter object
  */
-function migrateFilterConditions(filter: any): any {
+function migrateFilterConditions(filter: any, stream: string): any {
   if (!filter) return filter;
 
   if (filter.conditions && Array.isArray(filter.conditions)) {
@@ -134,13 +134,13 @@ function migrateFilterConditions(filter: any): any {
     filter.conditions = filter.conditions.map((condition: any) => {
       // If it's a group, recursively process it
       if (condition.filterType === "group") {
-        return migrateFilterConditions(condition);
+        return migrateFilterConditions(condition, stream);
       }
 
       // For regular conditions, convert string column to object with streamAlias and field
       if (typeof condition.column === "string") {
         condition.column = {
-          streamAlias: undefined,
+          streamAlias: stream,
           field: condition.column,
         };
       }
