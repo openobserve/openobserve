@@ -11,11 +11,6 @@ on:
   pull_request:
     branches:
       - "*"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
-
 env:
   COLUMNS: 150
   ZO_RESULT_CACHE_ENABLED: true
@@ -55,11 +50,11 @@ jobs:
       - name: Check if API code has changes
         id: check_changes
         run: |
-          if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qE '^src/|^Cargo\.(toml|lock)$'; then
+          # if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qE '^src/|^Cargo\.(toml|lock)$'; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
+          # else
+            # echo "has_changes=false" >> $GITHUB_OUTPUT
+          # fi
 
       - name: Setup Rust Toolchain
         if: steps.check_changes.outputs.has_changes == 'true'
