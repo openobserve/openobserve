@@ -209,6 +209,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelData.data.config.trellis.group_by_y_axis"
           label="Group multi Y-axis for trellis"
           data-test="dashboard-config-trellis-group-by-y-axis"
+          class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+          size="lg"
+          :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
         />
         <div>
           <q-icon
@@ -248,6 +251,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="dashboardPanelData.data.config.show_legends"
       :label="t('dashboard.showLegendsLabel')"
       data-test="dashboard-config-show-legend"
+      class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+      size="lg"
+      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
     />
 
     <div class="space"></div>
@@ -257,6 +263,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="dashboardPanelData.data.config.wrap_table_cells"
       :label="t('dashboard.wraptext')"
       data-test="dashboard-config-wrap-table-cells"
+      class="tw-h-[36px] -tw-ml-2 o2-toggle-button-lg"
+      size="lg"
+      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
     />
 
     <div class="space"></div>
@@ -266,6 +275,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="dashboardPanelData.data.config.table_transpose"
       :label="t('dashboard.tableTranspose')"
       data-test="dashboard-config-table_transpose"
+      class="tw-h-[36px] -tw-ml-2 o2-toggle-button-lg"
+      size="lg"
+      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
     />
 
     <div class="space"></div>
@@ -275,6 +287,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="dashboardPanelData.data.config.table_dynamic_columns"
       :label="t('dashboard.tableDynamicColumns')"
       data-test="dashboard-config-table_dynamic_columns"
+      class="tw-h-[36px] -tw-ml-2 o2-toggle-button-lg"
+      size="lg"
+      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
     />
 
     <div class="space"></div>
@@ -896,6 +911,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.breakdown?.length == 0
           "
+          class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+          size="lg"
+          :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
         />
 
         <q-icon
@@ -975,6 +993,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="dashboardPanelData.data.config.connect_nulls"
         label="Connect null values"
         data-test="dashboard-config-connect-null-values"
+        class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+      size="lg"
+      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
       />
 
       <div class="space"></div>
@@ -1185,6 +1206,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="dashboardPanelData.data.config.axis_border_show"
         :label="t('dashboard.showBorder')"
         data-test="dashboard-config-axis-border"
+        class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+      size="lg"
+      :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
       />
 
       <div class="space"></div>
@@ -2339,6 +2363,7 @@ export default defineComponent({
       isBreakdownFieldEmpty,
       hasTimeShifts,
       dashboardPanelDataPageKey,
+      store,
       shouldShowLegendsToggle,
       shouldShowLegendPosition,
       shouldShowLegendType,
