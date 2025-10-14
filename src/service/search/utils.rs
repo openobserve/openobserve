@@ -17,7 +17,7 @@ use std::{future::Future, pin::Pin, sync::Arc};
 
 use config::meta::{
     inverted_index::UNKNOWN_NAME,
-    search::{PARTIAL_ERROR_RESPONSE_MESSAGE, ScanStats},
+    search::{PARTIAL_ERROR_RESPONSE_MESSAGE, ScanStats, SearchEventType},
 };
 use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
 use sqlparser::ast::{BinaryOperator, Expr};
@@ -233,7 +233,21 @@ pub async fn collect_scan_stats(
     scan_stats
 }
 
-pub fn check_query_default_limit_exceeded(num_rows: usize, partial_err: &mut String, sql: &Sql) {
+pub fn check_query_default_limit_exceeded(
+    num_rows: usize,
+    partial_err: &mut String,
+    sql: &Sql,
+    search_event_type: Option<String>,
+) {
+    if search_event_type.is_none()
+        || search_event_type
+            .as_ref()
+            .and_then(|s| SearchEventType::try_from(s.as_ref()).ok())
+            != Some(SearchEventType::Dashboards)
+    {
+        return;
+    }
+
     if is_default_query_limit_exceeded(num_rows, sql) {
         let capped_err = CAPPED_RESULTS_MSG.to_string();
         if !partial_err.is_empty() {
