@@ -1220,9 +1220,15 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
             )
             .build();
 
-            tracer_builder = tracer_builder.with_span_processor(eval_processor);
+            // Wrap with filtering processor to only send AI traces
+            let filtered_eval_processor = FilteringSpanProcessor::new(
+                eval_processor,
+                Some("ai.".to_string()),
+            );
+
+            tracer_builder = tracer_builder.with_span_processor(filtered_eval_processor);
             log::info!(
-                "AI evaluation OTLP exporter configured - traces will be sent to both OpenObserve and evaluation platform"
+                "AI evaluation OTLP exporter configured - AI traces (ai.* spans only) will be sent to evaluation platform"
             );
         }
     }
