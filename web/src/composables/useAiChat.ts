@@ -1,5 +1,6 @@
 import store from "@/stores";
 import { contextRegistry, createDefaultContextProvider } from "@/composables/contextProviders";
+import { generateTraceContext } from "@/utils/zincutils";
 
 let contextHandler : any;
 
@@ -93,6 +94,9 @@ const useAiChat = () => {
         }
 
         try {
+            // Generate traceparent header with UUID v7 for distributed tracing
+            const { traceparent } = generateTraceContext();
+
             // Configure fetch options with abort signal for request cancellation
             const fetchOptions: RequestInit = {
                 method: 'POST',
@@ -100,11 +104,12 @@ const useAiChat = () => {
                 credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
+                    'traceparent': traceparent,
                 },
                 // Add abort signal if provided to enable request cancellation
                 ...(abortSignal && { signal: abortSignal })
             };
-            
+
             const response = await fetch(url, fetchOptions);
         return response;
         } catch (error) {
