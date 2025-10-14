@@ -657,7 +657,8 @@ const validateHistogramIntervalArgument = (
   index: number,
   errors: string[],
 ) => {
-  if (!(arg.value === null || typeof arg.value === "string")) {
+  // if arg value is null, value not present or not a string
+  if (!(arg.value === null || !arg.value || typeof arg.value === "string")) {
     errors.push(
       `${fieldPath}: Argument ${index + 1} must be a valid histogram interval`,
     );
