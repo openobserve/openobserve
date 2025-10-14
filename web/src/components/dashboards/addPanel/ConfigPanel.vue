@@ -244,15 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <q-toggle
-      v-if="
-        dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'heatmap' &&
-        dashboardPanelData.data.type != 'metric' &&
-        dashboardPanelData.data.type != 'gauge' &&
-        dashboardPanelData.data.type != 'geomap' &&
-        dashboardPanelData.data.type != 'sankey' &&
-        dashboardPanelData.data.type != 'maps'
-      "
+      v-if="shouldShowLegendsToggle(dashboardPanelData)"
       v-model="dashboardPanelData.data.config.show_legends"
       :label="t('dashboard.showLegendsLabel')"
       data-test="dashboard-config-show-legend"
@@ -289,16 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="o2-input">
       <q-select
-        v-if="
-          dashboardPanelData.data.type != 'table' &&
-          dashboardPanelData.data.type != 'heatmap' &&
-          dashboardPanelData.data.type != 'metric' &&
-          dashboardPanelData.data.type != 'gauge' &&
-          dashboardPanelData.data.type != 'geomap' &&
-          dashboardPanelData.data.config.show_legends &&
-          dashboardPanelData.data.type != 'sankey' &&
-          dashboardPanelData.data.type != 'maps'
-        "
+        v-if="shouldShowLegendPosition(dashboardPanelData)"
         outlined
         v-model="dashboardPanelData.data.config.legends_position"
         :options="legendsPositionOptions"
@@ -316,18 +299,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
+      <q-select
+        v-if="shouldShowLegendType(dashboardPanelData)"
+        outlined
+        v-model="dashboardPanelData.data.config.legends_type"
+        :options="legendTypeOptions"
+        dense
+        label="Legends Type"
+        class="showLabelOnTop"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.legends_type ?? 'Auto'
+        }`"
+        data-test="dashboard-config-legends-scrollable"
+      >
+      </q-select>
+
+      <div class="space"></div>
+
       <div class="input-container">
+        <!-- Legend Width Configuration (for right position) -->
         <q-input
-          v-if="
-            dashboardPanelData.data.type != 'table' &&
-            dashboardPanelData.data.type != 'heatmap' &&
-            dashboardPanelData.data.type != 'metric' &&
-            dashboardPanelData.data.type != 'gauge' &&
-            dashboardPanelData.data.type != 'geomap' &&
-            dashboardPanelData.data.config.show_legends &&
-            dashboardPanelData.data.config.legends_position == 'right' &&
-            dashboardPanelData.data.type != 'sankey'
-          "
+          v-if="shouldShowLegendWidth(dashboardPanelData)"
           v-model.number="legendWidthValue"
           :label="t('common.legendWidth')"
           color="input-border"
@@ -342,18 +336,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder="Auto"
           data-test="dashboard-config-legend-width"
         ></q-input>
+
+        <!-- Legend Height Configuration (for auto/bottom position) -->
+        <q-input
+          v-if="shouldShowLegendHeight(dashboardPanelData)"
+          v-model.number="legendHeightValue"
+          label="Legend Height"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-md showLabelOnTop q-mr-sm"
+          stack-label
+          outlined
+          filled
+          dense
+          label-slot
+          :type="'number'"
+          placeholder="Auto"
+          data-test="dashboard-config-legend-height"
+        ></q-input>
+        <!-- dashboardPanelData.data.config.legends_type != 'scroll' -->
+        <!-- Unit container for Legend Width (right position) -->
         <div
           class="unit-container"
-          v-if="
-            dashboardPanelData.data.type != 'table' &&
-            dashboardPanelData.data.type != 'heatmap' &&
-            dashboardPanelData.data.type != 'metric' &&
-            dashboardPanelData.data.type != 'gauge' &&
-            dashboardPanelData.data.type != 'geomap' &&
-            dashboardPanelData.data.config.show_legends &&
-            dashboardPanelData.data.config.legends_position == 'right' &&
-            dashboardPanelData.data.type != 'sankey'
-          "
+          v-if="shouldShowLegendWidthUnitContainer(dashboardPanelData)"
         >
           <button
             @click="setUnit('px')"
@@ -387,7 +392,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             %
           </button>
         </div>
+
+        <!-- Unit container for Legend Height (auto/bottom position) -->
+        <div
+          class="unit-container"
+          v-if="shouldShowLegendHeightUnitContainer(dashboardPanelData)"
+        >
+          <button
+            @click="setHeightUnit('px')"
+            :class="{
+              active:
+                dashboardPanelData?.data?.config.legend_height?.unit === null ||
+                dashboardPanelData?.data?.config?.legend_height?.unit === 'px',
+            }"
+            style="height: 100%; width: 100%; font-size: 14px"
+            :data-test="`dashboard-config-legend-height-unit-${
+              dashboardPanelData?.data?.config?.legend_height?.unit === 'px'
+                ? 'active'
+                : 'inactive'
+            }`"
+          >
+            px
+          </button>
+          <button
+            @click="setHeightUnit('%')"
+            :class="{
+              active:
+                dashboardPanelData?.data?.config?.legend_height?.unit === '%',
+            }"
+            style="height: 100%; width: 100%; font-size: 14px"
+            :data-test="`dashboard-config-legend-height-unit-${
+              dashboardPanelData?.data?.config?.legend_height?.unit === '%'
+                ? 'active'
+                : 'inactive'
+            }`"
+          >
+            %
+          </button>
+        </div>
       </div>
+
+      <div class="space"></div>
+
+      <q-select
+        v-if="shouldApplyChartAlign(dashboardPanelData)"
+        outlined
+        v-model="dashboardPanelData.data.config.chart_align"
+        :options="chartAlignOptions"
+        dense
+        label="Chart Align"
+        class="showLabelOnTop"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.chart_align ?? 'Auto'
+        }`"
+        data-test="dashboard-config-chart-align"
+      >
+      </q-select>
 
       <div class="space"></div>
 
@@ -1271,6 +1333,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
+      <div class="space"></div>
+
+      <q-toggle
+        v-if="shouldShowGridlines(dashboardPanelData)"
+        v-model="dashboardPanelData.data.config.show_gridlines"
+        label="Show Gridlines"
+        data-test="dashboard-config-show-gridlines"
+      />
+
+      <div class="space"></div>
+
       <q-input
         v-if="
           [
@@ -1554,7 +1627,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount, onMounted, ref } from "vue";
+import { computed, defineComponent, inject, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
@@ -1573,7 +1646,18 @@ import StepAfter from "@/components/icons/dashboards/StepAfter.vue";
 import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
 import { useStore } from "vuex";
 
-import { markRaw } from "vue";
+import { markRaw, watchEffect } from "vue";
+import {
+  shouldShowLegendsToggle,
+  shouldShowLegendPosition,
+  shouldShowLegendType,
+  shouldShowLegendWidth,
+  shouldShowLegendHeight,
+  shouldShowLegendWidthUnitContainer,
+  shouldShowLegendHeightUnitContainer,
+  shouldApplyChartAlign,
+  shouldShowGridlines,
+} from "@/utils/dashboard/configUtils";
 
 export default defineComponent({
   components: {
@@ -1602,6 +1686,7 @@ export default defineComponent({
     const { dashboardPanelData, promqlMode } = useDashboardPanelData(
       dashboardPanelDataPageKey,
     );
+
     const { t } = useI18n();
     const store = useStore();
 
@@ -1622,6 +1707,14 @@ export default defineComponent({
       // Ensure that the nested structure is initialized
       if (!dashboardPanelData.data.config.legend_width) {
         dashboardPanelData.data.config.legend_width = {
+          value: null,
+          unit: "px",
+        };
+      }
+
+      // Initialize legend height configuration
+      if (!dashboardPanelData.data.config.legend_height) {
+        dashboardPanelData.data.config.legend_height = {
           value: null,
           unit: "px",
         };
@@ -1689,12 +1782,19 @@ export default defineComponent({
         };
       }
 
+      // by default, use chart_align as null (auto)
+      if (dashboardPanelData.data.config.chart_align === undefined) {
+        dashboardPanelData.data.config.chart_align = null;
+      }
+
       // by default, set show_symbol as false
       if (dashboardPanelData.data.config.show_symbol === undefined) {
         const isNewPanel = !dashboardPanelData.data.id;
         // if new panel, use config env
         // else always false
-        dashboardPanelData.data.config.show_symbol = isNewPanel ? store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false : false;
+        dashboardPanelData.data.config.show_symbol = isNewPanel
+          ? (store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false)
+          : false;
       }
 
       // by default, set line interpolation as smooth
@@ -1714,6 +1814,13 @@ export default defineComponent({
 
       if (!dashboardPanelData?.data?.config?.trellis?.group_by_y_axis) {
         dashboardPanelData.data.config.trellis.group_by_y_axis = false;
+      }
+
+      if (
+        dashboardPanelData.data.config.show_gridlines === null ||
+        dashboardPanelData.data.config.show_gridlines === undefined
+      ) {
+        dashboardPanelData.data.config.show_gridlines = true;
       }
     });
 
@@ -1747,6 +1854,38 @@ export default defineComponent({
 
       // Set the unit
       dashboardPanelData.data.config.legend_width.unit = unit;
+    };
+
+    const legendHeightValue = computed({
+      get() {
+        return dashboardPanelData.data.config?.legend_height?.value;
+      },
+      set(value) {
+        // Ensure that the nested structure is initialized
+        if (!dashboardPanelData.data.config.legend_height) {
+          dashboardPanelData.data.config.legend_height = {
+            value: null,
+            unit: "px",
+          };
+        }
+
+        // Set the value
+        dashboardPanelData.data.config.legend_height.value =
+          value !== "" ? value : null;
+      },
+    });
+
+    const setHeightUnit = (unit: any) => {
+      // Ensure that the nested structure is initialized
+      if (!dashboardPanelData.data.config.legend_height) {
+        dashboardPanelData.data.config.legend_height = {
+          value: null,
+          unit: null,
+        };
+      }
+
+      // Set the unit
+      dashboardPanelData.data.config.legend_height.unit = unit;
     };
 
     const layerTypeOptions = [
@@ -1804,6 +1943,36 @@ export default defineComponent({
       {
         label: t("dashboard.bottom"),
         value: "bottom",
+      },
+    ];
+
+    const legendTypeOptions = [
+      {
+        label: "Auto",
+        value: null,
+      },
+      {
+        label: "Plain",
+        value: "plain",
+      },
+      {
+        label: "Scroll",
+        value: "scroll",
+      },
+    ];
+
+    const chartAlignOptions = [
+      {
+        label: "Auto",
+        value: null,
+      },
+      {
+        label: "Left",
+        value: "left",
+      },
+      {
+        label: "Center",
+        value: "center",
       },
     ];
     const unitOptions = [
@@ -2112,6 +2281,33 @@ export default defineComponent({
       );
     });
 
+    // Clear legend width when switching away from plain type or when position is not right
+    watchEffect(() => {
+      if (
+        dashboardPanelData.data.config.legends_type !== "plain" ||
+        dashboardPanelData.data.config.legends_position !== "right"
+      ) {
+        // Clear the legend width value when conditions no longer allow width customization
+        if (dashboardPanelData.data.config.legend_width) {
+          dashboardPanelData.data.config.legend_width.value = null;
+        }
+      }
+    });
+
+    // Clear legend height when switching away from plain type or when position is not bottom/auto
+    watchEffect(() => {
+      if (
+        dashboardPanelData.data.config.legends_type !== "plain" ||
+        (dashboardPanelData.data.config.legends_position !== null &&
+          dashboardPanelData.data.config.legends_position !== "bottom")
+      ) {
+        // Clear the legend height value when conditions no longer allow height customization
+        if (dashboardPanelData.data.config.legend_height) {
+          dashboardPanelData.data.config.legend_height.value = null;
+        }
+      }
+    });
+
     return {
       t,
       dashboardPanelData,
@@ -2121,14 +2317,18 @@ export default defineComponent({
       layerTypeOptions,
       symbolOptions,
       legendsPositionOptions,
+      legendTypeOptions,
+      chartAlignOptions,
       unitOptions,
       labelPositionOptions,
       showSymbol,
       lineInterpolationOptions,
       isWeightFieldPresent,
       setUnit,
+      setHeightUnit,
       handleBlur,
       legendWidthValue,
+      legendHeightValue,
       dashboardSelectfieldPromQlList,
       selectPromQlNameOption,
       addTimeShift,
@@ -2139,6 +2339,15 @@ export default defineComponent({
       isBreakdownFieldEmpty,
       hasTimeShifts,
       dashboardPanelDataPageKey,
+      shouldShowLegendsToggle,
+      shouldShowLegendPosition,
+      shouldShowLegendType,
+      shouldShowLegendWidth,
+      shouldShowLegendHeight,
+      shouldShowLegendWidthUnitContainer,
+      shouldShowLegendHeightUnitContainer,
+      shouldApplyChartAlign,
+      shouldShowGridlines,
     };
   },
 });
