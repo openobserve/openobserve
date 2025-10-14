@@ -45,7 +45,7 @@ use {
     std::str::FromStr,
 };
 
-use crate::common::utils::auth::UserEmail;
+use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
 #[cfg(feature = "enterprise")]
 const MANDATORY_FIELDS_FOR_ACTION_CREATION: [&str; 5] =
@@ -373,7 +373,7 @@ pub async fn upload_zipped_action(
     path: web::Path<String>,
     #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))] mut payload: Multipart,
     req: HttpRequest,
-    user_email: UserEmail,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {

@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 const { waitUtils } = require('../../playwright-tests/utils/wait-helpers.js');
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class SanityPage {
     constructor(page) {
@@ -86,9 +87,14 @@ export class SanityPage {
         this.streamCellButton = { role: 'cell', name: '01' };
         
         // Schema Pagination locators (sanity2 specific)
-        this.schemaNextPageButton = '[data-test="logs-page-fields-list-pagination-nextpage-button"]';
-        this.schemaPrevPageButton = '[data-test="logs-page-fields-list-pagination-previouspage-button"]';
-        this.schemaPaginationText = 'fast_rewind1/2fast_forward';
+        this.schemaLastPageButton = '[data-test="logs-page-fields-list-pagination-lastpage-button"]';
+        this.schemaFirstPageButton = '[data-test="logs-page-fields-list-pagination-firstpage-button"]';
+        this.schemaPage2Button = '[data-test="logs-page-fields-list-pagination-page-2-button"]';
+        this.schemaPage3Button = '[data-test="logs-page-fields-list-pagination-page-3-button"]';
+        this.schemaPage4Button = '[data-test="logs-page-fields-list-pagination-page-4-button"]';
+        this.schemaPaginationText = 'fast_rewind12fast_forward';
+        this.streamSelectDropdown = '[data-test="log-search-index-list-select-stream"]';
+        this.fieldsListContainer = '[data-test="log-search-index-list"]';
         
         // Advanced Histogram locators (sanity2 specific)
         this.histogramCanvas = '[data-test="logs-search-result-bar-chart"] canvas';
@@ -540,67 +546,154 @@ export class SanityPage {
     }
 
     // Schema Pagination Methods
+    async ingest70FieldsData() {
+        testLogger.step('Ingesting 70 fields data for schema pagination test');
+
+        const orgId = process.env["ORGNAME"];
+        const streamName = "e2e_automate";
+        const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
+
+        // Read the 70 fields JSON data
+        const fs = require('fs');
+        const path = require('path');
+        const data70Fields = JSON.parse(
+            fs.readFileSync(path.join(__dirname, '../../../test-data/70_fields.json'), 'utf8')
+        );
+
+        testLogger.debug(`Ingesting data with ${Object.keys(data70Fields[0]).length} fields`);
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        const fetchResponse = await fetch(
+            `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+            {
+                method: "POST",
+                headers: headers,
+                body: JSON.stringify(data70Fields),
+            }
+        );
+
+        try {
+            const response = await fetchResponse;
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                const jsonData = await response.json();
+                testLogger.info(`70 fields data ingestion status: ${response.status}`);
+            } else {
+                const textData = await response.text();
+                testLogger.warn(`Ingestion response is not JSON: ${textData}`);
+            }
+        } catch (error) {
+            testLogger.error(`Failed to parse JSON response: ${error.message}`);
+            throw error;
+        }
+
+        // Wait for data to be indexed using smart wait
+        await waitUtils.smartWait(this.page, 3000, 'data indexing after 70 fields ingestion');
+        testLogger.info('70 fields data ingestion completed');
+    }
+
     async displayPaginationForSchema() {
-        // First, ensure data is loaded by clicking the refresh button
+        testLogger.step('Testing schema pagination with 70 fields');
+
+        // Ingest 70 fields data first to ensure pagination is available
+        await this.ingest70FieldsData();
+
+        // Reload the page to load the new data
+        testLogger.debug('Reloading page to refresh schema');
+        await this.page.reload();
+        await this.page.waitForLoadState('domcontentloaded');
+        await this.page.waitForLoadState('networkidle');
+
+        // Select stream again after reload using existing locator
+        testLogger.debug('Selecting e2e_automate stream after reload');
+        const streamDropdown = this.page.locator(this.streamSelectDropdown);
+        await this.page.waitHelpers.waitForElementVisible(streamDropdown, {
+            description: 'stream select dropdown after reload'
+        });
+
+        await streamDropdown.click();
+        await waitUtils.smartWait(this.page, 1000, 'stream dropdown to open');
+
+        // Try to select e2e_automate stream
+        try {
+            await this.page.getByText('e2e_automate', { exact: true }).first().click({ timeout: 5000 });
+            testLogger.info('Stream e2e_automate selected successfully');
+        } catch (error) {
+            testLogger.warn('First stream selection method failed, trying toggle');
+            try {
+                await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] .q-toggle__inner').click({ timeout: 5000 });
+                testLogger.info('Stream selected via toggle');
+            } catch (toggleError) {
+                testLogger.warn('Stream selection failed after reload, continuing anyway');
+            }
+        }
+
+        // Wait for stream selection to complete
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+
+        // Ensure data is loaded by clicking the refresh button
+        testLogger.debug('Refreshing to load data with 70 fields');
         const refreshButton = this.page.locator(this.refreshButton);
-        await expect(refreshButton).toBeVisible({ timeout: 15000 });
-        await expect(refreshButton).toBeEnabled({ timeout: 10000 });
-        
-        try {
-            await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
-        } catch (error) {
-            console.warn('Refresh button click failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await refreshButton.click({ timeout: 10000 });
-            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
-        }
-        
-        // Wait and click on the pagination dropdown with error handling
-        try {
-            const paginationDropdown = this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down");
-            await expect(paginationDropdown).toBeVisible({ timeout: 15000 });
-            await paginationDropdown.click({ timeout: 10000 });
-        } catch (error) {
-            console.warn('Pagination dropdown click failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").click({ timeout: 10000 });
-        }
-        
-        // Click on schema pagination text with error handling
-        try {
-            const schemaPaginationText = this.page.getByText(this.schemaPaginationText);
-            await expect(schemaPaginationText).toBeVisible({ timeout: 15000 });
-            await schemaPaginationText.click({ timeout: 10000 });
-        } catch (error) {
-            console.warn('Schema pagination text click failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await this.page.getByText(this.schemaPaginationText).click({ timeout: 10000 });
-        }
-        
-        // Click next page button with error handling
-        try {
-            const nextPageButton = this.page.locator(this.schemaNextPageButton);
-            await expect(nextPageButton).toBeVisible({ timeout: 15000 });
-            await expect(nextPageButton).toBeEnabled({ timeout: 10000 });
-            await nextPageButton.click({ timeout: 10000 });
-        } catch (error) {
-            console.warn('Next page button click failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await this.page.locator(this.schemaNextPageButton).click({ timeout: 10000 });
-        }
-        
-        // Click previous page button with error handling
-        try {
-            const prevPageButton = this.page.locator(this.schemaPrevPageButton);
-            await expect(prevPageButton).toBeVisible({ timeout: 15000 });
-            await expect(prevPageButton).toBeEnabled({ timeout: 10000 });
-            await prevPageButton.click({ timeout: 10000 });
-        } catch (error) {
-            console.warn('Previous page button click failed, retrying:', error.message);
-            await this.page.waitForTimeout(2000);
-            await this.page.locator(this.schemaPrevPageButton).click({ timeout: 10000 });
-        }
+        await this.page.waitHelpers.waitForElementClickable(refreshButton, {
+            description: 'refresh button for schema pagination'
+        });
+
+        await refreshButton.click({ timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+
+        // Wait and click on the pagination dropdown
+        testLogger.debug('Opening logs results pagination dropdown');
+        const paginationDropdown = this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down");
+        await this.page.waitHelpers.waitForElementClickable(paginationDropdown, {
+            description: 'logs results pagination dropdown'
+        });
+        await paginationDropdown.click({ timeout: 10000 });
+
+        // Verify last page button is visible
+        testLogger.debug('Verifying schema last page button is visible');
+        const lastPageButton = this.page.locator(this.schemaLastPageButton);
+        await this.page.waitHelpers.waitForElementVisible(lastPageButton, {
+            description: 'schema pagination last page button'
+        });
+        testLogger.info('Schema last page button verified as visible');
+
+        // Click page 2 button
+        testLogger.debug('Navigating to page 2 of schema fields');
+        const page2Button = this.page.locator(this.schemaPage2Button);
+        await this.page.waitHelpers.waitForElementClickable(page2Button, {
+            description: 'schema pagination page 2 button'
+        });
+        await page2Button.click({ timeout: 10000 });
+
+        // Click page 3 button
+        testLogger.debug('Navigating to page 3 of schema fields');
+        const page3Button = this.page.locator(this.schemaPage3Button);
+        await this.page.waitHelpers.waitForElementClickable(page3Button, {
+            description: 'schema pagination page 3 button'
+        });
+        await page3Button.click({ timeout: 10000 });
+
+        // Click page 4 button
+        testLogger.debug('Navigating to page 4 of schema fields');
+        const page4Button = this.page.locator(this.schemaPage4Button);
+        await this.page.waitHelpers.waitForElementClickable(page4Button, {
+            description: 'schema pagination page 4 button'
+        });
+        await page4Button.click({ timeout: 10000 });
+
+        // Click first page button
+        testLogger.debug('Navigating back to first page of schema fields');
+        const firstPageButton = this.page.locator(this.schemaFirstPageButton);
+        await this.page.waitHelpers.waitForElementClickable(firstPageButton, {
+            description: 'schema pagination first page button'
+        });
+        await firstPageButton.click({ timeout: 10000 });
+
+        testLogger.info('Schema pagination test completed successfully');
     }
 
     // Advanced Histogram Methods

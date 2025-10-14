@@ -21,10 +21,14 @@ env:
   ZO_RESULT_CACHE_ENABLED: true
 
 jobs:
-  unit_tests:
+  backend_unit_tests:
     runs-on:
       labels: ubicloud-standard-8
+    permissions:
+      contents: read
 
+    # Note: Services always start regardless of conditional logic in steps.
+    # GitHub Actions does not support conditional services.
     services:
       postgres:
         image: postgres:17.5-alpine3.22
@@ -45,43 +49,56 @@ jobs:
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
-      - name: Check if API code has changes and skip if none
+      - name: Check if API code has changes
+        id: check_changes
         run: |
-          if [[ -n "${{ github.event.before }}" ]] && ! git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^src/"; then
-            echo "API code hasn't changed, skipping unit tests"
-            exit 0
+          if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qE '^src/|^Cargo\.(toml|lock)$'; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Setup Rust Toolchain
+        if: steps.check_changes.outputs.has_changes == 'true'
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2025-07-20
           targets: x86_64-unknown-linux-gnu
       - uses: taiki-e/install-action@v2
+        if: steps.check_changes.outputs.has_changes == 'true'
         with:
           tool: nextest
       - uses: Swatinem/rust-cache@v2
+        if: steps.check_changes.outputs.has_changes == 'true'
         with:
           cache-on-failure: true
       - name: Install Protoc
+        if: steps.check_changes.outputs.has_changes == 'true'
         uses: arduino/setup-protoc@v3
         with:
           version: "21.12"
 
       - name: Simulate building frontend code
+        if: steps.check_changes.outputs.has_changes == 'true'
         run: mkdir -p web/dist && touch web/dist/index.html
 
       - name: Print rustc cfg
+        if: steps.check_changes.outputs.has_changes == 'true'
         run: rustc -C target-cpu=native --print cfg
 
       - name: Check code formatting
+        if: steps.check_changes.outputs.has_changes == 'true'
         run: cargo fmt --all -- --check
 
       - name: Setup cargo config
+        if: steps.check_changes.outputs.has_changes == 'true'
         run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
 
       - name: Run unit tests
+        if: steps.check_changes.outputs.has_changes == 'true'
         run: |
           # required for all dbs
           export ZO_INTERNAL_GRPC_TOKEN=fake
@@ -98,7 +115,7 @@ jobs:
           rm -rf ./json
           rm -rf ./src/infra/data
 
-          # Run wih sqlite
+          # Run with sqlite
           echo "Running with sqlite"
           export ZO_META_STORE=sqlite
           export ZO_META_POSTGRES_DSN=""
@@ -119,30 +136,64 @@ jobs:
           ./coverage.sh check
 
   ui_unit_tests:
-    runs-on: ubuntu-latest
-    
+    runs-on:
+      labels: ubicloud-standard-8
+    permissions:
+      contents: read
+
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
-      - name: Check if frontend code has changes and skip if none
+      - name: Check if frontend code has changes
+        id: check_changes
         run: |
-          if [[ -n "${{ github.event.before }}" ]] && ! git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^web/"; then
-            echo "Frontend code hasn't changed, skipping frontend tests"
-            exit 0
+          if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -q "^web/"; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Setup Node.js
+        if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/setup-node@v5
         with:
-          node-version: '18'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
+        if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: web
         run: npm ci
 
       - name: Run frontend unit tests with coverage and check thresholds
+        if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: web
         run: ./coverage.sh check
+
+  unit_tests_summary:
+    runs-on: ubuntu-latest
+    permissions: {}
+    needs: [backend_unit_tests, ui_unit_tests]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.backend_unit_tests.result }}" == "success" ] || [ "${{ needs.backend_unit_tests.result }}" == "skipped" ]; then
+            echo "Backend tests passed or skipped"
+          else
+            echo "Backend tests failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.ui_unit_tests.result }}" == "success" ] || [ "${{ needs.ui_unit_tests.result }}" == "skipped" ]; then
+            echo "UI tests passed or skipped"
+          else
+            echo "UI tests failed"
+            exit 1
+          fi
+
+          echo "All tests completed successfully"
