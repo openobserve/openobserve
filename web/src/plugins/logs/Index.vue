@@ -107,11 +107,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else-if="
                       searchObj.data.errorMsg !== '' && searchObj.loading == false
                     "
-                    class="q-ma-lg"
+                    class="tw-justify-center"
                   >
                     <h5 class="text-center q-ma-none">
                       <div
                         data-test="logs-search-result-not-found-text"
+                        class=" q-pt-lg"
                         v-if="
                           searchObj.data.errorCode == 0 &&
                           searchObj.data.errorMsg == ''
@@ -125,11 +126,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                           @click="toggleErrorDetails"
                           size="sm"
+                          class="o2-secondary-button"
                           data-test="logs-page-result-error-details-btn-result-not-found"
                           >{{ t("search.functionErrorBtnLabel") }}</q-btn
                         >
                       </div>
-                      <div data-test="logs-search-error-message" v-else>
+                      <div data-test="logs-search-error-message" class=" q-pt-lg" v-else>
                         Error occurred while retrieving search events.
                         <q-btn
                           v-if="
@@ -138,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                           @click="toggleErrorDetails"
                           size="sm"
+                          class="o2-secondary-button"
                           data-test="logs-page-result-error-details-btn"
                           >{{ t("search.histogramErrorBtnLabel") }}</q-btn
                         >

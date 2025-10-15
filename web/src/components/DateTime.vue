@@ -1176,7 +1176,7 @@ export default defineComponent({
   }
 
   &:hover {
-    background: rgba(89, 96, 178, 0.3) !important;
+    background: var(--o2-hover-accent) !important;
   }
 }
 

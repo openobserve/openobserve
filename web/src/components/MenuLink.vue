@@ -192,7 +192,7 @@ export default defineComponent({
   // Phase 2: Enhanced hover state
   &:hover:not(.q-router-link--active) {
     transform: translateZ(0);
-    background-color: rgba(30, 41, 59, 0.6);
+    // background-color: rgba(30, 41, 59, 0.6);
 
     .q-icon {
       color: #cbd5e1;
@@ -207,17 +207,20 @@ export default defineComponent({
   &.q-router-link--active {
     transform: translateZ(0) !important;
     // Rich, vibrant multi-layer gradient background
-    background:
-      linear-gradient(135deg, rgba(168, 85, 247, 0.4) 0%, rgba(236, 72, 153, 0.35) 100%),
-      linear-gradient(180deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.25) 100%) !important;
-    // Stronger border with glow
-    border: 1px solid rgba(168, 85, 247, 0.6) !important;
-    // Minimal shadow for subtle depth
-    box-shadow:
-      0 0 8px rgba(168, 85, 247, 0.2),
-      0 2px 8px rgba(168, 85, 247, 0.25),
-      inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
-    color: white !important;
+    // background:
+    //   linear-gradient(135deg, rgba(168, 85, 247, 0.4) 0%, rgba(236, 72, 153, 0.35) 100%),
+    //   linear-gradient(180deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.25) 100%) !important;
+    // // Stronger border with glow
+    // border: 1px solid rgba(168, 85, 247, 0.6) !important;
+    // // Minimal shadow for subtle depth
+    // box-shadow:
+    //   0 0 8px rgba(168, 85, 247, 0.2),
+    //   0 2px 8px rgba(168, 85, 247, 0.25),
+    //   inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+    background: linear-gradient(135deg, var(--o2-menu-gradient-start) 0%, var(--o2-menu-gradient-end) 100%) !important;
+    border: 1px solid rgba(89, 155, 174, 0.6) !important;
+    box-shadow: 0 4px 12px rgba(89, 155, 174, 0.09) !important;
+    color: var(--o2-theme-color) !important;
     transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
     // Subtle inner highlight for depth
     position: relative;
@@ -226,12 +229,12 @@ export default defineComponent({
     .q-icon {
       // Minimal icon glow
       filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.4));
-      color: #e9d5ff; // Lighter purple for better visibility
+      color: var(--o2-theme-color); // Lighter purple for better visibility
     }
 
     .q-item-label {
       font-weight: 700;
-      color: #f3e8ff; // Very light purple/white for contrast
+      color: var(--o2-theme-color); // Very light purple/white for contrast
       text-shadow: 0 0 4px rgba(168, 85, 247, 0.3);
     }
 
@@ -245,7 +248,7 @@ export default defineComponent({
       top: 50%;
       transform: translateY(-50%);
       // Brighter gradient
-      background: linear-gradient(180deg, #c084fc 0%, #a855f7 50%, #9333ea 100%);
+      background: linear-gradient(180deg, var(--o2-theme-color) 0%, var(--o2-theme-color) 50%, var(--o2-theme-color) 100%);
       border-radius: 0 2px 2px 0;
       // Minimal glow
       box-shadow:
@@ -348,20 +351,20 @@ body.body--light {
       background: linear-gradient(135deg, rgba(89, 155, 174, 0.04) 0%, rgba(89, 155, 174, 0.08) 100%) !important;
       border: 1px solid rgba(89, 155, 174, 0.6) !important;
       box-shadow: 0 4px 12px rgba(89, 155, 174, 0.09) !important;
-      color: #2563eb !important;
+      color: var(--o2-menu-color) !important;
 
       :deep(.q-icon) {
-        color: #2563eb !important;
+        color: var(--o2-menu-color) !important;
         filter: drop-shadow(0 0 8px rgba(37, 99, 235, 0.5)) !important;
       }
 
       :deep(.q-item-label) {
-        color: #2563eb !important;
+        color: var(--o2-menu-color) !important;
         font-weight: 700 !important;
       }
 
       &::before {
-        background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%) !important;
+        background: linear-gradient(180deg, var(--o2-body-primary-bg) 0%, var(--o2-body-secondary-bg) 100%) !important;
         box-shadow: 0 0 8px rgba(37, 99, 235, 0.5) !important;
       }
     }
