@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="btnRefreshInterval"
       border
       no-caps
-      class="q-pa-xs refresh-interval-dropdown"
+      class="q-pa-xs refresh-interval-dropdown element-box-shadow"
       content-style="z-index: 10001"
     >
       <template v-slot:label>

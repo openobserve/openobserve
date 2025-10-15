@@ -56,6 +56,7 @@
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "lodash-es": "^4.17.21",
+    "lucide-vue-next": "^0.545.0",
     "luxon": "^3.5.0",
     "marked": "^15.0.11",
     "moment": "^2.30.1",

@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       id="date-time-button"
       ref="datetimeBtn"
       data-cy="date-time-button"
-      outline
       no-caps
       :label="getDisplayValue"
       icon="schedule"
@@ -1159,7 +1158,7 @@ export default defineComponent({
   padding: 0px 5px;
   font-size: 12px;
   min-width: auto;
-  background: rgba(89, 96, 178, 0.2) !important;
+  border: 0.0625rem solid rgba(0, 0, 0, 0.12);
 
   .q-icon.on-right {
     transition: transform 0.25s ease;
