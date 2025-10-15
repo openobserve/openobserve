@@ -181,13 +181,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 tokio::time::sleep(tokio::time::Duration::from_secs(10 * 60)).await;
             }
         });
-
-        o2_enterprise::enterprise::license::start_license_check(
-            crate::service::self_reporting::search::get_usage,
-            LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role(),
-        )
-        .await;
-        tokio::task::spawn(async move { db::license::watch().await });
     }
 
     // Router doesn't need to initialize job
@@ -371,6 +364,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
 /// Additional jobs that init processes should be deferred until the gRPC service
 /// starts in the main thread
 pub async fn init_deferred() -> Result<(), anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::license::start_license_check(
+            crate::service::self_reporting::search::get_usage,
+            LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role(),
+        )
+        .await;
+        tokio::task::spawn(async move { db::license::watch().await });
+    }
+
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {
         return Ok(());
     }

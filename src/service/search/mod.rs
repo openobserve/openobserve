@@ -1489,7 +1489,7 @@ pub fn check_search_allowed() -> Result<(), Error> {
         // this is installation level limit for all orgs combined
         if !o2_enterprise::enterprise::license::search_allowed() {
             Err(Error::Message(
-                "installation has exceeded its search quota".to_string(),
+                "This installation has exceeded its data ingestion limit".to_string(),
             ))
         } else {
             Ok(())
