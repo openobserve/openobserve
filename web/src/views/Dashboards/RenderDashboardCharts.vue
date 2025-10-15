@@ -728,6 +728,9 @@ export default defineComponent({
 
     let needsVariablesAutoUpdate = true;
 
+    // Track last global values to detect changes
+    const lastGlobalValues = ref<Record<string, any>>({});
+
     const variablesDataUpdated = (data: any) => {
       try {
         // update the variables data
@@ -740,37 +743,56 @@ export default defineComponent({
           currentVariablesDataRef.value = { __global: variablesData.value };
         }
 
-        // Extract values and update merged state (create new object to trigger reactivity)
-        const updatedValues: Record<string, any> = {
-          ...mergedVariablesValues.value,
-        };
+        // Extract current values from data.values that are GLOBAL level (_isCurrentLevel !== false)
+        const currentGlobalValues: Record<string, any> = {};
         if (data?.values) {
           data.values.forEach((v: any) => {
-            if (v.name && v.value !== undefined) {
-              updatedValues[v.name] = v.value;
+            // Only include global variables (those that are current level in global config)
+            if (v.name && v.value !== undefined && v._isCurrentLevel !== false) {
+              currentGlobalValues[v.name] = v.value;
             }
           });
         }
-        mergedVariablesValues.value = updatedValues;
 
-        console.log(
-          "[Global Variables Updated]",
-          Object.keys(mergedVariablesValues.value),
-        );
+        // Check if this is first load or if values actually changed
+        const isFirstLoad = !globalVariablesLoaded.value;
+        let hasActualChanges = false;
 
-        // Mark global as loaded and trigger tab load if exists
-        if (!globalVariablesLoaded.value) {
+        if (!isFirstLoad) {
+          // Compare with last values to detect actual changes
+          hasActualChanges = Object.keys(currentGlobalValues).some(
+            (key) =>
+              JSON.stringify(currentGlobalValues[key]) !==
+              JSON.stringify(lastGlobalValues.value[key])
+          );
+        }
+
+        // Update merged state only if values changed or first load
+        if (isFirstLoad || hasActualChanges) {
+          const updatedValues: Record<string, any> = {
+            ...mergedVariablesValues.value,
+            ...currentGlobalValues,
+          };
+          mergedVariablesValues.value = updatedValues;
+          lastGlobalValues.value = { ...currentGlobalValues };
+
+          console.log(
+            "[Global Variables Updated]",
+            isFirstLoad ? "(First Load)" : "(Value Changed)",
+            Object.keys(currentGlobalValues),
+          );
+        } else {
+          console.log(
+            "[Global Variables] No changes detected, skipping cascade",
+          );
+          return;
+        }
+
+        // Mark global as loaded and trigger tab load ONLY on first load
+        if (isFirstLoad) {
           globalVariablesLoaded.value = true;
           console.log(
             "[Global Variables] First load complete, triggering tab load",
-          );
-          console.log(
-            "[Global Variables] Tab ref exists:",
-            !!tabVariablesValueSelectorRef.value,
-          );
-          console.log(
-            "[Global Variables] Active tab variables:",
-            activeTabVariables.value,
           );
 
           nextTick(() => {
@@ -812,22 +834,59 @@ export default defineComponent({
     // Track if tab variables are loaded
     const tabVariablesReady = ref(false);
 
+    // Track last tab values to detect changes
+    const lastTabValues = ref<Record<string, any>>({});
+
     // Handler for tab variables data updates
     const tabVariablesDataUpdated = (data: any) => {
       console.log("[Tab Variables Updated]");
 
-      // Extract values and update merged state (create new object to trigger reactivity)
-      const updatedValues: Record<string, any> = {
-        ...mergedVariablesValues.value,
-      };
+      // Extract current tab values (only TAB level variables with _isCurrentLevel === true)
+      const currentTabValues: Record<string, any> = {};
       if (data?.values) {
         data.values.forEach((v: any) => {
-          if (v.name && v.value !== undefined) {
-            updatedValues[v.name] = v.value;
+          // Only include tab-level variables (those marked as current level)
+          if (v.name && v.value !== undefined && v._isCurrentLevel === true) {
+            currentTabValues[v.name] = v.value;
           }
         });
       }
-      mergedVariablesValues.value = updatedValues;
+
+      // Check if this is first load or if values actually changed
+      const isFirstLoad = !tabVariablesReady.value;
+      let hasActualChanges = false;
+
+      if (!isFirstLoad) {
+        // Compare with last values to detect actual changes
+        hasActualChanges = Object.keys(currentTabValues).some(
+          (key) =>
+            JSON.stringify(currentTabValues[key]) !==
+            JSON.stringify(lastTabValues.value[key])
+        );
+      }
+
+      // Update merged state only if values changed or first load
+      if (isFirstLoad || hasActualChanges) {
+        const updatedValues: Record<string, any> = {
+          ...mergedVariablesValues.value,
+          ...currentTabValues,
+        };
+        mergedVariablesValues.value = updatedValues;
+        lastTabValues.value = { ...currentTabValues };
+
+        console.log(
+          "[Tab Variables]",
+          isFirstLoad ? "(First Load)" : "(Value Changed)",
+          Object.keys(currentTabValues),
+        );
+      } else {
+        console.log(
+          "[Tab Variables] No changes detected, skipping panel cascade",
+        );
+        // Still mark as ready but don't trigger cascades
+        tabVariablesReady.value = true;
+        return;
+      }
 
       // Also update the main variablesData
       variablesData.value = {
@@ -835,17 +894,9 @@ export default defineComponent({
         ...data,
       };
 
-      // Mark tab variables as ready and trigger panel loads
-      const wasNotReady = !tabVariablesReady.value;
-      tabVariablesReady.value = true;
-
-      console.log(
-        "[Tab Variables] Merged values:",
-        Object.keys(mergedVariablesValues.value),
-      );
-
-      // If this is the first time tab is ready, trigger visible panels to load
-      if (wasNotReady) {
+      // Mark tab variables as ready and trigger panel loads ONLY on first load
+      if (isFirstLoad) {
+        tabVariablesReady.value = true;
         console.log(
           "[Tab Variables] First load complete, triggering visible panel loads",
         );
@@ -857,22 +908,61 @@ export default defineComponent({
       }
     };
 
+    // Track last panel values to detect changes
+    const lastPanelValues = ref<Record<string, Record<string, any>>>({});
+
     // Handler for panel variables data updates
     const panelVariablesDataUpdated = (data: any, panelId: string) => {
       console.log(`[Panel Variables Updated - ${panelId}]`);
 
-      // Extract values and update merged state (create new object to trigger reactivity)
-      const updatedValues: Record<string, any> = {
-        ...mergedVariablesValues.value,
-      };
+      // Extract current panel values (only PANEL level variables with _isCurrentLevel === true)
+      const currentPanelValues: Record<string, any> = {};
       if (data?.values) {
         data.values.forEach((v: any) => {
-          if (v.name && v.value !== undefined) {
-            updatedValues[v.name] = v.value;
+          // Only include panel-level variables (those marked as current level)
+          if (v.name && v.value !== undefined && v._isCurrentLevel === true) {
+            currentPanelValues[v.name] = v.value;
           }
         });
       }
-      mergedVariablesValues.value = updatedValues;
+
+      // Check if this is first load or if values actually changed
+      const isFirstLoad = !lastPanelValues.value[panelId];
+      let hasActualChanges = false;
+
+      if (!isFirstLoad) {
+        // Compare with last values to detect actual changes
+        hasActualChanges = Object.keys(currentPanelValues).some(
+          (key) =>
+            JSON.stringify(currentPanelValues[key]) !==
+            JSON.stringify(lastPanelValues.value[panelId]?.[key])
+        );
+      }
+
+      // Update merged state only if values changed or first load
+      if (isFirstLoad || hasActualChanges) {
+        const updatedValues: Record<string, any> = {
+          ...mergedVariablesValues.value,
+          ...currentPanelValues,
+        };
+        mergedVariablesValues.value = updatedValues;
+
+        if (!lastPanelValues.value[panelId]) {
+          lastPanelValues.value[panelId] = {};
+        }
+        lastPanelValues.value[panelId] = { ...currentPanelValues };
+
+        console.log(
+          `[Panel ${panelId}]`,
+          isFirstLoad ? "(First Load)" : "(Value Changed)",
+          Object.keys(currentPanelValues),
+        );
+      } else {
+        console.log(
+          `[Panel ${panelId}] No changes detected, skipping updates`,
+        );
+        return;
+      }
 
       // Also update the main variablesData
       variablesData.value = {
@@ -1323,12 +1413,25 @@ export default defineComponent({
         // Reset state for new tab
         tabVariablesReady.value = false;
         panelVariablesLoaded.value.clear();
+        lastTabValues.value = {}; // Reset tab value tracking
+        lastPanelValues.value = {}; // Reset panel value tracking
 
         // If no tab variables, mark as ready immediately
         nextTick(() => {
           if (activeTabVariables.value.length === 0) {
             console.log("[Tab Variables] No tab variables, marking as ready");
             tabVariablesReady.value = true;
+
+            // Trigger panel loads if no tab variables
+            nextTick(() => {
+              visiblePanels.value.forEach((panelId) => {
+                console.log(
+                  "[Tab Change] Triggering panel load (no tab vars):",
+                  panelId,
+                );
+                loadPanelVariablesIfVisible(panelId);
+              });
+            });
           }
         });
       }
