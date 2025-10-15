@@ -25,6 +25,9 @@ env:
   WS_ZO_BASE_URL: ws://localhost:5080/
   ZO_SMTP_ENABLED: true
   ZO_CREATE_ORG_THROUGH_INGESTION: true
+  # Utf8View regression test environment variables
+  ZO_FEATURE_JOIN_MATCH_ONE_ENABLED: true
+  ZO_UTF8_VIEW_ENABLED: true
 
 jobs:
   api_integration_tests:
