@@ -254,7 +254,7 @@ pub fn is_default_query_limit_exceeded(num_rows: usize, sql: &Sql) -> bool {
     }
 }
 
-pub fn is_cachable_function_error(function_error: &[String]) -> bool {
+pub fn is_permissable_function_error(function_error: &[String]) -> bool {
     if function_error.is_empty() {
         return true;
     }
@@ -276,39 +276,39 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_is_cachable_function_error() {
+    fn test_is_permissable_function_error() {
         let error = vec![];
-        assert_eq!(is_cachable_function_error(&error), true);
+        assert_eq!(is_permissable_function_error(&error), true);
 
         let error = vec!["".to_string()];
-        assert_eq!(is_cachable_function_error(&error), true);
+        assert_eq!(is_permissable_function_error(&error), true);
 
         let error = vec![
             CAPPED_RESULTS_MSG.to_string(),
             PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
         ];
-        assert_eq!(is_cachable_function_error(&error), true); // only this is cachable
+        assert_eq!(is_permissable_function_error(&error), true); // only this is cachable
 
         let error = vec![
             CAPPED_RESULTS_MSG.to_string(),
             PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
             "parquet not found".to_string(),
         ];
-        assert_eq!(is_cachable_function_error(&error), false);
+        assert_eq!(is_permissable_function_error(&error), false);
 
         let error = vec![
             "parquet not found".to_string(),
             PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
         ];
-        assert_eq!(is_cachable_function_error(&error), false);
+        assert_eq!(is_permissable_function_error(&error), false);
 
         let error = vec!["parquet not found".to_string()];
-        assert_eq!(is_cachable_function_error(&error), false);
+        assert_eq!(is_permissable_function_error(&error), false);
 
         let error = vec![
             "parquet not found".to_string(),
             CAPPED_RESULTS_MSG.to_string(),
         ];
-        assert_eq!(is_cachable_function_error(&error), false);
+        assert_eq!(is_permissable_function_error(&error), false);
     }
 }
