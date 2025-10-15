@@ -1651,21 +1651,21 @@ export default defineComponent({
         }
 
         .q-item__label {
-          color: white;
+          color: var(--o2-theme-color);
 
           // Light mode: make text blue for readability
           body.body--light & {
-            color: #2563eb !important;
+            color: var(--o2-menu-color) !important;
           }
         }
         color: white;
 
         // Light mode: make item text blue
         body.body--light & {
-          color: #2563eb !important;
+          color: var(--o2-menu-color) !important;
 
           .q-icon {
-            color: #2563eb !important;
+            color: var(--o2-menu-color) !important;
           }
         }
       }
