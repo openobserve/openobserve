@@ -37,6 +37,7 @@ pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta
 pub async fn get_enrichment_table_data(
     org_id: &str,
     name: &str,
+    _apply_primary_region_if_specified: bool,
 ) -> Result<Vec<serde_json::Value>, anyhow::Error> {
     let start_time = get_start_time(org_id, name).await;
     let end_time = now_micros();
@@ -49,10 +50,27 @@ pub async fn get_enrichment_table_data(
         ..Default::default()
     };
 
+    #[cfg(feature = "enterprise")]
+    let regions = {
+        use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+        let config = get_o2_config();
+        let enrichment_table_region = config.super_cluster.enrichment_table_get_region.clone();
+        if _apply_primary_region_if_specified
+            && config.super_cluster.enabled
+            && !enrichment_table_region.is_empty()
+        {
+            vec![enrichment_table_region]
+        } else {
+            vec![]
+        }
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let regions = vec![];
+
     let req = config::meta::search::Request {
         query,
         encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
+        regions,
         clusters: vec![],
         timeout: 0,
         search_type: None,
@@ -69,66 +87,17 @@ pub async fn get_enrichment_table_data(
     // do search
     match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
         Ok(res) => {
-            if !res.hits.is_empty() {
-                log::info!(
-                    "get enrichment table {org_id}/{name} data success with hits: {}",
-                    res.hits.len()
-                );
-                Ok(res.hits)
-            } else {
-                log::info!("get enrichment table {org_id}/{name} data success with no hits",);
-                Ok(vec![])
-            }
+            log::info!(
+                "get enrichment table {org_id}/{name} data success with hits: {}",
+                res.hits.len()
+            );
+            Ok(res.hits)
         }
         Err(err) => {
             log::error!("get enrichment table {org_id}/{name} data error: {err}",);
             Err(anyhow::anyhow!(
                 "get enrichment table {org_id}/{name} error: {err}"
             ))
-        }
-    }
-}
-
-pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-    let start_time = get_start_time(org_id, name).await;
-    let end_time = now_micros();
-
-    let query = config::meta::search::Query {
-        sql: format!("SELECT * FROM \"{name}\""),
-        start_time,
-        end_time,
-        size: -1, // -1 means no limit, enrichment table should not be limited
-        ..Default::default()
-    };
-
-    let req = config::meta::search::Request {
-        query,
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: None,
-        search_event_context: None,
-        use_cache: false,
-        local_mode: Some(true),
-    };
-    log::debug!(
-        "get enrichment table {} data req start time: {}",
-        name,
-        start_time
-    );
-    // do search
-    match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
-        Ok(res) => {
-            if !res.hits.is_empty() {
-                Ok(res.hits.iter().map(convert_to_vrl).collect())
-            } else {
-                Ok(vec![])
-            }
-        }
-        Err(err) => {
-            log::error!("get enrichment table data error: {:?}", err);
-            Ok(vec![])
         }
     }
 }
@@ -338,16 +307,24 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let org_id = keys[0];
                 let stream_name = keys[2];
 
-                let data = match super::super::enrichment::get_enrichment_table(org_id, stream_name)
-                    .await
+                let data = match super::super::enrichment::get_enrichment_table(
+                    org_id,
+                    stream_name,
+                    false,
+                )
+                .await
                 {
                     Ok(data) => data,
                     Err(e) => {
                         log::error!(
                             "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error, trying again: {e}"
                         );
-                        match super::super::enrichment::get_enrichment_table(org_id, stream_name)
-                            .await
+                        match super::super::enrichment::get_enrichment_table(
+                            org_id,
+                            stream_name,
+                            false,
+                        )
+                        .await
                         {
                             Ok(data) => data,
                             Err(e) => {

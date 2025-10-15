@@ -179,12 +179,19 @@ fn get_data(
 // static METADATA_CACHE: Lazy<Arc<RwLock<HashMap<String, EnrichmentTableMetadata>>>> =
 //     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
-/// Retrieve enrichment table data
+/// Retrieve enrichment table data.
+///
+/// Be careful with `apply_primary_region_if_specified` boolean. If this value is true and the
+/// primary region is specified, this will fetch enrichment table data only from the specified
+/// primary region and will ignore the other regions. Ideally only for cache_enrichment_table
+/// function used when starting a node, it should be used.
 pub async fn get_enrichment_table(
     org_id: &str,
     table_name: &str,
+    apply_primary_region_if_specified: bool,
 ) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-    let records = get_enrichment_table_json(org_id, table_name).await?;
+    let records =
+        get_enrichment_table_json(org_id, table_name, apply_primary_region_if_specified).await?;
 
     Ok(records
         .iter()
@@ -195,6 +202,7 @@ pub async fn get_enrichment_table(
 pub async fn get_enrichment_table_json(
     org_id: &str,
     table_name: &str,
+    apply_primary_region_if_specified: bool,
 ) -> Result<Vec<serde_json::Value>, anyhow::Error> {
     log::debug!("get_enrichment_table_json: {org_id}/{table_name}");
     let mut records = vec![];
@@ -207,9 +215,12 @@ pub async fn get_enrichment_table_json(
 
     if (db_stats.end_time > local_stats_last_updated) || local_stats_last_updated == 0 {
         log::info!("get_enrichment_table_json: fetching from remote: {org_id}/{table_name}");
-        let data =
-            crate::service::db::enrichment_table::get_enrichment_table_data(org_id, table_name)
-                .await?;
+        let data = crate::service::db::enrichment_table::get_enrichment_table_data(
+            org_id,
+            table_name,
+            apply_primary_region_if_specified,
+        )
+        .await?;
         records.extend(data);
     } else {
         // fetch from local cache and put into records
@@ -238,6 +249,9 @@ pub async fn get_enrichment_table_json(
     storage::local::store_data_if_needed_background(org_id, table_name, &records, last_updated_at)
         .await?;
 
-    log::debug!("get_enrichment_table_json: fetched from {org_id}/{table_name}");
+    log::info!(
+        "get_enrichment_table_json: fetched from {org_id}/{table_name}, number of records: {}",
+        records.len()
+    );
     Ok(records)
 }
