@@ -153,7 +153,7 @@ def test_subquery_with_substr_function(execute_search_query, query_timeframe, va
     Query: SELECT _timestamp, kubernetes_container_name FROM stream_pytest_data 
            WHERE kubernetes_container_name IN (
                SELECT kubernetes_container_name FROM stream_pytest_data 
-               WHERE substr(kubernetes_container_name, 0, 2) = 'p'
+               WHERE substr(kubernetes_container_name, 0, 2) = 'ap'
            )
     
     Expected: SUCCESS on fixed environments, Utf8View error on buggy environments
@@ -166,26 +166,26 @@ def test_subquery_with_substr_function(execute_search_query, query_timeframe, va
         WHERE kubernetes_container_name IN (
             SELECT kubernetes_container_name 
             FROM "stream_pytest_data" 
-            WHERE substr(kubernetes_container_name, 0, 2) = 'p'
+            WHERE substr(kubernetes_container_name, 0, 2) = 'ap'
         )
     """
     
     response = execute_search_query(sql_query, start_time, end_time)
     
-    def validate_prometheus_containers(hits, test_name):
-        """Validate that all containers start with 'p' (prometheus)."""
+    def validate_apiserver_containers(hits, test_name):
+        """Validate that all containers start with 'ap' (api-server)."""
         for i, hit in enumerate(hits):
             container_name = hit["kubernetes_container_name"]
-            assert container_name.startswith('p'), (
-                f"Hit {i}: container '{container_name}' should start with 'p'"
+            assert container_name.startswith('ap'), (
+                f"Hit {i}: container '{container_name}' should start with 'ap'"
             )
-        logging.info(f"{test_name}: Validated {len(hits)} prometheus containers")
+        logging.info(f"{test_name}: Validated {len(hits)} api-server containers")
     
     validate_query_response(
         response,
         ["_timestamp", "kubernetes_container_name"],
         "Subquery with substr",
-        validate_prometheus_containers
+        validate_apiserver_containers
     )
 
 
@@ -242,7 +242,7 @@ def test_subquery_with_concat_function(execute_search_query, query_timeframe):
         WHERE CONCAT(kubernetes_container_name, '|', kubernetes_namespace_name) IN (
             SELECT CONCAT(kubernetes_container_name, '|', kubernetes_namespace_name)
             FROM "stream_pytest_data"
-            WHERE substr(kubernetes_container_name, 0, 2) = 'p'
+            WHERE substr(kubernetes_container_name, 0, 2) = 'ap'
         )
         LIMIT 10
     """
@@ -261,8 +261,8 @@ def test_subquery_with_concat_function(execute_search_query, query_timeframe):
         
         for i, hit in enumerate(hits):
             container_name = hit["kubernetes_container_name"]
-            assert container_name.startswith('p'), (
-                f"Hit {i}: container '{container_name}' should start with 'p'"
+            assert container_name.startswith('ap'), (
+                f"Hit {i}: container '{container_name}' should start with 'ap'"
             )
 
 
@@ -342,7 +342,7 @@ def test_substr_without_subquery(execute_search_query, query_timeframe):
         SELECT _timestamp, kubernetes_container_name,
                substr(kubernetes_container_name, 0, 2) AS container_prefix
         FROM "stream_pytest_data"
-        WHERE substr(kubernetes_container_name, 0, 2) = 'p'
+        WHERE substr(kubernetes_container_name, 0, 2) = 'ap'
         LIMIT 10
     """
     
@@ -358,11 +358,11 @@ def test_substr_without_subquery(execute_search_query, query_timeframe):
     for i, hit in enumerate(hits):
         container_name = hit["kubernetes_container_name"]
         container_prefix = hit["container_prefix"]
-        assert container_name.startswith('p'), (
-            f"Hit {i}: container '{container_name}' should start with 'p'"
+        assert container_name.startswith('ap'), (
+            f"Hit {i}: container '{container_name}' should start with 'ap'"
         )
-        assert container_prefix == 'p', (
-            f"Hit {i}: container_prefix should be 'p', got '{container_prefix}'"
+        assert container_prefix == 'ap', (
+            f"Hit {i}: container_prefix should be 'ap', got '{container_prefix}'"
         )
 
 
@@ -393,13 +393,13 @@ def test_data_availability(execute_search_query, query_timeframe):
     
     if len(hits) > 0:
         container_names = [hit["kubernetes_container_name"] for hit in hits]
-        containers_with_p = [name for name in container_names if name.startswith('p')]
+        containers_with_ap = [name for name in container_names if name.startswith('ap')]
         
         logging.info(f"Available containers: {container_names}")
-        logging.info(f"Containers starting with 'p': {containers_with_p}")
+        logging.info(f"Containers starting with 'ap': {containers_with_ap}")
         
-        if len(containers_with_p) == 0:
-            pytest.skip("No containers starting with 'p' found - other tests may return empty results")
+        if len(containers_with_ap) == 0:
+            pytest.skip("No containers starting with 'ap' found - other tests may return empty results")
 
 
 """
