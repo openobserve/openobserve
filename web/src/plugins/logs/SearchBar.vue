@@ -4309,7 +4309,7 @@ export default defineComponent({
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 0.0625rem solid rgba(0, 0, 0, 0.12); // 1px
+  border: 0.0625rem solid var(--o2-border-color); // 1px
   border-radius: 0.375rem; // 6px
   transition: all 0.2s ease;
   cursor: pointer;
