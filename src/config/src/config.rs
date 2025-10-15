@@ -473,7 +473,6 @@ pub struct Config {
     pub health_check: HealthCheck,
     pub encryption: Encryption,
     pub enrichment_table: EnrichmentTable,
-    pub re_pattern: RePattern,
 }
 
 #[derive(EnvConfig, Default)]
@@ -2074,16 +2073,6 @@ pub struct EnrichmentTable {
     pub merge_interval: u64,
 }
 
-#[derive(EnvConfig, Default)]
-pub struct RePattern {
-    #[env_config(
-        name = "ZO_RE_PATTERN_HASH_LENGTH",
-        default = 12,
-        help = "Length of hash prefix for pattern hashing (minimum 12, maximum 64 characters)"
-    )]
-    pub hash_length: usize,
-}
-
 pub fn init() -> Config {
     if let Err(e) = load_config() {
         log::error!("Failed to load config {e}");
@@ -2175,11 +2164,6 @@ pub fn init() -> Config {
     // check inverted index config
     if let Err(e) = check_inverted_index_config(&mut cfg) {
         panic!("inverted index config error: {e}");
-    }
-
-    // check re_pattern config
-    if let Err(e) = check_re_pattern_config(&mut cfg) {
-        panic!("re_pattern config error: {e}");
     }
 
     cfg
@@ -3009,23 +2993,6 @@ fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.inverted_index_max_token_length == 0 {
         cfg.limit.inverted_index_max_token_length = 64;
-    }
-    Ok(())
-}
-
-fn check_re_pattern_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    // Ensure hash_length is within valid range (minimum 12, maximum 64)
-    if cfg.re_pattern.hash_length < 12 {
-        return Err(anyhow::anyhow!(
-            "ZO_RE_PATTERN_HASH_LENGTH must be at least 12 characters (configured: {})",
-            cfg.re_pattern.hash_length
-        ));
-    }
-    if cfg.re_pattern.hash_length > 64 {
-        return Err(anyhow::anyhow!(
-            "ZO_RE_PATTERN_HASH_LENGTH must be at most 64 characters (configured: {})",
-            cfg.re_pattern.hash_length
-        ));
     }
     Ok(())
 }

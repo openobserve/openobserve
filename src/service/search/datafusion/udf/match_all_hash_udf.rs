@@ -42,7 +42,9 @@ pub(crate) static MATCH_ALL_HASH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
 /// match_all_hash function for datafusion
 /// This is a placeholder that returns an error because match_all_hash doesn't support
 /// SQL with multiple streams. The actual matching is done by the query optimizer.
-pub fn match_all_hash_expr_impl(_args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarValue> {
+pub fn match_all_hash_expr_impl(
+    _args: &[ColumnarValue],
+) -> datafusion::error::Result<ColumnarValue> {
     Err(DataFusionError::Internal(
         "match_all_hash function don't support sql with multiple streams".to_string(),
     ))
@@ -63,7 +65,10 @@ mod tests {
         // Test that the UDF has the correct signature (accepts one string argument)
         let signature = MATCH_ALL_HASH_UDF.signature();
         // Just verify the signature exists
-        assert_eq!(signature.volatility, datafusion::logical_expr::Volatility::Immutable);
+        assert_eq!(
+            signature.volatility,
+            datafusion::logical_expr::Volatility::Immutable
+        );
     }
 
     #[test]
