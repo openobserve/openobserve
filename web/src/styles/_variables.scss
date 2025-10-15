@@ -254,6 +254,13 @@ $menu-border-color: rgba(89, 155, 174, 0.6);
 $actions-column-box-shawdow: rgba(0, 0, 0, 0.1);
 $actions-column-box-shawdow-dark: rgba(125, 125, 125, 0.694);
 
+$body-primary-bg: rgba(89, 155, 174, 0.01);
+$body-secondary-bg: rgba(89, 155, 174, 0.4);
+
+$menu-gradient-start: rgba(89, 155, 174, 0.04);
+$menu-gradient-end: rgba(89, 155, 174, 0.08);
+$menu-border-color: rgba(89, 155, 174, 0.6);
+
 // Semantic Colors - Light Mode
 :root {
   --o2-theme-mode: #{$theme-mode};
