@@ -585,8 +585,11 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
 
     // fill data
     for (key, tbl) in tables {
+        // Only use the primary region if specified to fetch enrichment table data assuming only the
+        // primary region contains the data.
         let data =
-            super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name).await?;
+            super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name, true)
+                .await?;
         ENRICHMENT_TABLES.insert(
             key,
             StreamTable {
