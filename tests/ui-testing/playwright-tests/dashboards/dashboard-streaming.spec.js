@@ -279,18 +279,8 @@ test.describe("dashboard streaming testcases", () => {
       "ziox"
     );
 
-    // Using a polling approach to wait until we receive exactly 3 API calls
-    await page.waitForFunction(
-      (expectedCount) => {
-        // This function runs in browser context, so we can't access valuesResponses directly
-        // We'll use a timeout-based approach instead
-        return true;
-      },
-      3,
-      { timeout: 50 }
-    ).catch(() => {});
-
-    // await page.waitForTimeout(3000);
+    // Wait for all 3 dependent variables to load their values via API calls
+    await pm.dashboardVariables.waitForDependentVariablesToLoad(valuesResponses, 3);
 
     // Assert that exactly 3 values API calls are made (one for each dependent variable)
     expect(valuesResponses.length).toBe(3);
