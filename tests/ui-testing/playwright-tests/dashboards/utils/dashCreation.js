@@ -42,7 +42,7 @@ export async function deleteDashboard(page, dashboardName) {
 
   // Wait for page to be fully loaded
   await page.waitForLoadState('networkidle');
-  await page.waitForTimeout(5000);
+  // await page.waitForTimeout(5000);
 
   // const dashboardRow = page.locator(`//tr[.//td[text()="${dashboardName}"]]`);
   // await expect(dashboardRow).toBeVisible(); // Ensure the row is visible
