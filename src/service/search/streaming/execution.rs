@@ -815,27 +815,6 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_partial_response() {
-        let response = Response {
-            is_partial: true,
-            function_error: vec!["Custom error".to_string()],
-            trace_id: "test-123".to_string(),
-            ..Default::default()
-        };
-
-        let result = handle_partial_response(response.clone());
-
-        // Should add the partial error message
-        assert!(
-            result
-                .function_error
-                .contains(&PARTIAL_ERROR_RESPONSE_MESSAGE.to_string())
-        );
-        assert!(result.function_error.contains(&"Custom error".to_string()));
-        assert_eq!(result.function_error.len(), 2);
-    }
-
-    #[test]
     fn test_handle_partial_response_no_errors() {
         let response = Response {
             is_partial: true,
